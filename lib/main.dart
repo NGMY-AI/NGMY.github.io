@@ -695,6 +695,10 @@ class _NGMYAppState extends State<NGMYApp> {
                     }
                   });
                   debugPrint('[ResetPW] Local state synced. Total users=${_allUsers.length}');
+                  
+                  // Force a save to local storage immediately
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
                 } catch (e) {
                   debugPrint('[ResetPW] error: $e');
                   _isSyncing = false;
@@ -708,12 +712,11 @@ class _NGMYAppState extends State<NGMYApp> {
               final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
               final email = e.toLowerCase().trim();
               
-              if (isLogin) {
+      if (isLogin) {
                 final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
                 if (index != -1) {
-                  if (_allUsers[index].passwordHash.isEmpty) {
-                    _allUsers[index].passwordHash = passwordHash;
-                  }
+                  // Ensure local password hash is updated if it was empty or different (e.g., after reset)
+                  _allUsers[index].passwordHash = passwordHash;
                   setState(() => _currentUser = _allUsers[index]); 
                 }
               } else {
