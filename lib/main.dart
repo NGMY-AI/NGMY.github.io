@@ -2,13 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 void main() async {
@@ -28,6 +31,23 @@ String _hashPassword(String password) {
   return sha256.convert(bytes).toString();
 }
 
+class DateSlashFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final buf = StringBuffer();
+    for (int i = 0; i < digits.length && i < 8; i++) {
+      if (i == 2 || i == 4) buf.write('/');
+      buf.write(digits[i]);
+    }
+    final text = buf.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
 String formatCurrency(double amount) {
   String str = amount.toStringAsFixed(2);
   List<String> parts = str.split('.');
@@ -36,7 +56,7 @@ String formatCurrency(double amount) {
   return parts.join('.');
 }
 
-enum TransactionType { deposit, withdrawal, adminAdd, adminRemove, reimbursement }
+enum TransactionType { deposit, withdrawal, adminAdd, adminRemove, reimbursement, contribution, claim }
 enum TransactionStatus { pending, approved, rejected }
 enum PaymentMethod { cashApp, bitcoin, system }
 
@@ -97,6 +117,18 @@ class AppConfig {
   String privacyPolicy;
   String loanPhone;
   String loanHowItWorks;
+  String geminiApiKey;
+  String logoUrl;
+  List<String> cities;
+  List<String> rooms;
+  bool helpModeActive;
+  String helpPurpose;
+  String helpCashApp;
+  String helpZelle;
+  String helpPhone;
+  String helpScopeType; // all, city, room
+  String helpScopeValue;
+
   AppConfig({
     this.officialCashApp = 'NGMYpay',
     this.officialBitcoin = 'bc1q...',
@@ -104,6 +136,17 @@ class AppConfig {
     this.privacyPolicy = 'We value your privacy. We collect data only to...',
     this.loanPhone = '706-623-7963',
     this.loanHowItWorks = '1. Submit your loan application with collateral details\n2. Your application will be reviewed within a few hours\n3. If approved, the loan amount will be credited to your account\n4. Make payments over 2 months (total repayment: loan + 36% interest)\n5. Upon full repayment, your collateral is released',
+    this.geminiApiKey = '',
+    this.logoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
+    this.cities = const ['Stone Mountain', 'Atlanta', 'Savannah'],
+    this.rooms = const ["Room M'minji", 'VIP Room', 'Main Lobby'],
+    this.helpModeActive = false,
+    this.helpPurpose = '',
+    this.helpCashApp = '',
+    this.helpZelle = '',
+    this.helpPhone = '',
+    this.helpScopeType = 'all',
+    this.helpScopeValue = '',
   });
   Map<String, dynamic> toJson() => {
     'officialCashApp': officialCashApp,
@@ -112,6 +155,17 @@ class AppConfig {
     'privacyPolicy': privacyPolicy,
     'loanPhone': loanPhone,
     'loanHowItWorks': loanHowItWorks,
+    'geminiApiKey': geminiApiKey,
+    'logoUrl': logoUrl,
+    'cities': cities,
+    'rooms': rooms,
+    'helpModeActive': helpModeActive,
+    'helpPurpose': helpPurpose,
+    'helpCashApp': helpCashApp,
+    'helpZelle': helpZelle,
+    'helpPhone': helpPhone,
+    'helpScopeType': helpScopeType,
+    'helpScopeValue': helpScopeValue,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
@@ -120,6 +174,17 @@ class AppConfig {
     privacyPolicy: json['privacyPolicy'] ?? 'We value your privacy. We collect data only to...',
     loanPhone: json['loanPhone'] ?? '706-623-7963',
     loanHowItWorks: json['loanHowItWorks'] ?? '1. Submit your loan application with collateral details\n2. Your application will be reviewed within a few hours\n3. If approved, the loan amount will be credited to your account\n4. Make payments over 2 months (total repayment: loan + 36% interest)\n5. Upon full repayment, your collateral is released',
+    geminiApiKey: json['geminiApiKey'] ?? '',
+    logoUrl: json['logoUrl'] ?? 'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
+    cities: List<String>.from(json['cities'] ?? ['Stone Mountain', 'Atlanta', 'Savannah']),
+    rooms: List<String>.from(json['rooms'] ?? ["Room M'minji", 'VIP Room', 'Main Lobby']),
+    helpModeActive: json['helpModeActive'] ?? false,
+    helpPurpose: json['helpPurpose'] ?? '',
+    helpCashApp: json['helpCashApp'] ?? '',
+    helpZelle: json['helpZelle'] ?? '',
+    helpPhone: json['helpPhone'] ?? '',
+    helpScopeType: json['helpScopeType'] ?? 'all',
+    helpScopeValue: json['helpScopeValue'] ?? '',
   );
 }
 
@@ -220,7 +285,19 @@ class UserData {
   bool isAuthorizedRegistrar;
   DateTime? lastClockInDate;
   String passwordHash;
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.lastClockInDate, this.passwordHash = ''});
+  String state;
+  int helps;
+  int missed;
+  bool isEnrolledInRegistry;
+  String? fullName;
+  String? dob;
+  String? idType;
+  String? registryId;
+  String? homeAddress;
+  String? city;
+  String? room;
+
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.lastClockInDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room});
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
     if (activeInvestment!.daysLeft <= 0) return 0.0;
@@ -240,7 +317,7 @@ class UserData {
     double earnings = (totalDaily / 24.0) * (elapsed.inSeconds / 3600.0);
     return earnings > totalDaily ? totalDaily : earnings;
   }
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -279,7 +356,18 @@ class UserData {
       profilePicturePath: json['profilePicturePath'], 
       isAuthorizedRegistrar: json['isAuthorizedRegistrar'] ?? false, 
       lastClockInDate: parseDate(json['lastClockInDate']),
-      passwordHash: json['passwordHash'] ?? ''
+      passwordHash: json['passwordHash'] ?? '',
+      state: json['state'] ?? 'Georgia',
+      helps: json['helps'] ?? 0,
+      missed: json['missed'] ?? 0,
+      isEnrolledInRegistry: json['isEnrolledInRegistry'] ?? false,
+      fullName: json['fullName'],
+      dob: json['dob'],
+      idType: json['idType'],
+      registryId: json['registryId'],
+      homeAddress: json['homeAddress'],
+      city: json['city'],
+      room: json['room'],
     );
   }
 }
@@ -312,6 +400,8 @@ class _NGMYAppState extends State<NGMYApp> {
   RealtimeChannel? _usersChannel;
   RealtimeChannel? _transactionsChannel;
   RealtimeChannel? _mediaChannel;
+  RealtimeChannel? _announcementsChannel;
+  RealtimeChannel? _configChannel;
   StreamSubscription<AuthState>? _authSub;
   bool _isSyncing = false;
 
@@ -328,6 +418,7 @@ class _NGMYAppState extends State<NGMYApp> {
     try { _transactionsChannel?.unsubscribe(); } catch (_) {}
     try { _mediaChannel?.unsubscribe(); } catch (_) {}
     try { _announcementsChannel?.unsubscribe(); } catch (_) {}
+    try { _configChannel?.unsubscribe(); } catch (_) {}
     try { _authSub?.cancel(); } catch (_) {}
     super.dispose();
   }
@@ -416,6 +507,16 @@ class _NGMYAppState extends State<NGMYApp> {
             callback: (payload) => _onAnnouncementsChange(payload),
           )
           .subscribe();
+
+      _configChannel = supabase
+          .channel('public:config')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'config',
+            callback: (payload) => _onConfigChange(payload),
+          )
+          .subscribe();
       debugPrint('Realtime subscriptions active');
     } catch (e) {
       debugPrint('Realtime subscribe error: $e');
@@ -442,6 +543,18 @@ class _NGMYAppState extends State<NGMYApp> {
       }
     } catch (e) {
       debugPrint('Announcements realtime apply error: $e');
+    }
+  }
+
+  void _onConfigChange(PostgresChangePayload payload) {
+    if (_isSyncing) return;
+    try {
+      if (payload.eventType != PostgresChangeEvent.delete) {
+        final newCfg = AppConfig.fromJson(payload.newRecord);
+        setState(() => _config = newCfg);
+      }
+    } catch (e) {
+      debugPrint('Config realtime apply error: $e');
     }
   }
 
@@ -581,6 +694,11 @@ class _NGMYAppState extends State<NGMYApp> {
         if (annData != null) {
           _allAnnouncements = (annData as List).map((e) => Announcement.fromJson(e)).toList();
         }
+
+        final configData = await supabase.from('config').select().maybeSingle();
+        if (configData != null) {
+          _config = AppConfig.fromJson(configData);
+        }
       } catch (e) {
         debugPrint("Supabase Load Error: $e. Falling back to local.");
         final uLocal = safeGet('all_users');
@@ -691,6 +809,12 @@ class _NGMYAppState extends State<NGMYApp> {
         }
       }
 
+      try {
+        await supabase.from('config').upsert({'id': 1, ..._config.toJson()});
+      } catch (e) {
+        debugPrint("Config sync error: $e");
+      }
+
       await prefs.setString('all_transactions', jsonEncode(_allTransactions.map((e) => e.toJson()).toList()));
       await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
       await prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
@@ -714,6 +838,7 @@ class _NGMYAppState extends State<NGMYApp> {
       home: _currentUser == null
           ? AuthScreen(
               allUsers: _allUsers,
+              config: _config,
               onGoogleLogin: () async {
                 try {
                   final launched = await supabase.auth.signInWithOAuth(
@@ -815,7 +940,21 @@ class _NGMYAppState extends State<NGMYApp> {
                 setState(() => _currentUser = null); 
               },
               onDataChanged: () => _saveData(),
-              onAddTransaction: (t) { setState(() => _allTransactions.add(t)); _saveData(); },
+              onAddTransaction: (t) { 
+                setState(() {
+                  _allTransactions.add(t);
+                  final userTrans = _allTransactions.where((tx) => tx.userEmail == t.userEmail).toList();
+                  if (userTrans.length > 30) {
+                    userTrans.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                    final toRemove = userTrans.take(userTrans.length - 30).toList();
+                    for (var old in toRemove) {
+                      _allTransactions.removeWhere((tx) => tx.id == old.id);
+                      supabase.from('transactions').delete().eq('id', old.id).then((_) {}).catchError((_) {});
+                    }
+                  }
+                }); 
+                _saveData(); 
+              },
               onProcessTransaction: (t, approve) { setState(() {
                 t.status = approve ? TransactionStatus.approved : TransactionStatus.rejected;
                 final targetIndex = _allUsers.indexWhere((u) => u.email == t.userEmail);
@@ -854,10 +993,11 @@ class FloatingTitle extends StatelessWidget {
 
 class AuthScreen extends StatefulWidget {
   final List<UserData> allUsers;
+  final AppConfig config;
   final Function(String, String, String, String, bool) onAuthComplete;
   final Future<String?> Function() onGoogleLogin;
   final Future<bool> Function(String email, String newPasswordHash) onResetPasswordByEmail;
-  const AuthScreen({super.key, required this.onAuthComplete, required this.allUsers, required this.onGoogleLogin, required this.onResetPasswordByEmail});
+  const AuthScreen({super.key, required this.onAuthComplete, required this.allUsers, required this.onGoogleLogin, required this.onResetPasswordByEmail, required this.config});
   @override State<AuthScreen> createState() => _AuthScreenState();
 }
 class _AuthScreenState extends State<AuthScreen> {
@@ -1135,38 +1275,45 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   @override Widget build(BuildContext context) {
-    return Scaffold(body: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(30), child: Column(children: [
-      const Icon(Icons.blur_on_rounded, size: 80, color: Color(0xFF6200EE)),
-      const SizedBox(height: 20), Text(_isLogin ? 'Login to NGMY' : 'Create Account', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 40),
+    return Scaffold(body: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(35), child: Column(children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: Image.network(
+          widget.config.logoUrl,
+          width: 110, height: 110,
+          errorBuilder: (c, e, s) => const Icon(Icons.blur_on_rounded, size: 80, color: Color(0xFF6200EE)),
+        ),
+      ),
+      const SizedBox(height: 25), Text(_isLogin ? 'Login to NGMY' : 'Create Account', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+      const SizedBox(height: 45),
       if (!_isLogin) ...[
-        TextField(controller: _u, decoration: InputDecoration(labelText: 'Username', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
+        TextField(controller: _u, decoration: InputDecoration(labelText: 'Username', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
         const SizedBox(height: 20),
       ],
-      TextField(controller: _e, decoration: InputDecoration(labelText: 'Gmail Address', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
+      TextField(controller: _e, decoration: InputDecoration(labelText: 'Gmail Address', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
       if (!_isLogin) ...[
         const SizedBox(height: 20), 
-        TextField(controller: _p, decoration: InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
+        TextField(controller: _p, decoration: InputDecoration(labelText: 'Phone Number', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
       ],
       const SizedBox(height: 20),
-      TextField(controller: _s, obscureText: true, decoration: InputDecoration(labelText: 'Password', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
-      const SizedBox(height: 30),
+      TextField(controller: _s, obscureText: true, decoration: InputDecoration(labelText: 'Password', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
+      const SizedBox(height: 35),
       ElevatedButton(
         onPressed: _submit, 
-        style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white), 
-        child: Text(_isLogin ? 'LOGIN' : 'SIGN UP')
+        style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, elevation: 5), 
+        child: Text(_isLogin ? 'LOGIN' : 'SIGN UP', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
       ),
       if (_isLogin) ...[
-        const SizedBox(height: 12),
+        const SizedBox(height: 15),
         OutlinedButton.icon(
           onPressed: () async {
             final err = await widget.onGoogleLogin();
             if (!mounted || err == null) return;
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
           },
-          icon: const Icon(Icons.g_mobiledata_rounded, size: 24),
-          label: const Text('Continue with Google'),
-          style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+          icon: const Icon(Icons.g_mobiledata_rounded, size: 30),
+          label: const Text('Continue with Google', style: TextStyle(fontWeight: FontWeight.w600)),
+          style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
         ),
       ],
       if (_isLogin)
@@ -1286,6 +1433,7 @@ class _MainScreenState extends State<MainScreen> {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Insufficient balance to buy this plan!')));
           return;
         }
+        final now = DateTime.now();
         setState(() {
           widget.user.accountBalance -= cost;
           // When buying a plan, we create a fresh ActiveInvestment instance to reset progress.
@@ -1294,28 +1442,39 @@ class _MainScreenState extends State<MainScreen> {
             name: n, 
             amount: p, 
             dailyROI: r, 
-            purchaseDate: DateTime.now(),
+            purchaseDate: now,
             daysClockedIn: 0,
             totalEarned: 0.0
           );
+          final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == widget.user.email.toLowerCase().trim());
+          if (idx != -1) {
+            widget.allUsers[idx] = widget.user;
+          }
         });
         if (cost > 0) {
           widget.onAddTransaction(AppTransaction(
-            id: DateTime.now().toString(),
+            id: now.toString(),
             userEmail: widget.user.email,
             amount: cost,
             type: TransactionType.adminRemove,
             method: PaymentMethod.system,
             sourceDetails: 'Investment plan purchase/upgrade: $n',
             status: TransactionStatus.approved,
-            timestamp: DateTime.now(),
+            timestamp: now,
           ));
         }
         widget.onDataChanged();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully purchased $n!')));
       }),
-      WalletScreen(user: widget.user, transactions: sorted.where((t) => t.userEmail == widget.user.email).toList(), onAdd: widget.onAddTransaction, config: widget.config, onDataChanged: widget.onDataChanged),
-      NgmyHubScreen(user: widget.user),
+      WalletScreen(user: widget.user, transactions: sorted.where((t) => t.userEmail == widget.user.email).take(30).toList(), onAdd: widget.onAddTransaction, config: widget.config, onDataChanged: widget.onDataChanged),
+      NgmyHubScreen(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        allTransactions: sorted,
+        onAddTransaction: widget.onAddTransaction,
+        onDataChanged: widget.onDataChanged,
+        config: widget.config,
+      ),
       MediaHubScreen(user: widget.user, allMedia: widget.allMedia, onPost: widget.onPostMedia),
       StatsScreen(user: widget.user, transactions: sorted),
       ProfileScreen(user: widget.user, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged),
@@ -1328,7 +1487,32 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
   Widget _nav(int i, IconData icon) => IconButton(onPressed: () => setState(() => _idx = i), icon: Icon(icon, color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey, size: 28));
-  Widget _navC(int i) => GestureDetector(onTap: () => setState(() => _idx = i), child: Transform.translate(offset: const Offset(0, -10), child: Container(width: 60, height: 60, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]), shape: BoxShape.circle, boxShadow: [BoxShadow(color: const Color(0xFF6200EE).withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))], border: Border.all(color: _idx == i ? Colors.white : Colors.transparent, width: 2)), child: const Center(child: Text('NGMY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10))))));
+  Widget _navC(int i) => GestureDetector(
+    onTap: () => setState(() => _idx = i), 
+    child: Transform.translate(
+      offset: const Offset(0, -10), 
+      child: Container(
+        width: 60, height: 60, 
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]), 
+          shape: BoxShape.circle, 
+          boxShadow: [BoxShadow(color: const Color(0xFF6200EE).withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))], 
+          border: Border.all(color: _idx == i ? Colors.white : Colors.transparent, width: 2)
+        ), 
+        child: Center(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: Image.network(
+              widget.config.logoUrl,
+              width: 40, height: 40,
+              fit: BoxFit.cover,
+              errorBuilder: (c, e, s) => const Text('NGMY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+            ),
+          )
+        )
+      )
+    )
+  );
 }
 
 class HomeScreen extends StatefulWidget {
@@ -1385,7 +1569,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
                 trailing: IconButton(
                   icon: const Icon(Icons.campaign_rounded, color: Colors.orangeAccent), 
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => AnnouncementScreen(user: widget.user, announcements: widget.allAnnouncements))),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => AnnouncementScreen(user: widget.user, announcements: widget.allAnnouncements, config: widget.config))),
                 ),
               ),
               const SizedBox(height: 20),
@@ -1673,6 +1857,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return '${diff.inDays}d ago';
   }
 
+  String _localClock(DateTime t) {
+    final d = t.isUtc ? t.toLocal() : t;
+    final hour12 = d.hour == 0 ? 12 : (d.hour > 12 ? d.hour - 12 : d.hour);
+    final minute = d.minute.toString().padLeft(2, '0');
+    final ampm = d.hour >= 12 ? 'PM' : 'AM';
+    return '$hour12:$minute $ampm';
+  }
+
   Widget _live(BuildContext ctx) {
     final recent = widget.allTransactions
         .where((t) =>
@@ -1779,6 +1971,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             const SizedBox(width: 8),
                             Text(
                               _timeAgo(t.timestamp),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 10, color: Colors.grey),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text('•', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                            const SizedBox(width: 6),
+                            Text(
+                              _localClock(t.timestamp),
                               textAlign: TextAlign.center,
                               style: const TextStyle(fontSize: 10, color: Colors.grey),
                             ),
@@ -1954,6 +2154,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final titleC = TextEditingController();
     final msgC = TextEditingController();
     final imgC = TextEditingController();
+    final apiC = TextEditingController(text: widget.config.geminiApiKey);
+    final logoC = TextEditingController(text: widget.config.logoUrl);
 
     showModalBottomSheet(
       context: context,
@@ -1961,65 +2163,132 @@ class _AdminDashboardState extends State<AdminDashboard> {
       backgroundColor: Colors.transparent,
       builder: (c) => StatefulBuilder(builder: (ctx, setST) {
         return Container(
-          height: MediaQuery.of(context).size.height * 0.85,
+          height: MediaQuery.of(context).size.height * 0.9,
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF0F111A) : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
           ),
-          padding: const EdgeInsets.all(25),
+          padding: const EdgeInsets.fromLTRB(25, 10, 25, 25),
           child: Column(
             children: [
               Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10))),
-              const SizedBox(height: 20),
-              const Text('Announcement Manager', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder())),
-              const SizedBox(height: 10),
-              TextField(controller: msgC, maxLines: 3, decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder())),
-              const SizedBox(height: 10),
-              TextField(controller: imgC, decoration: const InputDecoration(labelText: 'Image URL (Optional)', border: OutlineInputBorder())),
               const SizedBox(height: 15),
-              ElevatedButton(
-                onPressed: () {
-                  if (titleC.text.isEmpty || msgC.text.isEmpty) return;
-                  final ann = Announcement(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    title: titleC.text,
-                    message: msgC.text,
-                    imageUrl: imgC.text.isEmpty ? null : imgC.text,
-                    timestamp: DateTime.now(),
-                  );
-                  widget.onAddAnnouncement(ann);
-                  titleC.clear(); msgC.clear(); imgC.clear();
-                  setST(() {});
-                },
-                style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: Colors.orange),
-                child: const Text('POST ANNOUNCEMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(height: 20),
-              const Divider(),
-              const SizedBox(height: 10),
-              const Align(alignment: Alignment.centerLeft, child: Text('ACTIVE ANNOUNCEMENTS', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold))),
-              const SizedBox(height: 10),
+              const Text('Management Hub', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 15),
+              
               Expanded(
-                child: ListView.builder(
-                  itemCount: widget.allAnnouncements.length,
-                  itemBuilder: (ctx, i) {
-                    final a = widget.allAnnouncements[i];
-                    return Card(
-                      child: ListTile(
-                        title: Text(a.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(a.message, maxLines: 2, overflow: TextOverflow.ellipsis),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () {
-                            widget.onDeleteAnnouncement(a.id);
-                            setST(() {});
-                          },
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // Logo & API Configuration Section
+                      Container(
+                        padding: const EdgeInsets.all(15),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                        ),
+                        child: Column(
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.settings_suggest_rounded, color: Colors.blue, size: 20),
+                                SizedBox(width: 10),
+                                Text('App Configuration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              ],
+                            ),
+                            const SizedBox(height: 15),
+                            TextField(
+                              controller: logoC,
+                              decoration: const InputDecoration(
+                                labelText: 'App Logo URL',
+                                hintText: 'Paste image link here',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: apiC,
+                              decoration: const InputDecoration(
+                                labelText: 'Gemini API Key',
+                                hintText: 'Paste AI key here',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                            const SizedBox(height: 15),
+                            ElevatedButton(
+                              onPressed: () {
+                                widget.config.logoUrl = logoC.text.trim();
+                                widget.config.geminiApiKey = apiC.text.trim();
+                                widget.onDataChanged();
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Configuration Updated Successfully')));
+                                setState(() {}); // Refresh local UI if needed
+                              },
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                              child: const Text('SAVE GLOBAL SETTINGS', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  },
+                      const SizedBox(height: 25),
+                      const Divider(),
+                      const SizedBox(height: 15),
+                      
+                      const Align(alignment: Alignment.centerLeft, child: Text('CREATE ANNOUNCEMENT', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold))),
+                      const SizedBox(height: 15),
+                      TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder())),
+                      const SizedBox(height: 10),
+                      TextField(controller: msgC, maxLines: 3, decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder())),
+                      const SizedBox(height: 10),
+                      TextField(controller: imgC, decoration: const InputDecoration(labelText: 'Image URL (Optional)', border: OutlineInputBorder())),
+                      const SizedBox(height: 15),
+                      ElevatedButton(
+                        onPressed: () {
+                          if (titleC.text.isEmpty || msgC.text.isEmpty) return;
+                          final ann = Announcement(
+                            id: DateTime.now().millisecondsSinceEpoch.toString(),
+                            title: titleC.text,
+                            message: msgC.text,
+                            imageUrl: imgC.text.isEmpty ? null : imgC.text,
+                            timestamp: DateTime.now(),
+                          );
+                          widget.onAddAnnouncement(ann);
+                          titleC.clear(); msgC.clear(); imgC.clear();
+                          setST(() {});
+                        },
+                        style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: Colors.orange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                        child: const Text('POST ANNOUNCEMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(height: 25),
+                      const Divider(),
+                      const SizedBox(height: 15),
+                      const Align(alignment: Alignment.centerLeft, child: Text('ACTIVE ANNOUNCEMENTS', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold))),
+                      const SizedBox(height: 10),
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: widget.allAnnouncements.length,
+                        itemBuilder: (ctx, i) {
+                          final a = widget.allAnnouncements[i];
+                          return Card(
+                            child: ListTile(
+                              title: Text(a.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(a.message, maxLines: 2, overflow: TextOverflow.ellipsis),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () {
+                                  widget.onDeleteAnnouncement(a.id);
+                                  setST(() {});
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -2508,6 +2777,8 @@ class _WalletScreenState extends State<WalletScreen> {
             TransactionType.adminAdd => 'Admin Credit',
             TransactionType.adminRemove => 'Investment/Purchase',
             TransactionType.reimbursement => 'Reimbursement',
+            TransactionType.contribution => 'Contribution',
+            TransactionType.claim => 'Claim',
           };
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -2607,17 +2878,19 @@ class SubmitPaymentPage extends StatefulWidget {
   const SubmitPaymentPage({super.key, required this.user, required this.amount, required this.onAdd, required this.config});
   @override State<SubmitPaymentPage> createState() => _SubmitPaymentPageState();
 }
-class _SubmitPaymentPageState extends State<SubmitPaymentPage> {
+class _SubmitPaymentPageState extends State<SubmitPaymentPage> with SingleTickerProviderStateMixin {
   PaymentMethod _method = PaymentMethod.cashApp; final _tag = TextEditingController(); File? _shot; late String _vCode;
+  bool _isPressed = false;
+
   @override void initState() { super.initState(); _vCode = (10000 + math.Random().nextInt(89999)).toString(); }
 
   @override Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Submit Payment Request', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), centerTitle: true),
       body: SingleChildScrollView(padding: const EdgeInsets.all(20), child: Column(children: [
-        Container(width: double.infinity, padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.green.withOpacity(0.05), border: Border.all(color: Colors.green.withOpacity(0.2)), borderRadius: BorderRadius.circular(15)), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Amount:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)), Text('\$${formatCurrency(widget.amount)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.green))])),
+        Container(width: double.infinity, padding: const EdgeInsets.all(25), decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.green.withOpacity(0.1), Colors.green.withOpacity(0.02)]), border: Border.all(color: Colors.green.withOpacity(0.2)), borderRadius: BorderRadius.circular(30)), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Amount:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 14)), Text('\$${formatCurrency(widget.amount)}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.green))])),
         const SizedBox(height: 30),
-        const Align(alignment: Alignment.centerLeft, child: Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey))),
+        const Align(alignment: Alignment.centerLeft, child: Padding(padding: EdgeInsets.only(left: 10), child: Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)))),
         const SizedBox(height: 15),
         Row(children: [
           Expanded(child: _payOpt(PaymentMethod.cashApp, Icons.attach_money, 'Cash App')),
@@ -2626,42 +2899,137 @@ class _SubmitPaymentPageState extends State<SubmitPaymentPage> {
         ]),
         const SizedBox(height: 25),
         _instCard(),
-        const SizedBox(height: 20),
-        TextField(controller: _tag, decoration: InputDecoration(labelText: _method == PaymentMethod.cashApp ? 'Your Cash App Tag' : 'Your BTC Wallet', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)), hintText: _method == PaymentMethod.cashApp ? 'Starts with \$' : ''), onChanged: (v) { if (_method == PaymentMethod.cashApp && !v.startsWith('\$')) _tag.text = '\$$v'; }),
+        const SizedBox(height: 25),
+        TextField(controller: _tag, decoration: InputDecoration(labelText: _method == PaymentMethod.cashApp ? 'Your Cash App Tag' : 'Your BTC Wallet', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide(color: Colors.grey.withOpacity(0.1))), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: const BorderSide(color: Colors.green, width: 2)), hintText: _method == PaymentMethod.cashApp ? 'Starts with \$' : ''), onChanged: (v) { if (_method == PaymentMethod.cashApp && !v.startsWith('\$')) _tag.text = '\$$v'; }),
         const SizedBox(height: 25),
         _codeBox(),
         const SizedBox(height: 25),
-        GestureDetector(onTap: () async { final img = await ImagePicker().pickImage(source: ImageSource.gallery); if (img != null) setState(() => _shot = File(img.path)); }, child: Container(width: double.infinity, padding: const EdgeInsets.all(25), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), border: Border.all(color: Colors.blue.withOpacity(0.3), style: BorderStyle.solid), borderRadius: BorderRadius.circular(20)), child: Column(children: [const Icon(Icons.cloud_upload_outlined, color: Colors.blue, size: 35), const SizedBox(height: 10), Text(_shot == null ? 'Click to upload payment screenshot' : 'Screenshot Attached!', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)), const Text('PNG, JPG (Required)', style: TextStyle(fontSize: 9, color: Colors.grey))]))),
+        GestureDetector(onTap: () async { final img = await ImagePicker().pickImage(source: ImageSource.gallery); if (img != null) setState(() => _shot = File(img.path)); }, child: Container(width: double.infinity, padding: const EdgeInsets.all(30), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), border: Border.all(color: Colors.blue.withOpacity(0.3), style: BorderStyle.solid), borderRadius: BorderRadius.circular(30)), child: Column(children: [const Icon(Icons.cloud_upload_outlined, color: Colors.blue, size: 40), const SizedBox(height: 12), Text(_shot == null ? 'Click to upload payment screenshot' : 'Screenshot Attached!', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue)), const Text('PNG, JPG (Required)', style: TextStyle(fontSize: 10, color: Colors.grey))]))),
         const SizedBox(height: 20),
-        Container(padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(15)), child: const Text('Your request is being processed. Once verified, your funds will be credited to your account.', style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-        const SizedBox(height: 30),
+        Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(25), border: Border.all(color: Colors.amber.withOpacity(0.2))), child: const Text('Your request is being processed. Once verified, your funds will be credited to your account.', style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+        const SizedBox(height: 35),
         Row(children: [
-          Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), style: OutlinedButton.styleFrom(minimumSize: const Size(0, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), child: const Text('Cancel'))),
+          Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), style: OutlinedButton.styleFrom(minimumSize: const Size(0, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))), child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)))),
           const SizedBox(width: 15),
           Expanded(child: ElevatedButton(onPressed: () {
-            if (_shot == null || _tag.text.isEmpty) return;
+            if (_shot == null || _tag.text.isEmpty) {
+               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please upload screenshot and enter your handle')));
+               return;
+            }
             String t = _tag.text; if (_method == PaymentMethod.cashApp && !t.startsWith('\$')) t = '\$$t';
             widget.onAdd(AppTransaction(id: DateTime.now().toString(), userEmail: widget.user.email, amount: widget.amount, type: TransactionType.deposit, method: _method, sourceDetails: t, screenshotPath: _shot!.path, verificationCode: _vCode, timestamp: DateTime.now()));
             Navigator.pop(context);
-          }, style: ElevatedButton.styleFrom(minimumSize: const Size(0, 55), backgroundColor: Colors.green, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), child: const Text('Submit'))),
+          }, style: ElevatedButton.styleFrom(minimumSize: const Size(0, 60), backgroundColor: Colors.green, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), elevation: 4), child: const Text('Submit Request', style: TextStyle(fontWeight: FontWeight.bold)))),
         ]),
-        const SizedBox(height: 50),
+        const SizedBox(height: 60),
       ])),
     );
   }
 
   Widget _payOpt(PaymentMethod m, IconData i, String l) {
     bool sel = _method == m;
-    return GestureDetector(onTap: () => setState(() => _method = m), child: Container(padding: const EdgeInsets.symmetric(vertical: 20), decoration: BoxDecoration(color: sel ? Colors.green.withOpacity(0.1) : Colors.transparent, border: Border.all(color: sel ? Colors.green : Colors.grey.shade300, width: 2), borderRadius: BorderRadius.circular(15)), child: Column(children: [Icon(i, color: sel ? Colors.green : Colors.grey, size: 30), const SizedBox(height: 8), Text(l, style: TextStyle(fontWeight: FontWeight.bold, color: sel ? Colors.green : Colors.grey, fontSize: 13))])));
+    return GestureDetector(onTap: () => setState(() => _method = m), child: AnimatedContainer(duration: const Duration(milliseconds: 300), padding: const EdgeInsets.symmetric(vertical: 20), decoration: BoxDecoration(color: sel ? Colors.green.withOpacity(0.15) : Theme.of(context).cardColor, border: Border.all(color: sel ? Colors.green : Colors.grey.withOpacity(0.2), width: 2), borderRadius: BorderRadius.circular(25), boxShadow: sel ? [BoxShadow(color: Colors.green.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5))] : []), child: Column(children: [Icon(i, color: sel ? Colors.green : Colors.grey, size: 32), const SizedBox(height: 10), Text(l, style: TextStyle(fontWeight: FontWeight.bold, color: sel ? Colors.green : Colors.grey, fontSize: 14))])));
   }
 
   Widget _instCard() {
     String addr = _method == PaymentMethod.cashApp ? widget.config.officialCashApp : widget.config.officialBitcoin;
-    return Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.grey.withOpacity(0.05), borderRadius: BorderRadius.circular(15)), child: Column(children: [
-      Row(children: [Icon(_method == PaymentMethod.cashApp ? Icons.attach_money : Icons.currency_bitcoin, color: Colors.green, size: 18), const SizedBox(width: 10), Text(_method == PaymentMethod.cashApp ? 'Our Cash App Tag' : 'Our BTC Address', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12))]),
-      const SizedBox(height: 15),
-      Container(padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12), decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade200), borderRadius: BorderRadius.circular(10)), child: Row(children: [Expanded(child: Text(addr, style: const TextStyle(fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.bold))), IconButton(icon: const Icon(Icons.copy, size: 16), onPressed: () => Clipboard.setData(ClipboardData(text: addr)))]))
-    ]));
+    bool isCashApp = _method == PaymentMethod.cashApp;
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(25), 
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.08), 
+        borderRadius: BorderRadius.circular(35),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+      ), 
+      child: Column(children: [
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(isCashApp ? Icons.attach_money : Icons.currency_bitcoin, color: Colors.green, size: 20), 
+          const SizedBox(width: 8), 
+          Text(isCashApp ? 'Our Cash App Tag' : 'Our BTC Address', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5))
+        ]),
+        const SizedBox(height: 20),
+        GestureDetector(
+          onTapDown: (_) => setState(() => _isPressed = true),
+          onTapUp: (_) => setState(() => _isPressed = false),
+          onTapCancel: () => setState(() => _isPressed = false),
+          onTap: () async {
+            Uri? url;
+            if (isCashApp) {
+              final tag = addr.startsWith('\$') ? addr.substring(1) : addr;
+              url = Uri.parse('https://cash.app/\$$tag');
+            } else {
+              url = Uri.parse('bitcoin:$addr');
+            }
+            HapticFeedback.mediumImpact();
+            if (await canLaunchUrl(url)) {
+              await launchUrl(url, mode: LaunchMode.externalApplication);
+            } else {
+              Clipboard.setData(ClipboardData(text: addr));
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
+            }
+          },
+          child: AnimatedScale(
+            scale: _isPressed ? 0.95 : 1.0,
+            duration: const Duration(milliseconds: 100),
+            child: Stack(
+              children: [
+                // Glass-like background
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25), 
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF121212).withOpacity(0.9), 
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(color: (isCashApp ? Colors.green : Colors.blue).withOpacity(0.3), blurRadius: 20, spreadRadius: -5)
+                    ],
+                    border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
+                  ), 
+                  child: Column(
+                    children: [
+                      FittedBox(
+                        child: Text(
+                          addr, 
+                          style: const TextStyle(
+                            fontFamily: 'monospace', 
+                            fontSize: 24, // Bigger font
+                            fontWeight: FontWeight.w900, 
+                            color: Colors.white,
+                            letterSpacing: 1,
+                          )
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.touch_app_rounded, size: 14, color: Colors.green.shade400),
+                          const SizedBox(width: 5),
+                          Text('TAP TO OPEN APP', style: TextStyle(color: Colors.green.shade400, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1)),
+                        ],
+                      ),
+                    ],
+                  )
+                ),
+                // "Water/Glass" highlight shine
+                Positioned(
+                  top: -50, left: -50,
+                  child: Container(
+                    width: 150, height: 150,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(colors: [Colors.white.withOpacity(0.1), Colors.transparent]),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        )
+      ])
+    );
   }
 
   Widget _codeBox() {
@@ -3255,7 +3623,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 class NgmyHubScreen extends StatefulWidget {
   final UserData user;
-  const NgmyHubScreen({super.key, required this.user});
+  final List<UserData> allUsers;
+  final List<AppTransaction> allTransactions;
+  final Function(AppTransaction) onAddTransaction;
+  final VoidCallback onDataChanged;
+  final AppConfig config;
+  const NgmyHubScreen({
+    super.key,
+    required this.user,
+    required this.allUsers,
+    required this.allTransactions,
+    required this.onAddTransaction,
+    required this.onDataChanged,
+    required this.config,
+  });
 
   @override
   State<NgmyHubScreen> createState() => _NgmyHubScreenState();
@@ -3363,7 +3744,24 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                 crossAxisSpacing: 15,
                 childAspectRatio: 1.6,
                 children: [
-                  _hubBox('Civic Registry', Icons.shield_outlined, civicColors, () => Navigator.push(context, MaterialPageRoute(builder: (c) => CivicRegistryScreen(user: widget.user)))),
+                  _hubBox(
+                    'Civic Registry',
+                    Icons.shield_outlined,
+                    civicColors,
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (c) => CivicRegistryScreen(
+                          user: widget.user,
+                          allUsers: widget.allUsers,
+                          allTransactions: widget.allTransactions,
+                          onAddTransaction: widget.onAddTransaction,
+                          onDataChanged: widget.onDataChanged,
+                          config: widget.config,
+                        ),
+                      ),
+                    ),
+                  ),
                   _hubBox('NGMY Store', Icons.shopping_bag_outlined, storeColors, () {}), 
                   _hubBox('Job Marketplace', Icons.business_center_outlined, jobColors, () => Navigator.push(context, MaterialPageRoute(builder: (c) => JobMarketplaceScreen(user: widget.user)))),
                   _hubBox('Help Center', Icons.support_agent_rounded, helpColors, () {}),
@@ -3428,7 +3826,20 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
 class CivicRegistryScreen extends StatefulWidget {
   final UserData user;
-  const CivicRegistryScreen({super.key, required this.user});
+  final List<UserData> allUsers;
+  final List<AppTransaction> allTransactions;
+  final Function(AppTransaction) onAddTransaction;
+  final VoidCallback onDataChanged;
+  final AppConfig config;
+  const CivicRegistryScreen({
+    super.key,
+    required this.user,
+    required this.allUsers,
+    required this.allTransactions,
+    required this.onAddTransaction,
+    required this.onDataChanged,
+    required this.config,
+  });
 
   @override
   State<CivicRegistryScreen> createState() => _CivicRegistryScreenState();
@@ -3436,17 +3847,889 @@ class CivicRegistryScreen extends StatefulWidget {
 
 class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   int _activeTab = 0; // 0: Search, 1: Enroll, 2: Members, 3: Rankings
+  String _searchQuery = '';
+  late String _selectedState;
+  String _selectedCity = 'All Cities';
+  String _selectedRoom = 'All Rooms';
+  final TextEditingController _searchController = TextEditingController();
+
+  // Enrollment Form Controllers
+  final _fullNameC = TextEditingController();
+  final _dobC = TextEditingController();
+  final _idTypeC = TextEditingController(text: 'National ID');
+  final _addressC = TextEditingController();
+  final _phoneC = TextEditingController();
+  final _emailC = TextEditingController();
+  final _cityC = TextEditingController();
+  final _roomC = TextEditingController();
+
+  final List<String> _usStates = [
+    'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
+    'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland',
+    'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey',
+    'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina',
+    'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedState = widget.user.state;
+  }
+
+  void _registerMember() {
+    final fullName = _fullNameC.text.trim();
+    final dob = _dobC.text.trim();
+    final idType = _idTypeC.text.trim();
+    final address = _addressC.text.trim();
+    final phone = _phoneC.text.trim();
+    final email = _emailC.text.trim().toLowerCase();
+    final city = _cityC.text.trim();
+    final room = _roomC.text.trim();
+
+    final hasTwoNames = RegExp(r'^\S+\s+\S+').hasMatch(fullName);
+    if (!hasTwoNames) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Full Name must contain at least first and last name.')));
+      return;
+    }
+    if (!RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Date of Birth must be in MM/DD/YYYY format.')));
+      return;
+    }
+    if (idType.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select ID Type.')));
+      return;
+    }
+    if (address.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Home Address is required.')));
+      return;
+    }
+    if (!RegExp(r'^\d{7,15}$').hasMatch(phone)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone must contain numbers only (7-15 digits).')));
+      return;
+    }
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email address.')));
+      return;
+    }
+    if (!widget.config.cities.contains(city)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please choose a city from Manage Cities & Rooms.')));
+      return;
+    }
+    if (!widget.config.rooms.contains(room)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please choose a room from Manage Cities & Rooms.')));
+      return;
+    }
+
+    final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+    UserData targetUser;
+    if (idx != -1) {
+      targetUser = widget.allUsers[idx];
+    } else {
+      targetUser = UserData(
+        email: email,
+        username: fullName.split(' ').first,
+        phone: phone,
+        state: _selectedState,
+      );
+      widget.allUsers.add(targetUser);
+    }
+
+    setState(() {
+      targetUser.isEnrolledInRegistry = true;
+      targetUser.fullName = fullName;
+      targetUser.dob = dob;
+      targetUser.idType = idType;
+      targetUser.homeAddress = address;
+      targetUser.phone = phone;
+      targetUser.email = email;
+      targetUser.city = city;
+      targetUser.room = room;
+      targetUser.state = _selectedState;
+      targetUser.registryId = targetUser.registryId?.isNotEmpty == true
+          ? targetUser.registryId
+          : '${_selectedState.substring(0, 2).toUpperCase()}${math.Random().nextInt(8999999) + 1000000}';
+
+      _fullNameC.clear();
+      _dobC.clear();
+      _addressC.clear();
+      _phoneC.clear();
+      _emailC.clear();
+      _cityC.clear();
+      _roomC.clear();
+      _activeTab = 2;
+    });
+    widget.onDataChanged();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Member Registered Successfully!'), backgroundColor: Colors.green));
+  }
+
+  void _showStatePicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      builder: (c) => Container(
+        padding: const EdgeInsets.all(25),
+        child: Column(
+          children: [
+            const Text('Select State', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+            const SizedBox(height: 15),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _usStates.length,
+                itemBuilder: (ctx, i) => ListTile(
+                  title: Text(_usStates[i], style: const TextStyle(fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    setState(() {
+                      _selectedState = _usStates[i];
+                      _selectedCity = 'All Cities';
+                      _selectedRoom = 'All Rooms';
+                    });
+                    Navigator.pop(c);
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _isRegistrar() => widget.user.isAdmin || widget.user.isAuthorizedRegistrar;
+
+  bool _memberMatchesHelpScope(UserData u) {
+    if (!widget.config.helpModeActive) return false;
+    final scopeType = widget.config.helpScopeType;
+    final scopeValue = widget.config.helpScopeValue.trim();
+    if (scopeType == 'city') return scopeValue.isNotEmpty && (u.city ?? '') == scopeValue;
+    if (scopeType == 'room') return scopeValue.isNotEmpty && (u.room ?? '') == scopeValue;
+    return true;
+  }
+
+  bool _canCurrentUserSeeHelpMode() {
+    if (!widget.config.helpModeActive) return false;
+    if (_isRegistrar()) return true;
+    return _memberMatchesHelpScope(widget.user);
+  }
+
+  String _helpScopeLabel() {
+    if (widget.config.helpScopeType == 'city') {
+      return 'City: ${widget.config.helpScopeValue}';
+    }
+    if (widget.config.helpScopeType == 'room') {
+      return 'Room: ${widget.config.helpScopeValue}';
+    }
+    return 'All members';
+  }
+
+  Future<void> _openCashApp() async {
+    final raw = widget.config.helpCashApp.trim();
+    if (raw.isEmpty) return;
+    final handle = raw.startsWith(r'$') ? raw.substring(1) : raw;
+    final uri = Uri.parse('https://cash.app/\$$handle');
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _callHelpPhone() async {
+    final phone = widget.config.helpPhone.trim();
+    if (phone.isEmpty) return;
+    final uri = Uri.parse('tel:$phone');
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  void _copyText(String text, String label) {
+    if (text.trim().isEmpty) return;
+    Clipboard.setData(ClipboardData(text: text.trim()));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label copied')));
+  }
+
+  void _showHelpModeDialog() {
+    final purposeC = TextEditingController(text: widget.config.helpPurpose);
+    final cashC = TextEditingController(text: widget.config.helpCashApp);
+    final zelleC = TextEditingController(text: widget.config.helpZelle);
+    final phoneC = TextEditingController(text: widget.config.helpPhone);
+    String scopeType = widget.config.helpScopeType;
+    String scopeValue = widget.config.helpScopeValue;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) {
+          final scopeOptions = scopeType == 'room' ? widget.config.rooms : widget.config.cities;
+          if (scopeType == 'all') {
+            scopeValue = '';
+          } else if (scopeOptions.isNotEmpty && !scopeOptions.contains(scopeValue)) {
+            scopeValue = scopeOptions.first;
+          }
+          return AlertDialog(
+            title: Text(widget.config.helpModeActive ? 'Edit Help Mode' : 'Activate Help Mode'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(controller: purposeC, maxLines: 2, decoration: const InputDecoration(labelText: 'What are you collecting for?')),
+                  const SizedBox(height: 10),
+                  TextField(controller: cashC, decoration: const InputDecoration(labelText: 'Cash App')),
+                  const SizedBox(height: 10),
+                  TextField(controller: zelleC, decoration: const InputDecoration(labelText: 'Zelle')),
+                  const SizedBox(height: 10),
+                  TextField(controller: phoneC, keyboardType: TextInputType.phone, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: const InputDecoration(labelText: 'Help Phone Number')),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: scopeType,
+                    decoration: const InputDecoration(labelText: 'Who can see this help mode?'),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('Everyone in this state')),
+                      DropdownMenuItem(value: 'city', child: Text('Specific city')),
+                      DropdownMenuItem(value: 'room', child: Text('Specific room')),
+                    ],
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setDialog(() {
+                        scopeType = v;
+                        if (v == 'all') scopeValue = '';
+                      });
+                    },
+                  ),
+                  if (scopeType != 'all') ...[
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      initialValue: scopeOptions.isNotEmpty ? scopeValue : null,
+                      decoration: InputDecoration(labelText: scopeType == 'city' ? 'Select City' : 'Select Room'),
+                      items: scopeOptions.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                      onChanged: (v) => setDialog(() => scopeValue = v ?? ''),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              if (widget.config.helpModeActive)
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      widget.config.helpModeActive = false;
+                    });
+                    widget.onDataChanged();
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('Deactivate'),
+                ),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () {
+                  if (purposeC.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter purpose for contribution.')));
+                    return;
+                  }
+                  if (cashC.text.trim().isEmpty && zelleC.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter Cash App or Zelle.')));
+                    return;
+                  }
+                  if (phoneC.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone number is required.')));
+                    return;
+                  }
+                  if (scopeType != 'all' && scopeValue.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select scope value.')));
+                    return;
+                  }
+                  setState(() {
+                    widget.config.helpModeActive = true;
+                    widget.config.helpPurpose = purposeC.text.trim();
+                    widget.config.helpCashApp = cashC.text.trim();
+                    widget.config.helpZelle = zelleC.text.trim();
+                    widget.config.helpPhone = phoneC.text.trim();
+                    widget.config.helpScopeType = scopeType;
+                    widget.config.helpScopeValue = scopeType == 'all' ? '' : scopeValue.trim();
+                  });
+                  widget.onDataChanged();
+                  Navigator.pop(ctx);
+                },
+                child: Text(widget.config.helpModeActive ? 'Save' : 'Activate'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  String _statusLabelForMissed(int missed) {
+    if (missed >= 8) return 'BAD';
+    if (missed >= 7) return 'RISK';
+    if (missed >= 5) return 'NOT CLEAN';
+    return 'CLEAN';
+  }
+
+  Color _statusColorForMissed(int missed) {
+    if (missed >= 8) return Colors.red;
+    if (missed >= 7) return Colors.deepOrange;
+    if (missed >= 5) return Colors.amber.shade700;
+    return Colors.green;
+  }
+
+  void _showManageCitiesRooms() {
+    final cityC = TextEditingController();
+    final roomC = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Manage Cities & Rooms',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Create or delete options used in enrollment dropdowns.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 18),
+
+                      const Text('Add City', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: cityC,
+                              decoration: InputDecoration(
+                                hintText: 'City name',
+                                filled: true,
+                                fillColor: isDark ? Colors.black26 : Colors.grey.shade100,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: () {
+                              final value = cityC.text.trim();
+                              if (value.isEmpty) return;
+                              if (!widget.config.cities.contains(value)) {
+                                setState(() => widget.config.cities.add(value));
+                                widget.onDataChanged();
+                              }
+                              cityC.clear();
+                              setSheetState(() {});
+                            },
+                            child: const Text('Add'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: widget.config.cities.map((c) {
+                          return Chip(
+                            label: Text(c),
+                            onDeleted: () {
+                              setState(() => widget.config.cities.remove(c));
+                              if (_selectedCity == c) _selectedCity = 'All Cities';
+                              if (_cityC.text == c) _cityC.clear();
+                              widget.onDataChanged();
+                              setSheetState(() {});
+                            },
+                          );
+                        }).toList(),
+                      ),
+
+                      const SizedBox(height: 20),
+                      const Text('Add Room', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: roomC,
+                              decoration: InputDecoration(
+                                hintText: 'Room name',
+                                filled: true,
+                                fillColor: isDark ? Colors.black26 : Colors.grey.shade100,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: () {
+                              final value = roomC.text.trim();
+                              if (value.isEmpty) return;
+                              if (!widget.config.rooms.contains(value)) {
+                                setState(() => widget.config.rooms.add(value));
+                                widget.onDataChanged();
+                              }
+                              roomC.clear();
+                              setSheetState(() {});
+                            },
+                            child: const Text('Add'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: widget.config.rooms.map((r) {
+                          return Chip(
+                            label: Text(r),
+                            onDeleted: () {
+                              setState(() => widget.config.rooms.remove(r));
+                              if (_selectedRoom == r) _selectedRoom = 'All Rooms';
+                              if (_roomC.text == r) _roomC.clear();
+                              widget.onDataChanged();
+                              setSheetState(() {});
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showMemberProfile(UserData u) {
+    final contributions = widget.allTransactions
+        .where((t) => t.userEmail == u.email && t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final claims = widget.allTransactions
+        .where((t) => t.userEmail == u.email && t.type == TransactionType.claim)
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final openClaims = claims.where((c) => c.status == TransactionStatus.pending).toList();
+    final contributionTotal = contributions.fold<double>(0.0, (sum, t) => sum + t.amount);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final statusLabel = _statusLabelForMissed(u.missed);
+        final statusColor = _statusColorForMissed(u.missed);
+        return Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Full Member Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                      ElevatedButton.icon(
+                        onPressed: () => _copyMemberReport(u),
+                        icon: const Icon(Icons.print_outlined, size: 16),
+                        label: const Text('Print Full Report'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 20,
+                    runSpacing: 10,
+                    children: [
+                      _profileItem('Full Name', u.fullName ?? u.username),
+                      _profileItem('Date of Birth', u.dob ?? 'N/A'),
+                      _profileItem('Civic Registry ID', u.registryId ?? 'N/A'),
+                      _profileItem('Unique ID Number', u.registryId ?? 'N/A'),
+                      _profileItem('ID Type', u.idType ?? 'N/A'),
+                      _profileItem('State', u.state),
+                      _profileItem('City', u.city ?? 'N/A'),
+                      _profileItem('Room', u.room ?? 'N/A'),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(12)),
+                    child: Text(statusLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                  ),
+                  const SizedBox(height: 18),
+                  const Divider(),
+                  const Text('Contact Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 10),
+                  _profileItem('Home Address', u.homeAddress ?? 'N/A'),
+                  _profileItem('Phone Number', u.phone),
+                  _profileItem('Email Address', u.email),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(child: _statCard('Contributions', u.helps.toString(), Colors.green.shade50, Colors.green.shade800)),
+                      const SizedBox(width: 10),
+                      Expanded(child: _statCard('Open Claims', openClaims.length.toString(), Colors.red.shade50, Colors.red.shade800)),
+                      const SizedBox(width: 10),
+                      Expanded(child: _statCard('Money Given', '\$${formatCurrency(contributionTotal)}', Colors.blue.shade50, Colors.blue.shade800)),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  const Text('Contribution Records', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  if (contributions.isEmpty)
+                    const Text('No contribution records yet.', style: TextStyle(color: Colors.grey))
+                  else
+                    ...contributions.take(8).map(
+                      (t) => ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.monetization_on_outlined, color: Colors.green),
+                        title: Text('\$${formatCurrency(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(t.sourceDetails?.isNotEmpty == true ? t.sourceDetails! : 'Contribution'),
+                        trailing: Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  const Text('Claim Records', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  if (claims.isEmpty)
+                    const Text('No claim records yet.', style: TextStyle(color: Colors.grey))
+                  else
+                    ...claims.take(8).map(
+                      (t) => ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          t.status == TransactionStatus.pending ? Icons.warning_amber_rounded : Icons.verified,
+                          color: t.status == TransactionStatus.pending ? Colors.orange : Colors.green,
+                        ),
+                        title: Text(t.sourceDetails?.isNotEmpty == true ? t.sourceDetails! : 'Claim'),
+                        subtitle: Text(t.status == TransactionStatus.pending ? 'Open claim' : 'Resolved claim'),
+                        trailing: Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showEditMemberDialog(u);
+                          },
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('Edit Information'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Close'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _profileItem(String label, String value) {
+    return SizedBox(
+      width: 250,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(height: 2),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _statCard(String label, String value, Color bg, Color fg) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+          const SizedBox(height: 6),
+          Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: fg)),
+        ],
+      ),
+    );
+  }
+
+  void _copyMemberReport(UserData u) {
+    final report = StringBuffer()
+      ..writeln('FULL MEMBER INFORMATION')
+      ..writeln('Name: ${u.fullName ?? u.username}')
+      ..writeln('Registry ID: ${u.registryId ?? 'N/A'}')
+      ..writeln('DOB: ${u.dob ?? 'N/A'}')
+      ..writeln('ID Type: ${u.idType ?? 'N/A'}')
+      ..writeln('State: ${u.state}')
+      ..writeln('City: ${u.city ?? 'N/A'}')
+      ..writeln('Room: ${u.room ?? 'N/A'}')
+      ..writeln('Address: ${u.homeAddress ?? 'N/A'}')
+      ..writeln('Phone: ${u.phone}')
+      ..writeln('Email: ${u.email}')
+      ..writeln('Status: ${_statusLabelForMissed(u.missed)}');
+    Clipboard.setData(ClipboardData(text: report.toString()));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report copied to clipboard.')));
+  }
+
+  void _showContributionDialog(UserData u) {
+    if (!widget.config.helpModeActive) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help mode must be active before adding contribution.')));
+      return;
+    }
+    if (!_memberMatchesHelpScope(u)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This member is outside current help scope.')));
+      return;
+    }
+    final amountC = TextEditingController();
+    final noteC = TextEditingController(text: widget.config.helpPurpose.isNotEmpty ? widget.config.helpPurpose : 'Community contribution');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Contribution'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amountC,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Amount'),
+            ),
+            TextField(
+              controller: noteC,
+              decoration: const InputDecoration(labelText: 'Details'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final amount = double.tryParse(amountC.text.trim()) ?? 0;
+              if (amount <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount.')));
+                return;
+              }
+              final now = DateTime.now();
+              widget.onAddTransaction(
+                AppTransaction(
+                  id: 'contrib_${u.email}_$now',
+                  userEmail: u.email,
+                  amount: amount,
+                  type: TransactionType.contribution,
+                  method: PaymentMethod.system,
+                  sourceDetails: noteC.text.trim().isEmpty ? 'Community contribution' : noteC.text.trim(),
+                  status: TransactionStatus.approved,
+                  timestamp: now,
+                ),
+              );
+              setState(() => u.helps += 1);
+              widget.onDataChanged();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showClaimDialog(UserData u) {
+    final claimC = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Claim Record'),
+        content: TextField(
+          controller: claimC,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Claim details',
+            hintText: 'Describe what happened',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final text = claimC.text.trim();
+              if (text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Claim details are required.')));
+                return;
+              }
+              final now = DateTime.now();
+              widget.onAddTransaction(
+                AppTransaction(
+                  id: 'claim_${u.email}_$now',
+                  userEmail: u.email,
+                  amount: 0,
+                  type: TransactionType.claim,
+                  method: PaymentMethod.system,
+                  sourceDetails: text,
+                  status: TransactionStatus.pending,
+                  timestamp: now,
+                ),
+              );
+              setState(() => u.missed += 1);
+              widget.onDataChanged();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Add Claim'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showResolveClaimDialog(UserData u) {
+    final pendingClaims = widget.allTransactions
+        .where((t) => t.userEmail == u.email && t.type == TransactionType.claim && t.status == TransactionStatus.pending)
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    if (pendingClaims.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No open claims to remove.')));
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Resolve Claim'),
+        content: SizedBox(
+          width: 480,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: pendingClaims.length,
+            itemBuilder: (_, i) {
+              final c = pendingClaims[i];
+              return ListTile(
+                title: Text(c.sourceDetails?.isNotEmpty == true ? c.sourceDetails! : 'Claim'),
+                subtitle: Text('${c.timestamp.month}/${c.timestamp.day}/${c.timestamp.year}'),
+                trailing: TextButton(
+                  onPressed: () {
+                    setState(() {
+                      c.status = TransactionStatus.rejected;
+                      if (u.missed > 0) u.missed -= 1;
+                    });
+                    widget.onDataChanged();
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('Remove'),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  void _showEditMemberDialog(UserData u) {
+    final fullName = TextEditingController(text: u.fullName ?? u.username);
+    final phone = TextEditingController(text: u.phone);
+    final email = TextEditingController(text: u.email);
+    final address = TextEditingController(text: u.homeAddress ?? '');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Member Information'),
+        content: SingleChildScrollView(
+          child: Column(
+            children: [
+              TextField(controller: fullName, decoration: const InputDecoration(labelText: 'Full Name')),
+              TextField(controller: phone, keyboardType: TextInputType.phone, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: const InputDecoration(labelText: 'Phone')),
+              TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email')),
+              TextField(controller: address, decoration: const InputDecoration(labelText: 'Address')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              if (!RegExp(r'^\S+\s+\S+').hasMatch(fullName.text.trim())) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Full Name must contain two names.')));
+                return;
+              }
+              if (!RegExp(r'^\d{7,15}$').hasMatch(phone.text.trim())) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone must be numbers only.')));
+                return;
+              }
+              if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email.')));
+                return;
+              }
+              setState(() {
+                u.fullName = fullName.text.trim();
+                u.username = fullName.text.trim().split(' ').first;
+                u.phone = phone.text.trim();
+                u.email = email.text.trim().toLowerCase();
+                u.homeAddress = address.text.trim();
+              });
+              widget.onDataChanged();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = const Color(0xFF6200EE);
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF5F7FB),
       appBar: AppBar(
-        title: const Text('Civic Registry', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Civic Registry', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(onPressed: _showStatePicker, icon: const Icon(Icons.map_rounded), tooltip: 'Change State'),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -3457,71 +4740,137 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(25),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6200EE), Color(0xFF3700B3)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [BoxShadow(color: const Color(0xFF6200EE).withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))],
+                gradient: LinearGradient(colors: [primaryColor, primaryColor.withOpacity(0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))],
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(15)),
-                    child: const Icon(Icons.shield_rounded, color: Colors.white, size: 30),
-                  ),
+                  Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.shield_rounded, color: Colors.white, size: 30)),
                   const SizedBox(width: 20),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Civic Registry', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
-                        Text('Community Identity & Trust System', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                      ],
-                    ),
-                  ),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Civic Registry', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)), const Text('Community Identity & Trust System', style: TextStyle(color: Colors.white70, fontSize: 12))])),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
+            if (_canCurrentUserSeeHelpMode()) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF6A3DE8), Color(0xFF4F2FD6)]),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(color: Colors.red.shade400, borderRadius: BorderRadius.circular(10)),
+                      child: Text(
+                        'HELP MODE ACTIVE in ${widget.user.state} - ${widget.config.helpPurpose}',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: const Color(0xFFDEF8EA), borderRadius: BorderRadius.circular(12)),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Send Contributions To:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              Text(_helpScopeLabel(), style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (widget.config.helpCashApp.trim().isNotEmpty)
+                            _helpRow(
+                              icon: Icons.attach_money,
+                              title: 'Cash App',
+                              value: widget.config.helpCashApp,
+                              color: Colors.green,
+                              onPrimaryTap: _openCashApp,
+                              primaryLabel: 'Open',
+                              onSecondaryTap: () => _copyText(widget.config.helpCashApp, 'Cash App'),
+                              secondaryLabel: 'Copy',
+                            ),
+                          if (widget.config.helpZelle.trim().isNotEmpty)
+                            _helpRow(
+                              icon: Icons.account_balance_wallet_outlined,
+                              title: 'Zelle',
+                              value: widget.config.helpZelle,
+                              color: Colors.purple,
+                              onPrimaryTap: () => _copyText(widget.config.helpZelle, 'Zelle'),
+                              primaryLabel: 'Copy',
+                            ),
+                          _helpRow(
+                            icon: Icons.call_outlined,
+                            title: 'Call for Help',
+                            value: widget.config.helpPhone,
+                            color: Colors.blue,
+                            onPrimaryTap: _callHelpPhone,
+                            primaryLabel: 'Call',
+                            onSecondaryTap: () => _copyText(widget.config.helpPhone, 'Phone'),
+                            secondaryLabel: 'Copy',
+                          ),
+                          Container(
+                            margin: const EdgeInsets.only(top: 8),
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+                            decoration: BoxDecoration(color: Colors.amber.shade400, borderRadius: BorderRadius.circular(8)),
+                            child: const Text(
+                              'Include your NAME & PHONE in payment memo.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+
             // Authorized Registrar Card
             Container(
               padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.green.withOpacity(0.3)),
-              ),
+              decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.green.withOpacity(0.3))),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.verified_user_rounded, color: Colors.green, size: 24),
-                  ),
+                  Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.verified_user_rounded, color: Colors.green, size: 24)),
                   const SizedBox(width: 15),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Authorized Registrar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        Text('Georgia • 0 registered', style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
-                      ],
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Authorized Registrar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), Text('$_selectedState • ${widget.allUsers.where((u)=>u.isEnrolledInRegistry && u.state == _selectedState).length} registered', style: TextStyle(color: Colors.grey.shade600, fontSize: 11))])),
+                  
+                  if (_isRegistrar())
+                    GestureDetector(
+                      onTap: _showHelpModeDialog,
+                      child: Container(
+                        height: 35,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: widget.config.helpModeActive ? Colors.red : Colors.green,
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Center(
+                          child: Text(
+                            widget.config.helpModeActive ? 'Deactivate Help Mode' : 'Activate Help Mode',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00B25A),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                      minimumSize: const Size(0, 35),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('Activate Help Mode', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: () => setState(() => _activeTab = 1),
+                    child: Container(width: 35, height: 35, decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16)),
                   ),
                 ],
               ),
@@ -3549,37 +4898,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             // Search/Action Box
             if (_activeTab == 0) _searchSection(isDark),
             if (_activeTab == 1) _enrollSection(isDark),
+            if (_activeTab == 2) _membersSection(isDark),
+            if (_activeTab == 3) _rankingsSection(isDark),
             
-            const SizedBox(height: 30),
-
-            // About Section
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(25),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE3F2FD).withOpacity(isDark ? 0.05 : 1.0),
-                borderRadius: BorderRadius.circular(25),
-                border: Border.all(color: Colors.blue.withOpacity(0.1)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded, color: Colors.blue, size: 20),
-                      SizedBox(width: 10),
-                      Text('About Civic Registry', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  _aboutItem('Community-based identity and records system'),
-                  _aboutItem('Public can verify if someone is registered and "clean"'),
-                  _aboutItem('Private details visible only to Admin & Authorized Registrars'),
-                  _aboutItem('Contribution tracking builds community accountability'),
-                  _aboutItem('Apply to become an Authorized Registrar and help manage the registry'),
-                ],
-              ),
-            ),
             const SizedBox(height: 50),
           ],
         ),
@@ -3594,18 +4915,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       onTap: () => setState(() => _activeTab = index),
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        height: 80,
+        height: 85,
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF6200EE) : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))],
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: isSelected ? Colors.white : Colors.grey, size: 24),
+            Icon(icon, color: isSelected ? Colors.white : Colors.grey, size: 28),
             const SizedBox(height: 8),
-            Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)),
+            Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold, fontSize: 13)),
           ],
         ),
       ),
@@ -3614,35 +4935,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _searchSection(bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15)],
-      ),
+      padding: const EdgeInsets.all(25),
+      decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)]),
       child: Column(
         children: [
           TextField(
+            controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Search by name or ID number...',
+              hintText: 'Search members by name, ID, city...',
               hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
-              prefixIcon: const Icon(Icons.search, size: 20),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+              prefixIcon: const Icon(Icons.search, size: 22),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
               filled: true,
               fillColor: isDark ? Colors.black.withOpacity(0.2) : Colors.grey.shade50,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 25),
           ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6200EE),
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 55),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              elevation: 0,
-            ),
-            child: const Text('Search Registry', style: TextStyle(fontWeight: FontWeight.bold)),
+            onPressed: () { setState(() { _searchQuery = _searchController.text.toLowerCase(); _activeTab = 2; }); },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), elevation: 0),
+            child: const Text('Search Registry', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ],
       ),
@@ -3651,21 +4963,362 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _enrollSection(bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15)],
-      ),
-      child: const Column(
+      padding: const EdgeInsets.all(25),
+      decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Enrollment Form', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          SizedBox(height: 10),
-          Text('Enroll new members to the community registry.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 12)),
-          SizedBox(height: 20),
-          // Forms could go here
+          Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), borderRadius: BorderRadius.circular(15)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [Text('Enrollment Form', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue)), Text('Register any community member (app account not required).', style: TextStyle(fontSize: 11, color: Colors.blueGrey))])),
+          const SizedBox(height: 25),
+
+          const Text('Full Name *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _fullNameC,
+            decoration: InputDecoration(
+              hintText: 'First name and last name',
+              hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+              filled: true,
+              fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          const Text('Date of Birth *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _dobC,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')),
+              DateSlashFormatter(),
+            ],
+            decoration: InputDecoration(
+              hintText: 'MM/DD/YYYY',
+              hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+              filled: true,
+              fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          const Text('ID Type *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            initialValue: _idTypeC.text,
+            decoration: InputDecoration(filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
+            items: ['National ID', 'Passport', 'Drivers License', 'Voters Card'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+            onChanged: (v) { if (v != null) _idTypeC.text = v; },
+          ),
+          const SizedBox(height: 20),
+
+          Container(width: double.infinity, margin: const EdgeInsets.symmetric(vertical: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), borderRadius: BorderRadius.circular(15)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [Text('📋 Auto-Generated ID', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)), Text('A unique ID number will be automatically generated when you register this member.', style: TextStyle(fontSize: 10, color: Colors.blueGrey))])),
+          const SizedBox(height: 10),
+
+          _enrollField('Home Address', _addressC, 'Street address, Apt...'),
+
+          const Text('Phone Number *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _phoneC,
+            keyboardType: TextInputType.phone,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              hintText: 'Numbers only',
+              hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+              filled: true,
+              fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          const Text('Email Address *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _emailC,
+            keyboardType: TextInputType.emailAddress,
+            decoration: InputDecoration(
+              hintText: 'member@email.com',
+              hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+              filled: true,
+              fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          const Text('City *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 8),
+          DropdownMenu<String>(
+            width: double.infinity,
+            initialSelection: _cityC.text.isNotEmpty ? _cityC.text : null,
+            hintText: 'Search or select city',
+            enableFilter: true,
+            enableSearch: true,
+            trailingIcon: const Icon(Icons.arrow_drop_down),
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+            ),
+            dropdownMenuEntries: widget.config.cities.map((c) => DropdownMenuEntry(value: c, label: c)).toList(),
+            onSelected: (v) {
+              if (v == null) return;
+              setState(() => _cityC.text = v);
+            },
+          ),
+          const SizedBox(height: 20),
+
+          const Text('Room *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 8),
+          DropdownMenu<String>(
+            width: double.infinity,
+            initialSelection: _roomC.text.isNotEmpty ? _roomC.text : null,
+            hintText: 'Search or select room',
+            enableFilter: true,
+            enableSearch: true,
+            trailingIcon: const Icon(Icons.arrow_drop_down),
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+            ),
+            dropdownMenuEntries: widget.config.rooms.map((r) => DropdownMenuEntry(value: r, label: r)).toList(),
+            onSelected: (v) {
+              if (v == null) return;
+              setState(() => _roomC.text = v);
+            },
+          ),
+          const SizedBox(height: 20),
+          
+          ElevatedButton(
+            onPressed: _registerMember,
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25))),
+            child: const Text('Register Member', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
         ],
       ),
+    );
+  }
+  Widget _enrollField(String label, TextEditingController c, String hint) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (label.isNotEmpty) ...[Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)), const SizedBox(height: 8)],
+      TextField(controller: c, decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none))),
+      const SizedBox(height: 20),
+    ]);
+  }
+
+  Widget _membersSection(bool isDark) {
+    final members = widget.allUsers.where((u) => 
+      u.isEnrolledInRegistry && 
+      u.state == _selectedState &&
+      (u.username.toLowerCase().contains(_searchQuery) || u.fullName?.toLowerCase().contains(_searchQuery) == true || u.registryId?.toLowerCase().contains(_searchQuery) == true || u.city?.toLowerCase().contains(_searchQuery) == true) &&
+      (_selectedCity == 'All Cities' || u.city == _selectedCity) &&
+      (_selectedRoom == 'All Rooms' || u.room == _selectedRoom)
+    ).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), borderRadius: BorderRadius.circular(15)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('$_selectedState Community', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)), Text('Only members registered in $_selectedState are shown', style: const TextStyle(fontSize: 10, color: Colors.blueGrey))])),
+        const SizedBox(height: 20),
+        
+        TextField(
+          onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+          decoration: InputDecoration(hintText: 'Search members by name, ID, city...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: isDark ? Colors.white10 : Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
+        ),
+        const SizedBox(height: 20),
+        
+        Row(children: [
+          const Text('Filter by City:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          const SizedBox(width: 10),
+          Expanded(child: DropdownButton<String>(
+            isExpanded: true,
+            value: _selectedCity,
+            items: ['All Cities', ...widget.config.cities].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
+            onChanged: (v) => setState(() => _selectedCity = v!),
+          )),
+        ]),
+        Row(children: [
+          const Text('Filter by Room:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          const SizedBox(width: 10),
+          Expanded(child: DropdownButton<String>(
+            isExpanded: true,
+            value: _selectedRoom,
+            items: ['All Rooms', ...widget.config.rooms].map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12)))).toList(),
+            onChanged: (v) => setState(() => _selectedRoom = v!),
+          )),
+        ]),
+        
+        const SizedBox(height: 15),
+        ElevatedButton.icon(onPressed: _showManageCitiesRooms, icon: const Icon(Icons.settings, size: 16), label: const Text('Manage Cities & Rooms', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)))),
+        
+        const SizedBox(height: 20),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Showing ${members.length} member(s)', style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)), Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Row(children: const [Icon(Icons.brush, size: 12, color: Colors.red), SizedBox(width: 5), Text('Clear Missed', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)), Icon(Icons.keyboard_arrow_down, size: 12, color: Colors.red)]))]),
+        
+        const SizedBox(height: 15),
+        if (members.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No members match your filters.', style: TextStyle(color: Colors.grey))))
+        else ...members.map((m) => _memberCard(m, isDark)),
+      ],
+    );
+  }
+
+  Widget _memberCard(UserData u, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Text(u.fullName ?? u.username, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(color: _statusColorForMissed(u.missed), borderRadius: BorderRadius.circular(10)),
+                  child: Text(_statusLabelForMissed(u.missed), style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                ),
+              ]),
+              Text(u.registryId ?? 'PENDING ID', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13)),
+              Text('ID: ${u.registryId ?? "N/A"}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
+            ]),
+            const Spacer(),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text('${u.helps} helps', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
+              Text('${u.missed} missed', style: const TextStyle(color: Colors.red, fontSize: 10)),
+            ]),
+          ]),
+          const SizedBox(height: 15),
+          _memberInfo(Icons.location_on, u.city ?? 'Not specified', Colors.redAccent),
+          _memberInfo(Icons.home_work_rounded, u.room ?? 'No room assigned', Colors.orange),
+          _memberInfo(Icons.phone_android_rounded, u.phone, Colors.black54),
+          _memberInfo(Icons.email_outlined, u.email, Colors.blueAccent),
+          
+          const SizedBox(height: 20),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            _mBtn(Icons.visibility_outlined, 'View', Colors.indigo, () => _showMemberProfile(u)),
+            _mBtn(Icons.monetization_on_outlined, 'Money', Colors.green, () => _showContributionDialog(u)),
+            _mBtn(Icons.warning_amber_rounded, 'Claim', Colors.orange, () => _showClaimDialog(u)),
+            _mBtn(Icons.undo_rounded, 'Resolve', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
+            _mBtn(Icons.delete_outline_rounded, '', Colors.red, () {
+              setState(() => u.isEnrolledInRegistry = false);
+              widget.onDataChanged();
+            }),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _memberInfo(IconData i, String t, Color c) => Padding(padding: const EdgeInsets.only(bottom: 4), child: Row(children: [Icon(i, size: 14, color: c), const SizedBox(width: 10), Text(t, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))]));
+
+  Widget _mBtn(IconData i, String l, Color bg, VoidCallback onTap, {Color textColor = Colors.white}) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+      child: Row(children: [
+        Icon(i, size: 14, color: textColor),
+        if (l.isNotEmpty) ...[const SizedBox(width: 5), Text(l, style: TextStyle(color: textColor, fontSize: 10, fontWeight: FontWeight.bold))],
+      ]),
+    ),
+  );
+
+  Widget _helpRow({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color color,
+    required VoidCallback onPrimaryTap,
+    required String primaryLabel,
+    VoidCallback? onSecondaryTap,
+    String? secondaryLabel,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withOpacity(0.35))),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onPrimaryTap,
+            style: TextButton.styleFrom(backgroundColor: color, foregroundColor: Colors.white, minimumSize: const Size(40, 30), padding: const EdgeInsets.symmetric(horizontal: 10)),
+            child: Text(primaryLabel, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+          ),
+          if (onSecondaryTap != null && secondaryLabel != null) ...[
+            const SizedBox(width: 6),
+            TextButton(
+              onPressed: onSecondaryTap,
+              style: TextButton.styleFrom(backgroundColor: Colors.black12, foregroundColor: Colors.black87, minimumSize: const Size(40, 30), padding: const EdgeInsets.symmetric(horizontal: 10)),
+              child: Text(secondaryLabel, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _rankingsSection(bool isDark) {
+    final enrolled = widget.allUsers.where((u) => u.isEnrolledInRegistry && u.state == _selectedState).toList();
+    enrolled.sort((a, b) => b.helps.compareTo(a.helps));
+
+    final topHelpers = enrolled.where((u) => u.helps >= 10).toList();
+    final theMiss = enrolled.where((u) => u.helps > 0 && u.helps < 10).toList();
+    final nonHelpers = enrolled.where((u) => u.helps == 0).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Ranking - Top Helpers', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+            TextButton.icon(onPressed: _showStatePicker, icon: const Icon(Icons.edit_location_alt_rounded, size: 16), label: Text(_selectedState, style: const TextStyle(fontSize: 12))),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (topHelpers.isEmpty) const Text('No top helpers yet.', style: TextStyle(color: Colors.grey, fontSize: 12))
+        else ...topHelpers.map((u) => _rankTile(u, Colors.orange)),
+
+        const SizedBox(height: 25),
+        const Text('The Miss (Active)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+        const SizedBox(height: 10),
+        if (theMiss.isEmpty) const Text('No active helpers in this range.', style: TextStyle(color: Colors.grey, fontSize: 12))
+        else ...theMiss.map((u) => _rankTile(u, Colors.blue)),
+
+        const SizedBox(height: 25),
+        const Text('Non-Helpers', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+        const SizedBox(height: 10),
+        if (nonHelpers.isEmpty) const Text('Everyone is helping!', style: TextStyle(color: Colors.grey, fontSize: 12))
+        else ...nonHelpers.map((u) => _rankTile(u, Colors.grey)),
+      ],
+    );
+  }
+
+  Widget _rankTile(UserData u, Color color) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Text(u.username[0], style: TextStyle(color: color, fontWeight: FontWeight.bold))),
+      title: Text(u.username, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+      trailing: Text('${u.helps} Helps', style: TextStyle(color: color, fontWeight: FontWeight.w900)),
     );
   }
 
@@ -4080,7 +5733,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
 class AnnouncementScreen extends StatefulWidget {
   final UserData user;
   final List<Announcement> announcements;
-  const AnnouncementScreen({super.key, required this.user, required this.announcements});
+  final AppConfig config;
+  const AnnouncementScreen({super.key, required this.user, required this.announcements, required this.config});
 
   @override
   State<AnnouncementScreen> createState() => _AnnouncementScreenState();
@@ -4088,6 +5742,85 @@ class AnnouncementScreen extends StatefulWidget {
 
 class _AnnouncementScreenState extends State<AnnouncementScreen> {
   int _activeTab = 0; // 0: Chat, 1: Signals, 2: Rhyme
+  final List<Map<String, dynamic>> _messages = [];
+  final TextEditingController _chatController = TextEditingController();
+  bool _isTyping = false;
+
+  final ScrollController _scrollController = ScrollController();
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _chatController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      _messages.add({'role': 'user', 'text': text});
+      _chatController.clear();
+      _isTyping = true;
+    });
+    _scrollToBottom();
+
+    try {
+      final apiKey = widget.config.geminiApiKey.trim();
+      if (apiKey.isEmpty) {
+        setState(() {
+          _messages.add({'role': 'ai', 'text': 'I\'m sorry, but my AI brain isn\'t connected yet. Please ask the admin to set the Gemini API key.'});
+          _isTyping = false;
+        });
+        _scrollToBottom();
+        return;
+      }
+
+      // Using v1 instead of v1beta and ensuring no hidden spaces in key
+      final url = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=$apiKey';
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {'text': 'Context: You are NGMY AI, the official helper for NGMY (Next Generation - Make Yours). NGMY is a multi-service platform offering high-yield investment plans, daily earning via clock-ins, instant loans, a video-sharing media hub, and a community civic registry. You should be helpful, professional, and friendly. User query: $text'}
+              ]
+            }
+          ]
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final aiText = data['candidates'][0]['content']['parts'][0]['text'];
+        setState(() {
+          _messages.add({'role': 'ai', 'text': aiText});
+        });
+      } else {
+        final errorData = jsonDecode(response.body);
+        final errorMessage = errorData['error']?['message'] ?? 'Unknown error';
+        setState(() {
+          _messages.add({'role': 'ai', 'text': 'AI Service Error (${response.statusCode}): $errorMessage'});
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _messages.add({'role': 'ai', 'text': 'Connection error. Please check your internet and try again.'});
+      });
+    } finally {
+      setState(() => _isTyping = false);
+      _scrollToBottom();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -4108,10 +5841,14 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.blur_on_rounded, color: Colors.white, size: 24),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      widget.config.logoUrl,
+                      width: 32, height: 32,
+                      fit: BoxFit.cover,
+                      errorBuilder: (c, e, s) => const Icon(Icons.blur_on_rounded, color: Colors.white, size: 24),
+                    ),
                   ),
                   const SizedBox(width: 15),
                   const Text('NGMY Helper', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
@@ -4143,37 +5880,45 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
               child: _activeTab == 0 ? _chatView(isDark) : Center(child: Text('Coming Soon', style: TextStyle(color: Colors.grey))),
             ),
 
-            // Bottom Input (Mockup style)
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
-                border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.1))),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.black26 : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: const TextField(
-                        decoration: InputDecoration(hintText: 'Ask me anything about NGMY...', border: InputBorder.none),
+            // Bottom Input
+            if (_activeTab == 0)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+                  border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.1))),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.black26 : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: TextField(
+                          controller: _chatController,
+                          decoration: const InputDecoration(hintText: 'Ask me anything about NGMY...', border: InputBorder.none),
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 15),
-                  Container(
-                    width: 50, height: 50,
-                    decoration: BoxDecoration(color: primaryColor.withOpacity(0.2), shape: BoxShape.circle),
-                    child: Icon(Icons.send_rounded, color: primaryColor),
-                  ),
-                ],
+                    const SizedBox(width: 15),
+                    GestureDetector(
+                      onTap: _isTyping ? null : _sendMessage,
+                      child: Container(
+                        width: 50, height: 50,
+                        decoration: BoxDecoration(color: primaryColor.withOpacity(0.2), shape: BoxShape.circle),
+                        child: _isTyping 
+                          ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                          : Icon(Icons.send_rounded, color: primaryColor),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -4207,19 +5952,28 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   Widget _chatView(bool isDark) {
     return ListView(
+      controller: _scrollController,
       padding: const EdgeInsets.all(20),
       children: [
         // AI Intro
         Center(
           child: Column(
             children: [
-              Container(
-                width: 80, height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF00B25A).withOpacity(0.2), width: 5),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(40),
+                child: Image.network(
+                  widget.config.logoUrl,
+                  width: 80, height: 80,
+                  fit: BoxFit.cover,
+                  errorBuilder: (c, e, s) => Container(
+                    width: 80, height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF00B25A).withOpacity(0.2), width: 5),
+                    ),
+                    child: const Icon(Icons.blur_on_rounded, size: 40, color: Color(0xFF00B25A)),
+                  ),
                 ),
-                child: const Icon(Icons.blur_on_rounded, size: 40, color: Color(0xFF00B25A)),
               ),
               const SizedBox(height: 10),
               const Text('Hi! I\'m NGMY AI 👋', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
@@ -4232,12 +5986,63 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         ),
         const SizedBox(height: 30),
 
+        // Chat History
+        ..._messages.map((m) => _chatBubble(m, isDark)),
+
+        if (_isTyping)
+           _chatBubble({'role': 'ai', 'text': 'thinking...'}, isDark),
+
+        const SizedBox(height: 20),
+        const Divider(),
+        const SizedBox(height: 10),
+        const Text('RECENT ANNOUNCEMENTS', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 15),
+
         // Announcements
         if (widget.announcements.isEmpty)
           const Center(child: Text('No announcements yet', style: TextStyle(color: Colors.grey)))
         else
           ...widget.announcements.map((a) => _annCard(a, isDark)),
       ],
+    );
+  }
+
+  Widget _chatBubble(Map<String, dynamic> m, bool isDark) {
+    bool isUser = m['role'] == 'user';
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Column(
+        crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          if (!isUser) 
+            const Padding(
+              padding: EdgeInsets.only(left: 5, bottom: 2),
+              child: Text('NGMY AI', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey)),
+            ),
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+            decoration: BoxDecoration(
+              color: isUser ? const Color(0xFF00B25A) : (isDark ? const Color(0xFF1C1F2E) : Colors.white),
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(15),
+                topRight: const Radius.circular(15),
+                bottomLeft: Radius.circular(isUser ? 15 : 0),
+                bottomRight: Radius.circular(isUser ? 0 : 15),
+              ),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)],
+            ),
+            child: Text(
+              m['text'],
+              style: TextStyle(
+                color: isUser ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
