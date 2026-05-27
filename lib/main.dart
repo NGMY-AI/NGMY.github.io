@@ -4795,10 +4795,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               title: 'Cash App',
                               value: widget.config.helpCashApp,
                               color: Colors.green,
-                              onPrimaryTap: _openCashApp,
-                              primaryLabel: 'Open',
-                              onSecondaryTap: () => _copyText(widget.config.helpCashApp, 'Cash App'),
-                              secondaryLabel: 'Copy',
+                              onTap: _openCashApp,
+                              tapHint: 'Tap row to open Cash App',
+                              onCopyTap: () => _copyText(widget.config.helpCashApp, 'Cash App'),
                             ),
                           if (widget.config.helpZelle.trim().isNotEmpty)
                             _helpRow(
@@ -4806,18 +4805,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               title: 'Zelle',
                               value: widget.config.helpZelle,
                               color: Colors.purple,
-                              onPrimaryTap: () => _copyText(widget.config.helpZelle, 'Zelle'),
-                              primaryLabel: 'Copy',
+                              onCopyTap: () => _copyText(widget.config.helpZelle, 'Zelle'),
                             ),
                           _helpRow(
                             icon: Icons.call_outlined,
                             title: 'Call for Help',
                             value: widget.config.helpPhone,
                             color: Colors.blue,
-                            onPrimaryTap: _callHelpPhone,
-                            primaryLabel: 'Call',
-                            onSecondaryTap: () => _copyText(widget.config.helpPhone, 'Phone'),
-                            secondaryLabel: 'Copy',
+                            onTap: _callHelpPhone,
+                            tapHint: 'Tap row to call now',
+                            onCopyTap: () => _copyText(widget.config.helpPhone, 'Phone'),
                           ),
                           Container(
                             margin: const EdgeInsets.only(top: 8),
@@ -5236,15 +5233,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     required String title,
     required String value,
     required Color color,
-    required VoidCallback onPrimaryTap,
-    required String primaryLabel,
-    VoidCallback? onSecondaryTap,
-    String? secondaryLabel,
+    VoidCallback? onTap,
+    String? tapHint,
+    VoidCallback? onCopyTap,
   }) {
-    return Container(
+    final content = Container(
       margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withOpacity(0.35))),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
       child: Row(
         children: [
           Icon(icon, size: 16, color: color),
@@ -5253,25 +5253,35 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 11, color: Colors.black54)),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                Text(title, style: const TextStyle(fontSize: 11, color: Colors.black87, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.black)),
+                if (tapHint != null && onTap != null) ...[
+                  const SizedBox(height: 2),
+                  Text(tapHint, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
+                ],
               ],
             ),
           ),
-          TextButton(
-            onPressed: onPrimaryTap,
-            style: TextButton.styleFrom(backgroundColor: color, foregroundColor: Colors.white, minimumSize: const Size(40, 30), padding: const EdgeInsets.symmetric(horizontal: 10)),
-            child: Text(primaryLabel, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-          ),
-          if (onSecondaryTap != null && secondaryLabel != null) ...[
+          if (onCopyTap != null) ...[
             const SizedBox(width: 6),
             TextButton(
-              onPressed: onSecondaryTap,
+              onPressed: onCopyTap,
               style: TextButton.styleFrom(backgroundColor: Colors.black12, foregroundColor: Colors.black87, minimumSize: const Size(40, 30), padding: const EdgeInsets.symmetric(horizontal: 10)),
-              child: Text(secondaryLabel, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+              child: const Text('Copy', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
             ),
           ],
         ],
+      ),
+    );
+
+    if (onTap == null) return content;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: content,
       ),
     );
   }
