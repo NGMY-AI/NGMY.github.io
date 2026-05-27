@@ -653,60 +653,58 @@ class _NGMYAppState extends State<NGMYApp> {
               },
               onResetPasswordByEmail: (email, newHash) async {
                 final emailNorm = email.toLowerCase().trim();
-                debugPrint('[ResetPW] Setting hash=${newHash.substring(0, 8)}... for $emailNorm');
+                debugPrint('[ResetPW] Starting reset for $emailNorm');
                 _isSyncing = true;
 
                 try {
-                  final updateResult = await supabase
+                  // 1. Try to update the password in Supabase users table
+                  final result = await supabase
                       .from('users')
                       .update({'passwordHash': newHash})
                       .eq('email', emailNorm)
                       .select();
-                  debugPrint('[ResetPW] update affected ${updateResult.length} row(s)');
-
-                  if (updateResult.isEmpty) {
-                    // User row doesn't exist in public.users yet. Create one.
-                    final newUser = UserData(email: emailNorm, username: emailNorm.split('@').first, passwordHash: newHash);
-                    await supabase.from('users').insert(newUser.toJson());
-                    debugPrint('[ResetPW] Created new user row');
-                    _allUsers.add(newUser);
-                  }
-
-                  final fresh = await supabase.from('users').select().eq('email', emailNorm).maybeSingle();
-                  if (fresh == null) {
-                    debugPrint('[ResetPW] User missing after insert!');
-                    _isSyncing = false;
-                    return false;
-                  }
-                  final dbHash = (fresh['passwordHash'] ?? '').toString();
-                  debugPrint('[ResetPW] DB now has hash=${dbHash.isEmpty ? "(empty!)" : "${dbHash.substring(0, 8)}..."}');
-
-                  if (dbHash != newHash) {
-                    debugPrint('[ResetPW] WARNING: DB hash does not match expected hash!');
-                  }
-
-                  final freshUser = UserData.fromJson(fresh);
-                  final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailNorm);
-                  setState(() {
-                    if (idx == -1) {
-                      _allUsers.add(freshUser);
-                    } else {
-                      _allUsers[idx] = freshUser;
-                    }
-                  });
-                  debugPrint('[ResetPW] Local state synced. Total users=${_allUsers.length}');
                   
-                  // Force a save to local storage immediately
+                  debugPrint('[ResetPW] Supabase update result: ${result.length} rows');
+
+                  // 2. If user doesn't exist in the custom table yet, we can't update.
+                  // But usually they should exist if they have an account.
+                  // If they don't, we'll let the onAuthComplete handle it during next login
+                  // or create it now if we want. Let's ensure it exists.
+                  if (result.isEmpty) {
+                     debugPrint('[ResetPW] User not found in custom table, inserting new record');
+                     await supabase.from('users').insert({
+                       'email': emailNorm,
+                       'passwordHash': newHash,
+                       'username': emailNorm.split('@').first,
+                     });
+                  }
+
+                  // 3. Update the local list immediately so login works without restart
+                  final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailNorm);
+                  if (mounted) {
+                    setState(() {
+                      if (idx != -1) {
+                        _allUsers[idx].passwordHash = newHash;
+                        debugPrint('[ResetPW] Updated existing local user');
+                      } else {
+                        _allUsers.add(UserData(email: emailNorm, passwordHash: newHash, username: emailNorm.split('@').first));
+                        debugPrint('[ResetPW] Added new user to local list');
+                      }
+                    });
+                  }
+
+                  // 4. Force save to SharedPreferences
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+                  
+                  debugPrint('[ResetPW] Reset completed successfully');
+                  _isSyncing = false;
+                  return true;
                 } catch (e) {
-                  debugPrint('[ResetPW] error: $e');
+                  debugPrint('[ResetPW] Error: $e');
                   _isSyncing = false;
                   return false;
                 }
-
-                Future.delayed(const Duration(milliseconds: 1500), () => _isSyncing = false);
-                return true;
               },
               onAuthComplete: (e, p, u, passwordHash, isLogin) async {
               final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
@@ -812,17 +810,42 @@ class _AuthScreenState extends State<AuthScreen> {
         (u) => u.email.toLowerCase().trim() == email, 
         orElse: () => UserData(email: '')
       );
-      if (user.email.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account not found. Please Sign Up first.')));
-        return;
-      }
+      
       final enteredHash = _hashPassword(password);
       debugPrint('[Login] email=$email storedHash=${user.passwordHash.isEmpty ? "(empty)" : "${user.passwordHash.substring(0, 8)}..."} enteredHash=${enteredHash.substring(0, 8)}...');
-      if (user.passwordHash.isNotEmpty && user.passwordHash != enteredHash) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incorrect password')));
+      
+      // If user exists and hash matches, proceed immediately
+      if (user.email.isNotEmpty && user.passwordHash.isNotEmpty && user.passwordHash == enteredHash) {
+        widget.onAuthComplete(email, '', '', enteredHash, true);
         return;
       }
-      widget.onAuthComplete(email, '', '', enteredHash, true);
+      
+      // Fallback: If not found locally or hash mismatch, check Supabase directly
+      // This is crucial after a password reset to ensure we have the absolute latest data.
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Checking credentials...')));
+      
+      Supabase.instance.client
+          .from('users')
+          .select()
+          .eq('email', email)
+          .maybeSingle()
+          .then((fresh) {
+            if (fresh == null) {
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account not found. Please Sign Up first.')));
+              return;
+            }
+            
+            final dbHash = (fresh['passwordHash'] ?? '').toString();
+            if (dbHash.isNotEmpty && dbHash == enteredHash) {
+              // Password matches Supabase, let's login and update local state
+              widget.onAuthComplete(email, '', '', enteredHash, true);
+            } else {
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incorrect password')));
+            }
+          })
+          .catchError((err) {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login error: $err')));
+          });
     } else {
       if (username.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a username')));
@@ -907,15 +930,15 @@ class _AuthScreenState extends State<AuthScreen> {
           final confirm = confirmCtl.text;
 
           if (code.length < 6) {
-            ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Enter the 6-digit verification code')));
+            if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Enter the 6-digit verification code')));
             return;
           }
           if (pw.length < 6) {
-            ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Password must be at least 6 characters')));
+            if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Password must be at least 6 characters')));
             return;
           }
           if (pw != confirm) {
-            ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+            if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
             return;
           }
 
@@ -939,20 +962,25 @@ class _AuthScreenState extends State<AuthScreen> {
 
             if (!ctx.mounted) return;
             Navigator.pop(c);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(ok
-                  ? 'Password reset successful! Log in with your new password.'
-                  : 'Password updated but profile not found. Sign up first or contact support.'),
-                backgroundColor: ok ? Colors.green : Colors.orange,
-                duration: const Duration(seconds: 4),
-              ),
-            );
+            
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(ok
+                    ? 'Password reset successful! Log in with your new password.'
+                    : 'Password updated but profile not found. Sign up first or contact support.'),
+                  backgroundColor: ok ? Colors.green : Colors.orange,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
           } catch (e) {
-            setLocal(() => isLoading = false);
-            ScaffoldMessenger.of(ctx).showSnackBar(
-              SnackBar(content: Text('Verification failed: ${e.toString()}'), backgroundColor: Colors.red),
-            );
+            if (ctx.mounted) {
+              setLocal(() => isLoading = false);
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(content: Text('Verification failed: ${e.toString()}'), backgroundColor: Colors.red),
+              );
+            }
           }
         }
 
