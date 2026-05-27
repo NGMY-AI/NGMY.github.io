@@ -159,6 +159,32 @@ class MediaPost {
   }
 }
 
+class Announcement {
+  final String id;
+  final String title;
+  final String message;
+  final String? imageUrl;
+  final DateTime timestamp;
+  final bool isAi;
+
+  Announcement({required this.id, required this.title, required this.message, this.imageUrl, required this.timestamp, this.isAi = false});
+
+  Map<String, dynamic> toJson() => {
+    'id': id, 'title': title, 'message': message, 'imageUrl': imageUrl, 'timestamp': timestamp.toUtc().toIso8601String(), 'isAi': isAi
+  };
+
+  factory Announcement.fromJson(Map<String, dynamic> json) {
+    return Announcement(
+      id: json['id'] ?? '',
+      title: json['title'] ?? '',
+      message: json['message'] ?? '',
+      imageUrl: json['imageUrl'],
+      timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()).toLocal(),
+      isAi: json['isAi'] ?? false,
+    );
+  }
+}
+
 class ActiveInvestment {
   String name; double amount; double dailyROI; final DateTime purchaseDate;
   double totalEarned; int daysClockedIn;
@@ -281,6 +307,7 @@ class _NGMYAppState extends State<NGMYApp> {
     InvestmentPlan(name: 'Gold Plan', price: 200.0, roi: 0.0286)
   ];
   List<MediaPost> _allMedia = [];
+  List<Announcement> _allAnnouncements = [];
 
   RealtimeChannel? _usersChannel;
   RealtimeChannel? _transactionsChannel;
@@ -300,6 +327,7 @@ class _NGMYAppState extends State<NGMYApp> {
     try { _usersChannel?.unsubscribe(); } catch (_) {}
     try { _transactionsChannel?.unsubscribe(); } catch (_) {}
     try { _mediaChannel?.unsubscribe(); } catch (_) {}
+    try { _announcementsChannel?.unsubscribe(); } catch (_) {}
     try { _authSub?.cancel(); } catch (_) {}
     super.dispose();
   }
@@ -378,9 +406,42 @@ class _NGMYAppState extends State<NGMYApp> {
             callback: (payload) => _onMediaChange(payload),
           )
           .subscribe();
+
+      _announcementsChannel = supabase
+          .channel('public:announcements')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'announcements',
+            callback: (payload) => _onAnnouncementsChange(payload),
+          )
+          .subscribe();
       debugPrint('Realtime subscriptions active');
     } catch (e) {
       debugPrint('Realtime subscribe error: $e');
+    }
+  }
+
+  void _onAnnouncementsChange(PostgresChangePayload payload) {
+    if (_isSyncing) return;
+    try {
+      if (payload.eventType == PostgresChangeEvent.delete) {
+        final id = (payload.oldRecord['id'] ?? '').toString();
+        if (id.isEmpty) return;
+        setState(() => _allAnnouncements.removeWhere((a) => a.id == id));
+      } else {
+        final ann = Announcement.fromJson(payload.newRecord);
+        setState(() {
+          final idx = _allAnnouncements.indexWhere((a) => a.id == ann.id);
+          if (idx == -1) {
+            _allAnnouncements.add(ann);
+          } else {
+            _allAnnouncements[idx] = ann;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Announcements realtime apply error: $e');
     }
   }
 
@@ -515,6 +576,11 @@ class _NGMYAppState extends State<NGMYApp> {
         if (mediaData != null) {
           _allMedia = (mediaData as List).map((e) => MediaPost.fromJson(e)).toList();
         }
+
+        final annData = await supabase.from('announcements').select();
+        if (annData != null) {
+          _allAnnouncements = (annData as List).map((e) => Announcement.fromJson(e)).toList();
+        }
       } catch (e) {
         debugPrint("Supabase Load Error: $e. Falling back to local.");
         final uLocal = safeGet('all_users');
@@ -617,11 +683,20 @@ class _NGMYAppState extends State<NGMYApp> {
         }
       }
 
+      if (_allAnnouncements.isNotEmpty) {
+        try {
+          await supabase.from('announcements').upsert(_allAnnouncements.map((e) => e.toJson()).toList());
+        } catch (e) {
+          debugPrint("Announcement sync error: $e");
+        }
+      }
+
       await prefs.setString('all_transactions', jsonEncode(_allTransactions.map((e) => e.toJson()).toList()));
       await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
       await prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
       await prefs.setString('app_config', jsonEncode(_config.toJson()));
       await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
+      await prefs.setString('all_announcements', jsonEncode(_allAnnouncements.map((e) => e.toJson()).toList()));
       
     } catch (e) { debugPrint("Save error: $e"); }
     finally {
@@ -729,6 +804,7 @@ class _NGMYAppState extends State<NGMYApp> {
           : MainScreen(
               user: _currentUser!, allTransactions: _allTransactions, allUsers: _allUsers, globalPlans: _globalPlans,
               allMedia: _allMedia,
+              allAnnouncements: _allAnnouncements,
               config: _config,
               onThemeChanged: (m) => setState(() => _themeMode = m), currentThemeMode: _themeMode, 
               onLogout: () async { 
@@ -759,6 +835,8 @@ class _NGMYAppState extends State<NGMYApp> {
               }); _saveData(); },
               onAddPlan: (p) { setState(() { _globalPlans.add(p); _globalPlans.sort((a, b) => a.price.compareTo(b.price)); }); _saveData(); },
               onPostMedia: (post) { setState(() => _allMedia.insert(0, post)); _saveData(); },
+              onAddAnnouncement: (ann) { setState(() => _allAnnouncements.insert(0, ann)); _saveData(); },
+              onDeleteAnnouncement: (id) { setState(() => _allAnnouncements.removeWhere((a) => a.id == id)); _saveData(); },
             ),
     );
   }
@@ -1115,12 +1193,14 @@ class _AuthScreenState extends State<AuthScreen> {
 
 class MainScreen extends StatefulWidget {
   final UserData user; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans; 
-  final List<MediaPost> allMedia; final AppConfig config;
+  final List<MediaPost> allMedia; final List<Announcement> allAnnouncements; final AppConfig config;
   final Function(ThemeMode) onThemeChanged; final ThemeMode currentThemeMode; final VoidCallback onLogout; final VoidCallback onDataChanged;
   final Function(AppTransaction) onAddTransaction; final Function(AppTransaction, bool) onProcessTransaction; final Function(InvestmentPlan) onAddPlan;
   final Function(MediaPost) onPostMedia;
+  final Function(Announcement) onAddAnnouncement;
+  final Function(String) onDeleteAnnouncement;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 class _MainScreenState extends State<MainScreen> {
@@ -1198,7 +1278,7 @@ class _MainScreenState extends State<MainScreen> {
           widget.user.lastClockInDate = DateTime.now();
         }); 
         widget.onDataChanged(); 
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r) {
         final currentInvested = widget.user.totalInvestmentAmount;
         final cost = math.max(0.0, p - currentInvested);
@@ -1253,8 +1333,11 @@ class _MainScreenState extends State<MainScreen> {
 
 class HomeScreen extends StatefulWidget {
   final UserData user; final VoidCallback onClockIn; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans; final AppConfig config;
+  final List<Announcement> allAnnouncements;
+  final Function(Announcement) onAddAnnouncement;
+  final Function(String) onDeleteAnnouncement;
   final Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config});
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -1291,7 +1374,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               FloatingTitle(
                 title: 'GROWTH INCOME',
-                onTap: widget.user.isAdmin ? () => Navigator.push(context, MaterialPageRoute(builder: (c) => AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config))) : null,
+                onTap: widget.user.isAdmin ? () => Navigator.push(context, MaterialPageRoute(builder: (c) => AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement))) : null,
                 leading: InkWell(
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => LoanServiceScreen(user: widget.user, config: widget.config))),
                   child: Container(
@@ -1302,7 +1385,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
                 trailing: IconButton(
                   icon: const Icon(Icons.campaign_rounded, color: Colors.orangeAccent), 
-                  onPressed: () {},
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => AnnouncementScreen(user: widget.user, announcements: widget.allAnnouncements))),
                 ),
               ),
               const SizedBox(height: 20),
@@ -1725,9 +1808,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
 class AdminDashboard extends StatefulWidget {
   final UserData user; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans; final AppConfig config;
+  final List<Announcement> allAnnouncements;
+  final Function(Announcement) onAddAnnouncement;
+  final Function(String) onDeleteAnnouncement;
   final Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
 
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config});
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 class _AdminDashboardState extends State<AdminDashboard> {
@@ -1852,6 +1938,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           childAspectRatio: 1.4,
           children: [
             _menuFrame('Loan Center', Icons.handshake_outlined, Colors.teal, () => _showLoanAdmin(isDark), isDark),
+            _menuFrame('Announcements', Icons.campaign_outlined, Colors.orange, () => _showAnnouncementAdmin(isDark), isDark),
             _menuFrame('App Status', Icons.settings_suggest_rounded, Colors.blueGrey, () {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('System components running normally.')));
             }, isDark),
@@ -1862,6 +1949,85 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ],
     ),
   );
+
+  void _showAnnouncementAdmin(bool isDark) {
+    final titleC = TextEditingController();
+    final msgC = TextEditingController();
+    final imgC = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (c) => StatefulBuilder(builder: (ctx, setST) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F111A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          padding: const EdgeInsets.all(25),
+          child: Column(
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10))),
+              const SizedBox(height: 20),
+              const Text('Announcement Manager', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: msgC, maxLines: 3, decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: imgC, decoration: const InputDecoration(labelText: 'Image URL (Optional)', border: OutlineInputBorder())),
+              const SizedBox(height: 15),
+              ElevatedButton(
+                onPressed: () {
+                  if (titleC.text.isEmpty || msgC.text.isEmpty) return;
+                  final ann = Announcement(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    title: titleC.text,
+                    message: msgC.text,
+                    imageUrl: imgC.text.isEmpty ? null : imgC.text,
+                    timestamp: DateTime.now(),
+                  );
+                  widget.onAddAnnouncement(ann);
+                  titleC.clear(); msgC.clear(); imgC.clear();
+                  setST(() {});
+                },
+                style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: Colors.orange),
+                child: const Text('POST ANNOUNCEMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 10),
+              const Align(alignment: Alignment.centerLeft, child: Text('ACTIVE ANNOUNCEMENTS', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold))),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: widget.allAnnouncements.length,
+                  itemBuilder: (ctx, i) {
+                    final a = widget.allAnnouncements[i];
+                    return Card(
+                      child: ListTile(
+                        title: Text(a.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(a.message, maxLines: 2, overflow: TextOverflow.ellipsis),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () {
+                            widget.onDeleteAnnouncement(a.id);
+                            setST(() {});
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
 
   Widget _miniStat(String l, String v, IconData i, Color c) => Column(children: [
     Icon(i, color: c, size: 18),
@@ -3897,6 +4063,219 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  String _timeAgo(DateTime t) {
+    final diff = DateTime.now().difference(t);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+}
+
+class AnnouncementScreen extends StatefulWidget {
+  final UserData user;
+  final List<Announcement> announcements;
+  const AnnouncementScreen({super.key, required this.user, required this.announcements});
+
+  @override
+  State<AnnouncementScreen> createState() => _AnnouncementScreenState();
+}
+
+class _AnnouncementScreenState extends State<AnnouncementScreen> {
+  int _activeTab = 0; // 0: Chat, 1: Signals, 2: Rhyme
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = const Color(0xFF00B25A);
+
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF0F4F0),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header - NGMY Helper Style
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [primaryColor, primaryColor.withOpacity(0.8)]),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.blur_on_rounded, color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: 15),
+                  const Text('NGMY Helper', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+                  const Spacer(),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.white)),
+                ],
+              ),
+            ),
+
+            // Tabs Bar
+            Container(
+              margin: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white10 : Colors.white,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Row(
+                children: [
+                  _tabBtn(0, Icons.chat_bubble_outline, 'Chat'),
+                  _tabBtn(1, Icons.trending_up, 'Signals'),
+                  _tabBtn(2, Icons.music_note, 'Rhyme'),
+                ],
+              ),
+            ),
+
+            // Content Area
+            Expanded(
+              child: _activeTab == 0 ? _chatView(isDark) : Center(child: Text('Coming Soon', style: TextStyle(color: Colors.grey))),
+            ),
+
+            // Bottom Input (Mockup style)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+                border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.1))),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.black26 : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: const TextField(
+                        decoration: InputDecoration(hintText: 'Ask me anything about NGMY...', border: InputBorder.none),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+                  Container(
+                    width: 50, height: 50,
+                    decoration: BoxDecoration(color: primaryColor.withOpacity(0.2), shape: BoxShape.circle),
+                    child: Icon(Icons.send_rounded, color: primaryColor),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tabBtn(int idx, IconData icon, String label) {
+    bool sel = _activeTab == idx;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _activeTab = idx),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: sel ? (Theme.of(context).brightness == Brightness.dark ? Colors.white12 : Colors.white) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: sel ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)] : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: sel ? const Color(0xFF00B25A) : Colors.grey),
+              const SizedBox(width: 5),
+              Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: sel ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87) : Colors.grey)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _chatView(bool isDark) {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        // AI Intro
+        Center(
+          child: Column(
+            children: [
+              Container(
+                width: 80, height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF00B25A).withOpacity(0.2), width: 5),
+                ),
+                child: const Icon(Icons.blur_on_rounded, size: 40, color: Color(0xFF00B25A)),
+              ),
+              const SizedBox(height: 10),
+              const Text('Hi! I\'m NGMY AI 👋', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 40, vertical: 10),
+                child: Text('Ask me anything about NGMY! I can help with investments, games, loans, withdrawals, and more.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 13)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 30),
+
+        // Announcements
+        if (widget.announcements.isEmpty)
+          const Center(child: Text('No announcements yet', style: TextStyle(color: Colors.grey)))
+        else
+          ...widget.announcements.map((a) => _annCard(a, isDark)),
+      ],
+    );
+  }
+
+  Widget _annCard(Announcement a, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.campaign_rounded, color: Colors.orange, size: 18),
+              const SizedBox(width: 8),
+              Text(a.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const Spacer(),
+              Text(_timeAgo(a.timestamp), style: const TextStyle(color: Colors.grey, fontSize: 10)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(a.message, style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 13, height: 1.4)),
+          if (a.imageUrl != null) ...[
+            const SizedBox(height: 15),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: Image.network(
+                a.imageUrl!,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (c, e, s) => const SizedBox.shrink(),
+              ),
+            ),
+          ],
         ],
       ),
     );
