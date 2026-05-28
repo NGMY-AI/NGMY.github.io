@@ -1917,7 +1917,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _status(BuildContext ctx) {
     bool isLight = Theme.of(ctx).brightness == Brightness.light;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Theme.of(ctx).cardColor,
         borderRadius: BorderRadius.circular(20),
@@ -1927,7 +1927,40 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text('Network Status', style: TextStyle(fontWeight: FontWeight.bold)),
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF8EEBC0), Color(0xFF54C995)]),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(Icons.wifi, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Network Status',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 24 * 0.7,
+                      color: isLight ? const Color(0xFF111827) : Colors.white,
+                    ),
+                  ),
+                  Text(
+                    'Real-time statistics',
+                    style: TextStyle(
+                      color: isLight ? Colors.black54 : Colors.white60,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
           GestureDetector(
             onTap: () => Navigator.push(
               ctx,
@@ -1939,106 +1972,36 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
               ),
             ),
-            child: AnimatedBuilder(
-              animation: _smokeCtrl,
-              builder: (context, child) {
-                final t = _smokeCtrl.value * 2 * math.pi;
-                final glow = 0.65 + (math.sin(t) + 1) * 0.35;
-                final orbitX = math.cos(t) * 50;
-                final orbitY = math.sin(t) * 16;
-                final orbitX2 = math.cos(t + math.pi) * 50;
-                final orbitY2 = math.sin(t + math.pi) * 16;
-                return SizedBox(
-                  width: 112,
-                  height: 42,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none,
-                    children: [
-                      Positioned(
-                        left: 56 + orbitX - 4,
-                        top: 21 + orbitY - 4,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.85),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF9DFFD0).withOpacity(0.8),
-                                blurRadius: 9,
-                                spreadRadius: 1.2,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 56 + orbitX2 - 3,
-                        top: 21 + orbitY2 - 3,
-                        child: Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.72),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF5EEA9D).withOpacity(0.7),
-                                blurRadius: 8,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Container(
-                        width: 112,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.28 + (glow * 0.45)),
-                            width: 1.25,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF80FFB0).withOpacity(0.2 + (glow * 0.3)),
-                              blurRadius: 9 + (glow * 12),
-                              spreadRadius: 0.8 + (glow * 1.2),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 108,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF81C784)]),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.52), width: 0.85),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF00B25A).withOpacity(0.35 + (glow * 0.2)),
-                              blurRadius: 10 + (glow * 8),
-                              spreadRadius: glow * 0.8,
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.fiber_manual_record, size: 8, color: Colors.white),
-                            SizedBox(width: 8),
-                            Text('ACTIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-                          ],
-                        ),
-                      ),
-                    ],
+            child: Container(
+              width: 164,
+              height: 48,
+              padding: const EdgeInsets.all(2.2),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFFFFC107), Color(0xFFFF9800)]),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFFB300).withOpacity(0.35),
+                    blurRadius: 10,
                   ),
-                );
-              },
+                ],
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF13B7A0), Color(0xFF13C86A)]),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.sports_esports_rounded, color: Colors.pinkAccent, size: 18),
+                    SizedBox(width: 6),
+                    Text('ACTIVE', style: TextStyle(color: Colors.white, fontSize: 23 * 0.6, fontWeight: FontWeight.w900)),
+                    SizedBox(width: 6),
+                    Icon(Icons.attach_money_rounded, color: Colors.amber, size: 18),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
