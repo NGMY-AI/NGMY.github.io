@@ -5,7 +5,9 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -128,6 +130,8 @@ class AppConfig {
   String helpPhone;
   String helpScopeType; // all, city, room
   String helpScopeValue;
+  List<Map<String, dynamic>> jobPosts;
+  List<Map<String, dynamic>> jobWorkerApplications;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -147,6 +151,8 @@ class AppConfig {
     this.helpPhone = '',
     this.helpScopeType = 'all',
     this.helpScopeValue = '',
+    this.jobPosts = const [],
+    this.jobWorkerApplications = const [],
   });
   Map<String, dynamic> toJson() => {
     'officialCashApp': officialCashApp,
@@ -166,6 +172,8 @@ class AppConfig {
     'helpPhone': helpPhone,
     'helpScopeType': helpScopeType,
     'helpScopeValue': helpScopeValue,
+    'jobPosts': jobPosts,
+    'jobWorkerApplications': jobWorkerApplications,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
@@ -185,6 +193,8 @@ class AppConfig {
     helpPhone: json['helpPhone'] ?? '',
     helpScopeType: json['helpScopeType'] ?? 'all',
     helpScopeValue: json['helpScopeValue'] ?? '',
+    jobPosts: List<Map<String, dynamic>>.from((json['jobPosts'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
+    jobWorkerApplications: List<Map<String, dynamic>>.from((json['jobWorkerApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
   );
 }
 
@@ -200,26 +210,60 @@ class MediaPost {
   final String userEmail;
   final String username;
   final String videoUrl;
+  final String contentType; // video | image
   final String caption;
   final DateTime timestamp;
   int likes;
+  List<String> likedBy;
+  List<String> savedBy;
+  List<Map<String, dynamic>> comments;
 
-  MediaPost({required this.id, required this.userEmail, required this.username, required this.videoUrl, required this.caption, required this.timestamp, this.likes = 0});
+  MediaPost({
+    required this.id,
+    required this.userEmail,
+    required this.username,
+    required this.videoUrl,
+    required this.caption,
+    required this.timestamp,
+    this.contentType = 'video',
+    this.likes = 0,
+    this.likedBy = const [],
+    this.savedBy = const [],
+    this.comments = const [],
+  });
 
   Map<String, dynamic> toJson() => {
-    'id': id, 'userEmail': userEmail, 'username': username, 'videoUrl': videoUrl,
-    'caption': caption, 'timestamp': timestamp.toUtc().toIso8601String(), 'likes': likes
+    'id': id,
+    'userEmail': userEmail,
+    'username': username,
+    'videoUrl': videoUrl,
+    'contentType': contentType,
+    'caption': caption,
+    'timestamp': timestamp.toUtc().toIso8601String(),
+    'likes': likedBy.length,
+    'likedBy': likedBy,
+    'savedBy': savedBy,
+    'comments': comments,
   };
 
   factory MediaPost.fromJson(Map<String, dynamic> json) {
+    final likedBy = List<String>.from(json['likedBy'] ?? const []);
+    final savedBy = List<String>.from(json['savedBy'] ?? const []);
+    final comments = List<Map<String, dynamic>>.from(
+      (json['comments'] ?? const []).map((e) => Map<String, dynamic>.from(e)),
+    );
     return MediaPost(
       id: json['id'] ?? '',
       userEmail: json['userEmail'] ?? '',
       username: json['username'] ?? 'User',
       videoUrl: json['videoUrl'] ?? '',
+      contentType: (json['contentType'] ?? 'video').toString(),
       caption: json['caption'] ?? '',
       timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()).toLocal(),
-      likes: json['likes'] ?? 0,
+      likedBy: likedBy,
+      savedBy: savedBy,
+      comments: comments,
+      likes: likedBy.isNotEmpty ? likedBy.length : (json['likes'] ?? 0),
     );
   }
 }
@@ -283,6 +327,7 @@ class UserData {
   bool forceLogout; int referralCount; int points;
   String? profilePicturePath;
   bool isAuthorizedRegistrar;
+  bool isApprovedWorker;
   DateTime? lastClockInDate;
   String passwordHash;
   String state;
@@ -297,7 +342,7 @@ class UserData {
   String? city;
   String? room;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.lastClockInDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room});
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.lastClockInDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room});
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
     if (activeInvestment!.daysLeft <= 0) return 0.0;
@@ -317,7 +362,7 @@ class UserData {
     double earnings = (totalDaily / 24.0) * (elapsed.inSeconds / 3600.0);
     return earnings > totalDaily ? totalDaily : earnings;
   }
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -355,6 +400,7 @@ class UserData {
       points: json['points'] ?? 0, 
       profilePicturePath: json['profilePicturePath'], 
       isAuthorizedRegistrar: json['isAuthorizedRegistrar'] ?? false, 
+      isApprovedWorker: json['isApprovedWorker'] ?? false,
       lastClockInDate: parseDate(json['lastClockInDate']),
       passwordHash: json['passwordHash'] ?? '',
       state: json['state'] ?? 'Georgia',
@@ -380,7 +426,7 @@ class NGMYApp extends StatefulWidget {
 }
 
 class _NGMYAppState extends State<NGMYApp> {
-  ThemeMode _themeMode = ThemeMode.dark;
+  ThemeMode _themeMode = ThemeMode.light;
   UserData? _currentUser;
   bool _isLoading = true;
   List<AppTransaction> _allTransactions = [];
@@ -404,16 +450,20 @@ class _NGMYAppState extends State<NGMYApp> {
   RealtimeChannel? _configChannel;
   StreamSubscription<AuthState>? _authSub;
   bool _isSyncing = false;
+  Timer? _autoThemeTimer;
+  final Set<String> _disabledSupabaseTables = {};
 
   @override void initState() {
     super.initState();
     _loadData().then((_) {
+      _scheduleAutoThemeTick();
       _subscribeToRealtime();
       _subscribeToAuthState();
     });
   }
 
   @override void dispose() {
+    try { _autoThemeTimer?.cancel(); } catch (_) {}
     try { _usersChannel?.unsubscribe(); } catch (_) {}
     try { _transactionsChannel?.unsubscribe(); } catch (_) {}
     try { _mediaChannel?.unsubscribe(); } catch (_) {}
@@ -424,6 +474,67 @@ class _NGMYAppState extends State<NGMYApp> {
   }
 
   final supabase = Supabase.instance.client;
+
+  ThemeMode get _effectiveThemeMode {
+    if (_themeMode != ThemeMode.system) return _themeMode;
+    final now = DateTime.now();
+    final mins = now.hour * 60 + now.minute;
+    const startLight = 9 * 60;  // 9:00 AM
+    const startDark = 20 * 60;  // 8:00 PM
+    return (mins >= startLight && mins < startDark) ? ThemeMode.light : ThemeMode.dark;
+  }
+
+  void _applySystemUiForMode(ThemeMode mode) {
+    final isDarkMode = mode == ThemeMode.dark;
+    final style = isDarkMode
+        ? const SystemUiOverlayStyle(
+            statusBarColor: Color(0xFF121212),
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+            systemNavigationBarColor: Color(0xFF121212),
+            systemNavigationBarIconBrightness: Brightness.light,
+          )
+        : const SystemUiOverlayStyle(
+            statusBarColor: Colors.white,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+            systemNavigationBarColor: Colors.white,
+            systemNavigationBarIconBrightness: Brightness.dark,
+          );
+    SystemChrome.setSystemUIOverlayStyle(style);
+  }
+
+  Future<void> _setThemeMode(ThemeMode mode) async {
+    if (!mounted) return;
+    setState(() => _themeMode = mode);
+    _applySystemUiForMode(_effectiveThemeMode);
+    final p = await SharedPreferences.getInstance();
+    await p.setString('theme_mode', mode.name);
+    _scheduleAutoThemeTick();
+  }
+
+  void _scheduleAutoThemeTick() {
+    _autoThemeTimer?.cancel();
+    if (_themeMode != ThemeMode.system) return;
+
+    final now = DateTime.now();
+    final morning = DateTime(now.year, now.month, now.day, 9, 0);
+    final evening = DateTime(now.year, now.month, now.day, 20, 0);
+    DateTime next;
+    if (now.isBefore(morning)) {
+      next = morning;
+    } else if (now.isBefore(evening)) {
+      next = evening;
+    } else {
+      next = morning.add(const Duration(days: 1));
+    }
+    final delay = next.difference(now) + const Duration(seconds: 1);
+    _autoThemeTimer = Timer(delay, () {
+      if (!mounted) return;
+      setState(() {});
+      _scheduleAutoThemeTick();
+    });
+  }
 
   void _subscribeToAuthState() {
     _authSub = supabase.auth.onAuthStateChange.listen((data) {
@@ -640,6 +751,10 @@ class _NGMYAppState extends State<NGMYApp> {
   Future<void> _loadData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final savedTheme = prefs.getString('theme_mode');
+      if (savedTheme == 'light') _themeMode = ThemeMode.light;
+      if (savedTheme == 'dark') _themeMode = ThemeMode.dark;
+      if (savedTheme == 'system') _themeMode = ThemeMode.system;
       
       String? safeGet(String key) {
         try {
@@ -672,6 +787,16 @@ class _NGMYAppState extends State<NGMYApp> {
           if (map is Map<String, dynamic>) _config = AppConfig.fromJson(map);
         } catch (_) {}
       }
+      final localMediaJson = safeGet('all_media');
+      List<MediaPost> localMedia = [];
+      if (localMediaJson != null) {
+        try {
+          localMedia = (jsonDecode(localMediaJson) as List).map((e) => MediaPost.fromJson(e)).toList();
+          _allMedia = localMedia;
+        } catch (_) {
+          prefs.remove('all_media');
+        }
+      }
 
       // 2. Fetch Users & Transactions from Supabase
       try {
@@ -687,7 +812,19 @@ class _NGMYAppState extends State<NGMYApp> {
 
         final mediaData = await supabase.from('media').select();
         if (mediaData != null) {
-          _allMedia = (mediaData as List).map((e) => MediaPost.fromJson(e)).toList();
+          final remoteMedia = (mediaData as List).map((e) => MediaPost.fromJson(e)).toList();
+          if (remoteMedia.isEmpty && localMedia.isNotEmpty) {
+            _allMedia = localMedia;
+          } else {
+            final byId = <String, MediaPost>{};
+            for (final m in localMedia) {
+              if (m.id.isNotEmpty) byId[m.id] = m;
+            }
+            for (final m in remoteMedia) {
+              if (m.id.isNotEmpty) byId[m.id] = m;
+            }
+            _allMedia = byId.values.toList();
+          }
         }
 
         final annData = await supabase.from('announcements').select();
@@ -717,6 +854,14 @@ class _NGMYAppState extends State<NGMYApp> {
             prefs.remove('all_transactions');
           }
         }
+        final mLocal = safeGet('all_media');
+        if (mLocal != null) {
+          try {
+            _allMedia = (jsonDecode(mLocal) as List).map((e) => MediaPost.fromJson(e)).toList();
+          } catch (_) {
+            prefs.remove('all_media');
+          }
+        }
       }
 
       // 3. Handle Current User Session
@@ -742,6 +887,50 @@ class _NGMYAppState extends State<NGMYApp> {
 
     } catch (e) { debugPrint("General load error: $e"); }
     if (mounted) setState(() => _isLoading = false);
+  }
+
+  String? _missingColumnFromError(Object error) {
+    final text = error.toString();
+    final m = RegExp("Could not find the '([^']+)' column").firstMatch(text);
+    return m?.group(1);
+  }
+
+  bool _isMissingTableError(Object error, String table) {
+    return error.toString().contains("Could not find the table 'public.$table'");
+  }
+
+  Future<void> _safeUpsertRows(String table, List<Map<String, dynamic>> rows) async {
+    if (rows.isEmpty) return;
+    if (_disabledSupabaseTables.contains(table)) return;
+
+    final working = rows.map((e) => Map<String, dynamic>.from(e)).toList();
+    final removed = <String>{};
+
+    for (int i = 0; i < 12; i++) {
+      try {
+        await supabase.from(table).upsert(working);
+        if (removed.isNotEmpty) {
+          debugPrint('[$table] synced with removed columns: ${removed.join(', ')}');
+        }
+        return;
+      } catch (e) {
+        if (_isMissingTableError(e, table)) {
+          _disabledSupabaseTables.add(table);
+          debugPrint('[$table] table missing in Supabase. Local save continues.');
+          return;
+        }
+        final missing = _missingColumnFromError(e);
+        if (missing != null && missing.isNotEmpty) {
+          removed.add(missing);
+          for (final row in working) {
+            row.remove(missing);
+          }
+          continue;
+        }
+        debugPrint('[$table] sync error: $e');
+        return;
+      }
+    }
   }
 
   Future<void> _saveData() async {
@@ -777,43 +966,35 @@ class _NGMYAppState extends State<NGMYApp> {
       
       // Sync all transactions to Supabase
       if (_allTransactions.isNotEmpty) {
-        try {
-          await supabase.from('transactions').upsert(_allTransactions.map((e) => e.toJson()).toList());
-        } catch (e) {
-          debugPrint("Transaction sync error: $e");
-        }
+        await _safeUpsertRows(
+          'transactions',
+          _allTransactions.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
+        );
       }
       
       // Sync all users to Supabase (deduped list)
       if (_allUsers.isNotEmpty) {
-        try {
-          await supabase.from('users').upsert(_allUsers.map((e) => e.toJson()).toList());
-        } catch (e) {
-          debugPrint("User sync error: $e");
-        }
+        await _safeUpsertRows(
+          'users',
+          _allUsers.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
+        );
       }
 
       if (_allMedia.isNotEmpty) {
-        try {
-          await supabase.from('media').upsert(_allMedia.map((e) => e.toJson()).toList());
-        } catch (e) {
-          debugPrint("Media sync error: $e");
-        }
+        await _safeUpsertRows(
+          'media',
+          _allMedia.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
+        );
       }
 
       if (_allAnnouncements.isNotEmpty) {
-        try {
-          await supabase.from('announcements').upsert(_allAnnouncements.map((e) => e.toJson()).toList());
-        } catch (e) {
-          debugPrint("Announcement sync error: $e");
-        }
+        await _safeUpsertRows(
+          'announcements',
+          _allAnnouncements.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
+        );
       }
 
-      try {
-        await supabase.from('config').upsert({'id': 1, ..._config.toJson()});
-      } catch (e) {
-        debugPrint("Config sync error: $e");
-      }
+      await _safeUpsertRows('config', [<String, dynamic>{'id': 1, ..._config.toJson()}]);
 
       await prefs.setString('all_transactions', jsonEncode(_allTransactions.map((e) => e.toJson()).toList()));
       await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
@@ -830,11 +1011,34 @@ class _NGMYAppState extends State<NGMYApp> {
 
   @override Widget build(BuildContext context) {
     if (_isLoading) return const MaterialApp(debugShowCheckedModeBanner: false, home: Scaffold(body: Center(child: CircularProgressIndicator())));
+    _applySystemUiForMode(_effectiveThemeMode);
     return MaterialApp(
       title: 'NGMY', debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: const Color(0xFF00B25A), brightness: Brightness.light, scaffoldBackgroundColor: const Color(0xFFF0F4F0), cardColor: Colors.white),
-      darkTheme: ThemeData(useMaterial3: true, colorSchemeSeed: const Color(0xFFBB86FC), brightness: Brightness.dark, scaffoldBackgroundColor: const Color(0xFF0A0A0A), cardColor: const Color(0xFF1E1E1E)),
-      themeMode: _themeMode,
+      theme: ThemeData(
+        useMaterial3: true, 
+        colorSchemeSeed: const Color(0xFF00B25A), 
+        brightness: Brightness.light, 
+        scaffoldBackgroundColor: Colors.white, 
+        cardColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
+          backgroundColor: Colors.white,
+          elevation: 0,
+        ),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true, 
+        colorSchemeSeed: const Color(0xFFBB86FC), 
+        brightness: Brightness.dark, 
+        scaffoldBackgroundColor: const Color(0xFF121212), 
+        cardColor: const Color(0xFF1E1E1E),
+        appBarTheme: const AppBarTheme(
+          systemOverlayStyle: SystemUiOverlayStyle.light,
+          backgroundColor: Color(0xFF121212),
+          elevation: 0,
+        ),
+      ),
+      themeMode: _effectiveThemeMode,
       home: _currentUser == null
           ? AuthScreen(
               allUsers: _allUsers,
@@ -925,13 +1129,14 @@ class _NGMYAppState extends State<NGMYApp> {
                 });
               }
               await _saveData();
-            })
+            },
+          )
           : MainScreen(
               user: _currentUser!, allTransactions: _allTransactions, allUsers: _allUsers, globalPlans: _globalPlans,
               allMedia: _allMedia,
               allAnnouncements: _allAnnouncements,
               config: _config,
-              onThemeChanged: (m) => setState(() => _themeMode = m), currentThemeMode: _themeMode, 
+              onThemeChanged: (m) => _setThemeMode(m), currentThemeMode: _themeMode, 
               onLogout: () async { 
                 try {
                   final p = await SharedPreferences.getInstance();
@@ -1475,7 +1680,13 @@ class _MainScreenState extends State<MainScreen> {
         onDataChanged: widget.onDataChanged,
         config: widget.config,
       ),
-      MediaHubScreen(user: widget.user, allMedia: widget.allMedia, onPost: widget.onPostMedia),
+      MediaHubScreen(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        allMedia: widget.allMedia,
+        onPost: widget.onPostMedia,
+        onDataChanged: widget.onDataChanged,
+      ),
       StatsScreen(user: widget.user, transactions: sorted),
       ProfileScreen(user: widget.user, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged),
     ];
@@ -2647,8 +2858,80 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _adminUsers(bool isDark) {
     final filtered = widget.allUsers.where((u) => u.email.toLowerCase().contains(_query)).toList();
+    final workerApps = List<Map<String, dynamic>>.from(
+      widget.config.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)),
+    );
+    final pendingApps = workerApps.where((a) => (a['status'] ?? 'pending') == 'pending').toList();
     return Column(children: [
       Padding(padding: const EdgeInsets.all(15), child: TextField(controller: _search, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(hintText: 'Search users...', hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey), prefixIcon: Icon(Icons.search, color: isDark ? Colors.white38 : Colors.grey), filled: true, fillColor: isDark ? const Color(0xFF1C1F2E) : Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)), onChanged: (v) => setState(() => _query = v.toLowerCase()))),
+      if (pendingApps.isNotEmpty)
+        Container(
+          margin: const EdgeInsets.fromLTRB(15, 0, 15, 10),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Worker Applications', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              ...pendingApps.map((app) {
+                final email = (app['userEmail'] ?? '').toString().toLowerCase().trim();
+                final userIndex = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.black26 : const Color(0xFFF7FAFF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${app['username'] ?? 'User'} • ${app['userEmail'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                      if ((app['note'] ?? '').toString().trim().isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text((app['note'] ?? '').toString()),
+                      ],
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              app['status'] = 'approved';
+                              app['reviewedAt'] = DateTime.now().toIso8601String();
+                              widget.config.jobWorkerApplications = workerApps;
+                              if (userIndex != -1) {
+                                widget.allUsers[userIndex].isApprovedWorker = true;
+                                widget.allUsers[userIndex].status = 'verified';
+                              }
+                              widget.onDataChanged();
+                              setState(() {});
+                            },
+                            child: const Text('Approve'),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton(
+                            onPressed: () {
+                              app['status'] = 'rejected';
+                              app['reviewedAt'] = DateTime.now().toIso8601String();
+                              widget.config.jobWorkerApplications = workerApps;
+                              widget.onDataChanged();
+                              setState(() {});
+                            },
+                            child: const Text('Reject'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
       Expanded(child: ListView(padding: const EdgeInsets.symmetric(horizontal: 15), children: filtered.map((u) => Card(elevation: 0, color: isDark ? const Color(0xFF1C1F2E) : Colors.white, margin: const EdgeInsets.only(bottom: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), child: ExpansionTile(
         iconColor: isDark ? Colors.white : Colors.black,
         collapsedIconColor: isDark ? Colors.white60 : Colors.black54,
@@ -2677,6 +2960,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
               setState(() {});
             })),
             _sBtn('Logout', Icons.logout, Colors.redAccent, () { u.forceLogout = true; widget.onDataChanged(); setState((){}); }),
+            _sBtn(u.isApprovedWorker ? 'Worker ✓' : 'Approve Worker', Icons.verified_user, Colors.purple, () {
+              u.isApprovedWorker = true;
+              u.status = 'verified';
+              widget.onDataChanged();
+              setState(() {});
+            }),
             _sBtn('Delete', Icons.delete, isDark ? Colors.white12 : Colors.black, () { widget.allUsers.remove(u); widget.onDataChanged(); setState((){}); }),
           ]))
         ],
@@ -3506,14 +3795,30 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  ImageProvider? _profileImageProvider() {
+    final path = widget.user.profilePicturePath;
+    if (path == null || path.trim().isEmpty) return null;
+    if (path.startsWith('data:image')) {
+      try {
+        return MemoryImage(base64Decode(path.split(',').last));
+      } catch (_) {
+        return null;
+      }
+    }
+    if (kIsWeb) return null;
+    return FileImage(File(path));
+  }
+
   @override Widget build(BuildContext context) {
     return Scaffold(body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 150), child: Column(children: [
       const FloatingTitle(title: 'MY PROFILE'), const SizedBox(height: 30),
       GestureDetector(
         onTap: () async {
-          final img = await ImagePicker().pickImage(source: ImageSource.gallery);
+          final img = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 78, maxWidth: 1000);
           if (img != null) {
-            setState(() { widget.user.profilePicturePath = img.path; });
+            final bytes = await img.readAsBytes();
+            final value = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+            setState(() { widget.user.profilePicturePath = value; });
             widget.onDataChanged();
           }
         },
@@ -3521,8 +3826,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           CircleAvatar(
             radius: 50,
             backgroundColor: Colors.grey.shade300,
-            backgroundImage: widget.user.profilePicturePath != null ? FileImage(File(widget.user.profilePicturePath!)) : null,
-            child: widget.user.profilePicturePath == null ? const Icon(Icons.person, size: 40, color: Colors.white) : null,
+            backgroundImage: _profileImageProvider(),
+            child: _profileImageProvider() == null ? const Icon(Icons.person, size: 40, color: Colors.white) : null,
           ),
           if (widget.user.status == 'verified') Positioned(bottom: 0, right: 0, child: Container(padding: const EdgeInsets.all(2), decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: const Icon(Icons.verified, color: Colors.blue, size: 24))),
           if (widget.user.status != 'active' && widget.user.status != 'verified') Positioned(top: 0, right: 0, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)), child: Text(widget.user.status.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)))),
@@ -3644,16 +3949,78 @@ class NgmyHubScreen extends StatefulWidget {
 
 class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animCtrl;
+  bool _centerStarHover = false;
+  bool _centerStarPressed = false;
+  bool _triFast = false;
+  bool _triCheap = true;
+  bool _triGood = true;
+  double _discount = 0;
+  String _invoiceTemplate = 'Modern';
+  bool _invoicePaid = false;
+  final List<Offset?> _providerSignaturePoints = [];
+  final List<Offset?> _clientSignaturePoints = [];
+
+  final _calcCityC = TextEditingController();
+  final _calcServiceC = TextEditingController();
+  final _othersPriceC = TextEditingController();
+  final _myPriceC = TextEditingController();
+  final _invoiceNoC = TextEditingController(text: '1');
+  final _issuedDateC = TextEditingController();
+  final _dueDateC = TextEditingController();
+  final _bizNameC = TextEditingController();
+  final _bizStreetC = TextEditingController();
+  final _bizCityStateZipC = TextEditingController();
+  final _bizPhoneC = TextEditingController();
+  final _clientNameC = TextEditingController();
+  final _clientEmailC = TextEditingController();
+  final _billAddressC = TextEditingController();
+  final _billAptC = TextEditingController();
+  final _billCityC = TextEditingController();
+  final _billStateC = TextEditingController();
+  final _billZipC = TextEditingController();
+  final _itemNameC = TextEditingController();
+  final _itemDescC = TextEditingController();
+  final _itemPriceC = TextEditingController(text: '0');
+  final _itemQtyC = TextEditingController(text: '1');
+  final _itemDiscountC = TextEditingController(text: '0');
+  final _paymentInfoC = TextEditingController(text: 'Thank you for your business!');
 
   @override
   void initState() {
     super.initState();
     _animCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
+    final now = DateTime.now();
+    _issuedDateC.text = '${now.month}/${now.day}/${now.year}';
+    _dueDateC.text = '${now.month}/${now.day + 7}/${now.year}';
   }
 
   @override
   void dispose() {
     _animCtrl.dispose();
+    _calcCityC.dispose();
+    _calcServiceC.dispose();
+    _othersPriceC.dispose();
+    _myPriceC.dispose();
+    _invoiceNoC.dispose();
+    _issuedDateC.dispose();
+    _dueDateC.dispose();
+    _bizNameC.dispose();
+    _bizStreetC.dispose();
+    _bizCityStateZipC.dispose();
+    _bizPhoneC.dispose();
+    _clientNameC.dispose();
+    _clientEmailC.dispose();
+    _billAddressC.dispose();
+    _billAptC.dispose();
+    _billCityC.dispose();
+    _billStateC.dispose();
+    _billZipC.dispose();
+    _itemNameC.dispose();
+    _itemDescC.dispose();
+    _itemPriceC.dispose();
+    _itemQtyC.dispose();
+    _itemDiscountC.dispose();
+    _paymentInfoC.dispose();
     super.dispose();
   }
 
@@ -3662,9 +4029,9 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Gradient Sets
-    final topColors = isDark 
-      ? [const Color(0xFF6A1B9A), const Color(0xFFD84315)] 
-      : [const Color(0xFFAB47BC), const Color(0xFFFF7043)];
+    final topColors = isDark
+      ? [const Color(0xFF0B1F3A), const Color(0xFF3A0CA3)]
+      : [const Color(0xFF0EA5E9), const Color(0xFF7C3AED)];
     
     final civicColors = isDark
       ? [const Color(0xFF3949AB), const Color(0xFF512DA8)]
@@ -3693,20 +4060,30 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
               // Main Top Card
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 18),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: topColors,
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(isDark ? 0.22 : 0.38),
+                    width: 1.2,
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: topColors[0].withOpacity(0.3),
-                      blurRadius: 15,
+                      color: topColors[1].withOpacity(0.35),
+                      blurRadius: 18,
+                      spreadRadius: 1,
                       offset: const Offset(0, 8),
-                    )
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFF38BDF8).withOpacity(isDark ? 0.18 : 0.25),
+                      blurRadius: 22,
+                      spreadRadius: -2,
+                    ),
                   ],
                 ),
                 child: Column(
@@ -3714,22 +4091,37 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _animatedStar(30),
-                        const SizedBox(width: 15),
-                        _animatedStar(50),
-                        const SizedBox(width: 15),
-                        _animatedStar(30),
+                        _animatedStar(20, spin: false),
+                        const SizedBox(width: 10),
+                        _animatedStar(34, spin: true, reactive: true),
+                        const SizedBox(width: 10),
+                        _animatedStar(20, spin: false),
                       ],
                     ),
-                    const SizedBox(height: 15),
-                    const Text(
-                      'NGMY Services',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 32),
+                    const SizedBox(height: 10),
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
+                        children: [
+                          const TextSpan(text: 'N'),
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: GestureDetector(
+                              onTap: _openGServicesTool,
+                              child: const Text(
+                                'G',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
+                              ),
+                            ),
+                          ),
+                          const TextSpan(text: 'MY Services'),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
                       'Next Generation - Make Yours',
-                      style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14, fontWeight: FontWeight.w500),
+                      style: TextStyle(color: Colors.white.withOpacity(0.95), fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.2),
                     ),
                   ],
                 ),
@@ -3763,7 +4155,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     ),
                   ),
                   _hubBox('NGMY Store', Icons.shopping_bag_outlined, storeColors, () {}), 
-                  _hubBox('Job Marketplace', Icons.business_center_outlined, jobColors, () => Navigator.push(context, MaterialPageRoute(builder: (c) => JobMarketplaceScreen(user: widget.user)))),
+                  _hubBox('Job Marketplace', Icons.business_center_outlined, jobColors, () => Navigator.push(context, MaterialPageRoute(builder: (c) => JobMarketplaceScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onDataChanged: widget.onDataChanged)))),
                   _hubBox('Help Center', Icons.support_agent_rounded, helpColors, () {}),
                 ],
               ),
@@ -3775,18 +4167,971 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     );
   }
 
-  Widget _animatedStar(double size) {
-    return AnimatedBuilder(
+  double _num(String raw) => double.tryParse(raw.trim()) ?? 0;
+
+  void _setTriangleOption(String key, bool value) {
+    if (!value) {
+      setState(() {
+        if (key == 'fast') _triFast = false;
+        if (key == 'cheap') _triCheap = false;
+        if (key == 'good') _triGood = false;
+      });
+      return;
+    }
+
+    final selected = <String>[
+      if (_triFast) 'fast',
+      if (_triCheap) 'cheap',
+      if (_triGood) 'good',
+    ];
+    if (selected.length >= 2) {
+      final toDrop = selected.first;
+      if (toDrop == 'fast') _triFast = false;
+      if (toDrop == 'cheap') _triCheap = false;
+      if (toDrop == 'good') _triGood = false;
+    }
+    setState(() {
+      if (key == 'fast') _triFast = true;
+      if (key == 'cheap') _triCheap = true;
+      if (key == 'good') _triGood = true;
+    });
+  }
+
+  String _triangleResult() {
+    if (_triCheap && _triGood) return 'Cheap + Good = Not Fast — Quality at low cost takes time.';
+    if (_triFast && _triGood) return 'Fast + Good = Not Cheap — Speed with quality costs more.';
+    if (_triFast && _triCheap) return 'Fast + Cheap = Not Good — Rush and low cost reduce quality.';
+    return 'Pick any 2 options. The 3rd one turns off automatically.';
+  }
+
+  double _invoiceSubtotal() {
+    final price = _num(_itemPriceC.text);
+    final qty = _num(_itemQtyC.text);
+    final disc = _num(_itemDiscountC.text);
+    final gross = price * qty;
+    return gross - (gross * (disc.clamp(0, 100) / 100));
+  }
+
+  void _openInvoiceFromGDialog(BuildContext dialogContext) {
+    // 1. Close current G-Services dialog immediately
+    Navigator.of(dialogContext, rootNavigator: true).pop();
+    
+    // 2. Wait for the pop animation to finish and for the mouse tracker to stabilize.
+    // The previous crash was likely due to the dialog being replaced too fast
+    // while a hover/tooltip was active.
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      _openInvoiceGenerator();
+    });
+  }
+
+  Map<String, List<Color>> _invoiceTemplateStyles() => {
+        'Modern': [const Color(0xFF3B82F6), const Color(0xFF1D4ED8)],
+        'Classic': [const Color(0xFF1E293B), const Color(0xFF0F172A)],
+        'Minimal': [const Color(0xFF111827), const Color(0xFF030712)],
+        'Executive': [const Color(0xFF06B6D4), const Color(0xFF0E7490)],
+        'Corporate': [const Color(0xFF2563EB), const Color(0xFF1E40AF)],
+        'Creative': [const Color(0xFF7C3AED), const Color(0xFFDB2777)],
+        'Gold Foil': [const Color(0xFFFFC107), const Color(0xFFFF8F00)],
+        'Marble': [const Color(0xFFF8FAFC), const Color(0xFFCBD5E1)],
+        'Rose Gold': [const Color(0xFFFF6F91), const Color(0xFFFF3F7F)],
+        'Emerald': [const Color(0xFF10B981), const Color(0xFF047857)],
+        'Midnight': [const Color(0xFF0B1020), const Color(0xFF111827)],
+        'Diamond': [const Color(0xFF8BE9FD), const Color(0xFFB794F4)],
+      };
+
+  Directory _downloadDirectory() {
+    if (!kIsWeb && Platform.isWindows) {
+      final root = Platform.environment['USERPROFILE'];
+      if (root != null && root.isNotEmpty) {
+        return Directory('$root\\Downloads');
+      }
+    }
+    if (!kIsWeb) {
+      final root = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+      if (root != null && root.isNotEmpty) {
+        return Directory('$root${Platform.pathSeparator}Downloads');
+      }
+    }
+    return Directory.current;
+  }
+
+  List<Map<String, double>> _serializeSignature(List<Offset?> points) {
+    return points
+        .whereType<Offset>()
+        .map((p) => {'x': p.dx, 'y': p.dy})
+        .toList();
+  }
+
+  bool _hasSignature(List<Offset?> points) {
+    return points.any((p) => p != null);
+  }
+
+  Future<void> _cleanupExpiredPaidInvoices() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('saved_invoices_v1');
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final now = DateTime.now();
+      final decoded = (jsonDecode(raw) as List).cast<dynamic>();
+      final keep = decoded.where((entry) {
+        if (entry is! Map) return false;
+        final paidAtRaw = entry['paidAt']?.toString();
+        if (paidAtRaw == null || paidAtRaw.isEmpty) return true;
+        final paidAt = DateTime.tryParse(paidAtRaw);
+        if (paidAt == null) return true;
+        return now.isBefore(paidAt.add(const Duration(days: 5)));
+      }).toList();
+      await prefs.setString('saved_invoices_v1', jsonEncode(keep));
+    } catch (_) {
+      // If old/corrupt local invoice cache exists, leave it untouched.
+    }
+  }
+
+  Future<void> _saveInvoiceLocally(BuildContext dialogContext, double subtotal) async {
+    await _cleanupExpiredPaidInvoices();
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('saved_invoices_v1');
+    final entries = <dynamic>[];
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        entries.addAll((jsonDecode(raw) as List).cast<dynamic>());
+      } catch (_) {}
+    }
+    final now = DateTime.now().toIso8601String();
+    entries.add({
+      'id': DateTime.now().microsecondsSinceEpoch.toString(),
+      'template': _invoiceTemplate,
+      'invoiceNo': _invoiceNoC.text.trim(),
+      'issuedDate': _issuedDateC.text.trim(),
+      'dueDate': _dueDateC.text.trim(),
+      'business': _bizNameC.text.trim(),
+      'street': _bizStreetC.text.trim(),
+      'cityStateZip': _bizCityStateZipC.text.trim(),
+      'phone': _bizPhoneC.text.trim(),
+      'clientName': _clientNameC.text.trim(),
+      'clientEmail': _clientEmailC.text.trim(),
+      'item': _itemNameC.text.trim(),
+      'description': _itemDescC.text.trim(),
+      'paymentInfo': _paymentInfoC.text.trim(),
+      'subtotal': subtotal,
+      'isPaid': _invoicePaid,
+      'paidAt': _invoicePaid ? now : null,
+      'createdAt': now,
+      'providerSignature': _serializeSignature(_providerSignaturePoints),
+      'clientSignature': _serializeSignature(_clientSignaturePoints),
+    });
+    await prefs.setString('saved_invoices_v1', jsonEncode(entries));
+    if (dialogContext.mounted) {
+      ScaffoldMessenger.of(dialogContext).showSnackBar(
+        SnackBar(
+          content: Text(
+            _invoicePaid
+                ? 'Invoice saved. Paid invoices auto-delete after 5 days.'
+                : 'Invoice saved locally.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _downloadInvoiceImage(BuildContext dialogContext, GlobalKey previewKey) async {
+    try {
+      await Future.delayed(const Duration(milliseconds: 40));
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary = previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception('Preview is not ready yet.');
+      final image = await boundary.toImage(pixelRatio: 3.2);
+      final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
+      if (bytes == null) throw Exception('Could not render invoice image.');
+
+      if (kIsWeb) {
+        await Clipboard.setData(ClipboardData(text: base64Encode(bytes)));
+        if (dialogContext.mounted) {
+          ScaffoldMessenger.of(dialogContext).showSnackBar(
+            const SnackBar(content: Text('Web mode: invoice image copied as Base64 to clipboard.')),
+          );
+        }
+        return;
+      }
+
+      final dir = _downloadDirectory();
+      await dir.create(recursive: true);
+      final invoiceNo = _invoiceNoC.text.trim().isEmpty ? 'invoice' : _invoiceNoC.text.trim();
+      final file = File(
+        '${dir.path}${Platform.pathSeparator}invoice_${invoiceNo}_${DateTime.now().millisecondsSinceEpoch}.png',
+      );
+      await file.writeAsBytes(bytes, flush: true);
+      if (!await file.exists()) {
+        throw Exception('File write failed.');
+      }
+      if (dialogContext.mounted) {
+        ScaffoldMessenger.of(dialogContext).showSnackBar(
+          SnackBar(content: Text('Invoice downloaded to: ${file.path}')),
+        );
+      }
+    } catch (e) {
+      if (dialogContext.mounted) {
+        ScaffoldMessenger.of(dialogContext).showSnackBar(
+          SnackBar(content: Text('Download failed: $e')),
+        );
+      }
+    }
+  }
+
+  void _openGServicesTool() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) {
+          final others = _num(_othersPriceC.text);
+          final mine = _num(_myPriceC.text);
+          final netMine = mine - (mine * (_discount / 100));
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          const chrome = [Color(0xFF252A32), Color(0xFF0A0D14)];
+
+          Widget triRow({
+            required String keyName,
+            required String label,
+            required bool active,
+            required Color dot,
+          }) {
+            return Container(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.08))),
+              ),
+              child: Row(
+                children: [
+                  Container(width: 7, height: 7, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+                  const SizedBox(width: 10),
+                  Text(label, style: TextStyle(color: active ? Colors.white : Colors.white54, fontSize: 28 * 0.7, fontWeight: FontWeight.w800, letterSpacing: 2)),
+                  const Spacer(),
+                  Switch(
+                    value: active,
+                    onChanged: (v) {
+                      _setTriangleOption(keyName, v);
+                      setDialog(() {});
+                    },
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return Dialog(
+            insetPadding: const EdgeInsets.all(14),
+            backgroundColor: isDark ? const Color(0xFF0A1222) : const Color(0xFF091323),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: SizedBox(
+              width: 840,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.bolt, size: 18, color: Colors.white),
+                        const SizedBox(width: 8),
+                        const Text('Pick Two', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 30 * 0.7, color: Colors.white)),
+                        const Spacer(),
+                        IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close, color: Colors.white70)),
+                      ],
+                    ),
+                    Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: chrome, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF4B5563)),
+                        boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 18)],
+                      ),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 14),
+                          Text('THE IRON TRIANGLE', style: TextStyle(color: Colors.white.withOpacity(0.7), letterSpacing: 5, fontSize: 12, fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 10),
+                          triRow(keyName: 'fast', label: 'FAST', active: _triFast, dot: const Color(0xFF94A3B8)),
+                          triRow(keyName: 'cheap', label: 'CHEAP', active: _triCheap, dot: const Color(0xFF34D399)),
+                          triRow(keyName: 'good', label: 'GOOD', active: _triGood, dot: const Color(0xFF60A5FA)),
+                          const SizedBox(height: 10),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF113152),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF3B82F6)),
+                      ),
+                      child: Text(_triangleResult(), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFF0A3A46), Color(0xFF0A2D4F)]),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF06B6D4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text('💰 Price Calculator', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+                              const Spacer(),
+                              GestureDetector(
+                                onTap: () => _openInvoiceFromGDialog(ctx),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(10)),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.receipt_long_rounded, color: Colors.white, size: 18),
+                                      SizedBox(width: 4),
+                                      Text('Invoice', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(child: TextField(style: const TextStyle(color: Colors.white), controller: _calcCityC, decoration: const InputDecoration(hintText: 'City (e.g., Macon)'))),
+                              const SizedBox(width: 8),
+                              Expanded(child: TextField(style: const TextStyle(color: Colors.white), controller: _calcServiceC, decoration: const InputDecoration(hintText: 'Service name'))),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(child: TextField(style: const TextStyle(color: Colors.white), controller: _othersPriceC, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'Others charge (\$)'))),
+                              const SizedBox(width: 8),
+                              Expanded(child: TextField(style: const TextStyle(color: Colors.white), controller: _myPriceC, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'My price (\$)'))),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text('Discount: ${_discount.toStringAsFixed(0)}%', style: const TextStyle(color: Colors.white70)),
+                          Slider(
+                            value: _discount,
+                            min: 0,
+                            max: 20,
+                            divisions: 20,
+                            onChanged: (v) => setDialog(() => _discount = v),
+                          ),
+                          Text(
+                            'After discount: \$${netMine.toStringAsFixed(2)}  |  Difference vs market: \$${(netMine - others).toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text('Offline ready: this calculator and invoice generator work without internet.', style: TextStyle(fontSize: 11, color: Colors.white70)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _openInvoiceGenerator() {
+    _providerSignaturePoints.clear();
+    _clientSignaturePoints.clear();
+    _invoicePaid = false;
+    _cleanupExpiredPaidInvoices();
+    final templateStyles = _invoiceTemplateStyles();
+    final templates = templateStyles.keys.toList();
+    final GlobalKey localPreviewKey = GlobalKey();
+
+    // Use SchedulerBinding to ensure we are outside of any current build/frame processing
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setDialog) {
+            final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            final subtotal = _invoiceSubtotal();
+            final colors = templateStyles[_invoiceTemplate] ?? [const Color(0xFF3B82F6), const Color(0xFF1D4ED8)];
+            final useDarkText = _invoiceTemplate == 'Marble' || _invoiceTemplate == 'Diamond';
+            final headerTextColor = useDarkText ? const Color(0xFF0F172A) : Colors.white;
+            final screen = MediaQuery.of(ctx).size;
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              backgroundColor: isDark ? const Color(0xFF0A1020) : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              child: SizedBox(
+                width: math.min(1250, screen.width - 16),
+                height: screen.height * 0.95,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        const Icon(Icons.receipt_long_rounded),
+                        const SizedBox(width: 8),
+                        const Text('Create Invoice', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                        const Spacer(),
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+                      ]),
+                    const Text('Choose Template', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: templates.map((t) {
+                        final c = templateStyles[t]!;
+                        return GestureDetector(
+                          onTap: () => setDialog(() => _invoiceTemplate = t),
+                          child: Container(
+                            width: 120,
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(colors: c),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: _invoiceTemplate == t ? Colors.white : Colors.transparent, width: 2),
+                            ),
+                            child: Text(t, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: _invoiceNoC, decoration: const InputDecoration(labelText: 'Invoice #'))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextField(controller: _issuedDateC, decoration: const InputDecoration(labelText: 'Issued Date'))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextField(controller: _dueDateC, decoration: const InputDecoration(labelText: 'Due Date'))),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(controller: _bizNameC, decoration: const InputDecoration(labelText: 'Your Business Name')),
+                    const SizedBox(height: 8),
+                    TextField(controller: _bizStreetC, decoration: const InputDecoration(labelText: 'Street Address')),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: _bizCityStateZipC, decoration: const InputDecoration(labelText: 'City, State ZIP'))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextField(controller: _bizPhoneC, decoration: const InputDecoration(labelText: 'Phone Number'))),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: _clientNameC, decoration: const InputDecoration(labelText: 'Bill To (Client Name)'))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextField(controller: _clientEmailC, decoration: const InputDecoration(labelText: 'Client Email'))),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: _itemNameC, decoration: const InputDecoration(labelText: 'Item name'))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextField(controller: _itemPriceC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price'))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextField(controller: _itemQtyC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Qty'))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextField(controller: _itemDiscountC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Discount %'))),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(controller: _itemDescC, decoration: const InputDecoration(labelText: 'Description')),
+                    const SizedBox(height: 8),
+                    TextField(controller: _paymentInfoC, maxLines: 2, decoration: const InputDecoration(labelText: 'Notes & Payment Instructions')),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF0F1B33) : const Color(0xFFF3F6FF),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFCAD6F3)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Service Provider Signature', style: TextStyle(fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 8),
+                                Container(
+                                  height: 120,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  ),
+                                  child: GestureDetector(
+                                    onPanStart: (d) => setDialog(() => _providerSignaturePoints.add(d.localPosition)),
+                                    onPanUpdate: (d) => setDialog(() => _providerSignaturePoints.add(d.localPosition)),
+                                    onPanEnd: (_) => setDialog(() => _providerSignaturePoints.add(null)),
+                                    child: SizedBox.expand(
+                                      child: CustomPaint(
+                                        painter: _SignaturePainter(_providerSignaturePoints),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: () => setDialog(() => _providerSignaturePoints.clear()),
+                                    child: const Text('Clear'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF0F1B33) : const Color(0xFFF3F6FF),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFCAD6F3)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Client Signature', style: TextStyle(fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 8),
+                                Container(
+                                  height: 120,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  ),
+                                  child: GestureDetector(
+                                    onPanStart: (d) => setDialog(() => _clientSignaturePoints.add(d.localPosition)),
+                                    onPanUpdate: (d) => setDialog(() => _clientSignaturePoints.add(d.localPosition)),
+                                    onPanEnd: (_) => setDialog(() => _clientSignaturePoints.add(null)),
+                                    child: SizedBox.expand(
+                                      child: CustomPaint(
+                                        painter: _SignaturePainter(_clientSignaturePoints),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: () => setDialog(() => _clientSignaturePoints.clear()),
+                                    child: const Text('Clear'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      value: _invoicePaid,
+                      onChanged: (v) => setDialog(() => _invoicePaid = v),
+                      title: const Text('Mark invoice as paid'),
+                      subtitle: const Text('Paid invoices auto-delete from local saves after 5 days.'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 8),
+                    RepaintBoundary(
+                      key: localPreviewKey,
+                      child: Container(
+                        width: double.infinity,
+                        constraints: const BoxConstraints(minHeight: 780),
+                        padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: colors,
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withOpacity(0.2)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: colors.first.withOpacity(0.35),
+                              blurRadius: 18,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: DefaultTextStyle(
+                          style: TextStyle(color: headerTextColor),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'INVOICE',
+                                          style: TextStyle(
+                                            letterSpacing: 2,
+                                            fontSize: 50,
+                                            fontWeight: FontWeight.w300,
+                                            color: headerTextColor.withOpacity(0.95),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _bizNameC.text.isEmpty ? 'Your Business' : _bizNameC.text,
+                                          style: TextStyle(
+                                            fontSize: 21,
+                                            fontWeight: FontWeight.w700,
+                                            color: headerTextColor.withOpacity(0.95),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    width: 84,
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(useDarkText ? 0.55 : 0.06),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.white.withOpacity(0.24)),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Text('INVOICE', style: TextStyle(fontSize: 12, letterSpacing: 1.2, color: headerTextColor.withOpacity(0.85))),
+                                        const SizedBox(height: 4),
+                                        Text('#${_invoiceNoC.text.isEmpty ? '1' : _invoiceNoC.text}', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w300, color: headerTextColor)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(useDarkText ? 0.58 : 0.05),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('CLIENT', style: TextStyle(fontSize: 11, letterSpacing: 2, fontWeight: FontWeight.w700, color: headerTextColor.withOpacity(0.75))),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _clientNameC.text.isEmpty ? 'Client Name' : _clientNameC.text,
+                                            style: TextStyle(fontSize: 34 * 0.7, fontWeight: FontWeight.w800, color: headerTextColor),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text('Issued: ${_issuedDateC.text.isEmpty ? '--/--/----' : _issuedDateC.text}', style: TextStyle(fontSize: 12, color: headerTextColor.withOpacity(0.9))),
+                                        Text('Due: ${_dueDateC.text.isEmpty ? '—' : _dueDateC.text}', style: TextStyle(fontSize: 12, color: headerTextColor.withOpacity(0.9))),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(useDarkText ? 0.52 : 0.08),
+                                  borderRadius: BorderRadius.circular(7),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(child: Text('ITEM', style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor))),
+                                    SizedBox(width: 110, child: Text('PRICE', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor))),
+                                    SizedBox(width: 74, child: Text('QTY', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor))),
+                                    SizedBox(width: 90, child: Text('DISC.', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor))),
+                                    SizedBox(width: 120, child: Text('AMOUNT', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor))),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _itemNameC.text.isEmpty ? 'Item' : _itemNameC.text,
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: headerTextColor,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 110, child: Text('\$${_num(_itemPriceC.text).toStringAsFixed(2)}', textAlign: TextAlign.center, style: TextStyle(color: headerTextColor))),
+                                    SizedBox(width: 74, child: Text(_itemQtyC.text.isEmpty ? '1' : _itemQtyC.text, textAlign: TextAlign.center, style: TextStyle(color: headerTextColor))),
+                                    SizedBox(width: 90, child: Text('${_num(_itemDiscountC.text).toStringAsFixed(0)}%', textAlign: TextAlign.center, style: TextStyle(color: headerTextColor))),
+                                    SizedBox(width: 120, child: Text('\$${subtotal.toStringAsFixed(2)}', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor))),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Container(
+                                  width: 330,
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(useDarkText ? 0.54 : 0.08),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.white.withOpacity(0.22)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Subtotal', style: TextStyle(fontSize: 18 * 0.75, color: headerTextColor.withOpacity(0.8))),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        children: [
+                                          Text('Total', style: TextStyle(fontSize: 42 * 0.7, fontWeight: FontWeight.w900, color: headerTextColor)),
+                                          const Spacer(),
+                                          Text('\$${subtotal.toStringAsFixed(2)}', style: TextStyle(fontSize: 42 * 0.7, fontWeight: FontWeight.w900, color: headerTextColor)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              if (_itemDescC.text.trim().isNotEmpty)
+                                Text(
+                                  _itemDescC.text.trim(),
+                                  style: TextStyle(color: headerTextColor.withOpacity(0.95), fontSize: 14),
+                                ),
+                              const SizedBox(height: 14),
+                              Center(
+                                child: Text(
+                                  'By signing, both parties agree to the services and conditions described herein.',
+                                  style: TextStyle(color: headerTextColor.withOpacity(0.84), fontSize: 14),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(useDarkText ? 0.5 : 0.07),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('SERVICE PROVIDER', style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor)),
+                                          const SizedBox(height: 38),
+                                          Container(height: 1, color: headerTextColor.withOpacity(0.5)),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            _hasSignature(_providerSignaturePoints)
+                                                ? 'NGMY • ${_issuedDateC.text.isEmpty ? '--/--/----' : _issuedDateC.text}'
+                                                : 'Pending signature',
+                                            style: TextStyle(color: headerTextColor.withOpacity(0.9)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(useDarkText ? 0.5 : 0.07),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('CLIENT', style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor)),
+                                          const SizedBox(height: 38),
+                                          Container(height: 1, color: headerTextColor.withOpacity(0.5)),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            _hasSignature(_clientSignaturePoints)
+                                                ? '${_clientNameC.text.isEmpty ? 'Client' : _clientNameC.text} • ${_issuedDateC.text.isEmpty ? '--/--/----' : _issuedDateC.text}'
+                                                : 'Client • __/__/____',
+                                            style: TextStyle(color: headerTextColor.withOpacity(0.9)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Center(
+                                child: Text(
+                                  'POWERED BY: NGMY.SITE',
+                                  style: TextStyle(
+                                    color: headerTextColor.withOpacity(0.92),
+                                    letterSpacing: 1.4,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('Offline ready: all invoice calculations/templates are local and work without internet.', style: TextStyle(fontSize: 11)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _saveInvoiceLocally(ctx, subtotal),
+                            icon: const Icon(Icons.save_alt_rounded),
+                            label: const Text('Save Invoice'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () => _downloadInvoiceImage(ctx, localPreviewKey),
+                            icon: const Icon(Icons.download_rounded),
+                            label: const Text('Download'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: Text(
+                        'Tip: signatures are optional for download, but recommended.',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    });
+  }
+
+  Widget _animatedStar(double size, {bool spin = true, bool reactive = false}) {
+    Widget starCore = AnimatedBuilder(
       animation: _animCtrl,
       builder: (context, child) {
-        return Transform(
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.001) // perspective
-            ..rotateY(_animCtrl.value * 2 * math.pi),
-          alignment: Alignment.center,
-          child: Icon(Icons.star_rounded, color: Colors.white, size: size),
+        final pulse = 0.82 + (math.sin(_animCtrl.value * 2 * math.pi) + 1) * 0.12;
+        final smokeDrift = math.sin(_animCtrl.value * 2 * math.pi) * (size * 0.08);
+        return SizedBox(
+          width: size * 1.9,
+          height: size * 1.9,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned(
+                left: size * 0.25 + smokeDrift,
+                top: size * 0.35,
+                child: Container(
+                  width: size * 0.95,
+                  height: size * 0.95,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(spin ? 0.12 : 0.16 * pulse),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(spin ? 0.16 : 0.20 * pulse),
+                        blurRadius: size * 0.8,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Container(
+                width: size * 1.25,
+                height: size * 1.25,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.white.withOpacity(spin ? 0.26 : 0.32 * pulse),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+              Transform(
+                transform: spin
+                    ? (Matrix4.identity()
+                      ..setEntry(3, 2, 0.001)
+                      ..rotateY(_animCtrl.value * 2 * math.pi))
+                    : Matrix4.identity(),
+                alignment: Alignment.center,
+                child: Icon(Icons.star_rounded, color: Colors.white, size: size),
+              ),
+            ],
+          ),
         );
       },
+    );
+
+    if (!reactive) return starCore;
+
+    final scale = _centerStarPressed ? 1.12 : (_centerStarHover ? 1.06 : 1.0);
+    return MouseRegion(
+      onEnter: (_) => setState(() => _centerStarHover = true),
+      onExit: (_) => setState(() {
+        _centerStarHover = false;
+        _centerStarPressed = false;
+      }),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTapDown: (_) => setState(() => _centerStarPressed = true),
+        onTapUp: (_) => setState(() => _centerStarPressed = false),
+        onTapCancel: () => setState(() => _centerStarPressed = false),
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          scale: scale,
+          child: starCore,
+        ),
+      ),
     );
   }
 
@@ -3824,6 +5169,31 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   }
 }
 
+class _SignaturePainter extends CustomPainter {
+  final List<Offset?> points;
+  const _SignaturePainter(this.points);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF0F172A)
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 2.2;
+    for (int i = 0; i < points.length - 1; i++) {
+      final p1 = points[i];
+      final p2 = points[i + 1];
+      if (p1 != null && p2 != null) {
+        canvas.drawLine(p1, p2, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SignaturePainter oldDelegate) {
+    return oldDelegate.points != points;
+  }
+}
+
 class CivicRegistryScreen extends StatefulWidget {
   final UserData user;
   final List<UserData> allUsers;
@@ -3852,6 +5222,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   String _selectedCity = 'All Cities';
   String _selectedRoom = 'All Rooms';
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _enrollSearchC = TextEditingController();
 
   // Enrollment Form Controllers
   final _fullNameC = TextEditingController();
@@ -3862,6 +5233,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   final _emailC = TextEditingController();
   final _cityC = TextEditingController();
   final _roomC = TextEditingController();
+  final Set<String> _dismissedReceiptKeys = {};
 
   final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -4010,6 +5382,49 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (!widget.config.helpModeActive) return false;
     if (_isRegistrar()) return true;
     return _memberMatchesHelpScope(widget.user);
+  }
+
+  Map<String, dynamic> _decodeContributionMeta(AppTransaction t) {
+    final raw = t.sourceDetails?.trim() ?? '';
+    if (raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+    return {'note': raw};
+  }
+
+  bool _audienceMatchForViewer(String scopeType, String scopeValue) {
+    if (_isRegistrar()) return true;
+    if (scopeType == 'city') return (widget.user.city ?? '') == scopeValue;
+    if (scopeType == 'room') return (widget.user.room ?? '') == scopeValue;
+    return true;
+  }
+
+  List<AppTransaction> _visibleContributionTx() {
+    return widget.allTransactions.where((t) {
+      if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
+      final meta = _decodeContributionMeta(t);
+      final scopeType = (meta['scopeType'] ?? 'all').toString();
+      final scopeValue = (meta['scopeValue'] ?? '').toString();
+      final targetState = (meta['state'] ?? '').toString();
+      if (targetState.isNotEmpty && targetState != widget.user.state && !_isRegistrar()) return false;
+      return _audienceMatchForViewer(scopeType, scopeValue);
+    }).toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  }
+
+  Map<String, List<AppTransaction>> _groupContributionReceipts(List<AppTransaction> txs) {
+    final groups = <String, List<AppTransaction>>{};
+    for (final t in txs) {
+      final meta = _decodeContributionMeta(t);
+      final key = (meta['campaignId'] ?? '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|${meta['state'] ?? widget.user.state}')
+          .toString();
+      if (_dismissedReceiptKeys.contains(key)) continue;
+      groups.putIfAbsent(key, () => []).add(t);
+    }
+    return groups;
   }
 
   String _helpScopeLabel() {
@@ -4406,9 +5821,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       (t) => ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.monetization_on_outlined, color: Colors.green),
+                        leading: const Icon(Icons.volunteer_activism, color: Colors.green),
                         title: Text('\$${formatCurrency(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(t.sourceDetails?.isNotEmpty == true ? t.sourceDetails! : 'Contribution'),
+                        subtitle: Text(_txReadableDetails(t)),
                         trailing: Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                       ),
                     ),
@@ -4508,6 +5923,194 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report copied to clipboard.')));
   }
 
+  String _txReadableDetails(AppTransaction t) {
+    if (t.type != TransactionType.contribution) return t.sourceDetails?.trim().isNotEmpty == true ? t.sourceDetails!.trim() : 'No details';
+    final meta = _decodeContributionMeta(t);
+    final note = (meta['note'] ?? '').toString().trim();
+    final purpose = (meta['purpose'] ?? '').toString().trim();
+    if (note.isNotEmpty) return note;
+    if (purpose.isNotEmpty) return purpose;
+    return 'Contribution';
+  }
+
+  void _showContributionReceipts() {
+    final visible = _visibleContributionTx();
+    final groups = _groupContributionReceipts(visible);
+    final keys = groups.keys.toList();
+    String? selectedKey;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final panelBg = isDark ? const Color(0xFF232A2E) : const Color(0xFFE9F7EF);
+          final tileBg = isDark ? const Color(0xFF1B2025) : Colors.white;
+          final lineColor = isDark ? Colors.white24 : Colors.black12;
+          final strongText = isDark ? Colors.white : Colors.black87;
+          final softText = isDark ? Colors.white70 : Colors.black54;
+          final selected = selectedKey != null ? (groups[selectedKey] ?? <AppTransaction>[]) : <AppTransaction>[];
+          final first = selected.isNotEmpty ? selected.first : null;
+          final total = selected.fold<double>(0.0, (s, t) => s + t.amount);
+          final contributors = selected.map((e) => e.userEmail).toSet().length;
+          final meta = first != null ? _decodeContributionMeta(first) : <String, dynamic>{};
+          return Dialog(
+            insetPadding: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            backgroundColor: isDark ? const Color(0xFF1B1824) : Colors.white,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 920),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFF6A3DE8), Color(0xFF4F2FD6)]),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.shield_outlined, color: Colors.white),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Contribution Receipts', style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800)),
+                              Text("Past week's community contributions"),
+                            ],
+                          ),
+                        ),
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    if (keys.isEmpty)
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Center(child: Text('No contribution receipts yet.', style: TextStyle(color: softText))),
+                      )
+                    else if (selectedKey == null)
+                      ...keys.map((k) {
+                        final txs = groups[k] ?? [];
+                        final seed = txs.first;
+                        final m = _decodeContributionMeta(seed);
+                        final t = txs.fold<double>(0.0, (s, e) => s + e.amount);
+                        final c = txs.map((e) => e.userEmail).toSet().length;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(color: panelBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.greenAccent.shade400)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text((m['purpose'] ?? 'Contribution Campaign').toString(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22 * 0.7, color: strongText)),
+                              const SizedBox(height: 4),
+                              Text('${m['state'] ?? widget.user.state} • ${m['scopeType'] == 'all' ? 'All members' : '${m['scopeType']}: ${m['scopeValue']}'}', style: TextStyle(color: softText)),
+                              const SizedBox(height: 4),
+                              Text('${seed.timestamp.month}/${seed.timestamp.day}/${seed.timestamp.year}', style: TextStyle(color: softText)),
+                              Divider(color: lineColor),
+                              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                                Text('Click to view full receipt →', style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w700)),
+                                Text('\$${formatCurrency(t)}  •  $c contributors', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
+                              ]),
+                              const SizedBox(height: 6),
+                              GestureDetector(
+                                onTap: () => setDialog(() => selectedKey = k),
+                                child: Container(
+                                  height: 38,
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(color: Colors.indigo, borderRadius: BorderRadius.circular(10)),
+                                  child: const Center(child: Text('Open Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      })
+                    else
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: panelBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.greenAccent.shade400)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                TextButton(onPressed: () => setDialog(() => selectedKey = null), child: const Text('← Back to All Receipts')),
+                                const Spacer(),
+                                TextButton(
+                                  onPressed: () {
+                                    if (selectedKey == null) return;
+                                    setState(() => _dismissedReceiptKeys.add(selectedKey!));
+                                    setDialog(() {
+                                      selectedKey = null;
+                                    });
+                                  },
+                                  child: const Text('Delete Receipt'),
+                                ),
+                              ],
+                            ),
+                            Text((meta['purpose'] ?? 'Contribution Campaign').toString(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22 * 0.8, color: strongText)),
+                            Text('State: ${meta['state'] ?? widget.user.state}', style: TextStyle(color: softText)),
+                            Text('${first?.timestamp.month}/${first?.timestamp.day}/${first?.timestamp.year}', style: TextStyle(color: softText)),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(child: _statCard('Total Collected', '\$${formatCurrency(total)}', tileBg, Colors.green.shade800)),
+                                const SizedBox(width: 10),
+                                Expanded(child: _statCard('Contributors', contributors.toString(), tileBg, Colors.blue.shade800)),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              decoration: BoxDecoration(color: tileBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: lineColor)),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: EdgeInsets.all(10),
+                                    child: Text('Contribution Details', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
+                                  ),
+                                  Divider(height: 1, color: lineColor),
+                                  if (selected.isEmpty)
+                                    Padding(
+                                      padding: EdgeInsets.all(20),
+                                      child: Center(child: Text('No contributions recorded yet', style: TextStyle(color: softText))),
+                                    )
+                                  else
+                                    ...selected.map(
+                                      (t) => ListTile(
+                                        dense: true,
+                                        leading: const Icon(Icons.volunteer_activism, color: Colors.green),
+                                        title: Text(t.userEmail, style: TextStyle(color: strongText)),
+                                        subtitle: Text(_txReadableDetails(t), style: TextStyle(color: softText)),
+                                        trailing: Text('\$${formatCurrency(t.amount)}', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _showContributionDialog(UserData u) {
     if (!widget.config.helpModeActive) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help mode must be active before adding contribution.')));
@@ -4547,6 +6150,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 return;
               }
               final now = DateTime.now();
+              final campaignId = '${widget.config.helpPurpose}|${widget.config.helpScopeType}|${widget.config.helpScopeValue}|${widget.user.state}';
+              final payload = jsonEncode({
+                'kind': 'contribution',
+                'purpose': widget.config.helpPurpose,
+                'note': noteC.text.trim().isEmpty ? widget.config.helpPurpose : noteC.text.trim(),
+                'scopeType': widget.config.helpScopeType,
+                'scopeValue': widget.config.helpScopeValue,
+                'state': widget.user.state,
+                'campaignId': campaignId,
+              });
               widget.onAddTransaction(
                 AppTransaction(
                   id: 'contrib_${u.email}_$now',
@@ -4554,7 +6167,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   amount: amount,
                   type: TransactionType.contribution,
                   method: PaymentMethod.system,
-                  sourceDetails: noteC.text.trim().isEmpty ? 'Community contribution' : noteC.text.trim(),
+                  sourceDetails: payload,
                   status: TransactionStatus.approved,
                   timestamp: now,
                 ),
@@ -4698,14 +6311,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email.')));
                 return;
               }
+              final oldEmail = u.email;
+              final newEmail = email.text.trim().toLowerCase();
               setState(() {
                 u.fullName = fullName.text.trim();
                 u.username = fullName.text.trim().split(' ').first;
                 u.phone = phone.text.trim();
-                u.email = email.text.trim().toLowerCase();
+                u.email = newEmail;
                 u.homeAddress = address.text.trim();
               });
               widget.onDataChanged();
+              if (oldEmail != newEmail) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Email updated. New records will use this email.')));
+              }
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Member information saved successfully.')));
               Navigator.pop(ctx);
             },
             child: const Text('Save'),
@@ -4719,6 +6338,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Widget build(BuildContext context) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = const Color(0xFF6200EE);
+    final receiptGroups = _groupContributionReceipts(_visibleContributionTx());
+    final receiptCount = receiptGroups.length;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF5F7FB),
@@ -4746,7 +6367,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               child: Row(
                 children: [
-                  Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.shield_rounded, color: Colors.white, size: 30)),
+                  GestureDetector(
+                    onTap: _showContributionReceipts,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.shield_rounded, color: Colors.white, size: 30)),
+                        if (receiptCount > 0)
+                          Positioned(
+                            right: -6,
+                            top: -6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
+                              child: Text('$receiptCount', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(width: 20),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Civic Registry', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)), const Text('Community Identity & Trust System', style: TextStyle(color: Colors.white70, fontSize: 12))])),
                 ],
@@ -4959,145 +6598,151 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Widget _enrollSection(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(25),
-      decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)]),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), borderRadius: BorderRadius.circular(15)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [Text('Enrollment Form', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue)), Text('Register any community member (app account not required).', style: TextStyle(fontSize: 11, color: Colors.blueGrey))])),
-          const SizedBox(height: 25),
+    final availableAppUsers = widget.allUsers.where((u) => 
+      !u.isEnrolledInRegistry && 
+      (u.username.toLowerCase().contains(_enrollSearchC.text.toLowerCase()) || 
+       u.email.toLowerCase().contains(_enrollSearchC.text.toLowerCase()))
+    ).toList();
 
-          const Text('Full Name *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _fullNameC,
-            decoration: InputDecoration(
-              hintText: 'First name and last name',
-              hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
-              filled: true,
-              fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-            ),
-          ),
-          const SizedBox(height: 20),
+    return Column(
+      children: [
+        // MANUAL ENROLLMENT FORM
+        Container(
+          padding: const EdgeInsets.all(25),
+          decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)]),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), borderRadius: BorderRadius.circular(15)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [Text('Manual Enrollment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue)), Text('Register a new member from scratch.', style: TextStyle(fontSize: 11, color: Colors.blueGrey))])),
+              const SizedBox(height: 25),
 
-          const Text('Date of Birth *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _dobC,
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')),
-              DateSlashFormatter(),
+              const Text('Full Name *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _fullNameC,
+                decoration: InputDecoration(hintText: 'First name and last name', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+              ),
+              const SizedBox(height: 20),
+
+              const Text('Date of Birth *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _dobC,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')), DateSlashFormatter()],
+                decoration: InputDecoration(hintText: 'MM/DD/YYYY', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+              ),
+              const SizedBox(height: 20),
+
+              const Text('ID Type *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _idTypeC.text,
+                decoration: InputDecoration(filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
+                items: ['National ID', 'Passport', 'Drivers License', 'Voters Card'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                onChanged: (v) { if (v != null) setState(() => _idTypeC.text = v); },
+              ),
+              const SizedBox(height: 20),
+
+              _enrollField('Home Address', _addressC, 'Street address, Apt...'),
+
+              const Text('Phone Number *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _phoneC,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(hintText: 'Numbers only', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+              ),
+              const SizedBox(height: 20),
+
+              const Text('Email Address *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _emailC,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(hintText: 'member@email.com', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+              ),
+              const SizedBox(height: 20),
+
+              const Text('City *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 8),
+              DropdownMenu<String>(
+                width: double.infinity,
+                initialSelection: _cityC.text.isNotEmpty ? _cityC.text : null,
+                hintText: 'Select city',
+                inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+                dropdownMenuEntries: widget.config.cities.map((c) => DropdownMenuEntry(value: c, label: c)).toList(),
+                onSelected: (v) { if (v != null) setState(() => _cityC.text = v); },
+              ),
+              const SizedBox(height: 20),
+
+              const Text('Room *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 8),
+              DropdownMenu<String>(
+                width: double.infinity,
+                initialSelection: _roomC.text.isNotEmpty ? _roomC.text : null,
+                hintText: 'Select room',
+                inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+                dropdownMenuEntries: widget.config.rooms.map((r) => DropdownMenuEntry(value: r, label: r)).toList(),
+                onSelected: (v) { if (v != null) setState(() => _roomC.text = v); },
+              ),
+              const SizedBox(height: 30),
+              
+              ElevatedButton(
+                onPressed: _registerMember,
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25))),
+                child: const Text('Register Member', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
             ],
-            decoration: InputDecoration(
-              hintText: 'MM/DD/YYYY',
-              hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
-              filled: true,
-              fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-            ),
           ),
-          const SizedBox(height: 20),
+        ),
 
-          const Text('ID Type *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: _idTypeC.text,
-            decoration: InputDecoration(filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
-            items: ['National ID', 'Passport', 'Drivers License', 'Voters Card'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-            onChanged: (v) { if (v != null) _idTypeC.text = v; },
+        const SizedBox(height: 40),
+
+        // APP USERS LIST
+        Container(
+          padding: const EdgeInsets.all(25),
+          decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)]),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Enroll Existing App Users', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              const SizedBox(height: 5),
+              const Text('Select a user who already has an account to enroll them.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _enrollSearchC,
+                onChanged: (v) => setState(() {}),
+                decoration: InputDecoration(hintText: 'Search app users...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
+              ),
+              const SizedBox(height: 20),
+              if (availableAppUsers.isEmpty)
+                const Center(child: Padding(padding: EdgeInsets.all(30), child: Text('No matching users found.', style: TextStyle(color: Colors.grey))))
+              else
+                ...availableAppUsers.take(5).map((u) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(backgroundColor: Colors.blue.withOpacity(0.1), child: Text(u.username[0].toUpperCase(), style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold))),
+                  title: Text(u.username, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(u.email, style: const TextStyle(fontSize: 12)),
+                  trailing: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _fullNameC.text = u.fullName ?? u.username;
+                        _emailC.text = u.email;
+                        _phoneC.text = u.phone;
+                        _addressC.text = u.homeAddress ?? '';
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User details pre-filled in form above.')));
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                    child: const Text('Fill Form', style: TextStyle(fontSize: 11)),
+                  ),
+                )),
+            ],
           ),
-          const SizedBox(height: 20),
-
-          Container(width: double.infinity, margin: const EdgeInsets.symmetric(vertical: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), borderRadius: BorderRadius.circular(15)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [Text('📋 Auto-Generated ID', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)), Text('A unique ID number will be automatically generated when you register this member.', style: TextStyle(fontSize: 10, color: Colors.blueGrey))])),
-          const SizedBox(height: 10),
-
-          _enrollField('Home Address', _addressC, 'Street address, Apt...'),
-
-          const Text('Phone Number *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _phoneC,
-            keyboardType: TextInputType.phone,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: InputDecoration(
-              hintText: 'Numbers only',
-              hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
-              filled: true,
-              fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          const Text('Email Address *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _emailC,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              hintText: 'member@email.com',
-              hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
-              filled: true,
-              fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          const Text('City *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(height: 8),
-          DropdownMenu<String>(
-            width: double.infinity,
-            initialSelection: _cityC.text.isNotEmpty ? _cityC.text : null,
-            hintText: 'Search or select city',
-            enableFilter: true,
-            enableSearch: true,
-            trailingIcon: const Icon(Icons.arrow_drop_down),
-            inputDecorationTheme: InputDecorationTheme(
-              filled: true,
-              fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-            ),
-            dropdownMenuEntries: widget.config.cities.map((c) => DropdownMenuEntry(value: c, label: c)).toList(),
-            onSelected: (v) {
-              if (v == null) return;
-              setState(() => _cityC.text = v);
-            },
-          ),
-          const SizedBox(height: 20),
-
-          const Text('Room *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(height: 8),
-          DropdownMenu<String>(
-            width: double.infinity,
-            initialSelection: _roomC.text.isNotEmpty ? _roomC.text : null,
-            hintText: 'Search or select room',
-            enableFilter: true,
-            enableSearch: true,
-            trailingIcon: const Icon(Icons.arrow_drop_down),
-            inputDecorationTheme: InputDecorationTheme(
-              filled: true,
-              fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-            ),
-            dropdownMenuEntries: widget.config.rooms.map((r) => DropdownMenuEntry(value: r, label: r)).toList(),
-            onSelected: (v) {
-              if (v == null) return;
-              setState(() => _roomC.text = v);
-            },
-          ),
-          const SizedBox(height: 20),
-          
-          ElevatedButton(
-            onPressed: _registerMember,
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25))),
-            child: const Text('Register Member', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
   Widget _enrollField(String label, TextEditingController c, String hint) {
@@ -5203,7 +6848,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             _mBtn(Icons.visibility_outlined, 'View', Colors.indigo, () => _showMemberProfile(u)),
             _mBtn(Icons.monetization_on_outlined, 'Money', Colors.green, () => _showContributionDialog(u)),
             _mBtn(Icons.warning_amber_rounded, 'Claim', Colors.orange, () => _showClaimDialog(u)),
-            _mBtn(Icons.undo_rounded, 'Resolve', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
+            _mBtn(Icons.undo_rounded, 'Clean', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
             _mBtn(Icons.delete_outline_rounded, '', Colors.red, () {
               setState(() => u.isEnrolledInRegistry = false);
               widget.onDataChanged();
@@ -5348,7 +6993,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
 class JobMarketplaceScreen extends StatefulWidget {
   final UserData user;
-  const JobMarketplaceScreen({super.key, required this.user});
+  final List<UserData> allUsers;
+  final AppConfig config;
+  final VoidCallback onDataChanged;
+  const JobMarketplaceScreen({
+    super.key,
+    required this.user,
+    required this.allUsers,
+    required this.config,
+    required this.onDataChanged,
+  });
 
   @override
   State<JobMarketplaceScreen> createState() => _JobMarketplaceScreenState();
@@ -5356,10 +7010,436 @@ class JobMarketplaceScreen extends StatefulWidget {
 
 class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
   int _activeTab = 0; // 0: Find Jobs, 1: My Jobs, 2: Claimed
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.config.jobPosts = List<Map<String, dynamic>>.from(
+      widget.config.jobPosts.map((e) => Map<String, dynamic>.from(e)),
+    );
+    widget.config.jobWorkerApplications = List<Map<String, dynamic>>.from(
+      widget.config.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)),
+    );
+  }
+
+  bool get _isApprovedWorker => widget.user.isAdmin || widget.user.isApprovedWorker;
+  List<Map<String, dynamic>> get _jobs => widget.config.jobPosts;
+
+  ImageProvider? _jobImage(String? imageRef) {
+    if (imageRef == null || imageRef.trim().isEmpty) return null;
+    final src = imageRef.trim();
+    if (src.startsWith('data:image')) {
+      try {
+        return MemoryImage(base64Decode(src.split(',').last));
+      } catch (_) {
+        return null;
+      }
+    }
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      return NetworkImage(src);
+    }
+    if (!kIsWeb) {
+      return FileImage(File(src));
+    }
+    return null;
+  }
+
+  void _saveJobs() {
+    widget.onDataChanged();
+    setState(() {});
+  }
+
+  Future<void> _showPostJobDialog() async {
+    final titleC = TextEditingController();
+    final descC = TextEditingController();
+    final contactC = TextEditingController(text: widget.user.phone.isNotEmpty ? widget.user.phone : widget.user.email);
+    final whenC = TextEditingController();
+    final addressC = TextEditingController();
+    final budgetC = TextEditingController();
+    String imageRef = '';
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) => AlertDialog(
+          title: const Text('Post New Job'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Job title')),
+                TextField(controller: descC, maxLines: 3, decoration: const InputDecoration(labelText: 'Job details')),
+                TextField(controller: contactC, decoration: const InputDecoration(labelText: 'Phone or Email')),
+                TextField(controller: whenC, decoration: const InputDecoration(labelText: 'When do you need it done?')),
+                TextField(controller: addressC, decoration: const InputDecoration(labelText: 'Workplace address')),
+                TextField(controller: budgetC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Budget (\$)')),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final img = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 78, maxWidth: 1200);
+                          if (img == null) return;
+                          if (kIsWeb) {
+                            final bytes = await img.readAsBytes();
+                            imageRef = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                          } else {
+                            imageRef = img.path;
+                          }
+                          setDialog(() {});
+                        },
+                        icon: const Icon(Icons.photo),
+                        label: const Text('Add Picture'),
+                      ),
+                    ),
+                  ],
+                ),
+                if (imageRef.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 110,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      image: DecorationImage(image: _jobImage(imageRef)!, fit: BoxFit.cover),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                if (titleC.text.trim().isEmpty || contactC.text.trim().isEmpty || addressC.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Title, contact, and address are required.')));
+                  return;
+                }
+                final budget = double.tryParse(budgetC.text.trim()) ?? 0;
+                _jobs.add({
+                  'id': DateTime.now().microsecondsSinceEpoch.toString(),
+                  'ownerEmail': widget.user.email,
+                  'ownerName': widget.user.username,
+                  'title': titleC.text.trim(),
+                  'description': descC.text.trim(),
+                  'contact': contactC.text.trim(),
+                  'preferredTime': whenC.text.trim(),
+                  'address': addressC.text.trim(),
+                  'budget': budget,
+                  'imageRef': imageRef,
+                  'status': 'open',
+                  'offers': <Map<String, dynamic>>[],
+                  'claimedByEmail': '',
+                  'claimedByName': '',
+                  'agreedPrice': budget,
+                  'createdAt': DateTime.now().toIso8601String(),
+                  'completedAt': '',
+                });
+                _saveJobs();
+                Navigator.pop(ctx);
+              },
+              child: const Text('Post Job'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showWorkerApplicationDialog() async {
+    final noteC = TextEditingController();
+    final hasPending = widget.config.jobWorkerApplications.any(
+      (a) => (a['userEmail'] ?? '').toString().toLowerCase().trim() == widget.user.email.toLowerCase().trim() && (a['status'] ?? '') == 'pending',
+    );
+    if (hasPending) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You already have a pending worker application.')));
+      return;
+    }
+    if (_isApprovedWorker) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are already approved as a worker.')));
+      return;
+    }
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Apply as Worker'),
+        content: TextField(
+          controller: noteC,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Skills / experience',
+            hintText: 'Tell admin why you should be approved.',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              widget.config.jobWorkerApplications.add({
+                'id': DateTime.now().microsecondsSinceEpoch.toString(),
+                'userEmail': widget.user.email,
+                'username': widget.user.username,
+                'phone': widget.user.phone,
+                'note': noteC.text.trim(),
+                'status': 'pending',
+                'createdAt': DateTime.now().toIso8601String(),
+              });
+              _saveJobs();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _claimJob(Map<String, dynamic> job) {
+    if (!_isApprovedWorker) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Only admin-approved workers can claim jobs.')));
+      return;
+    }
+    if ((job['status'] ?? 'open') != 'open') return;
+    job['status'] = 'claimed';
+    job['claimedByEmail'] = widget.user.email;
+    job['claimedByName'] = widget.user.username;
+    job['claimedAt'] = DateTime.now().toIso8601String();
+    if ((job['agreedPrice'] ?? 0) == 0) job['agreedPrice'] = (job['budget'] ?? 0);
+    _saveJobs();
+  }
+
+  Future<void> _showOfferDialog(Map<String, dynamic> job) async {
+    final amountC = TextEditingController(text: '${(job['budget'] ?? 0)}');
+    final noteC = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Send Offer'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: amountC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Your offer amount (\$)')),
+            TextField(controller: noteC, maxLines: 3, decoration: const InputDecoration(labelText: 'Message')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final amount = double.tryParse(amountC.text.trim()) ?? 0;
+              if (amount <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid offer amount.')));
+                return;
+              }
+              final offers = List<Map<String, dynamic>>.from((job['offers'] ?? const []).map((e) => Map<String, dynamic>.from(e)));
+              offers.add({
+                'id': DateTime.now().microsecondsSinceEpoch.toString(),
+                'workerEmail': widget.user.email,
+                'workerName': widget.user.username,
+                'amount': amount,
+                'message': noteC.text.trim(),
+                'status': 'pending',
+                'createdAt': DateTime.now().toIso8601String(),
+              });
+              job['offers'] = offers;
+              _saveJobs();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Send Offer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showOffersManager(Map<String, dynamic> job) {
+    final offers = List<Map<String, dynamic>>.from((job['offers'] ?? const []).map((e) => Map<String, dynamic>.from(e)));
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) => AlertDialog(
+          title: const Text('Job Offers'),
+          content: SizedBox(
+            width: 520,
+            child: offers.isEmpty
+                ? const Text('No offers yet.')
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemBuilder: (context, i) {
+                      final o = offers[i];
+                      final status = (o['status'] ?? 'pending').toString();
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('${o['workerName'] ?? 'Worker'} • \$${formatCurrency((o['amount'] ?? 0).toDouble())}'),
+                        subtitle: Text('${o['message'] ?? ''}\n$status'.trim()),
+                        isThreeLine: true,
+                        trailing: status == 'pending'
+                            ? Wrap(
+                                spacing: 6,
+                                children: [
+                                  IconButton(
+                                    onPressed: () {
+                                      for (final each in offers) {
+                                        each['status'] = each['id'] == o['id'] ? 'accepted' : (each['status'] == 'pending' ? 'rejected' : each['status']);
+                                      }
+                                      job['offers'] = offers;
+                                      job['status'] = 'claimed';
+                                      job['claimedByEmail'] = o['workerEmail'];
+                                      job['claimedByName'] = o['workerName'];
+                                      job['agreedPrice'] = o['amount'];
+                                      job['claimedAt'] = DateTime.now().toIso8601String();
+                                      _saveJobs();
+                                      setDialog(() {});
+                                    },
+                                    icon: const Icon(Icons.check_circle, color: Colors.green),
+                                  ),
+                                  IconButton(
+                                    onPressed: () {
+                                      o['status'] = 'rejected';
+                                      job['offers'] = offers;
+                                      _saveJobs();
+                                      setDialog(() {});
+                                    },
+                                    icon: const Icon(Icons.cancel, color: Colors.red),
+                                  ),
+                                ],
+                              )
+                            : Text(status.toUpperCase()),
+                      );
+                    },
+                    separatorBuilder: (_, __) => const Divider(),
+                    itemCount: offers.length,
+                  ),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
+        ),
+      ),
+    );
+  }
+
+  void _markDone(Map<String, dynamic> job) {
+    job['status'] = 'done';
+    job['completedAt'] = DateTime.now().toIso8601String();
+    _saveJobs();
+  }
+
+  Widget _jobCard(Map<String, dynamic> job, {required bool isDark}) {
+    final ownerEmail = (job['ownerEmail'] ?? '').toString().toLowerCase().trim();
+    final status = (job['status'] ?? 'open').toString();
+    final mine = ownerEmail == widget.user.email.toLowerCase().trim();
+    final claimedByMe = (job['claimedByEmail'] ?? '').toString().toLowerCase().trim() == widget.user.email.toLowerCase().trim();
+    final image = _jobImage(job['imageRef']?.toString());
+    final canClaim = !mine && status == 'open' && _isApprovedWorker;
+    final canOffer = !mine && status == 'open';
+    final canManageOffers = mine && status == 'open';
+    final canDone = status == 'claimed' && (mine || claimedByMe);
+    final offers = List<Map<String, dynamic>>.from((job['offers'] ?? const []).map((e) => Map<String, dynamic>.from(e)));
+
+    return Card(
+      elevation: 0,
+      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (image != null)
+              Container(
+                height: 150,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  image: DecorationImage(image: image, fit: BoxFit.cover),
+                ),
+              ),
+            if (image != null) const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    (job['title'] ?? 'Untitled Job').toString(),
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: status == 'open'
+                        ? Colors.blue.withOpacity(0.12)
+                        : status == 'claimed'
+                            ? Colors.orange.withOpacity(0.12)
+                            : Colors.green.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(status.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text((job['description'] ?? '').toString()),
+            const SizedBox(height: 8),
+            Text('Budget: \$${formatCurrency((job['agreedPrice'] ?? job['budget'] ?? 0).toDouble())}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Contact: ${(job['contact'] ?? '').toString()}'),
+            Text('When: ${(job['preferredTime'] ?? '').toString()}'),
+            Text('Address: ${(job['address'] ?? '').toString()}'),
+            if ((job['claimedByName'] ?? '').toString().isNotEmpty) Text('Claimed by: ${(job['claimedByName'] ?? '').toString()}'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (canClaim)
+                  ElevatedButton.icon(
+                    onPressed: () => _claimJob(job),
+                    icon: const Icon(Icons.how_to_reg, size: 14),
+                    label: const Text('Claim'),
+                  ),
+                if (canOffer)
+                  OutlinedButton.icon(
+                    onPressed: () => _showOfferDialog(job),
+                    icon: const Icon(Icons.local_offer_outlined, size: 14),
+                    label: const Text('Send Offer'),
+                  ),
+                if (canManageOffers)
+                  OutlinedButton.icon(
+                    onPressed: () => _showOffersManager(job),
+                    icon: const Icon(Icons.inbox_outlined, size: 14),
+                    label: Text('Offers (${offers.where((e) => (e['status'] ?? 'pending') == 'pending').length})'),
+                  ),
+                if (canDone)
+                  ElevatedButton.icon(
+                    onPressed: () => _markDone(job),
+                    icon: const Icon(Icons.task_alt, size: 14),
+                    label: const Text('Mark Done'),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final myEmail = widget.user.email.toLowerCase().trim();
+    final allJobs = List<Map<String, dynamic>>.from(_jobs)..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+    final findJobs = allJobs.where((j) => (j['status'] ?? 'open') == 'open').toList();
+    final claimedJobs = allJobs.where((j) => (j['status'] ?? '') == 'claimed' && (((j['claimedByEmail'] ?? '').toString().toLowerCase().trim() == myEmail) || ((j['ownerEmail'] ?? '').toString().toLowerCase().trim() == myEmail))).toList();
+    final myJobs = allJobs.where((j) {
+      final owner = (j['ownerEmail'] ?? '').toString().toLowerCase().trim();
+      final claimed = (j['claimedByEmail'] ?? '').toString().toLowerCase().trim();
+      final status = (j['status'] ?? '').toString();
+      if (owner == myEmail) return true;
+      return status == 'done' && claimed == myEmail;
+    }).toList();
+    final tabJobs = _activeTab == 0 ? findJobs : (_activeTab == 1 ? myJobs : claimedJobs);
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF5F7FB),
       appBar: AppBar(
@@ -5398,9 +7478,9 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
                   ),
                   Column(
                     children: [
-                      _actionButton(Icons.person_add_alt_1_rounded, 'Apply'),
+                      _actionButton(Icons.person_add_alt_1_rounded, 'Apply', _showWorkerApplicationDialog),
                       const SizedBox(height: 10),
-                      _actionButton(Icons.business_center_rounded, 'Post'),
+                      _actionButton(Icons.business_center_rounded, 'Post', _showPostJobDialog),
                     ],
                   ),
                 ],
@@ -5428,22 +7508,38 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
             const SizedBox(height: 25),
 
             // Content Area
+            if (_activeTab == 0 && !_isApprovedWorker && !widget.user.isAdmin)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2A1B1B) : const Color(0xFFFFF2F2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text('You can post jobs now. Apply first to become an approved worker and claim jobs.'),
+              ),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 60),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(25),
                 boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15)],
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.business_center_outlined, size: 60, color: Colors.grey.shade400),
-                  const SizedBox(height: 15),
-                  Text('No jobs available', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500, fontSize: 14)),
-                ],
-              ),
+              child: tabJobs.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 60),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.business_center_outlined, size: 60, color: Colors.grey.shade400),
+                          const SizedBox(height: 15),
+                          Text('No jobs available', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500, fontSize: 14)),
+                        ],
+                      ),
+                    )
+                  : Column(children: tabJobs.map((j) => _jobCard(j, isDark: isDark)).toList()),
             ),
             const SizedBox(height: 50),
           ],
@@ -5452,8 +7548,11 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     );
   }
 
-  Widget _actionButton(IconData icon, String label) {
-    return Container(
+  Widget _actionButton(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
       width: 90,
       height: 38,
       decoration: BoxDecoration(
@@ -5468,6 +7567,7 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
           const SizedBox(width: 8),
           Text(label, style: const TextStyle(color: Color(0xFFE64A19), fontWeight: FontWeight.bold, fontSize: 11)),
         ],
+      ),
       ),
     );
   }
@@ -5499,10 +7599,19 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
 
 class MediaHubScreen extends StatefulWidget {
   final UserData user;
+  final List<UserData> allUsers;
   final List<MediaPost> allMedia;
   final Function(MediaPost) onPost;
+  final VoidCallback onDataChanged;
 
-  const MediaHubScreen({super.key, required this.user, required this.allMedia, required this.onPost});
+  const MediaHubScreen({
+    super.key,
+    required this.user,
+    required this.allUsers,
+    required this.allMedia,
+    required this.onPost,
+    required this.onDataChanged,
+  });
 
   @override
   State<MediaHubScreen> createState() => _MediaHubScreenState();
@@ -5510,60 +7619,250 @@ class MediaHubScreen extends StatefulWidget {
 
 class _MediaHubScreenState extends State<MediaHubScreen> {
   final _captionController = TextEditingController();
+  bool _isPosting = false;
+  final int _maxActivePostsPerUser = 3;
 
-  Future<void> _pickAndPost() async {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _cleanupExpiredPosts();
+    });
+  }
+
+  bool _isExpired(MediaPost post) {
+    return DateTime.now().difference(post.timestamp).inDays >= 7;
+  }
+
+  ({String bucket, String path})? _parseSupabaseRef(String mediaUrl) {
+    if (!mediaUrl.startsWith('supabase://')) return null;
+    final withoutScheme = mediaUrl.replaceFirst('supabase://', '');
+    final slashIdx = withoutScheme.indexOf('/');
+    if (slashIdx <= 0 || slashIdx >= withoutScheme.length - 1) return null;
+    return (bucket: withoutScheme.substring(0, slashIdx), path: withoutScheme.substring(slashIdx + 1));
+  }
+
+  Future<void> _deletePostFromStorage(MediaPost post) async {
+    final ref = _parseSupabaseRef(post.videoUrl);
+    if (ref == null) return;
+    try {
+      await Supabase.instance.client.storage.from(ref.bucket).remove([ref.path]);
+    } catch (e) {
+      debugPrint('Storage remove warning: $e');
+    }
+  }
+
+  Future<void> _deletePost(MediaPost post, {bool triggerSave = true}) async {
+    setState(() => widget.allMedia.removeWhere((m) => m.id == post.id));
+    await _deletePostFromStorage(post);
+    try {
+      await Supabase.instance.client.from('media').delete().eq('id', post.id);
+    } catch (e) {
+      debugPrint('Media delete warning: $e');
+    }
+    if (triggerSave) widget.onDataChanged();
+  }
+
+  Future<void> _cleanupExpiredPosts() async {
+    final expired = widget.allMedia.where(_isExpired).toList();
+    if (expired.isEmpty) return;
+    for (final post in expired) {
+      await _deletePost(post, triggerSave: false);
+    }
+    widget.onDataChanged();
+  }
+
+  String _mimeForVideoExt(String ext) {
+    switch (ext) {
+      case 'mov':
+        return 'video/quicktime';
+      case 'webm':
+        return 'video/webm';
+      case 'mkv':
+        return 'video/x-matroska';
+      case 'avi':
+        return 'video/x-msvideo';
+      default:
+        return 'video/mp4';
+    }
+  }
+
+  String _mimeForImageExt(String ext) {
+    switch (ext) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      default:
+        return 'image/jpeg';
+    }
+  }
+
+  int _activePostsForCurrentUser() {
+    return widget.allMedia.where((m) => m.userEmail == widget.user.email && !_isExpired(m)).length;
+  }
+
+  Future<void> _pickAndPost({required bool isVideo}) async {
+    if (_isPosting) return;
+    if (_activePostsForCurrentUser() >= _maxActivePostsPerUser) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You can only keep 3 active media posts at once. Delete/expire one first.')),
+        );
+      }
+      return;
+    }
     final picker = ImagePicker();
-    final video = await picker.pickVideo(source: ImageSource.gallery);
-    
-    if (video == null) return;
+    final media = isVideo
+        ? await picker.pickVideo(source: ImageSource.gallery)
+        : await picker.pickImage(source: ImageSource.gallery, imageQuality: 88, maxWidth: 1800);
+    if (media == null) return;
 
-    // In a real app, we would upload the video to Supabase Storage first.
-    // For now, we use the local path as the "URL" for testing.
+    setState(() => _isPosting = true);
+
+    final fallbackExt = isVideo ? 'mp4' : 'jpg';
+    final ext = media.path.contains('.') ? media.path.split('.').last.toLowerCase() : fallbackExt;
+    String mediaUrl = media.path;
+    try {
+      final bytes = await media.readAsBytes();
+      final fileName = '${DateTime.now().microsecondsSinceEpoch}_${widget.user.email.hashCode}.$ext';
+      final storagePath = 'uploads/$fileName';
+      await Supabase.instance.client.storage.from('media').uploadBinary(
+        storagePath,
+        bytes,
+        fileOptions: FileOptions(
+          upsert: true,
+          contentType: isVideo ? _mimeForVideoExt(ext) : _mimeForImageExt(ext),
+        ),
+      );
+      mediaUrl = 'supabase://media/$storagePath';
+    } catch (e) {
+      debugPrint('Media upload fallback (local path): $e');
+      if (kIsWeb) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Upload failed. Check Media bucket permissions and try again.')),
+          );
+        }
+        setState(() => _isPosting = false);
+        return;
+      }
+    }
+
     final post = MediaPost(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       userEmail: widget.user.email,
       username: widget.user.username,
-      videoUrl: video.path,
+      videoUrl: mediaUrl,
+      contentType: isVideo ? 'video' : 'image',
       caption: _captionController.text,
       timestamp: DateTime.now(),
     );
 
     widget.onPost(post);
     _captionController.clear();
-    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${isVideo ? 'Video' : 'Photo'} posted successfully.')),
+      );
+    }
+    if (mounted) setState(() => _isPosting = false);
+    widget.onDataChanged();
   }
 
   void _showPostDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (c) => Container(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20, left: 20, right: 20, top: 20),
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+          gradient: LinearGradient(
+            colors: isDark
+                ? const [Color(0xFF0E1324), Color(0xFF141B34)]
+                : const [Color(0xFFF6FBFF), Color(0xFFEAF1FF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+          border: Border.all(color: Colors.white.withOpacity(isDark ? 0.16 : 0.65)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Share a Video', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF7C3AED).withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.smart_display_rounded, color: Color(0xFF8B5CF6)),
+                ),
+                const SizedBox(width: 10),
+                const Text('Create Media Post', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              ],
+            ),
             const SizedBox(height: 15),
             TextField(
               controller: _captionController,
-              decoration: const InputDecoration(hintText: 'Write a caption...', border: OutlineInputBorder()),
+              style: const TextStyle(fontWeight: FontWeight.w500),
+              decoration: InputDecoration(
+                hintText: 'Write a caption...',
+                filled: true,
+                fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.85),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+                ),
+              ),
               maxLines: 3,
             ),
             const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _pickAndPost,
-              icon: const Icon(Icons.video_library_rounded),
-              label: const Text('Select Video & Post'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-                backgroundColor: const Color(0xFFE64A19),
-                foregroundColor: Colors.white,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isPosting ? null : () => _pickAndPost(isVideo: false),
+                    icon: const Icon(Icons.image_rounded),
+                    label: const Text('Photo'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 52),
+                      foregroundColor: const Color(0xFF8B5CF6),
+                      side: BorderSide(color: const Color(0xFF8B5CF6).withOpacity(0.35)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isPosting ? null : () => _pickAndPost(isVideo: true),
+                    icon: _isPosting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.smart_display_rounded),
+                    label: Text(_isPosting ? 'Posting...' : 'Video'),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 52),
+                      backgroundColor: const Color(0xFF7C3AED),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
           ],
@@ -5574,80 +7873,386 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final mediaFeed = widget.allMedia.where((m) => !_isExpired(m)).toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF080B16) : const Color(0xFFF3F7FF),
       appBar: AppBar(
-        title: const Text('MEDIA HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5)),
-        centerTitle: true,
-        actions: [
-          IconButton(onPressed: _showPostDialog, icon: const Icon(Icons.add_box_outlined, size: 28)),
-        ],
+        title: const Text('MEDIA HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+        centerTitle: false,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
       ),
-      body: widget.allMedia.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.video_collection_outlined, size: 60, color: Colors.grey.withOpacity(0.5)),
-                  const SizedBox(height: 15),
-                  const Text('No videos shared yet', style: TextStyle(color: Colors.grey)),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? const [Color(0xFF131D3A), Color(0xFF3B0E7A)]
+                      : const [Color(0xFFCCFBFF), Color(0xFFE9D5FF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withOpacity(isDark ? 0.15 : 0.6)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF8B5CF6).withOpacity(0.23),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
                 ],
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(0, 0, 0, 150),
-              itemCount: widget.allMedia.length,
-              itemBuilder: (context, index) {
-                return VideoPostWidget(post: widget.allMedia[index]);
-              },
+              child: Row(
+                children: [
+                  const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Share videos with a modern live media feed.',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: _showPostDialog,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.16),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Post'),
+                  ),
+                ],
+              ),
             ),
+          ),
+          Expanded(
+            child: mediaFeed.isEmpty
+                ? Center(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF111731) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(isDark ? 0.1 : 0.8)),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.perm_media_rounded, size: 58, color: Colors.grey.withOpacity(0.55)),
+                          const SizedBox(height: 12),
+                          const Text('No media posted yet', style: TextStyle(fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          const Text('Tap Post to upload photo or video.', style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 150),
+                    itemCount: mediaFeed.length,
+                    itemBuilder: (context, index) => VideoPostWidget(
+                      post: mediaFeed[index],
+                      currentUser: widget.user,
+                      allUsers: widget.allUsers,
+                      onChanged: widget.onDataChanged,
+                      onDelete: () => _deletePost(mediaFeed[index]),
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class VideoPostWidget extends StatefulWidget {
   final MediaPost post;
-  const VideoPostWidget({super.key, required this.post});
+  final UserData currentUser;
+  final List<UserData> allUsers;
+  final VoidCallback onChanged;
+  final VoidCallback onDelete;
+  const VideoPostWidget({
+    super.key,
+    required this.post,
+    required this.currentUser,
+    required this.allUsers,
+    required this.onChanged,
+    required this.onDelete,
+  });
 
   @override
   State<VideoPostWidget> createState() => _VideoPostWidgetState();
 }
 
 class _VideoPostWidgetState extends State<VideoPostWidget> {
-  late VideoPlayerController _controller;
+  VideoPlayerController? _controller;
   bool _isInitialized = false;
+  bool _hasError = false;
+  String _errorText = 'Unable to load this content.';
+  String? _resolvedMediaUrl;
+  ImageProvider? _authorImage;
+  bool _loadingMedia = true;
+
+  ({String bucket, String path})? _parseSupabaseRef(String mediaUrl) {
+    if (!mediaUrl.startsWith('supabase://')) return null;
+    final withoutScheme = mediaUrl.replaceFirst('supabase://', '');
+    final slashIdx = withoutScheme.indexOf('/');
+    if (slashIdx <= 0 || slashIdx >= withoutScheme.length - 1) return null;
+    return (bucket: withoutScheme.substring(0, slashIdx), path: withoutScheme.substring(slashIdx + 1));
+  }
+
+  Future<String> _resolveMediaUrl(String rawUrl) async {
+    if (rawUrl.startsWith('supabase://')) {
+      final ref = _parseSupabaseRef(rawUrl);
+      if (ref != null) {
+        try {
+          return await Supabase.instance.client.storage.from(ref.bucket).createSignedUrl(ref.path, 60 * 60 * 24 * 30);
+        } catch (_) {
+          return Supabase.instance.client.storage.from(ref.bucket).getPublicUrl(ref.path);
+        }
+      }
+    }
+    return rawUrl;
+  }
+
+  Future<void> _initializePlayer(String resolvedUrl) async {
+    try {
+      if (resolvedUrl.startsWith('http')) {
+        _controller = VideoPlayerController.networkUrl(Uri.parse(resolvedUrl));
+      } else {
+        _controller = VideoPlayerController.file(File(resolvedUrl));
+      }
+      await _controller!.initialize().timeout(const Duration(seconds: 12));
+      if (!mounted) return;
+      _controller!.setLooping(true);
+      setState(() => _isInitialized = true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _hasError = true;
+        _errorText = 'Unable to load this media.';
+      });
+      debugPrint('Video init error: $e');
+    }
+  }
+
+  Future<ImageProvider?> _profileImageProviderForEmail(String email) async {
+    final u = widget.allUsers.firstWhere(
+      (x) => x.email.toLowerCase().trim() == email.toLowerCase().trim(),
+      orElse: () => UserData(email: email),
+    );
+    final path = u.profilePicturePath;
+    if (path == null || path.trim().isEmpty) return null;
+    if (path.startsWith('data:image')) {
+      try {
+        return MemoryImage(base64Decode(path.split(',').last));
+      } catch (_) {
+        return null;
+      }
+    }
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return NetworkImage(path);
+    }
+    if (!kIsWeb) {
+      final f = File(path);
+      if (await f.exists()) return FileImage(f);
+    }
+    return null;
+  }
+
+  bool get _liked => widget.post.likedBy.contains(widget.currentUser.email);
+  bool get _saved => widget.post.savedBy.contains(widget.currentUser.email);
+  bool get _isOwner => widget.currentUser.email.toLowerCase().trim() == widget.post.userEmail.toLowerCase().trim();
+
+  Future<void> _prepareMedia() async {
+    final resolved = await _resolveMediaUrl(widget.post.videoUrl);
+    final avatar = await _profileImageProviderForEmail(widget.post.userEmail);
+    if (!mounted) return;
+    _resolvedMediaUrl = resolved;
+    _authorImage = avatar;
+    if (widget.post.contentType == 'video') {
+      await _initializePlayer(resolved);
+    }
+    if (mounted) setState(() => _loadingMedia = false);
+  }
+
+  Future<void> _toggleLike() async {
+    setState(() {
+      if (_liked) {
+        widget.post.likedBy.remove(widget.currentUser.email);
+      } else {
+        widget.post.likedBy.add(widget.currentUser.email);
+      }
+      widget.post.likes = widget.post.likedBy.length;
+    });
+    widget.onChanged();
+  }
+
+  Future<void> _quickLike() async {
+    if (_liked) return;
+    setState(() {
+      widget.post.likedBy.add(widget.currentUser.email);
+      widget.post.likes = widget.post.likedBy.length;
+    });
+    widget.onChanged();
+  }
+
+  Future<void> _toggleSave() async {
+    setState(() {
+      if (_saved) {
+        widget.post.savedBy.remove(widget.currentUser.email);
+      } else {
+        widget.post.savedBy.add(widget.currentUser.email);
+      }
+    });
+    widget.onChanged();
+  }
+
+  Future<void> _sharePost() async {
+    final resolved = await _resolveMediaUrl(widget.post.videoUrl);
+    if (!mounted) return;
+    await Clipboard.setData(ClipboardData(text: '${widget.post.caption}\n$resolved'));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Post link copied to clipboard.')),
+    );
+  }
+
+  Future<void> _handlePostMenu(String action) async {
+    if (action == 'save') {
+      await _toggleSave();
+      return;
+    }
+    if (action == 'delete') {
+      widget.onDelete();
+      return;
+    }
+  }
+
+  void _openComments() {
+    final c = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (ctx, setModal) {
+            return Container(
+              height: MediaQuery.of(ctx).size.height * 0.62,
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              ),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F152D) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  const Text('Comments', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: widget.post.comments.isEmpty
+                        ? const Center(child: Text('No comments yet.'))
+                        : ListView.builder(
+                            itemCount: widget.post.comments.length,
+                            itemBuilder: (context, i) {
+                              final cm = widget.post.comments[i];
+                              return ListTile(
+                                dense: true,
+                                title: Text(cm['username'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.w700)),
+                                subtitle: Text(cm['text'] ?? ''),
+                              );
+                            },
+                          ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: c,
+                          decoration: InputDecoration(
+                            hintText: 'Write a comment...',
+                            filled: true,
+                            fillColor: isDark ? Colors.white.withOpacity(0.06) : Colors.grey.shade100,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          final text = c.text.trim();
+                          if (text.isEmpty) return;
+                          setState(() {
+                            widget.post.comments.add({
+                              'id': DateTime.now().microsecondsSinceEpoch.toString(),
+                              'userEmail': widget.currentUser.email,
+                              'username': widget.currentUser.username,
+                              'text': text,
+                              'timestamp': DateTime.now().toUtc().toIso8601String(),
+                            });
+                          });
+                          setModal(() {});
+                          c.clear();
+                          widget.onChanged();
+                        },
+                        icon: const Icon(Icons.send_rounded),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(c.dispose);
+  }
 
   @override
   void initState() {
     super.initState();
-    if (widget.post.videoUrl.startsWith('http')) {
-      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.post.videoUrl));
-    } else {
-      _controller = VideoPlayerController.file(File(widget.post.videoUrl));
-    }
-
-    _controller.initialize().then((_) {
-      if (mounted) {
-        setState(() {
-          _isInitialized = true;
-          _controller.setLooping(true);
-        });
-      }
-    });
+    _prepareMedia();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isVideo = widget.post.contentType != 'image';
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.1)), bottom: BorderSide(color: Colors.grey.withOpacity(0.1))),
+        color: isDark ? const Color(0xFF111731) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(isDark ? 0.1 : 0.82)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withOpacity(isDark ? 0.12 : 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -5656,7 +8261,11 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                const CircleAvatar(radius: 18, child: Icon(Icons.person, size: 20)),
+                CircleAvatar(
+                  radius: 18,
+                  backgroundImage: _authorImage,
+                  child: _authorImage == null ? const Icon(Icons.person, size: 20) : null,
+                ),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -5666,23 +8275,89 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                   ],
                 ),
                 const Spacer(),
-                const Icon(Icons.more_vert, size: 20),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(isDark ? 0.07 : 0.75),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: PopupMenuButton<String>(
+                    onSelected: _handlePostMenu,
+                    icon: const Icon(Icons.more_horiz_rounded, size: 20),
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: 'save',
+                        child: Text(_saved ? 'Unsave' : 'Save post'),
+                      ),
+                      if (_isOwner) const PopupMenuItem(value: 'delete', child: Text('Delete post')),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
           GestureDetector(
             onTap: () {
+              if (!isVideo || !_isInitialized || _controller == null) return;
               setState(() {
-                _controller.value.isPlaying ? _controller.pause() : _controller.play();
+                _controller!.value.isPlaying ? _controller!.pause() : _controller!.play();
               });
             },
+            onDoubleTap: _quickLike,
             child: AspectRatio(
-              aspectRatio: _isInitialized ? _controller.value.aspectRatio : 16 / 9,
+              aspectRatio: isVideo
+                  ? (_isInitialized && _controller != null ? _controller!.value.aspectRatio : 16 / 9)
+                  : 4 / 5,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  if (_isInitialized) VideoPlayer(_controller) else const Center(child: CircularProgressIndicator()),
-                  if (_isInitialized && !_controller.value.isPlaying)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      color: Colors.black,
+                      child: _loadingMedia
+                          ? const Center(child: CircularProgressIndicator())
+                          : isVideo
+                          ? (_hasError
+                              ? Center(
+                                  child: Text(
+                                    _errorText,
+                                    style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                                  ),
+                                )
+                              : (_isInitialized && _controller != null)
+                                  ? VideoPlayer(_controller!)
+                                  : const Center(child: CircularProgressIndicator()))
+                          : Builder(builder: (context) {
+                              final resolved = _resolvedMediaUrl ?? widget.post.videoUrl;
+                              if (resolved.startsWith('data:image')) {
+                                try {
+                                  return Image.memory(base64Decode(resolved.split(',').last), fit: BoxFit.cover, width: double.infinity);
+                                } catch (_) {
+                                  return const Center(child: Text('Unable to load image.', style: TextStyle(color: Colors.white70)));
+                                }
+                              }
+                              if (resolved.startsWith('http')) {
+                                return Image.network(
+                                  resolved,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  gaplessPlayback: true,
+                                  errorBuilder: (_, __, ___) => const Center(child: Text('Unable to load image.', style: TextStyle(color: Colors.white70))),
+                                );
+                              }
+                              if (!kIsWeb) {
+                                return Image.file(
+                                  File(resolved),
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  errorBuilder: (_, __, ___) => const Center(child: Text('Unable to load image.', style: TextStyle(color: Colors.white70))),
+                                );
+                              }
+                              return const Center(child: Text('Unable to load image.', style: TextStyle(color: Colors.white70)));
+                            }),
+                    ),
+                  ),
+                  if (isVideo && _isInitialized && _controller != null && !_controller!.value.isPlaying)
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), shape: BoxShape.circle),
@@ -5699,17 +8374,33 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.favorite_border_rounded, size: 26, color: Theme.of(context).colorScheme.primary),
+                    IconButton(
+                      onPressed: _toggleLike,
+                      icon: Icon(
+                        _liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                        size: 25,
+                        color: _liked ? const Color(0xFFFF3B8A) : Theme.of(context).iconTheme.color,
+                      ),
+                    ),
                     const SizedBox(width: 15),
-                    const Icon(Icons.chat_bubble_outline_rounded, size: 24),
+                    IconButton(
+                      onPressed: _openComments,
+                      icon: const Icon(Icons.forum_outlined, size: 23),
+                    ),
                     const SizedBox(width: 15),
-                    const Icon(Icons.send_rounded, size: 24),
+                    IconButton(
+                      onPressed: _sharePost,
+                      icon: const Icon(Icons.near_me_rounded, size: 23),
+                    ),
                     const Spacer(),
-                    const Icon(Icons.bookmark_border_rounded, size: 26),
+                    IconButton(
+                      onPressed: _toggleSave,
+                      icon: Icon(_saved ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded, size: 25),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
-                Text('${widget.post.likes} likes', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Text('${widget.post.likedBy.length} likes  •  ${widget.post.comments.length} comments', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 const SizedBox(height: 5),
                 RichText(
                   text: TextSpan(
