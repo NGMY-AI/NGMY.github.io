@@ -2170,24 +2170,57 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                                 child: Container(
                                                   width: double.infinity,
                                                   height: double.infinity,
-                                                  decoration: BoxDecoration(
-                                                    gradient: LinearGradient(
-                                                      begin: Alignment.bottomCenter,
-                                                      end: Alignment.topCenter,
-                                                      colors: [
-                                                        Color.lerp(fullColor, const Color(0xFFFFA000), 0.55)!,
-                                                        fullColor,
-                                                        Color.lerp(fullColor, Colors.white, 0.22 + (shimmer * 0.23))!,
+                                              child: Stack(
+                                                children: [
+                                                  Container(
+                                                    decoration: BoxDecoration(
+                                                      gradient: LinearGradient(
+                                                        begin: Alignment.bottomCenter,
+                                                        end: Alignment.topCenter,
+                                                        colors: [
+                                                          Color.lerp(fullColor, const Color(0xFFFFA000), 0.55)!,
+                                                          fullColor,
+                                                          Color.lerp(fullColor, Colors.white, 0.22 + (shimmer * 0.23))!,
+                                                        ],
+                                                      ),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: fullColor.withOpacity(0.82),
+                                                          blurRadius: 10 + (shimmer * 6),
+                                                          spreadRadius: 1,
+                                                        ),
                                                       ],
                                                     ),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: fullColor.withOpacity(0.82),
-                                                        blurRadius: 10 + (shimmer * 6),
-                                                        spreadRadius: 1,
-                                                      ),
-                                                    ],
                                                   ),
+                                                  Positioned(
+                                                    left: -18 + (shimmer * 40),
+                                                    top: 5,
+                                                    child: Transform.rotate(
+                                                      angle: -0.35,
+                                                      child: Container(
+                                                        width: 22,
+                                                        height: 52,
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.white.withOpacity(0.26),
+                                                          borderRadius: BorderRadius.circular(10),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Positioned(
+                                                    left: 10 + (math.sin(_smokeCtrl.value * 2 * math.pi) * 4),
+                                                    top: 7 + (math.cos(_smokeCtrl.value * 2 * math.pi) * 2),
+                                                    child: Container(
+                                                      width: 4,
+                                                      height: 4,
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.white.withOpacity(0.85),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                                 ),
                                               ),
                                             ),
@@ -2219,37 +2252,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                       ),
                                     ),
                                   ),
-                                  // Pouring/charging stream effect while active
-                                  if (active)
-                                    Positioned(
-                                      top: 2,
-                                      child: Container(
-                                        width: 5,
-                                        height: 9 + (shimmer * 5),
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(5),
-                                          gradient: LinearGradient(
-                                            begin: Alignment.topCenter,
-                                            end: Alignment.bottomCenter,
-                                            colors: [
-                                              Colors.white.withOpacity(0.9),
-                                              Color.lerp(fullColor, const Color(0xFFFFC107), 0.6)!.withOpacity(0.95),
-                                            ],
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: const Color(0xFFFFD54F).withOpacity(0.6),
-                                              blurRadius: 8,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  if (active)
-                                    const Positioned(
-                                      top: -2,
-                                      child: Icon(Icons.bolt_rounded, color: Color(0xFFFFD54F), size: 12),
-                                    ),
                                 ],
                               ),
                             ),
@@ -3820,8 +3822,8 @@ class _WalletScreenState extends State<WalletScreen> {
     return Scaffold(body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 150), child: Column(children: [
       const FloatingTitle(title: 'MY WALLET'), const SizedBox(height: 20),
       Container(width: double.infinity, height: 180, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF2E3192), Color(0xFF1BFFFF)]), borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))]), child: Stack(alignment: Alignment.center, children: [
-        const Positioned(top: 20, child: Icon(Icons.account_balance_wallet_rounded, color: Colors.white24, size: 40)),
-        Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Text('Available Balance', style: TextStyle(color: Colors.white70, fontSize: 14)), const SizedBox(height: 5), Text('\$${formatCurrency(widget.user.accountBalance)}', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900))]),
+        const Positioned(top: 18, child: Icon(Icons.account_balance_wallet_rounded, color: Colors.white24, size: 40)),
+        Column(mainAxisAlignment: MainAxisAlignment.center, children: [const SizedBox(height: 10), const Text('Available Balance', style: TextStyle(color: Colors.white70, fontSize: 14)), const SizedBox(height: 5), Text('\$${formatCurrency(widget.user.accountBalance)}', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900))]),
       ])),
       const SizedBox(height: 30),
       Row(children: [
@@ -7595,11 +7597,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         ),
                       ),
                     ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: () => setState(() => _activeTab = 1),
-                    child: Container(width: 35, height: 35, decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16)),
-                  ),
+                  const SizedBox(width: 4),
                 ],
               ),
             ),
