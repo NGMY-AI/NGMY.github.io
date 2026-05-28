@@ -341,8 +341,10 @@ class UserData {
   String? homeAddress;
   String? city;
   String? room;
+  String referredByCode;
+  double clockInPenaltyPercent;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.lastClockInDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room});
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.lastClockInDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0});
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
     if (activeInvestment!.daysLeft <= 0) return 0.0;
@@ -358,11 +360,12 @@ class UserData {
   double get currentTodayEarnings {
     if (!isClockedIn || clockInStartTime == null || activeInvestment == null) return 0.0;
     final elapsed = DateTime.now().difference(clockInStartTime!);
-    final totalDaily = activeInvestment!.dailyAmount;
+    final totalDaily = activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
     double earnings = (totalDaily / 24.0) * (elapsed.inSeconds / 3600.0);
     return earnings > totalDaily ? totalDaily : earnings;
   }
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room};
+  double get todayDailyGoal => activeInvestment == null ? 0.0 : (activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100)));
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -414,6 +417,8 @@ class UserData {
       homeAddress: json['homeAddress'],
       city: json['city'],
       room: json['room'],
+      referredByCode: (json['referredByCode'] ?? '').toString(),
+      clockInPenaltyPercent: (json['clockInPenaltyPercent'] ?? 0.0).toDouble(),
     );
   }
 }
@@ -1570,7 +1575,7 @@ class _MainScreenState extends State<MainScreen> {
         double earned = 0;
         bool completed = false;
         setState(() {
-          if (widget.user.currentTodayEarnings >= (widget.user.activeInvestment?.dailyAmount ?? 0)) {
+          if (widget.user.currentTodayEarnings >= widget.user.todayDailyGoal) {
             earned = widget.user.currentTodayEarnings;
             widget.user.accountBalance += earned;
             widget.user.totalProfit += earned;
@@ -1578,6 +1583,7 @@ class _MainScreenState extends State<MainScreen> {
             widget.user.activeInvestment!.daysClockedIn++;
             widget.user.isClockedIn = false;
             widget.user.clockInStartTime = null;
+            widget.user.clockInPenaltyPercent = 0;
             completed = true;
           }
         });
@@ -1630,10 +1636,29 @@ class _MainScreenState extends State<MainScreen> {
           }
         }
         setState(() { 
+          final midnight = DateTime(now.year, now.month, now.day, 0, 0);
+          final minutesLate = now.difference(midnight).inMinutes;
+          double penalty = 0;
+          if (minutesLate >= 30) {
+            penalty = 20;
+          } else if (minutesLate >= 10) {
+            penalty = 15;
+          }
           widget.user.isClockedIn = true; 
           widget.user.clockInStartTime = DateTime.now(); 
           widget.user.lastClockInDate = DateTime.now();
+          widget.user.clockInPenaltyPercent = penalty;
         }); 
+        final penalty = widget.user.clockInPenaltyPercent;
+        if (penalty > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Clock-in registered. $penalty% deduction applied for late check-in.')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Clock-in registered on time.')),
+          );
+        }
         widget.onDataChanged(); 
       }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r) {
@@ -1693,7 +1718,7 @@ class _MainScreenState extends State<MainScreen> {
         onDataChanged: widget.onDataChanged,
       ),
       StatsScreen(user: widget.user, transactions: sorted),
-      ProfileScreen(user: widget.user, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged),
+      ProfileScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged),
     ];
     return Scaffold(
       body: Stack(children: [
@@ -1820,7 +1845,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         ),
                         child: Text(
                           widget.user.username.toUpperCase(),
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                       ),
                     ),
@@ -1903,20 +1928,117 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text('Network Status', style: TextStyle(fontWeight: FontWeight.bold)),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: isLight ? const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF81C784)]) : null,
-              color: isLight ? null : Colors.green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: isLight ? [BoxShadow(color: const Color(0xFF00B25A).withOpacity(0.3), blurRadius: 8)] : null,
+          GestureDetector(
+            onTap: () => Navigator.push(
+              ctx,
+              MaterialPageRoute(
+                builder: (c) => GameCenterScreen(
+                  user: widget.user,
+                  onAddTransaction: widget.onAddTransaction,
+                  onDataChanged: widget.onDataChanged,
+                ),
+              ),
             ),
-            child: Row(
-              children: [
-                Icon(Icons.fiber_manual_record, size: 8, color: isLight ? Colors.white : Colors.green),
-                const SizedBox(width: 8),
-                Text('ACTIVE', style: TextStyle(color: isLight ? Colors.white : Colors.green, fontSize: 10, fontWeight: FontWeight.w900)),
-              ],
+            child: AnimatedBuilder(
+              animation: _smokeCtrl,
+              builder: (context, child) {
+                final t = _smokeCtrl.value * 2 * math.pi;
+                final glow = 0.65 + (math.sin(t) + 1) * 0.35;
+                final orbitX = math.cos(t) * 50;
+                final orbitY = math.sin(t) * 16;
+                final orbitX2 = math.cos(t + math.pi) * 50;
+                final orbitY2 = math.sin(t + math.pi) * 16;
+                return SizedBox(
+                  width: 112,
+                  height: 42,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        left: 56 + orbitX - 4,
+                        top: 21 + orbitY - 4,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withOpacity(0.85),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF9DFFD0).withOpacity(0.8),
+                                blurRadius: 9,
+                                spreadRadius: 1.2,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 56 + orbitX2 - 3,
+                        top: 21 + orbitY2 - 3,
+                        child: Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withOpacity(0.72),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF5EEA9D).withOpacity(0.7),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: 112,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.28 + (glow * 0.45)),
+                            width: 1.25,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF80FFB0).withOpacity(0.2 + (glow * 0.3)),
+                              blurRadius: 9 + (glow * 12),
+                              spreadRadius: 0.8 + (glow * 1.2),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 108,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF81C784)]),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withOpacity(0.52), width: 0.85),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00B25A).withOpacity(0.35 + (glow * 0.2)),
+                              blurRadius: 10 + (glow * 8),
+                              spreadRadius: glow * 0.8,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.fiber_manual_record, size: 8, color: Colors.white),
+                            SizedBox(width: 8),
+                            Text('ACTIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -2015,7 +2137,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   animation: _smokeCtrl,
                   builder: (context, child) {
                     double scale = active ? (1.0 + math.sin(_smokeCtrl.value * 2 * math.pi) * 0.1) : 1.0;
-                    double dailyGoal = widget.user.activeInvestment?.dailyAmount ?? 1.0;
+                    double dailyGoal = widget.user.todayDailyGoal;
                     if (dailyGoal <= 0) dailyGoal = 1.0;
                     double progress = widget.user.currentTodayEarnings / dailyGoal;
                     if (progress > 1.0) progress = 1.0;
@@ -2215,6 +2337,555 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               );
             }),
         ],
+      ),
+    );
+  }
+}
+
+class GameCenterScreen extends StatefulWidget {
+  final UserData user;
+  final Function(AppTransaction) onAddTransaction;
+  final VoidCallback onDataChanged;
+  const GameCenterScreen({
+    super.key,
+    required this.user,
+    required this.onAddTransaction,
+    required this.onDataChanged,
+  });
+
+  @override
+  State<GameCenterScreen> createState() => _GameCenterScreenState();
+}
+
+class _GameDef {
+  final String id;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<Color> colors;
+  const _GameDef({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.colors,
+  });
+}
+
+class _GameCenterScreenState extends State<GameCenterScreen> {
+  final List<_GameDef> _games = const [
+    _GameDef(id: 'dice', title: 'Dice Roll', subtitle: 'Roll for cash & prizes!', icon: Icons.casino_rounded, colors: [Color(0xFF6D28D9), Color(0xFF7C3AED)]),
+    _GameDef(id: 'puzzle', title: '8-Puzzle Solver', subtitle: 'Solve puzzle, win up to \$10', icon: Icons.grid_view_rounded, colors: [Color(0xFF0EA5E9), Color(0xFF1D4ED8)]),
+    _GameDef(id: 'typing', title: 'Typing Speed', subtitle: 'Type fast, win up to \$10', icon: Icons.keyboard_rounded, colors: [Color(0xFF16A34A), Color(0xFF2563EB)]),
+    _GameDef(id: 'memory', title: 'Memory Match', subtitle: 'Match pairs, win \$5', icon: Icons.psychology_rounded, colors: [Color(0xFFDB2777), Color(0xFF9333EA)]),
+    _GameDef(id: 'math', title: 'Math Quiz', subtitle: '500+ questions, rewards', icon: Icons.calculate_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
+    _GameDef(id: 'reflex', title: 'Reflex Test', subtitle: 'Quick clicks, win up to \$10', icon: Icons.flash_on_rounded, colors: [Color(0xFFF97316), Color(0xFFDC2626)]),
+    _GameDef(id: 'scramble', title: 'Word Scramble', subtitle: 'Unscramble words', icon: Icons.abc_rounded, colors: [Color(0xFF7C3AED), Color(0xFF9333EA)]),
+    _GameDef(id: 'pattern', title: 'Pattern Memory', subtitle: 'Remember patterns', icon: Icons.extension_rounded, colors: [Color(0xFF4F46E5), Color(0xFF4338CA)]),
+    _GameDef(id: 'sequence', title: 'Number Sequence', subtitle: 'Find patterns, win rewards', icon: Icons.numbers_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
+    _GameDef(id: 'simon', title: 'Simon Says', subtitle: 'Memory color game!', icon: Icons.sports_esports_rounded, colors: [Color(0xFF7C3AED), Color(0xFF6D28D9)]),
+    _GameDef(id: 'color', title: 'Color Rush', subtitle: 'Match colors fast!', icon: Icons.palette_rounded, colors: [Color(0xFFDB2777), Color(0xFFBE185D)]),
+    _GameDef(id: 'card', title: 'Card Match', subtitle: 'Find all the pairs!', icon: Icons.style_rounded, colors: [Color(0xFFDB2777), Color(0xFF9333EA)]),
+  ];
+
+  Widget _gameTile(String id, String title, String subtitle, List<Color> colors, IconData icon) {
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (c) => GameBetScreen(
+            user: widget.user,
+            gameId: id,
+            gameTitle: title,
+            gameSubtitle: subtitle,
+            colors: colors,
+            onAddTransaction: widget.onAddTransaction,
+            onDataChanged: widget.onDataChanged,
+          ),
+        ),
+      ),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: colors),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withOpacity(0.25)),
+          boxShadow: [BoxShadow(color: colors.first.withOpacity(0.35), blurRadius: 10)],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.22), borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
+                Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+              ]),
+            ),
+            const Icon(Icons.play_arrow_rounded, color: Colors.lightBlueAccent),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF2B1454),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF7B1FA2),
+        title: const Text('GAME CENTER', style: TextStyle(fontWeight: FontWeight.w900)),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(10)),
+                child: Text('\$${formatCurrency(widget.user.accountBalance)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: const Color(0xFF5C3B8A), borderRadius: BorderRadius.circular(12)),
+              child: const Text('🎮  All Games\nWin real money playing skill games!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(height: 10),
+            ..._games.map((g) => _gameTile(g.id, g.title, g.subtitle, g.colors, g.icon)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class GameBetScreen extends StatefulWidget {
+  final UserData user;
+  final String gameId;
+  final String gameTitle;
+  final String gameSubtitle;
+  final List<Color> colors;
+  final Function(AppTransaction) onAddTransaction;
+  final VoidCallback onDataChanged;
+  const GameBetScreen({
+    super.key,
+    required this.user,
+    required this.gameId,
+    required this.gameTitle,
+    required this.gameSubtitle,
+    required this.colors,
+    required this.onAddTransaction,
+    required this.onDataChanged,
+  });
+
+  @override
+  State<GameBetScreen> createState() => _GameBetScreenState();
+}
+
+class _GameBetScreenState extends State<GameBetScreen> {
+  final TextEditingController _customBetC = TextEditingController();
+  double _bet = 5;
+
+  @override
+  void dispose() {
+    _customBetC.dispose();
+    super.dispose();
+  }
+
+  void _startGame() {
+    final custom = double.tryParse(_customBetC.text.trim());
+    final wager = (custom != null && custom >= 2) ? custom : _bet;
+    if (wager < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Minimum bet is \$2.00')));
+      return;
+    }
+    if (widget.user.accountBalance < wager) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Insufficient balance for this bet.')));
+      return;
+    }
+    setState(() => widget.user.accountBalance -= wager);
+    widget.onAddTransaction(
+      AppTransaction(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        userEmail: widget.user.email,
+        amount: wager,
+        type: TransactionType.adminRemove,
+        method: PaymentMethod.system,
+        sourceDetails: 'Game bet: ${widget.gameTitle}',
+        status: TransactionStatus.approved,
+        timestamp: DateTime.now(),
+      ),
+    );
+    widget.onDataChanged();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GamePlayScreen(
+          user: widget.user,
+          gameId: widget.gameId,
+          gameTitle: widget.gameTitle,
+          colors: widget.colors,
+          wager: wager,
+          onAddTransaction: widget.onAddTransaction,
+          onDataChanged: widget.onDataChanged,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final valuePerPair = (_bet * 1.46) / 8;
+    final profit = _bet * 0.46;
+    return Scaffold(
+      backgroundColor: const Color(0xFF2B1454),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF2B1454),
+        foregroundColor: Colors.white,
+        title: Text(widget.gameTitle, style: const TextStyle(fontWeight: FontWeight.w900)),
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(12)),
+            child: Center(child: Text('\$${formatCurrency(widget.user.accountBalance)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900))),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF6B21A8), Color(0xFF7E22CE)]),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.psychology, color: Colors.pink.shade200, size: 36),
+              const SizedBox(height: 8),
+              Text(widget.gameTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 34 * 0.7)),
+              const SizedBox(height: 4),
+              Text(widget.gameSubtitle, style: const TextStyle(color: Colors.white70)),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+                child: Column(
+                  children: [
+                    const Text('Select Your Bet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [2, 5, 10, 25].map((v) {
+                        final selected = _bet == v.toDouble();
+                        return Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: ElevatedButton(
+                              onPressed: () => setState(() => _bet = v.toDouble()),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: selected ? const Color(0xFF22C55E) : Colors.white.withOpacity(0.2),
+                                foregroundColor: Colors.white,
+                              ),
+                              child: Text('\$$v'),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _customBetC,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Custom amount (min \$2)',
+                        hintStyle: const TextStyle(color: Colors.white54),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: const Color(0xFF2A3A6E), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.tealAccent.withOpacity(0.4))),
+                child: Column(
+                  children: [
+                    const Text('💰 Partial Payout System', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+                      child: Column(
+                        children: [
+                          const Text('Perfect Score Profit', style: TextStyle(color: Colors.white70)),
+                          Text('+ \$${profit.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontSize: 24 * 0.7, fontWeight: FontWeight.w900)),
+                          Text('(46% return on \$${_bet.toStringAsFixed(2)} bet)', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+                      child: Column(
+                        children: [
+                          const Text('Value per pair', style: TextStyle(color: Colors.white70)),
+                          Text('\$${valuePerPair.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 24 * 0.7, fontWeight: FontWeight.w900)),
+                          Text('8 pairs × \$${valuePerPair.toStringAsFixed(2)} each', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _startGame,
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF22C55E), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 54)),
+                  child: Text('Start Game (\$${_bet.toStringAsFixed(2)})', style: const TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class GamePlayScreen extends StatefulWidget {
+  final UserData user;
+  final String gameId;
+  final String gameTitle;
+  final List<Color> colors;
+  final double wager;
+  final Function(AppTransaction) onAddTransaction;
+  final VoidCallback onDataChanged;
+  const GamePlayScreen({
+    super.key,
+    required this.user,
+    required this.gameId,
+    required this.gameTitle,
+    required this.colors,
+    required this.wager,
+    required this.onAddTransaction,
+    required this.onDataChanged,
+  });
+
+  @override
+  State<GamePlayScreen> createState() => _GamePlayScreenState();
+}
+
+class _GamePlayScreenState extends State<GamePlayScreen> {
+  final math.Random _rng = math.Random();
+  final TextEditingController _inputC = TextEditingController();
+  bool _won = false;
+  late String _prompt;
+  late String _answer;
+  int _dice = 1;
+  bool _readyReflex = false;
+  DateTime? _reflexStart;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupRound();
+  }
+
+  @override
+  void dispose() {
+    _inputC.dispose();
+    super.dispose();
+  }
+
+  void _setupRound() {
+    switch (widget.gameId) {
+      case 'math':
+        final a = _rng.nextInt(20) + 1;
+        final b = _rng.nextInt(20) + 1;
+        _prompt = '$a + $b = ?';
+        _answer = '${a + b}';
+        break;
+      case 'typing':
+        _prompt = 'Type: NGMY';
+        _answer = 'NGMY';
+        break;
+      case 'scramble':
+        _prompt = 'Unscramble: TIFORP';
+        _answer = 'PROFIT';
+        break;
+      case 'sequence':
+        _prompt = 'Complete sequence: 2, 4, 8, 16, ?';
+        _answer = '32';
+        break;
+      case 'pattern':
+        _prompt = 'Pattern: Circle, Square, Circle, ?';
+        _answer = 'SQUARE';
+        break;
+      case 'simon':
+        _prompt = 'Simon says tap GREEN';
+        _answer = 'GREEN';
+        break;
+      case 'color':
+        _prompt = 'Word: BLUE, text color is RED. Answer text color:';
+        _answer = 'RED';
+        break;
+      case 'card':
+        _prompt = 'Pick matching pair code: A-A, A-B, C-D';
+        _answer = 'A-A';
+        break;
+      case 'puzzle':
+        _prompt = 'Best first move for near-solved 8-puzzle?';
+        _answer = 'CENTER';
+        break;
+      default:
+        _prompt = 'Complete this round to win!';
+        _answer = 'OK';
+    }
+  }
+
+  void _payoutWin() {
+    if (_won) return;
+    _won = true;
+    final payout = widget.wager * 1.46;
+    setState(() {
+      widget.user.accountBalance += payout;
+      widget.user.totalProfit += (payout - widget.wager);
+      widget.user.points += ((payout - widget.wager) * 100).round();
+    });
+    widget.onAddTransaction(
+      AppTransaction(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        userEmail: widget.user.email,
+        amount: payout,
+        type: TransactionType.reimbursement,
+        method: PaymentMethod.system,
+        sourceDetails: 'Game payout: ${widget.gameTitle}',
+        status: TransactionStatus.approved,
+        timestamp: DateTime.now(),
+      ),
+    );
+    widget.onDataChanged();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('You won \$${payout.toStringAsFixed(2)}')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF1C1236),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        title: Text(widget.gameTitle, style: const TextStyle(fontWeight: FontWeight.w900)),
+      ),
+      body: Center(
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: widget.colors),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Bet: \$${widget.wager.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(_prompt, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 14),
+              if (widget.gameId == 'dice') ...[
+                Text('🎲 $_dice', style: const TextStyle(fontSize: 42)),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() => _dice = _rng.nextInt(6) + 1);
+                    if (_dice >= 5) _payoutWin();
+                  },
+                  child: const Text('Roll Dice'),
+                ),
+              ] else if (widget.gameId == 'reflex') ...[
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(color: _readyReflex ? Colors.green : Colors.red, shape: BoxShape.circle),
+                ),
+                const SizedBox(height: 8),
+                Text(_readyReflex ? 'Tap Now!' : 'Wait for green', style: const TextStyle(color: Colors.white)),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () {
+                    if (!_readyReflex) {
+                      Future.delayed(Duration(milliseconds: 800 + _rng.nextInt(1200)), () {
+                        if (!mounted) return;
+                        setState(() {
+                          _readyReflex = true;
+                          _reflexStart = DateTime.now();
+                        });
+                      });
+                      return;
+                    }
+                    final ms = _reflexStart == null ? 999 : DateTime.now().difference(_reflexStart!).inMilliseconds;
+                    if (ms < 420) _payoutWin();
+                  },
+                  child: Text(_readyReflex ? 'Tap' : 'Ready'),
+                ),
+              ] else ...[
+                TextField(
+                  controller: _inputC,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Enter answer',
+                    hintStyle: const TextStyle(color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.16),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_inputC.text.trim().toUpperCase() == _answer.toUpperCase()) {
+                      _payoutWin();
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not correct, try again.')));
+                    }
+                  },
+                  child: const Text('Submit'),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -3793,13 +4464,18 @@ class StatsScreen extends StatelessWidget {
 }
 
 class ProfileScreen extends StatefulWidget {
-  final UserData user; final AppConfig config; final Function(ThemeMode) onThemeChanged; final ThemeMode currentThemeMode; final VoidCallback onLogout; final VoidCallback onDataChanged;
-  const ProfileScreen({super.key, required this.user, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged});
+  final UserData user; final List<UserData> allUsers; final AppConfig config; final Function(ThemeMode) onThemeChanged; final ThemeMode currentThemeMode; final VoidCallback onLogout; final VoidCallback onDataChanged;
+  const ProfileScreen({super.key, required this.user, required this.allUsers, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged});
 
   @override State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final TextEditingController _referralInputC = TextEditingController();
+
+  String get _accountId => 'NGMY/USR/${widget.user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
+  String get _referralCode => 'REFD${widget.user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
+
   ImageProvider? _profileImageProvider() {
     final path = widget.user.profilePicturePath;
     if (path == null || path.trim().isEmpty) return null;
@@ -3814,7 +4490,132 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return FileImage(File(path));
   }
 
+  @override
+  void dispose() {
+    _referralInputC.dispose();
+    super.dispose();
+  }
+
+  Future<void> _copyReferralCode() async {
+    await Clipboard.setData(ClipboardData(text: _referralCode));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral code copied.')));
+  }
+
+  void _convertPointsToCash() {
+    final dollars = (widget.user.points ~/ 100).toDouble();
+    if (dollars <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You need at least 100 points to convert.')));
+      return;
+    }
+    setState(() {
+      widget.user.points -= (dollars.toInt() * 100);
+      widget.user.accountBalance += dollars;
+    });
+    widget.onDataChanged();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Converted to \$${dollars.toStringAsFixed(2)}.')));
+  }
+
+  String _refCodeForUser(UserData u) => 'REFD${u.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
+
+  List<UserData> _myInvitees() {
+    return widget.allUsers.where((u) {
+      if (u.email.toLowerCase().trim() == widget.user.email.toLowerCase().trim()) return false;
+      return u.referredByCode.trim().toUpperCase() == _referralCode.toUpperCase();
+    }).toList();
+  }
+
+  void _showReferralTree() {
+    final invites = _myInvitees();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Container(
+          height: MediaQuery.of(ctx).size.height * 0.72,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F152D) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.4), borderRadius: BorderRadius.circular(10))),
+              const SizedBox(height: 12),
+              const Text('Referral Tree', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+              const SizedBox(height: 4),
+              Text('${invites.length} invited user(s)', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54)),
+              const SizedBox(height: 12),
+              Expanded(
+                child: invites.isEmpty
+                    ? const Center(child: Text('No invited users yet.'))
+                    : ListView.separated(
+                        itemCount: invites.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (c, i) {
+                          final u = invites[i];
+                          return ListTile(
+                            leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                            title: Text(u.username, style: const TextStyle(fontWeight: FontWeight.w700)),
+                            subtitle: Text(u.email),
+                            trailing: Text('ID ${u.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}'),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _submitReferralCode() {
+    final code = _referralInputC.text.trim().toUpperCase();
+    if (code.isEmpty) return;
+    if (widget.user.referredByCode.trim().isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral code already linked on this account.')));
+      return;
+    }
+    if (code == _referralCode.toUpperCase()) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You cannot use your own referral code.')));
+      return;
+    }
+
+    UserData? referrer;
+    for (final u in widget.allUsers) {
+      if (_refCodeForUser(u).toUpperCase() == code) {
+        referrer = u;
+        break;
+      }
+    }
+    if (referrer == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid referral code.')));
+      return;
+    }
+
+    setState(() {
+      widget.user.referredByCode = code;
+      referrer!.referralCount += 1;
+      referrer.points += 100;
+    });
+    _referralInputC.clear();
+    widget.onDataChanged();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral linked successfully.')));
+  }
+
   @override Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF111827);
+    final softText = isDark ? Colors.white70 : Colors.grey;
+    final cardBg = isDark ? const Color(0xFF1B2136) : Colors.white;
+    final panelBg = isDark ? const Color(0xFF111827) : const Color(0xFFFAF4FF);
+    final panelBorder = isDark ? const Color(0xFF2B354C) : const Color(0xFFE7D5FF);
+    final cashEarned = widget.user.totalProfit;
+    final cashInvested = widget.user.totalInvestmentAmount;
+    final pointsCash = widget.user.points / 100.0;
     return Scaffold(body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 150), child: Column(children: [
       const FloatingTitle(title: 'MY PROFILE'), const SizedBox(height: 30),
       GestureDetector(
@@ -3849,11 +4650,186 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _row(Icons.phone_android_outlined, 'Phone', widget.user.phone.isEmpty ? 'Not set' : widget.user.phone)
       ]), const SizedBox(height: 15),
       _box(context, 'Account Information', [
-        _pair('Account ID', 'NGMY/USR/${widget.user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}'),
+        _pair('Account ID', _accountId),
         const Divider(), 
-        _pair('Account Type', widget.user.isAdmin ? 'System Administrator' : 'Premium Investor')
+        _pair('Account Type', widget.user.isAdmin ? 'System Administrator' : 'Premium Investor'),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: panelBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: panelBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('🎁  Invite & Earn', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: primaryText)),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(10)),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Your Referral Code', style: TextStyle(fontSize: 11, color: softText)),
+                          const SizedBox(height: 4),
+                          Text(_referralCode, style: const TextStyle(fontSize: 30 * 0.7, fontWeight: FontWeight.w900, color: Color(0xFF22D3EE))),
+                          Text('Share this code with friends to earn rewards!', style: TextStyle(fontSize: 12, color: softText)),
+                        ],
+                      ),
+                    ),
+                    FilledButton(
+                      onPressed: _copyReferralCode,
+                      style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0891B2), foregroundColor: Colors.white),
+                      child: const Text('Copy'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(10)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Referral Earnings', style: TextStyle(fontSize: 11, color: softText)),
+                    const SizedBox(height: 2),
+                    Text('\$${formatCurrency((widget.user.referralCount * 1.0))}', style: const TextStyle(fontSize: 26 * 0.7, fontWeight: FontWeight.w900, color: Color(0xFF10B981))),
+                    Text('Share your code to earn rewards!', style: TextStyle(fontSize: 12, color: softText)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              InkWell(
+                onTap: _showReferralTree,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF0E7490), Color(0xFF1E3A8A)]),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.group_outlined, color: Colors.white),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('View Referral Tree', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                          Text('See your referral network', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                        ]),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: Colors.white),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(10), border: Border.all(color: panelBorder)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Have a Referral Code?', style: TextStyle(fontWeight: FontWeight.w700, color: primaryText)),
+                    const SizedBox(height: 2),
+                    Text('Enter a referral code to credit your referrer', style: TextStyle(fontSize: 11, color: softText)),
+                    const SizedBox(height: 8),
+                    TextField(controller: _referralInputC, decoration: const InputDecoration(hintText: 'ENTER CODE')),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _submitReferralCode,
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0EA5E9), foregroundColor: Colors.white),
+                        child: const Text('Submit'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ]), const SizedBox(height: 15),
-      _box(context, 'My Prizes', [Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('NGMY Points', style: TextStyle(fontWeight: FontWeight.bold)), Text(widget.user.points.toString(), style: TextStyle(color: Colors.amber[900], fontWeight: FontWeight.w900, fontSize: 18))])]), const SizedBox(height: 15),
+      _box(context, 'My Prizes', [
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(12)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('💰 Cash Earned', style: TextStyle(fontSize: 12, color: softText)),
+                  const SizedBox(height: 4),
+                  Text('\$${formatCurrency(cashEarned)}', style: const TextStyle(fontSize: 26 * 0.7, fontWeight: FontWeight.w900, color: Color(0xFF0F9D58))),
+                ]),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(12)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('📊 Cash Invested', style: TextStyle(fontSize: 12, color: softText)),
+                  const SizedBox(height: 4),
+                  Text('\$${formatCurrency(cashInvested)}', style: const TextStyle(fontSize: 26 * 0.7, fontWeight: FontWeight.w900, color: Color(0xFF1D4ED8))),
+                ]),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: panelBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: panelBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text('🎯 NGMY Points', style: TextStyle(fontWeight: FontWeight.w700, color: primaryText)),
+                  const Spacer(),
+                  FilledButton(
+                    onPressed: _convertPointsToCash,
+                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF22C55E), foregroundColor: Colors.white, minimumSize: const Size(96, 34)),
+                    child: const Text('Convert'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('${widget.user.points} pts', style: const TextStyle(fontSize: 36 * 0.7, fontWeight: FontWeight.w900, color: Color(0xFF8A2BE2))),
+              const SizedBox(height: 8),
+              Text('Convert to Cash', style: TextStyle(fontWeight: FontWeight.w600, color: primaryText)),
+              const SizedBox(height: 3),
+              Text('Every 100 pts =', style: TextStyle(fontSize: 12, color: softText)),
+              Align(alignment: Alignment.centerRight, child: Text('\$1.00', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.green[700]))),
+              const Divider(),
+              Row(
+                children: [
+                  Text('Available:', style: TextStyle(color: primaryText)),
+                  const Spacer(),
+                  Text('\$${pointsCash.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF22D3EE))),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ]), const SizedBox(height: 15),
       _box(context, 'Legal Information', [
         InkWell(
           onTap: () => _showLegal(context, 'Terms & Conditions', widget.config.termsAndConditions),
