@@ -1620,10 +1620,6 @@ class _MainScreenState extends State<MainScreen> {
     final pages = [
       HomeScreen(user: widget.user, onClockIn: () { 
         final now = DateTime.now();
-        if (now.weekday == DateTime.saturday || now.weekday == DateTime.sunday) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Market is closed on weekends!')));
-          return;
-        }
         if (widget.user.activeInvestment == null) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You need an active investment plan to earn!')));
           return;
@@ -1718,7 +1714,7 @@ class _MainScreenState extends State<MainScreen> {
         onDataChanged: widget.onDataChanged,
       ),
       StatsScreen(user: widget.user, transactions: sorted),
-      ProfileScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged),
+      ProfileScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged, onAddTransaction: widget.onAddTransaction),
     ];
     return Scaffold(
       body: Stack(children: [
@@ -1925,9 +1921,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
+          Expanded(
+            child: Row(
             children: [
               Container(
                 width: 42,
@@ -1939,69 +1935,78 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: const Icon(Icons.wifi, color: Colors.white, size: 20),
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Network Status',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 24 * 0.7,
-                      color: isLight ? const Color(0xFF111827) : Colors.white,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Network Status',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24 * 0.7,
+                        color: isLight ? const Color(0xFF111827) : Colors.white,
+                      ),
                     ),
-                  ),
-                  Text(
-                    'Real-time statistics',
-                    style: TextStyle(
-                      color: isLight ? Colors.black54 : Colors.white60,
-                      fontSize: 12,
+                    Text(
+                      'Real-time statistics',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isLight ? Colors.black54 : Colors.white60,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          GestureDetector(
-            onTap: () => Navigator.push(
-              ctx,
-              MaterialPageRoute(
-                builder: (c) => GameCenterScreen(
-                  user: widget.user,
-                  onAddTransaction: widget.onAddTransaction,
-                  onDataChanged: widget.onDataChanged,
-                ),
-              ),
-            ),
-            child: Container(
-              width: 164,
-              height: 48,
-              padding: const EdgeInsets.all(2.2),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFFFFC107), Color(0xFFFF9800)]),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFFFB300).withOpacity(0.35),
-                    blurRadius: 10,
-                  ),
-                ],
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFF13B7A0), Color(0xFF13C86A)]),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.sports_esports_rounded, color: Colors.pinkAccent, size: 18),
-                    SizedBox(width: 6),
-                    Text('ACTIVE', style: TextStyle(color: Colors.white, fontSize: 23 * 0.6, fontWeight: FontWeight.w900)),
-                    SizedBox(width: 6),
-                    Icon(Icons.attach_money_rounded, color: Colors.amber, size: 18),
                   ],
                 ),
               ),
+            ],
+          ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: _openGameCenter,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final bool isPhone = MediaQuery.of(context).size.width < 420;
+                final double buttonWidth = isPhone ? 128 : (constraints.maxWidth > 190 ? 156 : 146);
+                final double buttonHeight = isPhone ? 42 : 46;
+                final double iconSize = isPhone ? 16 : 17.5;
+                final double labelSize = isPhone ? 11.5 : (23 * 0.6);
+                return Container(
+                  width: buttonWidth,
+                  height: buttonHeight,
+                  padding: const EdgeInsets.all(2.2),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFFFFC107), Color(0xFFFF9800)]),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFB300).withOpacity(0.35),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFF13B7A0), Color(0xFF13C86A)]),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.sports_esports_rounded, color: Colors.pinkAccent, size: iconSize),
+                        const SizedBox(width: 6),
+                        Text('ACTIVE', style: TextStyle(color: Colors.white, fontSize: labelSize, fontWeight: FontWeight.w900)),
+                        const SizedBox(width: 6),
+                        Icon(Icons.attach_money_rounded, color: Colors.amber, size: iconSize),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -2009,9 +2014,37 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  Future<void> _openGameCenter() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (c) => GameCenterScreen(
+          user: widget.user,
+          onAddTransaction: widget.onAddTransaction,
+          onDataChanged: widget.onDataChanged,
+        ),
+      ),
+    );
+    if (!mounted || result == null) return;
+    final gamesPlayed = (result['gamesPlayed'] is int) ? result['gamesPlayed'] as int : 0;
+    final pointsEarned = (result['pointsEarned'] is int) ? result['pointsEarned'] as int : 0;
+    if (gamesPlayed <= 0 || pointsEarned <= 0) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _GameRewardPopup(
+        gamesPlayed: gamesPlayed,
+        pointsEarned: pointsEarned,
+        totalPoints: widget.user.points,
+      ),
+    );
+  }
+
   Widget _clock(BuildContext ctx) {
     bool active = widget.user.isClockedIn;
     bool alreadyDone = widget.user.alreadyClockedInToday && !active;
+    final lateText = _clockLateText();
+    final showLate = !active && !alreadyDone && widget.user.activeInvestment != null && lateText != null;
     
     return GestureDetector(
       onTap: (active || alreadyDone || widget.user.activeInvestment == null) 
@@ -2023,9 +2056,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             }
           })
         : widget.onClockIn,
-      child: Stack(
-        alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
           // Animated Smoke Effect
           AnimatedBuilder(
             animation: _smokeCtrl,
@@ -2288,7 +2324,37 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
+          if (showLate) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.alarm_rounded, color: Color(0xFFFB7185), size: 14),
+                const SizedBox(width: 6),
+                Text(
+                  lateText,
+                  style: const TextStyle(
+                    color: Color(0xFFEA580C),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
+  }
+
+  String? _clockLateText() {
+    final now = DateTime.now();
+    final midnight = DateTime(now.year, now.month, now.day, 0, 0);
+    final diff = now.difference(midnight);
+    if (diff.inMinutes <= 0) return null;
+    final hours = diff.inHours;
+    final mins = diff.inMinutes % 60;
+    return 'You are $hours hours $mins min late';
   }
 
   String _maskName(String email, String username) {
@@ -2455,6 +2521,263 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 }
 
+class _GameRewardPopup extends StatefulWidget {
+  final int gamesPlayed;
+  final int pointsEarned;
+  final int totalPoints;
+  const _GameRewardPopup({
+    required this.gamesPlayed,
+    required this.pointsEarned,
+    required this.totalPoints,
+  });
+
+  @override
+  State<_GameRewardPopup> createState() => _GameRewardPopupState();
+}
+
+class _GameRewardPopupState extends State<_GameRewardPopup> with SingleTickerProviderStateMixin {
+  late final AnimationController _rainCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _rainCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _rainCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final int startPoints = math.max(0, widget.totalPoints - widget.pointsEarned);
+    final size = MediaQuery.of(context).size;
+    final cardWidth = math.min(size.width - 12, 410.0);
+    final cardHeight = math.min(size.height - 28, math.max(470.0, cardWidth * 1.12));
+    return Material(
+      type: MaterialType.transparency,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Container(color: Colors.black.withOpacity(0.45)),
+          ),
+          AnimatedBuilder(
+            animation: _rainCtrl,
+            builder: (context, _) {
+              return IgnorePointer(
+                child: Stack(
+                  children: List.generate(66, (i) {
+                    final seedX = ((i * 59) % 1000) / 1000.0;
+                    final seedY = ((i * 37) % 1000) / 1000.0;
+                    final drift = ((i * 17) % 10) - 5;
+                    final progress = (_rainCtrl.value + (i * 0.031)) % 1.0;
+                    final wave1 = 0.31 * math.sin((progress * 2 * math.pi) + (i * 0.9));
+                    final wave2 = 0.13 * math.sin((progress * 6 * math.pi) + (i * 0.43));
+                    final wave3 = 0.07 * math.cos((progress * 4.5 * math.pi) + (i * 0.67));
+                    final xNormalized = (seedX + wave1 + wave2 + wave3) % 1.0;
+                    final left = (size.width - 22) * (xNormalized < 0 ? xNormalized + 1 : xNormalized);
+                    final top = (size.height + 130) * progress - 80 + (math.sin((_rainCtrl.value + seedY) * 2 * math.pi) * drift);
+                    final z = 0.75 + ((math.sin((progress + seedY) * math.pi) + 1) / 2) * 0.9;
+                    final fade = (1 - (progress - 0.55).abs() * 1.25).clamp(0.2, 1.0);
+                    final isMoney = i % 3 != 0;
+                    final iconColor = isMoney ? const Color(0xFFFFD54F) : const Color(0xFFFFF59D);
+                    final spin = progress * 2 * math.pi + (i * 0.18);
+                    return Positioned(
+                      left: left,
+                      top: top,
+                      child: Opacity(
+                        opacity: fade,
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()
+                            ..setEntry(3, 2, 0.0014)
+                            ..rotateX(0.35 + (math.sin(spin) * 0.42))
+                            ..rotateY(0.22 + (math.cos(spin * 0.8) * 0.36))
+                            ..scale(z),
+                          child: Icon(
+                            isMoney ? Icons.attach_money_rounded : Icons.star_rounded,
+                            color: iconColor,
+                            size: 16 + (i % 5) * 2.4,
+                            shadows: [Shadow(color: Colors.black.withOpacity(0.35), blurRadius: 4, offset: const Offset(0, 2))],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              );
+            },
+          ),
+          Center(
+            child: SizedBox(
+              width: cardWidth,
+              height: cardHeight,
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(26),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF3A245B), Color(0xFF6A2DA5), Color(0xFF4C1C72)],
+                      ),
+                      border: Border.all(color: const Color(0xFFFFA726), width: 2.4),
+                      boxShadow: [
+                        BoxShadow(color: const Color(0xFFFF9800).withOpacity(0.28), blurRadius: 28, spreadRadius: 1.8),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.only(top: 20, bottom: 8),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 82,
+                                  height: 82,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(colors: [Color(0xFFFFC107), Color(0xFFFF9800)]),
+                                  ),
+                                  child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 42),
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  '🎉 CONGRATULATIONS! 🎉',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Color(0xFFFFD54F), fontSize: 34 * 0.7, fontWeight: FontWeight.w900),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'You earned NGMY Points playing games!',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 14),
+                                Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    color: const Color(0xFF5A2A70),
+                                    border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.55)),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      TweenAnimationBuilder<int>(
+                                        duration: const Duration(milliseconds: 1450),
+                                        tween: IntTween(begin: startPoints, end: widget.totalPoints),
+                                        builder: (_, value, __) => Text(
+                                          '$value',
+                                          style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 58 * 0.7, fontWeight: FontWeight.w900),
+                                        ),
+                                      ),
+                                      const Text(
+                                        'NGMY POINTS BALANCE',
+                                        style: TextStyle(color: Color(0xFFFFD54F), fontWeight: FontWeight.w800, letterSpacing: 0.4),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.09), borderRadius: BorderRadius.circular(12)),
+                                          child: Column(
+                                            children: [
+                                              Text('${widget.gamesPlayed}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26 * 0.7)),
+                                              const Text('Games Played', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.09), borderRadius: BorderRadius.circular(12)),
+                                          child: Column(
+                                            children: [
+                                              TweenAnimationBuilder<int>(
+                                                duration: const Duration(milliseconds: 1700),
+                                                tween: IntTween(begin: 0, end: widget.pointsEarned),
+                                                builder: (_, value, __) => Text('+$value', style: const TextStyle(color: Color(0xFFFFD54F), fontWeight: FontWeight.w900, fontSize: 26 * 0.7)),
+                                              ),
+                                              const Text('Points Earned', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(color: const Color(0xFF25465A).withOpacity(0.86), borderRadius: BorderRadius.circular(12)),
+                                  child: const Text(
+                                    '💡 Keep playing to earn more points! Points can be converted to real money.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 54,
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF9800),
+                                foregroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: const Text('AWESOME! 🚀', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20 * 0.7)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
+                        child: const Icon(Icons.close_rounded, color: Colors.white70),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class GameCenterScreen extends StatefulWidget {
   final UserData user;
   final Function(AppTransaction) onAddTransaction;
@@ -2486,6 +2809,10 @@ class _GameDef {
 }
 
 class _GameCenterScreenState extends State<GameCenterScreen> {
+  int _sessionGamesPlayed = 0;
+
+  int get _sessionPointsEarned => _sessionGamesPlayed * 20;
+
   final List<_GameDef> _games = const [
     _GameDef(id: 'dice', title: 'Dice Roll', subtitle: 'Roll for cash & prizes!', icon: Icons.casino_rounded, colors: [Color(0xFF6D28D9), Color(0xFF7C3AED)]),
     _GameDef(id: 'puzzle', title: '8-Puzzle Solver', subtitle: 'Solve puzzle, win up to \$10', icon: Icons.grid_view_rounded, colors: [Color(0xFF0EA5E9), Color(0xFF1D4ED8)]),
@@ -2514,6 +2841,9 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
             colors: colors,
             onAddTransaction: widget.onAddTransaction,
             onDataChanged: widget.onDataChanged,
+            onGameStarted: () {
+              setState(() => _sessionGamesPlayed++);
+            },
           ),
         ),
       ),
@@ -2551,40 +2881,60 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF2B1454),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF7B1FA2),
-        title: const Text('GAME CENTER', style: TextStyle(fontWeight: FontWeight.w900)),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(10)),
-                child: Text('\$${formatCurrency(widget.user.accountBalance)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+    return WillPopScope(
+      onWillPop: () async {
+        _exitToHome();
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF2B1454),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: _exitToHome,
+          ),
+          backgroundColor: const Color(0xFF7B1FA2),
+          title: const Text('GAME CENTER', style: TextStyle(fontWeight: FontWeight.w900)),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(10)),
+                  child: Text('\$${formatCurrency(widget.user.accountBalance)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: const Color(0xFF5C3B8A), borderRadius: BorderRadius.circular(12)),
-              child: const Text('🎮  All Games\nWin real money playing skill games!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-            ),
-            const SizedBox(height: 10),
-            ..._games.map((g) => _gameTile(g.id, g.title, g.subtitle, g.colors, g.icon)),
           ],
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: const Color(0xFF5C3B8A), borderRadius: BorderRadius.circular(12)),
+                child: const Text('🎮  All Games\nWin real money playing skill games!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(height: 10),
+              ..._games.map((g) => _gameTile(g.id, g.title, g.subtitle, g.colors, g.icon)),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  void _exitToHome() {
+    final result = _sessionGamesPlayed > 0
+        ? <String, dynamic>{
+            'gamesPlayed': _sessionGamesPlayed,
+            'pointsEarned': _sessionPointsEarned,
+          }
+        : null;
+    Navigator.pop(context, result);
   }
 }
 
@@ -2596,6 +2946,7 @@ class GameBetScreen extends StatefulWidget {
   final List<Color> colors;
   final Function(AppTransaction) onAddTransaction;
   final VoidCallback onDataChanged;
+  final VoidCallback onGameStarted;
   const GameBetScreen({
     super.key,
     required this.user,
@@ -2605,6 +2956,7 @@ class GameBetScreen extends StatefulWidget {
     required this.colors,
     required this.onAddTransaction,
     required this.onDataChanged,
+    required this.onGameStarted,
   });
 
   @override
@@ -2633,6 +2985,8 @@ class _GameBetScreenState extends State<GameBetScreen> {
       return;
     }
     setState(() => widget.user.accountBalance -= wager);
+    widget.user.points += 20;
+    widget.onGameStarted();
     widget.onAddTransaction(
       AppTransaction(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -2824,66 +3178,187 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   bool _won = false;
   late String _prompt;
   late String _answer;
+  List<String> _optionChoices = [];
   int _dice = 1;
   bool _readyReflex = false;
   DateTime? _reflexStart;
+  int _secondsLeft = 90;
+  Timer? _roundTimer;
+  int _tapScore = 0;
+  int _tapGoal = 10;
+  int _activeTapCell = 0;
+  final List<String> _memoryBase = ['🎮', '💎', '🚀', '🎯', '⚡', '🔥', '💰', '🧠'];
+  List<String> _memoryValues = [];
+  List<int> _revealedCards = [];
+  final Set<int> _matchedCards = {};
+  bool _lockingCards = false;
+  int _pairsFound = 0;
 
   @override
   void initState() {
     super.initState();
     _setupRound();
+    _roundTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _won) return;
+      if (_secondsLeft <= 0) {
+        setState(() => _secondsLeft = 0);
+        _roundTimer?.cancel();
+        return;
+      }
+      setState(() => _secondsLeft--);
+    });
   }
 
   @override
   void dispose() {
+    _roundTimer?.cancel();
     _inputC.dispose();
     super.dispose();
   }
 
   void _setupRound() {
+    _optionChoices = [];
     switch (widget.gameId) {
       case 'math':
-        final a = _rng.nextInt(20) + 1;
-        final b = _rng.nextInt(20) + 1;
-        _prompt = '$a + $b = ?';
-        _answer = '${a + b}';
-        break;
       case 'typing':
-        _prompt = 'Type: NGMY';
-        _answer = 'NGMY';
-        break;
       case 'scramble':
-        _prompt = 'Unscramble: TIFORP';
-        _answer = 'PROFIT';
-        break;
       case 'sequence':
-        _prompt = 'Complete sequence: 2, 4, 8, 16, ?';
-        _answer = '32';
-        break;
       case 'pattern':
-        _prompt = 'Pattern: Circle, Square, Circle, ?';
-        _answer = 'SQUARE';
-        break;
       case 'simon':
-        _prompt = 'Simon says tap GREEN';
-        _answer = 'GREEN';
-        break;
       case 'color':
-        _prompt = 'Word: BLUE, text color is RED. Answer text color:';
-        _answer = 'RED';
-        break;
       case 'card':
-        _prompt = 'Pick matching pair code: A-A, A-B, C-D';
-        _answer = 'A-A';
-        break;
       case 'puzzle':
-        _prompt = 'Best first move for near-solved 8-puzzle?';
-        _answer = 'CENTER';
+        _setupTapGame();
+        break;
+      case 'memory':
+        _prompt = 'Match all pairs to win full amount!';
+        _answer = 'MEMORY';
+        _setupMemoryBoard();
         break;
       default:
         _prompt = 'Complete this round to win!';
         _answer = 'OK';
     }
+  }
+
+  List<String> _shuffleChoices(String correct, List<String> wrong) {
+    final list = [correct, ...wrong];
+    list.shuffle(_rng);
+    return list;
+  }
+
+  void _setupMemoryBoard() {
+    _pairsFound = 0;
+    _matchedCards.clear();
+    _revealedCards = [];
+    _lockingCards = false;
+    _memoryValues = [..._memoryBase, ..._memoryBase]..shuffle(_rng);
+  }
+
+  void _pickMemoryCard(int index) {
+    if (_won || _lockingCards || _matchedCards.contains(index) || _revealedCards.contains(index)) return;
+    setState(() => _revealedCards.add(index));
+    if (_revealedCards.length < 2) return;
+    final a = _revealedCards[0];
+    final b = _revealedCards[1];
+    if (_memoryValues[a] == _memoryValues[b]) {
+      setState(() {
+        _matchedCards.add(a);
+        _matchedCards.add(b);
+        _pairsFound++;
+        _revealedCards = [];
+      });
+      if (_pairsFound >= _memoryBase.length) _payoutWin();
+      return;
+    }
+    _lockingCards = true;
+    Future.delayed(const Duration(milliseconds: 580), () {
+      if (!mounted) return;
+      setState(() {
+        _revealedCards = [];
+        _lockingCards = false;
+      });
+    });
+  }
+
+  void _selectOption(String value) {
+    if (_won) return;
+    if (value.toUpperCase() == _answer.toUpperCase()) {
+      _payoutWin();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wrong move, try again.')));
+    }
+  }
+
+  void _setupTapGame() {
+    _tapScore = 0;
+    _activeTapCell = _rng.nextInt(9);
+    _tapGoal = switch (widget.gameId) {
+      'typing' => 12,
+      'math' => 10,
+      'scramble' => 10,
+      'sequence' => 11,
+      'pattern' => 11,
+      'simon' => 12,
+      'color' => 12,
+      'card' => 10,
+      'puzzle' => 12,
+      _ => 10,
+    };
+    _prompt = 'Hit the glowing tile before time runs out.';
+  }
+
+  void _tapHotCell(int index) {
+    if (_won || _secondsLeft <= 0) return;
+    if (index != _activeTapCell) return;
+    setState(() {
+      _tapScore++;
+      _activeTapCell = _rng.nextInt(9);
+    });
+    if (_tapScore >= _tapGoal) _payoutWin();
+  }
+
+  Widget _buildTapArena() {
+    return Column(
+      children: [
+        Text('Score: $_tapScore / $_tapGoal', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 30 * 0.7)),
+        const SizedBox(height: 4),
+        Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+        const SizedBox(height: 10),
+        Expanded(
+          child: GridView.builder(
+            itemCount: 9,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8),
+            itemBuilder: (_, i) {
+              final active = i == _activeTapCell;
+              return InkWell(
+                onTap: () => _tapHotCell(i),
+                borderRadius: BorderRadius.circular(10),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    gradient: active
+                        ? const LinearGradient(colors: [Color(0xFF34D399), Color(0xFF059669)])
+                        : const LinearGradient(colors: [Color(0xFFA855F7), Color(0xFF7C3AED)]),
+                    boxShadow: active
+                        ? [BoxShadow(color: const Color(0xFF34D399).withOpacity(0.6), blurRadius: 14)]
+                        : [],
+                  ),
+                  child: Center(
+                    child: Icon(
+                      active ? Icons.sports_esports_rounded : Icons.crop_square_rounded,
+                      color: Colors.white,
+                      size: active ? 30 : 22,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   void _payoutWin() {
@@ -2893,7 +3368,6 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     setState(() {
       widget.user.accountBalance += payout;
       widget.user.totalProfit += (payout - widget.wager);
-      widget.user.points += ((payout - widget.wager) * 100).round();
     });
     widget.onAddTransaction(
       AppTransaction(
@@ -2913,6 +3387,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final timerText = '${_secondsLeft ~/ 60}:${(_secondsLeft % 60).toString().padLeft(2, '0')}';
     return Scaffold(
       backgroundColor: const Color(0xFF1C1236),
       appBar: AppBar(
@@ -2923,6 +3398,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       body: Center(
         child: Container(
           margin: const EdgeInsets.all(16),
+          height: math.min(MediaQuery.of(context).size.height * 0.74, 560),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: LinearGradient(colors: widget.colors),
@@ -2930,77 +3406,145 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
             border: Border.all(color: Colors.white24),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Bet: \$${widget.wager.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              Text(_prompt, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 14),
-              if (widget.gameId == 'dice') ...[
-                Text('🎲 $_dice', style: const TextStyle(fontSize: 42)),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() => _dice = _rng.nextInt(6) + 1);
-                    if (_dice >= 5) _payoutWin();
-                  },
-                  child: const Text('Roll Dice'),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ] else if (widget.gameId == 'reflex') ...[
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(color: _readyReflex ? Colors.green : Colors.red, shape: BoxShape.circle),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(widget.gameTitle, style: const TextStyle(color: Colors.white, fontSize: 30 * 0.7, fontWeight: FontWeight.w900)),
+                          Text('Win +46%  Bet: \$${widget.wager.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        const Icon(Icons.timer_outlined, color: Colors.white70, size: 16),
+                        const SizedBox(width: 4),
+                        Text(timerText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(_readyReflex ? 'Tap Now!' : 'Wait for green', style: const TextStyle(color: Colors.white)),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () {
-                    if (!_readyReflex) {
-                      Future.delayed(Duration(milliseconds: 800 + _rng.nextInt(1200)), () {
-                        if (!mounted) return;
-                        setState(() {
-                          _readyReflex = true;
-                          _reflexStart = DateTime.now();
-                        });
-                      });
-                      return;
-                    }
-                    final ms = _reflexStart == null ? 999 : DateTime.now().difference(_reflexStart!).inMilliseconds;
-                    if (ms < 420) _payoutWin();
-                  },
-                  child: Text(_readyReflex ? 'Tap' : 'Ready'),
-                ),
-              ] else ...[
-                TextField(
-                  controller: _inputC,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Enter answer',
-                    hintStyle: const TextStyle(color: Colors.white54),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.16),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white24),
                   ),
+                  child: _gameBoard(),
                 ),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () {
-                    if (_inputC.text.trim().toUpperCase() == _answer.toUpperCase()) {
-                      _payoutWin();
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not correct, try again.')));
-                    }
-                  },
-                  child: const Text('Submit'),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
+                  child: const Text('End Game Now', style: TextStyle(fontWeight: FontWeight.w800)),
                 ),
-              ],
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _gameBoard() {
+    if (widget.gameId == 'memory') {
+      return Column(
+        children: [
+          Text('Pairs: $_pairsFound/${_memoryBase.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 30 * 0.7)),
+          const SizedBox(height: 4),
+          const Text('Match all pairs to win full amount!', style: TextStyle(color: Colors.white70, fontSize: 11)),
+          const SizedBox(height: 10),
+          Expanded(
+            child: GridView.builder(
+              itemCount: _memoryValues.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, crossAxisSpacing: 8, mainAxisSpacing: 8),
+              itemBuilder: (_, i) {
+                final isOpen = _revealedCards.contains(i) || _matchedCards.contains(i);
+                return InkWell(
+                  onTap: () => _pickMemoryCard(i),
+                  borderRadius: BorderRadius.circular(8),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      gradient: isOpen
+                          ? const LinearGradient(colors: [Color(0xFF4ADE80), Color(0xFF14B8A6)])
+                          : const LinearGradient(colors: [Color(0xFFA855F7), Color(0xFFEC4899)]),
+                    ),
+                    child: Center(
+                      child: Text(isOpen ? _memoryValues[i] : '', style: const TextStyle(fontSize: 20)),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (widget.gameId == 'dice') {
+      return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Text('🎲 $_dice', style: const TextStyle(fontSize: 42)),
+        const SizedBox(height: 10),
+        ElevatedButton(
+          onPressed: () {
+            setState(() => _dice = _rng.nextInt(6) + 1);
+            if (_dice >= 5) _payoutWin();
+          },
+          child: const Text('Roll Dice'),
+        ),
+      ]);
+    }
+
+    if (widget.gameId == 'reflex') {
+      return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Container(
+          width: 90,
+          height: 90,
+          decoration: BoxDecoration(color: _readyReflex ? Colors.green : Colors.red, shape: BoxShape.circle),
+        ),
+        const SizedBox(height: 8),
+        Text(_readyReflex ? 'Tap Now!' : 'Wait for green', style: const TextStyle(color: Colors.white)),
+        const SizedBox(height: 10),
+        ElevatedButton(
+          onPressed: () {
+            if (!_readyReflex) {
+              Future.delayed(Duration(milliseconds: 800 + _rng.nextInt(1200)), () {
+                if (!mounted) return;
+                setState(() {
+                  _readyReflex = true;
+                  _reflexStart = DateTime.now();
+                });
+              });
+              return;
+            }
+            final ms = _reflexStart == null ? 999 : DateTime.now().difference(_reflexStart!).inMilliseconds;
+            if (ms < 420) _payoutWin();
+          },
+          child: Text(_readyReflex ? 'Tap' : 'Ready'),
+        ),
+      ]);
+    }
+
+    return _buildTapArena();
   }
 }
 
@@ -3838,26 +4382,64 @@ class _WalletScreenState extends State<WalletScreen> {
     ]))));
   }
 
-  Widget _wNav(int i, IconData ic, String l) => Container(padding: const EdgeInsets.symmetric(vertical: 15), decoration: BoxDecoration(color: _view == i ? Theme.of(context).colorScheme.primary : Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10)]), child: Column(children: [Icon(ic, color: _view == i ? Colors.white : Theme.of(context).colorScheme.primary, size: 20), const SizedBox(height: 5), Text(l, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: _view == i ? Colors.white : Colors.grey))]));
+  Widget _wNav(int i, IconData ic, String l) {
+    final bool selected = _view == i;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        color: selected ? const Color(0xFF22C55E) : Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: selected ? const Color(0xFF16A34A) : Colors.grey.withOpacity(0.2),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: selected ? const Color(0xFF22C55E).withOpacity(0.2) : Colors.black.withOpacity(0.05),
+            blurRadius: selected ? 12 : 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(ic, color: selected ? Colors.white : const Color(0xFF16A34A), size: 20),
+          const SizedBox(height: 5),
+          Text(
+            l,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: selected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF1F2937)),
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _walletBody() {
     if (_view == 2) {
+      double rollingBalance = widget.user.accountBalance;
+      final entries = <MapEntry<AppTransaction, double>>[];
+      for (final t in widget.transactions) {
+        entries.add(MapEntry(t, rollingBalance));
+        rollingBalance -= _transactionSignedDelta(t);
+      }
       return Container(width: double.infinity, padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 15)]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('TRANSACTION HISTORY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)), const SizedBox(height: 15),
         if (widget.transactions.isEmpty) const Center(child: Text('Empty', style: TextStyle(color: Colors.grey, fontSize: 12)))
-        else ...widget.transactions.map((t) {
-          final incoming = t.type == TransactionType.deposit || t.type == TransactionType.adminAdd || t.type == TransactionType.reimbursement;
+        else ...entries.map((entry) {
+          final t = entry.key;
+          final balanceAfter = entry.value;
+          final incoming = _isIncomingTransaction(t);
           final icon = incoming ? Icons.arrow_downward : Icons.arrow_upward;
           final color = t.status == TransactionStatus.approved ? Colors.green : (t.status == TransactionStatus.pending ? Colors.orange : Colors.red);
-          final typeLabel = switch (t.type) {
-            TransactionType.deposit => 'Deposit',
-            TransactionType.withdrawal => 'Withdrawal',
-            TransactionType.adminAdd => 'Admin Credit',
-            TransactionType.adminRemove => 'Investment/Purchase',
-            TransactionType.reimbursement => 'Reimbursement',
-            TransactionType.contribution => 'Contribution',
-            TransactionType.claim => 'Claim',
-          };
+          final typeLabel = _transactionTypeLabel(t);
+          final details = _transactionDetails(t);
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
@@ -3881,12 +4463,9 @@ class _WalletScreenState extends State<WalletScreen> {
                     children: [
                       Text(typeLabel, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                       const SizedBox(height: 2),
-                      Text('${t.method.name.toUpperCase()} • ${t.status.name.toUpperCase()}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
-                      if ((t.sourceDetails ?? '').isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(t.sourceDetails!, style: const TextStyle(color: Colors.grey, fontSize: 10), maxLines: 2, overflow: TextOverflow.ellipsis),
-                        ),
+                      Text(_historyTimestamp(t.timestamp), style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                      const SizedBox(height: 2),
+                      Text(details, style: const TextStyle(color: Colors.grey, fontSize: 10), maxLines: 2, overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ),
@@ -3894,8 +4473,8 @@ class _WalletScreenState extends State<WalletScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('${incoming ? '+' : '-'}\$${formatCurrency(t.amount)}', style: TextStyle(fontWeight: FontWeight.bold, color: incoming ? Colors.green : Colors.blue)),
-                    Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(color: Colors.grey, fontSize: 9)),
+                    Text('${incoming ? '+' : '-'}\$${formatCurrency(t.amount)}', style: TextStyle(fontWeight: FontWeight.bold, color: incoming ? Colors.green : Colors.red)),
+                    Text('Balance: \$${formatCurrency(balanceAfter)}', style: const TextStyle(color: Colors.grey, fontSize: 9)),
                   ],
                 )
               ],
@@ -3905,47 +4484,294 @@ class _WalletScreenState extends State<WalletScreen> {
       ]));
     }
     bool isDep = _view == 0;
-    return Container(padding: const EdgeInsets.all(25), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 15)]), child: Column(children: [
-      Text(isDep ? 'DEPOSIT FUNDS' : 'WITHDRAW FUNDS', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)), const SizedBox(height: 25),
-      TextField(controller: _amt, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Amount (\$)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))), 
-      if (isDep) ...[
-        const SizedBox(height: 15),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [10, 50, 100, 500].map((v) => GestureDetector(onTap: () => setState(() => _amt.text = v.toString()), child: Container(padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8), decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.3))), child: Text('\$$v', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary, fontSize: 12))))).toList()),
-        const SizedBox(height: 25),
-        ElevatedButton(onPressed: () {
-          final double? a = double.tryParse(_amt.text);
-          if (a != null && a > 0) Navigator.push(context, MaterialPageRoute(builder: (c) => SubmitPaymentPage(user: widget.user, amount: a, onAdd: widget.onAdd, config: widget.config)));
-        }, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), backgroundColor: Theme.of(context).colorScheme.primary, foregroundColor: Colors.white), child: const Text('DEPOSIT FUNDS')),
-      ] else ...[
-        const SizedBox(height: 20),
-        DropdownButtonFormField<PaymentMethod>(value: _method, decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))), items: const [DropdownMenuItem(value: PaymentMethod.cashApp, child: Text('Cash App')), DropdownMenuItem(value: PaymentMethod.bitcoin, child: Text('Bitcoin'))], onChanged: (v) => setState(() => _method = v!)), const SizedBox(height: 15),
-        TextField(controller: _handle, decoration: InputDecoration(labelText: _method == PaymentMethod.cashApp ? 'Cash App Tag' : 'Bitcoin Address', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))), onChanged: (v) { if (_method == PaymentMethod.cashApp && !v.startsWith('\$')) _handle.text = '\$$v'; }),
-        const SizedBox(height: 25),
-        ElevatedButton(onPressed: _submitWithdraw, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), backgroundColor: Theme.of(context).colorScheme.primary, foregroundColor: Colors.white), child: const Text('WITHDRAW FUNDS')),
-        const SizedBox(height: 15),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.orange.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.orange.withOpacity(0.4)),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final inputBg = isDark ? const Color(0xFF0F141B) : const Color(0xFFF8FAFC);
+    final inputBorder = isDark ? const Color(0xFF2B3440) : const Color(0xFFD1D5DB);
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 14, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            isDep ? 'Deposit Amount' : 'Withdrawal Amount',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w600),
           ),
-          child: const Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.info_outline, color: Colors.orange, size: 18),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Note: A 15% withdrawal fee will be deducted from your withdrawal amount. For example, if you withdraw \$100, you will receive \$85.',
-                  style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w500),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _amt,
+            keyboardType: TextInputType.number,
+            decoration: _iosInputDecoration(
+              fill: inputBg,
+              borderColor: inputBorder,
+              hint: '\$ 0.00',
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF22C55E).withOpacity(isDark ? 0.16 : 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Text('Available:', style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w500)),
+                const Spacer(),
+                Text(formatCurrency(widget.user.accountBalance), style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+              ],
+            ),
+          ),
+          if (isDep) ...[
+            const SizedBox(height: 16),
+            Text('Choose Deposit Amount', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [10, 50, 100, 200, 300, 400].map((v) {
+                final selected = _amt.text.trim() == v.toString();
+                return GestureDetector(
+                  onTap: () => setState(() => _amt.text = v.toString()),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: selected ? const Color(0xFF22C55E).withOpacity(0.16) : inputBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: selected ? const Color(0xFF22C55E) : inputBorder, width: 1.2),
+                    ),
+                    child: Text('\$$v', style: TextStyle(fontWeight: FontWeight.w700, color: selected ? const Color(0xFF15803D) : (isDark ? Colors.white70 : const Color(0xFF334155)))),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: () {
+                  final double? a = double.tryParse(_amt.text);
+                  if (a != null && a > 0) {
+                    Navigator.push(context, MaterialPageRoute(builder: (c) => SubmitPaymentPage(user: widget.user, amount: a, onAdd: widget.onAdd, config: widget.config)));
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF22C55E),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: const Text('Deposit Funds', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22 * 0.7)),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 16),
+            Text('Choose Withdrawal Method', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _methodOptionCard(
+                    label: 'Cash App',
+                    symbol: '\$',
+                    selected: _method == PaymentMethod.cashApp,
+                    onTap: () => setState(() => _method = PaymentMethod.cashApp),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _methodOptionCard(
+                    label: 'Bitcoin',
+                    symbol: '₿',
+                    selected: _method == PaymentMethod.bitcoin,
+                    onTap: () => setState(() => _method = PaymentMethod.bitcoin),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              _method == PaymentMethod.cashApp ? 'Your Cash App Tag' : 'Your Bitcoin Wallet',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _handle,
+              decoration: _iosInputDecoration(
+                fill: inputBg,
+                borderColor: inputBorder,
+                hint: _method == PaymentMethod.cashApp ? '\$YourCashTag' : 'bc1...',
+              ),
+              onChanged: (v) {
+                if (_method == PaymentMethod.cashApp && v.isNotEmpty && !v.startsWith('\$')) {
+                  _handle.text = '\$$v';
+                  _handle.selection = TextSelection.fromPosition(TextPosition(offset: _handle.text.length));
+                }
+              },
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _submitWithdraw,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF22C55E),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: const Text('Withdraw Funds', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22 * 0.7)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFDF5DD),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFF5C64C)),
+              ),
+              child: const Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: 'Note: ', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF9A3412))),
+                    TextSpan(text: 'A 15% processing fee applies to all withdrawals. Withdrawal requests are processed within 24 hours after verification.', style: TextStyle(color: Color(0xFF9A3412))),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _iosInputDecoration({required Color fill, required Color borderColor, required String hint}) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: fill,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(12)),
+        borderSide: BorderSide(color: Color(0xFF22C55E), width: 1.5),
+      ),
+    );
+  }
+
+  Widget _methodOptionCard({
+    required String label,
+    required String symbol,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF22C55E).withOpacity(0.15) : (isDark ? const Color(0xFF0F141B) : const Color(0xFFF8FAFC)),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: selected ? const Color(0xFF10B981) : Colors.grey.withOpacity(0.3), width: selected ? 1.6 : 1.2),
         ),
-      ],
-    ]));
+        child: Column(
+          children: [
+            Text(symbol, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: selected ? const Color(0xFF10B981) : (isDark ? Colors.white70 : Colors.black54))),
+            const SizedBox(height: 4),
+            Text(label, style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _isIncomingTransaction(AppTransaction t) {
+    return t.type == TransactionType.deposit ||
+        t.type == TransactionType.adminAdd ||
+        t.type == TransactionType.reimbursement ||
+        t.type == TransactionType.claim;
+  }
+
+  double _transactionSignedDelta(AppTransaction t) {
+    return _isIncomingTransaction(t) ? t.amount : -t.amount;
+  }
+
+  String _transactionTypeLabel(AppTransaction t) {
+    final raw = (t.sourceDetails ?? '').toLowerCase();
+    switch (t.type) {
+      case TransactionType.deposit:
+        return 'Deposit';
+      case TransactionType.withdrawal:
+        return 'Withdrawal';
+      case TransactionType.adminAdd:
+        return 'Admin Credit';
+      case TransactionType.adminRemove:
+        if (raw.contains('investment')) return 'Invested';
+        if (raw.contains('ticket')) return 'Ticket Purchase';
+        return 'Purchase';
+      case TransactionType.reimbursement:
+        if (raw.contains('points converted')) return 'Points Conversion';
+        if (raw.contains('clock-in')) return 'Clock In';
+        if (raw.contains('game payout')) return 'Game Reward';
+        if (raw.contains('ticket sale')) return 'Ticket Sale';
+        if (raw.contains('creator')) return 'Creator Sale';
+        if (raw.contains('rhyme')) return 'Rhyme Payment';
+        if (raw.contains('savings')) return 'Savings Withdrawal';
+        return 'Earnings';
+      case TransactionType.contribution:
+        return 'Contribution';
+      case TransactionType.claim:
+        return 'Claim';
+    }
+  }
+
+  String _transactionDetails(AppTransaction t) {
+    final details = (t.sourceDetails ?? '').trim();
+    if (details.isNotEmpty) return details;
+    switch (t.type) {
+      case TransactionType.deposit:
+        return 'Funds added via ${t.method.name.toUpperCase()}';
+      case TransactionType.withdrawal:
+        return 'Withdrawal request submitted';
+      case TransactionType.adminAdd:
+        return 'Admin account credit';
+      case TransactionType.adminRemove:
+        return 'Deducted from account';
+      case TransactionType.reimbursement:
+        return 'Income added to account';
+      case TransactionType.contribution:
+        return 'Community contribution';
+      case TransactionType.claim:
+        return 'Claim adjustment';
+    }
+  }
+
+  String _historyTimestamp(DateTime date) {
+    final d = date.isUtc ? date.toLocal() : date;
+    final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final hour12 = d.hour == 0 ? 12 : (d.hour > 12 ? d.hour - 12 : d.hour);
+    final minute = d.minute.toString().padLeft(2, '0');
+    final ampm = d.hour >= 12 ? 'PM' : 'AM';
+    return '${monthNames[d.month - 1]} ${d.day} ${d.year}, $hour12:$minute $ampm';
   }
 }
 
@@ -4577,8 +5403,8 @@ class StatsScreen extends StatelessWidget {
 }
 
 class ProfileScreen extends StatefulWidget {
-  final UserData user; final List<UserData> allUsers; final AppConfig config; final Function(ThemeMode) onThemeChanged; final ThemeMode currentThemeMode; final VoidCallback onLogout; final VoidCallback onDataChanged;
-  const ProfileScreen({super.key, required this.user, required this.allUsers, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged});
+  final UserData user; final List<UserData> allUsers; final AppConfig config; final Function(ThemeMode) onThemeChanged; final ThemeMode currentThemeMode; final VoidCallback onLogout; final VoidCallback onDataChanged; final Function(AppTransaction) onAddTransaction;
+  const ProfileScreen({super.key, required this.user, required this.allUsers, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction});
 
   @override State<ProfileScreen> createState() => _ProfileScreenState();
 }
@@ -4621,10 +5447,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You need at least 100 points to convert.')));
       return;
     }
+    final convertedPoints = dollars.toInt() * 100;
+    final now = DateTime.now();
     setState(() {
-      widget.user.points -= (dollars.toInt() * 100);
+      widget.user.points -= convertedPoints;
       widget.user.accountBalance += dollars;
     });
+    widget.onAddTransaction(
+      AppTransaction(
+        id: now.microsecondsSinceEpoch.toString(),
+        userEmail: widget.user.email,
+        amount: dollars,
+        type: TransactionType.reimbursement,
+        method: PaymentMethod.system,
+        sourceDetails: 'Points converted to cash (${convertedPoints} pts)',
+        status: TransactionStatus.approved,
+        timestamp: now,
+      ),
+    );
     widget.onDataChanged();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Converted to \$${dollars.toStringAsFixed(2)}.')));
   }
@@ -4742,11 +5582,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
           }
         },
         child: Stack(alignment: Alignment.center, children: [
-          CircleAvatar(
-            radius: 50,
-            backgroundColor: Colors.grey.shade300,
-            backgroundImage: _profileImageProvider(),
-            child: _profileImageProvider() == null ? const Icon(Icons.person, size: 40, color: Colors.white) : null,
+          Container(
+            width: 112,
+            height: 112,
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(colors: [Color(0xFF22D3EE), Color(0xFF8B5CF6)]),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF22D3EE).withOpacity(isDark ? 0.28 : 0.18),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark ? const Color(0xFF0F172A) : Colors.white,
+              ),
+              child: CircleAvatar(
+                radius: 50,
+                backgroundColor: Colors.grey.shade300,
+                backgroundImage: _profileImageProvider(),
+                child: _profileImageProvider() == null ? const Icon(Icons.person, size: 40, color: Colors.white) : null,
+              ),
+            ),
           ),
           if (widget.user.status == 'verified') Positioned(bottom: 0, right: 0, child: Container(padding: const EdgeInsets.all(2), decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: const Icon(Icons.verified, color: Colors.blue, size: 24))),
           if (widget.user.status != 'active' && widget.user.status != 'verified') Positioned(top: 0, right: 0, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)), child: Text(widget.user.status.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)))),
@@ -4944,14 +5806,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ]), const SizedBox(height: 15),
       _box(context, 'Legal Information', [
-        InkWell(
+        _legalTile(
+          icon: Icons.description_outlined,
+          title: 'Terms & Conditions',
           onTap: () => _showLegal(context, 'Terms & Conditions', widget.config.termsAndConditions),
-          child: Row(children: [const Icon(Icons.description_outlined, size: 20), const SizedBox(width: 12), const Text('Terms & Conditions'), const Spacer(), const Icon(Icons.chevron_right, color: Colors.grey)]),
         ),
-        const Divider(height: 30),
-        InkWell(
+        const SizedBox(height: 10),
+        _legalTile(
+          icon: Icons.privacy_tip_outlined,
+          title: 'Privacy Policy',
           onTap: () => _showLegal(context, 'Privacy Policy', widget.config.privacyPolicy),
-          child: Row(children: [const Icon(Icons.privacy_tip_outlined, size: 20), const SizedBox(width: 12), const Text('Privacy Policy'), const Spacer(), const Icon(Icons.chevron_right, color: Colors.grey)]),
         ),
       ]),
       const SizedBox(height: 15),
@@ -5015,9 +5879,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  Widget _row(IconData i, String l, String v) => Row(children: [Icon(i, size: 18, color: Colors.grey), const SizedBox(width: 12), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(l, style: const TextStyle(fontSize: 10, color: Colors.grey)), Text(v, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))])]);
+  Widget _row(IconData i, String l, String v) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.grey.withOpacity(0.22)),
+      color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.03) : Colors.grey.withOpacity(0.03),
+    ),
+    child: Row(
+      children: [
+        Icon(i, size: 18, color: Colors.grey),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+              Text(v, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
   Widget _box(BuildContext ctx, String t, List<Widget> c) => Container(width: double.infinity, padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Theme.of(ctx).cardColor, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 15, offset: const Offset(0, 5))]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)), const SizedBox(height: 15), ...c]));
-  Widget _pair(String l, String v) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(l, style: const TextStyle(fontSize: 13)), Text(v, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))]);
+  Widget _pair(String l, String v) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.grey.withOpacity(0.22)),
+      color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.03) : Colors.grey.withOpacity(0.03),
+    ),
+    child: Row(
+      children: [
+        Expanded(child: Text(l, style: const TextStyle(fontSize: 13))),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            v,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    ),
+  );
+  Widget _legalTile({required IconData icon, required String title, required VoidCallback onTap}) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.withOpacity(0.22)),
+          color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.03) : Colors.grey.withOpacity(0.03),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: 12),
+            Expanded(child: Text(title)),
+            const Icon(Icons.chevron_right, color: Colors.grey),
+          ],
+        ),
+      ),
+    ),
+  );
   Widget _tOp(BuildContext ctx, ThemeMode m, IconData i, String l) { bool sel = widget.currentThemeMode == m; return GestureDetector(onTap: () => widget.onThemeChanged(m), child: Column(children: [Icon(i, color: sel ? Theme.of(ctx).colorScheme.primary : Colors.grey, size: 28), const SizedBox(height: 5), Text(l, style: TextStyle(fontSize: 10, color: sel ? Theme.of(ctx).colorScheme.primary : Colors.grey))])); }
 }
 class NgmyHubScreen extends StatefulWidget {
