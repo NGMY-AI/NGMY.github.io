@@ -2099,27 +2099,175 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 AnimatedBuilder(
                   animation: _smokeCtrl,
                   builder: (context, child) {
-                    double scale = active ? (1.0 + math.sin(_smokeCtrl.value * 2 * math.pi) * 0.1) : 1.0;
+                    double scale = active ? (1.0 + math.sin(_smokeCtrl.value * 2 * math.pi) * 0.04) : 1.0;
                     double dailyGoal = widget.user.todayDailyGoal;
                     if (dailyGoal <= 0) dailyGoal = 1.0;
                     double progress = widget.user.currentTodayEarnings / dailyGoal;
                     if (progress > 1.0) progress = 1.0;
+                    if (progress < 0.0) progress = 0.0;
+                    final startFill = Color.lerp(const Color(0xFFEFFFF8), const Color(0xFF22D3EE), progress * 0.55)!;
+                    final fullColor = Color.lerp(startFill, const Color(0xFFFFC107), progress)!;
+                    final pulseRing = 0.85 + (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) * 0.08;
+                    final shimmer = (math.sin((_smokeCtrl.value * 2 * math.pi) + (progress * 1.4)) + 1) / 2;
 
                     return Transform.scale(
                       scale: scale,
-                      child: ShaderMask(
-                        shaderCallback: (Rect bounds) {
-                          return LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            stops: [progress, progress],
-                            colors: [
-                              Colors.white, 
-                              Colors.white.withOpacity(0.2)
-                            ],
-                          ).createShader(bounds);
-                        },
-                        child: Icon(alreadyDone ? Icons.check_circle_rounded : Icons.card_giftcard_rounded, color: Colors.white, size: 40),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 72 * pulseRing,
+                            height: 72 * pulseRing,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: fullColor.withOpacity(0.14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: fullColor.withOpacity(0.45),
+                                  blurRadius: 24,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (!alreadyDone)
+                            SizedBox(
+                              width: 52,
+                              height: 80,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                clipBehavior: Clip.none,
+                                children: [
+                                  // Battery body (slightly smaller, real battery style)
+                                  Positioned(
+                                    bottom: 0,
+                                    child: Container(
+                                      width: 40,
+                                      height: 60,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.white.withOpacity(0.94), width: 2.1),
+                                        color: Colors.white.withOpacity(0.05),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(3),
+                                        child: Stack(
+                                          alignment: Alignment.bottomCenter,
+                                          children: [
+                                            Container(
+                                              width: double.infinity,
+                                              height: double.infinity,
+                                              decoration: BoxDecoration(
+                                                borderRadius: BorderRadius.circular(7),
+                                                color: Colors.black.withOpacity(0.2),
+                                              ),
+                                            ),
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(7),
+                                              child: Align(
+                                                alignment: Alignment.bottomCenter,
+                                                heightFactor: progress,
+                                                child: Container(
+                                                  width: double.infinity,
+                                                  height: double.infinity,
+                                                  decoration: BoxDecoration(
+                                                    gradient: LinearGradient(
+                                                      begin: Alignment.bottomCenter,
+                                                      end: Alignment.topCenter,
+                                                      colors: [
+                                                        Color.lerp(fullColor, const Color(0xFFFFA000), 0.55)!,
+                                                        fullColor,
+                                                        Color.lerp(fullColor, Colors.white, 0.22 + (shimmer * 0.23))!,
+                                                      ],
+                                                    ),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: fullColor.withOpacity(0.82),
+                                                        blurRadius: 10 + (shimmer * 6),
+                                                        spreadRadius: 1,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            Positioned(
+                                              top: 5 + ((1 - progress) * 38),
+                                              child: Container(
+                                                width: 24,
+                                                height: 2.2,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white.withOpacity(0.85),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  // Top battery terminal/tap
+                                  Positioned(
+                                    top: 15,
+                                    child: Container(
+                                      width: 14,
+                                      height: 6,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(3),
+                                        color: Colors.white.withOpacity(0.96),
+                                      ),
+                                    ),
+                                  ),
+                                  // Pouring/charging stream effect while active
+                                  if (active)
+                                    Positioned(
+                                      top: 2,
+                                      child: Container(
+                                        width: 5,
+                                        height: 9 + (shimmer * 5),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(5),
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              Colors.white.withOpacity(0.9),
+                                              Color.lerp(fullColor, const Color(0xFFFFC107), 0.6)!.withOpacity(0.95),
+                                            ],
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(0xFFFFD54F).withOpacity(0.6),
+                                              blurRadius: 8,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  if (active)
+                                    const Positioned(
+                                      top: -2,
+                                      child: Icon(Icons.bolt_rounded, color: Color(0xFFFFD54F), size: 12),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          if (alreadyDone)
+                            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 40),
+                          if (!alreadyDone)
+                            Positioned(
+                              left: 10 + (math.sin(_smokeCtrl.value * 2 * math.pi) * 8),
+                              top: 12,
+                              child: Icon(Icons.auto_awesome, color: Colors.white.withOpacity(0.75 + (progress * 0.25)), size: 9),
+                            ),
+                          if (!alreadyDone)
+                            Positioned(
+                              right: 10 + (math.cos(_smokeCtrl.value * 2 * math.pi) * 8),
+                              bottom: 11,
+                              child: Icon(Icons.auto_awesome, color: Colors.white.withOpacity(0.62 + (progress * 0.3)), size: 8),
+                            ),
+                        ],
                       ),
                     );
                   },
@@ -2129,7 +2277,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 const SizedBox(height: 4),
                 if (!alreadyDone) Text(
                   '\$${formatCurrency(widget.user.currentTodayEarnings)}',
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
                 ),
                 if (!active && !alreadyDone) const Text('ACTIVATE', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
                 if (alreadyDone) const Text('TOMORROW', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
