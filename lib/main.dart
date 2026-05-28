@@ -1253,172 +1253,177 @@ class _NGMYAppState extends State<NGMYApp> {
 
   @override Widget build(BuildContext context) {
     if (_isLoading) return const MaterialApp(debugShowCheckedModeBanner: false, home: Scaffold(body: Center(child: CircularProgressIndicator())));
-    _applySystemUiForMode(_effectiveThemeMode);
-    return MaterialApp(
-      title: 'NGMY', debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true, 
-        colorSchemeSeed: const Color(0xFF00B25A), 
-        brightness: Brightness.light, 
-        scaffoldBackgroundColor: Colors.white, 
-        cardColor: Colors.white,
-        appBarTheme: const AppBarTheme(
-          systemOverlayStyle: SystemUiOverlayStyle(
+    
+    final isDarkMode = _effectiveThemeMode == ThemeMode.dark;
+    final style = isDarkMode
+        ? const SystemUiOverlayStyle(
+            statusBarColor: Color(0xFF121212),
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+            systemNavigationBarColor: Color(0xFF121212),
+            systemNavigationBarIconBrightness: Brightness.light,
+          )
+        : const SystemUiOverlayStyle(
             statusBarColor: Colors.white,
             statusBarIconBrightness: Brightness.dark,
             statusBarBrightness: Brightness.light,
+            systemNavigationBarColor: Colors.white,
+            systemNavigationBarIconBrightness: Brightness.dark,
+          );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: style,
+      child: MaterialApp(
+        title: 'NGMY', debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true, 
+          colorSchemeSeed: const Color(0xFF00B25A), 
+          brightness: Brightness.light, 
+          scaffoldBackgroundColor: Colors.white, 
+          cardColor: Colors.white,
+          appBarTheme: const AppBarTheme(
+            systemOverlayStyle: SystemUiOverlayStyle(
+              statusBarColor: Colors.white,
+              statusBarIconBrightness: Brightness.dark,
+              statusBarBrightness: Brightness.light,
+            ),
+            backgroundColor: Colors.white,
+            elevation: 0,
           ),
-          backgroundColor: Colors.white,
-          elevation: 0,
         ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true, 
-        colorSchemeSeed: const Color(0xFFBB86FC), 
-        brightness: Brightness.dark, 
-        scaffoldBackgroundColor: const Color(0xFF121212), 
-        cardColor: const Color(0xFF1E1E1E),
-        appBarTheme: const AppBarTheme(
-          systemOverlayStyle: SystemUiOverlayStyle.light,
-          backgroundColor: Color(0xFF121212),
-          elevation: 0,
+        darkTheme: ThemeData(
+          useMaterial3: true, 
+          colorSchemeSeed: const Color(0xFFBB86FC), 
+          brightness: Brightness.dark, 
+          scaffoldBackgroundColor: const Color(0xFF121212), 
+          cardColor: const Color(0xFF1E1E1E),
+          appBarTheme: const AppBarTheme(
+            systemOverlayStyle: SystemUiOverlayStyle.light,
+            backgroundColor: Color(0xFF121212),
+            elevation: 0,
+          ),
         ),
-      ),
-      themeMode: _effectiveThemeMode,
-      home: _currentUser == null
-          ? AuthScreen(
-              allUsers: _allUsers,
-              config: _config,
-              onGoogleLogin: () => _startOAuthSignIn(OAuthProvider.google),
-              onGithubLogin: () => _startOAuthSignIn(OAuthProvider.github),
-              onResetPasswordByEmail: (email, newHash) async {
-                final emailNorm = email.toLowerCase().trim();
-                debugPrint('[ResetPW] Starting reset for $emailNorm');
-                _isSyncing = true;
+        themeMode: _effectiveThemeMode,
+        home: _currentUser == null
+            ? AuthScreen(
+                allUsers: _allUsers,
+                config: _config,
+                onGoogleLogin: () => _startOAuthSignIn(OAuthProvider.google),
+                onGithubLogin: () => _startOAuthSignIn(OAuthProvider.github),
+                onResetPasswordByEmail: (email, newHash) async {
+                  final emailNorm = email.toLowerCase().trim();
+                  debugPrint('[ResetPW] Starting reset for $emailNorm');
+                  _isSyncing = true;
 
-                try {
-                  // 1. Try to update the password in Supabase users table
-                  final result = await supabase
-                      .from('users')
-                      .update({'passwordHash': newHash})
-                      .eq('email', emailNorm)
-                      .select();
-                  
-                  debugPrint('[ResetPW] Supabase update result: ${result.length} rows');
+                  try {
+                    final result = await supabase
+                        .from('users')
+                        .update({'passwordHash': newHash})
+                        .eq('email', emailNorm)
+                        .select();
+                    
+                    if (result.isEmpty) {
+                       await supabase.from('users').insert({
+                         'email': emailNorm,
+                         'passwordHash': newHash,
+                         'username': emailNorm.split('@').first,
+                       });
+                    }
 
-                  // 2. If user doesn't exist in the custom table yet, we can't update.
-                  // But usually they should exist if they have an account.
-                  // If they don't, we'll let the onAuthComplete handle it during next login
-                  // or create it now if we want. Let's ensure it exists.
-                  if (result.isEmpty) {
-                     debugPrint('[ResetPW] User not found in custom table, inserting new record');
-                     await supabase.from('users').insert({
-                       'email': emailNorm,
-                       'passwordHash': newHash,
-                       'username': emailNorm.split('@').first,
-                     });
+                    final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailNorm);
+                    if (mounted) {
+                      setState(() {
+                        if (idx != -1) {
+                          _allUsers[idx].passwordHash = newHash;
+                        } else {
+                          _allUsers.add(UserData(email: emailNorm, passwordHash: newHash, username: emailNorm.split('@').first));
+                        }
+                      });
+                    }
+
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+                    
+                    _isSyncing = false;
+                    return true;
+                  } catch (e) {
+                    _isSyncing = false;
+                    return false;
                   }
-
-                  // 3. Update the local list immediately so login works without restart
-                  final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailNorm);
-                  if (mounted) {
-                    setState(() {
-                      if (idx != -1) {
-                        _allUsers[idx].passwordHash = newHash;
-                        debugPrint('[ResetPW] Updated existing local user');
-                      } else {
-                        _allUsers.add(UserData(email: emailNorm, passwordHash: newHash, username: emailNorm.split('@').first));
-                        debugPrint('[ResetPW] Added new user to local list');
-                      }
+                },
+                onAuthComplete: (e, p, u, passwordHash, isLogin) async {
+                  final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
+                  final email = e.toLowerCase().trim();
+                  
+                  if (isLogin) {
+                    final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+                    if (index != -1) {
+                      _allUsers[index].passwordHash = passwordHash;
+                      setState(() => _currentUser = _allUsers[index]); 
+                    }
+                  } else {
+                    final user = UserData(email: email, phone: p, username: u, isAdmin: admins.contains(email), passwordHash: passwordHash);
+                    setState(() { 
+                      _currentUser = user; 
+                      _allUsers.add(user); 
                     });
                   }
-
-                  // 4. Force save to SharedPreferences
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
-                  
-                  debugPrint('[ResetPW] Reset completed successfully');
-                  _isSyncing = false;
-                  return true;
-                } catch (e) {
-                  debugPrint('[ResetPW] Error: $e');
-                  _isSyncing = false;
-                  return false;
-                }
-              },
-              onAuthComplete: (e, p, u, passwordHash, isLogin) async {
-              final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
-              final email = e.toLowerCase().trim();
-              
-      if (isLogin) {
-                final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-                if (index != -1) {
-                  // Ensure local password hash is updated if it was empty or different (e.g., after reset)
-                  _allUsers[index].passwordHash = passwordHash;
-                  setState(() => _currentUser = _allUsers[index]); 
-                }
-              } else {
-                final user = UserData(email: email, phone: p, username: u, isAdmin: admins.contains(email), passwordHash: passwordHash);
-                setState(() { 
-                  _currentUser = user; 
-                  _allUsers.add(user); 
-                });
-              }
-              await _saveData();
-            },
-          )
-          : MainScreen(
-              user: _currentUser!, allTransactions: _allTransactions, allUsers: _allUsers, globalPlans: _globalPlans,
-              allMedia: _allMedia,
-              allAnnouncements: _allAnnouncements,
-              config: _config,
-              onThemeChanged: (m) => _setThemeMode(m), currentThemeMode: _themeMode, 
-              onLogout: () async { 
-                try {
-                  final p = await SharedPreferences.getInstance();
-                  await p.remove('current_user');
-                } catch (_) {}
-                setState(() => _currentUser = null); 
-              },
-              onDataChanged: () => _saveData(),
-              onAddTransaction: (t) { 
-                setState(() {
-                  _allTransactions.add(t);
-                  final userTrans = _allTransactions.where((tx) => tx.userEmail == t.userEmail).toList();
-                  if (userTrans.length > 30) {
-                    userTrans.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-                    final toRemove = userTrans.take(userTrans.length - 30).toList();
-                    for (var old in toRemove) {
-                      _allTransactions.removeWhere((tx) => tx.id == old.id);
-                      supabase.from('transactions').delete().eq('id', old.id).then((_) {}).catchError((_) {});
+                  await _saveData();
+                },
+              )
+            : MainScreen(
+                user: _currentUser!, allTransactions: _allTransactions, allUsers: _allUsers, globalPlans: _globalPlans,
+                allMedia: _allMedia,
+                allAnnouncements: _allAnnouncements,
+                config: _config,
+                onThemeChanged: (m) => _setThemeMode(m), currentThemeMode: _themeMode, 
+                onLogout: () async { 
+                  try {
+                    final p = await SharedPreferences.getInstance();
+                    await p.remove('current_user');
+                  } catch (_) {}
+                  setState(() => _currentUser = null); 
+                },
+                onDataChanged: () => _saveData(),
+                onAddTransaction: (t) { 
+                  setState(() {
+                    _allTransactions.add(t);
+                    final userTrans = _allTransactions.where((tx) => tx.userEmail == t.userEmail).toList();
+                    if (userTrans.length > 30) {
+                      userTrans.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                      final toRemove = userTrans.take(userTrans.length - 30).toList();
+                      for (var old in toRemove) {
+                        _allTransactions.removeWhere((tx) => tx.id == old.id);
+                        supabase.from('transactions').delete().eq('id', old.id).then((_) {}).catchError((_) {});
+                      }
+                    }
+                  }); 
+                  _saveData(); 
+                  _notifyTransactionEvent(t);
+                },
+                onProcessTransaction: (t, approve) { setState(() {
+                  t.status = approve ? TransactionStatus.approved : TransactionStatus.rejected;
+                  final targetIndex = _allUsers.indexWhere((u) => u.email == t.userEmail);
+                  if (targetIndex == -1) return;
+                  if (approve) {
+                    if (t.type == TransactionType.deposit || t.type == TransactionType.adminAdd || t.type == TransactionType.reimbursement) {
+                      _allUsers[targetIndex].accountBalance += t.amount;
+                    }
+                  } else {
+                    if (t.type == TransactionType.withdrawal) {
+                      _allUsers[targetIndex].accountBalance += t.amount;
                     }
                   }
-                }); 
-                _saveData(); 
-                _notifyTransactionEvent(t);
-              },
-              onProcessTransaction: (t, approve) { setState(() {
-                t.status = approve ? TransactionStatus.approved : TransactionStatus.rejected;
-                final targetIndex = _allUsers.indexWhere((u) => u.email == t.userEmail);
-                if (targetIndex == -1) return;
-                if (approve) {
-                  if (t.type == TransactionType.deposit || t.type == TransactionType.adminAdd || t.type == TransactionType.reimbursement) {
-                    _allUsers[targetIndex].accountBalance += t.amount;
-                  }
-                  // For withdrawals: balance already deducted at submit, just approve.
-                } else {
-                  // Rejection: refund the user if it was a withdrawal (we deducted on submit).
-                  if (t.type == TransactionType.withdrawal) {
-                    _allUsers[targetIndex].accountBalance += t.amount;
-                  }
-                }
-                if (_currentUser != null && _currentUser!.email == t.userEmail) _currentUser = _allUsers[targetIndex];
-              }); _saveData(); _notifyTransactionEvent(t, statusChanged: true); },
-              onAddPlan: (p) { setState(() { _globalPlans.add(p); _globalPlans.sort((a, b) => a.price.compareTo(b.price)); }); _saveData(); },
-              onPostMedia: (post) { setState(() => _allMedia.insert(0, post)); _saveData(); },
-              onAddAnnouncement: (ann) { setState(() => _allAnnouncements.insert(0, ann)); _saveData(); },
-              onDeleteAnnouncement: (id) { setState(() => _allAnnouncements.removeWhere((a) => a.id == id)); _saveData(); },
-            ),
+                  if (_currentUser != null && _currentUser!.email == t.userEmail) _currentUser = _allUsers[targetIndex];
+                }); _saveData(); _notifyTransactionEvent(t, statusChanged: true); },
+                onAddPlan: (p) { setState(() { _globalPlans.add(p); _globalPlans.sort((a, b) => a.price.compareTo(b.price)); }); _saveData(); },
+                onPostMedia: (post) { setState(() => _allMedia.insert(0, post)); _saveData(); },
+                onAddAnnouncement: (ann) { setState(() => _allAnnouncements.insert(0, ann)); _saveData(); },
+                onDeleteAnnouncement: (id) { setState(() => _allAnnouncements.removeWhere((a) => a.id == id)); _saveData(); },
+              ),
+      ),
+    );
+  }
     );
   }
 }
@@ -1929,6 +1934,7 @@ class _MainScreenState extends State<MainScreen> {
   @override void dispose() { _t?.cancel(); super.dispose(); }
 
   @override Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sorted = List<AppTransaction>.from(widget.allTransactions)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     final pages = [
       HomeScreen(user: widget.user, onClockIn: () { 
@@ -2011,12 +2017,29 @@ class _MainScreenState extends State<MainScreen> {
       StatsScreen(user: widget.user, transactions: sorted),
       ProfileScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged, onAddTransaction: widget.onAddTransaction),
     ];
-    return SelectionArea(child: Scaffold(
-      body: Stack(children: [
-        pages[_idx],
-        Positioned(left: 15, right: 15, bottom: 25, child: SafeArea(child: Container(height: 75, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface.withOpacity(0.9), borderRadius: BorderRadius.circular(35), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 5))], border: Border.all(color: Colors.white.withOpacity(0.05))), child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_nav(0, Icons.home_rounded), _nav(1, Icons.trending_up_rounded), _nav(2, Icons.account_balance_wallet_rounded), _navC(3), _nav(4, Icons.play_circle_fill_rounded), _nav(5, Icons.bar_chart_rounded), _nav(6, Icons.person_rounded)])))),
-      ]),
-    ));
+    return SelectionArea(child:    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: isDark
+          ? const SystemUiOverlayStyle(
+              statusBarColor: Color(0xFF121212),
+              statusBarIconBrightness: Brightness.light,
+              statusBarBrightness: Brightness.dark,
+              systemNavigationBarColor: Color(0xFF121212),
+              systemNavigationBarIconBrightness: Brightness.light,
+            )
+          : const SystemUiOverlayStyle(
+              statusBarColor: Colors.white,
+              statusBarIconBrightness: Brightness.dark,
+              statusBarBrightness: Brightness.light,
+              systemNavigationBarColor: Colors.white,
+              systemNavigationBarIconBrightness: Brightness.dark,
+            ),
+      child: Scaffold(
+        body: Stack(children: [
+          pages[_idx],
+          Positioned(left: 15, right: 15, bottom: 25, child: SafeArea(child: Container(height: 75, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface.withOpacity(0.9), borderRadius: BorderRadius.circular(35), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 5))], border: Border.all(color: Colors.white.withOpacity(0.05))), child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_nav(0, Icons.home_rounded), _nav(1, Icons.trending_up_rounded), _nav(2, Icons.account_balance_wallet_rounded), _navC(3), _nav(4, Icons.play_circle_fill_rounded), _nav(5, Icons.bar_chart_rounded), _nav(6, Icons.person_rounded)])))),
+        ]),
+      ),
+    );
   }
   Widget _nav(int i, IconData icon) => IconButton(onPressed: () => setState(() => _idx = i), icon: Icon(icon, color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey, size: 28));
   Widget _navC(int i) => GestureDetector(

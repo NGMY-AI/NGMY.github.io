@@ -18,24 +18,18 @@
 
   <title>NGMY</title>
 
-  <!-- Dynamic Theme Color for PWA -->
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff">
 
   <link rel="manifest" href="manifest.json">
 
   <style>
     body {
       background-color: #ffffff;
-    }
-    @media (prefers-color-scheme: dark) {
-      body {
-        background-color: #121212;
-      }
+      margin: 0;
     }
   </style>
 </head>
-<body>
+<body style="overflow: hidden;">
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
