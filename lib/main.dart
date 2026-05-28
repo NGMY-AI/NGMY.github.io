@@ -495,9 +495,10 @@ class _NGMYAppState extends State<NGMYApp> {
             systemNavigationBarIconBrightness: Brightness.light,
           )
         : const SystemUiOverlayStyle(
-            statusBarColor: Colors.white,
-            statusBarIconBrightness: Brightness.dark,
-            statusBarBrightness: Brightness.light,
+            // Keep light mode top area bright and never black.
+            statusBarColor: Color(0xFF0A84D8),
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
             systemNavigationBarColor: Colors.white,
             systemNavigationBarIconBrightness: Brightness.dark,
           );
@@ -1021,7 +1022,11 @@ class _NGMYAppState extends State<NGMYApp> {
         scaffoldBackgroundColor: Colors.white, 
         cardColor: Colors.white,
         appBarTheme: const AppBarTheme(
-          systemOverlayStyle: SystemUiOverlayStyle.dark,
+          systemOverlayStyle: SystemUiOverlayStyle(
+            statusBarColor: Color(0xFF0A84D8),
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+          ),
           backgroundColor: Colors.white,
           elevation: 0,
         ),
