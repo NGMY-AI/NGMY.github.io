@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -343,8 +344,11 @@ class UserData {
   String? room;
   String referredByCode;
   double clockInPenaltyPercent;
+  String? pendingInvestmentName;
+  double? pendingInvestmentAmount;
+  double? pendingInvestmentRoi;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.lastClockInDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0});
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.lastClockInDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi});
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
     if (activeInvestment!.daysLeft <= 0) return 0.0;
@@ -365,7 +369,7 @@ class UserData {
     return earnings > totalDaily ? totalDaily : earnings;
   }
   double get todayDailyGoal => activeInvestment == null ? 0.0 : (activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100)));
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -419,6 +423,9 @@ class UserData {
       room: json['room'],
       referredByCode: (json['referredByCode'] ?? '').toString(),
       clockInPenaltyPercent: (json['clockInPenaltyPercent'] ?? 0.0).toDouble(),
+      pendingInvestmentName: json['pendingInvestmentName'] as String?,
+      pendingInvestmentAmount: json['pendingInvestmentAmount'] == null ? null : (json['pendingInvestmentAmount'] as num).toDouble(),
+      pendingInvestmentRoi: json['pendingInvestmentRoi'] == null ? null : (json['pendingInvestmentRoi'] as num).toDouble(),
     );
   }
 }
@@ -456,19 +463,26 @@ class _NGMYAppState extends State<NGMYApp> {
   StreamSubscription<AuthState>? _authSub;
   bool _isSyncing = false;
   Timer? _autoThemeTimer;
+  Timer? _configRefreshTimer;
   final Set<String> _disabledSupabaseTables = {};
+  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  bool _notificationsReady = false;
+  int _nextNotificationId = 1;
 
   @override void initState() {
     super.initState();
+    _initLocalNotifications();
     _loadData().then((_) {
       _scheduleAutoThemeTick();
       _subscribeToRealtime();
       _subscribeToAuthState();
+      _startConfigRefreshLoop();
     });
   }
 
   @override void dispose() {
     try { _autoThemeTimer?.cancel(); } catch (_) {}
+    try { _configRefreshTimer?.cancel(); } catch (_) {}
     try { _usersChannel?.unsubscribe(); } catch (_) {}
     try { _transactionsChannel?.unsubscribe(); } catch (_) {}
     try { _mediaChannel?.unsubscribe(); } catch (_) {}
@@ -501,9 +515,9 @@ class _NGMYAppState extends State<NGMYApp> {
           )
         : const SystemUiOverlayStyle(
             // Keep light mode top area bright and never black.
-            statusBarColor: Color(0xFF0A84D8),
-            statusBarIconBrightness: Brightness.light,
-            statusBarBrightness: Brightness.dark,
+            statusBarColor: Colors.white,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
             systemNavigationBarColor: Colors.white,
             systemNavigationBarIconBrightness: Brightness.dark,
           );
@@ -517,6 +531,228 @@ class _NGMYAppState extends State<NGMYApp> {
     final p = await SharedPreferences.getInstance();
     await p.setString('theme_mode', mode.name);
     _scheduleAutoThemeTick();
+  }
+
+  String? _oauthRedirectTo() {
+    if (kIsWeb) {
+      // Keep callback on the same running app origin/path.
+      return Uri.base.removeFragment().toString();
+    }
+    if (Platform.isAndroid || Platform.isIOS) {
+      return 'io.supabase.flutter://login-callback';
+    }
+    // Desktop platforms should use Supabase defaults (loopback flow).
+    return null;
+  }
+
+  Future<String?> _startDesktopOAuthSignIn(OAuthProvider provider) async {
+    HttpServer? server;
+    try {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 53682);
+      final redirectTo = 'http://127.0.0.1:53682/auth-callback';
+      final oauthUrl = await supabase.auth.getOAuthSignInUrl(
+        provider: provider,
+        redirectTo: redirectTo,
+      );
+      final launched = await launchUrl(
+        Uri.parse(oauthUrl.url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        await server.close(force: true);
+        return 'Could not open ${provider.name} login screen.';
+      }
+
+      final req = await server.first.timeout(const Duration(minutes: 2));
+      final callbackUri = Uri.parse('$redirectTo?${req.uri.query}');
+      final hasError = callbackUri.queryParameters['error'] != null;
+      final errorDescription = callbackUri.queryParameters['error_description'];
+
+      const html = '''
+<!doctype html>
+<html><head><meta charset="utf-8"><title>NGMY Login</title></head>
+<body style="font-family:Arial,sans-serif;padding:24px;background:#0f172a;color:#e2e8f0;">
+<h2>Login Completed</h2>
+<p>You can close this browser tab and return to NGMY.</p>
+</body></html>
+''';
+      req.response.headers.contentType = ContentType.html;
+      req.response.write(html);
+      await req.response.close();
+
+      if (hasError) {
+        await server.close(force: true);
+        return '${provider.name.toUpperCase()} login failed: ${errorDescription ?? "OAuth callback error"}';
+      }
+      await supabase.auth.getSessionFromUrl(callbackUri);
+      await server.close(force: true);
+      return null;
+    } on SocketException {
+      await server?.close(force: true);
+      return 'Desktop login callback port is busy. Close other apps using port 53682 and try again.';
+    } on TimeoutException {
+      await server?.close(force: true);
+      return '${provider.name.toUpperCase()} login timed out. Please try again.';
+    } catch (e) {
+      await server?.close(force: true);
+      return '${provider.name.toUpperCase()} login failed. Add this redirect URL in Supabase Auth settings: http://127.0.0.1:53682/auth-callback. Error: $e';
+    }
+  }
+
+  Future<String?> _startOAuthSignIn(OAuthProvider provider) async {
+    if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+      return _startDesktopOAuthSignIn(provider);
+    }
+    try {
+      final launched = await supabase.auth.signInWithOAuth(
+        provider,
+        redirectTo: _oauthRedirectTo(),
+      );
+      if (!launched) return 'Could not open ${provider.name} login screen.';
+      return null;
+    } catch (e) {
+      return '${provider.name.toUpperCase()} login failed. '
+          'If browser says "can\'t reach this page", add this redirect URL in Supabase Auth provider settings: ${_oauthRedirectTo() ?? "default desktop callback"}. Error: $e';
+    }
+  }
+
+  void _startConfigRefreshLoop() {
+    _configRefreshTimer?.cancel();
+    _configRefreshTimer = Timer.periodic(const Duration(seconds: 45), (_) async {
+      if (_isSyncing) return;
+      try {
+        final cfg = await supabase.from('config').select().maybeSingle();
+        if (cfg == null) return;
+        if (!mounted) return;
+        setState(() => _config = AppConfig.fromJson(cfg));
+      } catch (_) {
+        // Silent fallback; realtime/local cache still handles config.
+      }
+    });
+  }
+
+  Future<void> _initLocalNotifications() async {
+    if (kIsWeb) return;
+    try {
+      const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const darwin = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
+      const linux = LinuxInitializationSettings(defaultActionName: 'Open');
+      const initSettings = InitializationSettings(
+        android: android,
+        iOS: darwin,
+        macOS: darwin,
+        linux: linux,
+      );
+      await _localNotifications.initialize(settings: initSettings);
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+      _notificationsReady = true;
+    } catch (e) {
+      debugPrint('Notification init failed: $e');
+      _notificationsReady = false;
+    }
+  }
+
+  String _notificationTitleForTransaction(AppTransaction t, {bool statusChanged = false}) {
+    if (statusChanged) {
+      if (t.status == TransactionStatus.approved) return 'Transaction approved';
+      if (t.status == TransactionStatus.rejected) return 'Transaction rejected';
+      return 'Transaction update';
+    }
+    if (t.type == TransactionType.reimbursement &&
+        (t.sourceDetails ?? '').toLowerCase().contains('clock-in')) {
+      return 'Clock-in income received';
+    }
+    switch (t.type) {
+      case TransactionType.deposit:
+        return 'Deposit request submitted';
+      case TransactionType.withdrawal:
+        return 'Withdrawal request submitted';
+      case TransactionType.adminAdd:
+        return 'Account credited';
+      case TransactionType.adminRemove:
+        return 'Account debit';
+      case TransactionType.reimbursement:
+        return 'Earnings received';
+      case TransactionType.contribution:
+        return 'Contribution recorded';
+      case TransactionType.claim:
+        return 'Claim update';
+    }
+  }
+
+  String _notificationBodyForTransaction(AppTransaction t, {bool statusChanged = false}) {
+    final amount = '\$${formatCurrency(t.amount)}';
+    final details = (t.sourceDetails ?? '').trim();
+    if (statusChanged) {
+      final statusText = t.status.name.toUpperCase();
+      if (details.isNotEmpty) return '$statusText: $amount - $details';
+      return '$statusText: $amount';
+    }
+    if (details.isNotEmpty) return '$amount - $details';
+    return amount;
+  }
+
+  Future<void> _pushInAppNotification({
+    required String title,
+    required String body,
+  }) async {
+    if (_currentUser == null) return;
+
+    if (_notificationsReady && !kIsWeb) {
+      try {
+        const androidDetails = AndroidNotificationDetails(
+          'ngmy_transactions',
+          'NGMY Transactions',
+          channelDescription: 'Transaction and earnings notifications while app is open',
+          importance: Importance.max,
+          priority: Priority.high,
+        );
+        const darwinDetails = DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        );
+        const linuxDetails = LinuxNotificationDetails();
+        const details = NotificationDetails(
+          android: androidDetails,
+          iOS: darwinDetails,
+          macOS: darwinDetails,
+          linux: linuxDetails,
+        );
+        await _localNotifications.show(
+          id: _nextNotificationId++,
+          title: title,
+          body: body,
+          notificationDetails: details,
+        );
+      } catch (e) {
+        debugPrint('Notification show failed: $e');
+      }
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$title\n$body'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _notifyTransactionEvent(AppTransaction t, {bool statusChanged = false}) async {
+    final currentEmail = _currentUser?.email.toLowerCase().trim();
+    if (currentEmail == null || currentEmail.isEmpty) return;
+    if (t.userEmail.toLowerCase().trim() != currentEmail) return;
+    await _pushInAppNotification(
+      title: _notificationTitleForTransaction(t, statusChanged: statusChanged),
+      body: _notificationBodyForTransaction(t, statusChanged: statusChanged),
+    );
   }
 
   void _scheduleAutoThemeTick() {
@@ -1028,9 +1264,9 @@ class _NGMYAppState extends State<NGMYApp> {
         cardColor: Colors.white,
         appBarTheme: const AppBarTheme(
           systemOverlayStyle: SystemUiOverlayStyle(
-            statusBarColor: Color(0xFF0A84D8),
-            statusBarIconBrightness: Brightness.light,
-            statusBarBrightness: Brightness.dark,
+            statusBarColor: Colors.white,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
           ),
           backgroundColor: Colors.white,
           elevation: 0,
@@ -1053,18 +1289,8 @@ class _NGMYAppState extends State<NGMYApp> {
           ? AuthScreen(
               allUsers: _allUsers,
               config: _config,
-              onGoogleLogin: () async {
-                try {
-                  final launched = await supabase.auth.signInWithOAuth(
-                    OAuthProvider.google,
-                    redirectTo: 'io.supabase.flutter://login-callback',
-                  );
-                  if (!launched) return 'Could not open Google login screen.';
-                  return null;
-                } catch (e) {
-                  return 'Google login failed: $e';
-                }
-              },
+              onGoogleLogin: () => _startOAuthSignIn(OAuthProvider.google),
+              onGithubLogin: () => _startOAuthSignIn(OAuthProvider.github),
               onResetPasswordByEmail: (email, newHash) async {
                 final emailNorm = email.toLowerCase().trim();
                 debugPrint('[ResetPW] Starting reset for $emailNorm');
@@ -1169,6 +1395,7 @@ class _NGMYAppState extends State<NGMYApp> {
                   }
                 }); 
                 _saveData(); 
+                _notifyTransactionEvent(t);
               },
               onProcessTransaction: (t, approve) { setState(() {
                 t.status = approve ? TransactionStatus.approved : TransactionStatus.rejected;
@@ -1186,7 +1413,7 @@ class _NGMYAppState extends State<NGMYApp> {
                   }
                 }
                 if (_currentUser != null && _currentUser!.email == t.userEmail) _currentUser = _allUsers[targetIndex];
-              }); _saveData(); },
+              }); _saveData(); _notifyTransactionEvent(t, statusChanged: true); },
               onAddPlan: (p) { setState(() { _globalPlans.add(p); _globalPlans.sort((a, b) => a.price.compareTo(b.price)); }); _saveData(); },
               onPostMedia: (post) { setState(() => _allMedia.insert(0, post)); _saveData(); },
               onAddAnnouncement: (ann) { setState(() => _allAnnouncements.insert(0, ann)); _saveData(); },
@@ -1211,8 +1438,9 @@ class AuthScreen extends StatefulWidget {
   final AppConfig config;
   final Function(String, String, String, String, bool) onAuthComplete;
   final Future<String?> Function() onGoogleLogin;
+  final Future<String?> Function() onGithubLogin;
   final Future<bool> Function(String email, String newPasswordHash) onResetPasswordByEmail;
-  const AuthScreen({super.key, required this.onAuthComplete, required this.allUsers, required this.onGoogleLogin, required this.onResetPasswordByEmail, required this.config});
+  const AuthScreen({super.key, required this.onAuthComplete, required this.allUsers, required this.onGoogleLogin, required this.onGithubLogin, required this.onResetPasswordByEmail, required this.config});
   @override State<AuthScreen> createState() => _AuthScreenState();
 }
 class _AuthScreenState extends State<AuthScreen> {
@@ -1490,7 +1718,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   @override Widget build(BuildContext context) {
-    return Scaffold(body: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(35), child: Column(children: [
+    return SelectionArea(child: Scaffold(body: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(35), child: Column(children: [
       ClipRRect(
         borderRadius: BorderRadius.circular(30),
         child: Image.network(
@@ -1520,15 +1748,34 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
       if (_isLogin) ...[
         const SizedBox(height: 15),
-        OutlinedButton.icon(
-          onPressed: () async {
-            final err = await widget.onGoogleLogin();
-            if (!mounted || err == null) return;
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
-          },
-          icon: const Icon(Icons.g_mobiledata_rounded, size: 30),
-          label: const Text('Continue with Google', style: TextStyle(fontWeight: FontWeight.w600)),
-          style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final err = await widget.onGoogleLogin();
+                  if (!mounted || err == null) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+                },
+                icon: const Icon(Icons.g_mobiledata_rounded, size: 26),
+                label: const Text('Google', style: TextStyle(fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final err = await widget.onGithubLogin();
+                  if (!mounted || err == null) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+                },
+                icon: const Icon(Icons.code_rounded, size: 20),
+                label: const Text('GitHub', style: TextStyle(fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
+              ),
+            ),
+          ],
         ),
       ],
       if (_isLogin)
@@ -1549,7 +1796,7 @@ class _AuthScreenState extends State<AuthScreen> {
         }, 
         child: const Text('Trouble logging in? Reset App Data', style: TextStyle(color: Colors.grey, fontSize: 10))
       ),
-    ]))));
+    ])))));
   }
 }
 
@@ -1567,6 +1814,71 @@ class MainScreen extends StatefulWidget {
 }
 class _MainScreenState extends State<MainScreen> {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
+
+  void _activateInvestmentPlan(String name, double amount, double roi, {required double cost, required bool isAutoActivation}) {
+    final now = DateTime.now();
+    setState(() {
+      widget.user.accountBalance -= cost;
+      // Upgrades/purchases reset the earning cycle to match the selected plan.
+      widget.user.activeInvestment = ActiveInvestment(
+        name: name,
+        amount: amount,
+        dailyROI: roi,
+        purchaseDate: now,
+        daysClockedIn: 0,
+        totalEarned: 0.0,
+      );
+      widget.user.pendingInvestmentName = null;
+      widget.user.pendingInvestmentAmount = null;
+      widget.user.pendingInvestmentRoi = null;
+      final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == widget.user.email.toLowerCase().trim());
+      if (idx != -1) {
+        widget.allUsers[idx] = widget.user;
+      }
+    });
+    if (cost > 0) {
+      widget.onAddTransaction(AppTransaction(
+        id: now.toString(),
+        userEmail: widget.user.email,
+        amount: cost,
+        type: TransactionType.adminRemove,
+        method: PaymentMethod.system,
+        sourceDetails: 'Investment plan purchase/upgrade: $name',
+        status: TransactionStatus.approved,
+        timestamp: now,
+      ));
+    }
+    widget.onDataChanged();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isAutoActivation
+              ? 'Deposit received. $name activated automatically!'
+              : 'Successfully purchased $name!'),
+        ),
+      );
+    }
+  }
+
+  void _tryActivatePendingInvestment() {
+    final pendingName = widget.user.pendingInvestmentName;
+    final pendingAmount = widget.user.pendingInvestmentAmount;
+    final pendingRoi = widget.user.pendingInvestmentRoi;
+    if (pendingName == null || pendingAmount == null || pendingRoi == null) return;
+
+    final currentInvested = widget.user.totalInvestmentAmount;
+    final cost = math.max(0.0, pendingAmount - currentInvested);
+    if (widget.user.accountBalance < cost) return;
+
+    _activateInvestmentPlan(
+      pendingName,
+      pendingAmount,
+      pendingRoi,
+      cost: cost,
+      isAutoActivation: true,
+    );
+  }
+
   @override void initState() {
     super.initState();
     _t = Timer.periodic(const Duration(seconds: 1), (t) { 
@@ -1611,6 +1923,7 @@ class _MainScreenState extends State<MainScreen> {
           }
         }
       }
+      _tryActivatePendingInvestment();
     });
   }
   @override void dispose() { _t?.cancel(); super.dispose(); }
@@ -1661,41 +1974,23 @@ class _MainScreenState extends State<MainScreen> {
         final currentInvested = widget.user.totalInvestmentAmount;
         final cost = math.max(0.0, p - currentInvested);
         if (widget.user.accountBalance < cost) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Insufficient balance to buy this plan!')));
+          final shortfall = (cost - widget.user.accountBalance).clamp(0.0, double.infinity);
+          setState(() {
+            widget.user.pendingInvestmentName = n;
+            widget.user.pendingInvestmentAmount = p;
+            widget.user.pendingInvestmentRoi = r;
+          });
+          widget.onDataChanged();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Need \$${formatCurrency(shortfall)} more. Deposit the difference and $n will activate automatically.',
+              ),
+            ),
+          );
           return;
         }
-        final now = DateTime.now();
-        setState(() {
-          widget.user.accountBalance -= cost;
-          // When buying a plan, we create a fresh ActiveInvestment instance to reset progress.
-          // For upgrades, the user pays the difference and starts a fresh 261-day cycle.
-          widget.user.activeInvestment = ActiveInvestment(
-            name: n, 
-            amount: p, 
-            dailyROI: r, 
-            purchaseDate: now,
-            daysClockedIn: 0,
-            totalEarned: 0.0
-          );
-          final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == widget.user.email.toLowerCase().trim());
-          if (idx != -1) {
-            widget.allUsers[idx] = widget.user;
-          }
-        });
-        if (cost > 0) {
-          widget.onAddTransaction(AppTransaction(
-            id: now.toString(),
-            userEmail: widget.user.email,
-            amount: cost,
-            type: TransactionType.adminRemove,
-            method: PaymentMethod.system,
-            sourceDetails: 'Investment plan purchase/upgrade: $n',
-            status: TransactionStatus.approved,
-            timestamp: now,
-          ));
-        }
-        widget.onDataChanged();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully purchased $n!')));
+        _activateInvestmentPlan(n, p, r, cost: cost, isAutoActivation: false);
       }),
       WalletScreen(user: widget.user, transactions: sorted.where((t) => t.userEmail == widget.user.email).take(30).toList(), onAdd: widget.onAddTransaction, config: widget.config, onDataChanged: widget.onDataChanged),
       NgmyHubScreen(
@@ -1716,12 +2011,12 @@ class _MainScreenState extends State<MainScreen> {
       StatsScreen(user: widget.user, transactions: sorted),
       ProfileScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged, onAddTransaction: widget.onAddTransaction),
     ];
-    return Scaffold(
+    return SelectionArea(child: Scaffold(
       body: Stack(children: [
         pages[_idx],
         Positioned(left: 15, right: 15, bottom: 25, child: SafeArea(child: Container(height: 75, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface.withOpacity(0.9), borderRadius: BorderRadius.circular(35), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 5))], border: Border.all(color: Colors.white.withOpacity(0.05))), child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_nav(0, Icons.home_rounded), _nav(1, Icons.trending_up_rounded), _nav(2, Icons.account_balance_wallet_rounded), _navC(3), _nav(4, Icons.play_circle_fill_rounded), _nav(5, Icons.bar_chart_rounded), _nav(6, Icons.person_rounded)])))),
       ]),
-    );
+    ));
   }
   Widget _nav(int i, IconData icon) => IconButton(onPressed: () => setState(() => _idx = i), icon: Icon(icon, color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey, size: 28));
   Widget _navC(int i) => GestureDetector(
@@ -3706,14 +4001,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (c) => StatefulBuilder(builder: (ctx, setST) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.9,
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0F111A) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-          ),
-          padding: const EdgeInsets.fromLTRB(25, 10, 25, 25),
-          child: Column(
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.84),
+            margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F111A) : Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.20), blurRadius: 24, offset: const Offset(0, 10))],
+            ),
+            padding: const EdgeInsets.fromLTRB(22, 10, 22, 18),
+            child: Column(
             children: [
               Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10))),
               const SizedBox(height: 15),
@@ -3742,30 +4042,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               ],
                             ),
                             const SizedBox(height: 15),
-                            TextField(
-                              controller: logoC,
-                              decoration: const InputDecoration(
-                                labelText: 'App Logo URL',
-                                hintText: 'Paste image link here',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                            ),
+                            TextField(controller: logoC, decoration: _adminInputDecoration(label: 'App Logo URL', hint: 'Paste image link here', isDark: isDark)),
                             const SizedBox(height: 12),
-                            TextField(
-                              controller: apiC,
-                              decoration: const InputDecoration(
-                                labelText: 'Gemini API Key',
-                                hintText: 'Paste AI key here',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                            ),
+                            TextField(controller: apiC, decoration: _adminInputDecoration(label: 'Gemini API Key', hint: 'Paste AI key here', isDark: isDark)),
                             const SizedBox(height: 15),
                             ElevatedButton(
                               onPressed: () {
-                                widget.config.logoUrl = logoC.text.trim();
-                                widget.config.geminiApiKey = apiC.text.trim();
+                                setState(() {
+                                  widget.config.logoUrl = logoC.text.trim();
+                                  widget.config.geminiApiKey = apiC.text.trim();
+                                });
                                 widget.onDataChanged();
                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Configuration Updated Successfully')));
                                 setState(() {}); // Refresh local UI if needed
@@ -3782,11 +4068,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       
                       const Align(alignment: Alignment.centerLeft, child: Text('CREATE ANNOUNCEMENT', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold))),
                       const SizedBox(height: 15),
-                      TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder())),
+                      TextField(controller: titleC, decoration: _adminInputDecoration(label: 'Title', isDark: isDark)),
                       const SizedBox(height: 10),
-                      TextField(controller: msgC, maxLines: 3, decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder())),
+                      TextField(controller: msgC, maxLines: 3, decoration: _adminInputDecoration(label: 'Message', isDark: isDark)),
                       const SizedBox(height: 10),
-                      TextField(controller: imgC, decoration: const InputDecoration(labelText: 'Image URL (Optional)', border: OutlineInputBorder())),
+                      TextField(controller: imgC, decoration: _adminInputDecoration(label: 'Image URL (Optional)', isDark: isDark)),
                       const SizedBox(height: 15),
                       ElevatedButton(
                         onPressed: () {
@@ -3837,7 +4123,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
             ],
           ),
-        );
+        ));
       }),
     );
   }
@@ -3848,6 +4134,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
     Text(v, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
     Text(l, style: const TextStyle(color: Colors.grey, fontSize: 9)),
   ]);
+
+  InputDecoration _adminInputDecoration({
+    required String label,
+    required bool isDark,
+    String? hint,
+  }) {
+    final borderColor = isDark ? Colors.white24 : const Color(0xFFD1D5DB);
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      isDense: true,
+      filled: true,
+      fillColor: isDark ? const Color(0xFF121726) : const Color(0xFFF8FAFC),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(14)),
+        borderSide: BorderSide(color: Color(0xFF3B82F6), width: 1.4),
+      ),
+    );
+  }
 
   Widget _menuFrame(String title, IconData icon, Color color, VoidCallback onTap, bool isDark) => InkWell(
     onTap: onTap,
@@ -3920,19 +4230,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: isDark ? const Color(0xFF1C1F2E) : Colors.white, borderRadius: BorderRadius.circular(20)),
       child: Column(children: [
-        TextField(controller: cTag, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(labelText: 'Admin Cash App Tag', labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey), border: const OutlineInputBorder())),
+        TextField(controller: cTag, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Admin Cash App Tag', isDark: isDark)),
         const SizedBox(height: 15),
-        TextField(controller: bAddr, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(labelText: 'Admin Bitcoin Address', labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey), border: const OutlineInputBorder())),
+        TextField(controller: bAddr, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Admin Bitcoin Address', isDark: isDark)),
         const SizedBox(height: 15),
-        TextField(controller: lPhone, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(labelText: 'Loan Support Phone', labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey), border: const OutlineInputBorder())),
+        TextField(controller: lPhone, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Loan Support Phone', isDark: isDark)),
         const SizedBox(height: 15),
-        TextField(controller: lHow, maxLines: 5, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(labelText: 'Loan - How It Works Text', labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey), border: const OutlineInputBorder())),
+        TextField(controller: lHow, maxLines: 5, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Loan - How It Works Text', isDark: isDark)),
         const SizedBox(height: 20),
         ElevatedButton(onPressed: () { 
-          widget.config.officialCashApp = cTag.text; 
-          widget.config.officialBitcoin = bAddr.text; 
-          widget.config.loanPhone = lPhone.text;
-          widget.config.loanHowItWorks = lHow.text;
+          setState(() {
+            widget.config.officialCashApp = cTag.text.trim(); 
+            widget.config.officialBitcoin = bAddr.text.trim(); 
+            widget.config.loanPhone = lPhone.text.trim();
+            widget.config.loanHowItWorks = lHow.text.trim();
+          });
           widget.onDataChanged(); 
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Settings Updated'))); 
         }, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white), child: const Text('SAVE ALL SETTINGS'))
@@ -3958,9 +4270,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
           const SizedBox(height: 30),
           ElevatedButton(
             onPressed: () {
-              setState(() { widget.config.termsAndConditions = tCtrl.text; widget.config.privacyPolicy = pCtrl.text; });
+              setState(() {
+                widget.config.termsAndConditions = tCtrl.text.trim();
+                widget.config.privacyPolicy = pCtrl.text.trim();
+              });
               widget.onDataChanged();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Legal Info Updated!')));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Legal info saved globally for all users.')));
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
             child: const Text('SAVE ALL CHANGES'),
@@ -3969,11 +4284,46 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ),
     );
   }
-  Widget _editorBox(String l, TextEditingController c, bool isDark) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(l, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDark ? Colors.white60 : Colors.grey)),
-    const SizedBox(height: 8),
-    TextField(controller: c, maxLines: 6, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(filled: true, fillColor: isDark ? const Color(0xFF1C1F2E) : Colors.white, border: const OutlineInputBorder())),
-  ]);
+  Widget _editorBox(String l, TextEditingController c, bool isDark) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: isDark ? const Color(0xFF121726) : const Color(0xFFF8FAFC),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(isDark ? 0.22 : 0.05),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF334155))),
+        const SizedBox(height: 10),
+        TextField(
+          controller: c,
+          maxLines: 6,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: isDark ? const Color(0xFF0F111A) : Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
+            ),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+              borderSide: BorderSide(color: Color(0xFF3B82F6), width: 1.4),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _adminInvest(bool isDark) {
     final n = TextEditingController(); final p = TextEditingController(); final r = TextEditingController();
@@ -4026,14 +4376,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
             children: [
               const Text('PAYMENT CONTROLS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
               const SizedBox(height: 15),
-              TextField(controller: cTag, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(labelText: 'Admin Cash App Tag', labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey), border: const OutlineInputBorder())),
+              TextField(controller: cTag, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Admin Cash App Tag', isDark: isDark)),
               const SizedBox(height: 15),
-              TextField(controller: bAddr, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(labelText: 'Admin Bitcoin Address', labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey), border: const OutlineInputBorder())),
+              TextField(controller: bAddr, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Admin Bitcoin Address', isDark: isDark)),
               const SizedBox(height: 15),
               ElevatedButton(
                 onPressed: () { 
-                  widget.config.officialCashApp = cTag.text; 
-                  widget.config.officialBitcoin = bAddr.text; 
+                  setState(() {
+                    widget.config.officialCashApp = cTag.text.trim(); 
+                    widget.config.officialBitcoin = bAddr.text.trim();
+                  });
                   widget.onDataChanged(); 
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment Settings Updated'))); 
                 }, 
@@ -4536,7 +4888,7 @@ class _WalletScreenState extends State<WalletScreen> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [10, 50, 100, 200, 300, 400].map((v) {
+              children: [10, 50, 100, 200, 300].map((v) {
                 final selected = _amt.text.trim() == v.toString();
                 return GestureDetector(
                   onTap: () => setState(() => _amt.text = v.toString()),
@@ -5247,9 +5599,11 @@ class InvestScreen extends StatelessWidget {
     final isExpired = active != null && active.daysLeft <= 0;
     
     bool isCurrent = active != null && active.name == p.name && price == active.amount && !isExpired;
-    bool canAfford = user.accountBalance >= diff;
     bool isUpgrade = !isExpired && active != null && price > active.amount;
     bool isDowngrade = !isExpired && active != null && price < active.amount;
+    final pendingSamePlan = user.pendingInvestmentName == p.name &&
+        user.pendingInvestmentAmount != null &&
+        (user.pendingInvestmentAmount! - price).abs() < 0.0001;
 
     String buttonText = "Invest Now";
     if (isCurrent) {
@@ -5258,6 +5612,9 @@ class InvestScreen extends StatelessWidget {
       buttonText = "Upgrade Now";
     } else if (isExpired && price == (active?.amount ?? 0)) {
       buttonText = "Renew Plan";
+    }
+    if (!isCurrent && !isDowngrade && pendingSamePlan) {
+      buttonText = "Waiting for Deposit";
     }
 
     final isDark = Theme.of(ctx).brightness == Brightness.dark;
@@ -5333,7 +5690,7 @@ class InvestScreen extends StatelessWidget {
             width: double.infinity,
             margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             child: ElevatedButton(
-              onPressed: (isCurrent || isDowngrade || !canAfford)
+              onPressed: (isCurrent || isDowngrade)
                   ? null 
                   : () => onInvest(p.name, price, p.roi),
               style: ElevatedButton.styleFrom(
@@ -5644,7 +6001,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: panelBorder),
+                ),
                 child: Row(
                   children: [
                     Expanded(
@@ -7262,6 +7623,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   final _cityC = TextEditingController();
   final _roomC = TextEditingController();
   final Set<String> _dismissedReceiptKeys = {};
+  final Set<String> _openedReceiptKeys = {};
 
   final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -7275,9 +7637,34 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   void initState() {
     super.initState();
     _selectedState = widget.user.state;
+    _ensureUniqueRegistryIds();
   }
 
-  void _registerMember() {
+  void _ensureUniqueRegistryIds() {
+    final seen = <String>{};
+    for (final u in widget.allUsers.where((u) => u.isEnrolledInRegistry)) {
+      final id = (u.registryId ?? '').trim();
+      if (id.isEmpty || seen.contains(id)) {
+        u.registryId = _generateUniqueRegistryId(u.state);
+      }
+      seen.add((u.registryId ?? '').trim());
+    }
+  }
+
+  String _generateUniqueRegistryId(String state) {
+    final prefix = state.length >= 2 ? state.substring(0, 2).toUpperCase() : 'ST';
+    final existing = widget.allUsers
+        .map((u) => (u.registryId ?? '').trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    for (int i = 0; i < 5000; i++) {
+      final candidate = '$prefix${math.Random().nextInt(8999999) + 1000000}';
+      if (!existing.contains(candidate)) return candidate;
+    }
+    return '$prefix${DateTime.now().microsecondsSinceEpoch}';
+  }
+
+  Future<void> _registerMember() async {
     final fullName = _fullNameC.text.trim();
     final dob = _dobC.text.trim();
     final idType = _idTypeC.text.trim();
@@ -7348,7 +7735,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       targetUser.state = _selectedState;
       targetUser.registryId = targetUser.registryId?.isNotEmpty == true
           ? targetUser.registryId
-          : '${_selectedState.substring(0, 2).toUpperCase()}${math.Random().nextInt(8999999) + 1000000}';
+          : _generateUniqueRegistryId(_selectedState);
+      if (widget.allUsers.any((u) => u != targetUser && (u.registryId ?? '').trim() == (targetUser.registryId ?? '').trim())) {
+        targetUser.registryId = _generateUniqueRegistryId(_selectedState);
+      }
 
       _fullNameC.clear();
       _dobC.clear();
@@ -7359,8 +7749,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       _roomC.clear();
       _activeTab = 2;
     });
+    await _persistRegistryMember(targetUser);
     widget.onDataChanged();
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Member Registered Successfully!'), backgroundColor: Colors.green));
+  }
+
+  Future<void> _persistRegistryMember(UserData member) async {
+    try {
+      await Supabase.instance.client
+          .from('users')
+          .upsert([Map<String, dynamic>.from(member.toJson())]);
+    } catch (e) {
+      debugPrint('Registry member upsert failed: $e');
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('all_users', jsonEncode(widget.allUsers.map((e) => e.toJson()).toList()));
+    } catch (e) {
+      debugPrint('Registry member local save failed: $e');
+    }
   }
 
   void _showStatePicker() {
@@ -7443,13 +7850,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
   }
 
-  Map<String, List<AppTransaction>> _groupContributionReceipts(List<AppTransaction> txs) {
+  Map<String, List<AppTransaction>> _groupContributionReceipts(List<AppTransaction> txs, {bool unreadOnly = false}) {
     final groups = <String, List<AppTransaction>>{};
     for (final t in txs) {
       final meta = _decodeContributionMeta(t);
       final key = (meta['campaignId'] ?? '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|${meta['state'] ?? widget.user.state}')
           .toString();
       if (_dismissedReceiptKeys.contains(key)) continue;
+      if (unreadOnly && _openedReceiptKeys.contains(key)) continue;
       groups.putIfAbsent(key, () => []).add(t);
     }
     return groups;
@@ -7638,17 +8046,39 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Manage Cities & Rooms',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Create or delete options used in enrollment dropdowns.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF151C2B) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFD1D5DB)),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Manage Cities & Rooms',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(height: 6),
+                            Text(
+                              'Create or delete options used in enrollment dropdowns.',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 18),
 
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF111724) : Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFD1D5DB)),
+                        ),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       const Text('Add City', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       Row(
@@ -7700,8 +8130,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           );
                         }).toList(),
                       ),
+                        ]),
+                      ),
 
                       const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF111724) : Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFD1D5DB)),
+                        ),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       const Text('Add Room', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       Row(
@@ -7752,6 +8192,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             },
                           );
                         }).toList(),
+                      ),
+                        ]),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Done'),
+                        ),
                       ),
                     ],
                   ),
@@ -7965,6 +8415,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final visible = _visibleContributionTx();
     final groups = _groupContributionReceipts(visible);
     final keys = groups.keys.toList();
+    setState(() {
+      _openedReceiptKeys.addAll(keys);
+    });
     String? selectedKey;
 
     showDialog(
@@ -8366,7 +8819,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Widget build(BuildContext context) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = const Color(0xFF6200EE);
-    final receiptGroups = _groupContributionReceipts(_visibleContributionTx());
+    final receiptGroups = _groupContributionReceipts(_visibleContributionTx(), unreadOnly: true);
     final receiptCount = receiptGroups.length;
 
     return Scaffold(
@@ -8802,22 +9255,45 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         Row(children: [
           const Text('Filter by City:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
           const SizedBox(width: 10),
-          Expanded(child: DropdownButton<String>(
-            isExpanded: true,
-            value: _selectedCity,
-            items: ['All Cities', ...widget.config.cities].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
-            onChanged: (v) => setState(() => _selectedCity = v!),
-          )),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white10 : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
+              ),
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: _selectedCity,
+                underline: const SizedBox.shrink(),
+                items: ['All Cities', ...widget.config.cities].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
+                onChanged: (v) => setState(() => _selectedCity = v!),
+              ),
+            ),
+          ),
         ]),
+        const SizedBox(height: 10),
         Row(children: [
           const Text('Filter by Room:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
           const SizedBox(width: 10),
-          Expanded(child: DropdownButton<String>(
-            isExpanded: true,
-            value: _selectedRoom,
-            items: ['All Rooms', ...widget.config.rooms].map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12)))).toList(),
-            onChanged: (v) => setState(() => _selectedRoom = v!),
-          )),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white10 : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
+              ),
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: _selectedRoom,
+                underline: const SizedBox.shrink(),
+                items: ['All Rooms', ...widget.config.rooms].map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12)))).toList(),
+                onChanged: (v) => setState(() => _selectedRoom = v!),
+              ),
+            ),
+          ),
         ]),
         
         const SizedBox(height: 15),
@@ -8873,7 +9349,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             _mBtn(Icons.monetization_on_outlined, 'Money', Colors.green, () => _showContributionDialog(u)),
             _mBtn(Icons.warning_amber_rounded, 'Claim', Colors.orange, () => _showClaimDialog(u)),
             _mBtn(Icons.undo_rounded, 'Clean', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
-            _mBtn(Icons.delete_outline_rounded, '', Colors.red, () {
+            _mBtn(Icons.delete_outline_rounded, '', Colors.red, () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Delete Member?'),
+                  content: Text('Remove ${u.fullName ?? u.username} from registry? This only happens when you confirm.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                    ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+                  ],
+                ),
+              );
+              if (confirm != true) return;
               setState(() => u.isEnrolledInRegistry = false);
               widget.onDataChanged();
             }),
