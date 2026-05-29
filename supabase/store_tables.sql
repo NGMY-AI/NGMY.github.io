@@ -19,8 +19,17 @@ create index if not exists store_inquiries_updated_at_idx on public.store_inquir
 alter table public.store_listings enable row level security;
 alter table public.store_inquiries enable row level security;
 
--- App uses anon key today; allow read/write for authenticated marketplace sync.
+-- App uses anon key today; allow read/write for all users (marketplace sync).
 -- Tighten policies later if you add per-user auth rules.
+
+drop policy if exists "store_listings_read" on public.store_listings;
+drop policy if exists "store_listings_write" on public.store_listings;
+drop policy if exists "store_listings_update" on public.store_listings;
+drop policy if exists "store_listings_delete" on public.store_listings;
+drop policy if exists "store_inquiries_read" on public.store_inquiries;
+drop policy if exists "store_inquiries_write" on public.store_inquiries;
+drop policy if exists "store_inquiries_update" on public.store_inquiries;
+drop policy if exists "store_inquiries_delete" on public.store_inquiries;
 
 create policy "store_listings_read" on public.store_listings for select using (true);
 create policy "store_listings_write" on public.store_listings for insert with check (true);

@@ -485,10 +485,27 @@ bool _mediaPostIsImage(MediaPost post) {
   return false;
 }
 
+Map<String, dynamic> _normalizeStoreListing(Map<String, dynamic> listing) {
+  final copy = Map<String, dynamic>.from(listing);
+  final email = (copy['sellerEmail'] ?? '').toString().toLowerCase().trim();
+  if (email.isNotEmpty) copy['sellerEmail'] = email;
+  if ((copy['status'] ?? '').toString().isEmpty) copy['status'] = 'active';
+  return copy;
+}
+
 Map<String, dynamic> _storeListingFromRow(Map<String, dynamic> row) {
   final data = row['data'];
-  if (data is Map) return Map<String, dynamic>.from(data);
-  return Map<String, dynamic>.from(row);
+  if (data is Map) return _normalizeStoreListing(Map<String, dynamic>.from(data));
+  if (data is String && data.trim().isNotEmpty) {
+    try {
+      final parsed = jsonDecode(data);
+      if (parsed is Map) return _normalizeStoreListing(Map<String, dynamic>.from(parsed));
+    } catch (_) {}
+  }
+  final flat = Map<String, dynamic>.from(row);
+  flat.remove('data');
+  flat.remove('updated_at');
+  return _normalizeStoreListing(flat);
 }
 
 Map<String, dynamic> _storeInquiryFromRow(Map<String, dynamic> row) {
@@ -569,16 +586,30 @@ Future<bool> _upsertStoreInquiryRowSafe(Map<String, dynamic> inquiry) async {
 }
 
 Future<List<Map<String, dynamic>>> _fetchStoreListingsFromSupabase() async {
-  try {
-    final rows = await Supabase.instance.client.from('store_listings').select();
-    if (rows is! List) return [];
-    return rows.map((e) => _storeListingFromRow(Map<String, dynamic>.from(e))).where((l) => (l['id'] ?? '').toString().isNotEmpty).toList();
-  } catch (e) {
-    if (!_isMissingTablePostgrestError(e, 'store_listings')) {
-      debugPrint('[store_listings] fetch error: $e');
+  Object? lastError;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    try {
+      final rows = await Supabase.instance.client
+          .from('store_listings')
+          .select()
+          .order('updated_at', ascending: false);
+      if (rows is! List) return [];
+      return rows
+          .map((e) => _storeListingFromRow(Map<String, dynamic>.from(e)))
+          .where((l) => (l['id'] ?? '').toString().isNotEmpty)
+          .toList();
+    } catch (e) {
+      lastError = e;
+      if (_isMissingTablePostgrestError(e, 'store_listings')) {
+        debugPrint('[store_listings] table missing — run supabase/store_tables.sql');
+        return [];
+      }
+      debugPrint('[store_listings] fetch attempt ${attempt + 1}: $e');
+      if (attempt < 2) await Future.delayed(Duration(milliseconds: 400 * (attempt + 1)));
     }
-    return [];
   }
+  debugPrint('[store_listings] fetch failed: $lastError');
+  return [];
 }
 
 Future<List<Map<String, dynamic>>> _fetchStoreInquiriesFromSupabase() async {
@@ -1325,15 +1356,17 @@ class _NGMYAppState extends State<NGMYApp> {
 
   void _mergeStoreListingsIntoConfig(List<Map<String, dynamic>> remote) {
     final byId = <String, Map<String, dynamic>>{};
-    for (final l in _config.storeListings) {
-      final id = (l['id'] ?? '').toString();
-      if (id.isNotEmpty) byId[id] = Map<String, dynamic>.from(l);
-    }
     for (final l in remote) {
       final id = (l['id'] ?? '').toString();
       if (id.isEmpty) continue;
+      byId[id] = _normalizeStoreListing(Map<String, dynamic>.from(l));
+    }
+    for (final l in _config.storeListings) {
+      final id = (l['id'] ?? '').toString();
+      if (id.isEmpty) continue;
       final existing = byId[id];
-      byId[id] = existing == null ? Map<String, dynamic>.from(l) : _pickNewerListing(existing, l);
+      final local = _normalizeStoreListing(Map<String, dynamic>.from(l));
+      byId[id] = existing == null ? local : _pickNewerListing(existing, local);
     }
     _config.storeListings = byId.values.toList();
   }
@@ -1384,6 +1417,7 @@ class _NGMYAppState extends State<NGMYApp> {
     _mergeStoreListingsIntoConfig(remoteListings);
     _mergeStoreInquiriesIntoConfig(remoteInquiries);
     _purgeExpiredSoldStoreListings();
+    if (mounted) setState(() {});
   }
 
   Future<void> _reloadMediaFromSupabase() async {
@@ -1789,7 +1823,7 @@ class _NGMYAppState extends State<NGMYApp> {
         setState(() => _config.storeListings.removeWhere((l) => (l['id'] ?? '').toString() == id));
         return;
       }
-      final listing = _storeListingFromRow(Map<String, dynamic>.from(payload.newRecord));
+      final listing = _normalizeStoreListing(_storeListingFromRow(Map<String, dynamic>.from(payload.newRecord)));
       final id = (listing['id'] ?? '').toString();
       if (id.isEmpty) return;
       setState(() {
@@ -2150,11 +2184,14 @@ class _NGMYAppState extends State<NGMYApp> {
         );
       }
 
+      await _reloadStoreFromSupabase();
       await _syncStoreToSupabase();
       final configRow = await _configRowForSupabaseUpsert(
         config: _config,
         isAdmin: _currentUser?.isAdmin ?? false,
       );
+      configRow['storeListings'] = _config.storeListings;
+      configRow['storeInquiries'] = _config.storeInquiries;
       await _safeUpsertRows('config', [configRow]);
 
       await prefs.setString('all_transactions', jsonEncode(_allTransactions.map((e) => e.toJson()).toList()));
@@ -3350,36 +3387,36 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         : (isLight ? const Color(0xFF2563EB) : const Color(0xFF60A5FA));
     final iconBox = isToday
         ? Container(
-            width: 22,
-            height: 22,
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
               color: const Color(0xFF22C55E),
-              borderRadius: BorderRadius.circular(6),
-              boxShadow: [BoxShadow(color: const Color(0xFF22C55E).withOpacity(0.22), blurRadius: 3, offset: const Offset(0, 1))],
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [BoxShadow(color: const Color(0xFF22C55E).withOpacity(0.22), blurRadius: 4, offset: const Offset(0, 2))],
             ),
-            child: const Icon(Icons.trending_up_rounded, color: Colors.white, size: 12),
+            child: const Icon(Icons.trending_up_rounded, color: Colors.white, size: 15),
           )
         : Container(
-            width: 22,
-            height: 22,
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
               ),
-              borderRadius: BorderRadius.circular(6),
-              boxShadow: [BoxShadow(color: const Color(0xFF6366F1).withOpacity(0.22), blurRadius: 3, offset: const Offset(0, 1))],
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [BoxShadow(color: const Color(0xFF6366F1).withOpacity(0.22), blurRadius: 4, offset: const Offset(0, 2))],
             ),
-            child: const Icon(Icons.savings_rounded, color: Color(0xFFFFD54F), size: 12),
+            child: const Icon(Icons.savings_rounded, color: Color(0xFFFFD54F), size: 15),
           );
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 13),
       decoration: BoxDecoration(
         color: Theme.of(ctx).cardColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: isLight ? const Color(0xFFE5E7EB) : Colors.white12, width: 1),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isLight ? 0.04 : 0.15), blurRadius: 6, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isLight ? 0.05 : 0.15), blurRadius: 8, offset: const Offset(0, 3))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3387,14 +3424,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Row(
             children: [
               iconBox,
-              const SizedBox(width: 6),
-              Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isLight ? const Color(0xFF6B7280) : Colors.white70)),
+              const SizedBox(width: 8),
+              Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isLight ? const Color(0xFF6B7280) : Colors.white70)),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           FittedBox(
             alignment: Alignment.centerLeft,
-            child: Text(value, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: valueColor)),
+            child: Text(value, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: valueColor)),
           ),
         ],
       ),
@@ -7468,11 +7505,16 @@ class LoanServiceScreen extends StatelessWidget {
   );
 }
 
+double _ngmyBottomNavScrollPadding(BuildContext context) {
+  return 25 + 75 + MediaQuery.of(context).padding.bottom + 36;
+}
+
 class InvestScreen extends StatelessWidget {
   final UserData user; final List<InvestmentPlan> plans; final Function(String, double, double, double) onInvest;
   const InvestScreen({super.key, required this.user, required this.plans, required this.onInvest});
   @override Widget build(BuildContext context) {
-    return Scaffold(body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 150), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    final bottomPad = _ngmyBottomNavScrollPadding(context);
+    return Scaffold(body: SafeArea(child: SingleChildScrollView(padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPad), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const FloatingTitle(title: 'INVESTMENT PLANS'), const SizedBox(height: 20),
       if (user.activeInvestment != null) ...[const Text('ACTIVE ASSET', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)), const SizedBox(height: 15), _activeCard(context, user.activeInvestment!, user), const SizedBox(height: 30)],
       const Text('AVAILABLE PLANS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)), const SizedBox(height: 15),
@@ -7680,10 +7722,6 @@ class InvestScreen extends StatelessWidget {
       buttonText = "Waiting for Deposit";
     }
 
-    final isDark = Theme.of(ctx).brightness == Brightness.dark;
-    final textColor = isDark ? const Color(0xFFE5E7EB) : const Color(0xFF0F172A);
-    final subColor = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF475569);
-
     final isRenewSamePlan = isExpired && active != null && (price - active.amount).abs() < 0.0001;
     final requiredPayment = isRenewSamePlan ? price : math.max(0.0, diff);
     final canBuyNow = !isCurrent && !isDowngrade && !pendingSamePlan && requiredPayment > 0 && user.accountBalance >= requiredPayment;
@@ -7706,157 +7744,143 @@ class InvestScreen extends StatelessWidget {
 
     final disableButton = isCurrent || isDowngrade || pendingSamePlan;
 
-    final cardGradient = isDark
-        ? LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isCurrent
-                ? const [Color(0xFF384252), Color(0xFF1F2732)]
-                : isUpgrade
-                    ? const [Color(0xFF3A3446), Color(0xFF1F1B28)]
-                    : const [Color(0xFF2A2F37), Color(0xFF161B22)],
-          )
-        : LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isCurrent
-                ? const [Color(0xFFE7EEF8), Color(0xFFDCE5F2)]
-                : isUpgrade
-                    ? const [Color(0xFFF6EEF9), Color(0xFFEFE7F8)]
-                    : const [Color(0xFFF9F7F3), Color(0xFFEDEFF4)],
-          );
-    final cardBorderColor = isDark ? const Color(0xFF3F4754) : const Color(0xFFD7DEE8);
-    final accentShadow = isDark ? const Color(0xFF0B0F14) : const Color(0xFF94A3B8);
+    const textColor = Color(0xFF1A1206);
+    const subColor = Color(0xFF4A3A10);
+    const cardBorderColor = Color(0xFFFFF3B0);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      child: AspectRatio(
-        aspectRatio: 1.42,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            gradient: cardGradient,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: cardBorderColor, width: 1.3),
-            boxShadow: [
-              BoxShadow(
-                color: accentShadow.withOpacity(isDark ? 0.32 : 0.2),
-                blurRadius: isDark ? 18 : 14,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
-                blurRadius: 1,
-                offset: const Offset(0, -1),
-              ),
+      margin: const EdgeInsets.only(bottom: 14),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 11, 12, 10),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF3D2E08), Color(0xFF8B6914), Color(0xFFFFD700), Color(0xFFD4AF37), Color(0xFF5C4A0E)],
+          stops: [0.0, 0.28, 0.55, 0.82, 1.0],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cardBorderColor, width: 2),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFFFFD700).withOpacity(0.28), blurRadius: 14, offset: const Offset(0, 6)),
+          BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _cardChip(leader: true),
+              const Spacer(),
+              _tapPayBadge(ctx, forceLight: true),
             ],
           ),
-          child: Stack(
+          const SizedBox(height: 5),
+          const Text('NGMY GOLD INVEST', style: TextStyle(color: Color(0xFFFFF8DC), fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 2),
+          CopyOnHoldText(p.name, style: const TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 3),
+          CopyOnHoldText(
+            _pseudoCardNumber(price),
+            style: const TextStyle(color: textColor, fontWeight: FontWeight.w700, fontSize: 11, letterSpacing: 0.8),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 5),
+          Row(
             children: [
-              Positioned(
-                right: -18,
-                bottom: -22,
-                child: Container(
-                  width: 110,
-                  height: 110,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: (isDark ? Colors.white : Colors.black).withOpacity(0.04),
-                  ),
+              _planTagGold('${(InvestmentPlan.fixedRoi * 100).toStringAsFixed(2)}%'),
+              const SizedBox(width: 5),
+              _planTagGold('261d'),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('PLAN VALUE', style: TextStyle(color: subColor, fontSize: 8, fontWeight: FontWeight.w700)),
+                    CopyOnHoldText('\$${formatCurrency(price)}', style: const TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      _cardChip(),
-                      const Spacer(),
-                      _tapPayBadge(ctx),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text('NGMY INVEST', style: TextStyle(color: subColor, fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 2),
-                  CopyOnHoldText(p.name, style: TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 15), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 4),
-                  CopyOnHoldText(
-                    _pseudoCardNumber(price),
-                    style: TextStyle(color: textColor.withOpacity(0.92), fontWeight: FontWeight.w700, fontSize: 12, letterSpacing: 0.8),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      _tag(ctx, '${(InvestmentPlan.fixedRoi * 100).toStringAsFixed(2)}%'),
-                      const SizedBox(width: 6),
-                      _tag(ctx, '261d'),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('PLAN VALUE', style: TextStyle(color: subColor, fontSize: 8)),
-                            CopyOnHoldText('\$${formatCurrency(price)}', style: TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 18), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text('INVESTMENT', style: TextStyle(color: subColor, fontSize: 8)),
-                          Text(isCurrent ? 'ACTIVE' : (isUpgrade ? 'UPGRADE' : 'AVAILABLE'), style: TextStyle(color: textColor, fontWeight: FontWeight.w800, fontSize: 10)),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Container(height: 1, color: cardBorderColor.withOpacity(0.65)),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(child: _infoBox(ctx, 'Daily', '\$${formatCurrency(daily)}', compact: true)),
-                      const SizedBox(width: 6),
-                      Expanded(child: _infoBox(ctx, 'Total', '\$${formatCurrency(total)}', compact: true)),
-                      const SizedBox(width: 6),
-                      Expanded(child: _infoBox(ctx, 'Days', '261', compact: true)),
-                    ],
-                  ),
-                  const Spacer(),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 42,
-                    child: ElevatedButton(
-                      onPressed: disableButton
-                          ? null
-                          : () => onInvest(p.name, price, InvestmentPlan.fixedRoi, requiredPayment),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isDark ? const Color(0xFFC0A56E) : const Color(0xFF1E293B),
-                        foregroundColor: isDark ? const Color(0xFF111827) : Colors.white,
-                        disabledBackgroundColor: (isDark ? const Color(0xFF71717A) : const Color(0xFF94A3B8)).withOpacity(0.45),
-                        disabledForegroundColor: isDark ? const Color(0xFFE5E7EB) : Colors.white70,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        elevation: 0,
-                      ),
-                      child: Text(buttonText.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                    ),
-                  ),
-                ],
+              Text(
+                isCurrent ? 'ACTIVE' : (isUpgrade ? 'UPGRADE' : 'AVAILABLE'),
+                style: const TextStyle(color: textColor, fontWeight: FontWeight.w800, fontSize: 9),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 5),
+          Container(height: 1, color: subColor.withOpacity(0.35)),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              Expanded(child: _planInfoBoxGold('Daily', '\$${formatCurrency(daily)}')),
+              const SizedBox(width: 5),
+              Expanded(child: _planInfoBoxGold('Total', '\$${formatCurrency(total)}')),
+              const SizedBox(width: 5),
+              Expanded(child: _planInfoBoxGold('Days', '261')),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: ElevatedButton(
+              onPressed: disableButton ? null : () => onInvest(p.name, price, InvestmentPlan.fixedRoi, requiredPayment),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A1206),
+                foregroundColor: const Color(0xFFFFF8DC),
+                disabledBackgroundColor: const Color(0xFF4A3A10).withOpacity(0.45),
+                disabledForegroundColor: const Color(0xFFFFF8DC).withOpacity(0.55),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 2,
+              ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(buttonText.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  Widget _planTagGold(String text) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      color: const Color(0xFF1A1206).withOpacity(0.12),
+      borderRadius: BorderRadius.circular(5),
+      border: Border.all(color: const Color(0xFF4A3A10).withOpacity(0.35)),
+    ),
+    child: Text(text, style: const TextStyle(color: Color(0xFF1A1206), fontSize: 9, fontWeight: FontWeight.w800)),
+  );
+
+  Widget _planInfoBoxGold(String label, String value) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+    decoration: BoxDecoration(
+      color: const Color(0xFF1A1206).withOpacity(0.08),
+      borderRadius: BorderRadius.circular(7),
+      border: Border.all(color: const Color(0xFF4A3A10).withOpacity(0.25)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: const Color(0xFF4A3A10).withOpacity(0.9), fontSize: 7, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 1),
+        FittedBox(
+          alignment: Alignment.centerLeft,
+          child: Text(value, style: const TextStyle(color: Color(0xFF1A1206), fontWeight: FontWeight.w800, fontSize: 10)),
+        ),
+      ],
+    ),
+  );
 
   Widget _tag(BuildContext ctx, String text) {
     final isDark = Theme.of(ctx).brightness == Brightness.dark;
@@ -12772,7 +12796,14 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 3, vsync: this)..addListener(() { if (mounted) setState(() {}); });
+    _tabCtrl = TabController(length: 3, vsync: this)
+      ..addListener(() {
+        if (!mounted) return;
+        setState(() {});
+        if (!_tabCtrl.indexIsChanging && _tabCtrl.index == 0) {
+          unawaited(_refreshStoreListingsFromCloud());
+        }
+      });
     widget.config.storeListings = List<Map<String, dynamic>>.from(
       widget.config.storeListings.map((e) => Map<String, dynamic>.from(e)),
     );
@@ -12789,15 +12820,17 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   void _mergeRemoteStoreListings(List<Map<String, dynamic>> remote) {
     final byId = <String, Map<String, dynamic>>{};
-    for (final l in widget.config.storeListings) {
-      final id = (l['id'] ?? '').toString();
-      if (id.isNotEmpty) byId[id] = Map<String, dynamic>.from(l);
-    }
     for (final l in remote) {
       final id = (l['id'] ?? '').toString();
       if (id.isEmpty) continue;
+      byId[id] = _normalizeStoreListing(Map<String, dynamic>.from(l));
+    }
+    for (final l in widget.config.storeListings) {
+      final id = (l['id'] ?? '').toString();
+      if (id.isEmpty) continue;
       final existing = byId[id];
-      byId[id] = existing == null ? Map<String, dynamic>.from(l) : _pickNewerListing(existing, l);
+      final local = _normalizeStoreListing(Map<String, dynamic>.from(l));
+      byId[id] = existing == null ? local : _pickNewerListing(existing, local);
     }
     widget.config.storeListings = byId.values.toList();
   }
@@ -12805,7 +12838,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   Future<void> _refreshStoreListingsFromCloud() async {
     final remote = await _fetchStoreListingsFromSupabase();
     _mergeRemoteStoreListings(remote);
-    widget.onDataChanged();
+    if (mounted) setState(() {});
   }
 
   void _purgeExpiredSoldListingsLocal() {
@@ -13700,7 +13733,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                               if (!ctx.mounted) return;
                               final listing = <String, dynamic>{
                                 'id': DateTime.now().microsecondsSinceEpoch.toString(),
-                                'sellerEmail': widget.user.email,
+                                'sellerEmail': widget.user.email.toLowerCase().trim(),
                                 'sellerName': widget.user.username,
                                 'title': title,
                                 'description': desc,
@@ -13718,12 +13751,36 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                 'updatedAt': now,
                                 'soldAt': '',
                               };
-                              _listings.add(listing);
-                              await _upsertStoreListingRowSafe(listing);
+                              final normalized = _normalizeStoreListing(listing);
+                              final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == normalized['id']);
+                              if (idx >= 0) {
+                                _listings[idx] = normalized;
+                              } else {
+                                _listings.add(normalized);
+                              }
+                              final cloudOk = await _upsertStoreListingRowSafe(normalized);
+                              if (!cloudOk) {
+                                if (!ctx.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Listed on this device only. Run supabase/store_tables.sql in Supabase so others can see it.'),
+                                    backgroundColor: Color(0xFFEF4444),
+                                  ),
+                                );
+                              }
+                              await _refreshStoreListingsFromCloud();
                               _save();
                               Navigator.pop(ctx);
                               if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item listed and saved to NGMY cloud.')));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    cloudOk
+                                        ? 'Item is live in the shop for all NGMY users.'
+                                        : 'Item saved locally. Fix Supabase store tables to sync worldwide.',
+                                  ),
+                                ),
+                              );
                             },
                             icon: const Icon(Icons.rocket_launch_rounded, color: Colors.white),
                             label: const Text('Publish Listing', style: TextStyle(fontWeight: FontWeight.w900)),
