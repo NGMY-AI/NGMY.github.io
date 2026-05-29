@@ -531,6 +531,7 @@ class _NGMYAppState extends State<NGMYApp> {
   final Set<String> _disabledSupabaseTables = {};
   final Set<String> _seenRealtimeAnnouncementIds = {};
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  OverlayEntry? _inAppNoticeEntry;
   bool _notificationsReady = false;
   int _nextNotificationId = 1;
 
@@ -548,6 +549,7 @@ class _NGMYAppState extends State<NGMYApp> {
   @override void dispose() {
     try { _autoThemeTimer?.cancel(); } catch (_) {}
     try { _configRefreshTimer?.cancel(); } catch (_) {}
+    try { _inAppNoticeEntry?.remove(); } catch (_) {}
     try { _usersChannel?.unsubscribe(); } catch (_) {}
     try { _transactionsChannel?.unsubscribe(); } catch (_) {}
     try { _mediaChannel?.unsubscribe(); } catch (_) {}
@@ -801,13 +803,58 @@ class _NGMYAppState extends State<NGMYApp> {
       }
     }
 
+    _showModernInAppNotice(title: title, body: body);
+  }
+
+  void _showModernInAppNotice({
+    required String title,
+    required String body,
+    bool isError = false,
+  }) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$title\n$body'),
-        duration: const Duration(seconds: 3),
+    _inAppNoticeEntry?.remove();
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final accent = isError ? const Color(0xFFEF4444) : const Color(0xFF22D3EE);
+    _inAppNoticeEntry = OverlayEntry(
+      builder: (_) => IgnorePointer(
+        child: SafeArea(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0B1020).withOpacity(0.92),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: accent.withOpacity(0.55)),
+                boxShadow: [BoxShadow(color: accent.withOpacity(0.28), blurRadius: 16, offset: const Offset(0, 6))],
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.notifications_active_rounded, color: accent),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 2),
+                        Text(body, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
+    overlay.insert(_inAppNoticeEntry!);
+    Future.delayed(const Duration(seconds: 4), () {
+      _inAppNoticeEntry?.remove();
+      _inAppNoticeEntry = null;
+    });
   }
 
   Future<void> _notifyTransactionEvent(AppTransaction t, {bool statusChanged = false}) async {
@@ -2135,57 +2182,62 @@ class _MainScreenState extends State<MainScreen> {
             ),
       child: SelectionArea(
         child: Scaffold(
-          extendBody: true,
-          body: pages[_idx],
-          bottomNavigationBar: Material(
-            color: Colors.transparent,
-            child: SafeArea(
-              top: false,
-              minimum: const EdgeInsets.fromLTRB(15, 0, 15, 14),
-              child: Container(
-                height: 75,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withOpacity(0.78),
-                  borderRadius: BorderRadius.circular(35),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5),
+          body: Stack(
+            children: [
+              pages[_idx],
+              Positioned(
+                left: 15,
+                right: 15,
+                bottom: 25,
+                child: SafeArea(
+                  top: false,
+                  child: Container(
+                    height: 75,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface.withOpacity(0.78),
+                      borderRadius: BorderRadius.circular(35),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 15,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                      border: Border.all(color: Colors.white.withOpacity(0.10)),
                     ),
-                  ],
-                  border: Border.all(color: Colors.white.withOpacity(0.10)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _nav(0, Icons.home_rounded),
-                    _nav(1, Icons.trending_up_rounded),
-                    _nav(2, Icons.account_balance_wallet_rounded),
-                    _navC(3),
-                    _nav(4, Icons.play_circle_fill_rounded),
-                    _nav(5, Icons.bar_chart_rounded),
-                    _nav(6, Icons.person_rounded),
-                  ],
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _nav(0, Icons.home_rounded),
+                        _nav(1, Icons.trending_up_rounded),
+                        _nav(2, Icons.account_balance_wallet_rounded),
+                        _navC(3),
+                        _nav(4, Icons.play_circle_fill_rounded),
+                        _nav(5, Icons.bar_chart_rounded),
+                        _nav(6, Icons.person_rounded),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
   }
-  Widget _nav(int i, IconData icon) => SizedBox(
-    width: 48,
-    height: 48,
-    child: IconButton(
-      padding: EdgeInsets.zero,
-      splashRadius: 24,
-      onPressed: () => setState(() => _idx = i),
-      icon: Icon(
-        icon,
-        color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey,
-        size: 28,
+  Widget _nav(int i, IconData icon) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: () => setState(() => _idx = i),
+    child: SizedBox(
+      width: 48,
+      height: 48,
+      child: Center(
+        child: Icon(
+          icon,
+          color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey,
+          size: 28,
+        ),
       ),
     ),
   );
@@ -10448,7 +10500,8 @@ class MediaHubScreen extends StatefulWidget {
 class _MediaHubScreenState extends State<MediaHubScreen> {
   final _captionController = TextEditingController();
   bool _isPosting = false;
-  final int _maxActivePostsPerUser = 3;
+  final int _maxPostsPerWeek = 3;
+  OverlayEntry? _noticeEntry;
 
   @override
   void initState() {
@@ -10523,22 +10576,85 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
         return 'image/webp';
       case 'gif':
         return 'image/gif';
+      case 'heic':
+        return 'image/heic';
+      case 'heif':
+        return 'image/heif';
       default:
         return 'image/jpeg';
     }
   }
 
-  int _activePostsForCurrentUser() {
-    return widget.allMedia.where((m) => m.userEmail == widget.user.email && !_isExpired(m)).length;
+  int _weeklyPostsForCurrentUser() {
+    final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+    return widget.allMedia.where((m) {
+      final sameUser = m.userEmail.toLowerCase().trim() == widget.user.email.toLowerCase().trim();
+      return sameUser && m.timestamp.isAfter(weekAgo);
+    }).length;
+  }
+
+  Future<void> _ensureSupabaseSession() async {
+    final auth = Supabase.instance.client.auth;
+    if (auth.currentSession != null) return;
+    try {
+      await auth.signInAnonymously();
+    } catch (e) {
+      debugPrint('Anonymous sign-in warning: $e');
+    }
+  }
+
+  void _showGlassNotice(String title, String body, {bool isError = false}) {
+    if (!mounted) return;
+    _noticeEntry?.remove();
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final accent = isError ? const Color(0xFFEF4444) : const Color(0xFF22D3EE);
+    _noticeEntry = OverlayEntry(
+      builder: (_) => IgnorePointer(
+        child: SafeArea(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0B1020).withOpacity(0.92),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: accent.withOpacity(0.55)),
+                boxShadow: [BoxShadow(color: accent.withOpacity(0.28), blurRadius: 16, offset: const Offset(0, 6))],
+              ),
+              child: Row(
+                children: [
+                  Icon(isError ? Icons.error_outline_rounded : Icons.notifications_active_rounded, color: accent),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 2),
+                        Text(body, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(_noticeEntry!);
+    Future.delayed(const Duration(seconds: 4), () {
+      _noticeEntry?.remove();
+      _noticeEntry = null;
+    });
   }
 
   Future<void> _pickAndPost({required bool isVideo}) async {
     if (_isPosting) return;
-    if (_activePostsForCurrentUser() >= _maxActivePostsPerUser) {
+    if (_weeklyPostsForCurrentUser() >= _maxPostsPerWeek) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You can only keep 3 active media posts at once. Delete/expire one first.')),
-        );
+        _showGlassNotice('Upload limit reached', 'You can upload only 3 posts per 7 days.', isError: true);
       }
       return;
     }
@@ -10549,32 +10665,39 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     if (media == null) return;
 
     setState(() => _isPosting = true);
+    await _ensureSupabaseSession();
 
     final fallbackExt = isVideo ? 'mp4' : 'jpg';
     final ext = media.path.contains('.') ? media.path.split('.').last.toLowerCase() : fallbackExt;
+    final bytes = await media.readAsBytes();
     String mediaUrl = media.path;
+    bool uploadedToCloud = false;
     try {
-      final bytes = await media.readAsBytes();
       final fileName = '${DateTime.now().microsecondsSinceEpoch}_${widget.user.email.hashCode}.$ext';
       final storagePath = 'uploads/$fileName';
+      
+      // Attempt upload
       await Supabase.instance.client.storage.from('media').uploadBinary(
         storagePath,
         bytes,
         fileOptions: FileOptions(
-          upsert: true,
+          upsert: false,
           contentType: isVideo ? _mimeForVideoExt(ext) : _mimeForImageExt(ext),
         ),
       );
       mediaUrl = 'supabase://media/$storagePath';
+      uploadedToCloud = true;
     } catch (e) {
       debugPrint('Media upload error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Upload failed. Check Media bucket/policies and try again.')),
-        );
+      if (kIsWeb) {
+        final mime = isVideo ? _mimeForVideoExt(ext) : _mimeForImageExt(ext);
+        mediaUrl = 'data:$mime;base64,${base64Encode(bytes)}';
+        _showGlassNotice('Cloud blocked', 'Posted locally in browser mode.', isError: true);
+      } else {
+        // On mobile/desktop we can use the local path if cloud fails
+        mediaUrl = media.path;
+        _showGlassNotice('Cloud unavailable', 'Posted locally on this device.', isError: true);
       }
-      if (mounted) setState(() => _isPosting = false);
-      return;
     }
 
     final post = MediaPost(
@@ -10587,23 +10710,19 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       timestamp: DateTime.now(),
     );
 
-    final saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
-    if (!saved) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Media saved to storage, but database save failed.')),
-        );
-      }
-      if (mounted) setState(() => _isPosting = false);
-      return;
-    }
-
+    await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+    
     widget.onPost(post);
     _captionController.clear();
+    
     if (mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${isVideo ? 'Video' : 'Photo'} posted successfully.')),
+      if (Navigator.of(context).canPop()) Navigator.pop(context);
+      _showGlassNotice(
+        uploadedToCloud ? 'Post uploaded' : 'Post created',
+        uploadedToCloud
+            ? '${isVideo ? 'Video' : 'Photo'} shared successfully.'
+            : '${isVideo ? 'Video' : 'Photo'} saved locally on this device.',
+        isError: !uploadedToCloud && !kIsWeb,
       );
     }
     if (mounted) setState(() => _isPosting = false);
@@ -10706,6 +10825,13 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _noticeEntry?.remove();
+    _captionController.dispose();
+    super.dispose();
   }
 
   @override
@@ -10834,7 +10960,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   VideoPlayerController? _controller;
   bool _isInitialized = false;
   bool _hasError = false;
-  String _errorText = 'Unable to load this content.';
+  String _errorText = 'Unable to load media.';
   String? _resolvedMediaUrl;
   ImageProvider? _authorImage;
   bool _loadingMedia = true;
@@ -10852,8 +10978,12 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
       final ref = _parseSupabaseRef(rawUrl);
       if (ref != null) {
         try {
-          return await Supabase.instance.client.storage.from(ref.bucket).createSignedUrl(ref.path, 60 * 60 * 24 * 30);
+          // Try signed URL first (supports private buckets)
+          return await Supabase.instance.client.storage
+              .from(ref.bucket)
+              .createSignedUrl(ref.path, 60 * 60 * 24 * 7);
         } catch (_) {
+          // Fallback to public URL (supports public buckets)
           return Supabase.instance.client.storage.from(ref.bucket).getPublicUrl(ref.path);
         }
       }
@@ -10862,23 +10992,57 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   }
 
   Future<void> _initializePlayer(String resolvedUrl) async {
+    if (_controller != null) {
+      await _controller!.dispose();
+      _controller = null;
+    }
     try {
       if (resolvedUrl.startsWith('http')) {
         _controller = VideoPlayerController.networkUrl(Uri.parse(resolvedUrl));
-      } else {
+      } else if (!kIsWeb) {
         _controller = VideoPlayerController.file(File(resolvedUrl));
+      } else {
+        throw Exception('Invalid media path for web.');
       }
-      await _controller!.initialize().timeout(const Duration(seconds: 12));
+      
+      await _controller!.initialize().timeout(const Duration(seconds: 15));
       if (!mounted) return;
       _controller!.setLooping(true);
-      setState(() => _isInitialized = true);
+      setState(() {
+        _isInitialized = true;
+        _hasError = false;
+        _loadingMedia = false;
+      });
     } catch (e) {
+      debugPrint('Media init error: $e');
       if (!mounted) return;
       setState(() {
         _hasError = true;
+        _loadingMedia = false;
         _errorText = 'Unable to load this media.';
       });
-      debugPrint('Video init error: $e');
+    }
+  }
+
+  Future<void> _prepareMedia() async {
+    if (!mounted) return;
+    setState(() {
+      _loadingMedia = true;
+      _hasError = false;
+    });
+
+    final avatar = await _profileImageProviderForEmail(widget.post.userEmail);
+    if (!mounted) return;
+    setState(() => _authorImage = avatar);
+
+    final resolved = await _resolveMediaUrl(widget.post.videoUrl);
+    if (!mounted) return;
+    _resolvedMediaUrl = resolved;
+
+    if (widget.post.contentType == 'video') {
+      await _initializePlayer(resolved);
+    } else {
+      setState(() => _loadingMedia = false);
     }
   }
 
@@ -10913,18 +11077,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   Future<void> _persistPostChange() async {
     await _upsertMediaRowSafe(Map<String, dynamic>.from(widget.post.toJson()));
     widget.onChanged();
-  }
-
-  Future<void> _prepareMedia() async {
-    final resolved = await _resolveMediaUrl(widget.post.videoUrl);
-    final avatar = await _profileImageProviderForEmail(widget.post.userEmail);
-    if (!mounted) return;
-    _resolvedMediaUrl = resolved;
-    _authorImage = avatar;
-    if (widget.post.contentType == 'video') {
-      await _initializePlayer(resolved);
-    }
-    if (mounted) setState(() => _loadingMedia = false);
   }
 
   Future<void> _toggleLike() async {
@@ -11081,7 +11233,16 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isVideo = widget.post.contentType != 'image';
+    
+    // Improved detection: if contentType is 'image' OR URL ends in common image extensions
+    final url = widget.post.videoUrl.toLowerCase();
+    bool isImage = widget.post.contentType == 'image' || 
+                 url.endsWith('.jpg') || url.endsWith('.jpeg') || 
+                 url.endsWith('.png') || url.endsWith('.gif') || 
+                 url.endsWith('.webp') || url.endsWith('.heic');
+    
+    final isVideo = !isImage;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
@@ -11161,9 +11322,23 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                           : isVideo
                           ? (_hasError
                               ? Center(
-                                  child: Text(
-                                    _errorText,
-                                    style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.error_outline_rounded, color: Colors.white38, size: 40),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        _errorText,
+                                        style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      TextButton.icon(
+                                        onPressed: _prepareMedia,
+                                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                                        label: const Text('Retry'),
+                                        style: TextButton.styleFrom(foregroundColor: Colors.white),
+                                      ),
+                                    ],
                                   ),
                                 )
                               : (_isInitialized && _controller != null)
@@ -11184,7 +11359,17 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                                   fit: BoxFit.cover,
                                   width: double.infinity,
                                   gaplessPlayback: true,
-                                  errorBuilder: (_, __, ___) => const Center(child: Text('Unable to load image.', style: TextStyle(color: Colors.white70))),
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.broken_image_outlined, color: Colors.white38, size: 40),
+                                        const SizedBox(height: 8),
+                                        const Text('Unable to load image.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                                        TextButton(onPressed: _prepareMedia, child: const Text('Retry', style: TextStyle(color: Colors.white))),
+                                      ],
+                                    ),
+                                  ),
                                 );
                               }
                               if (!kIsWeb) {
@@ -11192,7 +11377,17 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                                   File(resolved),
                                   fit: BoxFit.cover,
                                   width: double.infinity,
-                                  errorBuilder: (_, __, ___) => const Center(child: Text('Unable to load image.', style: TextStyle(color: Colors.white70))),
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.broken_image_outlined, color: Colors.white38, size: 40),
+                                        const SizedBox(height: 8),
+                                        const Text('Local image missing.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                                        TextButton(onPressed: _prepareMedia, child: const Text('Retry', style: TextStyle(color: Colors.white))),
+                                      ],
+                                    ),
+                                  ),
                                 );
                               }
                               return const Center(child: Text('Unable to load image.', style: TextStyle(color: Colors.white70)));
