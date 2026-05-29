@@ -162,6 +162,11 @@ class AppConfig {
   String helpPhone;
   String helpScopeType; // all, city, room
   String helpScopeValue;
+  String helpCampaignId;
+  String helpCampaignStartedAt;
+  List<Map<String, dynamic>> helpCampaignClosures;
+  List<String> openedContributionReceiptKeys;
+  List<String> dismissedContributionReceiptKeys;
   List<Map<String, dynamic>> jobPosts;
   List<Map<String, dynamic>> jobWorkerApplications;
 
@@ -183,6 +188,11 @@ class AppConfig {
     this.helpPhone = '',
     this.helpScopeType = 'all',
     this.helpScopeValue = '',
+    this.helpCampaignId = '',
+    this.helpCampaignStartedAt = '',
+    this.helpCampaignClosures = const [],
+    this.openedContributionReceiptKeys = const [],
+    this.dismissedContributionReceiptKeys = const [],
     this.jobPosts = const [],
     this.jobWorkerApplications = const [],
   });
@@ -204,6 +214,11 @@ class AppConfig {
     'helpPhone': helpPhone,
     'helpScopeType': helpScopeType,
     'helpScopeValue': helpScopeValue,
+    'helpCampaignId': helpCampaignId,
+    'helpCampaignStartedAt': helpCampaignStartedAt,
+    'helpCampaignClosures': helpCampaignClosures,
+    'openedContributionReceiptKeys': openedContributionReceiptKeys,
+    'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys,
     'jobPosts': jobPosts,
     'jobWorkerApplications': jobWorkerApplications,
   };
@@ -225,6 +240,11 @@ class AppConfig {
     helpPhone: json['helpPhone'] ?? '',
     helpScopeType: json['helpScopeType'] ?? 'all',
     helpScopeValue: json['helpScopeValue'] ?? '',
+    helpCampaignId: json['helpCampaignId'] ?? '',
+    helpCampaignStartedAt: json['helpCampaignStartedAt'] ?? '',
+    helpCampaignClosures: List<Map<String, dynamic>>.from((json['helpCampaignClosures'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
+    openedContributionReceiptKeys: List<String>.from(json['openedContributionReceiptKeys'] ?? const []),
+    dismissedContributionReceiptKeys: List<String>.from(json['dismissedContributionReceiptKeys'] ?? const []),
     jobPosts: List<Map<String, dynamic>>.from((json['jobPosts'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     jobWorkerApplications: List<Map<String, dynamic>>.from((json['jobWorkerApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
   );
@@ -2198,6 +2218,39 @@ class _MainScreenState extends State<MainScreen> {
         if (cost <= 0) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('This plan is already active.')),
+          );
+          return;
+        }
+        if (widget.user.accountBalance >= cost) {
+          setState(() {
+            widget.user.accountBalance -= cost;
+            widget.user.activeInvestment = ActiveInvestment(
+              name: n,
+              amount: p,
+              dailyROI: r,
+              purchaseDate: DateTime.now(),
+              daysClockedIn: 0,
+              totalEarned: 0.0,
+            );
+            widget.user.pendingInvestmentName = null;
+            widget.user.pendingInvestmentAmount = null;
+            widget.user.pendingInvestmentRoi = null;
+          });
+          widget.onAddTransaction(
+            AppTransaction(
+              id: 'invest_buy_${DateTime.now().microsecondsSinceEpoch}',
+              userEmail: widget.user.email,
+              amount: cost,
+              type: TransactionType.adminRemove,
+              method: PaymentMethod.system,
+              sourceDetails: 'Direct investment buy: $n',
+              status: TransactionStatus.approved,
+              timestamp: DateTime.now(),
+            ),
+          );
+          widget.onDataChanged();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Plan purchased: $n')),
           );
           return;
         }
@@ -4297,23 +4350,184 @@ class _AdminDashboardState extends State<AdminDashboard> {
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
+          crossAxisCount: 3,
           mainAxisSpacing: 15,
           crossAxisSpacing: 15,
-          childAspectRatio: 1.4,
+          childAspectRatio: 1.1,
           children: [
             _menuFrame('Loan Center', Icons.handshake_outlined, Colors.teal, () => _showLoanAdmin(isDark), isDark),
             _menuFrame('Announcements', Icons.campaign_outlined, Colors.orange, () => _showAnnouncementAdmin(isDark), isDark),
-            _menuFrame('App Status', Icons.settings_suggest_rounded, Colors.blueGrey, () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('System components running normally.')));
-            }, isDark),
-            // Add other non-tab services here as needed
+            _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => _showJobApplicationsAdmin(isDark), isDark),
+            _menuFrame('Users', Icons.people_alt_outlined, Colors.blue, () => setState(() => _idx = 1), isDark),
+            _menuFrame('Plans', Icons.trending_up_rounded, Colors.green, () => setState(() => _idx = 2), isDark),
+            _menuFrame('Wallet', Icons.account_balance_wallet_outlined, Colors.pink, () => setState(() => _idx = 4), isDark),
           ],
         ),
         const SizedBox(height: 50),
       ],
     ),
   );
+
+  void _showJobApplicationsAdmin(bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setST) {
+          final apps = List<Map<String, dynamic>>.from(
+            widget.config.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)),
+          )..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+          final pendingApps = apps.where((a) => (a['status'] ?? 'pending').toString() == 'pending').toList();
+
+          String fmt(String raw) {
+            if (raw.trim().isEmpty) return 'N/A';
+            try {
+              final d = DateTime.parse(raw).toLocal();
+              return '${d.month}/${d.day}/${d.year} ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+            } catch (_) {
+              return raw;
+            }
+          }
+
+          return Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+              margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F111A) : Colors.white,
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+              ),
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+              child: Column(
+                children: [
+                  Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10))),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(Icons.assignment_ind_outlined, color: Colors.deepPurple),
+                      const SizedBox(width: 8),
+                      const Expanded(child: Text('Job Marketplace Applications', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18))),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.orange.withOpacity(0.12), borderRadius: BorderRadius.circular(9)),
+                        child: Text('${pendingApps.length} pending', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: apps.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No worker applications yet.',
+                              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: apps.length,
+                            itemBuilder: (context, i) {
+                              final app = apps[i];
+                              final status = (app['status'] ?? 'pending').toString();
+                              final statusColor = status == 'approved'
+                                  ? Colors.green
+                                  : status == 'rejected'
+                                      ? Colors.red
+                                      : Colors.orange;
+                              final email = (app['userEmail'] ?? '').toString().toLowerCase().trim();
+                              final userIndex = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: statusColor.withOpacity(0.28)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            (app['fullName'] ?? app['username'] ?? 'Applicant').toString(),
+                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(color: statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+                                          child: Text(status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text('Email: ${app['userEmail'] ?? ''}'),
+                                    Text('Phone: ${app['phone'] ?? ''}'),
+                                    if ((app['city'] ?? '').toString().trim().isNotEmpty) Text('City: ${app['city']}'),
+                                    if ((app['preferredRole'] ?? '').toString().trim().isNotEmpty) Text('Role: ${app['preferredRole']}'),
+                                    if ((app['skills'] ?? '').toString().trim().isNotEmpty) Text('Skills: ${app['skills']}'),
+                                    if ((app['availability'] ?? '').toString().trim().isNotEmpty) Text('Availability: ${app['availability']}'),
+                                    if ((app['note'] ?? '').toString().trim().isNotEmpty) Text('Statement: ${app['note']}'),
+                                    const SizedBox(height: 4),
+                                    Text('Submitted: ${fmt((app['createdAt'] ?? '').toString())}', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 11)),
+                                    if (status == 'pending') ...[
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: OutlinedButton(
+                                              onPressed: () {
+                                                app['status'] = 'rejected';
+                                                app['reviewedAt'] = DateTime.now().toIso8601String();
+                                                app['reviewedBy'] = widget.user.email;
+                                                widget.config.jobWorkerApplications = apps;
+                                                widget.onDataChanged();
+                                                setState(() {});
+                                                setST(() {});
+                                              },
+                                              child: const Text('Reject'),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: ElevatedButton(
+                                              onPressed: () {
+                                                app['status'] = 'approved';
+                                                app['reviewedAt'] = DateTime.now().toIso8601String();
+                                                app['reviewedBy'] = widget.user.email;
+                                                widget.config.jobWorkerApplications = apps;
+                                                if (userIndex != -1) {
+                                                  widget.allUsers[userIndex].isApprovedWorker = true;
+                                                  widget.allUsers[userIndex].status = 'verified';
+                                                }
+                                                widget.onDataChanged();
+                                                setState(() {});
+                                                setST(() {});
+                                              },
+                                              child: const Text('Approve'),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   void _showAnnouncementAdmin(bool isDark) {
     final titleC = TextEditingController();
@@ -4825,10 +5039,56 @@ class _AdminDashboardState extends State<AdminDashboard> {
     decoration: BoxDecoration(border: Border.all(color: isDark ? Colors.white10 : Colors.grey.withOpacity(0.2)), borderRadius: BorderRadius.circular(10)),
     child: Column(children: [
       Container(width: double.infinity, padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFF1A1C1E).withOpacity(0.8), borderRadius: const BorderRadius.vertical(top: Radius.circular(9))), child: Text('Payment Screenshot', style: TextStyle(color: isDark ? Colors.white70 : Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
-      if (t.screenshotPath != null) GestureDetector(onTap: () => showDialog(context: context, builder: (c) => AlertDialog(content: _screenshotImage(t.screenshotPath!))), child: Container(height: 120, alignment: Alignment.center, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.image, size: 40, color: isDark ? Colors.white24 : Colors.grey), Text('View Screenshot', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontSize: 12))])))
+      if (t.screenshotPath != null)
+        GestureDetector(
+          onTap: () => _openScreenshotViewer(t.screenshotPath!),
+          child: Container(
+            height: 120,
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.image, size: 40, color: isDark ? Colors.white24 : Colors.grey),
+                Text('View Screenshot (Tap to zoom)', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontSize: 12)),
+              ],
+            ),
+          ),
+        )
       else Container(height: 120, alignment: Alignment.center, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text('Transaction details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isDark ? Colors.white : Colors.black)), const SizedBox(height: 10), Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.check, color: Colors.green, size: 16), const SizedBox(width: 5), Text('Complete', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white70 : Colors.black87))]), Text('Payment sent successfully', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontSize: 11))])),
     ]),
   );
+
+  void _openScreenshotViewer(String screenshotPath) {
+    showDialog(
+      context: context,
+      builder: (c) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: Container(
+          width: double.infinity,
+          height: MediaQuery.of(context).size.height * 0.8,
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  const Expanded(child: Text('Payment Screenshot', style: TextStyle(fontWeight: FontWeight.bold))),
+                  IconButton(onPressed: () => Navigator.pop(c), icon: const Icon(Icons.close)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Expanded(
+                child: InteractiveViewer(
+                  minScale: 0.6,
+                  maxScale: 6.0,
+                  child: Center(child: _screenshotImage(screenshotPath)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _screenshotImage(String screenshotPath) {
     if (screenshotPath.startsWith('data:image')) {
@@ -4841,6 +5101,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
           return const Text('Invalid screenshot data.');
         }
       }
+    }
+    if (screenshotPath.startsWith('http://') || screenshotPath.startsWith('https://')) {
+      return Image.network(
+        screenshotPath,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const Text('Unable to load screenshot URL.'),
+      );
     }
     if (kIsWeb) {
       return const Text('Screenshot preview unavailable in this browser session.');
@@ -5539,14 +5806,10 @@ class _SubmitPaymentPageState extends State<SubmitPaymentPage> {
   Future<void> _pickScreenshot() async {
     final img = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (img == null) return;
-    if (kIsWeb) {
-      final bytes = await img.readAsBytes();
-      final lowerName = img.name.toLowerCase();
-      final mime = lowerName.endsWith('.png') ? 'image/png' : 'image/jpeg';
-      setState(() => _screenshotRef = 'data:$mime;base64,${base64Encode(bytes)}');
-    } else {
-      setState(() => _screenshotRef = img.path);
-    }
+    final bytes = await img.readAsBytes();
+    final lowerName = img.name.toLowerCase();
+    final mime = lowerName.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    setState(() => _screenshotRef = 'data:$mime;base64,${base64Encode(bytes)}');
   }
 
   @override Widget build(BuildContext context) {
@@ -6058,6 +6321,21 @@ class InvestScreen extends StatelessWidget {
 
     final isRenewSamePlan = isExpired && active != null && (price - active.amount).abs() < 0.0001;
     final requiredPayment = isRenewSamePlan ? price : math.max(0.0, diff);
+    final canBuyNow = !isCurrent && !isDowngrade && !pendingSamePlan && requiredPayment > 0 && user.accountBalance >= requiredPayment;
+
+    if (!isCurrent && !isDowngrade && pendingSamePlan) {
+      buttonText = "Waiting for Deposit";
+    } else if (canBuyNow) {
+      buttonText = "Buy";
+    } else if (isUpgrade) {
+      buttonText = "Upgrade Now";
+    } else if (isRenewSamePlan) {
+      buttonText = "Renew Plan";
+    } else if (isCurrent) {
+      buttonText = "Active";
+    } else {
+      buttonText = "Invest Now";
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -6179,21 +6457,139 @@ class InvestScreen extends StatelessWidget {
   }
 }
 
-class StatsScreen extends StatelessWidget {
-  final UserData user; final List<AppTransaction> transactions;
+class StatsScreen extends StatefulWidget {
+  final UserData user;
+  final List<AppTransaction> transactions;
   const StatsScreen({super.key, required this.user, required this.transactions});
-  @override Widget build(BuildContext context) {
-    final approved = transactions.where((t) => t.status == TransactionStatus.approved);
+
+  @override
+  State<StatsScreen> createState() => _StatsScreenState();
+}
+
+class _StatsScreenState extends State<StatsScreen> {
+  Timer? _ticker;
+  DateTime _now = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _now = DateTime.now());
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final approved = widget.transactions.where((t) => t.status == TransactionStatus.approved);
     final totalVol = approved.where((t) => t.type == TransactionType.deposit).fold(0.0, (s, t) => s + t.amount);
     final totalPay = approved.where((t) => t.type == TransactionType.withdrawal).fold(0.0, (s, t) => s + t.amount);
-    return Scaffold(body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 150), child: Column(children: [
-      const FloatingTitle(title: 'PLATFORM STATS'), const SizedBox(height: 25),
-      GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 15, crossAxisSpacing: 15, childAspectRatio: 1.3, children: [_sTile(context, 'Total Volume', '\$${formatCurrency(totalVol)}', Icons.account_balance, Colors.blue), _sTile(context, 'Total Profit', '\$${formatCurrency(user.totalProfit)}', Icons.auto_graph, Colors.purple), _sTile(context, 'Total Payout', '\$${formatCurrency(totalPay)}', Icons.payments, Colors.green), _sTile(context, 'Global Rank', '#1', Icons.public, Colors.orange)]),
-      const SizedBox(height: 25),
-      Container(width: double.infinity, padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 15)]), child: const Column(children: [Text('REAL-TIME GROWTH', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)), SizedBox(height: 20), Icon(Icons.show_chart_rounded, size: 80, color: Colors.blueAccent), Text('Data is synced live from your account.', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12))])),
-    ]))));
+
+    final last24h = _now.subtract(const Duration(hours: 24));
+    final prev24h = _now.subtract(const Duration(hours: 48));
+    final current24hVol = approved
+        .where((t) => t.type == TransactionType.deposit && t.timestamp.isAfter(last24h))
+        .fold(0.0, (s, t) => s + t.amount);
+    final previous24hVol = approved
+        .where((t) => t.type == TransactionType.deposit && t.timestamp.isAfter(prev24h) && t.timestamp.isBefore(last24h))
+        .fold(0.0, (s, t) => s + t.amount);
+    final growthPct = previous24hVol <= 0
+        ? (current24hVol > 0 ? 100.0 : 0.0)
+        : ((current24hVol - previous24hVol) / previous24hVol) * 100.0;
+
+    final minuteVol = approved
+        .where((t) => t.type == TransactionType.deposit && t.timestamp.isAfter(_now.subtract(const Duration(minutes: 1))))
+        .fold(0.0, (s, t) => s + t.amount);
+
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 150),
+          child: Column(
+            children: [
+              const FloatingTitle(title: 'PLATFORM STATS'),
+              const SizedBox(height: 25),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                mainAxisSpacing: 15,
+                crossAxisSpacing: 15,
+                childAspectRatio: 1.3,
+                children: [
+                  _sTile(context, 'Total Volume', '\$${formatCurrency(totalVol)}', Icons.account_balance, Colors.blue),
+                  _sTile(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit)}', Icons.auto_graph, Colors.purple),
+                  _sTile(context, 'Total Payout', '\$${formatCurrency(totalPay)}', Icons.payments, Colors.green),
+                  _sTile(context, 'Global Rank', '#1', Icons.public, Colors.orange),
+                ],
+              ),
+              const SizedBox(height: 25),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 15)],
+                ),
+                child: Column(
+                  children: [
+                    const Text('REAL-TIME GROWTH', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+                    const SizedBox(height: 14),
+                    Icon(
+                      growthPct >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                      size: 56,
+                      color: growthPct >= 0 ? Colors.green : Colors.red,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '${growthPct >= 0 ? '+' : ''}${growthPct.toStringAsFixed(2)}% vs previous 24h',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        color: growthPct >= 0 ? Colors.green : Colors.red,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text('Last 24h deposits: \$${formatCurrency(current24hVol)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    Text('Current flow (last 1 min): \$${formatCurrency(minuteVol)}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    Text(
+                      'Live updated: ${_now.hour.toString().padLeft(2, '0')}:${_now.minute.toString().padLeft(2, '0')}:${_now.second.toString().padLeft(2, '0')}',
+                      style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
-  Widget _sTile(BuildContext ctx, String l, String v, IconData i, Color c) => Container(padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Theme.of(ctx).cardColor, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))]), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(i, color: c, size: 24), const SizedBox(height: 8), Text(l, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)), Text(v, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900))]));
+
+  Widget _sTile(BuildContext ctx, String l, String v, IconData i, Color c) => Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Theme.of(ctx).cardColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(i, color: c, size: 24),
+            const SizedBox(height: 8),
+            Text(l, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+            Text(v, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+          ],
+        ),
+      );
 }
 
 class ProfileScreen extends StatefulWidget {
@@ -8087,6 +8483,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   final _roomC = TextEditingController();
   final Set<String> _dismissedReceiptKeys = {};
   final Set<String> _openedReceiptKeys = {};
+  bool _maintenanceQueued = false;
 
   final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -8101,6 +8498,99 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     super.initState();
     _selectedState = widget.user.state;
     _ensureUniqueRegistryIds();
+    _openedReceiptKeys
+      ..clear()
+      ..addAll(widget.config.openedContributionReceiptKeys);
+    _dismissedReceiptKeys
+      ..clear()
+      ..addAll(widget.config.dismissedContributionReceiptKeys);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _runHelpModeLifecycleMaintenance();
+    });
+  }
+
+  void _syncReceiptFlagsToConfig() {
+    widget.config.openedContributionReceiptKeys = _openedReceiptKeys.toList();
+    widget.config.dismissedContributionReceiptKeys = _dismissedReceiptKeys.toList();
+    widget.onDataChanged();
+  }
+
+  void _markCampaignClosed(String campaignId, DateTime closedAt) {
+    if (campaignId.trim().isEmpty) return;
+    final closures = List<Map<String, dynamic>>.from(widget.config.helpCampaignClosures.map((e) => Map<String, dynamic>.from(e)));
+    final idx = closures.indexWhere((e) => (e['campaignId'] ?? '').toString() == campaignId);
+    final record = <String, dynamic>{
+      'campaignId': campaignId,
+      'closedAt': closedAt.toUtc().toIso8601String(),
+    };
+    if (idx >= 0) {
+      closures[idx] = record;
+    } else {
+      closures.add(record);
+    }
+    widget.config.helpCampaignClosures = closures;
+  }
+
+  void _runHelpModeLifecycleMaintenance() {
+    var changed = false;
+    final now = DateTime.now();
+
+    final startedAtRaw = widget.config.helpCampaignStartedAt.trim();
+    if (widget.config.helpModeActive && startedAtRaw.isEmpty) {
+      widget.config.helpCampaignStartedAt = now.toUtc().toIso8601String();
+      changed = true;
+    }
+    if (widget.config.helpModeActive && startedAtRaw.isNotEmpty) {
+      try {
+        final startedAt = DateTime.parse(startedAtRaw).toLocal();
+        if (now.difference(startedAt).inDays >= 5) {
+          final campaignId = _activeHelpCampaignId();
+          _markMissedForNonContributorsInCampaign(campaignId);
+          widget.config.helpModeActive = false;
+          widget.config.helpCampaignId = '';
+          widget.config.helpCampaignStartedAt = '';
+          _markCampaignClosed(campaignId, now);
+          changed = true;
+        }
+      } catch (_) {}
+    }
+
+    if (widget.config.helpCampaignClosures.isNotEmpty) {
+      final closures = List<Map<String, dynamic>>.from(widget.config.helpCampaignClosures.map((e) => Map<String, dynamic>.from(e)));
+      final retained = <Map<String, dynamic>>[];
+      for (final c in closures) {
+        final campaignId = (c['campaignId'] ?? '').toString().trim();
+        final closedAtRaw = (c['closedAt'] ?? '').toString().trim();
+        if (campaignId.isEmpty || closedAtRaw.isEmpty) continue;
+        DateTime? closedAt;
+        try {
+          closedAt = DateTime.parse(closedAtRaw).toLocal();
+        } catch (_) {}
+        if (closedAt == null) continue;
+        final ageDays = now.difference(closedAt).inDays;
+        if (ageDays >= 5) {
+          _dismissedReceiptKeys.add(campaignId);
+          changed = true;
+        } else {
+          retained.add(c);
+        }
+      }
+      widget.config.helpCampaignClosures = retained;
+    }
+
+    if (changed) {
+      _syncReceiptFlagsToConfig();
+    }
+  }
+
+  void _queueHelpModeLifecycleMaintenance() {
+    if (_maintenanceQueued) return;
+    _maintenanceQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maintenanceQueued = false;
+      if (!mounted) return;
+      _runHelpModeLifecycleMaintenance();
+    });
   }
 
   void _ensureUniqueRegistryIds() {
@@ -8276,6 +8766,39 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return true;
   }
 
+  String _activeHelpCampaignId() {
+    final stored = widget.config.helpCampaignId.trim();
+    if (stored.isNotEmpty) return stored;
+    return '${widget.config.helpPurpose}|${widget.config.helpScopeType}|${widget.config.helpScopeValue}|${widget.user.state}';
+  }
+
+  List<UserData> _membersInCurrentHelpScope() {
+    return widget.allUsers.where((m) {
+      if (!m.isEnrolledInRegistry) return false;
+      if (!_memberMatchesHelpScope(m)) return false;
+      return (m.state.trim().isEmpty || m.state == widget.user.state);
+    }).toList();
+  }
+
+  void _markMissedForNonContributorsInCampaign(String campaignId) {
+    final normalizedCampaignId = campaignId.trim();
+    if (normalizedCampaignId.isEmpty) return;
+    final contributors = widget.allTransactions
+        .where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
+        .where((t) {
+          final meta = _decodeContributionMeta(t);
+          return (meta['campaignId'] ?? '').toString() == normalizedCampaignId;
+        })
+        .map((t) => t.userEmail.toLowerCase().trim())
+        .toSet();
+    for (final m in _membersInCurrentHelpScope()) {
+      final key = m.email.toLowerCase().trim();
+      if (!contributors.contains(key)) {
+        m.missed += 1;
+      }
+    }
+  }
+
   bool _canCurrentUserSeeHelpMode() {
     if (!widget.config.helpModeActive) return false;
     if (_isRegistrar()) return true;
@@ -8375,94 +8898,225 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           } else if (scopeOptions.isNotEmpty && !scopeOptions.contains(scopeValue)) {
             scopeValue = scopeOptions.first;
           }
-          return AlertDialog(
-            title: Text(widget.config.helpModeActive ? 'Edit Help Mode' : 'Activate Help Mode'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(controller: purposeC, maxLines: 2, decoration: const InputDecoration(labelText: 'What are you collecting for?')),
-                  const SizedBox(height: 10),
-                  TextField(controller: cashC, decoration: const InputDecoration(labelText: 'Cash App')),
-                  const SizedBox(height: 10),
-                  TextField(controller: zelleC, decoration: const InputDecoration(labelText: 'Zelle')),
-                  const SizedBox(height: 10),
-                  TextField(controller: phoneC, keyboardType: TextInputType.phone, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: const InputDecoration(labelText: 'Help Phone Number')),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    initialValue: scopeType,
-                    decoration: const InputDecoration(labelText: 'Who can see this help mode?'),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('Everyone in this state')),
-                      DropdownMenuItem(value: 'city', child: Text('Specific city')),
-                      DropdownMenuItem(value: 'room', child: Text('Specific room')),
-                    ],
-                    onChanged: (v) {
-                      if (v == null) return;
-                      setDialog(() {
-                        scopeType = v;
-                        if (v == 'all') scopeValue = '';
-                      });
-                    },
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final panelBg = isDark ? const Color(0xFF111827) : Colors.white;
+          final sectionBg = isDark ? const Color(0xFF1F2937) : const Color(0xFFF8FAFC);
+          final inputBg = isDark ? const Color(0xFF0F172A) : Colors.white;
+          final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB);
+          InputDecoration framedInput(String label) {
+            return InputDecoration(
+              labelText: label,
+              filled: true,
+              fillColor: inputBg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(14)),
+                borderSide: BorderSide(color: Color(0xFF4F46E5), width: 1.6),
+              ),
+            );
+          }
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.all(16),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 620),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: panelBg,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: borderColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.42 : 0.12),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
                   ),
-                  if (scopeType != 'all') ...[
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<String>(
-                      initialValue: scopeOptions.isNotEmpty ? scopeValue : null,
-                      decoration: InputDecoration(labelText: scopeType == 'city' ? 'Select City' : 'Select Room'),
-                      items: scopeOptions.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                      onChanged: (v) => setDialog(() => scopeValue = v ?? ''),
-                    ),
-                  ],
                 ],
               ),
-            ),
-            actions: [
-              if (widget.config.helpModeActive)
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      widget.config.helpModeActive = false;
-                    });
-                    widget.onDataChanged();
-                    Navigator.pop(ctx);
-                  },
-                  child: const Text('Deactivate'),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFF6A3DE8), Color(0xFF4F2FD6)]),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.edit_note_rounded, color: Colors.white),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            widget.config.helpModeActive ? 'Edit Help Mode' : 'Activate Help Mode',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 19,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: sectionBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Column(
+                        children: [
+                          TextField(controller: purposeC, maxLines: 2, decoration: framedInput('What are you collecting for?')),
+                          const SizedBox(height: 10),
+                          TextField(controller: cashC, decoration: framedInput('Cash App')),
+                          const SizedBox(height: 10),
+                          TextField(controller: zelleC, decoration: framedInput('Zelle')),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: phoneC,
+                            keyboardType: TextInputType.phone,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            decoration: framedInput('Help Phone Number'),
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            initialValue: scopeType,
+                            decoration: framedInput('Who can see this help mode?'),
+                            items: const [
+                              DropdownMenuItem(value: 'all', child: Text('Everyone in this state')),
+                              DropdownMenuItem(value: 'city', child: Text('Specific city')),
+                              DropdownMenuItem(value: 'room', child: Text('Specific room')),
+                            ],
+                            onChanged: (v) {
+                              if (v == null) return;
+                              setDialog(() {
+                                scopeType = v;
+                                if (v == 'all') scopeValue = '';
+                              });
+                            },
+                          ),
+                          if (scopeType != 'all') ...[
+                            const SizedBox(height: 10),
+                            DropdownButtonFormField<String>(
+                              initialValue: scopeOptions.isNotEmpty ? scopeValue : null,
+                              decoration: framedInput(scopeType == 'city' ? 'Select City' : 'Select Room'),
+                              items: scopeOptions.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                              onChanged: (v) => setDialog(() => scopeValue = v ?? ''),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SelectionContainer.disabled(
+                      child: Row(
+                        children: [
+                          if (widget.config.helpModeActive) ...[
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  final activeCampaignId = _activeHelpCampaignId();
+                                  setState(() {
+                                    _markMissedForNonContributorsInCampaign(activeCampaignId);
+                                    widget.config.helpModeActive = false;
+                                    widget.config.helpCampaignId = '';
+                                    widget.config.helpCampaignStartedAt = '';
+                                    _markCampaignClosed(activeCampaignId, DateTime.now());
+                                  });
+                                  widget.onDataChanged();
+                                  Navigator.pop(ctx);
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.red.shade500,
+                                  side: BorderSide(color: Colors.red.shade300),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                child: const Text('Deactivate'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                          ],
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                if (purposeC.text.trim().isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter purpose for contribution.')));
+                                  return;
+                                }
+                                if (cashC.text.trim().isEmpty && zelleC.text.trim().isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter Cash App or Zelle.')));
+                                  return;
+                                }
+                                if (phoneC.text.trim().isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone number is required.')));
+                                  return;
+                                }
+                                if (scopeType != 'all' && scopeValue.trim().isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select scope value.')));
+                                  return;
+                                }
+                                final wasActive = widget.config.helpModeActive;
+                                final previousPurpose = widget.config.helpPurpose.trim();
+                                final previousScopeType = widget.config.helpScopeType.trim();
+                                final previousScopeValue = widget.config.helpScopeValue.trim();
+                                final nextPurpose = purposeC.text.trim();
+                                final nextScopeType = scopeType;
+                                final nextScopeValue = scopeType == 'all' ? '' : scopeValue.trim();
+                                setState(() {
+                                  widget.config.helpModeActive = true;
+                                  widget.config.helpPurpose = nextPurpose;
+                                  widget.config.helpCashApp = cashC.text.trim();
+                                  widget.config.helpZelle = zelleC.text.trim();
+                                  widget.config.helpPhone = phoneC.text.trim();
+                                  widget.config.helpScopeType = nextScopeType;
+                                  widget.config.helpScopeValue = nextScopeValue;
+                                  final shouldStartNewCampaign = !wasActive ||
+                                      previousPurpose != nextPurpose ||
+                                      previousScopeType != nextScopeType ||
+                                      previousScopeValue != nextScopeValue;
+                                  if (shouldStartNewCampaign) {
+                                    widget.config.helpCampaignId = 'help_${DateTime.now().microsecondsSinceEpoch}';
+                                    widget.config.helpCampaignStartedAt = DateTime.now().toUtc().toIso8601String();
+                                  }
+                                });
+                                widget.onDataChanged();
+                                Navigator.pop(ctx);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF4F46E5),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: Text(widget.config.helpModeActive ? 'Save' : 'Activate'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-              ElevatedButton(
-                onPressed: () {
-                  if (purposeC.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter purpose for contribution.')));
-                    return;
-                  }
-                  if (cashC.text.trim().isEmpty && zelleC.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter Cash App or Zelle.')));
-                    return;
-                  }
-                  if (phoneC.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone number is required.')));
-                    return;
-                  }
-                  if (scopeType != 'all' && scopeValue.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select scope value.')));
-                    return;
-                  }
-                  setState(() {
-                    widget.config.helpModeActive = true;
-                    widget.config.helpPurpose = purposeC.text.trim();
-                    widget.config.helpCashApp = cashC.text.trim();
-                    widget.config.helpZelle = zelleC.text.trim();
-                    widget.config.helpPhone = phoneC.text.trim();
-                    widget.config.helpScopeType = scopeType;
-                    widget.config.helpScopeValue = scopeType == 'all' ? '' : scopeValue.trim();
-                  });
-                  widget.onDataChanged();
-                  Navigator.pop(ctx);
-                },
-                child: Text(widget.config.helpModeActive ? 'Save' : 'Activate'),
               ),
-            ],
+            ),
           );
         },
       ),
@@ -8692,15 +9346,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     showDialog(
       context: context,
       builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final statusLabel = _statusLabelForMissed(u.missed);
         final statusColor = _statusColorForMissed(u.missed);
         return Dialog(
           insetPadding: const EdgeInsets.all(16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: SingleChildScrollView(
-              child: Column(
+          child: SelectionArea(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: SingleChildScrollView(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
@@ -8715,33 +9371,110 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 20,
-                    runSpacing: 10,
-                    children: [
-                      _profileItem('Full Name', u.fullName ?? u.username),
-                      _profileItem('Date of Birth', u.dob ?? 'N/A'),
-                      _profileItem('Civic Registry ID', u.registryId ?? 'N/A'),
-                      _profileItem('Unique ID Number', u.registryId ?? 'N/A'),
-                      _profileItem('ID Type', u.idType ?? 'N/A'),
-                      _profileItem('State', u.state),
-                      _profileItem('City', u.city ?? 'N/A'),
-                      _profileItem('Room', u.room ?? 'N/A'),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(12)),
-                    child: Text(statusLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1A2233) : const Color(0xFFF8FAFF),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFD9E2F2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.badge_outlined, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Official Member Record',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? Colors.white : const Color(0xFF111827),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(12)),
+                              child: Text(statusLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE5E7EB)),
+                          ),
+                          child: Column(
+                            children: [
+                              _recordRow('Full Name', u.fullName ?? u.username, isDark),
+                              _recordDivider(isDark),
+                              _recordRow('Registry ID', u.registryId ?? 'N/A', isDark),
+                              _recordDivider(isDark),
+                              _recordRow('Date of Birth', u.dob ?? 'N/A', isDark),
+                              _recordDivider(isDark),
+                              _recordRow('ID Type', u.idType ?? 'N/A', isDark),
+                              _recordDivider(isDark),
+                              _recordRow('State / City / Room', '${u.state} / ${u.city ?? 'N/A'} / ${u.room ?? 'N/A'}', isDark),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 18),
-                  const Divider(),
-                  const Text('Contact Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 10),
-                  _profileItem('Home Address', u.homeAddress ?? 'N/A'),
-                  _profileItem('Phone Number', u.phone),
-                  _profileItem('Email Address', u.email),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1A2233) : const Color(0xFFF0F9FF),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.contact_phone_outlined, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Contact Information',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            children: [
+                              _contactRow('Home Address', u.homeAddress ?? 'N/A', isDark),
+                              _contactDivider(isDark),
+                              _contactRow('Phone Number', u.phone.isEmpty ? 'N/A' : u.phone, isDark),
+                              _contactDivider(isDark),
+                              _contactRow('Email Address', u.email, isDark),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 18),
                   Row(
                     children: [
@@ -8809,7 +9542,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ),
                     ],
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -8831,6 +9565,76 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ),
     );
   }
+
+  Widget _recordRow(String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _recordDivider(bool isDark) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE5E7EB));
+
+  Widget _contactRow(String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _contactDivider(bool isDark) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE5E7EB));
 
   Widget _statCard(String label, String value, Color bg, Color fg) {
     return Container(
@@ -8860,8 +9664,42 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ..writeln('Phone: ${u.phone}')
       ..writeln('Email: ${u.email}')
       ..writeln('Status: ${_statusLabelForMissed(u.missed)}');
-    Clipboard.setData(ClipboardData(text: report.toString()));
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report copied to clipboard.')));
+    final text = report.toString();
+    final escaped = text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('\n', '<br>');
+    final html = '''
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Civic Registry Report</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.5; }
+      h2 { margin-bottom: 14px; }
+      .card { border: 1px solid #d1d5db; border-radius: 8px; padding: 14px; }
+    </style>
+  </head>
+  <body>
+    <h2>FULL MEMBER INFORMATION</h2>
+    <div class="card">$escaped</div>
+    <script>window.onload = function(){ window.print(); };</script>
+  </body>
+</html>
+''';
+    final dataUri = Uri.parse('data:text/html;charset=utf-8,${Uri.encodeComponent(html)}');
+    launchUrl(dataUri, mode: LaunchMode.platformDefault).then((ok) async {
+      if (!ok) {
+        await Clipboard.setData(ClipboardData(text: text));
+      }
+    }).catchError((_) async {
+      await Clipboard.setData(ClipboardData(text: text));
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Print report opened. If blocked, report copied to clipboard.')),
+    );
   }
 
   String _txReadableDetails(AppTransaction t) {
@@ -8881,6 +9719,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     setState(() {
       _openedReceiptKeys.addAll(keys);
     });
+    _syncReceiptFlagsToConfig();
     String? selectedKey;
 
     showDialog(
@@ -8931,7 +9770,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             ],
                           ),
                         ),
-                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+                        SelectionContainer.disabled(
+                          child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -8965,13 +9806,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 Text('\$${formatCurrency(t)}  •  $c contributors', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
                               ]),
                               const SizedBox(height: 6),
-                              GestureDetector(
-                                onTap: () => setDialog(() => selectedKey = k),
-                                child: Container(
-                                  height: 38,
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(color: Colors.indigo, borderRadius: BorderRadius.circular(10)),
-                                  child: const Center(child: Text('Open Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                              SelectionContainer.disabled(
+                                child: GestureDetector(
+                                  onTap: () => setDialog(() => selectedKey = k),
+                                  child: Container(
+                                    height: 38,
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(color: Colors.indigo, borderRadius: BorderRadius.circular(10)),
+                                    child: const Center(child: Text('Open Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                                  ),
                                 ),
                               ),
                             ],
@@ -8988,17 +9831,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           children: [
                             Row(
                               children: [
-                                TextButton(onPressed: () => setDialog(() => selectedKey = null), child: const Text('← Back to All Receipts')),
+                                SelectionContainer.disabled(
+                                  child: TextButton(onPressed: () => setDialog(() => selectedKey = null), child: const Text('← Back to All Receipts')),
+                                ),
                                 const Spacer(),
-                                TextButton(
-                                  onPressed: () {
-                                    if (selectedKey == null) return;
-                                    setState(() => _dismissedReceiptKeys.add(selectedKey!));
-                                    setDialog(() {
-                                      selectedKey = null;
-                                    });
-                                  },
-                                  child: const Text('Delete Receipt'),
+                                SelectionContainer.disabled(
+                                  child: TextButton(
+                                    onPressed: () {
+                                      if (selectedKey == null) return;
+                                      setState(() => _dismissedReceiptKeys.add(selectedKey!));
+                                      _syncReceiptFlagsToConfig();
+                                      setDialog(() {
+                                        selectedKey = null;
+                                      });
+                                    },
+                                    child: const Text('Delete Receipt'),
+                                  ),
                                 ),
                               ],
                             ),
@@ -9094,7 +9942,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 return;
               }
               final now = DateTime.now();
-              final campaignId = '${widget.config.helpPurpose}|${widget.config.helpScopeType}|${widget.config.helpScopeValue}|${widget.user.state}';
+              final campaignId = _activeHelpCampaignId();
               final payload = jsonEncode({
                 'kind': 'contribution',
                 'purpose': widget.config.helpPurpose,
@@ -9116,7 +9964,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   timestamp: now,
                 ),
               );
-              setState(() => u.helps += 1);
+              final alreadyContributedInCampaign = widget.allTransactions.any((t) {
+                if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
+                if (t.userEmail.toLowerCase().trim() != u.email.toLowerCase().trim()) return false;
+                final meta = _decodeContributionMeta(t);
+                return (meta['campaignId'] ?? '').toString() == campaignId;
+              });
+              setState(() {
+                u.helps += 1;
+                if (!alreadyContributedInCampaign && u.missed > 0) {
+                  u.missed -= 1;
+                }
+              });
               widget.onDataChanged();
               Navigator.pop(ctx);
             },
@@ -9227,59 +10086,168 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Member Information'),
-        content: SingleChildScrollView(
-          child: Column(
-            children: [
-              TextField(controller: fullName, decoration: const InputDecoration(labelText: 'Full Name')),
-              TextField(controller: phone, keyboardType: TextInputType.phone, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: const InputDecoration(labelText: 'Phone')),
-              TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email')),
-              TextField(controller: address, decoration: const InputDecoration(labelText: 'Address')),
-            ],
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final panelBg = isDark ? const Color(0xFF0F172A) : Colors.white;
+        final inputBg = isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
+        final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB);
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: panelBg,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: borderColor),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.edit_note_rounded, color: Color(0xFF3B82F6)),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Update Member Record',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: fullName,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                    decoration: InputDecoration(
+                      labelText: 'Full Name',
+                      filled: true,
+                      fillColor: inputBg,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: phone,
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                    decoration: InputDecoration(
+                      labelText: 'Phone',
+                      filled: true,
+                      fillColor: inputBg,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: email,
+                    keyboardType: TextInputType.emailAddress,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      filled: true,
+                      fillColor: inputBg,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: address,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                    decoration: InputDecoration(
+                      labelText: 'Address',
+                      filled: true,
+                      fillColor: inputBg,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: borderColor),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (!RegExp(r'^\S+\s+\S+').hasMatch(fullName.text.trim())) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Full Name must contain two names.')));
+                              return;
+                            }
+                            if (!RegExp(r'^\d{7,15}$').hasMatch(phone.text.trim())) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone must be numbers only.')));
+                              return;
+                            }
+                            if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email.')));
+                              return;
+                            }
+                            final oldEmail = u.email;
+                            final newEmail = email.text.trim().toLowerCase();
+                            setState(() {
+                              u.fullName = fullName.text.trim();
+                              u.username = fullName.text.trim().split(' ').first;
+                              u.phone = phone.text.trim();
+                              u.email = newEmail;
+                              u.homeAddress = address.text.trim();
+                            });
+                            widget.onDataChanged();
+                            if (oldEmail != newEmail) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Email updated. New records will use this email.')));
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Member information saved successfully.')));
+                            Navigator.pop(ctx);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Save Changes'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              if (!RegExp(r'^\S+\s+\S+').hasMatch(fullName.text.trim())) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Full Name must contain two names.')));
-                return;
-              }
-              if (!RegExp(r'^\d{7,15}$').hasMatch(phone.text.trim())) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone must be numbers only.')));
-                return;
-              }
-              if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email.')));
-                return;
-              }
-              final oldEmail = u.email;
-              final newEmail = email.text.trim().toLowerCase();
-              setState(() {
-                u.fullName = fullName.text.trim();
-                u.username = fullName.text.trim().split(' ').first;
-                u.phone = phone.text.trim();
-                u.email = newEmail;
-                u.homeAddress = address.text.trim();
-              });
-              widget.onDataChanged();
-              if (oldEmail != newEmail) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Email updated. New records will use this email.')));
-              }
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Member information saved successfully.')));
-              Navigator.pop(ctx);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    _queueHelpModeLifecycleMaintenance();
     bool isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = const Color(0xFF6200EE);
     final receiptGroups = _groupContributionReceipts(_visibleContributionTx(), unreadOnly: true);
@@ -9296,10 +10264,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           IconButton(onPressed: _showStatePicker, icon: const Icon(Icons.map_rounded), tooltip: 'Change State'),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
+      body: SelectionArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
             // Top Header Card
             Container(
               width: double.infinity,
@@ -9311,23 +10280,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: _showContributionReceipts,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.shield_rounded, color: Colors.white, size: 30)),
-                        if (receiptCount > 0)
-                          Positioned(
-                            right: -6,
-                            top: -6,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
-                              child: Text('$receiptCount', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  SelectionContainer.disabled(
+                    child: GestureDetector(
+                      onTap: _showContributionReceipts,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.shield_rounded, color: Colors.white, size: 30)),
+                          if (receiptCount > 0)
+                            Positioned(
+                              right: -6,
+                              top: -6,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
+                                child: Text('$receiptCount', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 20),
@@ -9427,22 +10398,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 children: [
                   Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.verified_user_rounded, color: Colors.green, size: 24)),
                   const SizedBox(width: 15),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Authorized Registrar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), Text('$_selectedState • ${widget.allUsers.where((u)=>u.isEnrolledInRegistry && u.state == _selectedState).length} registered', style: TextStyle(color: Colors.grey.shade600, fontSize: 11))])),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Authorized Registrar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), Text('$_selectedState • ${widget.allUsers.where((u)=>u.isEnrolledInRegistry && u.state.trim().toLowerCase() == _selectedState.trim().toLowerCase()).length} registered', style: TextStyle(color: Colors.grey.shade600, fontSize: 11))])),
                   
                   if (_isRegistrar())
-                    GestureDetector(
-                      onTap: _showHelpModeDialog,
-                      child: Container(
-                        height: 35,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: widget.config.helpModeActive ? Colors.red : Colors.green,
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Center(
-                          child: Text(
-                            widget.config.helpModeActive ? 'Deactivate Help Mode' : 'Activate Help Mode',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                    SelectionContainer.disabled(
+                      child: GestureDetector(
+                        onTap: _showHelpModeDialog,
+                        child: Container(
+                          height: 35,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: widget.config.helpModeActive ? Colors.red : Colors.green,
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Center(
+                            child: Text(
+                              widget.config.helpModeActive ? 'Deactivate Help Mode' : 'Activate Help Mode',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                            ),
                           ),
                         ),
                       ),
@@ -9477,8 +10450,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             if (_activeTab == 2) _membersSection(isDark),
             if (_activeTab == 3) _rankingsSection(isDark),
             
-            const SizedBox(height: 50),
-          ],
+              const SizedBox(height: 50),
+            ],
+          ),
         ),
       ),
     );
@@ -9487,23 +10461,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Widget _tabItem(int index, String label, IconData icon) {
     bool isSelected = _activeTab == index;
     bool isDark = Theme.of(context).brightness == Brightness.dark;
-    return InkWell(
-      onTap: () => setState(() => _activeTab = index),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        height: 85,
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6200EE) : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: isSelected ? Colors.white : Colors.grey, size: 28),
-            const SizedBox(height: 8),
-            Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold, fontSize: 13)),
-          ],
+    return SelectionContainer.disabled(
+      child: InkWell(
+        onTap: () => setState(() => _activeTab = index),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 85,
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF6200EE) : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: isSelected ? Colors.white : Colors.grey, size: 28),
+              const SizedBox(height: 8),
+              Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold, fontSize: 13)),
+            ],
+          ),
         ),
       ),
     );
@@ -9695,13 +10671,38 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Widget _membersSection(bool isDark) {
-    final members = widget.allUsers.where((u) => 
-      u.isEnrolledInRegistry && 
-      u.state == _selectedState &&
-      (u.username.toLowerCase().contains(_searchQuery) || u.fullName?.toLowerCase().contains(_searchQuery) == true || u.registryId?.toLowerCase().contains(_searchQuery) == true || u.city?.toLowerCase().contains(_searchQuery) == true) &&
-      (_selectedCity == 'All Cities' || u.city == _selectedCity) &&
-      (_selectedRoom == 'All Rooms' || u.room == _selectedRoom)
-    ).toList();
+    bool matchesFilters(UserData u) {
+      final stateMatch = (u.state).trim().toLowerCase() == _selectedState.trim().toLowerCase();
+      final textMatch = u.username.toLowerCase().contains(_searchQuery) ||
+          u.fullName?.toLowerCase().contains(_searchQuery) == true ||
+          u.registryId?.toLowerCase().contains(_searchQuery) == true ||
+          u.city?.toLowerCase().contains(_searchQuery) == true;
+      final cityMatch = _selectedCity == 'All Cities' || (u.city ?? '').trim() == _selectedCity;
+      final roomMatch = _selectedRoom == 'All Rooms' || (u.room ?? '').trim() == _selectedRoom;
+      return u.isEnrolledInRegistry && stateMatch && textMatch && cityMatch && roomMatch;
+    }
+
+    final members = widget.allUsers.where(matchesFilters).toList();
+    if (members.isEmpty) {
+      final fallback = widget.allUsers.where((u) {
+        final textMatch = u.username.toLowerCase().contains(_searchQuery) ||
+            u.fullName?.toLowerCase().contains(_searchQuery) == true ||
+            u.registryId?.toLowerCase().contains(_searchQuery) == true ||
+            u.city?.toLowerCase().contains(_searchQuery) == true;
+        final cityMatch = _selectedCity == 'All Cities' || (u.city ?? '').trim() == _selectedCity;
+        final roomMatch = _selectedRoom == 'All Rooms' || (u.room ?? '').trim() == _selectedRoom;
+        return u.isEnrolledInRegistry && textMatch && cityMatch && roomMatch;
+      }).toList();
+      members.addAll(fallback);
+    }
+    final userOrder = <String, int>{
+      for (int i = 0; i < widget.allUsers.length; i++) widget.allUsers[i].email.toLowerCase().trim(): i,
+    };
+    members.sort((a, b) {
+      final aIndex = userOrder[a.email.toLowerCase().trim()] ?? -1;
+      final bIndex = userOrder[b.email.toLowerCase().trim()] ?? -1;
+      return bIndex.compareTo(aIndex);
+    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -9836,15 +10837,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _memberInfo(IconData i, String t, Color c) => Padding(padding: const EdgeInsets.only(bottom: 4), child: Row(children: [Icon(i, size: 14, color: c), const SizedBox(width: 10), Text(t, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))]));
 
-  Widget _mBtn(IconData i, String l, Color bg, VoidCallback onTap, {Color textColor = Colors.white}) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-      child: Row(children: [
-        Icon(i, size: 14, color: textColor),
-        if (l.isNotEmpty) ...[const SizedBox(width: 5), Text(l, style: TextStyle(color: textColor, fontSize: 10, fontWeight: FontWeight.bold))],
-      ]),
+  Widget _mBtn(IconData i, String l, Color bg, VoidCallback onTap, {Color textColor = Colors.white}) => SelectionContainer.disabled(
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+        child: Row(children: [
+          Icon(i, size: 14, color: textColor),
+          if (l.isNotEmpty) ...[const SizedBox(width: 5), Text(l, style: TextStyle(color: textColor, fontSize: 10, fontWeight: FontWeight.bold))],
+        ]),
+      ),
     ),
   );
 
@@ -9907,7 +10910,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Widget _rankingsSection(bool isDark) {
-    final enrolled = widget.allUsers.where((u) => u.isEnrolledInRegistry && u.state == _selectedState).toList();
+    final enrolled = widget.allUsers
+        .where((u) => u.isEnrolledInRegistry && u.state.trim().toLowerCase() == _selectedState.trim().toLowerCase())
+        .toList();
     enrolled.sort((a, b) => b.helps.compareTo(a.helps));
 
     final topHelpers = enrolled.where((u) => u.helps >= 10).toList();
@@ -10000,6 +11005,9 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
 
   bool get _isApprovedWorker => widget.user.isApprovedWorker;
   List<Map<String, dynamic>> get _jobs => widget.config.jobPosts;
+  List<Map<String, dynamic>> get _workerApplications =>
+      widget.config.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)).toList()
+        ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
 
   ImageProvider? _jobImage(String? imageRef) {
     if (imageRef == null || imageRef.trim().isEmpty) return null;
@@ -10025,6 +11033,49 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     setState(() {});
   }
 
+  void _processWorkerApplication(Map<String, dynamic> app, {required bool approve}) {
+    final appId = (app['id'] ?? '').toString();
+    if (appId.isEmpty) return;
+    final apps = List<Map<String, dynamic>>.from(
+      widget.config.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)),
+    );
+    final idx = apps.indexWhere((a) => (a['id'] ?? '').toString() == appId);
+    if (idx < 0) return;
+    apps[idx]['status'] = approve ? 'approved' : 'rejected';
+    apps[idx]['reviewedAt'] = DateTime.now().toIso8601String();
+    apps[idx]['reviewedBy'] = widget.user.email;
+    widget.config.jobWorkerApplications = apps;
+
+    final email = (apps[idx]['userEmail'] ?? '').toString().toLowerCase().trim();
+    final userIndex = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+    if (userIndex >= 0) {
+      widget.allUsers[userIndex].isApprovedWorker = approve;
+    }
+    _saveJobs();
+  }
+
+  String _appStatusLabel(String status) {
+    switch (status) {
+      case 'approved':
+        return 'Approved';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return 'Pending Review';
+    }
+  }
+
+  Color _appStatusColor(String status) {
+    switch (status) {
+      case 'approved':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      default:
+        return Colors.orange;
+    }
+  }
+
   Future<void> _showPostJobDialog() async {
     final titleC = TextEditingController();
     final descC = TextEditingController();
@@ -10032,6 +11083,9 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     final whenC = TextEditingController();
     final addressC = TextEditingController();
     final budgetC = TextEditingController();
+    String category = 'General Service';
+    String workType = 'On-site';
+    String urgency = 'Normal';
     String imageRef = '';
 
     await showDialog(
@@ -10045,10 +11099,55 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
               children: [
                 TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Job title')),
                 TextField(controller: descC, maxLines: 3, decoration: const InputDecoration(labelText: 'Job details')),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: category,
+                        decoration: const InputDecoration(labelText: 'Category'),
+                        items: const [
+                          DropdownMenuItem(value: 'General Service', child: Text('General Service')),
+                          DropdownMenuItem(value: 'Electrical', child: Text('Electrical')),
+                          DropdownMenuItem(value: 'Plumbing', child: Text('Plumbing')),
+                          DropdownMenuItem(value: 'Cleaning', child: Text('Cleaning')),
+                          DropdownMenuItem(value: 'Carpentry', child: Text('Carpentry')),
+                          DropdownMenuItem(value: 'Delivery', child: Text('Delivery')),
+                        ],
+                        onChanged: (v) => setDialog(() => category = v ?? 'General Service'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: workType,
+                        decoration: const InputDecoration(labelText: 'Work Type'),
+                        items: const [
+                          DropdownMenuItem(value: 'On-site', child: Text('On-site')),
+                          DropdownMenuItem(value: 'Remote', child: Text('Remote')),
+                          DropdownMenuItem(value: 'Hybrid', child: Text('Hybrid')),
+                        ],
+                        onChanged: (v) => setDialog(() => workType = v ?? 'On-site'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 TextField(controller: contactC, decoration: const InputDecoration(labelText: 'Phone or Email')),
                 TextField(controller: whenC, decoration: const InputDecoration(labelText: 'When do you need it done?')),
                 TextField(controller: addressC, decoration: const InputDecoration(labelText: 'Workplace address')),
                 TextField(controller: budgetC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Budget (\$)')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: urgency,
+                  decoration: const InputDecoration(labelText: 'Urgency'),
+                  items: const [
+                    DropdownMenuItem(value: 'Low', child: Text('Low')),
+                    DropdownMenuItem(value: 'Normal', child: Text('Normal')),
+                    DropdownMenuItem(value: 'Urgent', child: Text('Urgent')),
+                  ],
+                  onChanged: (v) => setDialog(() => urgency = v ?? 'Normal'),
+                ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -10099,6 +11198,9 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
                   'ownerName': widget.user.username,
                   'title': titleC.text.trim(),
                   'description': descC.text.trim(),
+                  'category': category,
+                  'workType': workType,
+                  'urgency': urgency,
                   'contact': contactC.text.trim(),
                   'preferredTime': whenC.text.trim(),
                   'address': addressC.text.trim(),
@@ -10124,7 +11226,15 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
   }
 
   Future<void> _showWorkerApplicationDialog() async {
+    final fullNameC = TextEditingController(text: widget.user.fullName ?? widget.user.username);
+    final phoneC = TextEditingController(text: widget.user.phone);
+    final cityC = TextEditingController(text: widget.user.city ?? '');
+    final yearsC = TextEditingController();
+    final skillsC = TextEditingController();
+    final roleC = TextEditingController();
+    final portfolioC = TextEditingController();
     final noteC = TextEditingController();
+    String availability = 'Full-time';
     final hasPending = widget.config.jobWorkerApplications.any(
       (a) => (a['userEmail'] ?? '').toString().toLowerCase().trim() == widget.user.email.toLowerCase().trim() && (a['status'] ?? '') == 'pending',
     );
@@ -10138,35 +11248,114 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     }
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Apply as Worker'),
-        content: TextField(
-          controller: noteC,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: 'Skills / experience',
-            hintText: 'Tell admin why you should be approved.',
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              widget.config.jobWorkerApplications.add({
-                'id': DateTime.now().microsecondsSinceEpoch.toString(),
-                'userEmail': widget.user.email,
-                'username': widget.user.username,
-                'phone': widget.user.phone,
-                'note': noteC.text.trim(),
-                'status': 'pending',
-                'createdAt': DateTime.now().toIso8601String(),
-              });
-              _saveJobs();
-              Navigator.pop(ctx);
-            },
-            child: const Text('Submit'),
-          ),
-        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final panelBg = isDark ? const Color(0xFF101827) : Colors.white;
+          final fill = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+          final border = isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB);
+          InputDecoration dec(String label, {String? hint}) => InputDecoration(
+                labelText: label,
+                hintText: hint,
+                filled: true,
+                fillColor: fill,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
+              );
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.all(16),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 640),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: panelBg,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: border),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Professional Worker Application', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                    const SizedBox(height: 12),
+                    TextField(controller: fullNameC, decoration: dec('Full Name *')),
+                    const SizedBox(height: 10),
+                    TextField(controller: phoneC, keyboardType: TextInputType.phone, decoration: dec('Phone Number *')),
+                    const SizedBox(height: 10),
+                    TextField(controller: cityC, decoration: dec('City / State')),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: yearsC, keyboardType: TextInputType.number, decoration: dec('Years of Experience'))),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: availability,
+                            decoration: dec('Availability'),
+                            items: const [
+                              DropdownMenuItem(value: 'Full-time', child: Text('Full-time')),
+                              DropdownMenuItem(value: 'Part-time', child: Text('Part-time')),
+                              DropdownMenuItem(value: 'Weekends', child: Text('Weekends')),
+                              DropdownMenuItem(value: 'Flexible', child: Text('Flexible')),
+                            ],
+                            onChanged: (v) => setDialog(() => availability = v ?? 'Flexible'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(controller: skillsC, maxLines: 2, decoration: dec('Skills *', hint: 'e.g., electrical, plumbing, painting')),
+                    const SizedBox(height: 10),
+                    TextField(controller: roleC, decoration: dec('Preferred Role *', hint: 'e.g., Electrician')),
+                    const SizedBox(height: 10),
+                    TextField(controller: portfolioC, decoration: dec('Portfolio Link (optional)')),
+                    const SizedBox(height: 10),
+                    TextField(controller: noteC, maxLines: 3, decoration: dec('Why should we approve you? *')),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (fullNameC.text.trim().isEmpty || phoneC.text.trim().isEmpty || skillsC.text.trim().isEmpty || roleC.text.trim().isEmpty || noteC.text.trim().isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all required fields.')));
+                                return;
+                              }
+                              widget.config.jobWorkerApplications.add({
+                                'id': DateTime.now().microsecondsSinceEpoch.toString(),
+                                'userEmail': widget.user.email,
+                                'username': widget.user.username,
+                                'fullName': fullNameC.text.trim(),
+                                'phone': phoneC.text.trim(),
+                                'city': cityC.text.trim(),
+                                'yearsExperience': yearsC.text.trim(),
+                                'availability': availability,
+                                'skills': skillsC.text.trim(),
+                                'preferredRole': roleC.text.trim(),
+                                'portfolio': portfolioC.text.trim(),
+                                'note': noteC.text.trim(),
+                                'status': 'pending',
+                                'createdAt': DateTime.now().toIso8601String(),
+                              });
+                              _saveJobs();
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Application sent to admin for review.')));
+                            },
+                            child: const Text('Submit Application'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -10300,6 +11489,85 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     _saveJobs();
   }
 
+  Widget _workerApplicationCard(Map<String, dynamic> app, {required bool isDark, required bool adminView}) {
+    final status = (app['status'] ?? 'pending').toString();
+    final accent = _appStatusColor(status);
+    final createdAt = (app['createdAt'] ?? '').toString();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141A24) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  (app['fullName'] ?? app['username'] ?? 'Applicant').toString(),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: accent.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+                child: Text(_appStatusLabel(status), style: TextStyle(color: accent, fontWeight: FontWeight.w700, fontSize: 10)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('Email: ${(app['userEmail'] ?? '').toString()}'),
+          Text('Phone: ${(app['phone'] ?? '').toString()}'),
+          if ((app['city'] ?? '').toString().trim().isNotEmpty) Text('Location: ${(app['city'] ?? '').toString()}'),
+          if ((app['preferredRole'] ?? '').toString().trim().isNotEmpty) Text('Role: ${(app['preferredRole'] ?? '').toString()}'),
+          if ((app['skills'] ?? '').toString().trim().isNotEmpty) Text('Skills: ${(app['skills'] ?? '').toString()}'),
+          if ((app['availability'] ?? '').toString().trim().isNotEmpty) Text('Availability: ${(app['availability'] ?? '').toString()}'),
+          if ((app['note'] ?? '').toString().trim().isNotEmpty) Text('Statement: ${(app['note'] ?? '').toString()}'),
+          if (createdAt.isNotEmpty)
+            Text(
+              'Submitted: ${_safeDate(createdAt)}',
+              style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54),
+            ),
+          if (adminView && status == 'pending') ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _processWorkerApplication(app, approve: false),
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    label: const Text('Reject'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _processWorkerApplication(app, approve: true),
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    label: const Text('Approve'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _safeDate(String raw) {
+    try {
+      final d = DateTime.parse(raw).toLocal();
+      return '${d.month}/${d.day}/${d.year} ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return raw;
+    }
+  }
+
   Widget _jobCard(Map<String, dynamic> job, {required bool isDark}) {
     final ownerEmail = (job['ownerEmail'] ?? '').toString().toLowerCase().trim();
     final status = (job['status'] ?? 'open').toString();
@@ -10311,14 +11579,30 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     final canManageOffers = mine && status == 'open';
     final canDone = status == 'claimed' && (mine || claimedByMe);
     final offers = List<Map<String, dynamic>>.from((job['offers'] ?? const []).map((e) => Map<String, dynamic>.from(e)));
+    final category = (job['category'] ?? 'General Service').toString();
+    final workType = (job['workType'] ?? 'On-site').toString();
+    final urgency = (job['urgency'] ?? 'Normal').toString();
+    final statusColor = status == 'open'
+        ? Colors.blue
+        : status == 'claimed'
+            ? Colors.orange
+            : Colors.green;
+    final urgencyColor = urgency == 'Urgent'
+        ? Colors.red
+        : urgency == 'Low'
+            ? Colors.green
+            : Colors.amber.shade700;
 
     return Card(
       elevation: 0,
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      color: isDark ? const Color(0xFF161B22) : Colors.white,
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: statusColor.withOpacity(0.2)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -10337,30 +11621,37 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
                 Expanded(
                   child: Text(
                     (job['title'] ?? 'Untitled Job').toString(),
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: status == 'open'
-                        ? Colors.blue.withOpacity(0.12)
-                        : status == 'claimed'
-                            ? Colors.orange.withOpacity(0.12)
-                            : Colors.green.withOpacity(0.12),
+                    color: statusColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(status.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
+                  child: Text(status.toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: statusColor)),
                 ),
               ],
             ),
             const SizedBox(height: 6),
             Text((job['description'] ?? '').toString()),
             const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _chip(category, Colors.deepPurple),
+                _chip(workType, Colors.teal),
+                _chip(urgency, urgencyColor),
+              ],
+            ),
+            const SizedBox(height: 8),
             Text('Budget: \$${formatCurrency((job['agreedPrice'] ?? job['budget'] ?? 0).toDouble())}', style: const TextStyle(fontWeight: FontWeight.bold)),
             Text('Contact: ${(job['contact'] ?? '').toString()}'),
             Text('When: ${(job['preferredTime'] ?? '').toString()}'),
             Text('Address: ${(job['address'] ?? '').toString()}'),
+            Text('Posted by: ${(job['ownerName'] ?? '').toString()}'),
             if ((job['claimedByName'] ?? '').toString().isNotEmpty) Text('Claimed by: ${(job['claimedByName'] ?? '').toString()}'),
             const SizedBox(height: 8),
             Wrap(
@@ -10396,6 +11687,17 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _chip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
     );
   }
 
@@ -10447,7 +11749,7 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text('Job Marketplace', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
-                        Text('Find work or post jobs', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13)),
+                        Text('Find work, post jobs, and hire with confidence', style: TextStyle(color: Colors.white.withOpacity(0.88), fontSize: 13)),
                       ],
                     ),
                   ),
@@ -10483,17 +11785,6 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
             const SizedBox(height: 25),
 
             // Content Area
-            if (_activeTab == 0 && !_isApprovedWorker)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF2A1B1B) : const Color(0xFFFFF2F2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text('You can post jobs now. Apply first to become an approved worker and claim jobs.'),
-              ),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
