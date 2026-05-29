@@ -1671,7 +1671,8 @@ class AuthScreen extends StatefulWidget {
   @override State<AuthScreen> createState() => _AuthScreenState();
 }
 class _AuthScreenState extends State<AuthScreen> {
-  bool _isLogin = true; 
+  bool _isLogin = true;
+  bool _showPassword = false;
   final _e = TextEditingController(); 
   final _p = TextEditingController(); 
   final _s = TextEditingController();
@@ -1985,7 +1986,20 @@ class _AuthScreenState extends State<AuthScreen> {
         TextField(controller: _p, decoration: InputDecoration(labelText: 'Phone Number', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
       ],
       const SizedBox(height: 20),
-      TextField(controller: _s, obscureText: true, decoration: InputDecoration(labelText: 'Password', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
+      TextField(
+        controller: _s,
+        obscureText: !_showPassword,
+        decoration: InputDecoration(
+          labelText: 'Password',
+          filled: true,
+          fillColor: Theme.of(context).cardColor,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+          suffixIcon: IconButton(
+            onPressed: () => setState(() => _showPassword = !_showPassword),
+            icon: Icon(_showPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+          ),
+        ),
+      ),
       const SizedBox(height: 35),
       ElevatedButton(
         onPressed: _submit, 
@@ -2486,7 +2500,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               // MAIN FRAME FOR THE CIRCLE
               Container(
                 width: double.infinity,
-                height: 230,
+                height: 272,
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(25),
@@ -2735,7 +2749,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               return Transform.rotate(
                 angle: active ? _smokeRot.value : 0,
                 child: Container(
-                  width: 220, height: 220,
+                  width: 206, height: 206,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: (alreadyDone ? Colors.grey : const Color(0xFF00B25A)).withOpacity(0.03),
@@ -2767,7 +2781,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           }),
           // Outer ring
           Container(
-            width: 180, height: 180,
+            width: 170, height: 170,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: (alreadyDone ? Colors.grey : const Color(0xFF00B25A)).withOpacity(0.12), width: 12),
@@ -2775,7 +2789,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           // Main inner circle
           Container(
-            width: 145, height: 145,
+            width: 136, height: 136,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
@@ -2795,9 +2809,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 )
               ],
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+            child: Transform.translate(
+              offset: const Offset(0, -6),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                 AnimatedBuilder(
                   animation: _smokeCtrl,
                   builder: (context, child) {
@@ -2834,8 +2853,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           ),
                           if (!alreadyDone)
                             SizedBox(
-                              width: 52,
-                              height: 80,
+                              width: 50,
+                              height: 76,
                               child: Stack(
                                 alignment: Alignment.center,
                                 clipBehavior: Clip.none,
@@ -2844,8 +2863,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   Positioned(
                                     bottom: 0,
                                     child: Container(
-                                      width: 40,
-                                      height: 60,
+                                      width: 38,
+                                      height: 56,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(color: Colors.white.withOpacity(0.94), width: 2.1),
@@ -2944,7 +2963,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   ),
                                   // Top battery terminal/tap
                                   Positioned(
-                                    top: 15,
+                                    top: 14,
                                     child: Container(
                                       width: 14,
                                       height: 6,
@@ -2976,39 +2995,41 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     );
                   },
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(alreadyDone ? 'Completed' : 'Daily Earnings', style: const TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 if (!alreadyDone) Text(
                   '\$${formatCurrency(widget.user.currentTodayEarnings)}',
-                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
                 ),
-                if (!active && !alreadyDone) const Text('ACTIVATE', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                if (alreadyDone) const Text('TOMORROW', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-              ],
+                if (!active && !alreadyDone) const Text('ACTIVATE', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
+                if (alreadyDone) const Text('TOMORROW', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              ),
             ),
           ),
         ],
       ),
           if (showLate) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(999),
                 border: Border.all(color: const Color(0xFFF97316).withOpacity(0.45)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.alarm_rounded, color: Color(0xFFFB7185), size: 14),
-                  const SizedBox(width: 6),
+                  const Icon(Icons.alarm_rounded, color: Color(0xFFFB7185), size: 12),
+                  const SizedBox(width: 5),
                   Text(
                     lateText,
                     style: const TextStyle(
                       color: Color(0xFFEA580C),
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -6295,9 +6316,10 @@ class InvestScreen extends StatelessWidget {
     final active = user.activeInvestment;
     final isExpired = active != null && active.daysLeft <= 0;
     
-    bool isCurrent = active != null && active.name == p.name && price == active.amount && !isExpired;
-    bool isUpgrade = !isExpired && active != null && price > active.amount;
-    bool isDowngrade = !isExpired && active != null && price < active.amount;
+    final hasActivePlan = active != null && !isExpired;
+    bool isCurrent = hasActivePlan && active!.name == p.name && price == active.amount;
+    bool isUpgrade = hasActivePlan && price > active.amount;
+    bool isDowngrade = hasActivePlan && price < active.amount;
     final pendingSamePlan = user.pendingInvestmentName == p.name &&
         user.pendingInvestmentAmount != null &&
         (user.pendingInvestmentAmount! - price).abs() < 0.0001;
@@ -6315,15 +6337,18 @@ class InvestScreen extends StatelessWidget {
     }
 
     final isDark = Theme.of(ctx).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final subColor = isDark ? Colors.white70 : Colors.black54;
+    final textColor = isDark ? const Color(0xFFE5E7EB) : const Color(0xFF0F172A);
+    final subColor = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF475569);
 
     final isRenewSamePlan = isExpired && active != null && (price - active.amount).abs() < 0.0001;
     final requiredPayment = isRenewSamePlan ? price : math.max(0.0, diff);
     final canBuyNow = !isCurrent && !isDowngrade && !pendingSamePlan && requiredPayment > 0 && user.accountBalance >= requiredPayment;
 
-    if (!isCurrent && !isDowngrade && pendingSamePlan) {
+    if (isCurrent) {
+      buttonText = "Active";
+    } else if (isDowngrade) {
+      buttonText = "Downgrade Locked";
+    } else if (pendingSamePlan) {
       buttonText = "Waiting for Deposit";
     } else if (canBuyNow) {
       buttonText = "Buy";
@@ -6331,30 +6356,47 @@ class InvestScreen extends StatelessWidget {
       buttonText = "Upgrade Now";
     } else if (isRenewSamePlan) {
       buttonText = "Renew Plan";
-    } else if (isCurrent) {
-      buttonText = "Active";
     } else {
       buttonText = "Invest Now";
     }
 
+    final disableButton = isCurrent || isDowngrade || pendingSamePlan;
+
+    final cardGradient = isDark
+        ? LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isCurrent
+                ? const [Color(0xFF384252), Color(0xFF1F2732)]
+                : isUpgrade
+                    ? const [Color(0xFF3A3446), Color(0xFF1F1B28)]
+                    : const [Color(0xFF2A2F37), Color(0xFF161B22)],
+          )
+        : LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isCurrent
+                ? const [Color(0xFFE7EEF8), Color(0xFFDCE5F2)]
+                : isUpgrade
+                    ? const [Color(0xFFF6EEF9), Color(0xFFEFE7F8)]
+                    : const [Color(0xFFF9F7F3), Color(0xFFEDEFF4)],
+          );
+    final cardBorderColor = isDark ? const Color(0xFF3F4754) : const Color(0xFFD7DEE8);
+    final accentShadow = isDark ? const Color(0xFF0B0F14) : const Color(0xFF94A3B8);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: cardBg,
-        gradient: isDark ? null : const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF00B25A), Color(0xFF00964D)],
-        ),
+        gradient: cardGradient,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: accentShadow.withOpacity(isDark ? 0.28 : 0.18),
+            blurRadius: isDark ? 16 : 12,
+            offset: const Offset(0, 6),
           ),
         ],
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: cardBorderColor),
       ),
       child: Column(
         children: [
@@ -6368,7 +6410,7 @@ class InvestScreen extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(p.name, style: TextStyle(color: isDark ? textColor : Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                        Text(p.name, style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 18)),
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -6382,8 +6424,8 @@ class InvestScreen extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text('\$${formatCurrency(price)}', style: TextStyle(color: isDark ? textColor : Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
-                        Text('Investment', style: TextStyle(color: isDark ? subColor : Colors.white70, fontSize: 10)),
+                        Text('\$${formatCurrency(price)}', style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 24)),
+                        Text('Investment', style: TextStyle(color: subColor, fontSize: 10)),
                       ],
                     ),
                   ],
@@ -6405,14 +6447,14 @@ class InvestScreen extends StatelessWidget {
             width: double.infinity,
             margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             child: ElevatedButton(
-              onPressed: (isCurrent || isDowngrade)
-                  ? null 
+              onPressed: disableButton
+                  ? null
                   : () => onInvest(p.name, price, p.roi, requiredPayment),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDark ? const Color(0xFF6200EE) : Colors.white,
-                foregroundColor: isDark ? Colors.white : const Color(0xFF00964D),
-                disabledBackgroundColor: (isDark ? Colors.grey : Colors.white).withOpacity(0.3),
-                disabledForegroundColor: isDark ? Colors.grey : const Color(0xFF00964D).withOpacity(0.6),
+                backgroundColor: isDark ? const Color(0xFFC0A56E) : const Color(0xFF1E293B),
+                foregroundColor: isDark ? const Color(0xFF111827) : Colors.white,
+                disabledBackgroundColor: (isDark ? const Color(0xFF71717A) : const Color(0xFF94A3B8)).withOpacity(0.45),
+                disabledForegroundColor: isDark ? const Color(0xFFE5E7EB) : Colors.white70,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 15),
@@ -6430,10 +6472,11 @@ class InvestScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.2),
+        color: isDark ? Colors.white.withOpacity(0.10) : const Color(0xFF334155).withOpacity(0.08),
         borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFCBD5E1)),
       ),
-      child: Text(text, style: TextStyle(color: isDark ? Colors.white70 : Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+      child: Text(text, style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF334155), fontSize: 10, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -6442,15 +6485,16 @@ class InvestScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.72),
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: isDark ? Colors.white60 : Colors.white70, fontSize: 10)),
+          Text(label, style: TextStyle(color: isDark ? Colors.white60 : const Color(0xFF64748B), fontSize: 10)),
           const SizedBox(height: 4),
-          Text(value, style: TextStyle(color: isDark ? Colors.white : Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(value, style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 14)),
         ],
       ),
     );
@@ -6490,6 +6534,17 @@ class _StatsScreenState extends State<StatsScreen> {
     final approved = widget.transactions.where((t) => t.status == TransactionStatus.approved);
     final totalVol = approved.where((t) => t.type == TransactionType.deposit).fold(0.0, (s, t) => s + t.amount);
     final totalPay = approved.where((t) => t.type == TransactionType.withdrawal).fold(0.0, (s, t) => s + t.amount);
+    final totalUsersInFlow = widget.transactions.map((t) => t.userEmail.toLowerCase().trim()).toSet().length;
+    final totalDepositsCount = widget.transactions.where((t) => t.type == TransactionType.deposit).length;
+    final totalWithdrawalsCount = widget.transactions.where((t) => t.type == TransactionType.withdrawal).length;
+    final withdrawn24h = approved
+        .where((t) => t.type == TransactionType.withdrawal && t.timestamp.isAfter(_now.subtract(const Duration(hours: 24))))
+        .fold(0.0, (s, t) => s + t.amount);
+    final active24hUsers = widget.transactions
+        .where((t) => t.timestamp.isAfter(_now.subtract(const Duration(hours: 24))))
+        .map((t) => t.userEmail.toLowerCase().trim())
+        .toSet()
+        .length;
 
     final last24h = _now.subtract(const Duration(hours: 24));
     final prev24h = _now.subtract(const Duration(hours: 48));
@@ -6559,6 +6614,26 @@ class _StatsScreenState extends State<StatsScreen> {
                     const SizedBox(height: 6),
                     Text('Last 24h deposits: \$${formatCurrency(current24hVol)}', style: const TextStyle(fontWeight: FontWeight.w700)),
                     Text('Current flow (last 1 min): \$${formatCurrency(minuteVol)}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: _miniGrowthInfo('Users in Flow', '$totalUsersInFlow')),
+                        const SizedBox(width: 8),
+                        Expanded(child: _miniGrowthInfo('Active 24h', '$active24hUsers')),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: _miniGrowthInfo('Deposits', '$totalDepositsCount')),
+                        const SizedBox(width: 8),
+                        Expanded(child: _miniGrowthInfo('Withdrawals', '$totalWithdrawalsCount')),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _miniGrowthInfo('Money Withdrawn (Company)', '\$${formatCurrency(totalPay)}'),
+                    const SizedBox(height: 8),
+                    _miniGrowthInfo('Withdrawn in Last 24h', '\$${formatCurrency(withdrawn24h)}'),
                     Text(
                       'Live updated: ${_now.hour.toString().padLeft(2, '0')}:${_now.minute.toString().padLeft(2, '0')}:${_now.second.toString().padLeft(2, '0')}',
                       style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 11),
@@ -6590,6 +6665,32 @@ class _StatsScreenState extends State<StatsScreen> {
           ],
         ),
       );
+
+  Widget _miniGrowthInfo(String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.06) : Colors.grey.withOpacity(0.09),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.white70 : Colors.black54,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: isDark ? Colors.white : Colors.black87)),
+        ],
+      ),
+    );
+  }
 }
 
 class ProfileScreen extends StatefulWidget {
@@ -6832,13 +6933,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       const SizedBox(height: 20),
       _box(context, 'Contact', [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Personal Info', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), IconButton(icon: const Icon(Icons.edit, size: 16, color: Colors.blue), onPressed: () => _editMe(context))]),
-        const Divider(),
-        _row(Icons.person_outline, 'Username', widget.user.username),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: panelBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: panelBorder),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Personal Info', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryText)),
+              IconButton(icon: const Icon(Icons.edit, size: 16, color: Colors.blue), onPressed: () => _editMe(context)),
+            ],
+          ),
+        ),
         const SizedBox(height: 10),
-        _row(Icons.email_outlined, 'Email', widget.user.email),
-        const SizedBox(height: 10),
-        _row(Icons.phone_android_outlined, 'Phone', widget.user.phone.isEmpty ? 'Not set' : widget.user.phone)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: panelBorder),
+          ),
+          child: Column(
+            children: [
+              _row(Icons.person_outline, 'Username', widget.user.username),
+              const SizedBox(height: 10),
+              _row(Icons.email_outlined, 'Email', widget.user.email),
+              const SizedBox(height: 10),
+              _row(Icons.phone_android_outlined, 'Phone', widget.user.phone.isEmpty ? 'Not set' : widget.user.phone),
+            ],
+          ),
+        ),
       ]), const SizedBox(height: 15),
       _box(context, 'Account Information', [
         _pair('Account ID', _accountId),
