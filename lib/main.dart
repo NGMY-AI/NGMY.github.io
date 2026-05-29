@@ -1418,6 +1418,15 @@ class _NGMYAppState extends State<NGMYApp> {
           brightness: Brightness.light, 
           scaffoldBackgroundColor: Colors.white, 
           cardColor: Colors.white,
+          pageTransitionsTheme: const PageTransitionsTheme(
+            builders: {
+              TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+            },
+          ),
           appBarTheme: const AppBarTheme(
             systemOverlayStyle: SystemUiOverlayStyle(
               statusBarColor: Colors.white,
@@ -1434,6 +1443,15 @@ class _NGMYAppState extends State<NGMYApp> {
           brightness: Brightness.dark, 
           scaffoldBackgroundColor: const Color(0xFF121212), 
           cardColor: const Color(0xFF1E1E1E),
+          pageTransitionsTheme: const PageTransitionsTheme(
+            builders: {
+              TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+            },
+          ),
           appBarTheme: const AppBarTheme(
             systemOverlayStyle: SystemUiOverlayStyle(
               statusBarColor: Color(0xFF121212),
@@ -2023,6 +2041,56 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
 
+  Future<void> _showOfficialNotice({
+    required String title,
+    required String message,
+    bool isError = false,
+  }) async {
+    if (!mounted) return;
+    final accent = isError ? const Color(0xFFEF4444) : const Color(0xFF22C55E);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0B1020).withOpacity(0.96),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: accent.withOpacity(0.55)),
+            boxShadow: [BoxShadow(color: accent.withOpacity(0.24), blurRadius: 16, offset: const Offset(0, 6))],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(isError ? Icons.info_outline_rounded : Icons.check_circle_outline_rounded, color: accent),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16))),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(message, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: FilledButton.styleFrom(backgroundColor: accent, foregroundColor: Colors.white),
+                  child: const Text('OK'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override void initState() {
     super.initState();
     _t = Timer.periodic(const Duration(seconds: 1), (t) { 
@@ -2078,13 +2146,21 @@ class _MainScreenState extends State<MainScreen> {
       HomeScreen(user: widget.user, onClockIn: () { 
         final now = DateTime.now();
         if (widget.user.activeInvestment == null) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You need an active investment plan to earn!')));
+          _showOfficialNotice(
+            title: 'Plan Required',
+            message: 'You need an active investment plan to start clock-in earnings.',
+            isError: true,
+          );
           return;
         }
         if (widget.user.lastClockInDate != null) {
           final last = widget.user.lastClockInDate!;
           if (last.year == now.year && last.month == now.month && last.day == now.day) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You have already clocked in today!')));
+            _showOfficialNotice(
+              title: 'Already Clocked In',
+              message: 'You have already completed today\'s clock-in.',
+              isError: true,
+            );
             return;
           }
         }
@@ -2104,12 +2180,16 @@ class _MainScreenState extends State<MainScreen> {
         }); 
         final penalty = widget.user.clockInPenaltyPercent;
         if (penalty > 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Clock-in registered. $penalty% deduction applied for late check-in.')),
+          _showOfficialNotice(
+            title: 'Clock-In Registered',
+            message: '$penalty% deduction applied for late check-in.',
+            isError: false,
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Clock-in registered on time.')),
+          _showOfficialNotice(
+            title: 'Clock-In Registered',
+            message: 'On-time check-in confirmed.',
+            isError: false,
           );
         }
         widget.onDataChanged(); 
@@ -2286,6 +2366,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late Animation<double> _smokeRot;
   Timer? _liveTicker;
   int _liveStart = 0;
+
+  Future<void> _showOfficialNotice(String title, String message) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        content: Text(message),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+      ),
+    );
+  }
 
   @override void initState() {
     super.initState();
@@ -2568,8 +2662,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       onTap: (active || alreadyDone || widget.user.activeInvestment == null) 
         ? (alreadyDone ? null : () {
             if (widget.user.activeInvestment == null) {
-              ScaffoldMessenger.of(ctx).showSnackBar(
-                const SnackBar(content: Text('You need an active investment plan to earn!'))
+              _showOfficialNotice(
+                'Plan Required',
+                'You need an active investment plan to start clock-in earnings.',
               );
             }
           })
