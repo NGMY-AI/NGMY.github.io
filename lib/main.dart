@@ -250,6 +250,8 @@ class AppConfig {
   List<Map<String, dynamic>> jobWorkerApplications;
   List<Map<String, dynamic>> storeListings;
   List<Map<String, dynamic>> storeInquiries;
+  /// When false, users cannot post to the News tab (admin can still post).
+  bool newsFeedOpen;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -278,6 +280,7 @@ class AppConfig {
     this.jobWorkerApplications = const [],
     this.storeListings = const [],
     this.storeInquiries = const [],
+    this.newsFeedOpen = true,
   });
   Map<String, dynamic> toJson() => {
     'officialCashApp': officialCashApp,
@@ -306,6 +309,7 @@ class AppConfig {
     'jobWorkerApplications': jobWorkerApplications,
     'storeListings': storeListings,
     'storeInquiries': storeInquiries,
+    'newsFeedOpen': newsFeedOpen,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
@@ -334,6 +338,7 @@ class AppConfig {
     jobWorkerApplications: List<Map<String, dynamic>>.from((json['jobWorkerApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     storeListings: List<Map<String, dynamic>>.from((json['storeListings'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     storeInquiries: List<Map<String, dynamic>>.from((json['storeInquiries'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
+    newsFeedOpen: json['newsFeedOpen'] ?? true,
   );
 }
 
@@ -433,29 +438,99 @@ bool _isMissingTablePostgrestError(Object error, String table) {
   return error.toString().contains("Could not find the table 'public.$table'");
 }
 
+Map<String, dynamic> _mediaPostPayloadFromRow(Map<String, dynamic> row) {
+  final data = row['data'];
+  if (data is Map) return Map<String, dynamic>.from(data);
+  if (data is String && data.trim().isNotEmpty) {
+    try {
+      final parsed = jsonDecode(data);
+      if (parsed is Map) return Map<String, dynamic>.from(parsed);
+    } catch (_) {}
+  }
+  final flat = Map<String, dynamic>.from(row);
+  flat.remove('data');
+  flat.remove('updated_at');
+  return flat;
+}
+
+Map<String, dynamic> _mediaRowSnakeCase(Map<String, dynamic> row) {
+  final likedBy = row['likedBy'] ?? row['liked_by'] ?? const [];
+  final savedBy = row['savedBy'] ?? row['saved_by'] ?? const [];
+  return {
+    'id': row['id'],
+    'user_email': row['userEmail'] ?? row['user_email'] ?? '',
+    'username': row['username'] ?? 'User',
+    'video_url': row['videoUrl'] ?? row['video_url'] ?? '',
+    'content_type': row['contentType'] ?? row['content_type'] ?? 'video',
+    'caption': row['caption'] ?? '',
+    'timestamp': row['timestamp'] ?? DateTime.now().toUtc().toIso8601String(),
+    'likes': row['likes'] ?? (likedBy is List ? likedBy.length : 0),
+    'liked_by': likedBy,
+    'saved_by': savedBy,
+    'comments': row['comments'] ?? const [],
+  };
+}
+
 Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
-  final working = Map<String, dynamic>.from(row);
-  final url = (working['videoUrl'] ?? working['video_url'] ?? '').toString();
+  final payload = Map<String, dynamic>.from(row);
+  final id = (payload['id'] ?? '').toString();
+  if (id.isEmpty) return false;
+
+  final url = (payload['videoUrl'] ?? payload['video_url'] ?? '').toString();
   if (url.startsWith('data:') && url.length > 120000) {
     debugPrint('[media] skipped upsert: inline media too large for database.');
     return false;
   }
-  for (int i = 0; i < 12; i++) {
-    try {
-      await Supabase.instance.client.from('media').upsert([working]);
-      return true;
-    } catch (e) {
-      if (_isMissingTablePostgrestError(e, 'media')) {
-        debugPrint('[media] table missing in Supabase.');
-        return false;
+
+  final jsonbRow = <String, dynamic>{
+    'id': id,
+    'data': payload,
+    'updated_at': DateTime.now().toUtc().toIso8601String(),
+  };
+  try {
+    await Supabase.instance.client.from('media').upsert([jsonbRow]);
+    return true;
+  } catch (e) {
+    debugPrint('[media] jsonb upsert: $e');
+  }
+
+  final attempts = <Map<String, dynamic>>[
+    payload,
+    _mediaRowSnakeCase(payload),
+    {
+      'id': id,
+      'userEmail': payload['userEmail'],
+      'username': payload['username'],
+      'videoUrl': payload['videoUrl'],
+      'contentType': payload['contentType'],
+      'caption': payload['caption'],
+      'timestamp': payload['timestamp'],
+      'likes': payload['likes'],
+      'likedBy': payload['likedBy'],
+      'savedBy': payload['savedBy'],
+      'comments': payload['comments'],
+    },
+  ];
+
+  for (final attempt in attempts) {
+    final working = Map<String, dynamic>.from(attempt);
+    for (int i = 0; i < 8; i++) {
+      try {
+        await Supabase.instance.client.from('media').upsert([working]);
+        return true;
+      } catch (e) {
+        if (_isMissingTablePostgrestError(e, 'media')) {
+          debugPrint('[media] table missing — run supabase/SQL_MEDIA_FIX.txt');
+          return false;
+        }
+        final missing = _missingColumnFromPostgrestError(e);
+        if (missing != null && missing.isNotEmpty) {
+          working.remove(missing);
+          continue;
+        }
+        debugPrint('[media] upsert attempt error: $e');
+        break;
       }
-      final missing = _missingColumnFromPostgrestError(e);
-      if (missing != null && missing.isNotEmpty) {
-        working.remove(missing);
-        continue;
-      }
-      debugPrint('[media] upsert error: $e');
-      return false;
     }
   }
   return false;
@@ -464,9 +539,9 @@ Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
 Future<List<MediaPost>> _fetchMediaPostsFromSupabase() async {
   try {
     final rows = await Supabase.instance.client.from('media').select();
-    if (rows == null) return [];
     return (rows as List)
-        .map((e) => MediaPost.fromJson(Map<String, dynamic>.from(e as Map)))
+        .map((e) => MediaPost.fromJson(_mediaPostPayloadFromRow(Map<String, dynamic>.from(e as Map))))
+        .where((m) => m.id.isNotEmpty)
         .toList();
   } catch (e) {
     debugPrint('[media] fetch error: $e');
@@ -1055,12 +1130,13 @@ class UserData {
     if (activeInvestment!.daysLeft <= 0) return 0.0;
     return activeInvestment!.amount;
   }
+  /// True only after today's session finished and earnings were deposited (not while clocking in).
   bool get alreadyClockedInToday {
-    if (lastClockInDate == null) return false;
+    if (isClockedIn || lastClockInDate == null) return false;
     final now = DateTime.now();
-    return lastClockInDate!.year == now.year && 
-           lastClockInDate!.month == now.month && 
-           lastClockInDate!.day == now.day;
+    return lastClockInDate!.year == now.year &&
+        lastClockInDate!.month == now.month &&
+        lastClockInDate!.day == now.day;
   }
   double get currentTodayEarnings {
     if (!isClockedIn || clockInStartTime == null || activeInvestment == null) return 0.0;
@@ -1131,6 +1207,22 @@ class UserData {
       savedBitcoinAddress: (json['savedBitcoinAddress'] ?? '').toString(),
     );
   }
+}
+
+/// When daily earnings reach the goal, deposit to balance and end the session.
+double completeClockInSessionIfReady(UserData user) {
+  if (!user.isClockedIn || user.activeInvestment == null) return 0;
+  if (user.currentTodayEarnings < user.todayDailyGoal) return 0;
+  final earned = user.currentTodayEarnings;
+  user.accountBalance += earned;
+  user.totalProfit += earned;
+  user.activeInvestment!.totalEarned += earned;
+  user.activeInvestment!.daysClockedIn++;
+  user.isClockedIn = false;
+  user.clockInStartTime = null;
+  user.clockInPenaltyPercent = 0;
+  user.lastClockInDate = DateTime.now();
+  return earned;
 }
 
 // --- MAIN APP ---
@@ -2883,6 +2975,7 @@ class MainScreen extends StatefulWidget {
 }
 class _MainScreenState extends State<MainScreen> {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
+  int _clockUiTick = 0;
 
   Future<void> _showOfficialNotice({
     required String title,
@@ -2940,37 +3033,30 @@ class _MainScreenState extends State<MainScreen> {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
       if (widget.user.isClockedIn) {
         double earned = 0;
-        bool completed = false;
         setState(() {
-          if (widget.user.currentTodayEarnings >= widget.user.todayDailyGoal) {
-            earned = widget.user.currentTodayEarnings;
-            widget.user.accountBalance += earned;
-            widget.user.totalProfit += earned;
-            widget.user.activeInvestment!.totalEarned += earned;
-            widget.user.activeInvestment!.daysClockedIn++;
-            widget.user.isClockedIn = false;
-            widget.user.clockInStartTime = null;
-            widget.user.clockInPenaltyPercent = 0;
-            completed = true;
-          }
+          earned = completeClockInSessionIfReady(widget.user);
+          if (earned <= 0) _clockUiTick++;
         });
-        
-        if (completed) {
-          if (earned > 0) {
-            widget.onAddTransaction(AppTransaction(
-              id: DateTime.now().toString(),
-              userEmail: widget.user.email,
-              amount: earned,
-              type: TransactionType.reimbursement,
-              method: PaymentMethod.system,
-              sourceDetails: 'Clock-in daily earnings',
-              status: TransactionStatus.approved,
-              timestamp: DateTime.now(),
-            ));
-          }
-          widget.onDataChanged(); // Immediate sync on completion
+
+        if (earned > 0) {
+          _clockUiTick++;
+          widget.onAddTransaction(AppTransaction(
+            id: DateTime.now().toString(),
+            userEmail: widget.user.email,
+            amount: earned,
+            type: TransactionType.reimbursement,
+            method: PaymentMethod.system,
+            sourceDetails: 'Clock-in daily earnings',
+            status: TransactionStatus.approved,
+            timestamp: DateTime.now(),
+          ));
+          widget.onDataChanged();
+          _showOfficialNotice(
+            title: 'Clock-In Complete',
+            message: '\$${formatCurrency(earned)} was added to your balance. See you tomorrow!',
+            isError: false,
+          );
         } else {
-          // Throttle cloud sync to every 30 seconds to prevent "quick/stuttery" UI
           _syncCounter++;
           if (_syncCounter >= 30) {
             _syncCounter = 0;
@@ -2986,7 +3072,7 @@ class _MainScreenState extends State<MainScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sorted = List<AppTransaction>.from(widget.allTransactions)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     final pages = [
-      HomeScreen(user: widget.user, onClockIn: () { 
+      HomeScreen(user: widget.user, clockUiTick: _clockUiTick, onClockIn: () { 
         final now = DateTime.now();
         if (widget.user.activeInvestment == null) {
           _showOfficialNotice(
@@ -2996,16 +3082,21 @@ class _MainScreenState extends State<MainScreen> {
           );
           return;
         }
-        if (widget.user.lastClockInDate != null) {
-          final last = widget.user.lastClockInDate!;
-          if (last.year == now.year && last.month == now.month && last.day == now.day) {
-            _showOfficialNotice(
-              title: 'Already Clocked In',
-              message: 'You have already completed today\'s clock-in.',
-              isError: true,
-            );
-            return;
-          }
+        if (widget.user.isClockedIn) {
+          _showOfficialNotice(
+            title: 'Session Active',
+            message: 'You are already clocked in. Earnings are counting now.',
+            isError: false,
+          );
+          return;
+        }
+        if (widget.user.alreadyClockedInToday) {
+          _showOfficialNotice(
+            title: 'Already Completed',
+            message: 'You have already completed today\'s clock-in.',
+            isError: true,
+          );
+          return;
         }
         setState(() { 
           final midnight = DateTime(now.year, now.month, now.day, 0, 0);
@@ -3018,8 +3109,8 @@ class _MainScreenState extends State<MainScreen> {
           }
           widget.user.isClockedIn = true; 
           widget.user.clockInStartTime = DateTime.now(); 
-          widget.user.lastClockInDate = DateTime.now();
           widget.user.clockInPenaltyPercent = penalty;
+          _clockUiTick++;
         }); 
         final penalty = widget.user.clockInPenaltyPercent;
         if (penalty > 0) {
@@ -3228,12 +3319,14 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 class HomeScreen extends StatefulWidget {
-  final UserData user; final VoidCallback onClockIn; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans; final AppConfig config;
+  final UserData user;
+  final int clockUiTick;
+  final VoidCallback onClockIn; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans; final AppConfig config;
   final List<Announcement> allAnnouncements;
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
   final Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
+  const HomeScreen({super.key, required this.user, this.clockUiTick = 0, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -3242,6 +3335,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late AnimationController _smokeCtrl;
   late Animation<double> _smokeRot;
   Timer? _liveTicker;
+  Timer? _clockUiTimer;
   int _liveStart = 0;
 
   Future<void> _showOfficialNotice(String title, String message) async {
@@ -3266,12 +3360,28 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       if (!mounted) return;
       setState(() => _liveStart++);
     });
+    _clockUiTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (widget.user.isClockedIn) setState(() {});
+    });
   }
 
   @override void dispose() {
     _liveTicker?.cancel();
+    _clockUiTimer?.cancel();
     _smokeCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.clockUiTick != widget.clockUiTick ||
+        oldWidget.user.isClockedIn != widget.user.isClockedIn ||
+        oldWidget.user.lastClockInDate != widget.user.lastClockInDate ||
+        oldWidget.user.accountBalance != widget.user.accountBalance) {
+      setState(() {});
+    }
   }
 
   @override Widget build(BuildContext context) {
@@ -3588,9 +3698,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _clock(BuildContext ctx) {
     bool active = widget.user.isClockedIn;
-    bool alreadyDone = widget.user.alreadyClockedInToday && !active;
+    bool alreadyDone = widget.user.alreadyClockedInToday;
     final lateText = _clockLateText();
-    final showLate = !active && !alreadyDone && widget.user.activeInvestment != null && lateText != null;
+    final showLate = !alreadyDone && !active && widget.user.activeInvestment != null && lateText != null;
     
     return GestureDetector(
       onTap: (active || alreadyDone || widget.user.activeInvestment == null) 
@@ -5433,18 +5543,47 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  Future<DateTime?> _pickDateTimeForAdmin(BuildContext ctx, DateTime? initial, String title) async {
+    final now = DateTime.now();
+    final base = initial ?? now;
+    final date = await showDatePicker(
+      context: ctx,
+      initialDate: base,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 2),
+      helpText: title,
+    );
+    if (date == null) return null;
+    final time = await showTimePicker(
+      context: ctx,
+      initialTime: TimeOfDay.fromDateTime(base),
+      helpText: '$title — time',
+    );
+    if (time == null) return null;
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  String _formatAdminDateTime(DateTime? dt) {
+    if (dt == null) return 'Not set';
+    final local = dt.toLocal();
+    return '${local.month}/${local.day}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  }
+
   void _showAnnouncementAdmin(bool isDark) {
     final titleC = TextEditingController();
     final msgC = TextEditingController();
     final imgC = TextEditingController();
     final apiC = TextEditingController(text: widget.config.geminiApiKey);
     final logoC = TextEditingController(text: widget.config.logoUrl);
+    DateTime? newsClearFrom;
+    DateTime? newsClearTo;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (c) => StatefulBuilder(builder: (ctx, setST) {
+        final newsOpen = widget.config.newsFeedOpen;
         return Align(
           alignment: Alignment.bottomCenter,
           child: Container(
@@ -5524,6 +5663,179 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               },
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
                               child: const Text('SAVE GLOBAL SETTINGS', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+                      const Divider(),
+                      const SizedBox(height: 15),
+
+                      Container(
+                        padding: const EdgeInsets.all(15),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.purple.withOpacity(0.25)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.newspaper_rounded, color: Colors.purple, size: 20),
+                                SizedBox(width: 10),
+                                Text('News Feed Controls', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              newsOpen
+                                  ? 'News is OPEN — users can post messages.'
+                                  : 'News is CLOSED — users cannot post (admin can still post).',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: newsOpen ? Colors.green.shade700 : Colors.red.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      setState(() => widget.config.newsFeedOpen = true);
+                                      widget.onDataChanged();
+                                      setST(() {});
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('News feed opened for all users.')),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.lock_open_rounded, size: 18),
+                                    label: const Text('Open News'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      foregroundColor: Colors.white,
+                                      minimumSize: const Size(0, 42),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      setState(() => widget.config.newsFeedOpen = false);
+                                      widget.onDataChanged();
+                                      setST(() {});
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('News feed closed — users cannot send messages.')),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.lock_rounded, size: 18),
+                                    label: const Text('Close News'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red.shade700,
+                                      foregroundColor: Colors.white,
+                                      minimumSize: const Size(0, 42),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+                            const Text('CLEAR NEWS MESSAGES', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Choose a start and end date/time. Posts in that range will be deleted from News for everyone.',
+                              style: TextStyle(fontSize: 11, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 10),
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('From', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              subtitle: Text(_formatAdminDateTime(newsClearFrom), style: const TextStyle(fontSize: 11)),
+                              trailing: TextButton(
+                                onPressed: () async {
+                                  final picked = await _pickDateTimeForAdmin(ctx, newsClearFrom, 'From date');
+                                  if (picked != null) setST(() => newsClearFrom = picked);
+                                },
+                                child: const Text('Pick'),
+                              ),
+                            ),
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('To', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              subtitle: Text(_formatAdminDateTime(newsClearTo), style: const TextStyle(fontSize: 11)),
+                              trailing: TextButton(
+                                onPressed: () async {
+                                  final picked = await _pickDateTimeForAdmin(ctx, newsClearTo, 'To date');
+                                  if (picked != null) setST(() => newsClearTo = picked);
+                                },
+                                child: const Text('Pick'),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                if (newsClearFrom == null || newsClearTo == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Set both From and To date/time first.')),
+                                  );
+                                  return;
+                                }
+                                var from = newsClearFrom!.toLocal();
+                                var to = newsClearTo!.toLocal();
+                                if (to.isBefore(from)) {
+                                  final swap = from;
+                                  from = to;
+                                  to = swap;
+                                }
+                                final targets = widget.allAnnouncements.where((a) {
+                                  final t = a.timestamp.toLocal();
+                                  return !t.isBefore(from) && !t.isAfter(to);
+                                }).toList();
+                                if (targets.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('No news posts found in that time range.')),
+                                  );
+                                  return;
+                                }
+                                final ok = await showDialog<bool>(
+                                  context: ctx,
+                                  builder: (dCtx) => AlertDialog(
+                                    title: const Text('Clear news messages?'),
+                                    content: Text(
+                                      'Delete ${targets.length} post(s) from ${_formatAdminDateTime(from)} to ${_formatAdminDateTime(to)}? This cannot be undone.',
+                                    ),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Cancel')),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(dCtx, true),
+                                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                        child: const Text('Delete'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (ok != true) return;
+                                for (final a in targets) {
+                                  widget.onDeleteAnnouncement(a.id);
+                                }
+                                setST(() {});
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Cleared ${targets.length} news post(s).')),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.delete_sweep_rounded),
+                              label: const Text('CLEAR MESSAGES IN RANGE'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.deepPurple,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(double.infinity, 44),
+                              ),
                             ),
                           ],
                         ),
@@ -7532,20 +7844,75 @@ class InvestScreen extends StatelessWidget {
         colors: leader
             ? const [Color(0xFFFFF8DC), Color(0xFFFFE566), Color(0xFFFFD700), Color(0xFFC9A227), Color(0xFF8B6914)]
             : platinum
-                ? const [Color(0xFFFFE566), Color(0xFFFFD700), Color(0xFFC9A227)]
+                ? const [Color(0xFFF8FAFC), Color(0xFFE2E8F0), Color(0xFFCBD5E1), Color(0xFF94A3B8), Color(0xFF64748B)]
                 : const [Color(0xFFE8D9A8), Color(0xFFC5A15D), Color(0xFF9E7B34)],
-        stops: leader ? const [0.0, 0.22, 0.5, 0.78, 1.0] : null,
+        stops: leader ? const [0.0, 0.22, 0.5, 0.78, 1.0] : (platinum ? const [0.0, 0.25, 0.5, 0.75, 1.0] : null),
       ),
       border: Border.all(
-        color: leader ? const Color(0xFFFFF3B0) : Colors.white.withOpacity(0.35),
-        width: leader ? 3.4 : 0.8,
+        color: leader ? const Color(0xFFFFF3B0) : (platinum ? const Color(0xFFF1F5F9) : Colors.white.withOpacity(0.35)),
+        width: leader ? 3.4 : (platinum ? 1.6 : 0.8),
       ),
       boxShadow: leader
           ? [
               BoxShadow(color: const Color(0xFFFFD700).withOpacity(0.65), blurRadius: 10, offset: const Offset(0, 2)),
               BoxShadow(color: Colors.black.withOpacity(0.35), blurRadius: 6, offset: const Offset(0, 4)),
             ]
-          : null,
+          : platinum
+              ? [
+                  BoxShadow(color: Colors.white.withOpacity(0.55), blurRadius: 8, offset: const Offset(-1, -1)),
+                  BoxShadow(color: const Color(0xFF64748B).withOpacity(0.45), blurRadius: 6, offset: const Offset(0, 3)),
+                ]
+              : null,
+    ),
+  );
+
+  /// Shiny diamond chip for available plan cards (top-left corner).
+  Widget _diamondCardChip() => SizedBox(
+    width: 44,
+    height: 44,
+    child: Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          left: 2,
+          top: 4,
+          child: Transform.rotate(
+            angle: math.pi / 4,
+            child: Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(5),
+                gradient: const LinearGradient(
+                  begin: Alignment(-0.8, -1),
+                  end: Alignment(1.2, 1),
+                  colors: [
+                    Color(0xFFFFFFFF),
+                    Color(0xFFE0F2FE),
+                    Color(0xFF7DD3FC),
+                    Color(0xFFFFFFFF),
+                    Color(0xFFBAE6FD),
+                    Color(0xFF38BDF8),
+                    Color(0xFFF0F9FF),
+                  ],
+                  stops: [0.0, 0.15, 0.35, 0.48, 0.62, 0.82, 1.0],
+                ),
+                border: Border.all(color: Colors.white, width: 2.2),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFF7DD3FC).withOpacity(0.95), blurRadius: 14, spreadRadius: 0.5),
+                  BoxShadow(color: Colors.white.withOpacity(0.9), blurRadius: 6),
+                  BoxShadow(color: const Color(0xFF0EA5E9).withOpacity(0.55), blurRadius: 4, offset: const Offset(0, 2)),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 10,
+          top: 12,
+          child: Icon(Icons.auto_awesome, size: 11, color: Colors.white.withOpacity(0.95)),
+        ),
+      ],
     ),
   );
 
@@ -7744,9 +8111,11 @@ class InvestScreen extends StatelessWidget {
 
     final disableButton = isCurrent || isDowngrade || pendingSamePlan;
 
-    const textColor = Color(0xFF1A1206);
-    const subColor = Color(0xFF4A3A10);
-    const cardBorderColor = Color(0xFFFFF3B0);
+    // Platinum metal — available plans only (active asset stays full gold).
+    const textColor = Color(0xFF0F172A);
+    const subColor = Color(0xFF475569);
+    const cardBorderColor = Color(0xFFF8FAFC);
+    const labelColor = Color(0xFFE2E8F0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -7756,127 +8125,158 @@ class InvestScreen extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF3D2E08), Color(0xFF8B6914), Color(0xFFFFD700), Color(0xFFD4AF37), Color(0xFF5C4A0E)],
-          stops: [0.0, 0.28, 0.55, 0.82, 1.0],
+          colors: [
+            Color(0xFF1E293B),
+            Color(0xFF334155),
+            Color(0xFF94A3B8),
+            Color(0xFFE2E8F0),
+            Color(0xFFF8FAFC),
+            Color(0xFFCBD5E1),
+            Color(0xFF64748B),
+          ],
+          stops: [0.0, 0.18, 0.38, 0.52, 0.62, 0.78, 1.0],
         ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: cardBorderColor, width: 2),
         boxShadow: [
-          BoxShadow(color: const Color(0xFFFFD700).withOpacity(0.28), blurRadius: 14, offset: const Offset(0, 6)),
-          BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.white.withOpacity(0.35), blurRadius: 16, offset: const Offset(-2, -2)),
+          BoxShadow(color: const Color(0xFF64748B).withOpacity(0.45), blurRadius: 14, offset: const Offset(0, 8)),
+          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4)),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Row(
-            children: [
-              _cardChip(leader: true),
-              const Spacer(),
-              _tapPayBadge(ctx, forceLight: true),
-            ],
-          ),
-          const SizedBox(height: 5),
-          const Text('NGMY GOLD INVEST', style: TextStyle(color: Color(0xFFFFF8DC), fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 2),
-          CopyOnHoldText(p.name, style: const TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 3),
-          CopyOnHoldText(
-            _pseudoCardNumber(price),
-            style: const TextStyle(color: textColor, fontWeight: FontWeight.w700, fontSize: 11, letterSpacing: 0.8),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 5),
-          Row(
-            children: [
-              _planTagGold('${(InvestmentPlan.fixedRoi * 100).toStringAsFixed(2)}%'),
-              const SizedBox(width: 5),
-              _planTagGold('261d'),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('PLAN VALUE', style: TextStyle(color: subColor, fontSize: 8, fontWeight: FontWeight.w700)),
-                    CopyOnHoldText('\$${formatCurrency(price)}', style: const TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ],
+          Positioned(
+            right: -28,
+            top: -32,
+            child: Container(
+              width: 110,
+              height: 110,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Colors.white.withOpacity(0.35), Colors.white.withOpacity(0.0)],
                 ),
               ),
-              Text(
-                isCurrent ? 'ACTIVE' : (isUpgrade ? 'UPGRADE' : 'AVAILABLE'),
-                style: const TextStyle(color: textColor, fontWeight: FontWeight.w800, fontSize: 9),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Container(height: 1, color: subColor.withOpacity(0.35)),
-          const SizedBox(height: 5),
-          Row(
-            children: [
-              Expanded(child: _planInfoBoxGold('Daily', '\$${formatCurrency(daily)}')),
-              const SizedBox(width: 5),
-              Expanded(child: _planInfoBoxGold('Total', '\$${formatCurrency(total)}')),
-              const SizedBox(width: 5),
-              Expanded(child: _planInfoBoxGold('Days', '261')),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            height: 40,
-            child: ElevatedButton(
-              onPressed: disableButton ? null : () => onInvest(p.name, price, InvestmentPlan.fixedRoi, requiredPayment),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1A1206),
-                foregroundColor: const Color(0xFFFFF8DC),
-                disabledBackgroundColor: const Color(0xFF4A3A10).withOpacity(0.45),
-                disabledForegroundColor: const Color(0xFFFFF8DC).withOpacity(0.55),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                elevation: 2,
-              ),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(buttonText.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11)),
-              ),
             ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _diamondCardChip(),
+                  const Spacer(),
+                  _tapPayBadge(ctx, forceLight: true),
+                ],
+              ),
+              const SizedBox(height: 2),
+              const Text('NGMY PLATINUM', style: TextStyle(color: labelColor, fontSize: 9, letterSpacing: 1.4, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 2),
+              CopyOnHoldText(p.name, style: const TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 3),
+              CopyOnHoldText(
+                _pseudoCardNumber(price),
+                style: const TextStyle(color: textColor, fontWeight: FontWeight.w700, fontSize: 11, letterSpacing: 0.8),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 5),
+              Row(
+                children: [
+                  _planTagPlatinum('${(InvestmentPlan.fixedRoi * 100).toStringAsFixed(2)}%'),
+                  const SizedBox(width: 5),
+                  _planTagPlatinum('261d'),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('PLAN VALUE', style: TextStyle(color: subColor, fontSize: 8, fontWeight: FontWeight.w700)),
+                        CopyOnHoldText('\$${formatCurrency(price)}', style: const TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    isCurrent ? 'ACTIVE' : (isUpgrade ? 'UPGRADE' : 'AVAILABLE'),
+                    style: const TextStyle(color: textColor, fontWeight: FontWeight.w800, fontSize: 9),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Container(height: 1, color: subColor.withOpacity(0.35)),
+              const SizedBox(height: 5),
+              Row(
+                children: [
+                  Expanded(child: _planInfoBoxPlatinum('Daily', '\$${formatCurrency(daily)}')),
+                  const SizedBox(width: 5),
+                  Expanded(child: _planInfoBoxPlatinum('Total', '\$${formatCurrency(total)}')),
+                  const SizedBox(width: 5),
+                  Expanded(child: _planInfoBoxPlatinum('Days', '261')),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: 40,
+                child: ElevatedButton(
+                  onPressed: disableButton ? null : () => onInvest(p.name, price, InvestmentPlan.fixedRoi, requiredPayment),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E293B),
+                    foregroundColor: const Color(0xFFF8FAFC),
+                    disabledBackgroundColor: const Color(0xFF64748B).withOpacity(0.5),
+                    disabledForegroundColor: const Color(0xFFE2E8F0).withOpacity(0.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: const BorderSide(color: Color(0xFFCBD5E1), width: 0.8),
+                    ),
+                    elevation: 3,
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(buttonText.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11)),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _planTagGold(String text) => Container(
+  Widget _planTagPlatinum(String text) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
     decoration: BoxDecoration(
-      color: const Color(0xFF1A1206).withOpacity(0.12),
+      color: Colors.white.withOpacity(0.45),
       borderRadius: BorderRadius.circular(5),
-      border: Border.all(color: const Color(0xFF4A3A10).withOpacity(0.35)),
+      border: Border.all(color: const Color(0xFFCBD5E1)),
     ),
-    child: Text(text, style: const TextStyle(color: Color(0xFF1A1206), fontSize: 9, fontWeight: FontWeight.w800)),
+    child: Text(text, style: const TextStyle(color: Color(0xFF1E293B), fontSize: 9, fontWeight: FontWeight.w800)),
   );
 
-  Widget _planInfoBoxGold(String label, String value) => Container(
+  Widget _planInfoBoxPlatinum(String label, String value) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
     decoration: BoxDecoration(
-      color: const Color(0xFF1A1206).withOpacity(0.08),
+      color: Colors.white.withOpacity(0.38),
       borderRadius: BorderRadius.circular(7),
-      border: Border.all(color: const Color(0xFF4A3A10).withOpacity(0.25)),
+      border: Border.all(color: const Color(0xFFE2E8F0)),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: const Color(0xFF4A3A10).withOpacity(0.9), fontSize: 7, fontWeight: FontWeight.w700)),
+        Text(label, style: const TextStyle(color: Color(0xFF475569), fontSize: 7, fontWeight: FontWeight.w700)),
         const SizedBox(height: 1),
         FittedBox(
           alignment: Alignment.centerLeft,
-          child: Text(value, style: const TextStyle(color: Color(0xFF1A1206), fontWeight: FontWeight.w800, fontSize: 10)),
+          child: Text(value, style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w800, fontSize: 10)),
         ),
       ],
     ),
@@ -11505,12 +11905,36 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return 'Contribution';
   }
 
+  Future<bool> _confirmDeleteContributionReceipt(BuildContext ctx) async {
+    return await showDialog<bool>(
+          context: ctx,
+          builder: (c) => AlertDialog(
+            title: const Text('Delete receipt?'),
+            content: const Text('This removes the receipt from your list. The underlying contribution records are not changed.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.pop(c, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  void _dismissContributionReceipt(String key, VoidCallback refreshUi) {
+    setState(() => _dismissedReceiptKeys.add(key));
+    _syncReceiptFlagsToConfig();
+    refreshUi();
+  }
+
   void _showContributionReceipts() {
-    final visible = _visibleContributionTx();
-    final groups = _groupContributionReceipts(visible);
-    final keys = groups.keys.toList();
+    final initialVisible = _visibleContributionTx();
+    final initialGroups = _groupContributionReceipts(initialVisible);
     setState(() {
-      _openedReceiptKeys.addAll(keys);
+      _openedReceiptKeys.addAll(initialGroups.keys);
     });
     _syncReceiptFlagsToConfig();
     String? selectedKey;
@@ -11519,6 +11943,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) {
+          final visible = _visibleContributionTx();
+          final groups = _groupContributionReceipts(visible);
+          final keys = groups.keys.toList();
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           final panelBg = isDark ? const Color(0xFF232A2E) : const Color(0xFFE9F7EF);
           final tileBg = isDark ? const Color(0xFF1B2025) : Colors.white;
@@ -11588,7 +12015,31 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text((m['purpose'] ?? 'Contribution Campaign').toString(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22 * 0.7, color: strongText)),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      (m['purpose'] ?? 'Contribution Campaign').toString(),
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22 * 0.7, color: strongText),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    tooltip: 'Delete receipt',
+                                    icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400, size: 22),
+                                    onPressed: () async {
+                                      final ok = await _confirmDeleteContributionReceipt(ctx);
+                                      if (!ok) return;
+                                      _dismissContributionReceipt(k, () => setDialog(() {
+                                        if (selectedKey == k) selectedKey = null;
+                                      }));
+                                    },
+                                  ),
+                                ],
+                              ),
                               const SizedBox(height: 4),
                               Text('${m['state'] ?? widget.user.state} • ${m['scopeType'] == 'all' ? 'All members' : '${m['scopeType']}: ${m['scopeValue']}'}', style: TextStyle(color: softText)),
                               const SizedBox(height: 4),
@@ -11628,18 +12079,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   child: TextButton(onPressed: () => setDialog(() => selectedKey = null), child: const Text('← Back to All Receipts')),
                                 ),
                                 const Spacer(),
-                                SelectionContainer.disabled(
-                                  child: TextButton(
-                                    onPressed: () {
-                                      if (selectedKey == null) return;
-                                      setState(() => _dismissedReceiptKeys.add(selectedKey!));
-                                      _syncReceiptFlagsToConfig();
-                                      setDialog(() {
-                                        selectedKey = null;
-                                      });
-                                    },
-                                    child: const Text('Delete Receipt'),
-                                  ),
+                                IconButton(
+                                  tooltip: 'Delete receipt',
+                                  icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400),
+                                  onPressed: () async {
+                                    if (selectedKey == null) return;
+                                    final key = selectedKey!;
+                                    final ok = await _confirmDeleteContributionReceipt(ctx);
+                                    if (!ok) return;
+                                    _dismissContributionReceipt(key, () => setDialog(() => selectedKey = null));
+                                  },
                                 ),
                               ],
                             ),
@@ -15471,7 +15920,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
         if (mounted) {
           _showGlassNotice(
             'Sync failed',
-            'Media uploaded but database row failed. Run supabase/media_tables.sql in Supabase.',
+            'Media uploaded but database row failed. In Supabase SQL Editor run supabase/SQL_MEDIA_FIX.txt (copy only the SQL).',
             isError: true,
           );
         }
@@ -16447,7 +16896,19 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     setState(() {});
   }
 
+  bool get _canPostToNews => widget.config.newsFeedOpen || widget.user.isAdmin;
+
   Future<void> _postCommunityNews() async {
+    if (!_canPostToNews) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('News posting is closed by admin. You can read posts but cannot send messages.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
     final text = _newsController.text.trim();
     if (text.isEmpty && _pendingNewsImageUrl == null && _pendingNewsVideoUrl == null) return;
     setState(() => _isPostingNews = true);
@@ -16576,8 +17037,37 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                   ? _chatView(isDark, chatBg)
                   : Column(
                       children: [
+                        if (!widget.config.newsFeedOpen)
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444).withOpacity(isDark ? 0.22 : 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.45)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.lock_rounded, color: Color(0xFFEF4444), size: 20),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    widget.user.isAdmin
+                                        ? 'News is closed for users. You can still post as admin.'
+                                        : 'News is closed. You cannot send messages right now.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? Colors.white : const Color(0xFF7F1D1D),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         Expanded(child: _newsView(isDark)),
-                        _newsComposer(isDark),
+                        if (_canPostToNews) _newsComposer(isDark),
                       ],
                     ),
             ),
@@ -16762,6 +17252,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   Widget _newsComposer(bool isDark) {
+    if (!_canPostToNews) return const SizedBox.shrink();
     const accent = Color(0xFF00B25A);
     return _ngmyGlassComposerBar(
       isDark: isDark,
