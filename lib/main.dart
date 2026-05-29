@@ -279,25 +279,58 @@ class MediaPost {
   };
 
   factory MediaPost.fromJson(Map<String, dynamic> json) {
-    final likedBy = List<String>.from(json['likedBy'] ?? const []);
-    final savedBy = List<String>.from(json['savedBy'] ?? const []);
+    final likedBy = List<String>.from(json['likedBy'] ?? json['liked_by'] ?? const []);
+    final savedBy = List<String>.from(json['savedBy'] ?? json['saved_by'] ?? const []);
     final comments = List<Map<String, dynamic>>.from(
-      (json['comments'] ?? const []).map((e) => Map<String, dynamic>.from(e)),
+      (json['comments'] ?? json['media_comments'] ?? const []).map((e) => Map<String, dynamic>.from(e)),
     );
     return MediaPost(
       id: json['id'] ?? '',
-      userEmail: json['userEmail'] ?? '',
+      userEmail: json['userEmail'] ?? json['user_email'] ?? '',
       username: json['username'] ?? 'User',
-      videoUrl: json['videoUrl'] ?? '',
-      contentType: (json['contentType'] ?? 'video').toString(),
+      videoUrl: json['videoUrl'] ?? json['video_url'] ?? '',
+      contentType: (json['contentType'] ?? json['content_type'] ?? 'video').toString(),
       caption: json['caption'] ?? '',
-      timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()).toLocal(),
+      timestamp: DateTime.parse(json['timestamp'] ?? json['created_at'] ?? DateTime.now().toIso8601String()).toLocal(),
       likedBy: likedBy,
       savedBy: savedBy,
       comments: comments,
       likes: likedBy.isNotEmpty ? likedBy.length : (json['likes'] ?? 0),
     );
   }
+}
+
+String? _missingColumnFromPostgrestError(Object error) {
+  final text = error.toString();
+  final m = RegExp("Could not find the '([^']+)' column").firstMatch(text);
+  return m?.group(1);
+}
+
+bool _isMissingTablePostgrestError(Object error, String table) {
+  return error.toString().contains("Could not find the table 'public.$table'");
+}
+
+Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
+  final working = Map<String, dynamic>.from(row);
+  for (int i = 0; i < 12; i++) {
+    try {
+      await Supabase.instance.client.from('media').upsert([working]);
+      return true;
+    } catch (e) {
+      if (_isMissingTablePostgrestError(e, 'media')) {
+        debugPrint('[media] table missing in Supabase.');
+        return false;
+      }
+      final missing = _missingColumnFromPostgrestError(e);
+      if (missing != null && missing.isNotEmpty) {
+        working.remove(missing);
+        continue;
+      }
+      debugPrint('[media] upsert error: $e');
+      return false;
+    }
+  }
+  return false;
 }
 
 class Announcement {
@@ -1314,14 +1347,14 @@ class _NGMYAppState extends State<NGMYApp> {
     final isDarkMode = _effectiveThemeMode == ThemeMode.dark;
     final style = isDarkMode
         ? const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
+            statusBarColor: Color(0xFF121212),
             statusBarIconBrightness: Brightness.light,
             statusBarBrightness: Brightness.dark,
             systemNavigationBarColor: Color(0xFF121212),
             systemNavigationBarIconBrightness: Brightness.light,
           )
         : const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
+            statusBarColor: Colors.white,
             statusBarIconBrightness: Brightness.dark,
             statusBarBrightness: Brightness.light,
             systemNavigationBarColor: Colors.white,
@@ -1330,10 +1363,8 @@ class _NGMYAppState extends State<NGMYApp> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: style,
-      child: Container(
-        color: isDarkMode ? const Color(0xFF121212) : Colors.white,
-        child: MaterialApp(
-          title: 'NGMY', debugShowCheckedModeBanner: false,
+      child: MaterialApp(
+        title: 'NGMY', debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true, 
           colorSchemeSeed: const Color(0xFF00B25A), 
@@ -1342,7 +1373,7 @@ class _NGMYAppState extends State<NGMYApp> {
           cardColor: Colors.white,
           appBarTheme: const AppBarTheme(
             systemOverlayStyle: SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
+              statusBarColor: Colors.white,
               statusBarIconBrightness: Brightness.dark,
               statusBarBrightness: Brightness.light,
             ),
@@ -1358,7 +1389,7 @@ class _NGMYAppState extends State<NGMYApp> {
           cardColor: const Color(0xFF1E1E1E),
           appBarTheme: const AppBarTheme(
             systemOverlayStyle: SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
+              statusBarColor: Color(0xFF121212),
               statusBarIconBrightness: Brightness.light,
               statusBarBrightness: Brightness.dark,
             ),
@@ -1529,7 +1560,6 @@ class _NGMYAppState extends State<NGMYApp> {
                 _saveData();
               },
             ),
-        ),
       ),
     );
   }
@@ -1830,7 +1860,26 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   @override Widget build(BuildContext context) {
-    return SelectionArea(child: Scaffold(body: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(35), child: Column(children: [
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final style = isDark
+        ? const SystemUiOverlayStyle(
+            statusBarColor: Color(0xFF121212),
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+            systemNavigationBarColor: Color(0xFF121212),
+            systemNavigationBarIconBrightness: Brightness.light,
+          )
+        : const SystemUiOverlayStyle(
+            statusBarColor: Colors.white,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+            systemNavigationBarColor: Colors.white,
+            systemNavigationBarIconBrightness: Brightness.dark,
+          );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: style,
+      child: SelectionArea(child: Scaffold(body: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(35), child: Column(children: [
       ClipRRect(
         borderRadius: BorderRadius.circular(30),
         child: Image.network(
@@ -1908,7 +1957,7 @@ class _AuthScreenState extends State<AuthScreen> {
         }, 
         child: const Text('Trouble logging in? Reset App Data', style: TextStyle(color: Colors.grey, fontSize: 10))
       ),
-    ])))));
+    ]))))));
   }
 }
 
@@ -2071,14 +2120,14 @@ class _MainScreenState extends State<MainScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
+              statusBarColor: Color(0xFF121212),
               statusBarIconBrightness: Brightness.light,
               statusBarBrightness: Brightness.dark,
               systemNavigationBarColor: Color(0xFF121212),
               systemNavigationBarIconBrightness: Brightness.light,
             )
           : const SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
+              statusBarColor: Colors.white,
               statusBarIconBrightness: Brightness.dark,
               statusBarBrightness: Brightness.light,
               systemNavigationBarColor: Colors.white,
@@ -2086,16 +2135,62 @@ class _MainScreenState extends State<MainScreen> {
             ),
       child: SelectionArea(
         child: Scaffold(
-          body: Stack(children: [
-            pages[_idx],
-            Positioned(left: 15, right: 15, bottom: 25, child: SafeArea(child: Container(height: 75, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface.withOpacity(0.9), borderRadius: BorderRadius.circular(35), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 5))], border: Border.all(color: Colors.white.withOpacity(0.05))), child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_nav(0, Icons.home_rounded), _nav(1, Icons.trending_up_rounded), _nav(2, Icons.account_balance_wallet_rounded), _navC(3), _nav(4, Icons.play_circle_fill_rounded), _nav(5, Icons.bar_chart_rounded), _nav(6, Icons.person_rounded)])))),
-          ]),
+          extendBody: true,
+          body: pages[_idx],
+          bottomNavigationBar: Material(
+            color: Colors.transparent,
+            child: SafeArea(
+              top: false,
+              minimum: const EdgeInsets.fromLTRB(15, 0, 15, 14),
+              child: Container(
+                height: 75,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.78),
+                  borderRadius: BorderRadius.circular(35),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                  border: Border.all(color: Colors.white.withOpacity(0.10)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _nav(0, Icons.home_rounded),
+                    _nav(1, Icons.trending_up_rounded),
+                    _nav(2, Icons.account_balance_wallet_rounded),
+                    _navC(3),
+                    _nav(4, Icons.play_circle_fill_rounded),
+                    _nav(5, Icons.bar_chart_rounded),
+                    _nav(6, Icons.person_rounded),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
-  Widget _nav(int i, IconData icon) => IconButton(onPressed: () => setState(() => _idx = i), icon: Icon(icon, color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey, size: 28));
+  Widget _nav(int i, IconData icon) => SizedBox(
+    width: 48,
+    height: 48,
+    child: IconButton(
+      padding: EdgeInsets.zero,
+      splashRadius: 24,
+      onPressed: () => setState(() => _idx = i),
+      icon: Icon(
+        icon,
+        color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey,
+        size: 28,
+      ),
+    ),
+  );
   Widget _navC(int i) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
     onTap: () => setState(() => _idx = i), 
     child: Transform.translate(
       offset: const Offset(0, -10), 
@@ -6101,12 +6196,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
+    final currentEmail = widget.user.email.toLowerCase().trim();
+    final currentIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == currentEmail);
+    final refIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == referrer!.email.toLowerCase().trim());
     setState(() {
       widget.user.referredByCode = code;
-      referrer!.referralCount += 1;
-      referrer.points += 100;
+      if (currentIdx != -1) {
+        widget.allUsers[currentIdx].referredByCode = code;
+      } else {
+        widget.allUsers.add(widget.user);
+      }
+      if (refIdx != -1) {
+        widget.allUsers[refIdx].referralCount += 1;
+        widget.allUsers[refIdx].points += 100;
+      } else {
+        referrer!.referralCount += 1;
+        referrer.points += 100;
+      }
     });
     _referralInputC.clear();
+    try {
+      final rows = <Map<String, dynamic>>[];
+      if (currentIdx != -1) {
+        rows.add(Map<String, dynamic>.from(widget.allUsers[currentIdx].toJson()));
+      } else {
+        rows.add(Map<String, dynamic>.from(widget.user.toJson()));
+      }
+      final resolvedRef = refIdx != -1 ? widget.allUsers[refIdx] : referrer!;
+      rows.add(Map<String, dynamic>.from(resolvedRef.toJson()));
+      if (rows.isNotEmpty) {
+        Supabase.instance.client.from('users').upsert(rows).then((_) {}).catchError((_) {});
+      }
+    } catch (_) {}
     widget.onDataChanged();
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral linked successfully.')));
   }
@@ -10446,16 +10567,14 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       );
       mediaUrl = 'supabase://media/$storagePath';
     } catch (e) {
-      debugPrint('Media upload fallback (local path): $e');
-      if (kIsWeb) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Upload failed. Check Media bucket permissions and try again.')),
-          );
-        }
-        setState(() => _isPosting = false);
-        return;
+      debugPrint('Media upload error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Upload failed. Check Media bucket/policies and try again.')),
+        );
       }
+      if (mounted) setState(() => _isPosting = false);
+      return;
     }
 
     final post = MediaPost(
@@ -10467,6 +10586,17 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       caption: _captionController.text,
       timestamp: DateTime.now(),
     );
+
+    final saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+    if (!saved) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Media saved to storage, but database save failed.')),
+        );
+      }
+      if (mounted) setState(() => _isPosting = false);
+      return;
+    }
 
     widget.onPost(post);
     _captionController.clear();
@@ -10780,6 +10910,11 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   bool get _saved => widget.post.savedBy.contains(widget.currentUser.email);
   bool get _isOwner => widget.currentUser.email.toLowerCase().trim() == widget.post.userEmail.toLowerCase().trim();
 
+  Future<void> _persistPostChange() async {
+    await _upsertMediaRowSafe(Map<String, dynamic>.from(widget.post.toJson()));
+    widget.onChanged();
+  }
+
   Future<void> _prepareMedia() async {
     final resolved = await _resolveMediaUrl(widget.post.videoUrl);
     final avatar = await _profileImageProviderForEmail(widget.post.userEmail);
@@ -10801,7 +10936,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
       }
       widget.post.likes = widget.post.likedBy.length;
     });
-    widget.onChanged();
+    await _persistPostChange();
   }
 
   Future<void> _quickLike() async {
@@ -10810,7 +10945,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
       widget.post.likedBy.add(widget.currentUser.email);
       widget.post.likes = widget.post.likedBy.length;
     });
-    widget.onChanged();
+    await _persistPostChange();
   }
 
   Future<void> _toggleSave() async {
@@ -10821,7 +10956,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
         widget.post.savedBy.add(widget.currentUser.email);
       }
     });
-    widget.onChanged();
+    await _persistPostChange();
   }
 
   Future<void> _sharePost() async {
@@ -10916,7 +11051,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                           });
                           setModal(() {});
                           c.clear();
-                          widget.onChanged();
+                          _persistPostChange();
                         },
                         icon: const Icon(Icons.send_rounded),
                       ),
