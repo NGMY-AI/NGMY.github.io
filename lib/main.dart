@@ -1314,14 +1314,14 @@ class _NGMYAppState extends State<NGMYApp> {
     final isDarkMode = _effectiveThemeMode == ThemeMode.dark;
     final style = isDarkMode
         ? const SystemUiOverlayStyle(
-            statusBarColor: Color(0xFF121212),
+            statusBarColor: Colors.transparent,
             statusBarIconBrightness: Brightness.light,
             statusBarBrightness: Brightness.dark,
             systemNavigationBarColor: Color(0xFF121212),
             systemNavigationBarIconBrightness: Brightness.light,
           )
         : const SystemUiOverlayStyle(
-            statusBarColor: Colors.white,
+            statusBarColor: Colors.transparent,
             statusBarIconBrightness: Brightness.dark,
             statusBarBrightness: Brightness.light,
             systemNavigationBarColor: Colors.white,
@@ -1330,8 +1330,10 @@ class _NGMYAppState extends State<NGMYApp> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: style,
-      child: MaterialApp(
-        title: 'NGMY', debugShowCheckedModeBanner: false,
+      child: Container(
+        color: isDarkMode ? const Color(0xFF121212) : Colors.white,
+        child: MaterialApp(
+          title: 'NGMY', debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true, 
           colorSchemeSeed: const Color(0xFF00B25A), 
@@ -1340,7 +1342,7 @@ class _NGMYAppState extends State<NGMYApp> {
           cardColor: Colors.white,
           appBarTheme: const AppBarTheme(
             systemOverlayStyle: SystemUiOverlayStyle(
-              statusBarColor: Colors.white,
+              statusBarColor: Colors.transparent,
               statusBarIconBrightness: Brightness.dark,
               statusBarBrightness: Brightness.light,
             ),
@@ -1355,7 +1357,11 @@ class _NGMYAppState extends State<NGMYApp> {
           scaffoldBackgroundColor: const Color(0xFF121212), 
           cardColor: const Color(0xFF1E1E1E),
           appBarTheme: const AppBarTheme(
-            systemOverlayStyle: SystemUiOverlayStyle.light,
+            systemOverlayStyle: SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.light,
+              statusBarBrightness: Brightness.dark,
+            ),
             backgroundColor: Color(0xFF121212),
             elevation: 0,
           ),
@@ -1523,6 +1529,7 @@ class _NGMYAppState extends State<NGMYApp> {
                 _saveData();
               },
             ),
+        ),
       ),
     );
   }
@@ -2064,14 +2071,14 @@ class _MainScreenState extends State<MainScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
-              statusBarColor: Color(0xFF121212),
+              statusBarColor: Colors.transparent,
               statusBarIconBrightness: Brightness.light,
               statusBarBrightness: Brightness.dark,
               systemNavigationBarColor: Color(0xFF121212),
               systemNavigationBarIconBrightness: Brightness.light,
             )
           : const SystemUiOverlayStyle(
-              statusBarColor: Colors.white,
+              statusBarColor: Colors.transparent,
               statusBarIconBrightness: Brightness.dark,
               statusBarBrightness: Brightness.light,
               systemNavigationBarColor: Colors.white,
@@ -9723,7 +9730,7 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     );
   }
 
-  bool get _isApprovedWorker => widget.user.isAdmin || widget.user.isApprovedWorker;
+  bool get _isApprovedWorker => widget.user.isApprovedWorker;
   List<Map<String, dynamic>> get _jobs => widget.config.jobPosts;
 
   ImageProvider? _jobImage(String? imageRef) {
@@ -10208,7 +10215,7 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
             const SizedBox(height: 25),
 
             // Content Area
-            if (_activeTab == 0 && !_isApprovedWorker && !widget.user.isAdmin)
+            if (_activeTab == 0 && !_isApprovedWorker)
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.only(bottom: 12),

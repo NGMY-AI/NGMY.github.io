@@ -5,11 +5,14 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="Next Generation - Make Yours">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <!-- Use 'default' to allow system to manage it, or 'black-translucent' for full bleed -->
+  <!-- Translucent is better for matching dark/light dynamically -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="NGMY">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
@@ -18,14 +21,25 @@
 
   <title>NGMY</title>
 
-  <meta name="theme-color" content="#ffffff">
+  <!-- Dynamic Theme Color for iOS Switcher and PWA header -->
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
 
   <link rel="manifest" href="manifest.json">
 
   <style>
-    body {
-      background-color: #ffffff;
+    html, body {
       margin: 0;
+      padding: 0;
+      background-color: #ffffff;
+      height: 100%;
+      width: 100%;
+    }
+    /* This ensures that when the app switcher is used, the area matches the theme */
+    @media (prefers-color-scheme: dark) {
+      html, body {
+        background-color: #121212;
+      }
     }
   </style>
 </head>
