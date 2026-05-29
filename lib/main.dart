@@ -63,6 +63,37 @@ enum TransactionType { deposit, withdrawal, adminAdd, adminRemove, reimbursement
 enum TransactionStatus { pending, approved, rejected }
 enum PaymentMethod { cashApp, bitcoin, system }
 
+const String _investmentRequestPrefix = 'INVEST_REQUEST|';
+
+bool isInvestmentRequestDetails(String? details) {
+  return details != null && details.startsWith(_investmentRequestPrefix);
+}
+
+Map<String, String> parseInvestmentRequestDetails(String? details) {
+  final out = <String, String>{};
+  if (!isInvestmentRequestDetails(details)) return out;
+  final parts = details!.split('|');
+  for (final p in parts.skip(1)) {
+    final idx = p.indexOf(':');
+    if (idx <= 0 || idx >= p.length - 1) continue;
+    out[p.substring(0, idx)] = p.substring(idx + 1);
+  }
+  return out;
+}
+
+String buildInvestmentRequestDetails({
+  required String plan,
+  required double amount,
+  required double roi,
+  required String payer,
+}) {
+  return '$_investmentRequestPrefix'
+      'plan:$plan|'
+      'amount:${amount.toStringAsFixed(2)}|'
+      'roi:${roi.toStringAsFixed(6)}|'
+      'payer:$payer';
+}
+
 class AppTransaction {
   final String id;
   final String userEmail;
@@ -465,6 +496,7 @@ class _NGMYAppState extends State<NGMYApp> {
   Timer? _autoThemeTimer;
   Timer? _configRefreshTimer;
   final Set<String> _disabledSupabaseTables = {};
+  final Set<String> _seenRealtimeAnnouncementIds = {};
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   bool _notificationsReady = false;
   int _nextNotificationId = 1;
@@ -885,14 +917,23 @@ class _NGMYAppState extends State<NGMYApp> {
         setState(() => _allAnnouncements.removeWhere((a) => a.id == id));
       } else {
         final ann = Announcement.fromJson(payload.newRecord);
+        bool isNew = false;
         setState(() {
           final idx = _allAnnouncements.indexWhere((a) => a.id == ann.id);
           if (idx == -1) {
             _allAnnouncements.add(ann);
+            isNew = true;
           } else {
             _allAnnouncements[idx] = ann;
           }
         });
+        if (isNew && !_seenRealtimeAnnouncementIds.contains(ann.id)) {
+          _seenRealtimeAnnouncementIds.add(ann.id);
+          _pushInAppNotification(
+            title: 'New announcement',
+            body: '${ann.title}: ${ann.message}',
+          );
+        }
       }
     } catch (e) {
       debugPrint('Announcements realtime apply error: $e');
@@ -1251,6 +1292,22 @@ class _NGMYAppState extends State<NGMYApp> {
     }
   }
 
+  Future<void> _upsertAnnouncement(Announcement ann) async {
+    try {
+      await supabase.from('announcements').upsert([Map<String, dynamic>.from(ann.toJson())]);
+    } catch (e) {
+      debugPrint('Announcement upsert error: $e');
+    }
+  }
+
+  Future<void> _deleteAnnouncementById(String id) async {
+    try {
+      await supabase.from('announcements').delete().eq('id', id);
+    } catch (e) {
+      debugPrint('Announcement delete error: $e');
+    }
+  }
+
   @override Widget build(BuildContext context) {
     if (_isLoading) return const MaterialApp(debugShowCheckedModeBanner: false, home: Scaffold(body: Center(child: CircularProgressIndicator())));
     
@@ -1405,25 +1462,68 @@ class _NGMYAppState extends State<NGMYApp> {
                   t.status = approve ? TransactionStatus.approved : TransactionStatus.rejected;
                   final targetIndex = _allUsers.indexWhere((u) => u.email == t.userEmail);
                   if (targetIndex == -1) return;
+                  final targetUser = _allUsers[targetIndex];
+                  final details = t.sourceDetails ?? '';
+                  final isInvestmentRequest = t.type == TransactionType.deposit && isInvestmentRequestDetails(details);
                   if (approve) {
-                    if (t.type == TransactionType.deposit || t.type == TransactionType.adminAdd || t.type == TransactionType.reimbursement) {
-                      _allUsers[targetIndex].accountBalance += t.amount;
+                    if (isInvestmentRequest) {
+                      final meta = parseInvestmentRequestDetails(details);
+                      final planName = (meta['plan'] ?? '').trim();
+                      final planAmount = double.tryParse(meta['amount'] ?? '');
+                      final planRoi = double.tryParse(meta['roi'] ?? '');
+                      if (planName.isNotEmpty && planAmount != null && planRoi != null) {
+                        targetUser.activeInvestment = ActiveInvestment(
+                          name: planName,
+                          amount: planAmount,
+                          dailyROI: planRoi,
+                          purchaseDate: DateTime.now(),
+                          daysClockedIn: 0,
+                          totalEarned: 0.0,
+                        );
+                        targetUser.pendingInvestmentName = null;
+                        targetUser.pendingInvestmentAmount = null;
+                        targetUser.pendingInvestmentRoi = null;
+                        _allTransactions.add(
+                          AppTransaction(
+                            id: '${DateTime.now()}-invest',
+                            userEmail: t.userEmail,
+                            amount: t.amount,
+                            type: TransactionType.adminRemove,
+                            method: PaymentMethod.system,
+                            sourceDetails: 'Investment plan purchase/upgrade: $planName',
+                            status: TransactionStatus.approved,
+                            timestamp: DateTime.now(),
+                          ),
+                        );
+                      }
+                    } else if (t.type == TransactionType.deposit || t.type == TransactionType.adminAdd || t.type == TransactionType.reimbursement) {
+                      targetUser.accountBalance += t.amount;
                     }
                   } else {
-                    if (t.type == TransactionType.withdrawal) {
-                      _allUsers[targetIndex].accountBalance += t.amount;
+                    if (isInvestmentRequest) {
+                      targetUser.pendingInvestmentName = null;
+                      targetUser.pendingInvestmentAmount = null;
+                      targetUser.pendingInvestmentRoi = null;
+                    } else if (t.type == TransactionType.withdrawal) {
+                      targetUser.accountBalance += t.amount;
                     }
                   }
-                  if (_currentUser != null && _currentUser!.email == t.userEmail) _currentUser = _allUsers[targetIndex];
+                  if (_currentUser != null && _currentUser!.email == t.userEmail) _currentUser = targetUser;
                 }); _saveData(); _notifyTransactionEvent(t, statusChanged: true); },
                 onAddPlan: (p) { setState(() { _globalPlans.add(p); _globalPlans.sort((a, b) => a.price.compareTo(b.price)); }); _saveData(); },
                 onPostMedia: (post) { setState(() => _allMedia.insert(0, post)); _saveData(); },
-                onAddAnnouncement: (ann) { setState(() => _allAnnouncements.insert(0, ann)); _saveData(); },
-                onDeleteAnnouncement: (id) { setState(() => _allAnnouncements.removeWhere((a) => a.id == id)); _saveData(); },
-              ),
+                onAddAnnouncement: (ann) {
+                  setState(() => _allAnnouncements.insert(0, ann));
+                  _upsertAnnouncement(ann);
+                  _saveData();
+                },
+              onDeleteAnnouncement: (id) {
+                setState(() => _allAnnouncements.removeWhere((a) => a.id == id));
+                _deleteAnnouncementById(id);
+                _saveData();
+              },
+            ),
       ),
-    );
-  }
     );
   }
 }
@@ -1820,70 +1920,6 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
 
-  void _activateInvestmentPlan(String name, double amount, double roi, {required double cost, required bool isAutoActivation}) {
-    final now = DateTime.now();
-    setState(() {
-      widget.user.accountBalance -= cost;
-      // Upgrades/purchases reset the earning cycle to match the selected plan.
-      widget.user.activeInvestment = ActiveInvestment(
-        name: name,
-        amount: amount,
-        dailyROI: roi,
-        purchaseDate: now,
-        daysClockedIn: 0,
-        totalEarned: 0.0,
-      );
-      widget.user.pendingInvestmentName = null;
-      widget.user.pendingInvestmentAmount = null;
-      widget.user.pendingInvestmentRoi = null;
-      final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == widget.user.email.toLowerCase().trim());
-      if (idx != -1) {
-        widget.allUsers[idx] = widget.user;
-      }
-    });
-    if (cost > 0) {
-      widget.onAddTransaction(AppTransaction(
-        id: now.toString(),
-        userEmail: widget.user.email,
-        amount: cost,
-        type: TransactionType.adminRemove,
-        method: PaymentMethod.system,
-        sourceDetails: 'Investment plan purchase/upgrade: $name',
-        status: TransactionStatus.approved,
-        timestamp: now,
-      ));
-    }
-    widget.onDataChanged();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isAutoActivation
-              ? 'Deposit received. $name activated automatically!'
-              : 'Successfully purchased $name!'),
-        ),
-      );
-    }
-  }
-
-  void _tryActivatePendingInvestment() {
-    final pendingName = widget.user.pendingInvestmentName;
-    final pendingAmount = widget.user.pendingInvestmentAmount;
-    final pendingRoi = widget.user.pendingInvestmentRoi;
-    if (pendingName == null || pendingAmount == null || pendingRoi == null) return;
-
-    final currentInvested = widget.user.totalInvestmentAmount;
-    final cost = math.max(0.0, pendingAmount - currentInvested);
-    if (widget.user.accountBalance < cost) return;
-
-    _activateInvestmentPlan(
-      pendingName,
-      pendingAmount,
-      pendingRoi,
-      cost: cost,
-      isAutoActivation: true,
-    );
-  }
-
   @override void initState() {
     super.initState();
     _t = Timer.periodic(const Duration(seconds: 1), (t) { 
@@ -1928,7 +1964,6 @@ class _MainScreenState extends State<MainScreen> {
           }
         }
       }
-      _tryActivatePendingInvestment();
     });
   }
   @override void dispose() { _t?.cancel(); super.dispose(); }
@@ -1976,27 +2011,36 @@ class _MainScreenState extends State<MainScreen> {
         }
         widget.onDataChanged(); 
       }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement),
-      InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r) {
-        final currentInvested = widget.user.totalInvestmentAmount;
-        final cost = math.max(0.0, p - currentInvested);
-        if (widget.user.accountBalance < cost) {
-          final shortfall = (cost - widget.user.accountBalance).clamp(0.0, double.infinity);
-          setState(() {
-            widget.user.pendingInvestmentName = n;
-            widget.user.pendingInvestmentAmount = p;
-            widget.user.pendingInvestmentRoi = r;
-          });
-          widget.onDataChanged();
+      InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
+        if (cost <= 0) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Need \$${formatCurrency(shortfall)} more. Deposit the difference and $n will activate automatically.',
-              ),
-            ),
+            const SnackBar(content: Text('This plan is already active.')),
           );
           return;
         }
-        _activateInvestmentPlan(n, p, r, cost: cost, isAutoActivation: false);
+        setState(() {
+          widget.user.pendingInvestmentName = n;
+          widget.user.pendingInvestmentAmount = p;
+          widget.user.pendingInvestmentRoi = r;
+        });
+        widget.onDataChanged();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (c) => SubmitPaymentPage(
+              user: widget.user,
+              amount: cost,
+              onAdd: widget.onAddTransaction,
+              config: widget.config,
+              requestTitle: 'Submit Investment Request',
+              successHint: 'Your investment request was sent to admin for approval.',
+              requestKind: 'investment',
+              investmentPlanName: n,
+              investmentPlanAmount: p,
+              investmentPlanRoi: r,
+            ),
+          ),
+        );
       }),
       WalletScreen(user: widget.user, transactions: sorted.where((t) => t.userEmail == widget.user.email).take(30).toList(), onAdd: widget.onAddTransaction, config: widget.config, onDataChanged: widget.onDataChanged),
       NgmyHubScreen(
@@ -2017,7 +2061,7 @@ class _MainScreenState extends State<MainScreen> {
       StatsScreen(user: widget.user, transactions: sorted),
       ProfileScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged, onAddTransaction: widget.onAddTransaction),
     ];
-    return SelectionArea(child:    return AnnotatedRegion<SystemUiOverlayStyle>(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
               statusBarColor: Color(0xFF121212),
@@ -2033,11 +2077,13 @@ class _MainScreenState extends State<MainScreen> {
               systemNavigationBarColor: Colors.white,
               systemNavigationBarIconBrightness: Brightness.dark,
             ),
-      child: Scaffold(
-        body: Stack(children: [
-          pages[_idx],
-          Positioned(left: 15, right: 15, bottom: 25, child: SafeArea(child: Container(height: 75, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface.withOpacity(0.9), borderRadius: BorderRadius.circular(35), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 5))], border: Border.all(color: Colors.white.withOpacity(0.05))), child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_nav(0, Icons.home_rounded), _nav(1, Icons.trending_up_rounded), _nav(2, Icons.account_balance_wallet_rounded), _navC(3), _nav(4, Icons.play_circle_fill_rounded), _nav(5, Icons.bar_chart_rounded), _nav(6, Icons.person_rounded)])))),
-        ]),
+      child: SelectionArea(
+        child: Scaffold(
+          body: Stack(children: [
+            pages[_idx],
+            Positioned(left: 15, right: 15, bottom: 25, child: SafeArea(child: Container(height: 75, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface.withOpacity(0.9), borderRadius: BorderRadius.circular(35), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 5))], border: Border.all(color: Colors.white.withOpacity(0.05))), child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_nav(0, Icons.home_rounded), _nav(1, Icons.trending_up_rounded), _nav(2, Icons.account_balance_wallet_rounded), _navC(3), _nav(4, Icons.play_circle_fill_rounded), _nav(5, Icons.bar_chart_rounded), _nav(6, Icons.person_rounded)])))),
+          ]),
+        ),
       ),
     );
   }
@@ -2643,21 +2689,29 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ],
       ),
           if (showLate) ...[
-            const SizedBox(height: 10),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.alarm_rounded, color: Color(0xFFFB7185), size: 14),
-                const SizedBox(width: 6),
-                Text(
-                  lateText,
-                  style: const TextStyle(
-                    color: Color(0xFFEA580C),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF97316).withOpacity(0.45)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.alarm_rounded, color: Color(0xFFFB7185), size: 14),
+                  const SizedBox(width: 6),
+                  Text(
+                    lateText,
+                    style: const TextStyle(
+                      color: Color(0xFFEA580C),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ],
@@ -4449,6 +4503,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _depositCard(AppTransaction t, bool isDark) {
     final user = widget.allUsers.firstWhere((u) => u.email == t.userEmail, orElse: () => UserData(email: t.userEmail));
+    final isInvestmentRequest = isInvestmentRequestDetails(t.sourceDetails);
+    final investmentMeta = parseInvestmentRequestDetails(t.sourceDetails);
+    final payerHandle = isInvestmentRequest ? (investmentMeta['payer'] ?? 'N/A') : (t.sourceDetails ?? 'N/A');
     bool isPending = t.status == TransactionStatus.pending;
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -4478,8 +4535,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Row(children: [
             Expanded(child: _detailBox('Payment Method', t.method.name.toUpperCase(), isDark, color: isDark ? Colors.blue.withOpacity(0.1) : const Color(0xFFE8F0FF))),
             const SizedBox(width: 10),
-            Expanded(child: _detailBox('Cash App Tag', t.sourceDetails ?? 'N/A', isDark, color: isDark ? Colors.green.withOpacity(0.1) : const Color(0xFFE8FDF2))),
+            Expanded(
+              child: _detailBox(
+                isInvestmentRequest ? 'Payer Handle' : 'Cash App Tag',
+                payerHandle,
+                isDark,
+                color: isDark ? Colors.green.withOpacity(0.1) : const Color(0xFFE8FDF2),
+              ),
+            ),
           ]),
+          if (isInvestmentRequest) ...[
+            const SizedBox(height: 10),
+            _detailBox(
+              'Investment Plan',
+              '${investmentMeta['plan'] ?? 'N/A'} (\$${investmentMeta['amount'] ?? '0'})',
+              isDark,
+              color: isDark ? Colors.orange.withOpacity(0.1) : const Color(0xFFFFF3E8),
+            ),
+          ],
           if (t.verificationCode != null) ...[const SizedBox(height: 10), _detailBox('Verification Code', t.verificationCode!, isDark, color: isDark ? Colors.purple.withOpacity(0.1) : const Color(0xFFF5E8FF), center: true, bigText: true)],
           const SizedBox(height: 10),
           _screenshotBox(t, isDark),
@@ -4503,10 +4576,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
     decoration: BoxDecoration(border: Border.all(color: isDark ? Colors.white10 : Colors.grey.withOpacity(0.2)), borderRadius: BorderRadius.circular(10)),
     child: Column(children: [
       Container(width: double.infinity, padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFF1A1C1E).withOpacity(0.8), borderRadius: const BorderRadius.vertical(top: Radius.circular(9))), child: Text('Payment Screenshot', style: TextStyle(color: isDark ? Colors.white70 : Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
-      if (t.screenshotPath != null) GestureDetector(onTap: () => showDialog(context: context, builder: (c) => AlertDialog(content: Image.file(File(t.screenshotPath!)))), child: Container(height: 120, alignment: Alignment.center, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.image, size: 40, color: isDark ? Colors.white24 : Colors.grey), Text('View Screenshot', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontSize: 12))])))
+      if (t.screenshotPath != null) GestureDetector(onTap: () => showDialog(context: context, builder: (c) => AlertDialog(content: _screenshotImage(t.screenshotPath!))), child: Container(height: 120, alignment: Alignment.center, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.image, size: 40, color: isDark ? Colors.white24 : Colors.grey), Text('View Screenshot', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontSize: 12))])))
       else Container(height: 120, alignment: Alignment.center, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text('Transaction details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isDark ? Colors.white : Colors.black)), const SizedBox(height: 10), Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.check, color: Colors.green, size: 16), const SizedBox(width: 5), Text('Complete', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white70 : Colors.black87))]), Text('Payment sent successfully', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontSize: 11))])),
     ]),
   );
+
+  Widget _screenshotImage(String screenshotPath) {
+    if (screenshotPath.startsWith('data:image')) {
+      final comma = screenshotPath.indexOf(',');
+      if (comma > -1 && comma < screenshotPath.length - 1) {
+        try {
+          final bytes = base64Decode(screenshotPath.substring(comma + 1));
+          return Image.memory(bytes, fit: BoxFit.contain);
+        } catch (_) {
+          return const Text('Invalid screenshot data.');
+        }
+      }
+    }
+    if (kIsWeb) {
+      return const Text('Screenshot preview unavailable in this browser session.');
+    }
+    return Image.file(File(screenshotPath), fit: BoxFit.contain);
+  }
 
   Widget _withdrawalCard(AppTransaction t, bool isDark) {
     final user = widget.allUsers.firstWhere((u) => u.email == t.userEmail, orElse: () => UserData(email: t.userEmail));
@@ -5094,6 +5185,7 @@ class _WalletScreenState extends State<WalletScreen> {
     final raw = (t.sourceDetails ?? '').toLowerCase();
     switch (t.type) {
       case TransactionType.deposit:
+        if (isInvestmentRequestDetails(t.sourceDetails)) return 'Investment Request';
         return 'Deposit';
       case TransactionType.withdrawal:
         return 'Withdrawal';
@@ -5121,6 +5213,12 @@ class _WalletScreenState extends State<WalletScreen> {
 
   String _transactionDetails(AppTransaction t) {
     final details = (t.sourceDetails ?? '').trim();
+    if (isInvestmentRequestDetails(details)) {
+      final meta = parseInvestmentRequestDetails(details);
+      final plan = meta['plan'] ?? 'plan';
+      final payer = meta['payer'] ?? 'payment handle';
+      return 'Investment request for $plan via $payer';
+    }
     if (details.isNotEmpty) return details;
     switch (t.type) {
       case TransactionType.deposit:
@@ -5153,19 +5251,58 @@ class _WalletScreenState extends State<WalletScreen> {
 // --- NEW SUBMIT PAYMENT PAGE ---
 
 class SubmitPaymentPage extends StatefulWidget {
-  final UserData user; final double amount; final Function(AppTransaction) onAdd; final AppConfig config;
-  const SubmitPaymentPage({super.key, required this.user, required this.amount, required this.onAdd, required this.config});
+  final UserData user;
+  final double amount;
+  final Function(AppTransaction) onAdd;
+  final AppConfig config;
+  final String requestTitle;
+  final String successHint;
+  final String requestKind;
+  final String? investmentPlanName;
+  final double? investmentPlanAmount;
+  final double? investmentPlanRoi;
+  const SubmitPaymentPage({
+    super.key,
+    required this.user,
+    required this.amount,
+    required this.onAdd,
+    required this.config,
+    this.requestTitle = 'Submit Payment Request',
+    this.successHint = 'Your request is being processed. Once verified, your funds will be credited to your account.',
+    this.requestKind = 'deposit',
+    this.investmentPlanName,
+    this.investmentPlanAmount,
+    this.investmentPlanRoi,
+  });
   @override State<SubmitPaymentPage> createState() => _SubmitPaymentPageState();
 }
-class _SubmitPaymentPageState extends State<SubmitPaymentPage> with SingleTickerProviderStateMixin {
-  PaymentMethod _method = PaymentMethod.cashApp; final _tag = TextEditingController(); File? _shot; late String _vCode;
+class _SubmitPaymentPageState extends State<SubmitPaymentPage> {
+  PaymentMethod _method = PaymentMethod.cashApp;
+  final _tag = TextEditingController();
+  String? _screenshotRef;
+  late String _vCode;
   bool _isPressed = false;
 
   @override void initState() { super.initState(); _vCode = (10000 + math.Random().nextInt(89999)).toString(); }
 
+  bool get _isInvestmentRequest => widget.requestKind == 'investment';
+
+  Future<void> _pickScreenshot() async {
+    final img = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (img == null) return;
+    if (kIsWeb) {
+      final bytes = await img.readAsBytes();
+      final lowerName = img.name.toLowerCase();
+      final mime = lowerName.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      setState(() => _screenshotRef = 'data:$mime;base64,${base64Encode(bytes)}');
+    } else {
+      setState(() => _screenshotRef = img.path);
+    }
+  }
+
   @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Submit Payment Request', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), centerTitle: true),
+      appBar: AppBar(title: Text(widget.requestTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), centerTitle: true),
       body: SingleChildScrollView(padding: const EdgeInsets.all(20), child: Column(children: [
         Container(width: double.infinity, padding: const EdgeInsets.all(25), decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.green.withOpacity(0.1), Colors.green.withOpacity(0.02)]), border: Border.all(color: Colors.green.withOpacity(0.2)), borderRadius: BorderRadius.circular(30)), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Amount:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 14)), Text('\$${formatCurrency(widget.amount)}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.green))])),
         const SizedBox(height: 30),
@@ -5183,20 +5320,28 @@ class _SubmitPaymentPageState extends State<SubmitPaymentPage> with SingleTicker
         const SizedBox(height: 25),
         _codeBox(),
         const SizedBox(height: 25),
-        GestureDetector(onTap: () async { final img = await ImagePicker().pickImage(source: ImageSource.gallery); if (img != null) setState(() => _shot = File(img.path)); }, child: Container(width: double.infinity, padding: const EdgeInsets.all(30), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), border: Border.all(color: Colors.blue.withOpacity(0.3), style: BorderStyle.solid), borderRadius: BorderRadius.circular(30)), child: Column(children: [const Icon(Icons.cloud_upload_outlined, color: Colors.blue, size: 40), const SizedBox(height: 12), Text(_shot == null ? 'Click to upload payment screenshot' : 'Screenshot Attached!', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue)), const Text('PNG, JPG (Required)', style: TextStyle(fontSize: 10, color: Colors.grey))]))),
+        GestureDetector(onTap: _pickScreenshot, child: Container(width: double.infinity, padding: const EdgeInsets.all(30), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), border: Border.all(color: Colors.blue.withOpacity(0.3), style: BorderStyle.solid), borderRadius: BorderRadius.circular(30)), child: Column(children: [const Icon(Icons.cloud_upload_outlined, color: Colors.blue, size: 40), const SizedBox(height: 12), Text(_screenshotRef == null ? 'Click to upload payment screenshot' : 'Screenshot Attached!', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue)), const Text('PNG, JPG (Required)', style: TextStyle(fontSize: 10, color: Colors.grey))]))),
         const SizedBox(height: 20),
-        Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(25), border: Border.all(color: Colors.amber.withOpacity(0.2))), child: const Text('Your request is being processed. Once verified, your funds will be credited to your account.', style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+        Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(25), border: Border.all(color: Colors.amber.withOpacity(0.2))), child: Text(widget.successHint, style: const TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
         const SizedBox(height: 35),
         Row(children: [
           Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), style: OutlinedButton.styleFrom(minimumSize: const Size(0, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))), child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)))),
           const SizedBox(width: 15),
           Expanded(child: ElevatedButton(onPressed: () {
-            if (_shot == null || _tag.text.isEmpty) {
+            if (_screenshotRef == null || _tag.text.isEmpty) {
                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please upload screenshot and enter your handle')));
                return;
             }
             String t = _tag.text; if (_method == PaymentMethod.cashApp && !t.startsWith('\$')) t = '\$$t';
-            widget.onAdd(AppTransaction(id: DateTime.now().toString(), userEmail: widget.user.email, amount: widget.amount, type: TransactionType.deposit, method: _method, sourceDetails: t, screenshotPath: _shot!.path, verificationCode: _vCode, timestamp: DateTime.now()));
+            final sourceDetails = _isInvestmentRequest
+                ? buildInvestmentRequestDetails(
+                    plan: widget.investmentPlanName ?? '',
+                    amount: widget.investmentPlanAmount ?? 0,
+                    roi: widget.investmentPlanRoi ?? 0,
+                    payer: t,
+                  )
+                : t;
+            widget.onAdd(AppTransaction(id: DateTime.now().toString(), userEmail: widget.user.email, amount: widget.amount, type: TransactionType.deposit, method: _method, sourceDetails: sourceDetails, screenshotPath: _screenshotRef, verificationCode: _vCode, timestamp: DateTime.now()));
             Navigator.pop(context);
           }, style: ElevatedButton.styleFrom(minimumSize: const Size(0, 60), backgroundColor: Colors.green, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), elevation: 4), child: const Text('Submit Request', style: TextStyle(fontWeight: FontWeight.bold)))),
         ]),
@@ -5313,11 +5458,28 @@ class _SubmitPaymentPageState extends State<SubmitPaymentPage> with SingleTicker
 
   Widget _codeBox() {
     return Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.green.withOpacity(0.05), border: Border.all(color: Colors.green.withOpacity(0.2)), borderRadius: BorderRadius.circular(15)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Your Code:', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)), Text(_vCode, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green, letterSpacing: 2))]),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('Your Code:', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)),
+        Row(children: [
+          Text(_vCode, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.green, letterSpacing: 2)),
+          IconButton(
+            icon: const Icon(Icons.copy_rounded, size: 19, color: Colors.green),
+            tooltip: 'Copy code',
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: _vCode));
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code copied')));
+              }
+            },
+          ),
+        ]),
+      ]),
       const SizedBox(height: 15),
       _bullet('1. Send \$${formatCurrency(widget.amount)} to ${_method == PaymentMethod.cashApp ? widget.config.officialCashApp : 'the BTC address'}'),
       _bullet('2. Include this code $_vCode in the payment note'),
-      _bullet('3. Submit this form after sending payment'),
+      if (_isInvestmentRequest && widget.investmentPlanName != null)
+        _bullet('3. This payment is for ${widget.investmentPlanName}'),
+      _bullet(_isInvestmentRequest ? '4. Submit this form after sending payment' : '3. Submit this form after sending payment'),
     ]));
   }
   Widget _bullet(String t) => Padding(padding: const EdgeInsets.only(top: 5), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('• ', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)), Expanded(child: Text(t, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)))]));
@@ -5566,7 +5728,7 @@ class LoanServiceScreen extends StatelessWidget {
 }
 
 class InvestScreen extends StatelessWidget {
-  final UserData user; final List<InvestmentPlan> plans; final Function(String, double, double) onInvest;
+  final UserData user; final List<InvestmentPlan> plans; final Function(String, double, double, double) onInvest;
   const InvestScreen({super.key, required this.user, required this.plans, required this.onInvest});
   @override Widget build(BuildContext context) {
     return Scaffold(body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 150), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -5645,6 +5807,9 @@ class InvestScreen extends StatelessWidget {
     final textColor = isDark ? Colors.white : Colors.black87;
     final subColor = isDark ? Colors.white70 : Colors.black54;
 
+    final isRenewSamePlan = isExpired && active != null && (price - active.amount).abs() < 0.0001;
+    final requiredPayment = isRenewSamePlan ? price : math.max(0.0, diff);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
@@ -5715,7 +5880,7 @@ class InvestScreen extends StatelessWidget {
             child: ElevatedButton(
               onPressed: (isCurrent || isDowngrade)
                   ? null 
-                  : () => onInvest(p.name, price, p.roi),
+                  : () => onInvest(p.name, price, p.roi, requiredPayment),
               style: ElevatedButton.styleFrom(
                 backgroundColor: isDark ? const Color(0xFF6200EE) : Colors.white,
                 foregroundColor: isDark ? Colors.white : const Color(0xFF00964D),
