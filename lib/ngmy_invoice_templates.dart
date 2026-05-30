@@ -20,6 +20,7 @@ enum NgmyInvoiceLayout {
   arcticPlatinum,
   crimsonEdge,
   celestialGradient,
+  luxuryCombo,
   goldFoil,
   marble,
   diamond,
@@ -69,14 +70,19 @@ List<NgmyInvoiceTemplate> ngmyInvoiceTemplates() => const [
   // Premium luxurious — midnight-inspired
   NgmyInvoiceTemplate(id: 'midnight_royale', label: 'Midnight Royale', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.midnightRoyale, gradient: [Color(0xFF020617), Color(0xFF0F172A)], accent: Color(0xFFD4AF37), accent2: Color(0xFF1E293B)),
   NgmyInvoiceTemplate(id: 'obsidian_chevron', label: 'Obsidian Chevron', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.obsidianChevron, gradient: [Color(0xFF0A0A0A), Color(0xFF1A1A1A)], accent: Color(0xFFDC2626), accent2: Color(0xFF111111)),
-  NgmyInvoiceTemplate(id: 'sapphire_luxe', label: 'Sapphire Luxe', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.sapphireLuxe, gradient: [Color(0xFF0C1445), Color(0xFF1E3A8A)], accent: Color(0xFF38BDF8), accent2: Color(0xFF818CF8)),
+  NgmyInvoiceTemplate(id: 'sapphire_luxe', label: 'Sapphire Luxe', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.luxuryCombo, gradient: [Color(0xFF0C1445), Color(0xFF1E3A8A)], accent: Color(0xFF38BDF8), accent2: Color(0xFF818CF8)),
   NgmyInvoiceTemplate(id: 'ruby_executive', label: 'Ruby Executive', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.rubyExecutive, gradient: [Color(0xFF1F0A0A), Color(0xFF450A0A)], accent: Color(0xFFEF4444), accent2: Color(0xFFFBBF24)),
   NgmyInvoiceTemplate(id: 'onyx_prism', label: 'Onyx Prism', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.onyxPrism, gradient: [Color(0xFF09090B), Color(0xFF18181B)], accent: Color(0xFF22D3EE), accent2: Color(0xFFA78BFA)),
   NgmyInvoiceTemplate(id: 'champagne_noir', label: 'Champagne Noir', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.champagneNoir, gradient: [Color(0xFF0D0D0D), Color(0xFF1C1917)], accent: Color(0xFFE7C9A9), accent2: Color(0xFFD4AF37)),
-  NgmyInvoiceTemplate(id: 'violet_crown', label: 'Violet Crown', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.violetCrown, gradient: [Color(0xFF1E1B4B), Color(0xFF312E81)], accent: Color(0xFFC084FC), accent2: Color(0xFFF472B6)),
-  NgmyInvoiceTemplate(id: 'arctic_platinum', label: 'Arctic Platinum', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.arcticPlatinum, gradient: [Color(0xFF0F172A), Color(0xFF1E293B)], accent: Color(0xFFE2E8F0), accent2: Color(0xFF94A3B8)),
+  NgmyInvoiceTemplate(id: 'violet_crown', label: 'Violet Crown', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.luxuryCombo, gradient: [Color(0xFF1E1B4B), Color(0xFF312E81)], accent: Color(0xFFC084FC), accent2: Color(0xFFF472B6)),
+  NgmyInvoiceTemplate(id: 'arctic_platinum', label: 'Arctic Platinum', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.luxuryCombo, gradient: [Color(0xFF0F172A), Color(0xFF1E293B)], accent: Color(0xFFE2E8F0), accent2: Color(0xFF94A3B8)),
   NgmyInvoiceTemplate(id: 'crimson_edge', label: 'Crimson Edge', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.crimsonEdge, gradient: [Color(0xFF0F0F0F), Color(0xFF1A0505)], accent: Color(0xFFB91C1C), accent2: Color(0xFFFCA5A5)),
-  NgmyInvoiceTemplate(id: 'celestial_gradient', label: 'Celestial Gradient', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.celestialGradient, gradient: [Color(0xFF0B1026), Color(0xFF1E1B4B)], accent: Color(0xFF6366F1), accent2: Color(0xFFEC4899)),
+  NgmyInvoiceTemplate(id: 'celestial_gradient', label: 'Celestial Gradient', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.luxuryCombo, gradient: [Color(0xFF0B1026), Color(0xFF1E1B4B)], accent: Color(0xFF6366F1), accent2: Color(0xFFEC4899)),
+  NgmyInvoiceTemplate(id: 'golden_phoenix', label: 'Golden Phoenix', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.luxuryCombo, gradient: [Color(0xFF1A1208), Color(0xFF2D1B0E)], accent: Color(0xFFFBBF24), accent2: Color(0xFFDC2626)),
+  NgmyInvoiceTemplate(id: 'midnight_blade', label: 'Midnight Blade', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.obsidianChevron, gradient: [Color(0xFF030712), Color(0xFF0F172A)], accent: Color(0xFF38BDF8), accent2: Color(0xFF1E293B)),
+  NgmyInvoiceTemplate(id: 'emerald_fang', label: 'Emerald Fang', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.rubyExecutive, gradient: [Color(0xFF022C22), Color(0xFF064E3B)], accent: Color(0xFF10B981), accent2: Color(0xFFD4AF37)),
+  NgmyInvoiceTemplate(id: 'royal_carbon', label: 'Royal Carbon', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.corporateStripe, gradient: [Color(0xFF0A0A0A), Color(0xFF171717)], accent: Color(0xFFD4AF37), accent2: Color(0xFF525252)),
+  NgmyInvoiceTemplate(id: 'platinum_strike', label: 'Platinum Strike', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.crimsonEdge, gradient: [Color(0xFF111827), Color(0xFF1F2937)], accent: Color(0xFFE5E7EB), accent2: Color(0xFF9CA3AF)),
 ];
 
 NgmyInvoiceTemplate? ngmyInvoiceTemplateById(String id) {
@@ -293,6 +299,7 @@ class NgmyInvoicePreview extends StatelessWidget {
         );
       case NgmyInvoiceLayout.obsidianChevron:
       case NgmyInvoiceLayout.crimsonEdge:
+      case NgmyInvoiceLayout.luxuryCombo:
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -631,6 +638,13 @@ class _LayoutDecorationPainter extends CustomPainter {
       case NgmyInvoiceLayout.obsidianChevron:
       case NgmyInvoiceLayout.crimsonEdge:
         _chevrons(canvas, size);
+        _diagonalStripes(canvas, size, topRight: true, bottomLeft: false);
+        break;
+      case NgmyInvoiceLayout.luxuryCombo:
+        _chevrons(canvas, size);
+        _diagonalStripes(canvas, size, topRight: true, bottomLeft: true);
+        _bottomTriangles(canvas, size);
+        _goldFrame(canvas, size, dense: true);
         break;
       case NgmyInvoiceLayout.modernWave:
       case NgmyInvoiceLayout.sapphireLuxe:
@@ -758,13 +772,16 @@ class _LayoutDecorationPainter extends CustomPainter {
   bool shouldRepaint(covariant _LayoutDecorationPainter oldDelegate) => oldDelegate.layout != layout;
 }
 
-/// Template picker chips grouped by category.
+/// Template picker chips grouped by category (3 per row).
 Widget ngmyInvoiceTemplatePicker({
+  required BuildContext context,
   required String selectedId,
   required ValueChanged<String> onSelect,
 }) {
   final all = ngmyInvoiceTemplates();
   final categories = [kNgmyInvoiceStandardCategory, kNgmyInvoicePremiumCategory];
+  final screenW = MediaQuery.of(context).size.width;
+  final chipW = (screenW - 48) / 3;
 
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -791,8 +808,8 @@ Widget ngmyInvoiceTemplatePicker({
               return GestureDetector(
                 onTap: () => onSelect(t.id),
                 child: Container(
-                  width: cat == kNgmyInvoicePremiumCategory ? 130 : 112,
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                  width: chipW.clamp(100, 140),
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(colors: t.gradient),
                     borderRadius: BorderRadius.circular(8),
@@ -802,7 +819,9 @@ Widget ngmyInvoiceTemplatePicker({
                   child: Text(
                     t.label,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: t.lightBackground ? Colors.black87 : Colors.white, fontWeight: FontWeight.w700, fontSize: 11),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: t.lightBackground ? Colors.black87 : Colors.white, fontWeight: FontWeight.w700, fontSize: 10),
                   ),
                 ),
               );

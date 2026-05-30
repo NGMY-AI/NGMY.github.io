@@ -34,6 +34,7 @@ import 'ngmy_fun_games.dart';
 import 'ngmy_invoice_storage.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
+import 'ngmy_store_location.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 
@@ -770,10 +771,34 @@ List<Map<String, dynamic>> _mergeStoreOrdersLists(
   return byId.values.toList();
 }
 
-Future<bool> _pushStoreOrdersToSupabase(List<Map<String, dynamic>> orders) async {
+Future<bool> _pushStoreOrdersToSupabase(List<Map<String, dynamic>> localOrders, {String? forceLocalOrderId}) async {
   try {
-    final payload = orders.map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e))).toList();
-    await Supabase.instance.client.from('config').update({'storeOrders': payload}).eq('id', 1);
+    final client = Supabase.instance.client;
+    final cfg = await client.from('config').select('storeOrders').eq('id', 1).maybeSingle();
+    var remote = <Map<String, dynamic>>[];
+    if (cfg != null && cfg['storeOrders'] is List) {
+      remote = (cfg['storeOrders'] as List).map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
+    }
+    var merged = _mergeStoreOrdersLists(localOrders, remote);
+    if (forceLocalOrderId != null && forceLocalOrderId.isNotEmpty) {
+      Map<String, dynamic>? local;
+      for (final o in localOrders) {
+        if ((o['id'] ?? '').toString() == forceLocalOrderId) {
+          local = Map<String, dynamic>.from(o);
+          break;
+        }
+      }
+      if (local != null) {
+        final norm = _normalizeStoreOrder(local);
+        final idx = merged.indexWhere((o) => (o['id'] ?? '').toString() == forceLocalOrderId);
+        if (idx >= 0) {
+          merged[idx] = norm;
+        } else {
+          merged.add(norm);
+        }
+      }
+    }
+    await client.from('config').update({'storeOrders': merged}).eq('id', 1);
     return true;
   } catch (e) {
     debugPrint('[storeOrders] push error: $e');
@@ -811,26 +836,52 @@ String _storeVehicleLabel(String method) {
 }
 
 int _shipmentProgressPercent(Map<String, dynamic> order) {
+  return (_shipmentProgressFraction(order) * 100).round().clamp(0, 100);
+}
+
+/// Smooth 0.0–1.0 progress for live vehicle animation (time-based, accelerates near ETA).
+double _shipmentProgressFraction(Map<String, dynamic> order) {
   final status = (order['fulfillmentStatus'] ?? 'pending').toString();
   if (status == 'refunded') return 0;
-  if (status == 'delivered') return 100;
+  if (status == 'delivered') return 1;
   if (status == 'pending') return 0;
-  if (status == 'shipped') return 15;
+  if (status == 'shipped') return 0.15;
+
   final eta = DateTime.tryParse((order['estimatedArrival'] ?? '').toString());
   final shippedAt = DateTime.tryParse((order['shippedAt'] ?? order['updatedAt'] ?? order['createdAt'] ?? '').toString());
+  final now = DateTime.now();
+
+  if (eta != null) {
+    final remaining = eta.difference(now);
+    if (remaining.inMinutes <= 10 && remaining.inSeconds > 0) {
+      final frac = 1.0 - (remaining.inSeconds / 600.0);
+      return (0.86 + frac * 0.13).clamp(0.0, 0.99);
+    }
+    if (remaining.isNegative) return 0.98;
+  }
+
   if (eta != null && shippedAt != null) {
     final totalSec = eta.difference(shippedAt).inSeconds;
     if (totalSec > 0) {
-      final elapsed = DateTime.now().difference(shippedAt).inSeconds;
-      final pct = 15 + ((elapsed / totalSec) * 84).floor();
-      if (status == 'arriving') return pct.clamp(75, 99);
-      if (status == 'in_transit') return pct.clamp(30, 74);
-      return pct.clamp(15, 99);
+      final elapsed = now.difference(shippedAt).inSeconds;
+      final pct = 0.15 + (elapsed / totalSec) * 0.84;
+      if (status == 'arriving') return pct.clamp(0.75, 0.99);
+      if (status == 'in_transit') return pct.clamp(0.30, 0.74);
+      return pct.clamp(0.15, 0.99);
     }
   }
-  if (status == 'in_transit') return 45;
-  if (status == 'arriving') return 75;
-  return 15;
+  if (status == 'in_transit') return 0.45;
+  if (status == 'arriving') return 0.75;
+  return 0.15;
+}
+
+String? _minutesUntilEta(Map<String, dynamic> order) {
+  final eta = DateTime.tryParse((order['estimatedArrival'] ?? '').toString());
+  if (eta == null) return null;
+  final mins = eta.difference(DateTime.now()).inMinutes;
+  if (mins <= 0) return 'Arriving now';
+  if (mins <= 60) return 'About $mins min away';
+  return null;
 }
 
 String _orderStatusLabel(Map<String, dynamic> order) {
@@ -12091,6 +12142,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     const Text('Choose Template', style: TextStyle(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 6),
                     ngmyInvoiceTemplatePicker(
+                      context: ctx,
                       selectedId: _invoiceTemplate,
                       onSelect: (id) => setDialog(() => _invoiceTemplate = id),
                     ),
@@ -14919,7 +14971,7 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
   @override
   void initState() {
     super.initState();
-    _tick = Timer.periodic(const Duration(milliseconds: 400), (_) {
+    _tick = Timer.periodic(const Duration(milliseconds: 250), (_) {
       if (mounted) setState(() {});
     });
   }
@@ -14935,6 +14987,8 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
     final order = widget.order;
     final dark = widget.isDark;
     final progress = _shipmentProgressPercent(order);
+    final progressFrac = _shipmentProgressFraction(order);
+    final etaMins = _minutesUntilEta(order);
     final trackingId = (order['trackingId'] ?? '').toString();
     final status = (order['fulfillmentStatus'] ?? '').toString();
     final method = (order['shippingMethod'] ?? 'car').toString();
@@ -14947,7 +15001,7 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
     if (status == 'in_transit') activeStep = 1;
     if (status == 'arriving') activeStep = 2;
     if (status == 'delivered') activeStep = 3;
-    final t = progress / 100.0;
+    final t = progressFrac.clamp(0.0, 1.0);
 
     final panelBg = dark ? const Color(0xFF12182A) : const Color(0xFFEFF6FF);
     final panelBorder = dark ? const Color(0xFF3B82F6) : const Color(0xFFBFDBFE);
@@ -14984,6 +15038,11 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text('Now: $currentLoc', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: bodyColor)),
+            ),
+          if (etaMins != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(etaMins, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: dark ? const Color(0xFF34D399) : const Color(0xFF059669))),
             ),
           const SizedBox(height: 12),
           LayoutBuilder(
@@ -15137,7 +15196,7 @@ class _StoreReceiptsPageState extends State<_StoreReceiptsPage> {
   @override
   void initState() {
     super.initState();
-    _poll = Timer.periodic(const Duration(seconds: 3), (_) => unawaited(_runPoll()));
+    _poll = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(_runPoll()));
     unawaited(_runPoll());
   }
 
@@ -15435,6 +15494,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   final Set<String> _likedListingIds = {};
   final Map<String, String> _listingMediaUrlCache = {};
   Timer? _liveOrderPollTimer;
+  Timer? _autoGpsTimer;
+  final Set<String> _autoGpsOrderIds = {};
 
   bool get _canSell => widget.user.isAdmin || widget.user.canSellOnStore;
 
@@ -15469,11 +15530,66 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _listingsSig = _storeListingsSignature(_listings);
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStoreListingsFromCloud(silent: true));
     _searchC.addListener(() => setState(() => _searchQuery = _searchC.text.trim().toLowerCase()));
-    _liveOrderPollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+    _liveOrderPollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted) return;
       unawaited(_syncLiveOrders());
     });
     unawaited(_syncLiveOrders());
+    for (final o in _orders) {
+      if (o['autoLocationEnabled'] == true && _isMySaleOrder(o)) {
+        final id = (o['id'] ?? '').toString();
+        if (id.isNotEmpty) _autoGpsOrderIds.add(id);
+      }
+    }
+    _startAutoGpsTimerIfNeeded();
+  }
+
+  bool _isMySaleOrder(Map<String, dynamic> order) {
+    final me = widget.user.email.toLowerCase().trim();
+    return (order['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
+  }
+
+  void _startAutoGpsTimerIfNeeded() {
+    _autoGpsTimer?.cancel();
+    if (_autoGpsOrderIds.isEmpty) return;
+    _autoGpsTimer = Timer.periodic(const Duration(minutes: 5), (_) => unawaited(_runAutoGpsUpdates()));
+  }
+
+  Future<void> _runAutoGpsUpdates() async {
+    for (final id in _autoGpsOrderIds.toList()) {
+      await _applyGpsToOrder(id, fromAuto: true);
+    }
+  }
+
+  Future<void> _applyGpsToOrder(String orderId, {bool fromAuto = false}) async {
+    final label = await ngmyFetchCurrentLocationLabel();
+    if (!mounted) return;
+    if (label == null) {
+      if (!fromAuto) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not get GPS. Allow location access in browser/phone settings.')),
+        );
+      }
+      return;
+    }
+    await _patchOrder(orderId, (o) {
+      o['currentLocation'] = label;
+      o['lastGpsAt'] = DateTime.now().toUtc().toIso8601String();
+      if (fromAuto) o['autoLocationEnabled'] = true;
+      _appendLocationHistory(o, label, fromAuto ? 'Auto GPS update' : 'Live GPS shared');
+    }, successMessage: fromAuto ? null : 'Live location updated for buyer.');
+  }
+
+  void _appendLocationHistory(Map<String, dynamic> o, String location, String note) {
+    final hist = List<Map<String, dynamic>>.from((o['locationHistory'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? []);
+    hist.insert(0, {'location': location, 'note': note, 'at': DateTime.now().toLocal().toString()});
+    o['locationHistory'] = hist;
+    final s = (o['fulfillmentStatus'] ?? '').toString();
+    if (s == 'shipped') o['fulfillmentStatus'] = 'in_transit';
+    final eta = DateTime.tryParse((o['estimatedArrival'] ?? '').toString());
+    if (eta != null && DateTime.now().isAfter(eta.subtract(const Duration(hours: 6)))) {
+      o['fulfillmentStatus'] = 'arriving';
+    }
   }
 
   String _storeOrdersDigest() {
@@ -15591,6 +15707,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   @override
   void dispose() {
     _liveOrderPollTimer?.cancel();
+    _autoGpsTimer?.cancel();
     _tabCtrl.dispose();
     _searchC.dispose();
     super.dispose();
@@ -16327,11 +16444,17 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     }
   }
 
-  Future<void> _persistOrdersAndRefresh() async {
+  Future<void> _persistOrdersAndRefresh({String? orderId, bool pullRemote = false}) async {
     _advanceOrderStatuses();
-    await _pushStoreOrdersToSupabase(_orders);
-    await _refreshStoreOrdersFromConfig();
+    final ok = await _pushStoreOrdersToSupabase(_orders, forceLocalOrderId: orderId);
+    if (pullRemote) await _refreshStoreOrdersFromConfig();
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save order to cloud. Check connection and try again.'), backgroundColor: Color(0xFFEF4444)),
+      );
+    }
     if (mounted) setState(() {});
+    return;
   }
 
   void _upsertListingLocal(Map<String, dynamic> listing) {
@@ -16446,15 +16569,20 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     return '${months[local.month - 1]} ${local.day}, ${local.year} at $h:${local.minute.toString().padLeft(2, '0')} $ampm';
   }
 
-  void _patchOrder(String orderId, void Function(Map<String, dynamic>) edit) {
+  Future<void> _patchOrder(String orderId, void Function(Map<String, dynamic>) edit, {String? successMessage}) async {
     final idx = _orders.indexWhere((o) => (o['id'] ?? '').toString() == orderId);
     if (idx < 0) return;
     edit(_orders[idx]);
     _orders[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     _orders[idx] = _normalizeStoreOrder(_orders[idx]);
-    unawaited(_persistOrdersAndRefresh());
+    await _persistOrdersAndRefresh(orderId: orderId, pullRemote: false);
     widget.onDataChanged();
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      if (successMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(successMessage)));
+      }
+    }
   }
 
   Widget _shipByDeadlineBanner(Map<String, dynamic> order, {required bool isDark, required bool forSeller}) {
@@ -17047,36 +17175,84 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   void _showUpdateLocationSheet(Map<String, dynamic> order) {
     final c = TextEditingController(text: (order['currentLocation'] ?? '').toString());
     final orderId = (order['id'] ?? '').toString();
-    showDialog(
+    var autoEnabled = order['autoLocationEnabled'] == true;
+    showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _storeSheetBackground(ctx),
-        title: Text('Update location', style: TextStyle(color: _storeSheetTextPrimary(ctx))),
-        content: TextField(
-          controller: c,
-          style: TextStyle(color: _storeSheetTextPrimary(ctx)),
-          decoration: _storeSheetInputDecoration(ctx, hintText: 'Current package location'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _patchOrder(orderId, (o) {
-                o['currentLocation'] = c.text.trim();
-                final hist = List<Map<String, dynamic>>.from((o['locationHistory'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? []);
-                hist.insert(0, {'location': c.text.trim(), 'note': 'Location updated', 'at': DateTime.now().toLocal().toString()});
-                o['locationHistory'] = hist;
-                if ((o['fulfillmentStatus'] ?? '') == 'shipped') o['fulfillmentStatus'] = 'in_transit';
-                final eta = DateTime.tryParse((o['estimatedArrival'] ?? '').toString());
-                if (eta != null && DateTime.now().isAfter(eta.subtract(const Duration(hours: 6)))) {
-                  o['fulfillmentStatus'] = 'arriving';
-                }
-              });
-            },
-            child: const Text('Save'),
+      isScrollControlled: true,
+      backgroundColor: _storeSheetBackground(context),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => Padding(
+          padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(ctx).viewInsets.bottom + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: Text('Update Package Location', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: _storeSheetTextPrimary(ctx)))),
+                  IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close, color: _storeSheetTextMuted(ctx))),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: c,
+                      style: TextStyle(color: _storeSheetTextPrimary(ctx)),
+                      decoration: _storeSheetInputDecoration(ctx, hintText: 'Type address or landmark', prefixIcon: Icons.place_outlined),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    tooltip: 'Share live GPS now',
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await _applyGpsToOrder(orderId);
+                    },
+                    icon: const Icon(Icons.my_location_rounded),
+                    style: IconButton.styleFrom(backgroundColor: const Color(0xFF7C3AED), foregroundColor: Colors.white, minimumSize: const Size(52, 52)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: autoEnabled,
+                onChanged: (v) => setDlg(() => autoEnabled = v),
+                title: Text('Automatic GPS every 5 min', style: TextStyle(fontWeight: FontWeight.w700, color: _storeSheetTextPrimary(ctx))),
+                subtitle: Text('Shares your live location while delivering', style: TextStyle(fontSize: 11, color: _storeSheetTextMuted(ctx))),
+                secondary: const Icon(Icons.gps_fixed_rounded, color: Color(0xFF10B981)),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await _patchOrder(orderId, (o) {
+                    final loc = c.text.trim();
+                    if (loc.isNotEmpty) {
+                      o['currentLocation'] = loc;
+                      _appendLocationHistory(o, loc, 'Location updated by seller');
+                    }
+                    o['autoLocationEnabled'] = autoEnabled;
+                    if (autoEnabled) {
+                      _autoGpsOrderIds.add(orderId);
+                      _startAutoGpsTimerIfNeeded();
+                    } else {
+                      _autoGpsOrderIds.remove(orderId);
+                      _startAutoGpsTimerIfNeeded();
+                    }
+                  }, successMessage: 'Location saved — buyer sees it live.');
+                  if (autoEnabled) unawaited(_applyGpsToOrder(orderId, fromAuto: true));
+                },
+                icon: const Icon(Icons.save_rounded),
+                label: const Text('Save Location'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -17084,53 +17260,92 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   void _showUpdateEtaSheet(Map<String, dynamic> order) {
     DateTime? eta = DateTime.tryParse((order['estimatedArrival'] ?? '').toString()) ?? DateTime.now().add(const Duration(days: 2));
     final orderId = (order['id'] ?? '').toString();
-    showDialog(
+    showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: _storeSheetBackground(context),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlg) => AlertDialog(
-          backgroundColor: _storeSheetBackground(ctx),
-          title: Text('Update ETA', style: TextStyle(color: _storeSheetTextPrimary(ctx))),
-          content: ListTile(
-            title: Text(
-              eta == null ? 'Pick arrival time' : _formatReceiptWhen(eta!.toUtc().toIso8601String()),
-              style: TextStyle(color: _storeSheetTextPrimary(ctx)),
-            ),
-            leading: Icon(Icons.schedule, color: _storeSheetTextMuted(ctx)),
-            onTap: () async {
-              final d = await showDatePicker(context: ctx, initialDate: eta ?? DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
-              if (d == null) return;
-              final t = await showTimePicker(context: ctx, initialTime: TimeOfDay.fromDateTime(eta ?? DateTime.now()));
-              if (t == null) return;
-              setDlg(() => eta = DateTime(d.year, d.month, d.day, t.hour, t.minute));
-            },
+        builder: (ctx, setDlg) => Padding(
+          padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(ctx).viewInsets.bottom + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Update Delivery ETA', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: _storeSheetTextPrimary(ctx))),
+              const SizedBox(height: 6),
+              Text('Buyer sees this instantly on live tracking.', style: TextStyle(fontSize: 11, color: _storeSheetTextMuted(ctx))),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.schedule, color: _storeSheetTextMuted(ctx)),
+                title: Text(
+                  eta == null ? 'Pick date & time' : _formatReceiptWhen(eta!.toUtc().toIso8601String()),
+                  style: TextStyle(fontWeight: FontWeight.w800, color: _storeSheetTextPrimary(ctx)),
+                ),
+                trailing: const Icon(Icons.edit_calendar),
+                onTap: () async {
+                  final d = await showDatePicker(context: ctx, initialDate: eta ?? DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+                  if (d == null) return;
+                  if (!ctx.mounted) return;
+                  final t = await showTimePicker(context: ctx, initialTime: TimeOfDay.fromDateTime(eta ?? DateTime.now()));
+                  if (t == null) return;
+                  setDlg(() => eta = DateTime(d.year, d.month, d.day, t.hour, t.minute));
+                },
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ActionChip(
+                    label: const Text('+1 hour'),
+                    onPressed: () => setDlg(() => eta = DateTime.now().add(const Duration(hours: 1))),
+                  ),
+                  ActionChip(
+                    label: const Text('+1 day'),
+                    onPressed: () => setDlg(() => eta = DateTime.now().add(const Duration(days: 1))),
+                  ),
+                  ActionChip(
+                    label: const Text('In 10 min'),
+                    onPressed: () => setDlg(() => eta = DateTime.now().add(const Duration(minutes: 10))),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                onPressed: eta == null
+                    ? null
+                    : () async {
+                        Navigator.pop(ctx);
+                        final picked = eta!;
+                        await _patchOrder(orderId, (o) {
+                          o['estimatedArrival'] = picked.toUtc().toIso8601String();
+                          final now = DateTime.now();
+                          if (picked.difference(now).inMinutes <= 30) {
+                            o['fulfillmentStatus'] = 'arriving';
+                          } else if ((o['fulfillmentStatus'] ?? '') == 'shipped') {
+                            o['fulfillmentStatus'] = 'in_transit';
+                          }
+                        }, successMessage: 'ETA updated — buyer tracking refreshed.');
+                      },
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('Save ETA'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF97316), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: eta == null
-                  ? null
-                  : () {
-                      Navigator.pop(ctx);
-                      _patchOrder(orderId, (o) {
-                        o['estimatedArrival'] = eta!.toUtc().toIso8601String();
-                        o['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-                      });
-                    },
-              child: const Text('Save'),
-            ),
-          ],
         ),
       ),
     );
   }
 
   void _markOrderDelivered(String orderId) {
-    _patchOrder(orderId, (o) {
+    unawaited(_patchOrder(orderId, (o) {
       o['fulfillmentStatus'] = 'delivered';
       final hist = List<Map<String, dynamic>>.from((o['locationHistory'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? []);
       hist.insert(0, {'location': (o['buyerAddress'] ?? '').toString(), 'note': 'Delivered', 'at': DateTime.now().toLocal().toString()});
       o['locationHistory'] = hist;
-    });
+    }, successMessage: 'Order marked delivered.'));
   }
 
   Future<void> _resellListing(Map<String, dynamic> src, {int? units}) async {
