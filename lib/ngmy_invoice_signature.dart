@@ -1,20 +1,20 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Opens a full-screen signature pad (portrait) for comfortable signing on phone.
+/// Opens a full-screen landscape signature pad (YouTube-style wide canvas).
 Future<void> showNgmyFullscreenSignature(
   BuildContext context, {
   required String title,
   required List<Offset?> points,
   required void Function(List<Offset?> saved, Size canvasSize) onSave,
 }) async {
-  final working = List<Offset?>.from(points);
   await showDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (ctx) => _FullscreenSignatureDialog(
       title: title,
-      initialPoints: working,
+      initialPoints: List<Offset?>.from(points),
       onSave: onSave,
     ),
   );
@@ -44,22 +44,22 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
     super.initState();
     _points = List<Offset?>.from(widget.initialPoints);
     SystemChrome.setPreferredOrientations(const [
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
   void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
   }
 
   void _done() {
     final box = _padKey.currentContext?.findRenderObject() as RenderBox?;
-    final size = box?.size ?? const Size(400, 600);
+    final size = box?.size ?? const Size(600, 300);
     widget.onSave(List<Offset?>.from(_points), size);
     Navigator.pop(context);
   }
@@ -81,7 +81,7 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(widget.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                        Text('Rotate phone for wider space · sign with finger or stylus', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
+                        Text('Landscape mode · sign with finger or stylus', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11)),
                       ],
                     ),
                   ),
@@ -93,27 +93,11 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Container(
+                child: _SignatureCanvas(
                   key: _padKey,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF10B981), width: 2),
-                    boxShadow: [BoxShadow(color: const Color(0xFF10B981).withOpacity(0.2), blurRadius: 20)],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: GestureDetector(
-                      onPanStart: (d) => setState(() => _points.add(d.localPosition)),
-                      onPanUpdate: (d) => setState(() => _points.add(d.localPosition)),
-                      onPanEnd: (_) => setState(() => _points.add(null)),
-                      child: CustomPaint(
-                        painter: NgmySignaturePainter(_points),
-                        child: const SizedBox.expand(),
-                      ),
-                    ),
-                  ),
+                  points: _points,
+                  onChanged: () => setState(() {}),
+                  borderColor: const Color(0xFF10B981),
                 ),
               ),
             ),
@@ -160,38 +144,17 @@ class NgmyInvoiceSignaturePad extends StatelessWidget {
             children: [
               Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700))),
               IconButton(
-                tooltip: 'Full screen sign',
+                tooltip: 'Full screen sign (landscape)',
                 visualDensity: VisualDensity.compact,
                 onPressed: onFullscreen,
-                icon: const Icon(Icons.open_in_full_rounded, color: Color(0xFF10B981), size: 22),
+                icon: const Icon(Icons.screen_rotation_rounded, color: Color(0xFF10B981), size: 22),
               ),
             ],
           ),
-          Container(
+          _SignatureCanvas(
+            points: points,
+            onChanged: onChanged,
             height: padHeight,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
-            ),
-            child: GestureDetector(
-              onPanStart: (d) {
-                points.add(d.localPosition);
-                onChanged();
-              },
-              onPanUpdate: (d) {
-                points.add(d.localPosition);
-                onChanged();
-              },
-              onPanEnd: (_) {
-                points.add(null);
-                onChanged();
-              },
-              child: CustomPaint(
-                painter: NgmySignaturePainter(points),
-                child: const SizedBox.expand(),
-              ),
-            ),
           ),
           Align(
             alignment: Alignment.centerRight,
@@ -203,44 +166,168 @@ class NgmyInvoiceSignaturePad extends StatelessWidget {
   }
 }
 
+class _SignatureCanvas extends StatelessWidget {
+  final List<Offset?> points;
+  final VoidCallback onChanged;
+  final double? height;
+  final Color borderColor;
+
+  const _SignatureCanvas({
+    super.key,
+    required this.points,
+    required this.onChanged,
+    this.height,
+    this.borderColor = const Color(0xFFCBD5E1),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final h = height ?? constraints.maxHeight;
+        final w = constraints.maxWidth.isFinite ? constraints.maxWidth : double.infinity;
+        return Container(
+          height: height,
+          width: w,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(height != null ? 8 : 16),
+            border: Border.all(color: borderColor, width: height != null ? 1 : 2),
+            boxShadow: height == null ? [BoxShadow(color: borderColor.withOpacity(0.2), blurRadius: 20)] : null,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(height != null ? 7 : 14),
+            child: GestureDetector(
+              onPanStart: (d) {
+                _addPoint(points, d.localPosition, Size(w, h));
+                onChanged();
+              },
+              onPanUpdate: (d) {
+                _addPoint(points, d.localPosition, Size(w, h));
+                onChanged();
+              },
+              onPanEnd: (_) {
+                points.add(null);
+                onChanged();
+              },
+              child: CustomPaint(
+                painter: NgmySignaturePainter(points, canvasSize: Size(w, h)),
+                child: SizedBox(height: h, width: w),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _addPoint(List<Offset?> target, Offset local, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+    target.add(Offset(local.dx / size.width, local.dy / size.height));
+  }
+}
+
 class NgmySignaturePainter extends CustomPainter {
   final List<Offset?> points;
   final Color color;
+  final Size canvasSize;
 
-  NgmySignaturePainter(this.points, {this.color = const Color(0xFF0F172A)});
+  NgmySignaturePainter(this.points, {this.color = const Color(0xFF0F172A), required this.canvasSize});
 
   @override
   void paint(Canvas canvas, Size size) {
+    final fitted = fitSignatureToSize(points, size);
+    final stroke = (2.8 * (size.shortestSide / 280)).clamp(2.0, 4.5);
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 2.4
+      ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    for (var i = 0; i < points.length - 1; i++) {
-      final a = points[i];
-      final b = points[i + 1];
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke
+      ..isAntiAlias = true;
+    for (var i = 0; i < fitted.length - 1; i++) {
+      final a = fitted[i];
+      final b = fitted[i + 1];
       if (a != null && b != null) canvas.drawLine(a, b, paint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant NgmySignaturePainter oldDelegate) => true;
+  bool shouldRepaint(covariant NgmySignaturePainter oldDelegate) =>
+      oldDelegate.points != points || oldDelegate.canvasSize != canvasSize;
+}
+
+bool signaturePointsLookNormalized(List<Offset?> points) {
+  var maxV = 0.0;
+  var hasPoint = false;
+  for (final p in points) {
+    if (p == null) continue;
+    hasPoint = true;
+    maxV = math.max(maxV, math.max(p.dx.abs(), p.dy.abs()));
+  }
+  return hasPoint && maxV <= 1.5;
+}
+
+List<Offset?> normalizeSignaturePoints(List<Offset?> src, Size size) {
+  if (size.width <= 0 || size.height <= 0) return src;
+  if (signaturePointsLookNormalized(src)) return src;
+  return src.map((p) => p == null ? null : Offset(p.dx / size.width, p.dy / size.height)).toList();
 }
 
 List<Offset?> scaleSignaturePoints(List<Offset?> src, {required double scaleX, required double scaleY}) {
+  if (signaturePointsLookNormalized(src)) return src;
   return src.map((p) => p == null ? null : Offset(p.dx * scaleX, p.dy * scaleY)).toList();
 }
 
-Widget previewSignature(List<Offset?> points, {double height = 36, Color color = const Color(0xFF0F172A)}) {
+/// Fits normalized (or legacy pixel) signature strokes into [targetSize] preserving proportions.
+List<Offset?> fitSignatureToSize(List<Offset?> rawPoints, Size targetSize, {Size legacySource = const Size(280, 120)}) {
+  if (!rawPoints.any((p) => p != null) || targetSize.width <= 0 || targetSize.height <= 0) return rawPoints;
+
+  List<Offset?> pixelPts;
+  if (signaturePointsLookNormalized(rawPoints)) {
+    pixelPts = rawPoints.map((p) => p == null ? null : Offset(p.dx * targetSize.width, p.dy * targetSize.height)).toList();
+  } else {
+    pixelPts = rawPoints
+        .map((p) => p == null ? null : Offset(p.dx / legacySource.width * targetSize.width, p.dy / legacySource.height * targetSize.height))
+        .toList();
+  }
+
+  var minX = double.infinity;
+  var minY = double.infinity;
+  var maxX = double.negativeInfinity;
+  var maxY = double.negativeInfinity;
+  for (final p in pixelPts) {
+    if (p == null) continue;
+    minX = math.min(minX, p.dx);
+    minY = math.min(minY, p.dy);
+    maxX = math.max(maxX, p.dx);
+    maxY = math.max(maxY, p.dy);
+  }
+  final contentW = maxX - minX;
+  final contentH = maxY - minY;
+  if (contentW < 0.5 && contentH < 0.5) return pixelPts;
+
+  const pad = 6.0;
+  final availW = targetSize.width - pad * 2;
+  final availH = targetSize.height - pad * 2;
+  final scale = math.min(availW / contentW, availH / contentH);
+
+  return pixelPts.map((p) {
+    if (p == null) return null;
+    final dx = (p.dx - minX) * scale + pad + (availW - contentW * scale) / 2;
+    final dy = (p.dy - minY) * scale + pad + (availH - contentH * scale) / 2;
+    return Offset(dx, dy);
+  }).toList();
+}
+
+Widget previewSignature(List<Offset?> points, {double height = 48, Color color = const Color(0xFF0F172A)}) {
   if (!points.any((p) => p != null)) return SizedBox(height: height);
-  final scale = height / NgmyInvoiceSignaturePad.padHeight;
   return SizedBox(
     height: height,
     width: double.infinity,
-    child: CustomPaint(
-      painter: NgmySignaturePainter(
-        scaleSignaturePoints(points, scaleX: scale, scaleY: scale),
-        color: color,
+    child: LayoutBuilder(
+      builder: (_, c) => CustomPaint(
+        painter: NgmySignaturePainter(points, color: color, canvasSize: Size(c.maxWidth, height)),
       ),
     ),
   );

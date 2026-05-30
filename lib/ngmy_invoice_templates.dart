@@ -539,14 +539,14 @@ class NgmyInvoicePreview extends StatelessWidget {
           Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: c)),
           const SizedBox(height: 6),
           Container(
-            height: 36,
+            height: 48,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: t.lightBackground ? Colors.white : Colors.white.withOpacity(0.92),
+              color: t.lightBackground ? Colors.white : Colors.white.withOpacity(0.96),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: t.accent.withOpacity(0.35)),
             ),
-            child: previewSignature(points, height: 36, color: t.lightBackground ? const Color(0xFF0F172A) : const Color(0xFF0F172A)),
+            child: previewSignature(points, height: 48, color: const Color(0xFF0F172A)),
           ),
           const SizedBox(height: 4),
           Text('Sign Here', style: TextStyle(fontSize: 8, color: c.withOpacity(0.55), fontStyle: FontStyle.italic)),

@@ -12039,25 +12039,14 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
               required String title,
               required List<Offset?> target,
             }) async {
-              const inlineW = 280.0;
-              const inlineH = NgmyInvoiceSignaturePad.padHeight;
-              final seed = scaleSignaturePoints(
-                target,
-                scaleX: 400 / inlineW,
-                scaleY: 600 / inlineH,
-              );
               await showNgmyFullscreenSignature(
                 ctx,
                 title: title,
-                points: seed,
+                points: target,
                 onSave: (saved, canvasSize) {
                   target
                     ..clear()
-                    ..addAll(scaleSignaturePoints(
-                      saved,
-                      scaleX: inlineW / canvasSize.width,
-                      scaleY: inlineH / canvasSize.height,
-                    ));
+                    ..addAll(normalizeSignaturePoints(saved, canvasSize));
                   setDialog(() {});
                 },
               );
@@ -14944,6 +14933,7 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
+    final dark = widget.isDark;
     final progress = _shipmentProgressPercent(order);
     final trackingId = (order['trackingId'] ?? '').toString();
     final status = (order['fulfillmentStatus'] ?? '').toString();
@@ -14959,29 +14949,42 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
     if (status == 'delivered') activeStep = 3;
     final t = progress / 100.0;
 
+    final panelBg = dark ? const Color(0xFF12182A) : const Color(0xFFEFF6FF);
+    final panelBorder = dark ? const Color(0xFF3B82F6) : const Color(0xFFBFDBFE);
+    final titleColor = dark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8);
+    final bodyColor = dark ? Colors.white : const Color(0xFF334155);
+    final mutedColor = dark ? Colors.white70 : const Color(0xFF475569);
+    final trackBg = dark ? const Color(0xFF1E293B) : Colors.white;
+    final stepActive = dark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB);
+    final stepDone = Colors.greenAccent.shade400;
+    final stepIdle = dark ? Colors.white38 : Colors.grey;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
+        color: panelBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFBFDBFE)),
+        border: Border.all(color: panelBorder, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Text('Live Tracking', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF1D4ED8))),
+              Text('Live Tracking', style: TextStyle(fontWeight: FontWeight.w900, color: titleColor, fontSize: 14)),
               const Spacer(),
-              Text('#$trackingId', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF6D28D9))),
+              Text('#$trackingId', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: dark ? const Color(0xFFC4B5FD) : const Color(0xFF6D28D9))),
             ],
           ),
           const SizedBox(height: 6),
-          Text('$vehicleLabel · updates every few seconds', style: const TextStyle(fontSize: 10, color: Color(0xFF475569), fontWeight: FontWeight.w600)),
+          Text('$vehicleLabel · updates every few seconds', style: TextStyle(fontSize: 11, color: mutedColor, fontWeight: FontWeight.w600)),
           if (eta != null)
-            Text('ETA: ${_formatStoreTrackingWhen(eta.toUtc().toIso8601String())}', style: const TextStyle(fontSize: 10, color: Color(0xFF2563EB), fontWeight: FontWeight.w700)),
+            Text('ETA: ${_formatStoreTrackingWhen(eta.toUtc().toIso8601String())}', style: TextStyle(fontSize: 11, color: dark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB), fontWeight: FontWeight.w800)),
           if (currentLoc.isNotEmpty)
-            Text('Now: $currentLoc', style: const TextStyle(fontSize: 10, color: Color(0xFF334155))),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('Now: $currentLoc', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: bodyColor)),
+            ),
           const SizedBox(height: 12),
           LayoutBuilder(
             builder: (_, constraints) {
@@ -15000,9 +15003,9 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
                       child: Container(
                         height: 6,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: trackBg,
                           borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                          border: Border.all(color: panelBorder),
                         ),
                       ),
                     ),
@@ -15024,7 +15027,7 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: dark ? const Color(0xFF1E293B) : Colors.white,
                           shape: BoxShape.circle,
                           boxShadow: [BoxShadow(color: const Color(0xFF7C3AED).withOpacity(0.35), blurRadius: 8, offset: const Offset(0, 2))],
                           border: Border.all(color: const Color(0xFF7C3AED), width: 2),
@@ -15044,8 +15047,8 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
               final done = i <= activeStep;
               return Column(
                 children: [
-                  Icon(done ? Icons.check_circle : Icons.circle_outlined, size: 18, color: done ? Colors.green : Colors.grey),
-                  Text(steps[i], style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: done ? const Color(0xFF2563EB) : Colors.grey)),
+                  Icon(done ? Icons.check_circle : Icons.circle_outlined, size: 18, color: done ? stepDone : stepIdle),
+                  Text(steps[i], style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: done ? stepActive : stepIdle)),
                 ],
               );
             }),
@@ -15054,18 +15057,24 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
             const SizedBox(height: 10),
             ...((order['locationHistory'] as List).cast<Map>().map((e) => Map<String, dynamic>.from(e))).take(4).map((h) {
               return Padding(
-                padding: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.only(top: 6),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.circle, size: 8, color: Color(0xFF2563EB)),
+                    Icon(Icons.fiber_manual_record, size: 10, color: dark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text((h['location'] ?? '').toString(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                          Text('${h['note'] ?? ''} · ${(h['at'] ?? '').toString()}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                          Text(
+                            (h['location'] ?? '').toString(),
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: bodyColor),
+                          ),
+                          Text(
+                            '${h['note'] ?? ''} · ${(h['at'] ?? '').toString()}',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: mutedColor),
+                          ),
                         ],
                       ),
                     ),
@@ -15074,12 +15083,23 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
               );
             }),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Center(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-              child: Text(status == 'delivered' ? '✓ Delivered' : '$progress% · Live', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: dark
+                      ? [const Color(0xFF2563EB), const Color(0xFF7C3AED)]
+                      : [const Color(0xFF1D4ED8), const Color(0xFF6D28D9)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: const Color(0xFF2563EB).withOpacity(0.35), blurRadius: 8)],
+              ),
+              child: Text(
+                status == 'delivered' ? '✓ Delivered' : '$progress% · Live',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.white),
+              ),
             ),
           ),
         ],
@@ -16655,6 +16675,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             const SizedBox(height: 10),
             _shipByDeadlineBanner(order, isDark: isDark, forSeller: isSeller),
           ],
+          if (isSeller && fulfillment == 'pending') ...[
+            const SizedBox(height: 12),
+            _sellerShipToBlock(order, isDark: isDark),
+          ],
           if (fulfillment != 'pending' && fulfillment != 'refunded') ...[
             const SizedBox(height: 12),
             _LiveTrackingPanel(key: ValueKey('track_${orderId}_${order['updatedAt']}'), order: order, isDark: isDark),
@@ -16668,10 +16692,15 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
               ),
             ),
           const SizedBox(height: 10),
-          _receiptInfoRow(Icons.inventory_2_outlined, 'Payment Method', _paymentDisplayLabel((order['paidVia'] ?? 'ngmy').toString()), isDark),
-          _receiptInfoRow(Icons.location_on_outlined, 'Delivery Address', (order['buyerAddress'] ?? '').toString(), isDark),
-          if ((order['buyerPhone'] ?? '').toString().isNotEmpty)
-            _receiptInfoRow(Icons.phone_outlined, 'Phone', (order['buyerPhone'] ?? '').toString(), isDark),
+          if (!isSeller || fulfillment != 'pending') ...[
+            _receiptInfoRow(Icons.person_outline, 'Buyer Name', (order['buyerName'] ?? '').toString(), isDark),
+            _receiptInfoRow(Icons.inventory_2_outlined, 'Payment Method', _paymentDisplayLabel((order['paidVia'] ?? 'ngmy').toString()), isDark),
+            _receiptInfoRow(Icons.location_on_outlined, 'Delivery Address', (order['buyerAddress'] ?? '').toString(), isDark),
+            if ((order['buyerPhone'] ?? '').toString().isNotEmpty)
+              _receiptInfoRow(Icons.phone_outlined, 'Phone', (order['buyerPhone'] ?? '').toString(), isDark),
+          ] else ...[
+            _receiptInfoRow(Icons.inventory_2_outlined, 'Payment Method', _paymentDisplayLabel((order['paidVia'] ?? 'ngmy').toString()), isDark),
+          ],
           if (isSeller && fulfillment == 'pending') ...[
             const SizedBox(height: 12),
             SizedBox(
@@ -16750,6 +16779,70 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
               children: [
                 Text(label, style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black45)),
                 Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sellerShipToBlock(Map<String, dynamic> order, {required bool isDark}) {
+    final name = (order['buyerName'] ?? 'Buyer').toString().trim();
+    final phone = (order['buyerPhone'] ?? '').toString().trim();
+    final address = (order['buyerAddress'] ?? '').toString().trim();
+    final email = (order['buyerEmail'] ?? '').toString().trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? const Color(0xFF3B82F6) : const Color(0xFF2563EB), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.local_shipping_outlined, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8), size: 20),
+              const SizedBox(width: 8),
+              Text('SHIP TO — Buyer Details', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8))),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _shipToLine(Icons.person, 'Name', name.isEmpty ? 'Not provided' : name, isDark, missing: name.isEmpty),
+          _shipToLine(Icons.phone, 'Phone', phone.isEmpty ? 'Not provided' : phone, isDark, missing: phone.isEmpty),
+          _shipToLine(Icons.location_on, 'Address', address.isEmpty ? 'Not provided — ask buyer in Messages' : address, isDark, missing: address.isEmpty),
+          if (email.isNotEmpty) _shipToLine(Icons.email_outlined, 'Email', email, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _shipToLine(IconData icon, String label, String value, bool isDark, {bool missing = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: missing ? Colors.orange : (isDark ? Colors.white54 : const Color(0xFF64748B))),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : Colors.black54)),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: missing ? Colors.orange : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                    height: 1.3,
+                  ),
+                ),
               ],
             ),
           ),
