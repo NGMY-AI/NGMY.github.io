@@ -250,8 +250,9 @@ class AppConfig {
   List<Map<String, dynamic>> jobWorkerApplications;
   List<Map<String, dynamic>> storeListings;
   List<Map<String, dynamic>> storeInquiries;
-  /// When false, users cannot post to the News tab (admin can still post).
-  bool newsFeedOpen;
+  List<Map<String, dynamic>> helpHelperApplications;
+  List<Map<String, dynamic>> helpRequests;
+  List<Map<String, dynamic>> helpBusinesses;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -280,7 +281,9 @@ class AppConfig {
     this.jobWorkerApplications = const [],
     this.storeListings = const [],
     this.storeInquiries = const [],
-    this.newsFeedOpen = true,
+    this.helpHelperApplications = const [],
+    this.helpRequests = const [],
+    this.helpBusinesses = const [],
   });
   Map<String, dynamic> toJson() => {
     'officialCashApp': officialCashApp,
@@ -309,7 +312,9 @@ class AppConfig {
     'jobWorkerApplications': jobWorkerApplications,
     'storeListings': storeListings,
     'storeInquiries': storeInquiries,
-    'newsFeedOpen': newsFeedOpen,
+    'helpHelperApplications': helpHelperApplications,
+    'helpRequests': helpRequests,
+    'helpBusinesses': helpBusinesses,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
@@ -338,7 +343,9 @@ class AppConfig {
     jobWorkerApplications: List<Map<String, dynamic>>.from((json['jobWorkerApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     storeListings: List<Map<String, dynamic>>.from((json['storeListings'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     storeInquiries: List<Map<String, dynamic>>.from((json['storeInquiries'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
-    newsFeedOpen: json['newsFeedOpen'] ?? true,
+    helpHelperApplications: List<Map<String, dynamic>>.from((json['helpHelperApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
+    helpRequests: List<Map<String, dynamic>>.from((json['helpRequests'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
+    helpBusinesses: List<Map<String, dynamic>>.from((json['helpBusinesses'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
   );
 }
 
@@ -397,7 +404,9 @@ class MediaPost {
     'userEmail': userEmail,
     'username': username,
     'videoUrl': videoUrl,
+    'url': videoUrl,
     'contentType': contentType,
+    'type': contentType,
     'caption': caption,
     'timestamp': timestamp.toUtc().toIso8601String(),
     'likes': likedBy.length,
@@ -417,7 +426,7 @@ class MediaPost {
       userEmail: json['userEmail'] ?? json['user_email'] ?? '',
       username: json['username'] ?? 'User',
       videoUrl: json['videoUrl'] ?? json['video_url'] ?? '',
-      contentType: (json['contentType'] ?? json['content_type'] ?? 'video').toString(),
+      contentType: (json['contentType'] ?? json['content_type'] ?? json['type'] ?? 'video').toString(),
       caption: json['caption'] ?? '',
       timestamp: DateTime.parse(json['timestamp'] ?? json['created_at'] ?? DateTime.now().toIso8601String()).toLocal(),
       likedBy: likedBy,
@@ -438,99 +447,34 @@ bool _isMissingTablePostgrestError(Object error, String table) {
   return error.toString().contains("Could not find the table 'public.$table'");
 }
 
-Map<String, dynamic> _mediaPostPayloadFromRow(Map<String, dynamic> row) {
-  final data = row['data'];
-  if (data is Map) return Map<String, dynamic>.from(data);
-  if (data is String && data.trim().isNotEmpty) {
-    try {
-      final parsed = jsonDecode(data);
-      if (parsed is Map) return Map<String, dynamic>.from(parsed);
-    } catch (_) {}
-  }
-  final flat = Map<String, dynamic>.from(row);
-  flat.remove('data');
-  flat.remove('updated_at');
-  return flat;
-}
-
-Map<String, dynamic> _mediaRowSnakeCase(Map<String, dynamic> row) {
-  final likedBy = row['likedBy'] ?? row['liked_by'] ?? const [];
-  final savedBy = row['savedBy'] ?? row['saved_by'] ?? const [];
-  return {
-    'id': row['id'],
-    'user_email': row['userEmail'] ?? row['user_email'] ?? '',
-    'username': row['username'] ?? 'User',
-    'video_url': row['videoUrl'] ?? row['video_url'] ?? '',
-    'content_type': row['contentType'] ?? row['content_type'] ?? 'video',
-    'caption': row['caption'] ?? '',
-    'timestamp': row['timestamp'] ?? DateTime.now().toUtc().toIso8601String(),
-    'likes': row['likes'] ?? (likedBy is List ? likedBy.length : 0),
-    'liked_by': likedBy,
-    'saved_by': savedBy,
-    'comments': row['comments'] ?? const [],
-  };
-}
-
 Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
-  final payload = Map<String, dynamic>.from(row);
-  final id = (payload['id'] ?? '').toString();
-  if (id.isEmpty) return false;
-
-  final url = (payload['videoUrl'] ?? payload['video_url'] ?? '').toString();
+  final working = Map<String, dynamic>.from(row);
+  final mediaType = (working['contentType'] ?? working['content_type'] ?? working['type'] ?? 'video').toString();
+  working['type'] = mediaType;
+  working['contentType'] = mediaType;
+  final url = (working['videoUrl'] ?? working['video_url'] ?? working['url'] ?? '').toString();
+  if (url.isEmpty) return false;
+  working['url'] = url;
   if (url.startsWith('data:') && url.length > 120000) {
     debugPrint('[media] skipped upsert: inline media too large for database.');
     return false;
   }
-
-  final jsonbRow = <String, dynamic>{
-    'id': id,
-    'data': payload,
-    'updated_at': DateTime.now().toUtc().toIso8601String(),
-  };
-  try {
-    await Supabase.instance.client.from('media').upsert([jsonbRow]);
-    return true;
-  } catch (e) {
-    debugPrint('[media] jsonb upsert: $e');
-  }
-
-  final attempts = <Map<String, dynamic>>[
-    payload,
-    _mediaRowSnakeCase(payload),
-    {
-      'id': id,
-      'userEmail': payload['userEmail'],
-      'username': payload['username'],
-      'videoUrl': payload['videoUrl'],
-      'contentType': payload['contentType'],
-      'caption': payload['caption'],
-      'timestamp': payload['timestamp'],
-      'likes': payload['likes'],
-      'likedBy': payload['likedBy'],
-      'savedBy': payload['savedBy'],
-      'comments': payload['comments'],
-    },
-  ];
-
-  for (final attempt in attempts) {
-    final working = Map<String, dynamic>.from(attempt);
-    for (int i = 0; i < 8; i++) {
-      try {
-        await Supabase.instance.client.from('media').upsert([working]);
-        return true;
-      } catch (e) {
-        if (_isMissingTablePostgrestError(e, 'media')) {
-          debugPrint('[media] table missing — run supabase/SQL_MEDIA_FIX.txt');
-          return false;
-        }
-        final missing = _missingColumnFromPostgrestError(e);
-        if (missing != null && missing.isNotEmpty) {
-          working.remove(missing);
-          continue;
-        }
-        debugPrint('[media] upsert attempt error: $e');
-        break;
+  for (int i = 0; i < 12; i++) {
+    try {
+      await Supabase.instance.client.from('media').upsert([working]);
+      return true;
+    } catch (e) {
+      if (_isMissingTablePostgrestError(e, 'media')) {
+        debugPrint('[media] table missing in Supabase.');
+        return false;
       }
+      final missing = _missingColumnFromPostgrestError(e);
+      if (missing != null && missing.isNotEmpty) {
+        working.remove(missing);
+        continue;
+      }
+      debugPrint('[media] upsert error: $e');
+      return false;
     }
   }
   return false;
@@ -539,9 +483,9 @@ Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
 Future<List<MediaPost>> _fetchMediaPostsFromSupabase() async {
   try {
     final rows = await Supabase.instance.client.from('media').select();
+    if (rows == null) return [];
     return (rows as List)
-        .map((e) => MediaPost.fromJson(_mediaPostPayloadFromRow(Map<String, dynamic>.from(e as Map))))
-        .where((m) => m.id.isNotEmpty)
+        .map((e) => MediaPost.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
   } catch (e) {
     debugPrint('[media] fetch error: $e');
@@ -565,7 +509,31 @@ Map<String, dynamic> _normalizeStoreListing(Map<String, dynamic> listing) {
   final email = (copy['sellerEmail'] ?? '').toString().toLowerCase().trim();
   if (email.isNotEmpty) copy['sellerEmail'] = email;
   if ((copy['status'] ?? '').toString().isEmpty) copy['status'] = 'active';
+  if (copy['negotiable'] == null) copy['negotiable'] = true;
+  if (copy['deliveryFee'] == null) copy['deliveryFee'] = 0;
+  final liked = copy['likedBy'];
+  if (liked is! List) copy['likedBy'] = <String>[];
+  final payments = copy['acceptedPayments'];
+  if (payments is! List || payments.isEmpty) {
+    copy['acceptedPayments'] = ['ngmy'];
+  }
   return copy;
+}
+
+String _storeListingsSignature(List<Map<String, dynamic>> listings) {
+  final parts = listings.map((l) {
+    final id = (l['id'] ?? '').toString();
+    final status = (l['status'] ?? '').toString();
+    final likes = (l['likedBy'] is List) ? (l['likedBy'] as List).length : 0;
+    final title = (l['title'] ?? '').toString();
+    final price = ((l['price'] as num?) ?? 0).toString();
+    final rawImgs = l['imageRefs'];
+    final imgCount = rawImgs is List ? rawImgs.length : ((l['imageRef'] ?? '').toString().isNotEmpty ? 1 : 0);
+    final hasVideo = (l['videoRef'] ?? '').toString().isNotEmpty ? 1 : 0;
+    return '$id|$status|$likes|$title|$price|$imgCount|$hasVideo';
+  }).toList()
+    ..sort();
+  return parts.join(';;');
 }
 
 Map<String, dynamic> _storeListingFromRow(Map<String, dynamic> row) {
@@ -719,6 +687,66 @@ Future<void> _deleteStoreInquiryRowsFromSupabase(List<String> ids) async {
     if (!_isMissingTablePostgrestError(e, 'store_inquiries')) {
       debugPrint('[store_inquiries] delete error: $e');
     }
+  }
+}
+
+Map<String, dynamic> _helpDataFromRow(Map<String, dynamic> row) {
+  final data = row['data'];
+  if (data is Map) return Map<String, dynamic>.from(data);
+  if (data is String && data.trim().isNotEmpty) {
+    try {
+      final parsed = jsonDecode(data);
+      if (parsed is Map) return Map<String, dynamic>.from(parsed);
+    } catch (_) {}
+  }
+  final flat = Map<String, dynamic>.from(row);
+  flat.remove('data');
+  flat.remove('updated_at');
+  return flat;
+}
+
+Future<bool> _upsertHelpRowSafe(String table, Map<String, dynamic> record) async {
+  final id = (record['id'] ?? '').toString();
+  if (id.isEmpty) return false;
+  final working = <String, dynamic>{
+    'id': id,
+    'data': Map<String, dynamic>.from(record),
+    'updated_at': DateTime.now().toUtc().toIso8601String(),
+  };
+  for (int i = 0; i < 12; i++) {
+    try {
+      await Supabase.instance.client.from(table).upsert([working]);
+      return true;
+    } catch (e) {
+      if (_isMissingTablePostgrestError(e, table)) {
+        debugPrint('[$table] table missing — run supabase/help_center_tables.sql');
+        return false;
+      }
+      final missing = _missingColumnFromPostgrestError(e);
+      if (missing != null && missing.isNotEmpty) {
+        working.remove(missing);
+        continue;
+      }
+      debugPrint('[$table] upsert error: $e');
+      return false;
+    }
+  }
+  return false;
+}
+
+Future<List<Map<String, dynamic>>> _fetchHelpTableFromSupabase(String table) async {
+  try {
+    final rows = await Supabase.instance.client.from(table).select().order('updated_at', ascending: false);
+    if (rows is! List) return [];
+    return rows
+        .map((e) => _helpDataFromRow(Map<String, dynamic>.from(e)))
+        .where((m) => (m['id'] ?? '').toString().isNotEmpty)
+        .toList();
+  } catch (e) {
+    if (!_isMissingTablePostgrestError(e, table)) {
+      debugPrint('[$table] fetch error: $e');
+    }
+    return [];
   }
 }
 
@@ -1083,11 +1111,11 @@ class ActiveInvestment {
       } catch (_) { return DateTime.now(); }
     }
     return ActiveInvestment(
-      name: json['name'], 
-      amount: (json['amount'] ?? 0.0).toDouble(), 
-      dailyROI: (json['dailyROI'] ?? 0.0).toDouble(), 
-      purchaseDate: parseDate(json['purchaseDate']), 
-      totalEarned: (json['totalEarned'] ?? 0.0).toDouble(), 
+      name: json['name'],
+      amount: (json['amount'] ?? 0.0).toDouble(),
+      dailyROI: (json['dailyROI'] ?? 0.0).toDouble(),
+      purchaseDate: parseDate(json['purchaseDate']),
+      totalEarned: (json['totalEarned'] ?? 0.0).toDouble(),
       daysClockedIn: json['daysClockedIn'] ?? 0
     );
   }
@@ -1103,6 +1131,8 @@ class UserData {
   String? profilePicturePath;
   bool isAuthorizedRegistrar;
   bool isApprovedWorker;
+  bool isApprovedHelper;
+  bool canSellOnStore;
   DateTime? lastClockInDate;
   String passwordHash;
   String state;
@@ -1122,21 +1152,21 @@ class UserData {
   double? pendingInvestmentAmount;
   double? pendingInvestmentRoi;
   String savedCashAppTag;
+  String savedZelleInfo;
   String savedBitcoinAddress;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.lastClockInDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedBitcoinAddress = ''});
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = ''});
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
     if (activeInvestment!.daysLeft <= 0) return 0.0;
     return activeInvestment!.amount;
   }
-  /// True only after today's session finished and earnings were deposited (not while clocking in).
   bool get alreadyClockedInToday {
-    if (isClockedIn || lastClockInDate == null) return false;
+    if (lastClockInDate == null) return false;
     final now = DateTime.now();
     return lastClockInDate!.year == now.year &&
-        lastClockInDate!.month == now.month &&
-        lastClockInDate!.day == now.day;
+           lastClockInDate!.month == now.month &&
+           lastClockInDate!.day == now.day;
   }
   double get currentTodayEarnings {
     if (!isClockedIn || clockInStartTime == null || activeInvestment == null) return 0.0;
@@ -1146,7 +1176,7 @@ class UserData {
     return earnings > totalDaily ? totalDaily : earnings;
   }
   double get todayDailyGoal => activeInvestment == null ? 0.0 : (activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100)));
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedBitcoinAddress': savedBitcoinAddress};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -1169,22 +1199,24 @@ class UserData {
       return null;
     }
     return UserData(
-      email: json['email'] ?? '', 
-      phone: json['phone'] ?? '', 
-      username: json['username'] ?? 'User', 
-      accountBalance: (json['accountBalance'] ?? 0.0).toDouble(), 
-      totalProfit: (json['totalProfit'] ?? 0.0).toDouble(), 
-      isClockedIn: json['isClockedIn'] ?? false, 
-      clockInStartTime: parseDate(json['clockInStartTime']), 
-      isAdmin: json['isAdmin'] ?? false, 
-      activeInvestment: parseActiveInvestment(json['activeInvestment']), 
-      status: json['status'] ?? 'active', 
-      forceLogout: json['forceLogout'] ?? false, 
-      referralCount: json['referralCount'] ?? 0, 
-      points: json['points'] ?? 0, 
-      profilePicturePath: json['profilePicturePath'], 
-      isAuthorizedRegistrar: json['isAuthorizedRegistrar'] ?? false, 
+      email: json['email'] ?? '',
+      phone: json['phone'] ?? '',
+      username: json['username'] ?? 'User',
+      accountBalance: (json['accountBalance'] ?? 0.0).toDouble(),
+      totalProfit: (json['totalProfit'] ?? 0.0).toDouble(),
+      isClockedIn: json['isClockedIn'] ?? false,
+      clockInStartTime: parseDate(json['clockInStartTime']),
+      isAdmin: json['isAdmin'] ?? false,
+      activeInvestment: parseActiveInvestment(json['activeInvestment']),
+      status: json['status'] ?? 'active',
+      forceLogout: json['forceLogout'] ?? false,
+      referralCount: json['referralCount'] ?? 0,
+      points: json['points'] ?? 0,
+      profilePicturePath: json['profilePicturePath'],
+      isAuthorizedRegistrar: json['isAuthorizedRegistrar'] ?? false,
       isApprovedWorker: json['isApprovedWorker'] ?? false,
+      isApprovedHelper: json['isApprovedHelper'] ?? false,
+      canSellOnStore: json['canSellOnStore'] == true,
       lastClockInDate: parseDate(json['lastClockInDate']),
       passwordHash: json['passwordHash'] ?? '',
       state: json['state'] ?? 'Georgia',
@@ -1204,25 +1236,10 @@ class UserData {
       pendingInvestmentAmount: json['pendingInvestmentAmount'] == null ? null : (json['pendingInvestmentAmount'] as num).toDouble(),
       pendingInvestmentRoi: json['pendingInvestmentRoi'] == null ? null : (json['pendingInvestmentRoi'] as num).toDouble(),
       savedCashAppTag: (json['savedCashAppTag'] ?? '').toString(),
+      savedZelleInfo: (json['savedZelleInfo'] ?? '').toString(),
       savedBitcoinAddress: (json['savedBitcoinAddress'] ?? '').toString(),
     );
   }
-}
-
-/// When daily earnings reach the goal, deposit to balance and end the session.
-double completeClockInSessionIfReady(UserData user) {
-  if (!user.isClockedIn || user.activeInvestment == null) return 0;
-  if (user.currentTodayEarnings < user.todayDailyGoal) return 0;
-  final earned = user.currentTodayEarnings;
-  user.accountBalance += earned;
-  user.totalProfit += earned;
-  user.activeInvestment!.totalEarned += earned;
-  user.activeInvestment!.daysClockedIn++;
-  user.isClockedIn = false;
-  user.clockInStartTime = null;
-  user.clockInPenaltyPercent = 0;
-  user.lastClockInDate = DateTime.now();
-  return earned;
 }
 
 // --- MAIN APP ---
@@ -1416,6 +1433,8 @@ class _NGMYAppState extends State<NGMYApp> {
     }
   }
 
+  String _appConfigSig(AppConfig c) => jsonEncode(c.toJson());
+
   void _startConfigRefreshLoop() {
     _configRefreshTimer?.cancel();
     _configRefreshTimer = Timer.periodic(const Duration(seconds: 45), (_) async {
@@ -1424,22 +1443,26 @@ class _NGMYAppState extends State<NGMYApp> {
         final cfg = await supabase.from('config').select().maybeSingle();
         if (cfg == null) return;
         if (!mounted) return;
-        setState(() {
-          final keepGemini = _config.geminiApiKey.trim();
-          final keepListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
-          final keepInquiries = List<Map<String, dynamic>>.from(_config.storeInquiries.map((e) => Map<String, dynamic>.from(e)));
-          _config = AppConfig.fromJson(Map<String, dynamic>.from(cfg));
-          final remoteGemini = _geminiKeyFromMap(Map<String, dynamic>.from(cfg));
-          if (remoteGemini.isNotEmpty) {
-            _config.geminiApiKey = remoteGemini;
-          } else if (_config.geminiApiKey.trim().isEmpty && keepGemini.isNotEmpty) {
-            _config.geminiApiKey = keepGemini;
-          }
-          if (_config.storeListings.isEmpty && keepListings.isNotEmpty) _config.storeListings = keepListings;
-          if (_config.storeInquiries.isEmpty && keepInquiries.isNotEmpty) _config.storeInquiries = keepInquiries;
-        });
-        await _reloadStoreFromSupabase();
-        if (mounted) setState(() {});
+        final keepGemini = _config.geminiApiKey.trim();
+        final keepListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
+        final keepInquiries = List<Map<String, dynamic>>.from(_config.storeInquiries.map((e) => Map<String, dynamic>.from(e)));
+        final keepHelpApps = List<Map<String, dynamic>>.from(_config.helpHelperApplications.map((e) => Map<String, dynamic>.from(e)));
+        final keepHelpReqs = List<Map<String, dynamic>>.from(_config.helpRequests.map((e) => Map<String, dynamic>.from(e)));
+        final keepHelpBiz = List<Map<String, dynamic>>.from(_config.helpBusinesses.map((e) => Map<String, dynamic>.from(e)));
+        final next = AppConfig.fromJson(Map<String, dynamic>.from(cfg));
+        final remoteGemini = _geminiKeyFromMap(Map<String, dynamic>.from(cfg));
+        if (remoteGemini.isNotEmpty) {
+          next.geminiApiKey = remoteGemini;
+        } else if (next.geminiApiKey.trim().isEmpty && keepGemini.isNotEmpty) {
+          next.geminiApiKey = keepGemini;
+        }
+        if (next.storeListings.isEmpty && keepListings.isNotEmpty) next.storeListings = keepListings;
+        if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) next.storeInquiries = keepInquiries;
+        if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
+        if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
+        if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
+        if (_appConfigSig(_config) == _appConfigSig(next)) return;
+        setState(() => _config = next);
       } catch (_) {
         // Silent fallback; realtime/local cache still handles config.
       }
@@ -1504,11 +1527,42 @@ class _NGMYAppState extends State<NGMYApp> {
   }
 
   Future<void> _reloadStoreFromSupabase() async {
+    final listingsSigBefore = _storeListingsSignature(_config.storeListings);
+    final inquiriesBefore = _config.storeInquiries.length;
     final remoteListings = await _fetchStoreListingsFromSupabase();
     final remoteInquiries = await _fetchStoreInquiriesFromSupabase();
     _mergeStoreListingsIntoConfig(remoteListings);
     _mergeStoreInquiriesIntoConfig(remoteInquiries);
     _purgeExpiredSoldStoreListings();
+    if (!mounted) return;
+    final listingsSigAfter = _storeListingsSignature(_config.storeListings);
+    final inquiriesAfter = _config.storeInquiries.length;
+    if (listingsSigBefore != listingsSigAfter || inquiriesBefore != inquiriesAfter) {
+      setState(() {});
+    }
+  }
+
+  void _mergeHelpListIntoConfig(String key, List<Map<String, dynamic>> remote, void Function(List<Map<String, dynamic>>) setter, List<Map<String, dynamic>> local) {
+    final byId = <String, Map<String, dynamic>>{};
+    for (final m in local) {
+      final id = (m['id'] ?? '').toString();
+      if (id.isNotEmpty) byId[id] = Map<String, dynamic>.from(m);
+    }
+    for (final m in remote) {
+      final id = (m['id'] ?? '').toString();
+      if (id.isEmpty) continue;
+      byId[id] = Map<String, dynamic>.from(m);
+    }
+    setter(byId.values.toList());
+  }
+
+  Future<void> _reloadHelpFromSupabase() async {
+    final apps = await _fetchHelpTableFromSupabase('help_applications');
+    final reqs = await _fetchHelpTableFromSupabase('help_requests');
+    final biz = await _fetchHelpTableFromSupabase('help_businesses');
+    _mergeHelpListIntoConfig('apps', apps, (v) => _config.helpHelperApplications = v, _config.helpHelperApplications);
+    _mergeHelpListIntoConfig('reqs', reqs, (v) => _config.helpRequests = v, _config.helpRequests);
+    _mergeHelpListIntoConfig('biz', biz, (v) => _config.helpBusinesses = v, _config.helpBusinesses);
     if (mounted) setState(() {});
   }
 
@@ -1885,21 +1939,26 @@ class _NGMYAppState extends State<NGMYApp> {
     if (_isSyncing) return;
     try {
       if (payload.eventType != PostgresChangeEvent.delete) {
-        final newCfg = AppConfig.fromJson(payload.newRecord);
         final keepListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
         final keepInquiries = List<Map<String, dynamic>>.from(_config.storeInquiries.map((e) => Map<String, dynamic>.from(e)));
+        final keepHelpApps = List<Map<String, dynamic>>.from(_config.helpHelperApplications.map((e) => Map<String, dynamic>.from(e)));
+        final keepHelpReqs = List<Map<String, dynamic>>.from(_config.helpRequests.map((e) => Map<String, dynamic>.from(e)));
+        final keepHelpBiz = List<Map<String, dynamic>>.from(_config.helpBusinesses.map((e) => Map<String, dynamic>.from(e)));
         final keepGeminiKey = _config.geminiApiKey.trim();
         final remoteGemini = _geminiKeyFromMap(Map<String, dynamic>.from(payload.newRecord));
-        setState(() {
-          _config = newCfg;
-          if (_config.storeListings.isEmpty && keepListings.isNotEmpty) _config.storeListings = keepListings;
-          if (_config.storeInquiries.isEmpty && keepInquiries.isNotEmpty) _config.storeInquiries = keepInquiries;
-          if (remoteGemini.isNotEmpty) {
-            _config.geminiApiKey = remoteGemini;
-          } else if (_config.geminiApiKey.trim().isEmpty && keepGeminiKey.isNotEmpty) {
-            _config.geminiApiKey = keepGeminiKey;
-          }
-        });
+        final next = AppConfig.fromJson(payload.newRecord);
+        if (next.storeListings.isEmpty && keepListings.isNotEmpty) next.storeListings = keepListings;
+        if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) next.storeInquiries = keepInquiries;
+        if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
+        if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
+        if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
+        if (remoteGemini.isNotEmpty) {
+          next.geminiApiKey = remoteGemini;
+        } else if (next.geminiApiKey.trim().isEmpty && keepGeminiKey.isNotEmpty) {
+          next.geminiApiKey = keepGeminiKey;
+        }
+        if (_appConfigSig(_config) == _appConfigSig(next)) return;
+        setState(() => _config = next);
       }
     } catch (e) {
       debugPrint('Config realtime apply error: $e');
@@ -1918,14 +1977,18 @@ class _NGMYAppState extends State<NGMYApp> {
       final listing = _normalizeStoreListing(_storeListingFromRow(Map<String, dynamic>.from(payload.newRecord)));
       final id = (listing['id'] ?? '').toString();
       if (id.isEmpty) return;
-      setState(() {
-        final idx = _config.storeListings.indexWhere((l) => (l['id'] ?? '').toString() == id);
-        if (idx == -1) {
-          _config.storeListings.add(listing);
-        } else {
-          _config.storeListings[idx] = _pickNewerListing(_config.storeListings[idx], listing);
-        }
-      });
+      final idx = _config.storeListings.indexWhere((l) => (l['id'] ?? '').toString() == id);
+      final merged = idx == -1
+          ? listing
+          : _pickNewerListing(_config.storeListings[idx], listing);
+      final oldSig = _storeListingsSignature(_config.storeListings);
+      if (idx == -1) {
+        _config.storeListings.add(merged);
+      } else if (_storeListingsSignature([_config.storeListings[idx]]) != _storeListingsSignature([merged])) {
+        _config.storeListings[idx] = merged;
+      }
+      final newSig = _storeListingsSignature(_config.storeListings);
+      if (newSig != oldSig && mounted) setState(() {});
     } catch (e) {
       debugPrint('Store listing realtime apply error: $e');
     }
@@ -2017,7 +2080,7 @@ class _NGMYAppState extends State<NGMYApp> {
       if (savedTheme == 'light') _themeMode = ThemeMode.light;
       if (savedTheme == 'dark') _themeMode = ThemeMode.dark;
       if (savedTheme == 'system') _themeMode = ThemeMode.system;
-      
+
       String? safeGet(String key) {
         try {
           final val = prefs.getString(key);
@@ -2046,7 +2109,7 @@ class _NGMYAppState extends State<NGMYApp> {
           }
         } catch (_) {}
       }
-      
+
       final configJson = safeGet('app_config');
       if (configJson != null) {
         try {
@@ -2148,7 +2211,7 @@ class _NGMYAppState extends State<NGMYApp> {
       // 3. Handle Current User Session
       final userJson = safeGet('current_user');
       if (userJson != null) {
-        try { 
+        try {
           final map = jsonDecode(userJson);
           if (map is Map<String, dynamic>) {
             final localUser = UserData.fromJson(map);
@@ -2161,7 +2224,7 @@ class _NGMYAppState extends State<NGMYApp> {
           }
         } catch (_) {}
       }
-      
+
       // Ensure admins are updated
       final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
       for (var u in _allUsers) if (admins.contains(u.email.toLowerCase().trim())) u.isAdmin = true;
@@ -2245,7 +2308,7 @@ class _NGMYAppState extends State<NGMYApp> {
           await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
         }
       }
-      
+
       // Sync all transactions to Supabase
       if (_allTransactions.isNotEmpty) {
         await _safeUpsertRows(
@@ -2253,7 +2316,7 @@ class _NGMYAppState extends State<NGMYApp> {
           _allTransactions.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
         );
       }
-      
+
       // Sync all users to Supabase (deduped list)
       if (_allUsers.isNotEmpty) {
         await _safeUpsertRows(
@@ -2262,11 +2325,12 @@ class _NGMYAppState extends State<NGMYApp> {
         );
       }
 
-      if (_allMedia.isNotEmpty) {
-        await _safeUpsertRows(
-          'media',
-          _allMedia.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
-        );
+      for (final post in _allMedia) {
+        final row = Map<String, dynamic>.from(post.toJson());
+        final mediaType = (row['contentType'] ?? row['type'] ?? 'video').toString();
+        row['type'] = mediaType;
+        row['contentType'] = mediaType;
+        await _upsertMediaRowSafe(row);
       }
 
       if (_allAnnouncements.isNotEmpty) {
@@ -2284,6 +2348,9 @@ class _NGMYAppState extends State<NGMYApp> {
       );
       configRow['storeListings'] = _config.storeListings;
       configRow['storeInquiries'] = _config.storeInquiries;
+      configRow['helpHelperApplications'] = _config.helpHelperApplications;
+      configRow['helpRequests'] = _config.helpRequests;
+      configRow['helpBusinesses'] = _config.helpBusinesses;
       await _safeUpsertRows('config', [configRow]);
 
       await prefs.setString('all_transactions', jsonEncode(_allTransactions.map((e) => e.toJson()).toList()));
@@ -2292,7 +2359,7 @@ class _NGMYAppState extends State<NGMYApp> {
       await prefs.setString('app_config', jsonEncode(_config.toJson()));
       await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
       await prefs.setString('all_announcements', jsonEncode(_allAnnouncements.map((e) => e.toJson()).toList()));
-      
+
     } catch (e) { debugPrint("Save error: $e"); }
     finally {
       Future.delayed(const Duration(milliseconds: 800), () => _isSyncing = false);
@@ -2313,7 +2380,7 @@ class _NGMYAppState extends State<NGMYApp> {
 
   @override Widget build(BuildContext context) {
     if (_isLoading) return const MaterialApp(debugShowCheckedModeBanner: false, home: Scaffold(body: Center(child: CircularProgressIndicator())));
-    
+
     final isDarkMode = _effectiveThemeMode == ThemeMode.dark;
     final style = isDarkMode
         ? const SystemUiOverlayStyle(
@@ -2336,10 +2403,10 @@ class _NGMYAppState extends State<NGMYApp> {
       child: MaterialApp(
         title: 'NGMY', debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          useMaterial3: true, 
-          colorSchemeSeed: const Color(0xFF00B25A), 
-          brightness: Brightness.light, 
-          scaffoldBackgroundColor: Colors.white, 
+          useMaterial3: true,
+          colorSchemeSeed: const Color(0xFF00B25A),
+          brightness: Brightness.light,
+          scaffoldBackgroundColor: Colors.white,
           cardColor: Colors.white,
           pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
@@ -2361,10 +2428,10 @@ class _NGMYAppState extends State<NGMYApp> {
           ),
         ),
         darkTheme: ThemeData(
-          useMaterial3: true, 
-          colorSchemeSeed: const Color(0xFFBB86FC), 
-          brightness: Brightness.dark, 
-          scaffoldBackgroundColor: const Color(0xFF121212), 
+          useMaterial3: true,
+          colorSchemeSeed: const Color(0xFFBB86FC),
+          brightness: Brightness.dark,
+          scaffoldBackgroundColor: const Color(0xFF121212),
           cardColor: const Color(0xFF1E1E1E),
           pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
@@ -2403,7 +2470,7 @@ class _NGMYAppState extends State<NGMYApp> {
                         .update({'passwordHash': newHash})
                         .eq('email', emailNorm)
                         .select();
-                    
+
                     if (result.isEmpty) {
                        await supabase.from('users').insert({
                          'email': emailNorm,
@@ -2425,7 +2492,7 @@ class _NGMYAppState extends State<NGMYApp> {
 
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
-                    
+
                     _isSyncing = false;
                     return true;
                   } catch (e) {
@@ -2436,18 +2503,18 @@ class _NGMYAppState extends State<NGMYApp> {
                 onAuthComplete: (e, p, u, passwordHash, isLogin) async {
                   final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
                   final email = e.toLowerCase().trim();
-                  
+
                   if (isLogin) {
                     final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
                     if (index != -1) {
                       _allUsers[index].passwordHash = passwordHash;
-                      setState(() => _currentUser = _allUsers[index]); 
+                      setState(() => _currentUser = _allUsers[index]);
                     }
                   } else {
                     final user = UserData(email: email, phone: p, username: u, isAdmin: admins.contains(email), passwordHash: passwordHash);
-                    setState(() { 
-                      _currentUser = user; 
-                      _allUsers.add(user); 
+                    setState(() {
+                      _currentUser = user;
+                      _allUsers.add(user);
                     });
                   }
                   await _saveData();
@@ -2458,16 +2525,16 @@ class _NGMYAppState extends State<NGMYApp> {
                 allMedia: _allMedia,
                 allAnnouncements: _allAnnouncements,
                 config: _config,
-                onThemeChanged: (m) => _setThemeMode(m), currentThemeMode: _themeMode, 
-                onLogout: () async { 
+                onThemeChanged: (m) => _setThemeMode(m), currentThemeMode: _themeMode,
+                onLogout: () async {
                   try {
                     final p = await SharedPreferences.getInstance();
                     await p.remove('current_user');
                   } catch (_) {}
-                  setState(() => _currentUser = null); 
+                  setState(() => _currentUser = null);
                 },
                 onDataChanged: () => _saveData(),
-                onAddTransaction: (t) { 
+                onAddTransaction: (t) {
                   setState(() {
                     _allTransactions.add(t);
                     final userTrans = _allTransactions.where((tx) => tx.userEmail == t.userEmail).toList();
@@ -2479,8 +2546,8 @@ class _NGMYAppState extends State<NGMYApp> {
                         supabase.from('transactions').delete().eq('id', old.id).then((_) {}).catchError((_) {});
                       }
                     }
-                  }); 
-                  _saveData(); 
+                  });
+                  _saveData();
                   _notifyTransactionEvent(t);
                 },
                 onProcessTransaction: (t, approve) { setState(() {
@@ -2577,8 +2644,8 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
   bool _showPassword = false;
-  final _e = TextEditingController(); 
-  final _p = TextEditingController(); 
+  final _e = TextEditingController();
+  final _p = TextEditingController();
   final _s = TextEditingController();
   final _u = TextEditingController();
 
@@ -2586,12 +2653,12 @@ class _AuthScreenState extends State<AuthScreen> {
     final email = _e.text.toLowerCase().trim();
     final phone = _p.text.trim();
     final username = _u.text.trim();
-    
+
     if (email.isEmpty || !email.endsWith('@gmail.com')) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid Gmail address')));
       return;
     }
-    
+
     final password = _s.text;
     if (password.isEmpty || password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password must be at least 6 characters')));
@@ -2600,23 +2667,23 @@ class _AuthScreenState extends State<AuthScreen> {
 
     if (_isLogin) {
       final user = widget.allUsers.firstWhere(
-        (u) => u.email.toLowerCase().trim() == email, 
+        (u) => u.email.toLowerCase().trim() == email,
         orElse: () => UserData(email: '')
       );
-      
+
       final enteredHash = _hashPassword(password);
       debugPrint('[Login] email=$email storedHash=${user.passwordHash.isEmpty ? "(empty)" : "${user.passwordHash.substring(0, 8)}..."} enteredHash=${enteredHash.substring(0, 8)}...');
-      
+
       // If user exists and hash matches, proceed immediately
       if (user.email.isNotEmpty && user.passwordHash.isNotEmpty && user.passwordHash == enteredHash) {
         widget.onAuthComplete(email, '', '', enteredHash, true);
         return;
       }
-      
+
       // Fallback: If not found locally or hash mismatch, check Supabase directly
       // This is crucial after a password reset to ensure we have the absolute latest data.
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Checking credentials...')));
-      
+
       Supabase.instance.client
           .from('users')
           .select()
@@ -2627,7 +2694,7 @@ class _AuthScreenState extends State<AuthScreen> {
               if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account not found. Please Sign Up first.')));
               return;
             }
-            
+
             final dbHash = (fresh['passwordHash'] ?? '').toString();
             if (dbHash.isNotEmpty && dbHash == enteredHash) {
               // Password matches Supabase, let's login and update local state
@@ -2648,7 +2715,7 @@ class _AuthScreenState extends State<AuthScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a phone number')));
         return;
       }
-      
+
       final existsEmail = widget.allUsers.any((u) => u.email.toLowerCase().trim() == email);
       if (existsEmail) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This email is already registered. Please Login.')));
@@ -2664,7 +2731,7 @@ class _AuthScreenState extends State<AuthScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone number already registered')));
         return;
       }
-      
+
       widget.onAuthComplete(email, phone, username, _hashPassword(password), false);
     }
   }
@@ -2755,7 +2822,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
             if (!ctx.mounted) return;
             Navigator.pop(c);
-            
+
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -2882,7 +2949,7 @@ class _AuthScreenState extends State<AuthScreen> {
       ],
       TextField(controller: _e, decoration: InputDecoration(labelText: 'Gmail Address', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
       if (!_isLogin) ...[
-        const SizedBox(height: 20), 
+        const SizedBox(height: 20),
         TextField(controller: _p, decoration: InputDecoration(labelText: 'Phone Number', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
       ],
       const SizedBox(height: 20),
@@ -2902,8 +2969,8 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
       const SizedBox(height: 35),
       ElevatedButton(
-        onPressed: _submit, 
-        style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, elevation: 5), 
+        onPressed: _submit,
+        style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, elevation: 5),
         child: Text(_isLogin ? 'LOGIN' : 'SIGN UP', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
       ),
       if (_isLogin) ...[
@@ -2953,7 +3020,7 @@ class _AuthScreenState extends State<AuthScreen> {
             await p.clear();
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('System Reset. Please restart the app.')));
           }
-        }, 
+        },
         child: const Text('Trouble logging in? Reset App Data', style: TextStyle(color: Colors.grey, fontSize: 10))
       ),
     ]))))));
@@ -2961,7 +3028,7 @@ class _AuthScreenState extends State<AuthScreen> {
 }
 
 class MainScreen extends StatefulWidget {
-  final UserData user; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans; 
+  final UserData user; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans;
   final List<MediaPost> allMedia; final List<Announcement> allAnnouncements; final AppConfig config;
   final Function(ThemeMode) onThemeChanged; final ThemeMode currentThemeMode; final VoidCallback onLogout; final VoidCallback onDataChanged;
   final Function(AppTransaction) onAddTransaction; final Function(AppTransaction, bool) onProcessTransaction; final Function(InvestmentPlan) onAddPlan;
@@ -2975,7 +3042,6 @@ class MainScreen extends StatefulWidget {
 }
 class _MainScreenState extends State<MainScreen> {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
-  int _clockUiTick = 0;
 
   Future<void> _showOfficialNotice({
     required String title,
@@ -3029,34 +3095,41 @@ class _MainScreenState extends State<MainScreen> {
 
   @override void initState() {
     super.initState();
-    _t = Timer.periodic(const Duration(seconds: 1), (t) { 
+    _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
       if (widget.user.isClockedIn) {
         double earned = 0;
+        bool completed = false;
         setState(() {
-          earned = completeClockInSessionIfReady(widget.user);
-          if (earned <= 0) _clockUiTick++;
+          if (widget.user.currentTodayEarnings >= widget.user.todayDailyGoal) {
+            earned = widget.user.currentTodayEarnings;
+            widget.user.accountBalance += earned;
+            widget.user.totalProfit += earned;
+            widget.user.activeInvestment!.totalEarned += earned;
+            widget.user.activeInvestment!.daysClockedIn++;
+            widget.user.isClockedIn = false;
+            widget.user.clockInStartTime = null;
+            widget.user.clockInPenaltyPercent = 0;
+            completed = true;
+          }
         });
 
-        if (earned > 0) {
-          _clockUiTick++;
-          widget.onAddTransaction(AppTransaction(
-            id: DateTime.now().toString(),
-            userEmail: widget.user.email,
-            amount: earned,
-            type: TransactionType.reimbursement,
-            method: PaymentMethod.system,
-            sourceDetails: 'Clock-in daily earnings',
-            status: TransactionStatus.approved,
-            timestamp: DateTime.now(),
-          ));
-          widget.onDataChanged();
-          _showOfficialNotice(
-            title: 'Clock-In Complete',
-            message: '\$${formatCurrency(earned)} was added to your balance. See you tomorrow!',
-            isError: false,
-          );
+        if (completed) {
+          if (earned > 0) {
+            widget.onAddTransaction(AppTransaction(
+              id: DateTime.now().toString(),
+              userEmail: widget.user.email,
+              amount: earned,
+              type: TransactionType.reimbursement,
+              method: PaymentMethod.system,
+              sourceDetails: 'Clock-in daily earnings',
+              status: TransactionStatus.approved,
+              timestamp: DateTime.now(),
+            ));
+          }
+          widget.onDataChanged(); // Immediate sync on completion
         } else {
+          // Throttle cloud sync to every 30 seconds to prevent "quick/stuttery" UI
           _syncCounter++;
           if (_syncCounter >= 30) {
             _syncCounter = 0;
@@ -3072,7 +3145,7 @@ class _MainScreenState extends State<MainScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sorted = List<AppTransaction>.from(widget.allTransactions)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     final pages = [
-      HomeScreen(user: widget.user, clockUiTick: _clockUiTick, onClockIn: () { 
+      HomeScreen(user: widget.user, onClockIn: () {
         final now = DateTime.now();
         if (widget.user.activeInvestment == null) {
           _showOfficialNotice(
@@ -3082,23 +3155,18 @@ class _MainScreenState extends State<MainScreen> {
           );
           return;
         }
-        if (widget.user.isClockedIn) {
-          _showOfficialNotice(
-            title: 'Session Active',
-            message: 'You are already clocked in. Earnings are counting now.',
-            isError: false,
-          );
-          return;
+        if (widget.user.lastClockInDate != null) {
+          final last = widget.user.lastClockInDate!;
+          if (last.year == now.year && last.month == now.month && last.day == now.day) {
+            _showOfficialNotice(
+              title: 'Already Clocked In',
+              message: 'You have already completed today\'s clock-in.',
+              isError: true,
+            );
+            return;
+          }
         }
-        if (widget.user.alreadyClockedInToday) {
-          _showOfficialNotice(
-            title: 'Already Completed',
-            message: 'You have already completed today\'s clock-in.',
-            isError: true,
-          );
-          return;
-        }
-        setState(() { 
+        setState(() {
           final midnight = DateTime(now.year, now.month, now.day, 0, 0);
           final minutesLate = now.difference(midnight).inMinutes;
           double penalty = 0;
@@ -3107,11 +3175,11 @@ class _MainScreenState extends State<MainScreen> {
           } else if (minutesLate >= 10) {
             penalty = 15;
           }
-          widget.user.isClockedIn = true; 
-          widget.user.clockInStartTime = DateTime.now(); 
+          widget.user.isClockedIn = true;
+          widget.user.clockInStartTime = DateTime.now();
+          widget.user.lastClockInDate = DateTime.now();
           widget.user.clockInPenaltyPercent = penalty;
-          _clockUiTick++;
-        }); 
+        });
         final penalty = widget.user.clockInPenaltyPercent;
         if (penalty > 0) {
           _showOfficialNotice(
@@ -3126,7 +3194,7 @@ class _MainScreenState extends State<MainScreen> {
             isError: false,
           );
         }
-        widget.onDataChanged(); 
+        widget.onDataChanged();
       }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
         if (cost <= 0) {
@@ -3291,17 +3359,17 @@ class _MainScreenState extends State<MainScreen> {
   );
   Widget _navC(int i) => GestureDetector(
     behavior: HitTestBehavior.opaque,
-    onTap: () => setState(() => _idx = i), 
+    onTap: () => setState(() => _idx = i),
     child: Transform.translate(
-      offset: const Offset(0, -10), 
+      offset: const Offset(0, -10),
       child: Container(
-        width: 60, height: 60, 
+        width: 60, height: 60,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]), 
-          shape: BoxShape.circle, 
-          boxShadow: [BoxShadow(color: const Color(0xFF6200EE).withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))], 
+          gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]),
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: const Color(0xFF6200EE).withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))],
           border: Border.all(color: _idx == i ? Colors.white : Colors.transparent, width: 2)
-        ), 
+        ),
         child: Center(
           child: ClipRRect(
             borderRadius: BorderRadius.circular(30),
@@ -3319,14 +3387,12 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 class HomeScreen extends StatefulWidget {
-  final UserData user;
-  final int clockUiTick;
-  final VoidCallback onClockIn; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans; final AppConfig config;
+  final UserData user; final VoidCallback onClockIn; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans; final AppConfig config;
   final List<Announcement> allAnnouncements;
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
   final Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
-  const HomeScreen({super.key, required this.user, this.clockUiTick = 0, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -3335,7 +3401,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late AnimationController _smokeCtrl;
   late Animation<double> _smokeRot;
   Timer? _liveTicker;
-  Timer? _clockUiTimer;
   int _liveStart = 0;
 
   Future<void> _showOfficialNotice(String title, String message) async {
@@ -3360,28 +3425,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       if (!mounted) return;
       setState(() => _liveStart++);
     });
-    _clockUiTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      if (widget.user.isClockedIn) setState(() {});
-    });
   }
 
   @override void dispose() {
     _liveTicker?.cancel();
-    _clockUiTimer?.cancel();
     _smokeCtrl.dispose();
     super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(HomeScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.clockUiTick != widget.clockUiTick ||
-        oldWidget.user.isClockedIn != widget.user.isClockedIn ||
-        oldWidget.user.lastClockInDate != widget.user.lastClockInDate ||
-        oldWidget.user.accountBalance != widget.user.accountBalance) {
-      setState(() {});
-    }
   }
 
   @override Widget build(BuildContext context) {
@@ -3698,12 +3747,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _clock(BuildContext ctx) {
     bool active = widget.user.isClockedIn;
-    bool alreadyDone = widget.user.alreadyClockedInToday;
+    bool alreadyDone = widget.user.alreadyClockedInToday && !active;
     final lateText = _clockLateText();
-    final showLate = !alreadyDone && !active && widget.user.activeInvestment != null && lateText != null;
-    
+    final showLate = !active && !alreadyDone && widget.user.activeInvestment != null && lateText != null;
+
     return GestureDetector(
-      onTap: (active || alreadyDone || widget.user.activeInvestment == null) 
+      onTap: (active || alreadyDone || widget.user.activeInvestment == null)
         ? (alreadyDone ? null : () {
             if (widget.user.activeInvestment == null) {
               _showOfficialNotice(
@@ -3772,9 +3821,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: active 
+                colors: active
                   ? [const Color(0xFF00B25A), const Color(0xFF00894B)]
-                  : (alreadyDone 
+                  : (alreadyDone
                       ? [Colors.grey.shade600, Colors.grey.shade800]
                       : [Colors.grey.shade400, Colors.grey.shade600]),
               ),
@@ -5238,12 +5287,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override Widget build(BuildContext context) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
     final pages = [
-      _adminHome(isDark), 
+      _adminHome(isDark),
       _adminUsers(isDark),
-      _adminInvest(isDark), 
-      _adminLegal(isDark), 
-      _adminWallet(isDark), 
+      _adminInvest(isDark),
+      _adminLegal(isDark),
+      _adminWallet(isDark),
       _adminMedia(isDark),
+      _adminStore(isDark),
     ];
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
@@ -5282,6 +5332,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _navItem(3, Icons.edit_note_rounded, 'Creator', isDark, frameBg, frameBorder),
             _navItem(4, Icons.account_balance_wallet_outlined, 'Wallet', isDark, frameBg, frameBorder),
             _navItem(5, Icons.play_circle_outline, 'Media', isDark, frameBg, frameBorder),
+            _navItem(6, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
           ],
         ),
       ),
@@ -5325,12 +5376,131 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "MEDIA"][_idx];
+  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "MEDIA", "STORE"][_idx];
+
+  Widget _adminStore(bool isDark) {
+    final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
+    final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
+    final sellers = widget.allUsers.where((u) => u.isAdmin || u.canSellOnStore).toList();
+    final filtered = widget.allUsers.where((u) {
+      final q = _query.trim();
+      if (q.isEmpty) return true;
+      return u.email.toLowerCase().contains(q) || u.username.toLowerCase().contains(q);
+    }).toList()
+      ..sort((a, b) {
+        final aSell = a.isAdmin || a.canSellOnStore;
+        final bSell = b.isAdmin || b.canSellOnStore;
+        if (aSell != bSell) return aSell ? -1 : 1;
+        return a.username.compareTo(b.username);
+      });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(15, 15, 15, 8),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: panelBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: frameBorder, width: 1.4),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.storefront_rounded, color: Colors.deepPurple.shade400, size: 22),
+                    const SizedBox(width: 8),
+                    Text('NGMY Store Sell Access', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Only admins can post items by default. Grant "Sell Item" to specific users so they can list products for sale.',
+                  style: TextStyle(fontSize: 12, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
+                ),
+                const SizedBox(height: 10),
+                Text('${sellers.length} user${sellers.length == 1 ? '' : 's'} can sell now', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFF7C3AED))),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          child: TextField(
+            controller: _search,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            decoration: InputDecoration(
+              hintText: 'Search users to grant sell access...',
+              hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
+              prefixIcon: Icon(Icons.search, color: isDark ? Colors.white38 : Colors.grey),
+              filled: true,
+              fillColor: panelBg,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: frameBorder)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: frameBorder)),
+            ),
+            onChanged: (v) => setState(() => _query = v.toLowerCase()),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(15, 0, 15, 20),
+            itemCount: filtered.length,
+            itemBuilder: (_, i) {
+              final u = filtered[i];
+              final adminAlways = u.isAdmin;
+              final canSell = adminAlways || u.canSellOnStore;
+              return Card(
+                elevation: 0,
+                color: panelBg,
+                margin: const EdgeInsets.only(bottom: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: canSell ? const Color(0xFF7C3AED).withOpacity(0.45) : frameBorder)),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: canSell ? const Color(0xFF7C3AED) : (isDark ? Colors.white24 : Colors.grey.shade300),
+                    child: Icon(adminAlways ? Icons.admin_panel_settings : Icons.person, color: Colors.white, size: 20),
+                  ),
+                  title: Text(u.username, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                  subtitle: Text(
+                    adminAlways ? '${u.email}\nAdmin — always can sell' : u.email,
+                    style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                  ),
+                  isThreeLine: adminAlways,
+                  trailing: adminAlways
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(color: const Color(0xFF7C3AED).withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+                          child: const Text('Admin', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF7C3AED))),
+                        )
+                      : Switch(
+                          value: u.canSellOnStore,
+                          activeColor: const Color(0xFF7C3AED),
+                          onChanged: (on) {
+                            u.canSellOnStore = on;
+                            widget.onDataChanged();
+                            setState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(on ? '${u.username} can now use Sell Item in NGMY Store.' : 'Sell Item removed for ${u.username}.')),
+                            );
+                          },
+                        ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _adminHome(bool isDark) => SingleChildScrollView(
-    padding: const EdgeInsets.all(20), 
+    padding: const EdgeInsets.all(20),
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start, 
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('System Hub', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: isDark ? Colors.white : Colors.black)),
         const SizedBox(height: 18),
@@ -5353,7 +5523,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ],
         ),
         const SizedBox(height: 28),
-        
+
         // Overview Stats Frame
         Container(
           padding: const EdgeInsets.all(20),
@@ -5543,47 +5713,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Future<DateTime?> _pickDateTimeForAdmin(BuildContext ctx, DateTime? initial, String title) async {
-    final now = DateTime.now();
-    final base = initial ?? now;
-    final date = await showDatePicker(
-      context: ctx,
-      initialDate: base,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(now.year + 2),
-      helpText: title,
-    );
-    if (date == null) return null;
-    final time = await showTimePicker(
-      context: ctx,
-      initialTime: TimeOfDay.fromDateTime(base),
-      helpText: '$title — time',
-    );
-    if (time == null) return null;
-    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
-  }
-
-  String _formatAdminDateTime(DateTime? dt) {
-    if (dt == null) return 'Not set';
-    final local = dt.toLocal();
-    return '${local.month}/${local.day}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-  }
-
   void _showAnnouncementAdmin(bool isDark) {
     final titleC = TextEditingController();
     final msgC = TextEditingController();
     final imgC = TextEditingController();
     final apiC = TextEditingController(text: widget.config.geminiApiKey);
     final logoC = TextEditingController(text: widget.config.logoUrl);
-    DateTime? newsClearFrom;
-    DateTime? newsClearTo;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (c) => StatefulBuilder(builder: (ctx, setST) {
-        final newsOpen = widget.config.newsFeedOpen;
         return Align(
           alignment: Alignment.bottomCenter,
           child: Container(
@@ -5602,7 +5743,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               const SizedBox(height: 15),
               const Text('Management Hub', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 15),
-              
+
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
@@ -5671,179 +5812,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       const Divider(),
                       const SizedBox(height: 15),
 
-                      Container(
-                        padding: const EdgeInsets.all(15),
-                        decoration: BoxDecoration(
-                          color: Colors.purple.withOpacity(0.06),
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(color: Colors.purple.withOpacity(0.25)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.newspaper_rounded, color: Colors.purple, size: 20),
-                                SizedBox(width: 10),
-                                Text('News Feed Controls', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              newsOpen
-                                  ? 'News is OPEN — users can post messages.'
-                                  : 'News is CLOSED — users cannot post (admin can still post).',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: newsOpen ? Colors.green.shade700 : Colors.red.shade700,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      setState(() => widget.config.newsFeedOpen = true);
-                                      widget.onDataChanged();
-                                      setST(() {});
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('News feed opened for all users.')),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.lock_open_rounded, size: 18),
-                                    label: const Text('Open News'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
-                                      foregroundColor: Colors.white,
-                                      minimumSize: const Size(0, 42),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      setState(() => widget.config.newsFeedOpen = false);
-                                      widget.onDataChanged();
-                                      setST(() {});
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('News feed closed — users cannot send messages.')),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.lock_rounded, size: 18),
-                                    label: const Text('Close News'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red.shade700,
-                                      foregroundColor: Colors.white,
-                                      minimumSize: const Size(0, 42),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 18),
-                            const Text('CLEAR NEWS MESSAGES', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Choose a start and end date/time. Posts in that range will be deleted from News for everyone.',
-                              style: TextStyle(fontSize: 11, color: Colors.grey),
-                            ),
-                            const SizedBox(height: 10),
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('From', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              subtitle: Text(_formatAdminDateTime(newsClearFrom), style: const TextStyle(fontSize: 11)),
-                              trailing: TextButton(
-                                onPressed: () async {
-                                  final picked = await _pickDateTimeForAdmin(ctx, newsClearFrom, 'From date');
-                                  if (picked != null) setST(() => newsClearFrom = picked);
-                                },
-                                child: const Text('Pick'),
-                              ),
-                            ),
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('To', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              subtitle: Text(_formatAdminDateTime(newsClearTo), style: const TextStyle(fontSize: 11)),
-                              trailing: TextButton(
-                                onPressed: () async {
-                                  final picked = await _pickDateTimeForAdmin(ctx, newsClearTo, 'To date');
-                                  if (picked != null) setST(() => newsClearTo = picked);
-                                },
-                                child: const Text('Pick'),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            ElevatedButton.icon(
-                              onPressed: () async {
-                                if (newsClearFrom == null || newsClearTo == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Set both From and To date/time first.')),
-                                  );
-                                  return;
-                                }
-                                var from = newsClearFrom!.toLocal();
-                                var to = newsClearTo!.toLocal();
-                                if (to.isBefore(from)) {
-                                  final swap = from;
-                                  from = to;
-                                  to = swap;
-                                }
-                                final targets = widget.allAnnouncements.where((a) {
-                                  final t = a.timestamp.toLocal();
-                                  return !t.isBefore(from) && !t.isAfter(to);
-                                }).toList();
-                                if (targets.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('No news posts found in that time range.')),
-                                  );
-                                  return;
-                                }
-                                final ok = await showDialog<bool>(
-                                  context: ctx,
-                                  builder: (dCtx) => AlertDialog(
-                                    title: const Text('Clear news messages?'),
-                                    content: Text(
-                                      'Delete ${targets.length} post(s) from ${_formatAdminDateTime(from)} to ${_formatAdminDateTime(to)}? This cannot be undone.',
-                                    ),
-                                    actions: [
-                                      TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Cancel')),
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(dCtx, true),
-                                        style: TextButton.styleFrom(foregroundColor: Colors.red),
-                                        child: const Text('Delete'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (ok != true) return;
-                                for (final a in targets) {
-                                  widget.onDeleteAnnouncement(a.id);
-                                }
-                                setST(() {});
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Cleared ${targets.length} news post(s).')),
-                                  );
-                                }
-                              },
-                              icon: const Icon(Icons.delete_sweep_rounded),
-                              label: const Text('CLEAR MESSAGES IN RANGE'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.deepPurple,
-                                foregroundColor: Colors.white,
-                                minimumSize: const Size(double.infinity, 44),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 25),
-                      const Divider(),
-                      const SizedBox(height: 15),
-                      
                       const Align(alignment: Alignment.centerLeft, child: Text('CREATE ANNOUNCEMENT', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold))),
                       const SizedBox(height: 15),
                       TextField(controller: titleC, decoration: _adminInputDecoration(label: 'Title', isDark: isDark)),
@@ -6019,15 +5987,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
         const SizedBox(height: 15),
         TextField(controller: lHow, maxLines: 5, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Loan - How It Works Text', isDark: isDark)),
         const SizedBox(height: 20),
-        ElevatedButton(onPressed: () { 
+        ElevatedButton(onPressed: () {
           setState(() {
-            widget.config.officialCashApp = cTag.text.trim(); 
-            widget.config.officialBitcoin = bAddr.text.trim(); 
+            widget.config.officialCashApp = cTag.text.trim();
+            widget.config.officialBitcoin = bAddr.text.trim();
             widget.config.loanPhone = lPhone.text.trim();
             widget.config.loanHowItWorks = lHow.text.trim();
           });
-          widget.onDataChanged(); 
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Settings Updated'))); 
+          widget.onDataChanged();
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Settings Updated')));
         }, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white), child: const Text('SAVE ALL SETTINGS'))
       ]),
     );
@@ -6384,7 +6352,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _adminWallet(bool isDark) {
     final cTag = TextEditingController(text: widget.config.officialCashApp);
     final bAddr = TextEditingController(text: widget.config.officialBitcoin);
-    
+
     final pendingDeposits = widget.allTransactions.where((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending).toList();
     final approvedDeposits = widget.allTransactions.where((t) => (t.type == TransactionType.deposit || t.type == TransactionType.adminAdd) && t.status != TransactionStatus.pending).toList();
     final pendingWithdrawals = widget.allTransactions.where((t) => t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending).toList();
@@ -6412,15 +6380,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
               TextField(controller: bAddr, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Admin Bitcoin Address', isDark: isDark)),
               const SizedBox(height: 15),
               ElevatedButton(
-                onPressed: () { 
+                onPressed: () {
                   setState(() {
-                    widget.config.officialCashApp = cTag.text.trim(); 
+                    widget.config.officialCashApp = cTag.text.trim();
                     widget.config.officialBitcoin = bAddr.text.trim();
                   });
-                  widget.onDataChanged(); 
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment Settings Updated'))); 
-                }, 
-                style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white), 
+                  widget.onDataChanged();
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment Settings Updated')));
+                },
+                style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
                 child: const Text('SAVE PAYMENT SETTINGS')
               )
             ],
@@ -6430,7 +6398,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _sectionHeader(Icons.attach_money_rounded, 'Deposit & Investment Requests', pendingDeposits.length, isDark),
         ...pendingDeposits.map((t) => _depositCard(t, isDark)),
         ...approvedDeposits.map((t) => _depositCard(t, isDark)),
-        
+
         const SizedBox(height: 30),
         _sectionHeader(Icons.outbox_rounded, 'Withdrawal Requests', pendingWithdrawals.length, isDark, iconColor: Colors.blue),
         ...pendingWithdrawals.map((t) => _withdrawalCard(t, isDark)),
@@ -6769,6 +6737,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _sBtn(u.isApprovedWorker ? 'Worker ✓' : 'Approve Worker', Icons.verified_user, Colors.purple, () {
               u.isApprovedWorker = true;
               u.status = 'verified';
+              widget.onDataChanged();
+              setState(() {});
+            }),
+            _sBtn(u.canSellOnStore ? 'Store Sell ✓' : 'Allow Store Sell', Icons.storefront_rounded, Colors.deepPurple, () {
+              u.canSellOnStore = !u.canSellOnStore;
+              widget.onDataChanged();
+              setState(() {});
+            }),
+            _sBtn(u.isApprovedHelper ? 'Helper ✓' : 'Approve Helper', Icons.support_agent_rounded, Colors.teal, () {
+              u.isApprovedHelper = !u.isApprovedHelper;
               widget.onDataChanged();
               setState(() {});
             }),
@@ -7448,19 +7426,19 @@ class _SubmitPaymentPageState extends State<SubmitPaymentPage> {
   Widget _instCard() {
     String addr = _method == PaymentMethod.cashApp ? widget.config.officialCashApp : widget.config.officialBitcoin;
     bool isCashApp = _method == PaymentMethod.cashApp;
-    
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(25), 
+      padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.08), 
+        color: Colors.grey.withOpacity(0.08),
         borderRadius: BorderRadius.circular(35),
         border: Border.all(color: Colors.grey.withOpacity(0.1)),
-      ), 
+      ),
       child: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(isCashApp ? Icons.attach_money : Icons.currency_bitcoin, color: Colors.green, size: 20), 
-          const SizedBox(width: 8), 
+          Icon(isCashApp ? Icons.attach_money : Icons.currency_bitcoin, color: Colors.green, size: 20),
+          const SizedBox(width: 8),
           Text(isCashApp ? 'Our Cash App Tag' : 'Our BTC Address', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5))
         ]),
         const SizedBox(height: 20),
@@ -7492,24 +7470,24 @@ class _SubmitPaymentPageState extends State<SubmitPaymentPage> {
                 // Glass-like background
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25), 
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF121212).withOpacity(0.9), 
+                    color: const Color(0xFF121212).withOpacity(0.9),
                     borderRadius: BorderRadius.circular(25),
                     boxShadow: [
                       BoxShadow(color: (isCashApp ? Colors.green : Colors.blue).withOpacity(0.3), blurRadius: 20, spreadRadius: -5)
                     ],
                     border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
-                  ), 
+                  ),
                   child: Column(
                     children: [
                       FittedBox(
                         child: Text(
-                          addr, 
+                          addr,
                           style: const TextStyle(
-                            fontFamily: 'monospace', 
+                            fontFamily: 'monospace',
                             fontSize: 24, // Bigger font
-                            fontWeight: FontWeight.w900, 
+                            fontWeight: FontWeight.w900,
                             color: Colors.white,
                             letterSpacing: 1,
                           )
@@ -7691,7 +7669,7 @@ class LoanServiceScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 13, height: 1.8, color: isDark ? Colors.white70 : Colors.black87),
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // Warning Box
                   Container(
                     padding: const EdgeInsets.all(15),
@@ -7866,7 +7844,7 @@ class InvestScreen extends StatelessWidget {
     ),
   );
 
-  /// Shiny diamond chip for available plan cards (top-left corner).
+  /// Shiny diamond chip on available plan cards (top-left).
   Widget _diamondCardChip() => SizedBox(
     width: 44,
     height: 44,
@@ -7899,18 +7877,18 @@ class InvestScreen extends StatelessWidget {
                 ),
                 border: Border.all(color: Colors.white, width: 2.2),
                 boxShadow: [
-                  BoxShadow(color: const Color(0xFF7DD3FC).withOpacity(0.95), blurRadius: 14, spreadRadius: 0.5),
+                  BoxShadow(color: Color(0xFF7DD3FC).withOpacity(0.95), blurRadius: 14, spreadRadius: 0.5),
                   BoxShadow(color: Colors.white.withOpacity(0.9), blurRadius: 6),
-                  BoxShadow(color: const Color(0xFF0EA5E9).withOpacity(0.55), blurRadius: 4, offset: const Offset(0, 2)),
+                  BoxShadow(color: Color(0xFF0EA5E9).withOpacity(0.55), blurRadius: 4, offset: Offset(0, 2)),
                 ],
               ),
             ),
           ),
         ),
-        Positioned(
+        const Positioned(
           left: 10,
           top: 12,
-          child: Icon(Icons.auto_awesome, size: 11, color: Colors.white.withOpacity(0.95)),
+          child: Icon(Icons.auto_awesome, size: 11, color: Colors.white),
         ),
       ],
     ),
@@ -8068,7 +8046,7 @@ class InvestScreen extends StatelessWidget {
 
     final active = user.activeInvestment;
     final isExpired = active != null && active.daysLeft <= 0;
-    
+
     final hasActivePlan = active != null && !isExpired;
     bool isCurrent = hasActivePlan && active!.name == p.name && price == active.amount;
     bool isUpgrade = hasActivePlan && price > active.amount;
@@ -8111,7 +8089,7 @@ class InvestScreen extends StatelessWidget {
 
     final disableButton = isCurrent || isDowngrade || pendingSamePlan;
 
-    // Platinum metal — available plans only (active asset stays full gold).
+    // Platinum metal for available plans — active asset card stays gold.
     const textColor = Color(0xFF0F172A);
     const subColor = Color(0xFF475569);
     const cardBorderColor = Color(0xFFF8FAFC);
@@ -8945,7 +8923,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ]), const SizedBox(height: 15),
       _box(context, 'Account Information', [
         _pair('Account ID', _accountId),
-        const Divider(), 
+        const Divider(),
         _pair('Account Type', widget.user.isAdmin ? 'System Administrator' : 'Premium Investor'),
         const SizedBox(height: 14),
         Container(
@@ -9216,7 +9194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
                   const Spacer(),
                   IconButton(
-                    onPressed: () => Navigator.pop(c), 
+                    onPressed: () => Navigator.pop(c),
                     icon: Container(
                       padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(color: Colors.grey.withOpacity(0.1), shape: BoxShape.circle),
@@ -9447,7 +9425,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     final topColors = isDark
       ? [const Color(0xFF0B1F3A), const Color(0xFF3A0CA3)]
       : [const Color(0xFF0EA5E9), const Color(0xFF7C3AED)];
-    
+
     final civicColors = isDark
       ? [const Color(0xFF3949AB), const Color(0xFF512DA8)]
       : [const Color(0xFF7986CB), const Color(0xFF9575CD)];
@@ -9585,7 +9563,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         ),
                       ),
                     ),
-                  ), 
+                  ),
                   _hubBox('Job Marketplace', Icons.business_center_outlined, jobColors, () => Navigator.push(context, MaterialPageRoute(builder: (c) => JobMarketplaceScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onDataChanged: widget.onDataChanged)))),
                   _hubBox(
                     'Help Center',
@@ -9594,7 +9572,12 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (c) => NgmyHelpCenterScreen(user: widget.user, config: widget.config),
+                        builder: (c) => NgmyHelpCenterScreen(
+                          user: widget.user,
+                          allUsers: widget.allUsers,
+                          config: widget.config,
+                          onDataChanged: widget.onDataChanged,
+                        ),
                       ),
                     ),
                   ),
@@ -9656,7 +9639,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   void _openInvoiceFromGDialog(BuildContext dialogContext) {
     // 1. Close current G-Services dialog immediately
     Navigator.of(dialogContext, rootNavigator: true).pop();
-    
+
     // 2. Wait for the pop animation to finish and for the mouse tracker to stabilize.
     // The previous crash was likely due to the dialog being replaced too fast
     // while a hover/tooltip was active.
@@ -11905,36 +11888,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return 'Contribution';
   }
 
-  Future<bool> _confirmDeleteContributionReceipt(BuildContext ctx) async {
-    return await showDialog<bool>(
-          context: ctx,
-          builder: (c) => AlertDialog(
-            title: const Text('Delete receipt?'),
-            content: const Text('This removes the receipt from your list. The underlying contribution records are not changed.'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-              TextButton(
-                onPressed: () => Navigator.pop(c, true),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
-
-  void _dismissContributionReceipt(String key, VoidCallback refreshUi) {
-    setState(() => _dismissedReceiptKeys.add(key));
-    _syncReceiptFlagsToConfig();
-    refreshUi();
-  }
-
   void _showContributionReceipts() {
-    final initialVisible = _visibleContributionTx();
-    final initialGroups = _groupContributionReceipts(initialVisible);
+    final visible = _visibleContributionTx();
+    final groups = _groupContributionReceipts(visible);
+    final keys = groups.keys.toList();
     setState(() {
-      _openedReceiptKeys.addAll(initialGroups.keys);
+      _openedReceiptKeys.addAll(keys);
     });
     _syncReceiptFlagsToConfig();
     String? selectedKey;
@@ -11943,9 +11902,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) {
-          final visible = _visibleContributionTx();
-          final groups = _groupContributionReceipts(visible);
-          final keys = groups.keys.toList();
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           final panelBg = isDark ? const Color(0xFF232A2E) : const Color(0xFFE9F7EF);
           final tileBg = isDark ? const Color(0xFF1B2025) : Colors.white;
@@ -12015,31 +11971,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      (m['purpose'] ?? 'Contribution Campaign').toString(),
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22 * 0.7, color: strongText),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    visualDensity: VisualDensity.compact,
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                    tooltip: 'Delete receipt',
-                                    icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400, size: 22),
-                                    onPressed: () async {
-                                      final ok = await _confirmDeleteContributionReceipt(ctx);
-                                      if (!ok) return;
-                                      _dismissContributionReceipt(k, () => setDialog(() {
-                                        if (selectedKey == k) selectedKey = null;
-                                      }));
-                                    },
-                                  ),
-                                ],
-                              ),
+                              Text((m['purpose'] ?? 'Contribution Campaign').toString(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22 * 0.7, color: strongText)),
                               const SizedBox(height: 4),
                               Text('${m['state'] ?? widget.user.state} • ${m['scopeType'] == 'all' ? 'All members' : '${m['scopeType']}: ${m['scopeValue']}'}', style: TextStyle(color: softText)),
                               const SizedBox(height: 4),
@@ -12079,16 +12011,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   child: TextButton(onPressed: () => setDialog(() => selectedKey = null), child: const Text('← Back to All Receipts')),
                                 ),
                                 const Spacer(),
-                                IconButton(
-                                  tooltip: 'Delete receipt',
-                                  icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400),
-                                  onPressed: () async {
-                                    if (selectedKey == null) return;
-                                    final key = selectedKey!;
-                                    final ok = await _confirmDeleteContributionReceipt(ctx);
-                                    if (!ok) return;
-                                    _dismissContributionReceipt(key, () => setDialog(() => selectedKey = null));
-                                  },
+                                SelectionContainer.disabled(
+                                  child: TextButton(
+                                    onPressed: () {
+                                      if (selectedKey == null) return;
+                                      setState(() => _dismissedReceiptKeys.add(selectedKey!));
+                                      _syncReceiptFlagsToConfig();
+                                      setDialog(() {
+                                        selectedKey = null;
+                                      });
+                                    },
+                                    child: const Text('Delete Receipt'),
+                                  ),
                                 ),
                               ],
                             ),
@@ -12641,7 +12575,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.verified_user_rounded, color: Colors.green, size: 24)),
                   const SizedBox(width: 15),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Authorized Registrar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), Text('$_selectedState • ${widget.allUsers.where((u)=>u.isEnrolledInRegistry && u.state.trim().toLowerCase() == _selectedState.trim().toLowerCase()).length} registered', style: TextStyle(color: Colors.grey.shade600, fontSize: 11))])),
-                  
+
                   if (_isRegistrar())
                     SelectionContainer.disabled(
                       child: GestureDetector(
@@ -12691,7 +12625,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             if (_activeTab == 1) _enrollSection(isDark),
             if (_activeTab == 2) _membersSection(isDark),
             if (_activeTab == 3) _rankingsSection(isDark),
-            
+
               const SizedBox(height: 50),
             ],
           ),
@@ -12756,9 +12690,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Widget _enrollSection(bool isDark) {
-    final availableAppUsers = widget.allUsers.where((u) => 
-      !u.isEnrolledInRegistry && 
-      (u.username.toLowerCase().contains(_enrollSearchC.text.toLowerCase()) || 
+    final availableAppUsers = widget.allUsers.where((u) =>
+      !u.isEnrolledInRegistry &&
+      (u.username.toLowerCase().contains(_enrollSearchC.text.toLowerCase()) ||
        u.email.toLowerCase().contains(_enrollSearchC.text.toLowerCase()))
     ).toList();
 
@@ -12846,7 +12780,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 onSelected: (v) { if (v != null) setState(() => _roomC.text = v); },
               ),
               const SizedBox(height: 30),
-              
+
               ElevatedButton(
                 onPressed: _registerMember,
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25))),
@@ -12951,13 +12885,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       children: [
         Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), borderRadius: BorderRadius.circular(15)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('$_selectedState Community', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)), Text('Only members registered in $_selectedState are shown', style: const TextStyle(fontSize: 10, color: Colors.blueGrey))])),
         const SizedBox(height: 20),
-        
+
         TextField(
           onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
           decoration: InputDecoration(hintText: 'Search members by name, ID, city...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: isDark ? Colors.white10 : Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
         ),
         const SizedBox(height: 20),
-        
+
         Row(children: [
           const Text('Filter by City:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
           const SizedBox(width: 10),
@@ -13001,13 +12935,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             ),
           ),
         ]),
-        
+
         const SizedBox(height: 15),
         ElevatedButton.icon(onPressed: _showManageCitiesRooms, icon: const Icon(Icons.settings, size: 16), label: const Text('Manage Cities & Rooms', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)))),
-        
+
         const SizedBox(height: 20),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Showing ${members.length} member(s)', style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)), Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Row(children: const [Icon(Icons.brush, size: 12, color: Colors.red), SizedBox(width: 5), Text('Clear Missed', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)), Icon(Icons.keyboard_arrow_down, size: 12, color: Colors.red)]))]),
-        
+
         const SizedBox(height: 15),
         if (members.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No members match your filters.', style: TextStyle(color: Colors.grey))))
         else ...members.map((m) => _memberCard(m, isDark)),
@@ -13048,7 +12982,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           _memberInfo(Icons.home_work_rounded, u.room ?? 'No room assigned', Colors.orange),
           _memberInfo(Icons.phone_android_rounded, u.phone, Colors.black54),
           _memberInfo(Icons.email_outlined, u.email, Colors.blueAccent),
-          
+
           const SizedBox(height: 20),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             _mBtn(Icons.visibility_outlined, 'View', Colors.indigo, () => _showMemberProfile(u)),
@@ -13235,35 +13169,41 @@ class NgmyStoreScreen extends StatefulWidget {
 
 class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProviderStateMixin {
   static const Color _storeAccent = Color(0xFF00B25A);
+  static const Color _storePurple = Color(0xFF7C3AED);
 
   late TabController _tabCtrl;
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _searchC = TextEditingController();
-  bool _searchOpen = false;
   String _searchQuery = '';
+  String _listingsSig = '';
+  bool _storeLoading = false;
+  DateTime? _lastCloudRefresh;
+  final Set<String> _likedListingIds = {};
+
+  bool get _canSell => widget.user.isAdmin || widget.user.canSellOnStore;
 
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 3, vsync: this)
-      ..addListener(() {
-        if (!mounted) return;
-        setState(() {});
-        if (!_tabCtrl.indexIsChanging && _tabCtrl.index == 0) {
-          unawaited(_refreshStoreListingsFromCloud());
-        }
-      });
+    _tabCtrl = TabController(length: _canSell ? 3 : 2, vsync: this)..addListener(() {
+      if (!mounted) return;
+      setState(() {});
+    });
     widget.config.storeListings = List<Map<String, dynamic>>.from(
       widget.config.storeListings.map((e) => Map<String, dynamic>.from(e)),
     );
     widget.config.storeInquiries = List<Map<String, dynamic>>.from(
       widget.config.storeInquiries.map((e) => Map<String, dynamic>.from(e)),
     );
+    for (final l in widget.config.storeListings) {
+      final liked = l['likedBy'];
+      if (liked is List && liked.contains(widget.user.email)) {
+        _likedListingIds.add((l['id'] ?? '').toString());
+      }
+    }
     _purgeExpiredSoldListingsLocal();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _refreshStoreListingsFromCloud();
-      if (mounted) setState(() {});
-    });
+    _listingsSig = _storeListingsSignature(_listings);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStoreListingsFromCloud(silent: true));
     _searchC.addListener(() => setState(() => _searchQuery = _searchC.text.trim().toLowerCase()));
   }
 
@@ -13284,10 +13224,25 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     widget.config.storeListings = byId.values.toList();
   }
 
-  Future<void> _refreshStoreListingsFromCloud() async {
+  Future<void> _refreshStoreListingsFromCloud({bool silent = false, bool force = false}) async {
+    if (_storeLoading) return;
+    if (!force && _lastCloudRefresh != null && DateTime.now().difference(_lastCloudRefresh!) < const Duration(seconds: 8)) {
+      return;
+    }
+    _storeLoading = true;
+    if (!silent && mounted) setState(() {});
     final remote = await _fetchStoreListingsFromSupabase();
     _mergeRemoteStoreListings(remote);
-    if (mounted) setState(() {});
+    _lastCloudRefresh = DateTime.now();
+    _storeLoading = false;
+    if (!mounted) return;
+    final sig = _storeListingsSignature(_listings);
+    if (sig != _listingsSig) {
+      _listingsSig = sig;
+      setState(() {});
+    } else if (!silent) {
+      setState(() {});
+    }
   }
 
   void _purgeExpiredSoldListingsLocal() {
@@ -13340,12 +13295,40 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     }).length;
   }
 
+  int _unreadBuyerInquiries() {
+    final me = widget.user.email.toLowerCase().trim();
+    return _inquiries.where((m) {
+      final buyer = (m['buyerEmail'] ?? '').toString().toLowerCase().trim();
+      if (buyer != me) return false;
+      final replies = _inquiryReplies(m);
+      if (replies.isEmpty) return false;
+      final last = replies.last;
+      return (last['role'] ?? '').toString() == 'seller' && m['buyerRead'] != true;
+    }).length;
+  }
+
+  int _unreadMessageCount() => _unreadSellerInquiries() + _unreadBuyerInquiries();
+
   void _markInquiryRead(String id) {
     final idx = _inquiries.indexWhere((m) => (m['id'] ?? '').toString() == id);
     if (idx >= 0) {
       _inquiries[idx]['read'] = true;
       _save();
     }
+  }
+
+  void _markInquiryBuyerRead(String id) {
+    final idx = _inquiries.indexWhere((m) => (m['id'] ?? '').toString() == id);
+    if (idx >= 0) {
+      _inquiries[idx]['buyerRead'] = true;
+      _save();
+    }
+  }
+
+  List<Map<String, dynamic>> _inquiryReplies(Map<String, dynamic> m) {
+    final raw = m['replies'];
+    if (raw is! List) return [];
+    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
   void _showSellerInbox() {
@@ -13360,97 +13343,244 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
           final sheetMessages = List<Map<String, dynamic>>.from(
-            _inquiries.where((m) => (m['sellerEmail'] ?? '').toString().toLowerCase().trim() == me),
+            _inquiries.where((m) {
+              final seller = (m['sellerEmail'] ?? '').toString().toLowerCase().trim();
+              final buyer = (m['buyerEmail'] ?? '').toString().toLowerCase().trim();
+              return seller == me || buyer == me;
+            }),
           )..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
           return Container(
-        height: MediaQuery.of(ctx).size.height * 0.72,
-        margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
-        padding: const EdgeInsets.all(18),
+            height: MediaQuery.of(ctx).size.height * 0.72,
+            margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF121726) : Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: border, width: 1.4),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _storePurple.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _storePurple.withOpacity(0.35)),
+                      ),
+                      child: const Icon(Icons.chat_bubble_rounded, color: _storePurple),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(child: Text('Messages', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18))),
+                    IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text('Tap a thread to read and reply', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54)),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: sheetMessages.isEmpty
+                      ? const Center(child: Text('No messages yet.', style: TextStyle(color: Colors.grey)))
+                      : ListView.builder(
+                          itemCount: sheetMessages.length,
+                          itemBuilder: (_, i) {
+                            final m = sheetMessages[i];
+                            final id = (m['id'] ?? '').toString();
+                            final isSellerThread = (m['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
+                            final isBuyerThread = (m['buyerEmail'] ?? '').toString().toLowerCase().trim() == me;
+                            final replies = _inquiryReplies(m);
+                            final unread = isSellerThread
+                                ? m['read'] != true
+                                : (replies.isNotEmpty && (replies.last['role'] ?? '').toString() == 'seller' && m['buyerRead'] != true);
+                            return GestureDetector(
+                              onTap: () {
+                                if (isSellerThread) _markInquiryRead(id);
+                                if (isBuyerThread) _markInquiryBuyerRead(id);
+                                setSheet(() {});
+                                _openInquiryThread(m, isDark);
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: unread ? _storePurple : border, width: unread ? 1.6 : 1.1),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text((m['listingTitle'] ?? 'Item').toString(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                                        ),
+                                        if (unread)
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: const BoxDecoration(color: _storePurple, shape: BoxShape.circle),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      isSellerThread
+                                          ? 'From: ${(m['buyerName'] ?? 'User').toString()}'
+                                          : 'To seller: ${(m['listingTitle'] ?? 'Item').toString()}',
+                                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text((m['message'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
+                                    if (replies.isNotEmpty)
+                                      Text('${replies.length} repl${replies.length == 1 ? 'y' : 'ies'}', style: TextStyle(fontSize: 10, color: _storePurple.withOpacity(0.85))),
+                                    const SizedBox(height: 4),
+                                    Text(_safeStoreDate((m['createdAt'] ?? '').toString()), style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black45)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _openInquiryThread(Map<String, dynamic> inquiry, bool isDark) {
+    final replyC = TextEditingController();
+    final me = widget.user.email.toLowerCase().trim();
+    final isSeller = (inquiry['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
+    final isBuyer = (inquiry['buyerEmail'] ?? '').toString().toLowerCase().trim() == me;
+    final inquiryId = (inquiry['id'] ?? '').toString();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          final idx = _inquiries.indexWhere((m) => (m['id'] ?? '').toString() == inquiryId);
+          final thread = idx >= 0 ? _inquiries[idx] : inquiry;
+          final replies = _inquiryReplies(thread);
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              height: MediaQuery.of(ctx).size.height * 0.65,
+              margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF121726) : Colors.white,
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: Text((thread['listingTitle'] ?? 'Item').toString(), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16))),
+                      IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                    ],
+                  ),
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        _inquiryBubble(
+                          isDark: isDark,
+                          who: (thread['buyerName'] ?? 'Buyer').toString(),
+                          text: (thread['message'] ?? '').toString(),
+                          mine: !isSeller,
+                        ),
+                        ...replies.map((r) => _inquiryBubble(
+                              isDark: isDark,
+                              who: (r['name'] ?? r['role'] ?? 'User').toString(),
+                              text: (r['message'] ?? '').toString(),
+                              mine: (r['role'] ?? '').toString() == 'seller' ? isSeller : !isSeller,
+                            )),
+                      ],
+                    ),
+                  ),
+                  if (isSeller || isBuyer)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: replyC,
+                            minLines: 1,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              hintText: isSeller ? 'Reply to buyer…' : 'Reply to seller…',
+                              filled: true,
+                              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filled(
+                          onPressed: () {
+                            final text = replyC.text.trim();
+                            if (text.isEmpty || idx < 0) return;
+                            final list = _inquiryReplies(thread);
+                            final role = isSeller ? 'seller' : 'buyer';
+                            list.add({
+                              'role': role,
+                              'name': widget.user.username,
+                              'email': widget.user.email,
+                              'message': text,
+                              'createdAt': DateTime.now().toUtc().toIso8601String(),
+                            });
+                            _inquiries[idx]['replies'] = list;
+                            if (isSeller) {
+                              _inquiries[idx]['read'] = true;
+                              _inquiries[idx]['buyerRead'] = false;
+                            } else {
+                              _inquiries[idx]['buyerRead'] = true;
+                              _inquiries[idx]['read'] = false;
+                            }
+                            replyC.clear();
+                            unawaited(_upsertStoreInquiryRowSafe(_inquiries[idx]));
+                            _save();
+                            setSheet(() {});
+                          },
+                          icon: const Icon(Icons.send_rounded),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _inquiryBubble({required bool isDark, required String who, required String text, required bool mine}) {
+    return Align(
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF121726) : Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: border, width: 1.4),
+          color: mine ? _storePurple.withOpacity(0.15) : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _storeAccent.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _storeAccent.withOpacity(0.35)),
-                  ),
-                  child: const Icon(Icons.chat_bubble_rounded, color: _storeAccent),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(child: Text('Buyer Messages', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18))),
-                IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text('Availability questions from shoppers', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54)),
-            const SizedBox(height: 12),
-            Expanded(
-              child: sheetMessages.isEmpty
-                  ? const Center(child: Text('No messages yet.', style: TextStyle(color: Colors.grey)))
-                  : ListView.builder(
-                      itemCount: sheetMessages.length,
-                      itemBuilder: (_, i) {
-                        final m = sheetMessages[i];
-                        final id = (m['id'] ?? '').toString();
-                        final unread = m['read'] != true;
-                        return GestureDetector(
-                          onTap: () {
-                            if (unread) {
-                              _markInquiryRead(id);
-                              setSheet(() {});
-                              setState(() {});
-                            }
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: unread ? _storeAccent : border, width: unread ? 1.6 : 1.1),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text((m['listingTitle'] ?? 'Item').toString(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                                    ),
-                                    if (unread)
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: const BoxDecoration(color: _storeAccent, shape: BoxShape.circle),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text('From: ${(m['buyerName'] ?? 'User').toString()}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
-                                const SizedBox(height: 6),
-                                Text((m['message'] ?? '').toString(), style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
-                                const SizedBox(height: 4),
-                                Text(_safeStoreDate((m['createdAt'] ?? '').toString()), style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black45)),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
+            Text(who, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: mine ? _storePurple : Colors.grey)),
+            const SizedBox(height: 2),
+            Text(text, style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
           ],
         ),
-      );
-        },
       ),
     );
   }
@@ -13484,7 +13614,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             onPressed: () {
               final message = msgC.text.trim();
               if (message.isEmpty) return;
-              _inquiries.add({
+              final inquiry = {
                 'id': DateTime.now().microsecondsSinceEpoch.toString(),
                 'listingId': (listing['id'] ?? '').toString(),
                 'listingTitle': (listing['title'] ?? 'Item').toString(),
@@ -13494,7 +13624,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                 'message': message,
                 'createdAt': DateTime.now().toUtc().toIso8601String(),
                 'read': false,
-              });
+                'buyerRead': true,
+                'replies': <Map<String, dynamic>>[],
+              };
+              _inquiries.add(inquiry);
+              unawaited(_upsertStoreInquiryRowSafe(inquiry));
               _save();
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Message sent to seller.')));
@@ -13526,9 +13660,26 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     );
   }
 
-  void _save() {
+  void _save({bool refreshCloud = false}) {
+    _listingsSig = _storeListingsSignature(_listings);
     widget.onDataChanged();
-    setState(() {});
+    if (refreshCloud) {
+      unawaited(_refreshStoreListingsFromCloud(silent: true, force: true));
+    } else if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _upsertListingLocal(Map<String, dynamic> listing) {
+    final normalized = _normalizeStoreListing(listing);
+    final id = (normalized['id'] ?? '').toString();
+    final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == id);
+    if (idx >= 0) {
+      _listings[idx] = normalized;
+    } else {
+      _listings.add(normalized);
+    }
+    unawaited(_upsertStoreListingRowSafe(normalized));
   }
 
   ImageProvider? _listingImage(String? imageRef) {
@@ -13717,28 +13868,26 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     );
   }
 
-  Widget _storeTabFrame(int index, String label, int count, bool isDark) {
+  Widget _storeTabChip(int index, String label, int count, bool isDark) {
     final selected = _tabCtrl.index == index;
     final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => _tabCtrl.animateTo(index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: selected ? (isDark ? const Color(0xFF1F2937) : Colors.white) : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: selected ? _storeAccent : border, width: selected ? 2 : 1.2),
-            boxShadow: selected ? [BoxShadow(color: _storeAccent.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3))] : null,
-          ),
-          child: Column(
-            children: [
-              Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: selected ? _storeAccent : (isDark ? Colors.white70 : Colors.black54))),
-              const SizedBox(height: 2),
-              Text('$count', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF111827))),
-            ],
+    return GestureDetector(
+      onTap: () => _tabCtrl.animateTo(index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        margin: const EdgeInsets.only(left: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? (isDark ? const Color(0xFF1F2937) : Colors.white) : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: selected ? _storeAccent : border, width: selected ? 1.6 : 1),
+        ),
+        child: Text(
+          '$label $count',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 9,
+            color: selected ? _storeAccent : (isDark ? Colors.white60 : Colors.black54),
           ),
         ),
       ),
@@ -13823,8 +13972,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   Widget _sellItemButton({bool compact = false}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final unread = _unreadSellerInquiries();
-    final sellBtn = Container(
+    final unread = _unreadMessageCount();
+    Widget? sellBtn;
+    if (_canSell) {
+    sellBtn = Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(colors: [isDark ? const Color(0xFF1E293B) : _storeAccent, const Color(0xFF00894B)]),
         borderRadius: BorderRadius.circular(compact ? 12 : 999),
@@ -13851,7 +14002,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         ),
       ),
     );
-    if (compact) return sellBtn;
+    }
+    if (compact) return sellBtn ?? const SizedBox.shrink();
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -13890,21 +14042,513 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        sellBtn,
+        if (sellBtn != null) ...[const SizedBox(height: 8), sellBtn],
       ],
     );
   }
 
+  List<String> _listingAcceptedPayments(Map<String, dynamic> listing) {
+    final raw = listing['acceptedPayments'];
+    if (raw is! List || raw.isEmpty) return ['ngmy'];
+    final list = raw.map((e) => e.toString()).where((p) {
+      if (p == 'cashapp' && _listingSellerCashTag(listing).isEmpty) return false;
+      if (p == 'zelle' && _listingSellerZelle(listing).isEmpty) return false;
+      return true;
+    }).toList();
+    return list.isEmpty ? ['ngmy'] : list;
+  }
+
+  UserData? _sellerUserForListing(Map<String, dynamic> listing) {
+    final email = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
+    if (email.isEmpty) return null;
+    for (final u in widget.allUsers) {
+      if (u.email.toLowerCase().trim() == email) return u;
+    }
+    return null;
+  }
+
+  String _listingSellerCashTag(Map<String, dynamic> listing) {
+    final onListing = (listing['sellerCashAppTag'] ?? '').toString().trim();
+    if (onListing.isNotEmpty) return _normalizeCashAppDisplayTag(onListing);
+    return _normalizeCashAppDisplayTag(_sellerUserForListing(listing)?.savedCashAppTag ?? '');
+  }
+
+  String _listingSellerZelle(Map<String, dynamic> listing) {
+    final onListing = (listing['sellerZelleInfo'] ?? '').toString().trim();
+    if (onListing.isNotEmpty) return onListing;
+    return (_sellerUserForListing(listing)?.savedZelleInfo ?? '').trim();
+  }
+
+  String _normalizeCashAppDisplayTag(String raw) {
+    var t = raw.trim();
+    if (t.isEmpty) return '';
+    if (!t.startsWith(r'$')) t = '\$$t';
+    return t;
+  }
+
+  String _cashAppBareHandle(String tag) {
+    return tag.replaceFirst(RegExp(r'^\$'), '').trim();
+  }
+
+  Future<void> _openSellerCashApp(String tag) async {
+    final handle = _cashAppBareHandle(tag);
+    if (handle.isEmpty) return;
+    final uri = Uri.parse('https://cash.app/\$$handle');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Cash App.')));
+    }
+  }
+
+  Future<void> _openSellerZelle(String info) async {
+    final t = info.trim();
+    if (t.isEmpty) return;
+    Uri? uri;
+    if (t.contains('@')) {
+      uri = Uri.parse('mailto:$t');
+    } else {
+      final digits = t.replaceAll(RegExp(r'[^\d+]'), '');
+      if (digits.isNotEmpty) uri = Uri.parse('tel:$digits');
+    }
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      await Clipboard.setData(ClipboardData(text: t));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Zelle info copied.')));
+    }
+  }
+
+  void _persistSellerPaymentPrefs({required bool saveCashApp, required String cashTag, required bool saveZelle, required String zelleInfo}) {
+    if (saveCashApp && cashTag.isNotEmpty) widget.user.savedCashAppTag = cashTag;
+    if (saveZelle && zelleInfo.isNotEmpty) widget.user.savedZelleInfo = zelleInfo;
+    widget.onDataChanged();
+  }
+
+  Widget _storePaymentInfoTile({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Material(
+      color: const Color(0xFFF1F5F9),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey)),
+                    const SizedBox(height: 2),
+                    Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: color)),
+                  ],
+                ),
+              ),
+              Icon(Icons.open_in_new_rounded, size: 18, color: color),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showExternalPaymentSheet(String method, Map<String, dynamic> listing, double total) {
+    final cashTag = _listingSellerCashTag(listing);
+    final zelle = _listingSellerZelle(listing);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Pay via ${_paymentLabel(method)}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Send \$${formatCurrency(total)} to the seller:', style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 12),
+            if (method == 'cashapp' && cashTag.isNotEmpty)
+              _storePaymentInfoTile(
+                label: 'Cash App — tap to open',
+                value: cashTag,
+                icon: Icons.payments_rounded,
+                color: const Color(0xFF00D632),
+                onTap: () => _openSellerCashApp(cashTag),
+              ),
+            if (method == 'zelle' && zelle.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _storePaymentInfoTile(
+                label: 'Zelle — tap phone/email',
+                value: zelle,
+                icon: Icons.account_balance_rounded,
+                color: const Color(0xFF6D1ED4),
+                onTap: () => _openSellerZelle(zelle),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
+        ],
+      ),
+    );
+  }
+
+  void _toggleListingLike(Map<String, dynamic> listing) {
+    final id = (listing['id'] ?? '').toString();
+    if (id.isEmpty) return;
+    final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == id);
+    if (idx < 0) return;
+    final liked = List<String>.from((_listings[idx]['likedBy'] as List?)?.map((e) => e.toString()) ?? []);
+    final me = widget.user.email.toLowerCase().trim();
+    if (liked.contains(me)) {
+      liked.remove(me);
+      _likedListingIds.remove(id);
+    } else {
+      liked.add(me);
+      _likedListingIds.add(id);
+    }
+    _listings[idx]['likedBy'] = liked;
+    unawaited(_upsertStoreListingRowSafe(_listings[idx]));
+    final sig = _storeListingsSignature(_listings);
+    if (sig != _listingsSig) {
+      _listingsSig = sig;
+      setState(() {});
+    }
+  }
+
+  Widget _sellerAvatar(String sellerEmail, {double radius = 12}) {
+    final provider = _avatarForEmail(sellerEmail);
+    if (provider != null) {
+      return CircleAvatar(radius: radius, backgroundImage: provider);
+    }
+    return CircleAvatar(radius: radius, backgroundColor: _storePurple.withOpacity(0.2), child: Icon(Icons.person, size: radius, color: _storePurple));
+  }
+
+  ImageProvider? _avatarForEmail(String email) {
+    final key = email.toLowerCase().trim();
+    for (final u in widget.allUsers) {
+      if (u.email.toLowerCase().trim() != key) continue;
+      final path = u.profilePicturePath;
+      if (path == null || path.trim().isEmpty) return null;
+      final src = path.trim();
+      if (src.startsWith('data:image')) {
+        try {
+          return MemoryImage(base64Decode(src.split(',').last));
+        } catch (_) {
+          return null;
+        }
+      }
+      if (src.startsWith('http')) return NetworkImage(src);
+      if (!kIsWeb) return FileImage(File(src));
+    }
+    return null;
+  }
+
+  Widget _storeGridCard(Map<String, dynamic> listing) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final price = (listing['price'] as num?)?.toDouble() ?? 0;
+    final delivery = (listing['deliveryFee'] as num?)?.toDouble() ?? 0;
+    final images = _listingImageRefs(listing);
+    final videoRef = _listingVideoRef(listing);
+    final id = (listing['id'] ?? '').toString();
+    final liked = _likedListingIds.contains(id) || ((listing['likedBy'] as List?)?.contains(widget.user.email) ?? false);
+    final likes = (listing['likedBy'] is List) ? (listing['likedBy'] as List).length : 0;
+    final negotiable = listing['negotiable'] != false;
+    final sellerEmail = (listing['sellerEmail'] ?? '').toString();
+    final sellerName = (listing['sellerName'] ?? 'User').toString();
+    final location = (listing['location'] ?? '').toString();
+
+    return GestureDetector(
+      onTap: () => _openListingDetail(listing),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 1,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: images.isNotEmpty
+                        ? _listingPhoto(images.first, fit: BoxFit.cover)
+                        : Container(color: Colors.grey.shade300, child: const Icon(Icons.image_outlined, size: 40, color: Colors.white54)),
+                  ),
+                  if (negotiable)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(color: const Color(0xFF22C55E), borderRadius: BorderRadius.circular(20)),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.chat_bubble_outline, size: 12, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text('Negotiable', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (videoRef.isNotEmpty)
+                    const Center(child: Icon(Icons.play_circle_fill_rounded, color: Colors.white70, size: 36)),
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: GestureDetector(
+                      onTap: () => _toggleListingLike(listing),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                        child: Icon(liked ? Icons.favorite : Icons.favorite_border, size: 18, color: liked ? const Color(0xFFEF4444) : Colors.grey),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _sellerAvatar(sellerEmail, radius: 10),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(sellerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text((listing['title'] ?? '').toString().toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  RichText(
+                    text: TextSpan(
+                      style: DefaultTextStyle.of(context).style,
+                      children: [
+                        TextSpan(text: '\$${formatCurrency(price)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF2563EB))),
+                        if (delivery > 0)
+                          TextSpan(text: ' +\$${formatCurrency(delivery)} delivery', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _storePurple.withOpacity(0.9))),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.favorite, size: 12, color: Colors.grey.shade500),
+                      const SizedBox(width: 3),
+                      Text('$likes', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                      const SizedBox(width: 8),
+                      Text((listing['condition'] ?? 'new').toString().toLowerCase(), style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                  if (location.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, size: 12, color: Colors.red.shade400),
+                        const SizedBox(width: 2),
+                        Expanded(child: Text(location, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: Colors.grey.shade600))),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openListingDetail(Map<String, dynamic> listing) {
+    final images = _listingImageRefs(listing);
+    final videoRef = _listingVideoRef(listing);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pageCount = images.length + (videoRef.isNotEmpty ? 1 : 0);
+    final pageCtrl = PageController();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            title: Text((listing['title'] ?? 'Item').toString(), style: const TextStyle(fontSize: 16)),
+          ),
+          body: Column(
+            children: [
+              Expanded(
+                child: pageCount == 0
+                    ? const Center(child: Icon(Icons.image_not_supported, color: Colors.white54, size: 48))
+                    : PageView.builder(
+                        controller: pageCtrl,
+                        itemCount: pageCount == 0 ? 1 : pageCount,
+                        itemBuilder: (_, i) {
+                          if (videoRef.isNotEmpty && i == images.length) {
+                            return Center(
+                              child: FutureBuilder<Widget>(
+                                future: _listingVideoWidget(videoRef),
+                                builder: (c, snap) => snap.data ?? const CircularProgressIndicator(color: Colors.white),
+                              ),
+                            );
+                          }
+                          final ref = images[i];
+                          return InteractiveViewer(child: Center(child: _listingPhoto(ref, fit: BoxFit.contain)));
+                        },
+                      ),
+              ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                color: isDark ? const Color(0xFF121726) : Colors.white,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('\$${formatCurrency((listing['price'] as num?)?.toDouble() ?? 0)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Color(0xFF2563EB))),
+                    Text((listing['description'] ?? '').toString(), style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+                    const SizedBox(height: 10),
+                    ..._listingAcceptedPayments(listing).map((p) {
+                      if (p == 'cashapp') {
+                        final tag = _listingSellerCashTag(listing);
+                        if (tag.isEmpty) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _storePaymentInfoTile(
+                            label: 'Cash App',
+                            value: tag,
+                            icon: Icons.payments_rounded,
+                            color: const Color(0xFF00D632),
+                            onTap: () => _openSellerCashApp(tag),
+                          ),
+                        );
+                      }
+                      if (p == 'zelle') {
+                        final z = _listingSellerZelle(listing);
+                        if (z.isEmpty) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _storePaymentInfoTile(
+                            label: 'Zelle',
+                            value: z,
+                            icon: Icons.account_balance_rounded,
+                            color: const Color(0xFF6D1ED4),
+                            onTap: () => _openSellerZelle(z),
+                          ),
+                        );
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6, bottom: 6),
+                        child: Chip(label: Text(_paymentLabel(p), style: const TextStyle(fontSize: 10))),
+                      );
+                    }),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _askAvailability(listing);
+                            },
+                            icon: const Icon(Icons.chat_bubble_outline),
+                            label: const Text('Message'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if ((listing['status'] ?? '') == 'active' && (listing['sellerEmail'] ?? '').toString().toLowerCase() != widget.user.email.toLowerCase())
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _buyListing(listing);
+                              },
+                              style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white),
+                              child: const Text('Buy'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<Widget> _listingVideoWidget(String ref) async {
+    if (ref.startsWith('supabase://')) {
+      final url = await _resolveSupabaseStorageUrl(ref);
+      return Container(
+        alignment: Alignment.center,
+        color: Colors.black87,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 64),
+            const SizedBox(height: 8),
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Text(url, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 11))),
+          ],
+        ),
+      );
+    }
+    return const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 64);
+  }
+
+  String _paymentLabel(String key) {
+    switch (key) {
+      case 'cashapp':
+        return 'Cash App';
+      case 'zelle':
+        return 'Zelle';
+      default:
+        return 'NGMY Balance';
+    }
+  }
+
   Future<void> _showPostListingDialog() async {
+    if (!_canSell) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are not authorized to sell on NGMY Store. Ask admin to enable Store Sell.')));
+      return;
+    }
     final titleC = TextEditingController();
     final descC = TextEditingController();
     final priceC = TextEditingController();
+    final deliveryC = TextEditingController(text: '0');
     final locationC = TextEditingController(text: widget.user.city ?? '');
     String category = 'Electronics';
     String condition = 'Used - Good';
+    bool negotiable = true;
+    bool payNgmy = true;
+    bool payCashApp = false;
+    bool payZelle = false;
     final List<String> imageRefs = [];
     String videoRef = '';
+    final cashAppTagC = TextEditingController(text: widget.user.savedCashAppTag);
+    final zelleInfoC = TextEditingController(text: widget.user.savedZelleInfo);
 
     await showDialog(
       context: context,
@@ -13976,9 +14620,58 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                             children: [
                               Expanded(child: TextField(controller: priceC, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Price (\$) *', Icons.attach_money_rounded, isDark))),
                               const SizedBox(width: 10),
-                              Expanded(child: TextField(controller: locationC, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Location', Icons.location_on_outlined, isDark))),
+                              Expanded(child: TextField(controller: deliveryC, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Delivery (\$)', Icons.local_shipping_outlined, isDark))),
                             ],
                           ),
+                          const SizedBox(height: 8),
+                          TextField(controller: locationC, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Location', Icons.location_on_outlined, isDark)),
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Negotiable', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                            value: negotiable,
+                            activeColor: _storeAccent,
+                            onChanged: (v) => setDlg(() => negotiable = v),
+                          ),
+                          const SizedBox(height: 8),
+                          _storeSectionTitle('Accepted payments', Icons.payments_outlined, isDark),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              FilterChip(
+                                label: const Text('NGMY account'),
+                                selected: payNgmy,
+                                onSelected: (v) => setDlg(() => payNgmy = v),
+                              ),
+                              FilterChip(
+                                label: const Text('Cash App'),
+                                selected: payCashApp,
+                                onSelected: (v) => setDlg(() => payCashApp = v),
+                              ),
+                              FilterChip(
+                                label: const Text('Zelle'),
+                                selected: payZelle,
+                                onSelected: (v) => setDlg(() => payZelle = v),
+                              ),
+                            ],
+                          ),
+                          if (payCashApp) ...[
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: cashAppTagC,
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                              decoration: _storeFieldDec('Cash App \$tag (saved for next time)', Icons.payments_rounded, isDark),
+                            ),
+                          ],
+                          if (payZelle) ...[
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: zelleInfoC,
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                              decoration: _storeFieldDec('Zelle phone or email (saved)', Icons.account_balance_rounded, isDark),
+                            ),
+                          ],
                           const SizedBox(height: 16),
                           _storeSectionTitle('Category', Icons.grid_view_rounded, isDark),
                           const SizedBox(height: 10),
@@ -14169,10 +14862,35 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                               final title = titleC.text.trim();
                               final desc = descC.text.trim();
                               final price = double.tryParse(priceC.text.trim()) ?? 0;
+                              final deliveryFee = double.tryParse(deliveryC.text.trim()) ?? 0;
                               if (title.isEmpty || desc.isEmpty || price <= 0) {
                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Title, description, and valid price are required.')));
                                 return;
                               }
+                              final payments = <String>[];
+                              if (payNgmy) payments.add('ngmy');
+                              if (payCashApp) payments.add('cashapp');
+                              if (payZelle) payments.add('zelle');
+                              if (payments.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select at least one payment method.')));
+                                return;
+                              }
+                              final cashTag = _normalizeCashAppDisplayTag(cashAppTagC.text);
+                              final zelleInfo = zelleInfoC.text.trim();
+                              if (payCashApp && cashTag.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter your Cash App \$tag for Cash App payments.')));
+                                return;
+                              }
+                              if (payZelle && zelleInfo.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter your Zelle phone number or email.')));
+                                return;
+                              }
+                              _persistSellerPaymentPrefs(
+                                saveCashApp: payCashApp,
+                                cashTag: cashTag,
+                                saveZelle: payZelle,
+                                zelleInfo: zelleInfo,
+                              );
                               final now = DateTime.now().toUtc().toIso8601String();
                               final uploadedImages = <String>[];
                               for (final ref in imageRefs) {
@@ -14187,6 +14905,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                 'title': title,
                                 'description': desc,
                                 'price': price,
+                                'deliveryFee': deliveryFee,
+                                'negotiable': negotiable,
+                                'acceptedPayments': payments,
+                                'sellerCashAppTag': payCashApp ? cashTag : '',
+                                'sellerZelleInfo': payZelle ? zelleInfo : '',
+                                'likedBy': <String>[],
                                 'category': category,
                                 'condition': condition,
                                 'location': locationC.text.trim(),
@@ -14217,7 +14941,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                   ),
                                 );
                               }
-                              await _refreshStoreListingsFromCloud();
+                              _listingsSig = _storeListingsSignature(_listings);
                               _save();
                               Navigator.pop(ctx);
                               if (!mounted) return;
@@ -14253,84 +14977,182 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         },
       ),
     );
+    cashAppTagC.dispose();
+    zelleInfoC.dispose();
   }
 
   void _buyListing(Map<String, dynamic> listing) {
     final price = (listing['price'] as num?)?.toDouble() ?? 0;
-    if (price <= 0) return;
+    final delivery = (listing['deliveryFee'] as num?)?.toDouble() ?? 0;
+    final total = price + delivery;
+    if (total <= 0) return;
     final sellerEmail = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
     final buyerEmail = widget.user.email.toLowerCase().trim();
     if (sellerEmail == buyerEmail) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You cannot buy your own listing.')));
       return;
     }
-    if (widget.user.accountBalance < price) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Insufficient balance. Need \$${formatCurrency(price)}.')));
-      return;
-    }
+    final payments = _listingAcceptedPayments(listing);
+    String selectedPay = payments.contains('ngmy') ? 'ngmy' : payments.first;
     final title = (listing['title'] ?? 'Item').toString();
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirm Purchase'),
-        content: Text('Buy "$title" for \$${formatCurrency(price)}? Payment is sent instantly from your NGMY balance.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              final sellerIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sellerEmail);
-              if (sellerIdx < 0) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Seller account not found.')));
-                Navigator.pop(ctx);
-                return;
-              }
-              final listingId = (listing['id'] ?? '').toString();
-              final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == listingId);
-              if (idx < 0 || (_listings[idx]['status'] ?? '') != 'active') {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This item is no longer available.')));
-                Navigator.pop(ctx);
-                return;
-              }
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) {
+          final needsBalance = selectedPay == 'ngmy';
+          final balanceOk = widget.user.accountBalance >= total;
+          final canConfirm = selectedPay == 'ngmy'
+              ? balanceOk
+              : selectedPay == 'cashapp'
+                  ? _listingSellerCashTag(listing).isNotEmpty
+                  : selectedPay == 'zelle'
+                      ? _listingSellerZelle(listing).isNotEmpty
+                      : true;
+          return AlertDialog(
+            title: const Text('Confirm Purchase'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Buy "$title" for \$${formatCurrency(total)}${delivery > 0 ? ' (includes delivery)' : ''}.'),
+                const SizedBox(height: 12),
+                const Text('Pay seller via:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                const SizedBox(height: 8),
+                ...payments.map((p) => RadioListTile<String>(
+                      dense: true,
+                      title: Text(_paymentLabel(p), style: const TextStyle(fontSize: 13)),
+                      subtitle: p == 'ngmy'
+                          ? Text(
+                              'Deducted from your NGMY account (\$${formatCurrency(widget.user.accountBalance)} available)',
+                              style: TextStyle(fontSize: 10, color: balanceOk ? Colors.grey : const Color(0xFFEF4444)),
+                            )
+                          : p == 'cashapp'
+                              ? Text(
+                                  _listingSellerCashTag(listing).isEmpty ? 'Seller Cash App not set' : 'Pay ${_listingSellerCashTag(listing)} in Cash App',
+                                  style: const TextStyle(fontSize: 10),
+                                )
+                              : Text(
+                                  _listingSellerZelle(listing).isEmpty ? 'Seller Zelle not set' : 'Zelle: ${_listingSellerZelle(listing)}',
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                      value: p,
+                      groupValue: selectedPay,
+                      onChanged: (v) => setDlg(() => selectedPay = v ?? selectedPay),
+                    )),
+                if (needsBalance && !balanceOk)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Not enough money in your NGMY account. You need \$${formatCurrency(total)} but only have \$${formatCurrency(widget.user.accountBalance)}.',
+                      style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                if (selectedPay == 'cashapp' && _listingSellerCashTag(listing).isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _storePaymentInfoTile(
+                    label: 'Tap to open seller Cash App',
+                    value: _listingSellerCashTag(listing),
+                    icon: Icons.payments_rounded,
+                    color: const Color(0xFF00D632),
+                    onTap: () => _openSellerCashApp(_listingSellerCashTag(listing)),
+                  ),
+                ],
+                if (selectedPay == 'zelle' && _listingSellerZelle(listing).isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _storePaymentInfoTile(
+                    label: 'Tap seller Zelle phone/email',
+                    value: _listingSellerZelle(listing),
+                    icon: Icons.account_balance_rounded,
+                    color: const Color(0xFF6D1ED4),
+                    onTap: () => _openSellerZelle(_listingSellerZelle(listing)),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: !canConfirm
+                    ? null
+                    : () {
+                        if (selectedPay == 'ngmy' && widget.user.accountBalance < total) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Not enough NGMY balance. Need \$${formatCurrency(total)}.')),
+                          );
+                          return;
+                        }
+                        final sellerIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sellerEmail);
+                        if (sellerIdx < 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Seller account not found.')));
+                          Navigator.pop(ctx);
+                          return;
+                        }
+                        final listingId = (listing['id'] ?? '').toString();
+                        final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == listingId);
+                        if (idx < 0 || (_listings[idx]['status'] ?? '') != 'active') {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This item is no longer available.')));
+                          Navigator.pop(ctx);
+                          return;
+                        }
 
-              setState(() {
-                widget.user.accountBalance -= price;
-                widget.allUsers[sellerIdx].accountBalance += price;
-                final soldNow = DateTime.now().toUtc().toIso8601String();
-                _listings[idx]['status'] = 'sold';
-                _listings[idx]['buyerEmail'] = widget.user.email;
-                _listings[idx]['buyerName'] = widget.user.username;
-                _listings[idx]['soldAt'] = soldNow;
-                _listings[idx]['updatedAt'] = soldNow;
-              });
+                        setState(() {
+                          if (selectedPay == 'ngmy') {
+                            widget.user.accountBalance -= total;
+                            widget.allUsers[sellerIdx].accountBalance += total;
+                          }
+                          final soldNow = DateTime.now().toUtc().toIso8601String();
+                          _listings[idx]['status'] = 'sold';
+                          _listings[idx]['buyerEmail'] = widget.user.email;
+                          _listings[idx]['buyerName'] = widget.user.username;
+                          _listings[idx]['soldAt'] = soldNow;
+                          _listings[idx]['updatedAt'] = soldNow;
+                          _listings[idx]['paidVia'] = selectedPay;
+                        });
 
-              final ts = DateTime.now().microsecondsSinceEpoch.toString();
-              widget.onAddTransaction(AppTransaction(
-                id: 'store_buy_$ts',
-                userEmail: widget.user.email,
-                amount: price,
-                type: TransactionType.adminRemove,
-                method: PaymentMethod.system,
-                status: TransactionStatus.approved,
-                timestamp: DateTime.now(),
-                sourceDetails: 'NGMY Store purchase: $title',
-              ));
-              widget.onAddTransaction(AppTransaction(
-                id: 'store_sale_$ts',
-                userEmail: widget.allUsers[sellerIdx].email,
-                amount: price,
-                type: TransactionType.adminAdd,
-                method: PaymentMethod.system,
-                status: TransactionStatus.approved,
-                timestamp: DateTime.now(),
-                sourceDetails: 'NGMY Store sale: $title',
-              ));
-              _save();
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Purchase complete! Seller has been paid.')));
-            },
-            child: const Text('Buy Now'),
-          ),
-        ],
+                        final ts = DateTime.now().microsecondsSinceEpoch.toString();
+                        if (selectedPay == 'ngmy') {
+                          widget.onAddTransaction(AppTransaction(
+                            id: 'store_buy_$ts',
+                            userEmail: widget.user.email,
+                            amount: total,
+                            type: TransactionType.adminRemove,
+                            method: PaymentMethod.system,
+                            status: TransactionStatus.approved,
+                            timestamp: DateTime.now(),
+                            sourceDetails: 'NGMY Store purchase: $title',
+                          ));
+                          widget.onAddTransaction(AppTransaction(
+                            id: 'store_sale_$ts',
+                            userEmail: widget.allUsers[sellerIdx].email,
+                            amount: total,
+                            type: TransactionType.adminAdd,
+                            method: PaymentMethod.system,
+                            status: TransactionStatus.approved,
+                            timestamp: DateTime.now(),
+                            sourceDetails: 'NGMY Store sale: $title',
+                          ));
+                        }
+                        unawaited(_upsertStoreListingRowSafe(_listings[idx]));
+                        _listingsSig = _storeListingsSignature(_listings);
+                        _save();
+                        Navigator.pop(ctx);
+                        if (selectedPay == 'ngmy') {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Purchase complete! \$${formatCurrency(total)} paid from your NGMY account.')),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Order placed. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}.')),
+                          );
+                          _showExternalPaymentSheet(selectedPay, listing, total);
+                        }
+                      },
+                child: const Text('Confirm'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -14500,54 +15322,30 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                 child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                      padding: const EdgeInsets.fromLTRB(2, 4, 8, 6),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           IconButton(
-                            icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: isDark ? Colors.white : Colors.black87),
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: isDark ? Colors.white : Colors.black87),
                             onPressed: () => Navigator.pop(context),
                           ),
-                          const Expanded(
-                            child: Text('NGMY Store', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                          ),
-                          IconButton(
-                            icon: Icon(_searchOpen ? Icons.close_rounded : Icons.search_rounded, color: _storeAccent),
-                            tooltip: 'Search items',
-                            onPressed: () => setState(() => _searchOpen = !_searchOpen),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.receipt_long_rounded, color: _storeAccent),
-                            tooltip: 'Receipts',
-                            onPressed: _showStoreReceipts,
-                          ),
+                          const Icon(Icons.storefront_rounded, color: _storePurple, size: 18),
+                          const SizedBox(width: 6),
+                          const Text('NGMY Store', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: _storePurple)),
+                          const Spacer(),
+                          _storeTabChip(0, 'Shop', shop.length, isDark),
+                          if (_canSell) _storeTabChip(1, 'Listings', mine.length, isDark),
+                          _storeTabChip(_canSell ? 2 : 1, 'Purchases', bought.length, isDark),
                         ],
                       ),
                     ),
-                    if (_searchOpen)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                        child: TextField(
-                          controller: _searchC,
-                          style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                          decoration: InputDecoration(
-                            hintText: 'Search items, category, seller...',
-                            prefixIcon: const Icon(Icons.search_rounded, color: _storeAccent),
-                            filled: true,
-                            fillColor: (isDark ? const Color(0xFF0F172A) : Colors.white).withOpacity(0.7),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: frameBorder)),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: frameBorder)),
-                          ),
-                        ),
-                      ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
-                      child: Row(
-                        children: [
-                          _storeTabFrame(0, 'Shop', shop.length, isDark),
-                          _storeTabFrame(1, 'My Listings', mine.length, isDark),
-                          _storeTabFrame(2, 'Purchases', bought.length, isDark),
-                        ],
-                      ),
+                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                      child: _storeTopActionBar(isDark, frameBorder),
                     ),
                   ],
                 ),
@@ -14558,13 +15356,107 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             child: TabBarView(
               controller: _tabCtrl,
               physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _listingList(shop, empty: 'No items for sale yet. Be the first to post!', showBuy: true, showManage: false),
-                _listingList(mine, empty: 'You have no listings. Tap Sell Item to post.', showBuy: false, showManage: true),
-                _listingList(bought, empty: 'No purchases yet.', showBuy: false, showManage: false),
-              ],
+              children: _canSell
+                  ? [
+                      _shopGrid(shop),
+                      _listingList(mine, empty: 'You have no listings. Tap Sell Item to post.', showBuy: false, showManage: true),
+                      _listingList(bought, empty: 'No purchases yet.', showBuy: false, showManage: false),
+                    ]
+                  : [
+                      _shopGrid(shop),
+                      _listingList(bought, empty: 'No purchases yet.', showBuy: false, showManage: false),
+                    ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _storeTopActionBar(bool isDark, Color frameBorder) {
+    final barFill = isDark ? const Color(0xFF0F172A) : Colors.white;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: barFill,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: frameBorder, width: 1.4),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.06), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.search_rounded, color: _storePurple, size: 20),
+          const SizedBox(width: 6),
+          Expanded(
+            child: TextField(
+              controller: _searchC,
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(
+                hintText: 'Search products...',
+                hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade500, fontSize: 14),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          Container(
+            height: 36,
+            width: 1,
+            margin: const EdgeInsets.symmetric(horizontal: 6),
+            color: frameBorder,
+          ),
+          IconButton(
+            tooltip: 'Receipts',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
+            icon: const Icon(Icons.receipt_long_rounded, color: _storeAccent, size: 22),
+            onPressed: _showStoreReceipts,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _shopGrid(List<Map<String, dynamic>> items) {
+    if (_storeLoading && items.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: _storePurple));
+    }
+    return RefreshIndicator(
+      color: _storePurple,
+      onRefresh: () => _refreshStoreListingsFromCloud(force: true),
+      child: CustomScrollView(
+        slivers: [
+          if (items.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    _canSell ? 'No items for sale yet. Tap Sell Item to post!' : 'No items for sale yet.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 100),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.58,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => _storeGridCard(items[i]),
+                  childCount: items.length,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -14582,172 +15474,1288 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 }
 
-class NgmyHelpCenterScreen extends StatelessWidget {
+class NgmyHelpCenterScreen extends StatefulWidget {
   final UserData user;
+  final List<UserData> allUsers;
   final AppConfig config;
-  const NgmyHelpCenterScreen({super.key, required this.user, required this.config});
+  final VoidCallback onDataChanged;
+  const NgmyHelpCenterScreen({super.key, required this.user, required this.allUsers, required this.config, required this.onDataChanged});
 
-  Widget _helpFrame(BuildContext context, {required IconData icon, required String title, required String subtitle, required VoidCallback onTap}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF121726) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: border, width: 1.2),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.18 : 0.06), blurRadius: 10, offset: const Offset(0, 4))],
-          ),
-          child: Row(
+  @override
+  State<NgmyHelpCenterScreen> createState() => _NgmyHelpCenterScreenState();
+}
+
+class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
+  static const Color _accent = Color(0xFF00B25A);
+  bool _refreshing = false;
+  bool _cloudLoaded = false;
+  DateTime? _lastHelpCloudRefresh;
+  Timer? _persistDebounce;
+  final ImagePicker _picker = ImagePicker();
+  final TextEditingController _searchC = TextEditingController();
+
+  /// 16:9 business cover photos (real storefront / workplace scenes).
+  static const List<String> _presetThumbUrls = [
+    'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1920&h=1080&fit=crop',
+    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1920&h=1080&fit=crop',
+    'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&h=1080&fit=crop',
+    'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=1920&h=1080&fit=crop',
+    'https://images.unsplash.com/photo-1581578731544-c64695cc6952?w=1920&h=1080&fit=crop',
+    'https://images.unsplash.com/photo-1507679799987-c73779590ccf?w=1920&h=1080&fit=crop',
+    'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=1920&h=1080&fit=crop',
+    'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=1920&h=1080&fit=crop',
+  ];
+
+  static const List<String> _presetThumbLabels = [
+    'Retail Store',
+    'Restaurant',
+    'Office',
+    'Café',
+    'Home Services',
+    'Consulting',
+    'Workshop',
+    'Market',
+  ];
+
+  bool get _isHelper => widget.user.isAdmin || widget.user.isApprovedHelper;
+  String get _me => widget.user.email.toLowerCase().trim();
+
+  List<Map<String, dynamic>> get _apps => widget.config.helpHelperApplications;
+  List<Map<String, dynamic>> get _requests => widget.config.helpRequests;
+  List<Map<String, dynamic>> get _businesses => widget.config.helpBusinesses;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.config.helpHelperApplications = List<Map<String, dynamic>>.from(_apps.map((e) => Map<String, dynamic>.from(e)));
+    widget.config.helpRequests = List<Map<String, dynamic>>.from(_requests.map((e) => Map<String, dynamic>.from(e)));
+    widget.config.helpBusinesses = List<Map<String, dynamic>>.from(_businesses.map((e) => Map<String, dynamic>.from(e)));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshFromCloud(silent: true));
+  }
+
+  @override
+  void dispose() {
+    _persistDebounce?.cancel();
+    _searchC.dispose();
+    super.dispose();
+  }
+
+  String get _searchQuery => _searchC.text.trim().toLowerCase();
+
+  List<String> _keywordsList(Map<String, dynamic> b) {
+    final raw = (b['keywords'] ?? '').toString();
+    if (raw.isEmpty) return [];
+    return raw.split(RegExp(r'[,;#|]')).map((e) => e.trim()).where((e) => e.isNotEmpty).take(10).toList();
+  }
+
+  bool _businessMatchesSearch(Map<String, dynamic> b) {
+    final q = _searchQuery;
+    if (q.isEmpty) return true;
+    final hay = [
+      b['businessName'],
+      b['tagline'],
+      b['description'],
+      b['services'],
+      b['keywords'],
+      b['address'],
+      b['city'],
+      b['ownerName'],
+    ].join(' ').toLowerCase();
+    return hay.contains(q);
+  }
+
+  Widget _helpKeywordChips(List<String> tags, bool isDark) {
+    if (tags.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: tags.map((t) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _accent.withOpacity(isDark ? 0.2 : 0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _accent.withOpacity(0.35)),
+            ),
+            child: Text(t, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : const Color(0xFF065F46))),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _helpFormFrame({
+    required bool isDark,
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    final border = isDark ? const Color(0xFF3D4F5F) : const Color(0xFFDCE3EB);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF161B28) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border, width: 1.2),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.25 : 0.05), blurRadius: 10, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00B25A).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF00B25A).withOpacity(0.3)),
-                ),
-                child: Icon(icon, color: const Color(0xFF00B25A), size: 24),
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(color: _accent.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, size: 18, color: _accent),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _helpFieldDec(String label, bool isDark, {String? hint, IconData? icon}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: icon != null ? Icon(icon, size: 20, color: _accent) : null,
+      filled: true,
+      fillColor: isDark ? const Color(0xFF0F131C) : const Color(0xFFF8FAFC),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF3D4F5F) : const Color(0xFFE2E8F0))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF3D4F5F) : const Color(0xFFE2E8F0))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _accent, width: 1.6)),
+    );
+  }
+
+  String _helpListsSignature() {
+    String sig(List<Map<String, dynamic>> list) => list.map((m) => '${m['id']}|${m['updatedAt'] ?? m['createdAt']}').join(';');
+    return '${sig(_apps)}#${sig(_requests)}#${sig(_businesses)}';
+  }
+
+  Future<void> _refreshFromCloud({bool silent = false, bool force = false}) async {
+    if (_refreshing) return;
+    if (!force && _cloudLoaded) return;
+    if (!force && _lastHelpCloudRefresh != null && DateTime.now().difference(_lastHelpCloudRefresh!) < const Duration(seconds: 12)) {
+      return;
+    }
+    _refreshing = true;
+    _lastHelpCloudRefresh = DateTime.now();
+    try {
+      final before = _helpListsSignature();
+      final apps = await _fetchHelpTableFromSupabase('help_applications');
+      final reqs = await _fetchHelpTableFromSupabase('help_requests');
+      final biz = await _fetchHelpTableFromSupabase('help_businesses');
+      final merge = (List<Map<String, dynamic>> local, List<Map<String, dynamic>> remote) {
+        final byId = <String, Map<String, dynamic>>{};
+        for (final m in local) {
+          final id = (m['id'] ?? '').toString();
+          if (id.isNotEmpty) byId[id] = Map<String, dynamic>.from(m);
+        }
+        for (final m in remote) {
+          final id = (m['id'] ?? '').toString();
+          if (id.isNotEmpty) byId[id] = Map<String, dynamic>.from(m);
+        }
+        return byId.values.toList();
+      };
+      widget.config.helpHelperApplications = merge(_apps, apps);
+      widget.config.helpRequests = merge(_requests, reqs);
+      widget.config.helpBusinesses = merge(_businesses, biz);
+      _cloudLoaded = true;
+      if (mounted && _helpListsSignature() != before) {
+        setState(() {});
+      }
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  void _save({bool persistApp = true}) {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+    if (persistApp) {
+      _persistDebounce?.cancel();
+      _persistDebounce = Timer(const Duration(milliseconds: 600), () {
+        if (mounted) unawaited(_persistHelpDataOnly());
+      });
+    }
+  }
+
+  Future<void> _persistHelpDataOnly() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+      for (final app in _apps) {
+        unawaited(_upsertHelpRowSafe('help_applications', app));
+      }
+      for (final req in _requests) {
+        unawaited(_upsertHelpRowSafe('help_requests', req));
+      }
+      for (final biz in _businesses) {
+        unawaited(_upsertHelpRowSafe('help_businesses', biz));
+      }
+      final configRow = await _configRowForSupabaseUpsert(config: widget.config, isAdmin: widget.user.isAdmin);
+      configRow['helpHelperApplications'] = widget.config.helpHelperApplications;
+      configRow['helpRequests'] = widget.config.helpRequests;
+      configRow['helpBusinesses'] = widget.config.helpBusinesses;
+      await Supabase.instance.client.from('config').upsert([configRow]);
+    } catch (e) {
+      debugPrint('[help] persist error: $e');
+    }
+  }
+
+  void _openBusinessEditor({Map<String, dynamic>? existing}) {
+    _persistDebounce?.cancel();
+    if (!_isHelper) {
+      unawaited(_applyToBecomeHelper());
+      return;
+    }
+    unawaited(_showOpenBusinessDialog(existing: existing));
+  }
+
+  Map<String, dynamic>? _myApplication() {
+    for (final a in _apps) {
+      if ((a['userEmail'] ?? '').toString().toLowerCase().trim() == _me) return a;
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _myBusiness() {
+    for (final b in _businesses) {
+      if ((b['ownerEmail'] ?? '').toString().toLowerCase().trim() == _me) return b;
+    }
+    return null;
+  }
+
+  Future<void> _applyToBecomeHelper() async {
+    if (_isHelper) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are already an approved helper.')));
+      return;
+    }
+    final existing = _myApplication();
+    if (existing != null && (existing['status'] ?? 'pending') == 'pending') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your helper application is pending review.')));
+      return;
+    }
+    final noteC = TextEditingController();
+    final servicesC = TextEditingController();
+    final phoneC = TextEditingController(text: widget.user.phone);
+    final ok = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Apply to Become a Helper'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Tell us what kind of help you can provide. Admin will review your application.', style: TextStyle(fontSize: 12)),
+              const SizedBox(height: 12),
+              TextField(controller: servicesC, maxLines: 3, decoration: const InputDecoration(labelText: 'Services you offer *', hintText: 'e.g. Plumbing, tutoring, rides…')),
+              TextField(controller: phoneC, decoration: const InputDecoration(labelText: 'Contact phone')),
+              TextField(controller: noteC, maxLines: 2, decoration: const InputDecoration(labelText: 'Experience / note')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Submit')),
+        ],
+      ),
+    );
+    final services = servicesC.text.trim();
+    final phone = phoneC.text.trim();
+    final note = noteC.text.trim();
+    noteC.dispose();
+    servicesC.dispose();
+    phoneC.dispose();
+    if (ok != true) return;
+    if (services.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Describe the services you can provide.')));
+      return;
+    }
+    final app = {
+      'id': DateTime.now().microsecondsSinceEpoch.toString(),
+      'userEmail': _me,
+      'username': widget.user.username,
+      'services': services,
+      'phone': phone,
+      'note': note,
+      'status': 'pending',
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+    };
+    _apps.add(app);
+    unawaited(_upsertHelpRowSafe('help_applications', app));
+    _save();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Application submitted. Admin will review it.')));
+  }
+
+  String _defaultThumbnailRef() => 'preset:0';
+
+  String _thumbnailRef(Map<String, dynamic> biz) {
+    final ref = (biz['thumbnailRef'] ?? '').toString().trim();
+    return ref.isEmpty ? _defaultThumbnailRef() : ref;
+  }
+
+  Widget _buildThumbnail(String ref, {BorderRadius? radius}) {
+    final r = radius ?? BorderRadius.circular(12);
+    Widget child;
+    if (ref.startsWith('preset:')) {
+      final idx = int.tryParse(ref.replaceFirst('preset:', '')) ?? 0;
+      final url = _presetThumbUrls[idx.clamp(0, _presetThumbUrls.length - 1)];
+      child = Image.network(url, fit: BoxFit.cover, width: double.infinity, errorBuilder: (_, __, ___) => _gradientThumbPlaceholder(idx));
+    } else if (ref.startsWith('data:image')) {
+      try {
+        child = Image.memory(base64Decode(ref.split(',').last), fit: BoxFit.cover, width: double.infinity);
+      } catch (_) {
+        child = _gradientThumbPlaceholder(0);
+      }
+    } else if (ref.startsWith('http')) {
+      child = Image.network(ref, fit: BoxFit.cover, width: double.infinity, errorBuilder: (_, __, ___) => _gradientThumbPlaceholder(0));
+    } else if (!kIsWeb && ref.isNotEmpty) {
+      child = Image.file(File(ref), fit: BoxFit.cover, width: double.infinity, errorBuilder: (_, __, ___) => _gradientThumbPlaceholder(0));
+    } else {
+      child = _gradientThumbPlaceholder(0);
+    }
+    return SizedBox(
+      width: double.infinity,
+      child: ClipRRect(
+        borderRadius: r,
+        child: AspectRatio(aspectRatio: 16 / 9, child: child),
+      ),
+    );
+  }
+
+  Widget _gradientThumbPlaceholder(int idx) {
+    final url = _presetThumbUrls[idx.clamp(0, _presetThumbUrls.length - 1)];
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (_, __, ___) => Container(
+        color: const Color(0xFFE8EEF2),
+        alignment: Alignment.center,
+        child: const Icon(Icons.image_outlined, color: Color(0xFF94A3B8), size: 36),
+      ),
+    );
+  }
+
+  Future<void> _showOpenBusinessDialog({Map<String, dynamic>? existing}) async {
+    if (!_isHelper) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You must be an approved helper to open a business.')));
+      return;
+    }
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (ctx) => _HelpBusinessEditorPage(
+          existing: existing,
+          user: widget.user,
+          me: _me,
+          presetThumbUrls: _presetThumbUrls,
+          presetThumbLabels: _presetThumbLabels,
+          buildThumbnail: _buildThumbnail,
+          placeholderForIndex: _gradientThumbPlaceholder,
+          formFrame: _helpFormFrame,
+          fieldDec: _helpFieldDec,
+          onPublish: (biz) {
+            final idx = _businesses.indexWhere((b) => (b['id'] ?? '').toString() == biz['id']);
+            if (idx >= 0) {
+              _businesses[idx] = biz;
+            } else {
+              _businesses.add(biz);
+            }
+            unawaited(_upsertHelpRowSafe('help_businesses', biz));
+            _save();
+          },
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _showMessageHelper(Map<String, dynamic> biz) async {
+    if ((biz['ownerEmail'] ?? '').toString().toLowerCase().trim() == _me) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This is your business.')));
+      return;
+    }
+    if (biz['isOpen'] == false) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This business is closed right now.')));
+      return;
+    }
+    final msgC = TextEditingController();
+    final titleC = TextEditingController(text: 'I need help with…');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Message ${(biz['businessName'] ?? 'Helper').toString()}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Describe what you need help with. Only approved helpers can respond.', style: TextStyle(fontSize: 12)),
+            const SizedBox(height: 12),
+            TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Subject *')),
+            TextField(controller: msgC, maxLines: 4, decoration: const InputDecoration(labelText: 'Your message *')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send')),
+        ],
+      ),
+    );
+    final title = titleC.text.trim();
+    final message = msgC.text.trim();
+    titleC.dispose();
+    msgC.dispose();
+    if (ok != true || title.isEmpty || message.isEmpty) return;
+    final now = DateTime.now().toUtc().toIso8601String();
+    final owner = (biz['ownerEmail'] ?? '').toString().toLowerCase().trim();
+    final req = {
+      'id': DateTime.now().microsecondsSinceEpoch.toString(),
+      'requesterEmail': _me,
+      'requesterName': widget.user.username,
+      'title': title,
+      'description': message,
+      'category': 'Message',
+      'urgency': 'Normal',
+      'contact': widget.user.phone.isNotEmpty ? widget.user.phone : widget.user.email,
+      'location': widget.user.city ?? '',
+      'businessId': (biz['id'] ?? '').toString(),
+      'businessName': (biz['businessName'] ?? '').toString(),
+      'status': 'open',
+      'assignedHelperEmail': owner,
+      'assignedHelperName': (biz['ownerName'] ?? '').toString(),
+      'createdAt': now,
+      'updatedAt': now,
+    };
+    _requests.add(req);
+    unawaited(_upsertHelpRowSafe('help_requests', req));
+    _save();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Message sent to the helper.')));
+  }
+
+  void _openBusinessPage(Map<String, dynamic> biz) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => _HelpBusinessDetailPage(
+          biz: biz,
+          me: _me,
+          thumbBuilder: _buildThumbnail,
+          onMessage: () {
+            Navigator.pop(ctx);
+            _showMessageHelper(biz);
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showHelperMessagesInbox() {
+    final myBiz = _myBusiness();
+    if (myBiz == null) return;
+    final bizId = (myBiz['id'] ?? '').toString();
+    final msgs = _requests
+        .where((r) => (r['businessId'] ?? '').toString() == bizId || (r['assignedHelperEmail'] ?? '').toString().toLowerCase().trim() == _me)
+        .toList()
+      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.55,
+        builder: (_, scroll) => Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Customer Messages', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            ),
+            Expanded(
+              child: msgs.isEmpty
+                  ? const Center(child: Text('No messages yet.', style: TextStyle(color: Colors.grey)))
+                  : ListView.builder(
+                      controller: scroll,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: msgs.length,
+                      itemBuilder: (_, i) {
+                        final r = msgs[i];
+                        return Card(
+                          child: ListTile(
+                            title: Text((r['title'] ?? '').toString(), style: const TextStyle(fontWeight: FontWeight.w700)),
+                            subtitle: Text('${r['requesterName']}: ${r['description']}', maxLines: 3),
+                            trailing: (r['status'] ?? '') != 'completed'
+                                ? TextButton(
+                                    onPressed: () {
+                                      final idx = _requests.indexWhere((x) => (x['id'] ?? '') == (r['id'] ?? ''));
+                                      if (idx >= 0) {
+                                        _requests[idx]['status'] = 'completed';
+                                        _requests[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+                                        unawaited(_upsertHelpRowSafe('help_requests', _requests[idx]));
+                            _save(persistApp: false);
+                            Navigator.pop(ctx);
+                            if (mounted) setState(() {});
+                          }
+                                    },
+                                    child: const Text('Done'),
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _applyBanner(bool isDark) {
+    if (_isHelper) return const SizedBox.shrink();
+    final app = _myApplication();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _accent.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Want to help others?', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+          const SizedBox(height: 6),
+          const Text('Apply to become a helper. Users cannot help others until admin approves them.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+          if (app != null) ...[
+            const SizedBox(height: 8),
+            Text('Status: ${(app['status'] ?? 'pending').toString().toUpperCase()}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: _accent)),
+          ],
+          if (app == null || (app['status'] ?? '') == 'rejected') ...[
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _applyToBecomeHelper,
+              style: ElevatedButton.styleFrom(backgroundColor: _accent, foregroundColor: Colors.white),
+              child: const Text('Apply to Become a Helper'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _youtubeBusinessCard(Map<String, dynamic> b, bool isDark) {
+    final name = (b['businessName'] ?? 'Business').toString();
+    final owner = (b['ownerName'] ?? 'Helper').toString();
+    final services = (b['services'] ?? '').toString();
+    final address = (b['address'] ?? '').toString();
+    final city = (b['city'] ?? '').toString();
+    final location = [address, city].where((s) => s.trim().isNotEmpty).join(', ');
+    final tags = _keywordsList(b);
+    final isMine = (b['ownerEmail'] ?? '').toString().toLowerCase().trim() == _me;
+    final thumbRef = _thumbnailRef(b);
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Stack(
+              fit: StackFit.expand,
+              clipBehavior: Clip.hardEdge,
+              children: [
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _openBusinessPage(b),
+                    child: _buildThumbnail(thumbRef, radius: BorderRadius.circular(12)),
+                  ),
+                ),
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.75), borderRadius: BorderRadius.circular(4)),
+                    child: const Text('HELP', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                  ),
+                ),
+                if (!isMine && b['isOpen'] != false)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Material(
+                      color: Colors.white,
+                      shape: const CircleBorder(),
+                      elevation: 3,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => _showMessageHelper(b),
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(Icons.chat_bubble_rounded, color: _accent, size: 22),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (isMine)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: _accent, borderRadius: BorderRadius.circular(6)),
+                      child: const Text('YOUR BUSINESS', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: _accent.withOpacity(0.15),
+                child: Text(owner.isNotEmpty ? owner[0].toUpperCase() : 'H', style: const TextStyle(fontWeight: FontWeight.w900, color: _accent)),
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF111827))),
+                    Text(
+                      name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, height: 1.25, color: isDark ? Colors.white : const Color(0xFF0F0F0F)),
+                    ),
                     const SizedBox(height: 4),
-                    Text(subtitle, style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54)),
+                    Text(
+                      owner,
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFF606060)),
+                    ),
+                    Text(
+                      services,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : const Color(0xFF909090)),
+                    ),
+                    if (location.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Row(
+                          children: [
+                            Icon(Icons.location_on_outlined, size: 13, color: isDark ? Colors.white38 : const Color(0xFF909090)),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                location,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : const Color(0xFF909090)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    _helpKeywordChips(tags, isDark),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: isDark ? Colors.white38 : Colors.grey),
             ],
           ),
+        ],
+    );
+  }
+
+  Widget _businessesFeed(bool isDark) {
+    final open = _businesses.where((b) => b['isOpen'] != false && _businessMatchesSearch(b)).toList()
+      ..sort((a, b) {
+        final aMine = (a['ownerEmail'] ?? '').toString().toLowerCase().trim() == _me;
+        final bMine = (b['ownerEmail'] ?? '').toString().toLowerCase().trim() == _me;
+        if (aMine != bMine) return aMine ? -1 : 1;
+        return (b['updatedAt'] ?? '').toString().compareTo((a['updatedAt'] ?? '').toString());
+      });
+    if (open.isEmpty) {
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _applyBanner(isDark),
+          const SizedBox(height: 40),
+          Center(
+            child: Text(
+              _searchQuery.isNotEmpty
+                  ? 'No businesses match your search.\nTry different keywords or services.'
+                  : 'No helper businesses yet.\nApproved helpers can open their business here.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ),
+        ],
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
+      itemCount: open.length + 1,
+      itemBuilder: (_, i) {
+        if (i == 0) return _applyBanner(isDark);
+        return Padding(padding: const EdgeInsets.only(bottom: 20), child: _youtubeBusinessCard(open[i - 1], isDark));
+      },
+    );
+  }
+
+  int _helperInboxCount() {
+    final myBiz = _myBusiness();
+    if (myBiz == null) return 0;
+    final bizId = (myBiz['id'] ?? '').toString();
+    return _requests.where((r) {
+      if ((r['status'] ?? '') == 'completed') return false;
+      return (r['businessId'] ?? '').toString() == bizId || (r['assignedHelperEmail'] ?? '').toString().toLowerCase().trim() == _me;
+    }).length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final myBiz = _myBusiness();
+    final inbox = _helperInboxCount();
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9F9F9),
+      appBar: AppBar(
+        backgroundColor: isDark ? const Color(0xFF0F0F0F) : Colors.white,
+        foregroundColor: isDark ? Colors.white : Colors.black,
+        elevation: 0,
+        titleSpacing: 8,
+        title: Row(
+          children: [
+            const Text('Businesses', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SizedBox(
+                height: 40,
+                child: TextField(
+                  controller: _searchC,
+                  onChanged: (_) => setState(() {}),
+                  style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                  decoration: InputDecoration(
+                    hintText: 'Search keywords, services, address…',
+                    hintStyle: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.grey),
+                    prefixIcon: Icon(Icons.search_rounded, size: 20, color: isDark ? Colors.white54 : Colors.grey.shade600),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: () {
+                              _searchC.clear();
+                              setState(() {});
+                            },
+                          )
+                        : null,
+                    isDense: true,
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFF1F5F9),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? const Color(0xFF3D4F5F) : const Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? const Color(0xFF3D4F5F) : const Color(0xFFE2E8F0))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _accent, width: 1.5)),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
+        actions: [
+          if (_isHelper && myBiz != null)
+            IconButton(
+              icon: Badge(
+                isLabelVisible: inbox > 0,
+                label: Text(inbox > 9 ? '9+' : '$inbox'),
+                child: const Icon(Icons.chat_bubble_outline_rounded),
+              ),
+              tooltip: 'Customer messages',
+              onPressed: _showHelperMessagesInbox,
+            ),
+          IconButton(
+            icon: Icon(
+              _isHelper ? (myBiz == null ? Icons.add_business_rounded : Icons.edit_rounded) : Icons.storefront_rounded,
+              size: 26,
+            ),
+            tooltip: _isHelper ? (myBiz == null ? 'Open my business' : 'Edit my business') : 'Apply to become a helper',
+            onPressed: () => _openBusinessEditor(existing: myBiz),
+          ),
+        ],
       ),
+      body: _businessesFeed(isDark),
+    );
+  }
+}
+
+class _HelpBusinessEditorPage extends StatefulWidget {
+  static const Color _accent = Color(0xFF00B25A);
+
+  final Map<String, dynamic>? existing;
+  final UserData user;
+  final String me;
+  final List<String> presetThumbUrls;
+  final List<String> presetThumbLabels;
+  final Widget Function(String ref, {BorderRadius? radius}) buildThumbnail;
+  final Widget Function(int idx) placeholderForIndex;
+  final Widget Function({required bool isDark, required String title, required IconData icon, required List<Widget> children}) formFrame;
+  final InputDecoration Function(String label, bool isDark, {String? hint, IconData? icon}) fieldDec;
+  final void Function(Map<String, dynamic> biz) onPublish;
+
+  const _HelpBusinessEditorPage({
+    required this.existing,
+    required this.user,
+    required this.me,
+    required this.presetThumbUrls,
+    required this.presetThumbLabels,
+    required this.buildThumbnail,
+    required this.placeholderForIndex,
+    required this.formFrame,
+    required this.fieldDec,
+    required this.onPublish,
+  });
+
+  @override
+  State<_HelpBusinessEditorPage> createState() => _HelpBusinessEditorPageState();
+}
+
+class _HelpBusinessEditorPageState extends State<_HelpBusinessEditorPage> {
+  final ImagePicker _picker = ImagePicker();
+  late final TextEditingController _nameC;
+  late final TextEditingController _tagC;
+  late final TextEditingController _descC;
+  late final TextEditingController _servicesC;
+  late final TextEditingController _phoneC;
+  late final TextEditingController _addressC;
+  late final TextEditingController _cityC;
+  late final TextEditingController _keywordsC;
+  late bool _isOpen;
+  late String _thumbnailRef;
+
+  bool get _isEdit => widget.existing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    _nameC = TextEditingController(text: _isEdit ? (e!['businessName'] ?? '').toString() : '');
+    _tagC = TextEditingController(text: _isEdit ? (e!['tagline'] ?? '').toString() : '');
+    _descC = TextEditingController(text: _isEdit ? (e!['description'] ?? '').toString() : '');
+    _servicesC = TextEditingController(text: _isEdit ? (e!['services'] ?? '').toString() : '');
+    _phoneC = TextEditingController(text: _isEdit ? (e!['phone'] ?? widget.user.phone).toString() : widget.user.phone);
+    _addressC = TextEditingController(text: _isEdit ? (e!['address'] ?? '').toString() : '');
+    _cityC = TextEditingController(text: _isEdit ? (e!['city'] ?? widget.user.city ?? '').toString() : (widget.user.city ?? ''));
+    _keywordsC = TextEditingController(text: _isEdit ? (e!['keywords'] ?? '').toString() : '');
+    _isOpen = _isEdit ? e!['isOpen'] != false : true;
+    final ref = _isEdit ? (e!['thumbnailRef'] ?? '').toString().trim() : '';
+    _thumbnailRef = ref.isEmpty ? 'preset:0' : ref;
+  }
+
+  @override
+  void dispose() {
+    _nameC.dispose();
+    _tagC.dispose();
+    _descC.dispose();
+    _servicesC.dispose();
+    _phoneC.dispose();
+    _addressC.dispose();
+    _cityC.dispose();
+    _keywordsC.dispose();
+    super.dispose();
+  }
+
+  void _publish() {
+    if (_nameC.text.trim().isEmpty || _descC.text.trim().isEmpty || _servicesC.text.trim().isEmpty || _addressC.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Business name, description, services, and address are required.')));
+      return;
+    }
+    final now = DateTime.now().toUtc().toIso8601String();
+    final e = widget.existing;
+    final biz = <String, dynamic>{
+      'id': _isEdit ? (e!['id'] ?? '').toString() : DateTime.now().microsecondsSinceEpoch.toString(),
+      'ownerEmail': widget.me,
+      'ownerName': widget.user.username,
+      'businessName': _nameC.text.trim(),
+      'tagline': _tagC.text.trim(),
+      'description': _descC.text.trim(),
+      'services': _servicesC.text.trim(),
+      'phone': _phoneC.text.trim(),
+      'email': widget.user.email,
+      'address': _addressC.text.trim(),
+      'city': _cityC.text.trim(),
+      'keywords': _keywordsC.text.trim(),
+      'thumbnailRef': _thumbnailRef,
+      'isOpen': _isOpen,
+      'createdAt': _isEdit ? (e!['createdAt'] ?? now).toString() : now,
+      'updatedAt': now,
+    };
+    widget.onPublish(biz);
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_isEdit ? 'Business updated.' : 'Your business is now open on Help Center!')),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF5F7FB),
+      backgroundColor: isDark ? const Color(0xFF0F0F0F) : Colors.white,
       appBar: AppBar(
-        title: const Text('NGMY Help Center', style: TextStyle(fontWeight: FontWeight.w900)),
-        backgroundColor: Colors.transparent,
+        title: Text(_isEdit ? 'Edit My Business' : 'Open Helper Business', style: const TextStyle(fontWeight: FontWeight.w900)),
+        backgroundColor: isDark ? const Color(0xFF0F0F0F) : Colors.white,
+        foregroundColor: isDark ? Colors.white : Colors.black,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark ? [const Color(0xFF1E293B), const Color(0xFF0F172A)] : [const Color(0xFF00B25A), const Color(0xFF00894B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: [
+          widget.formFrame(
+            isDark: isDark,
+            title: 'Business Cover Photo',
+            icon: Icons.photo_camera_rounded,
+            children: [
+              widget.buildThumbnail(_thumbnailRef, radius: BorderRadius.circular(10)),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 88,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (var i = 0; i < widget.presetThumbUrls.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: InkWell(
+                          onTap: () => setState(() => _thumbnailRef = 'preset:$i'),
+                          child: Container(
+                            width: 128,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _thumbnailRef == 'preset:$i' ? _HelpBusinessEditorPage._accent : (isDark ? const Color(0xFF3D4F5F) : const Color(0xFFE2E8F0)),
+                                width: _thumbnailRef == 'preset:$i' ? 2.5 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(9)),
+                                    child: Image.network(
+                                      widget.presetThumbUrls[i],
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => widget.placeholderForIndex(i),
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF0F131C) : const Color(0xFFF8FAFC),
+                                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)),
+                                  ),
+                                  child: Text(
+                                    i < widget.presetThumbLabels.length ? widget.presetThumbLabels[i] : 'Photo ${i + 1}',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    InkWell(
+                      onTap: () async {
+                        final img = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 1920);
+                        if (img == null || !mounted) return;
+                        if (kIsWeb) {
+                          final bytes = await img.readAsBytes();
+                          setState(() => _thumbnailRef = 'data:image/jpeg;base64,${base64Encode(bytes)}');
+                        } else {
+                          setState(() => _thumbnailRef = img.path);
+                        }
+                      },
+                      child: Container(
+                        width: 128,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: _HelpBusinessEditorPage._accent.withOpacity(0.5)),
+                          color: _HelpBusinessEditorPage._accent.withOpacity(0.08),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_photo_alternate_rounded, color: _HelpBusinessEditorPage._accent, size: 30),
+                            const SizedBox(height: 6),
+                            Text('Your Photo', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white70 : const Color(0xFF065F46))),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: border, width: 1.2),
-                boxShadow: [BoxShadow(color: const Color(0xFF00B25A).withOpacity(0.2), blurRadius: 12, offset: const Offset(0, 6))],
               ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white30),
+            ],
+          ),
+          widget.formFrame(
+            isDark: isDark,
+            title: 'Business Profile',
+            icon: Icons.storefront_rounded,
+            children: [
+              TextField(controller: _nameC, decoration: widget.fieldDec('Business name *', isDark, icon: Icons.business_rounded)),
+              const SizedBox(height: 10),
+              TextField(controller: _tagC, decoration: widget.fieldDec('Short tagline', isDark, hint: 'e.g. Fast, friendly, local', icon: Icons.short_text_rounded)),
+              const SizedBox(height: 10),
+              TextField(controller: _descC, maxLines: 3, decoration: widget.fieldDec('About your business *', isDark, icon: Icons.info_outline_rounded)),
+            ],
+          ),
+          widget.formFrame(
+            isDark: isDark,
+            title: 'Location',
+            icon: Icons.location_on_rounded,
+            children: [
+              TextField(controller: _addressC, decoration: widget.fieldDec('Street address *', isDark, hint: '123 Main St, Suite 4', icon: Icons.home_work_outlined)),
+              const SizedBox(height: 10),
+              TextField(controller: _cityC, decoration: widget.fieldDec('City / area', isDark, icon: Icons.map_outlined)),
+            ],
+          ),
+          widget.formFrame(
+            isDark: isDark,
+            title: 'Services & Search Keywords',
+            icon: Icons.sell_rounded,
+            children: [
+              TextField(controller: _servicesC, maxLines: 2, decoration: widget.fieldDec('Services you offer *', isDark, hint: 'Plumbing, tutoring, delivery…', icon: Icons.handyman_rounded)),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _keywordsC,
+                maxLines: 2,
+                decoration: widget.fieldDec('Keywords / tags', isDark, hint: 'plumber, 24/7, Atlanta, affordable (comma separated)', icon: Icons.tag_rounded),
+              ),
+              const SizedBox(height: 6),
+              Text('Customers search these words to find your business.', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey.shade600)),
+            ],
+          ),
+          widget.formFrame(
+            isDark: isDark,
+            title: 'Contact',
+            icon: Icons.contact_phone_rounded,
+            children: [
+              TextField(controller: _phoneC, decoration: widget.fieldDec('Phone', isDark, icon: Icons.phone_rounded)),
+            ],
+          ),
+          widget.formFrame(
+            isDark: isDark,
+            title: 'Availability',
+            icon: Icons.schedule_rounded,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('Business open to customers', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
+                value: _isOpen,
+                activeColor: _HelpBusinessEditorPage._accent,
+                onChanged: (v) => setState(() => _isOpen = v),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), side: BorderSide(color: isDark ? const Color(0xFF3D4F5F) : const Color(0xFFE2E8F0))),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _publish,
+                  style: ElevatedButton.styleFrom(backgroundColor: _HelpBusinessEditorPage._accent, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                  child: Text(_isEdit ? 'Save Business' : 'Open Business'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HelpBusinessDetailPage extends StatelessWidget {
+  final Map<String, dynamic> biz;
+  final String me;
+  final Widget Function(String ref, {BorderRadius? radius}) thumbBuilder;
+  final VoidCallback onMessage;
+
+  const _HelpBusinessDetailPage({
+    required this.biz,
+    required this.me,
+    required this.thumbBuilder,
+    required this.onMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ref = (biz['thumbnailRef'] ?? '').toString().trim().isEmpty ? 'preset:0' : (biz['thumbnailRef'] ?? '').toString();
+    final isMine = (biz['ownerEmail'] ?? '').toString().toLowerCase().trim() == me;
+    final open = biz['isOpen'] != false;
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F0F0F) : Colors.white,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: MediaQuery.of(context).size.width * 9 / 16,
+            pinned: true,
+            backgroundColor: Colors.black,
+            flexibleSpace: FlexibleSpaceBar(
+              background: SizedBox.expand(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Positioned.fill(child: thumbBuilder(ref, radius: BorderRadius.zero)),
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Colors.black.withOpacity(0.65)],
+                        ),
+                      ),
                     ),
-                    child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 30),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('We are here to help', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                        const SizedBox(height: 6),
-                        Text('Get support, loan help, and quick answers in one place.', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 20),
-            Text('Support Options', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF111827))),
-            const SizedBox(height: 10),
-            _helpFrame(
-              context,
-              icon: Icons.phone_in_talk_rounded,
-              title: 'Call Support',
-              subtitle: config.loanPhone,
-              onTap: () {},
-            ),
-            _helpFrame(
-              context,
-              icon: Icons.account_balance_wallet_outlined,
-              title: 'Loan Center',
-              subtitle: 'Apply for loans and view how it works',
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => LoanServiceScreen(user: user, config: config))),
-            ),
-            _helpFrame(
-              context,
-              icon: Icons.storefront_rounded,
-              title: 'NGMY Store Help',
-              subtitle: 'Buy safely and sell with receipts in the app',
-              onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Use Receipts icon in NGMY Store for purchase history.'))),
-            ),
-            _helpFrame(
-              context,
-              icon: Icons.work_outline_rounded,
-              title: 'Job Marketplace Help',
-              subtitle: 'Post jobs or apply to become an approved worker',
-              onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Open Job Marketplace from NGMY Hub.'))),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF121726) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: border, width: 1.2),
-              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text((biz['businessName'] ?? 'Business').toString(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: isDark ? Colors.white : Colors.black)),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(Icons.info_outline_rounded, color: Color(0xFF00B25A), size: 20),
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: const Color(0xFF00B25A).withOpacity(0.15),
+                        child: Text(
+                          ((biz['ownerName'] ?? 'H').toString()).isNotEmpty ? (biz['ownerName'] as String)[0].toUpperCase() : 'H',
+                          style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF00B25A)),
+                        ),
+                      ),
                       const SizedBox(width: 8),
-                      Text('Account', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF111827))),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text((biz['ownerName'] ?? 'Helper').toString(), style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
+                            if ((biz['tagline'] ?? '').toString().isNotEmpty)
+                              Text((biz['tagline'] ?? '').toString(), style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey)),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: open ? const Color(0xFF00B25A).withOpacity(0.15) : Colors.orange.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(open ? 'OPEN' : 'CLOSED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: open ? const Color(0xFF00B25A) : Colors.orange)),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text('Signed in as ${user.username}', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12)),
-                  Text(user.email, style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 11)),
-                  if (user.isAdmin) const Padding(padding: EdgeInsets.only(top: 6), child: Text('Administrator access enabled', style: TextStyle(color: Color(0xFF00B25A), fontWeight: FontWeight.w700, fontSize: 11))),
+                  const SizedBox(height: 16),
+                  Text('About', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black)),
+                  const SizedBox(height: 6),
+                  Text((biz['description'] ?? '').toString(), style: TextStyle(fontSize: 14, height: 1.4, color: isDark ? Colors.white70 : Colors.black87)),
+                  const SizedBox(height: 14),
+                  Text('Services', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black)),
+                  const SizedBox(height: 6),
+                  Text((biz['services'] ?? '').toString(), style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : Colors.black54)),
+                  if ((biz['keywords'] ?? '').toString().trim().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text('Keywords', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: (biz['keywords'] ?? '').toString().split(RegExp(r'[,;#|]')).map((e) => e.trim()).where((e) => e.isNotEmpty).map((t) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00B25A).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFF00B25A).withOpacity(0.3)),
+                          ),
+                          child: Text(t, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : const Color(0xFF065F46))),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                  if ((biz['address'] ?? '').toString().isNotEmpty || (biz['city'] ?? '').toString().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text('Address', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black)),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.location_on_outlined, size: 16, color: Color(0xFF00B25A)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            [(biz['address'] ?? '').toString(), (biz['city'] ?? '').toString()].where((s) => s.trim().isNotEmpty).join(', '),
+                            style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if ((biz['phone'] ?? '').toString().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(children: [const Icon(Icons.phone_outlined, size: 16, color: Color(0xFF00B25A)), const SizedBox(width: 6), Text((biz['phone'] ?? '').toString())]),
+                  ],
+                  if (!isMine && open) ...[
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: onMessage,
+                        icon: const Icon(Icons.chat_bubble_rounded),
+                        label: const Text('Message Helper — Ask for Help'),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -15699,8 +17707,8 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
       child: Container(
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          gradient: isSelected 
-              ? const LinearGradient(colors: [Color(0xFFFF5722), Color(0xFFE64A19)]) 
+          gradient: isSelected
+              ? const LinearGradient(colors: [Color(0xFFFF5722), Color(0xFFE64A19)])
               : null,
           borderRadius: BorderRadius.circular(12),
         ),
@@ -15920,7 +17928,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
         if (mounted) {
           _showGlassNotice(
             'Sync failed',
-            'Media uploaded but database row failed. In Supabase SQL Editor run supabase/SQL_MEDIA_FIX.txt (copy only the SQL).',
+            'Media uploaded but database row failed. Run supabase/media_tables.sql in Supabase.',
             isError: true,
           );
         }
@@ -16211,7 +18219,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
       } else {
         throw Exception('Invalid media path for web.');
       }
-      
+
       await _controller!.initialize().timeout(const Duration(seconds: 15));
       if (!mounted) return;
       _controller!.setLooping(true);
@@ -16451,7 +18459,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     final isImage = _isImagePost;
     final isVideo = !isImage;
 
@@ -16896,19 +18904,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     setState(() {});
   }
 
-  bool get _canPostToNews => widget.config.newsFeedOpen || widget.user.isAdmin;
-
   Future<void> _postCommunityNews() async {
-    if (!_canPostToNews) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('News posting is closed by admin. You can read posts but cannot send messages.'),
-          backgroundColor: Color(0xFFEF4444),
-        ),
-      );
-      return;
-    }
     final text = _newsController.text.trim();
     if (text.isEmpty && _pendingNewsImageUrl == null && _pendingNewsVideoUrl == null) return;
     setState(() => _isPostingNews = true);
@@ -17037,37 +19033,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                   ? _chatView(isDark, chatBg)
                   : Column(
                       children: [
-                        if (!widget.config.newsFeedOpen)
-                          Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444).withOpacity(isDark ? 0.22 : 0.12),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.45)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.lock_rounded, color: Color(0xFFEF4444), size: 20),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    widget.user.isAdmin
-                                        ? 'News is closed for users. You can still post as admin.'
-                                        : 'News is closed. You cannot send messages right now.',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDark ? Colors.white : const Color(0xFF7F1D1D),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         Expanded(child: _newsView(isDark)),
-                        if (_canPostToNews) _newsComposer(isDark),
+                        _newsComposer(isDark),
                       ],
                     ),
             ),
@@ -17252,7 +19219,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   Widget _newsComposer(bool isDark) {
-    if (!_canPostToNews) return const SizedBox.shrink();
     const accent = Color(0xFF00B25A);
     return _ngmyGlassComposerBar(
       isDark: isDark,
