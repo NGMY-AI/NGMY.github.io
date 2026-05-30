@@ -36,6 +36,7 @@ import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_store_location.dart';
 import 'ngmy_offline.dart';
+import 'ngmy_oauth.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
@@ -49,7 +50,12 @@ void main() async {
       url: 'https://gvufllqqxjnpicmkxzcg.supabase.co',
       anonKey:
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2dWZsbHFxeGpucGljbWt4emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA1OTksImV4cCI6MjA5NTM5NjU5OX0.NoJnis6t_RLSJOHu5iLdjGaCTxVj5ZAFnG3gBZ3XYbM',
+      authOptions: const FlutterAuthClientOptions(
+        authFlowType: AuthFlowType.pkce,
+        detectSessionInUri: true,
+      ),
     );
+    await ngmyRecoverOAuthSessionIfNeeded();
   } catch (e) {
     debugPrint('Supabase init failed (app still starts): $e');
   }
@@ -2263,17 +2269,7 @@ class _NGMYAppState extends State<NGMYApp> {
     _scheduleAutoThemeTick();
   }
 
-  String? _oauthRedirectTo() {
-    if (kIsWeb) {
-      // Keep callback on the same running app origin/path.
-      return Uri.base.removeFragment().toString();
-    }
-    if (Platform.isAndroid || Platform.isIOS) {
-      return 'io.supabase.flutter://login-callback';
-    }
-    // Desktop platforms should use Supabase defaults (loopback flow).
-    return null;
-  }
+  String? _oauthRedirectTo() => ngmyOAuthRedirectUrl();
 
   Future<String?> _startDesktopOAuthSignIn(OAuthProvider provider) async {
     HttpServer? server;
@@ -2333,17 +2329,7 @@ class _NGMYAppState extends State<NGMYApp> {
     if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
       return _startDesktopOAuthSignIn(provider);
     }
-    try {
-      final launched = await supabase.auth.signInWithOAuth(
-        provider,
-        redirectTo: _oauthRedirectTo(),
-      );
-      if (!launched) return 'Could not open ${provider.name} login screen.';
-      return null;
-    } catch (e) {
-      return '${provider.name.toUpperCase()} login failed. '
-          'If browser says "can\'t reach this page", add this redirect URL in Supabase Auth provider settings: ${_oauthRedirectTo() ?? "default desktop callback"}. Error: $e';
-    }
+    return ngmyStartOAuthSignIn(provider);
   }
 
   String _appConfigSig(AppConfig c) => jsonEncode(c.toJson());
