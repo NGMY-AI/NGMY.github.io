@@ -31,6 +31,7 @@ import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
 import 'ngmy_dice_config.dart';
 import 'ngmy_fun_games.dart';
+import 'ngmy_qr_generator.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -11112,7 +11113,17 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                               ),
                             ),
                           ),
-                          const TextSpan(text: 'Y Services'),
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: GestureDetector(
+                              onTap: _openYQrGenerator,
+                              child: const Text(
+                                'Y',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
+                              ),
+                            ),
+                          ),
+                          const TextSpan(text: ' Services'),
                         ],
                       ),
                     ),
@@ -11449,6 +11460,8 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   }
 
   void _openMFunGames() => showNgmyFunGamesDialog(context);
+
+  void _openYQrGenerator() => showNgmyQrGeneratorDialog(context);
 
   void _openGServicesTool() {
     showDialog(
