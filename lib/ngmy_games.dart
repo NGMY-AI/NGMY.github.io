@@ -393,21 +393,27 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(color: Colors.white.withOpacity(0.12)),
                         ),
-                        child: Center(
-                          child: Ngmy3DDiceCube(
-                            rolling: _rolling,
-                            outcome: _rolling ? _rollPreview : _landedOutcome,
-                            size: math.min(MediaQuery.of(context).size.width * 0.46, 156),
-                          ),
+                        child: LayoutBuilder(
+                          builder: (context, box) {
+                            final side = math.min(box.maxWidth, box.maxHeight);
+                            final diceSize = (side * 0.88).clamp(210.0, 360.0);
+                            return Center(
+                              child: Ngmy3DDiceCube(
+                                rolling: _rolling,
+                                outcome: _rolling ? _rollPreview : _landedOutcome,
+                                size: diceSize,
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
                       'Roll lands on one of:',
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 11, fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         for (final o in kNgmyDiceOutcomes)
@@ -420,7 +426,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                     ),
                     if (!_rolling && _landedOutcome != null)
                       Padding(
-                        padding: const EdgeInsets.only(top: 10),
+                        padding: const EdgeInsets.only(top: 6),
                         child: Text(
                           'Landed on ${ngmyDiceOutcomeLabel(_landedOutcome!)}',
                           style: TextStyle(
@@ -430,12 +436,12 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                           ),
                         ),
                       ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text('Bet Amount', style: TextStyle(color: Colors.white.withOpacity(0.85), fontWeight: FontWeight.w800, fontSize: 12)),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       children: [2.0, 5.0, 10.0, 25.0].map((v) {
                         final sel = _bet == v && _customBetC.text.trim().isEmpty;
@@ -454,7 +460,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                                       }),
                                 borderRadius: BorderRadius.circular(10),
                                 child: SizedBox(
-                                  height: 38,
+                                  height: 34,
                                   child: Center(
                                     child: Text(
                                       '\$${v.toStringAsFixed(0)}',
@@ -495,7 +501,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                           ),
                         ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text(
@@ -503,10 +509,10 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                         style: const TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w800, fontSize: 11),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 2),
                     SizedBox(
                       width: double.infinity,
-                      height: 52,
+                      height: 50,
                       child: ElevatedButton(
                         onPressed: _rolling ? null : _roll,
                         style: ElevatedButton.styleFrom(
