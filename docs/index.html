@@ -1,131 +1,95 @@
-﻿<!DOCTYPE html>
-<html>
-<head>
-  <base href="/NGMY.github.io/">
-  <script>
-    (function () {
-      var p = location.pathname || "/";
-      if (p.indexOf("/NGMY.github.io") === 0) {
-        var b = document.querySelector("base");
-        if (b) b.setAttribute("href", "/NGMY.github.io/");
-      }
-    })();
-  </script>
-
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="description" content="Next Generation - Make Yours">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="NGMY">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-  <link rel="icon" type="image/png" href="favicon.png"/>
-  <title>NGMY</title>
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="manifest.json">
-
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      background-color: #ffffff;
-    }
-    @media (prefers-color-scheme: dark) {
-      html, body { background-color: #121212; }
-    }
-    #ngmy-loading {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      background: #ffffff;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    }
-    @media (prefers-color-scheme: dark) {
-      #ngmy-loading { background: #121212; color: #f3f4f6; }
-    }
-    #ngmy-loading .spinner {
-      width: 42px;
-      height: 42px;
-      border: 4px solid rgba(0, 178, 90, 0.2);
-      border-top-color: #00B25A;
-      border-radius: 50%;
-      animation: ngmy-spin 0.9s linear infinite;
-    }
-    @keyframes ngmy-spin { to { transform: rotate(360deg); } }
-    #ngmy-error {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 10000;
-      padding: 24px;
-      text-align: center;
-      background: #121212;
-      color: #fff;
-      font-family: system-ui, sans-serif;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-    }
-  </style>
-</head>
-<body style="overflow: hidden;">
-  <div id="ngmy-loading">
-    <div class="spinner"></div>
-    <p style="margin-top:16px;font-weight:700;color:#00B25A">Loading NGMYâ€¦</p>
-  </div>
-  <div id="ngmy-error">
-    <p style="font-size:18px;font-weight:800">NGMY could not start</p>
-    <p id="ngmy-error-msg" style="opacity:0.8;max-width:320px"></p>
-    <button onclick="location.reload()" style="margin-top:16px;padding:12px 24px;border:none;border-radius:8px;background:#00B25A;color:#fff;font-weight:700">Reload</button>
-  </div>
-  <script>
-    (function () {
-      var KEY = "ngmy_deploy_id";
-      var CURRENT = "20260529230601";
-      function hideLoaderSoon() {
-        setTimeout(function () {
-          var el = document.getElementById("ngmy-loading");
-          if (el) el.style.display = "none";
-        }, 12000);
-      }
-      function showError(msg) {
-        var el = document.getElementById("ngmy-loading");
-        var err = document.getElementById("ngmy-error");
-        var msgEl = document.getElementById("ngmy-error-msg");
-        if (el) el.style.display = "none";
-        if (err) err.style.display = "flex";
-        if (msgEl) msgEl.textContent = msg || "Clear site data for this URL, then reload.";
-      }
-      window.__ngmyShowLoadError = showError;
-      hideLoaderSoon();
-      try {
-        var prev = localStorage.getItem(KEY);
-        if (prev && prev !== CURRENT && "serviceWorker" in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function (regs) {
-            return Promise.all(regs.map(function (r) { return r.unregister(); }));
-          }).then(function () {
-            if ("caches" in window) {
-              return caches.keys().then(function (keys) {
-                return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-              });
-            }
-          }).catch(function () {});
-        }
-        try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
-      } catch (e) {}
-    })();
-  </script>
-  <script src="flutter_bootstrap.js?v=20260529230601" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/')"></script>
-</body>
-</html>
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <base href="/NGMY.github.io/">
+  <script>
+    (function () {
+      var p = location.pathname || "/";
+      if (p.indexOf("/NGMY.github.io") === 0) {
+        var b = document.querySelector("base");
+        if (b) b.setAttribute("href", "/NGMY.github.io/");
+      }
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Next Generation - Make Yours">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="NGMY">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>NGMY</title>
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #ffffff;
+    }
+    @media (prefers-color-scheme: dark) {
+      html, body { background-color: #121212; }
+    }
+    #ngmy-error {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      padding: 24px;
+      text-align: center;
+      background: #121212;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+  </style>
+</head>
+<body>
+  <div id="ngmy-error">
+    <p style="font-size:18px;font-weight:800">NGMY could not start</p>
+    <p id="ngmy-error-msg" style="opacity:0.8;max-width:320px"></p>
+    <button onclick="location.reload()" style="margin-top:16px;padding:12px 24px;border:none;border-radius:8px;background:#00B25A;color:#fff;font-weight:700">Reload</button>
+  </div>
+  <script>
+    (function () {
+      var KEY = "ngmy_deploy_id";
+      var CURRENT = "20260529230601";
+      function showError(msg) {
+        var err = document.getElementById("ngmy-error");
+        var msgEl = document.getElementById("ngmy-error-msg");
+        if (err) err.style.display = "flex";
+        if (msgEl) msgEl.textContent = msg || "Clear site data for this URL, then reload.";
+      }
+      window.__ngmyShowLoadError = showError;
+      try {
+        var prev = localStorage.getItem(KEY);
+        if (prev && prev !== CURRENT && "serviceWorker" in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            return Promise.all(regs.map(function (r) { return r.unregister(); }));
+          }).then(function () {
+            if ("caches" in window) {
+              return caches.keys().then(function (keys) {
+                return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+              });
+            }
+          }).catch(function () {});
+        }
+        try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
+      } catch (e) {}
+    })();
+  </script>
+  <script src="flutter_bootstrap.js?v=20260529230601" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/')"></script>
+</body>
+</html>

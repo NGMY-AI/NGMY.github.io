@@ -1527,6 +1527,7 @@ class _NGMYAppState extends State<NGMYApp> {
   Timer? _configRefreshTimer;
   final Set<String> _disabledSupabaseTables = {};
   final Set<String> _seenRealtimeAnnouncementIds = {};
+  final Set<String> _seenRealtimeStoreOrderIds = {};
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   OverlayEntry? _inAppNoticeEntry;
   bool _notificationsReady = false;
@@ -2248,6 +2249,28 @@ class _NGMYAppState extends State<NGMYApp> {
     }
   }
 
+  void _notifySellerOfNewStoreOrders(AppConfig prev, AppConfig next) {
+    final me = _currentUser?.email.toLowerCase().trim();
+    if (me == null || me.isEmpty) return;
+    final prevIds = prev.storeOrders
+        .map((o) => (o['id'] ?? '').toString())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    for (final raw in next.storeOrders) {
+      final o = Map<String, dynamic>.from(raw);
+      final id = (o['id'] ?? '').toString();
+      if (id.isEmpty || prevIds.contains(id) || _seenRealtimeStoreOrderIds.contains(id)) continue;
+      final seller = (o['sellerEmail'] ?? '').toString().toLowerCase().trim();
+      if (seller != me) continue;
+      _seenRealtimeStoreOrderIds.add(id);
+      final title = (o['title'] ?? 'Item').toString();
+      unawaited(_pushInAppNotification(
+        title: 'New sale',
+        body: 'A buyer purchased $title. Open Store → Sales to ship.',
+      ));
+    }
+  }
+
   void _onConfigChange(PostgresChangePayload payload) {
     if (_isSyncing) return;
     try {
@@ -2275,6 +2298,7 @@ class _NGMYAppState extends State<NGMYApp> {
           next.geminiApiKey = keepGeminiKey;
         }
         if (_appConfigSig(_config) == _appConfigSig(next)) return;
+        _notifySellerOfNewStoreOrders(_config, next);
         setState(() => _config = next);
         SharedPreferences.getInstance().then((prefs) {
           prefs.setString('app_config', jsonEncode(_config.toJson()));
@@ -2459,6 +2483,35 @@ class _NGMYAppState extends State<NGMYApp> {
         }
       }
 
+      final uLocalEarly = safeGet('all_users');
+      if (uLocalEarly != null) {
+        try {
+          _allUsers = (jsonDecode(uLocalEarly) as List).map((e) => UserData.fromJson(e)).toList();
+        } catch (_) {
+          prefs.remove('all_users');
+        }
+      }
+      final tLocalEarly = safeGet('all_transactions');
+      if (tLocalEarly != null) {
+        try {
+          _allTransactions = (jsonDecode(tLocalEarly) as List).map((e) => AppTransaction.fromJson(e)).toList();
+        } catch (_) {
+          prefs.remove('all_transactions');
+        }
+      }
+      final userJsonEarly = safeGet('current_user');
+      if (userJsonEarly != null) {
+        try {
+          final map = jsonDecode(userJsonEarly);
+          if (map is Map<String, dynamic>) {
+            final localUser = UserData.fromJson(map);
+            final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == localUser.email.toLowerCase().trim());
+            _currentUser = index != -1 ? _allUsers[index] : localUser;
+          }
+        } catch (_) {}
+      }
+      if (mounted) setState(() => _isLoading = false);
+
       // 2. Fetch Users & Transactions from Supabase
       try {
         final usersData = await supabase.from('users').select();
@@ -2551,6 +2604,10 @@ class _NGMYAppState extends State<NGMYApp> {
       for (var u in _allUsers) if (admins.contains(u.email.toLowerCase().trim())) u.isAdmin = true;
 
       _purgeExpiredSoldStoreListings();
+      for (final o in _config.storeOrders) {
+        final id = (o['id'] ?? '').toString();
+        if (id.isNotEmpty) _seenRealtimeStoreOrderIds.add(id);
+      }
     } catch (e) { debugPrint("General load error: $e"); }
     if (mounted) setState(() => _isLoading = false);
   }
@@ -3633,7 +3690,11 @@ class _MainScreenState extends State<MainScreen> {
         child: Scaffold(
           body: Stack(
             children: [
-              pages[_idx],
+              IndexedStack(
+                index: _idx,
+                sizing: StackFit.expand,
+                children: pages,
+              ),
               Positioned(
                 left: 15,
                 right: 15,
@@ -13594,6 +13655,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     super.initState();
     _tabCtrl = TabController(length: _canSell ? 3 : 2, vsync: this)..addListener(() {
       if (!mounted) return;
+      if (_canSell && _tabCtrl.index == 2) {
+        unawaited(_refreshStoreOrdersFromConfig().then((_) {
+          if (mounted) setState(() {});
+        }));
+      }
       setState(() {});
     });
     widget.config.storeListings = List<Map<String, dynamic>>.from(
@@ -14320,6 +14386,65 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 120),
       itemCount: orders.length,
       itemBuilder: (_, i) => _orderReceiptCard(orders[i], isBuyer: isBuyer),
+    );
+  }
+
+  Widget _sellerSalesTab(List<Map<String, dynamic>> sales) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pending = sales.where((o) => (o['fulfillmentStatus'] ?? 'pending').toString() == 'pending').length;
+    return RefreshIndicator(
+      color: _storePurple,
+      onRefresh: () async {
+        await _refreshStoreOrdersFromConfig();
+        if (mounted) setState(() {});
+      },
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _storePurple.withOpacity(0.35)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.local_shipping_outlined, color: _storePurple, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        pending > 0
+                            ? '$pending order(s) need shipping — confirm address and mark shipped below.'
+                            : 'New buyer orders appear here. Use Mark as Shipped, then update location and ETA.',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF334155)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (sales.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Text('No sales yet. Orders show here when someone buys your item.', style: TextStyle(color: Colors.grey))),
+            )
+          else
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (_, i) => Padding(
+                  padding: EdgeInsets.fromLTRB(14, i == 0 ? 4 : 0, 14, 0),
+                  child: _orderReceiptCard(sales[i], isBuyer: false),
+                ),
+                childCount: sales.length,
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
+        ],
+      ),
     );
   }
 
@@ -16117,13 +16242,19 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     unawaited(_upsertStoreListingRowSafe(_listings[idx]));
     _listingsSig = _storeListingsSignature(_listings);
     _save(refreshCloud: true);
+    if (mounted) {
+      setState(() {});
+      if (!_canSell) {
+        _tabCtrl.animateTo(1);
+      }
+    }
     if (selectedPay == 'ngmy') {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Purchase complete! Track shipment in Receipts.')),
+        SnackBar(content: Text(_canSell ? 'Purchase complete! Track in Receipts → My Purchases.' : 'Purchase complete! Track shipment in Purchases.')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Order placed. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}. Track in Receipts.')),
+        SnackBar(content: Text('Order placed. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}. Track in Purchases.')),
       );
       _showExternalPaymentSheet(selectedPay, listing, total);
     }
@@ -16537,6 +16668,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final shop = _activeShopListings();
     final mine = _myListings();
     final bought = _myPurchases();
+    final sales = _mySalesOrders();
+    final ordersTabCount = _canSell
+        ? sales.where((o) => (o['fulfillmentStatus'] ?? 'pending').toString() == 'pending').length
+        : bought.length;
+    final ordersTabLabel = _canSell ? 'Sales' : 'Purchases';
     final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
 
     return Scaffold(
@@ -16570,7 +16706,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                           const Spacer(),
                           _storeTabChip(0, 'Shop', shop.length, isDark),
                           if (_canSell) _storeTabChip(1, 'Listings', mine.length, isDark),
-                          _storeTabChip(_canSell ? 2 : 1, 'Purchases', bought.length, isDark),
+                          _storeTabChip(_canSell ? 2 : 1, ordersTabLabel, ordersTabCount, isDark),
                         ],
                       ),
                     ),
@@ -16591,7 +16727,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                   ? [
                       _shopGrid(shop),
                       _listingList(mine, empty: 'You have no listings. Tap Sell Item to post.', showBuy: false, showManage: true),
-                      _receiptsScroll(bought, isBuyer: true),
+                      _sellerSalesTab(sales),
                     ]
                   : [
                       _shopGrid(shop),
@@ -16650,7 +16786,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   Widget _shopGrid(List<Map<String, dynamic>> items) {
-    if (_storeLoading && items.isEmpty) {
+    if (_storeLoading && items.isEmpty && _listings.isEmpty) {
       return const Center(child: CircularProgressIndicator(color: _storePurple));
     }
     return RefreshIndicator(
