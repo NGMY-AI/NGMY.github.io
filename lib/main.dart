@@ -1343,16 +1343,59 @@ Future<String> _fetchRemoteGeminiApiKey() async {
 Future<bool> _persistGeminiApiKeyToSupabase(String key) async {
   final k = key.trim();
   if (k.isEmpty) return false;
-  for (final field in ['geminiApiKey', 'gemini_api_key']) {
+  final client = Supabase.instance.client;
+
+  Map<String, dynamic> row = {'id': 1};
+  try {
+    final existing = await client.from('config').select().eq('id', 1).maybeSingle();
+    if (existing != null) row = Map<String, dynamic>.from(existing);
+  } catch (e) {
+    debugPrint('[config] load before gemini save: $e');
+  }
+  row['id'] = 1;
+  row['geminiApiKey'] = k;
+  row['gemini_api_key'] = k;
+
+  var working = Map<String, dynamic>.from(row);
+  for (var attempt = 0; attempt < 16; attempt++) {
     try {
-      await Supabase.instance.client.from('config').upsert([
-        {'id': 1, field: k},
-      ]);
-      debugPrint('[config] Gemini API key saved ($field).');
-      return true;
+      await client.from('config').upsert(working);
+      final verify = await _fetchRemoteGeminiApiKey();
+      if (verify.isNotEmpty) {
+        debugPrint('[config] Gemini API key synced for all users.');
+        return true;
+      }
     } catch (e) {
-      debugPrint('[config] Gemini save via $field failed: $e');
+      final missing = _missingColumnFromError(e);
+      if (missing != null && missing.isNotEmpty && working.containsKey(missing)) {
+        working = Map<String, dynamic>.from(working)..remove(missing);
+        continue;
+      }
+      debugPrint('[config] Gemini upsert failed: $e');
     }
+
+    for (final field in ['geminiApiKey', 'gemini_api_key']) {
+      if (!working.containsKey(field)) continue;
+      try {
+        await client.from('config').upsert({'id': 1, field: k});
+        if ((await _fetchRemoteGeminiApiKey()).isNotEmpty) {
+          debugPrint('[config] Gemini API key saved via $field.');
+          return true;
+        }
+      } catch (e) {
+        debugPrint('[config] Gemini save via $field failed: $e');
+      }
+      try {
+        await client.from('config').update({field: k}).eq('id', 1);
+        if ((await _fetchRemoteGeminiApiKey()).isNotEmpty) {
+          debugPrint('[config] Gemini API key updated via $field.');
+          return true;
+        }
+      } catch (e) {
+        debugPrint('[config] Gemini update via $field failed: $e');
+      }
+    }
+    break;
   }
   return false;
 }
@@ -1366,8 +1409,10 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   final remoteKey = await _fetchRemoteGeminiApiKey();
   if (isAdmin && localKey.isNotEmpty) {
     row['geminiApiKey'] = localKey;
+    row['gemini_api_key'] = localKey;
   } else if (remoteKey.isNotEmpty) {
     row['geminiApiKey'] = remoteKey;
+    row['gemini_api_key'] = remoteKey;
     config.geminiApiKey = remoteKey;
   } else {
     row.remove('geminiApiKey');
@@ -7239,28 +7284,35 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                   widget.config.logoUrl = logo;
                                   widget.config.geminiApiKey = apiKey;
                                 });
+                                var geminiSynced = true;
                                 if (apiKey.isNotEmpty) {
-                                  final saved = await _persistGeminiApiKeyToSupabase(apiKey);
-                                  if (!saved && mounted) {
+                                  geminiSynced = await _persistGeminiApiKeyToSupabase(apiKey);
+                                  if (!geminiSynced && mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('API key saved locally but Supabase sync failed. Add geminiApiKey column in config table.'),
+                                        content: Text(
+                                          'API key saved on this device only. Supabase sync failed — open Supabase SQL Editor and run supabase/gemini_api_key_column.sql, then tap Save Global Settings again.',
+                                        ),
                                         backgroundColor: Color(0xFFEF4444),
+                                        duration: Duration(seconds: 8),
                                       ),
                                     );
                                   }
                                 }
                                 widget.onDataChanged();
                                 if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      apiKey.isNotEmpty
-                                          ? 'Gemini API key saved for all NGMY users.'
-                                          : 'Configuration updated.',
+                                if (apiKey.isEmpty || geminiSynced) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        apiKey.isNotEmpty
+                                            ? 'Gemini API key saved — NGMY Helper works for all users.'
+                                            : 'Configuration updated.',
+                                      ),
+                                      backgroundColor: apiKey.isNotEmpty ? const Color(0xFF16A34A) : null,
                                     ),
-                                  ),
-                                );
+                                  );
+                                }
                                 setState(() {});
                               },
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
@@ -22189,13 +22241,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (widget.config.geminiApiKey.trim().isNotEmpty) return;
-      final remote = await _fetchRemoteGeminiApiKey();
-      if (remote.isNotEmpty && mounted) {
-        setState(() => widget.config.geminiApiKey = remote);
-      }
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshGeminiKeyFromCloud());
   }
 
   @override
@@ -22226,6 +22272,14 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     });
   }
 
+  Future<void> _refreshGeminiKeyFromCloud() async {
+    final remote = await _fetchRemoteGeminiApiKey();
+    if (!mounted) return;
+    if (remote.isNotEmpty && remote != widget.config.geminiApiKey.trim()) {
+      setState(() => widget.config.geminiApiKey = remote);
+    }
+  }
+
   Future<void> _sendMessage() async {
     final text = _chatController.text.trim();
     if (text.isEmpty) return;
@@ -22238,10 +22292,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _scrollToBottom();
 
     try {
+      await _refreshGeminiKeyFromCloud();
       var apiKey = widget.config.geminiApiKey.trim();
       if (apiKey.isEmpty) {
         apiKey = await _fetchRemoteGeminiApiKey();
-        if (apiKey.isNotEmpty) widget.config.geminiApiKey = apiKey;
+        if (apiKey.isNotEmpty && mounted) setState(() => widget.config.geminiApiKey = apiKey);
       }
       if (apiKey.isEmpty) {
         setState(() {
