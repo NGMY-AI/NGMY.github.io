@@ -5357,28 +5357,75 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF2B1454),
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded),
-            onPressed: _exitGameCenter,
-          ),
-          backgroundColor: const Color(0xFF7B1FA2),
-          title: const Text('GAME CENTER', style: TextStyle(fontWeight: FontWeight.w900)),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Center(
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(15, 8, 15, 10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(10)),
-                  child: Text('\$${formatCurrency(widget.user.accountBalance)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                  height: 60,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.78),
+                    borderRadius: BorderRadius.circular(35),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                    border: Border.all(color: Colors.white.withOpacity(0.10)),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                        color: Colors.white,
+                        onPressed: _exitGameCenter,
+                      ),
+                      const Expanded(
+                        child: Center(
+                          child: Text(
+                            'GAME CENTER',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 16),
+                              const SizedBox(width: 5),
+                              Text(
+                                '\$${formatCurrency(widget.user.accountBalance)}',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(14),
+              Expanded(
+                child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
           child: Column(
             children: [
               Container(
@@ -5390,6 +5437,10 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
               const SizedBox(height: 10),
               _inviteBanner(),
               ..._games.map(_gameTile),
+            ],
+          ),
+                ),
+              ),
             ],
           ),
         ),
