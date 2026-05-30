@@ -86,18 +86,16 @@ if (Test-Path $manifestPath) {
     $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path $manifestPath -Encoding UTF8
 }
 
-# Fix Flutter bootstrap: empty build entry + service worker often cause black screen on phones
+# Fix Flutter bootstrap: keep service worker for PWA offline (app shell cached on device).
 $bootPath = Join-Path $PSScriptRoot "docs\flutter_bootstrap.js"
 if (Test-Path $bootPath) {
     $boot = Get-Content $bootPath -Raw
     $boot = $boot -replace ',\{\}', ''
-    $boot = $boot -replace '_flutter\.loader\.load\(\{\s*serviceWorkerSettings:\s*\{[^}]*\}[^}]*\}\s*\);', '_flutter.loader.load();'
     Set-Content -Path $bootPath -Value $boot -Encoding UTF8 -NoNewline
-    Write-Host "  Patched flutter_bootstrap.js (no service worker)" -ForegroundColor DarkGray
+    Write-Host "  Patched flutter_bootstrap.js (PWA service worker enabled)" -ForegroundColor DarkGray
 }
 if (Test-Path (Join-Path $PSScriptRoot "docs\flutter_service_worker.js")) {
-    Remove-Item (Join-Path $PSScriptRoot "docs\flutter_service_worker.js") -Force
-    Write-Host "  Removed flutter_service_worker.js" -ForegroundColor DarkGray
+    Write-Host "  flutter_service_worker.js present (offline PWA)" -ForegroundColor DarkGray
 }
 
 $mainJs = Join-Path $PSScriptRoot "docs\main.dart.js"

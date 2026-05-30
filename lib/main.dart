@@ -35,6 +35,7 @@ import 'ngmy_invoice_storage.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_store_location.dart';
+import 'ngmy_offline.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
@@ -665,7 +666,7 @@ bool _mediaUrlIsCloudSynced(String url) {
   return u.startsWith('supabase://') || u.startsWith('http://') || u.startsWith('https://');
 }
 
-/// Merges Supabase media with local-only drafts. Remote list is authoritative for cloud posts.
+/// Merges Supabase media with local-only drafts. Social fields merge both sides.
 List<MediaPost> _mergeMediaWithRemote(
   List<MediaPost> local,
   List<MediaPost> remote, {
@@ -677,9 +678,11 @@ List<MediaPost> _mergeMediaWithRemote(
   }
   for (final m in local) {
     if (m.id.isEmpty || tombstones.contains(m.id)) continue;
-    if (merged.containsKey(m.id)) continue;
+    if (merged.containsKey(m.id)) {
+      merged[m.id] = _combineMediaPosts(merged[m.id]!, m);
+      continue;
+    }
     if (_mediaUrlIsCloudSynced(m.videoUrl)) {
-      // Keep very recent cloud uploads visible for the poster while remote catches up.
       if (DateTime.now().difference(m.timestamp).inMinutes <= 15) {
         merged[m.id] = m;
       }
@@ -688,6 +691,74 @@ List<MediaPost> _mergeMediaWithRemote(
     merged[m.id] = m;
   }
   return merged.values.toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+}
+
+List<String> _mergeStringLists(List<String> a, List<String> b) {
+  final out = <String>{...a, ...b};
+  return out.toList();
+}
+
+List<Map<String, dynamic>> _mergeCommentLists(
+  List<Map<String, dynamic>> a,
+  List<Map<String, dynamic>> b,
+) {
+  final byId = <String, Map<String, dynamic>>{};
+  for (final raw in [...a, ...b]) {
+    final c = Map<String, dynamic>.from(raw);
+    final id = (c['id'] ?? '').toString();
+    if (id.isEmpty) continue;
+    final existing = byId[id];
+    if (existing == null) {
+      byId[id] = c;
+      continue;
+    }
+    final replies = _mergeCommentLists(
+      List<Map<String, dynamic>>.from((existing['replies'] ?? []).map((e) => Map<String, dynamic>.from(e))),
+      List<Map<String, dynamic>>.from((c['replies'] ?? []).map((e) => Map<String, dynamic>.from(e))),
+    );
+    final merged = Map<String, dynamic>.from(existing);
+    final text = (c['text'] ?? '').toString().trim();
+    if (text.isNotEmpty) merged['text'] = text;
+    merged['replies'] = replies;
+    byId[id] = merged;
+  }
+  final list = byId.values.toList();
+  list.sort((x, y) {
+    final tx = DateTime.tryParse((x['timestamp'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final ty = DateTime.tryParse((y['timestamp'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    return tx.compareTo(ty);
+  });
+  return list;
+}
+
+MediaPost _combineMediaPosts(MediaPost remote, MediaPost local) {
+  final likedBy = _mergeStringLists(remote.likedBy, local.likedBy);
+  final savedBy = _mergeStringLists(remote.savedBy, local.savedBy);
+  final comments = _mergeCommentLists(local.comments, remote.comments);
+  return MediaPost(
+    id: remote.id,
+    userEmail: remote.userEmail,
+    username: remote.username,
+    videoUrl: remote.videoUrl.isNotEmpty ? remote.videoUrl : local.videoUrl,
+    contentType: remote.contentType.isNotEmpty ? remote.contentType : local.contentType,
+    caption: remote.caption.isNotEmpty ? remote.caption : local.caption,
+    timestamp: remote.timestamp.isAfter(local.timestamp) ? remote.timestamp : local.timestamp,
+    likes: likedBy.length,
+    likedBy: likedBy,
+    savedBy: savedBy,
+    comments: comments,
+    mediaAspectRatio: remote.mediaAspectRatio ?? local.mediaAspectRatio,
+  );
+}
+
+int _mediaCommentCount(List<Map<String, dynamic>> comments) {
+  var n = 0;
+  for (final c in comments) {
+    n += 1;
+    final replies = c['replies'];
+    if (replies is List) n += replies.length;
+  }
+  return n;
 }
 
 Uint8List _readMediaFileBytesSync(String path) => File(path).readAsBytesSync();
@@ -2473,7 +2544,9 @@ class _NGMYAppState extends State<NGMYApp> {
     final remote = await _fetchMediaPostsFromSupabase();
     if (remote == null || !mounted) return;
     final next = _mergeMediaWithRemote(_allMedia, remote, tombstones: _tombstonedMediaIds);
-    if (next.length != _allMedia.length || !_mediaListsSameIds(_allMedia, next)) {
+    final before = jsonEncode(_allMedia.map((e) => e.toJson()).toList());
+    final after = jsonEncode(next.map((e) => e.toJson()).toList());
+    if (before != after) {
       setState(() => _allMedia = next);
       await _persistAllMediaLocally();
     }
@@ -3050,17 +3123,18 @@ class _NGMYAppState extends State<NGMYApp> {
         return;
       }
       if (_isSyncing) return;
-      final post = MediaPost.fromJson(payload.newRecord);
+      final incoming = MediaPost.fromJson(payload.newRecord);
       if (!mounted) return;
       setState(() {
-        final idx = _allMedia.indexWhere((m) => m.id == post.id);
+        final idx = _allMedia.indexWhere((m) => m.id == incoming.id);
         if (idx == -1) {
-          _allMedia.insert(0, post);
+          _allMedia.insert(0, incoming);
         } else {
-          _allMedia[idx] = post;
+          _allMedia[idx] = _combineMediaPosts(incoming, _allMedia[idx]);
         }
         _allMedia.sort((a, b) => b.timestamp.compareTo(a.timestamp));
       });
+      unawaited(_persistAllMediaLocally());
     } catch (e) {
       debugPrint('Media realtime apply error: $e');
     }
@@ -3211,7 +3285,11 @@ class _NGMYAppState extends State<NGMYApp> {
       }
       if (mounted) setState(() => _isLoading = false);
 
-      // 2. Fetch Users & Transactions from Supabase
+      // 2. Fetch from Supabase when online (offline uses local cache above).
+      if (!await ngmyDeviceIsOnline()) {
+        debugPrint('[ngmy] offline — using cached local data');
+        return;
+      }
       try {
         final usersData = await supabase.from('users').select();
         if (usersData != null) {
@@ -3369,6 +3447,7 @@ class _NGMYAppState extends State<NGMYApp> {
     final ordersSnapshot = List<Map<String, dynamic>>.from(
       _config.storeOrders.map((e) => Map<String, dynamic>.from(e)),
     );
+    final online = await ngmyDeviceIsOnline();
     try {
       final prefs = await SharedPreferences.getInstance();
 
@@ -3399,7 +3478,7 @@ class _NGMYAppState extends State<NGMYApp> {
       }
 
       // Sync all transactions to Supabase
-      if (_allTransactions.isNotEmpty) {
+      if (online && _allTransactions.isNotEmpty) {
         await _safeUpsertRows(
           'transactions',
           _allTransactions.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
@@ -3407,7 +3486,7 @@ class _NGMYAppState extends State<NGMYApp> {
       }
 
       // Sync all users to Supabase (deduped list)
-      if (_allUsers.isNotEmpty) {
+      if (online && _allUsers.isNotEmpty) {
         await _safeUpsertRows(
           'users',
           _allUsers.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
@@ -3415,33 +3494,39 @@ class _NGMYAppState extends State<NGMYApp> {
       }
 
       // Do not bulk-upsert media here — it resurrected deleted posts from stale cache.
-      await _pruneStaleMediaAgainstCloud();
+      if (online) {
+        await _pruneStaleMediaAgainstCloud();
+      }
 
-      if (_allAnnouncements.isNotEmpty) {
+      if (online && _allAnnouncements.isNotEmpty) {
         await _safeUpsertRows(
           'announcements',
           _allAnnouncements.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
         );
       }
 
-      await _reloadStoreFromSupabase();
-      await _syncStoreToSupabase();
-      if (_currentUser?.isAdmin == true) {
-        _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
-        await _persistInvestmentPlansToCloud(_config.investmentPlans);
+      if (online) {
+        await _reloadStoreFromSupabase();
+        await _syncStoreToSupabase();
+        if (_currentUser?.isAdmin == true) {
+          _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
+          await _persistInvestmentPlansToCloud(_config.investmentPlans);
+        }
+        final configRow = await _configRowForSupabaseUpsert(
+          config: _config,
+          isAdmin: _currentUser?.isAdmin ?? false,
+        );
+        configRow['storeListings'] = _config.storeListings;
+        configRow['storeInquiries'] = _config.storeInquiries;
+        configRow['storeOrders'] = ordersSnapshot;
+        _config.storeOrders = ordersSnapshot;
+        configRow['helpHelperApplications'] = _config.helpHelperApplications;
+        configRow['helpRequests'] = _config.helpRequests;
+        configRow['helpBusinesses'] = _config.helpBusinesses;
+        await _safeUpsertRows('config', [configRow]);
+      } else {
+        _config.storeOrders = ordersSnapshot;
       }
-      final configRow = await _configRowForSupabaseUpsert(
-        config: _config,
-        isAdmin: _currentUser?.isAdmin ?? false,
-      );
-      configRow['storeListings'] = _config.storeListings;
-      configRow['storeInquiries'] = _config.storeInquiries;
-      configRow['storeOrders'] = ordersSnapshot;
-      _config.storeOrders = ordersSnapshot;
-      configRow['helpHelperApplications'] = _config.helpHelperApplications;
-      configRow['helpRequests'] = _config.helpRequests;
-      configRow['helpBusinesses'] = _config.helpBusinesses;
-      await _safeUpsertRows('config', [configRow]);
 
       await prefs.setString('all_transactions', jsonEncode(_allTransactions.map((e) => e.toJson()).toList()));
       await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
@@ -4185,6 +4270,15 @@ class MainScreen extends StatefulWidget {
 }
 class _MainScreenState extends State<MainScreen> {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
+  bool _offline = false;
+  Timer? _onlineCheck;
+
+  Future<void> _refreshOnlineStatus() async {
+    final online = await ngmyDeviceIsOnline();
+    if (!mounted) return;
+    final nextOffline = !online;
+    if (nextOffline != _offline) setState(() => _offline = nextOffline);
+  }
 
   Future<void> _showOfficialNotice({
     required String title,
@@ -4238,6 +4332,8 @@ class _MainScreenState extends State<MainScreen> {
 
   @override void initState() {
     super.initState();
+    _refreshOnlineStatus();
+    _onlineCheck = Timer.periodic(const Duration(seconds: 8), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
       if (widget.user.isClockedIn) {
@@ -4282,7 +4378,7 @@ class _MainScreenState extends State<MainScreen> {
       }
     });
   }
-  @override void dispose() { _t?.cancel(); super.dispose(); }
+  @override void dispose() { _t?.cancel(); _onlineCheck?.cancel(); super.dispose(); }
 
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -4449,6 +4545,35 @@ class _MainScreenState extends State<MainScreen> {
                 sizing: StackFit.expand,
                 children: pages,
               ),
+              if (_offline)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Container(
+                      margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7C3AED).withOpacity(0.92),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Offline mode — your saved data is available on this device.',
+                              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               Positioned(
                 left: 15,
                 right: 15,
@@ -22572,6 +22697,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
 
   Future<void> _silentRefreshFeed() async {
     if (!mounted || _isPosting) return;
+    if (!await ngmyDeviceIsOnline()) return;
     await widget.onRefreshFromCloud?.call();
     if (!mounted || _isPosting) return;
     final sig = _feedSignature();
@@ -23015,7 +23141,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final topInset = MediaQuery.paddingOf(context).top + 72;
+    final topInset = MediaQuery.paddingOf(context).top + 68;
     final mediaFeed = widget.allMedia.where((m) => !_isExpired(m)).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return Scaffold(
@@ -23074,8 +23200,8 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                   child: BackdropFilter(
                     filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                     child: Container(
-                      height: 60,
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      height: 64,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.surface.withOpacity(isDark ? 0.52 : 0.72),
                         borderRadius: BorderRadius.circular(35),
@@ -23090,18 +23216,14 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                       ),
                       child: Row(
                         children: [
-                          IconButton(
-                            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                            onPressed: () => NgmyNavigator.pop(context),
-                          ),
                           Expanded(
                             child: Center(
                               child: Text(
                                 'MEDIA HUB',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
-                                  fontSize: 15,
-                                  letterSpacing: 1,
+                                  fontSize: 22,
+                                  letterSpacing: 1.4,
                                   color: isDark ? Colors.white : Colors.black87,
                                 ),
                               ),
@@ -23153,6 +23275,135 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   }
 }
 
+class _NgmyFullscreenVideoPage extends StatefulWidget {
+  final String url;
+  final double aspectRatio;
+  const _NgmyFullscreenVideoPage({required this.url, required this.aspectRatio});
+
+  @override
+  State<_NgmyFullscreenVideoPage> createState() => _NgmyFullscreenVideoPageState();
+}
+
+class _NgmyFullscreenVideoPageState extends State<_NgmyFullscreenVideoPage> {
+  VideoPlayerController? _controller;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      final c = VideoPlayerController.networkUrl(
+        Uri.parse(widget.url),
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      );
+      await c.initialize();
+      c.setLooping(true);
+      await c.play();
+      if (!mounted) return;
+      setState(() {
+        _controller = c;
+        _ready = true;
+      });
+    } catch (e) {
+      debugPrint('[media] fullscreen video: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (_ready && _controller != null)
+            Center(
+              child: AspectRatio(
+                aspectRatio: _controller!.value.aspectRatio > 0 ? _controller!.value.aspectRatio : widget.aspectRatio,
+                child: VideoPlayer(_controller!),
+              ),
+            )
+          else
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ),
+          if (_ready && _controller != null)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 28),
+                child: IconButton(
+                  iconSize: 56,
+                  color: Colors.white,
+                  icon: Icon(_controller!.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
+                  onPressed: () {
+                    setState(() {
+                      _controller!.value.isPlaying ? _controller!.pause() : _controller!.play();
+                    });
+                  },
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NgmyFullscreenImagePage extends StatelessWidget {
+  final String url;
+  const _NgmyFullscreenImagePage({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget image;
+    if (url.startsWith('data:image')) {
+      try {
+        image = Image.memory(base64Decode(url.split(',').last), fit: BoxFit.contain);
+      } catch (_) {
+        image = const Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48);
+      }
+    } else if (url.startsWith('http')) {
+      image = Image.network(url, fit: BoxFit.contain);
+    } else if (!kIsWeb) {
+      image = Image.file(File(url), fit: BoxFit.contain);
+    } else {
+      image = const Icon(Icons.image_not_supported_outlined, color: Colors.white54, size: 48);
+    }
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          InteractiveViewer(minScale: 0.5, maxScale: 4, child: Center(child: image)),
+          SafeArea(
+            child: IconButton(
+              icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class VideoPostWidget extends StatefulWidget {
   final MediaPost post;
   final UserData currentUser;
@@ -23180,6 +23431,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   String? _resolvedMediaUrl;
   ImageProvider? _authorImage;
   bool _loadingMedia = false;
+  bool _showHeartBurst = false;
 
   bool get _isImagePost => _mediaPostIsImage(widget.post);
 
@@ -23324,6 +23576,17 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                   decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), shape: BoxShape.circle),
                   child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 40),
                 ),
+              if (_showHeartBurst)
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.4, end: 1.3),
+                  duration: const Duration(milliseconds: 700),
+                  curve: Curves.easeOutBack,
+                  builder: (context, scale, child) => Opacity(
+                    opacity: _showHeartBurst ? (1.0 - (scale - 0.4) / 1.1).clamp(0.0, 1.0) : 0,
+                    child: Transform.scale(scale: scale, child: child),
+                  ),
+                  child: const Icon(Icons.favorite_rounded, color: Color(0xFFFF3B8A), size: 96),
+                ),
             ],
           ),
         );
@@ -23429,15 +23692,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
     await _persistPostChange();
   }
 
-  Future<void> _quickLike() async {
-    if (_liked) return;
-    setState(() {
-      widget.post.likedBy.add(widget.currentUser.email);
-      widget.post.likes = widget.post.likedBy.length;
-    });
-    await _persistPostChange();
-  }
-
   Future<void> _toggleSave() async {
     setState(() {
       if (_saved) {
@@ -23470,8 +23724,135 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
     }
   }
 
+  Future<void> _quickLike() async {
+    if (!_liked) {
+      setState(() {
+        widget.post.likedBy.add(widget.currentUser.email);
+        widget.post.likes = widget.post.likedBy.length;
+      });
+      await _persistPostChange();
+    }
+    _triggerHeartBurst();
+  }
+
+  void _triggerHeartBurst() {
+    setState(() => _showHeartBurst = true);
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _showHeartBurst = false);
+    });
+  }
+
+  Future<void> _openFullscreenMedia() async {
+    var resolved = _resolvedMediaUrl ?? widget.post.videoUrl;
+    if (resolved.startsWith('supabase://')) {
+      resolved = await _resolveSupabaseStorageUrlResilient(resolved);
+    }
+    if (!mounted || resolved.trim().isEmpty) return;
+    if (_isImagePost) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          fullscreenDialog: true,
+          builder: (_) => _NgmyFullscreenImagePage(url: resolved),
+        ),
+      );
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => _NgmyFullscreenVideoPage(
+          url: resolved,
+          aspectRatio: _effectiveAspectRatio(true),
+        ),
+      ),
+    );
+  }
+
+  Widget _commentAvatar(String email, {double radius = 18}) {
+    final u = widget.allUsers.firstWhere(
+      (x) => x.email.toLowerCase().trim() == email.toLowerCase().trim(),
+      orElse: () => UserData(email: email),
+    );
+    final path = u.profilePicturePath;
+    ImageProvider? img;
+    if (path != null && path.trim().isNotEmpty) {
+      if (path.startsWith('data:image')) {
+        try {
+          img = MemoryImage(base64Decode(path.split(',').last));
+        } catch (_) {}
+      } else if (path.startsWith('http')) {
+        img = NetworkImage(path);
+      } else if (!kIsWeb) {
+        img = FileImage(File(path));
+      }
+    }
+    return CircleAvatar(
+      radius: radius,
+      backgroundImage: img,
+      backgroundColor: const Color(0xFF7C3AED).withOpacity(0.25),
+      child: img == null ? Icon(Icons.person, size: radius, color: Colors.white70) : null,
+    );
+  }
+
+  Widget _buildCommentTile(
+    Map<String, dynamic> cm, {
+    required bool isDark,
+    required void Function(String commentId, String username) onReply,
+    int depth = 0,
+  }) {
+    final email = (cm['userEmail'] ?? '').toString();
+    final username = (cm['username'] ?? 'User').toString();
+    final text = (cm['text'] ?? '').toString();
+    final id = (cm['id'] ?? '').toString();
+    final replies = List<Map<String, dynamic>>.from(
+      (cm['replies'] ?? []).map((e) => Map<String, dynamic>.from(e as Map)),
+    );
+    return Padding(
+      padding: EdgeInsets.only(left: depth * 16.0, bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _commentAvatar(email, radius: depth > 0 ? 14 : 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 13),
+                        children: [
+                          TextSpan(text: username, style: const TextStyle(fontWeight: FontWeight.w800)),
+                          const TextSpan(text: '  '),
+                          TextSpan(text: text),
+                        ],
+                      ),
+                    ),
+                    if (depth == 0 && id.isNotEmpty)
+                      TextButton(
+                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                        onPressed: () => onReply(id, username),
+                        child: Text('Reply', style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.w600)),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          for (final r in replies)
+            _buildCommentTile(r, isDark: isDark, onReply: onReply, depth: depth + 1),
+        ],
+      ),
+    );
+  }
+
   void _openComments() {
     final c = TextEditingController();
+    String? replyToId;
+    String? replyToName;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -23480,8 +23861,45 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return StatefulBuilder(
           builder: (ctx, setModal) {
+            Future<void> submitComment() async {
+              final text = c.text.trim();
+              if (text.isEmpty) return;
+              final node = {
+                'id': DateTime.now().microsecondsSinceEpoch.toString(),
+                'userEmail': widget.currentUser.email,
+                'username': widget.currentUser.username,
+                'text': text,
+                'timestamp': DateTime.now().toUtc().toIso8601String(),
+                'replies': <Map<String, dynamic>>[],
+              };
+              setState(() {
+                if (replyToId != null) {
+                  final idx = widget.post.comments.indexWhere((x) => (x['id'] ?? '').toString() == replyToId);
+                  if (idx != -1) {
+                    final parent = Map<String, dynamic>.from(widget.post.comments[idx]);
+                    final replies = List<Map<String, dynamic>>.from(
+                      (parent['replies'] ?? []).map((e) => Map<String, dynamic>.from(e as Map)),
+                    );
+                    replies.add(node);
+                    parent['replies'] = replies;
+                    widget.post.comments[idx] = parent;
+                  } else {
+                    widget.post.comments.add(node);
+                  }
+                } else {
+                  widget.post.comments.add(node);
+                }
+              });
+              setModal(() {
+                replyToId = null;
+                replyToName = null;
+              });
+              c.clear();
+              await _persistPostChange();
+            }
+
             return Container(
-              height: MediaQuery.of(ctx).size.height * 0.62,
+              height: MediaQuery.of(ctx).size.height * 0.72,
               padding: EdgeInsets.only(
                 left: 16,
                 right: 16,
@@ -23494,57 +23912,64 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
               ),
               child: Column(
                 children: [
-                  const Text('Comments', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Comments', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   Expanded(
                     child: widget.post.comments.isEmpty
-                        ? const Center(child: Text('No comments yet.'))
+                        ? const Center(child: Text('No comments yet. Be the first!'))
                         : ListView.builder(
                             itemCount: widget.post.comments.length,
                             itemBuilder: (context, i) {
                               final cm = widget.post.comments[i];
-                              return ListTile(
-                                dense: true,
-                                title: Text(cm['username'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.w700)),
-                                subtitle: Text(cm['text'] ?? ''),
+                              return _buildCommentTile(
+                                cm,
+                                isDark: isDark,
+                                onReply: (id, name) {
+                                  setModal(() {
+                                    replyToId = id;
+                                    replyToName = name;
+                                  });
+                                },
                               );
                             },
                           ),
                   ),
-                  const SizedBox(height: 8),
+                  if (replyToName != null)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text('Replying to $replyToName', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                      ),
+                    ),
                   Row(
                     children: [
+                      _commentAvatar(widget.currentUser.email, radius: 16),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: c,
                           decoration: InputDecoration(
-                            hintText: 'Write a comment...',
+                            hintText: replyToName != null ? 'Reply to $replyToName...' : 'Write a comment...',
                             filled: true,
                             fillColor: isDark ? Colors.white.withOpacity(0.06) : Colors.grey.shade100,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                           ),
+                          onSubmitted: (_) => submitComment(),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () {
-                          final text = c.text.trim();
-                          if (text.isEmpty) return;
-                          setState(() {
-                            widget.post.comments.add({
-                              'id': DateTime.now().microsecondsSinceEpoch.toString(),
-                              'userEmail': widget.currentUser.email,
-                              'username': widget.currentUser.username,
-                              'text': text,
-                              'timestamp': DateTime.now().toUtc().toIso8601String(),
-                            });
-                          });
-                          setModal(() {});
-                          c.clear();
-                          _persistPostChange();
-                        },
-                        icon: const Icon(Icons.send_rounded),
-                      ),
+                      IconButton(onPressed: submitComment, icon: const Icon(Icons.send_rounded)),
                     ],
                   ),
                 ],
@@ -23633,13 +24058,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
             ),
           ),
           GestureDetector(
-            onTap: () async {
-              if (!isVideo) return;
-              if (!_isInitialized || _controller == null) return;
-              setState(() {
-                _controller!.value.isPlaying ? _controller!.pause() : _controller!.play();
-              });
-            },
+            onTap: _openFullscreenMedia,
             onDoubleTap: _quickLike,
             child: _buildMediaFrame(isVideo, isImage),
           ),
@@ -23676,7 +24095,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Text('${widget.post.likedBy.length} likes  •  ${widget.post.comments.length} comments', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Text('${widget.post.likedBy.length} likes  •  ${_mediaCommentCount(widget.post.comments)} comments', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 const SizedBox(height: 5),
                 RichText(
                   text: TextSpan(
