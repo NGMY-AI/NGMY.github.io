@@ -5346,7 +5346,13 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _exitToHome();
+      },
+      child: Scaffold(
         backgroundColor: const Color(0xFF2B1454),
         appBar: AppBar(
           leading: IconButton(
@@ -5384,6 +5390,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
             ],
           ),
         ),
+      ),
     );
   }
 
@@ -5774,8 +5781,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       title: title,
       subtitle: subtitle,
       outcomeLabel: outcomeLabel,
-      onGoBack: () => ngmyPopRouteCount(nav, 2),
-      onPlayAgain: () => ngmyPopRouteCount(nav, 1),
+      onGoBack: () => ngmyGameGoBack(nav),
+      onPlayAgain: () => ngmyGamePlayAgain(nav),
     );
   }
 

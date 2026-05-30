@@ -280,7 +280,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
         subtitle: bonus > 0
             ? '+\$${payout.toStringAsFixed(2)} total (includes \$3 bonus for +3!)'
             : '+\$${payout.toStringAsFixed(2)} added to your balance',
-        onGoBack: () => ngmyPopRouteCount(nav, 1),
+        onGoBack: () => ngmyGameGoBack(nav),
         onPlayAgain: () => setState(() {
           _betLocked = false;
           _landedOutcome = null;
@@ -294,7 +294,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
         title: 'YOU LOSE',
         outcomeLabel: label,
         subtitle: 'Better luck on the next roll!',
-        onGoBack: () => ngmyPopRouteCount(nav, 1),
+        onGoBack: () => ngmyGameGoBack(nav),
         onPlayAgain: () => setState(() {
           _betLocked = false;
           _landedOutcome = null;

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_nav_stub.dart' if (dart.library.html) 'ngmy_nav_web.dart' as nav_platform;
 
-/// Root navigator — used for web swipe-back → instant [Navigator.pop].
+/// Root navigator — used for web swipe-back → [Navigator.pop].
 final GlobalKey<NavigatorState> ngmyRootNavigatorKey = GlobalKey<NavigatorState>();
 
 class NgmyHistoryObserver extends NavigatorObserver {
@@ -25,11 +25,13 @@ class NgmyNavigator {
 
   static Route<T> route<T extends Object?>(
     WidgetBuilder builder, {
+    RouteSettings? settings,
     bool fullscreenDialog = false,
     bool maintainState = true,
   }) {
     return nav_platform.ngmyBuildRoute<T>(
       builder,
+      settings: settings,
       fullscreenDialog: fullscreenDialog,
       maintainState: maintainState,
     );
@@ -40,10 +42,16 @@ class NgmyNavigator {
     Widget page, {
     bool fullscreenDialog = false,
     bool rootNavigator = false,
+    String? routeName,
   }) {
+    final name = routeName ?? page.runtimeType.toString();
     return pushRoute<T>(
       context,
-      route<T>((_) => page, fullscreenDialog: fullscreenDialog),
+      route<T>(
+        (_) => page,
+        settings: RouteSettings(name: name),
+        fullscreenDialog: fullscreenDialog,
+      ),
       rootNavigator: rootNavigator,
     );
   }

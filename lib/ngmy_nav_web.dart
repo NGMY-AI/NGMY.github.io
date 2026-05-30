@@ -1,44 +1,55 @@
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-
-import 'package:flutter/material.dart';
-
-import 'ngmy_nav_stub.dart' as stub;
-
-bool _skipNextPopState = false;
-
-Route<T> ngmyBuildRoute<T extends Object?>(
-  WidgetBuilder builder, {
-  bool fullscreenDialog = false,
-  bool maintainState = true,
-}) {
-  return stub.ngmyBuildRoute<T>(
-    builder,
-    fullscreenDialog: fullscreenDialog,
-    maintainState: maintainState,
-  );
-}
-
-/// Web: browser / swipe back pops one Flutter route. We do NOT push history on
-/// every route — that caused double-pops and sent users to the home screen.
-void installWebHistorySync(GlobalKey<NavigatorState> navigatorKey) {
-  html.window.onPopState.listen((_) {
-    if (_skipNextPopState) {
-      _skipNextPopState = false;
-      return;
-    }
-    final nav = navigatorKey.currentState;
-    if (nav != null && nav.canPop()) {
-      nav.pop();
-    }
-  });
-}
-
-void onNavigatorDidPush() {
-  // Intentionally empty — no per-route history.pushState (fixes double-pop).
-}
-
-void onNavigatorDidPop() {
-  // Intentionally empty — do not call history.back() from Flutter pops.
-}
-
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+
+import 'package:flutter/material.dart';
+
+import 'ngmy_nav_stub.dart' as stub;
+
+bool _suppressPopState = false;
+bool _popFromBrowser = false;
+
+Route<T> ngmyBuildRoute<T extends Object?>(
+  WidgetBuilder builder, {
+  RouteSettings? settings,
+  bool fullscreenDialog = false,
+  bool maintainState = true,
+}) {
+  return stub.ngmyBuildRoute<T>(
+    builder,
+    settings: settings,
+    fullscreenDialog: fullscreenDialog,
+    maintainState: maintainState,
+  );
+}
+
+/// Keeps browser back / swipe in sync with Flutter routes without double-popping.
+void installWebHistorySync(GlobalKey<NavigatorState> navigatorKey) {
+  html.window.history.replaceState(<String, dynamic>{'ngmy': 0}, '', html.window.location.href);
+
+  html.window.onPopState.listen((_) {
+    if (_suppressPopState) {
+      _suppressPopState = false;
+      return;
+    }
+    final nav = navigatorKey.currentState;
+    if (nav != null && nav.canPop()) {
+      _popFromBrowser = true;
+      nav.maybePop();
+    }
+  });
+}
+
+void onNavigatorDidPush() {
+  html.window.history.pushState(<String, dynamic>{'ngmy': 'page'}, '', html.window.location.href);
+}
+
+void onNavigatorDidPop({bool fromBrowser = false}) {
+  if (fromBrowser || _popFromBrowser) {
+    _popFromBrowser = false;
+    return;
+  }
+  if (html.window.history.length > 1) {
+    _suppressPopState = true;
+    html.window.history.back();
+  }
+}
