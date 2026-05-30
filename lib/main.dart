@@ -2979,11 +2979,11 @@ class _NGMYAppState extends State<NGMYApp> {
           cardColor: Colors.white,
           pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
-              TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.android: CupertinoPageTransitionsBuilder(),
               TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
               TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-              TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
-              TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+              TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
             },
           ),
           appBarTheme: const AppBarTheme(
@@ -3004,11 +3004,11 @@ class _NGMYAppState extends State<NGMYApp> {
           cardColor: const Color(0xFF1E1E1E),
           pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
-              TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.android: CupertinoPageTransitionsBuilder(),
               TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
               TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-              TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
-              TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+              TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
             },
           ),
           appBarTheme: const AppBarTheme(
@@ -4050,9 +4050,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               FloatingTitle(
                 title: 'GROWTH INCOME',
-                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onSaveLegalContent: widget.onSaveLegalContent)) : null,
+                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onSaveLegalContent: widget.onSaveLegalContent), routeName: 'AdminDashboard') : null,
                 leading: InkWell(
-                  onTap: () => NgmyNavigator.push(context, LoanServiceScreen(user: widget.user, config: widget.config)),
+                  onTap: () => NgmyNavigator.push(context, LoanServiceScreen(user: widget.user, config: widget.config), routeName: 'LoanServiceScreen'),
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(color: isLight ? const Color(0xFF00B25A) : Colors.transparent, shape: BoxShape.circle),
@@ -4333,6 +4333,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         onAddTransaction: widget.onAddTransaction,
         onDataChanged: widget.onDataChanged,
       ),
+      routeName: kRouteGameCenter,
     );
     if (!mounted || result == null) return;
     final gamesPlayed = (result['gamesPlayed'] is int) ? result['gamesPlayed'] as int : 0;
@@ -5215,6 +5216,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
           onDataChanged: widget.onDataChanged,
           onGameStarted: () => setState(() => _sessionGamesPlayed++),
         ),
+        routeName: kRouteDiceGame,
       );
       return;
     }
@@ -5231,6 +5233,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
         onDataChanged: widget.onDataChanged,
         onGameStarted: () => setState(() => _sessionGamesPlayed++),
       ),
+      routeName: kRouteGameBet,
     );
   }
 
@@ -5401,7 +5404,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
             'pointsEarned': _sessionPointsEarned,
           }
         : null;
-    Navigator.pop(context, result);
+    NgmyNavigator.pop(context, result);
   }
 }
 
@@ -5562,6 +5565,7 @@ class _GameBetScreenState extends State<GameBetScreen> {
         onAddTransaction: widget.onAddTransaction,
         onDataChanged: widget.onDataChanged,
       ),
+      routeName: kRouteGamePlay,
     );
   }
 
@@ -5574,6 +5578,10 @@ class _GameBetScreenState extends State<GameBetScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF2B1454),
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => NgmyNavigator.pop(context),
+        ),
         title: Text(widget.gameTitle, style: const TextStyle(fontWeight: FontWeight.w900)),
         actions: [
           Container(
@@ -5774,15 +5782,14 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   Future<void> _showEndPopup({required bool win, required String title, String? subtitle, String? outcomeLabel}) async {
     if (!mounted) return;
-    final nav = Navigator.of(context);
     await showNgmyGameResultPopup(
       context,
       win: win,
       title: title,
       subtitle: subtitle,
       outcomeLabel: outcomeLabel,
-      onGoBack: () => ngmyGameGoBack(nav),
-      onPlayAgain: () => ngmyGamePlayAgain(nav),
+      onGoBack: ngmyGameGoBack,
+      onPlayAgain: ngmyGamePlayAgain,
     );
   }
 
@@ -6246,7 +6253,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
               Row(
                 children: [
                   IconButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => NgmyNavigator.pop(context),
                     icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
                   ),
                   Expanded(
@@ -6658,13 +6665,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _adminMedia(isDark),
       _adminStore(isDark),
     ];
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
       appBar: AppBar(
         backgroundColor: isDark ? const Color(0xFF161922) : Colors.white,
         elevation: 0,
         centerTitle: false,
-        leading: IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : Colors.black, size: 18), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : Colors.black, size: 18), onPressed: () => NgmyNavigator.pop(context)),
         title: Text(_menuName(), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(78),
@@ -6672,6 +6681,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
       ),
       body: pages[_idx],
+    ),
     );
   }
 
@@ -8821,7 +8831,14 @@ class _SubmitPaymentPageState extends State<SubmitPaymentPage> {
 
   @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.requestTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), centerTitle: true),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => NgmyNavigator.pop(context),
+        ),
+        title: Text(widget.requestTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(padding: const EdgeInsets.all(20), child: Column(children: [
         Container(width: double.infinity, padding: const EdgeInsets.all(25), decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.green.withOpacity(0.1), Colors.green.withOpacity(0.02)]), border: Border.all(color: Colors.green.withOpacity(0.2)), borderRadius: BorderRadius.circular(30)), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Amount:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 14)), Text('\$${formatCurrency(widget.amount)}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.green))])),
         const SizedBox(height: 30),
@@ -8861,7 +8878,7 @@ class _SubmitPaymentPageState extends State<SubmitPaymentPage> {
                   )
                 : t;
             widget.onAdd(AppTransaction(id: DateTime.now().toString(), userEmail: widget.user.email, amount: widget.amount, type: TransactionType.deposit, method: _method, sourceDetails: sourceDetails, screenshotPath: _screenshotRef, verificationCode: _vCode, timestamp: DateTime.now()));
-            Navigator.pop(context);
+            NgmyNavigator.pop(context);
           }, style: ElevatedButton.styleFrom(minimumSize: const Size(0, 60), backgroundColor: Colors.green, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), elevation: 4), child: const Text('Submit Request', style: TextStyle(fontWeight: FontWeight.bold)))),
         ]),
         const SizedBox(height: 60),
@@ -9017,6 +9034,10 @@ class LoanServiceScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF5F7FB),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => NgmyNavigator.pop(context),
+        ),
         title: const Text('Loan Services', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -10994,6 +11015,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         onDataChanged: widget.onDataChanged,
                         config: widget.config,
                       ),
+                      routeName: 'CivicRegistryScreen',
                     ),
                   ),
                   _hubBox(
@@ -11009,9 +11031,10 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         onAddTransaction: widget.onAddTransaction,
                         onDataChanged: widget.onDataChanged,
                       ),
+                      routeName: 'NgmyStoreScreen',
                     ),
                   ),
-                  _hubBox('Job Marketplace', Icons.business_center_outlined, jobColors, () => NgmyNavigator.push(context, JobMarketplaceScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onDataChanged: widget.onDataChanged))),
+                  _hubBox('Job Marketplace', Icons.business_center_outlined, jobColors, () => NgmyNavigator.push(context, JobMarketplaceScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onDataChanged: widget.onDataChanged), routeName: 'JobMarketplaceScreen')),
                   _hubBox(
                     'Help Center',
                     Icons.support_agent_rounded,
@@ -11024,6 +11047,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         config: widget.config,
                         onDataChanged: widget.onDataChanged,
                       ),
+                      routeName: 'NgmyHelpCenterScreen',
                     ),
                   ),
                 ],
@@ -13944,6 +13968,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF5F7FB),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => NgmyNavigator.pop(context),
+        ),
         title: const Text('Civic Registry', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -16254,6 +16282,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
               );
           },
         ),
+        settings: const RouteSettings(name: 'StoreReceiptsPage'),
       ),
     ).then((_) {
       if (mounted) setState(() {});
@@ -17428,6 +17457,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           appBar: AppBar(
             backgroundColor: Colors.black,
             foregroundColor: Colors.white,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+              onPressed: () => NgmyNavigator.pop(ctx),
+            ),
             title: Text((listing['title'] ?? 'Item').toString(), style: const TextStyle(fontSize: 16)),
           ),
           body: Column(
@@ -17497,7 +17530,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            Navigator.pop(ctx);
+                            NgmyNavigator.pop(ctx);
                             _promptResellListing(listing);
                           },
                           icon: const Icon(Icons.refresh_rounded),
@@ -17512,7 +17545,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         width: double.infinity,
                         child: OutlinedButton.icon(
                           onPressed: () {
-                            Navigator.pop(ctx);
+                            NgmyNavigator.pop(ctx);
                             _confirmDeleteListing(listing);
                           },
                           icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
@@ -17525,7 +17558,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: () {
-                                Navigator.pop(ctx);
+                                NgmyNavigator.pop(ctx);
                                 _askAvailability(listing);
                               },
                               icon: const Icon(Icons.chat_bubble_outline),
@@ -17537,7 +17570,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () {
-                                  Navigator.pop(ctx);
+                                  NgmyNavigator.pop(ctx);
                                   _buyListing(listing);
                                 },
                                 style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white),
@@ -17552,6 +17585,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             ],
           ),
         ),
+        settings: const RouteSettings(name: 'StoreListingDetailPage'),
       ),
     );
   }
@@ -18582,7 +18616,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                             icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: isDark ? Colors.white : Colors.black87),
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: () => NgmyNavigator.pop(context),
                           ),
                           const Icon(Icons.storefront_rounded, color: _storePurple, size: 18),
                           const SizedBox(width: 6),
@@ -19174,8 +19208,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
           _save();
         },
       ),
-      fullscreenDialog: true,
-      rootNavigator: true,
+      routeName: 'HelpBusinessEditorPage',
     );
     if (mounted) setState(() {});
   }
@@ -19250,10 +19283,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
           me: _me,
           thumbBuilder: _buildThumbnail,
           onMessage: () {
-            Navigator.pop(detailCtx);
+            NgmyNavigator.pop(detailCtx);
             _showMessageHelper(biz);
           },
         ),
+        settings: const RouteSettings(name: 'HelpBusinessDetailPage'),
       ),
     );
   }
@@ -19493,12 +19527,18 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final myBiz = _myBusiness();
     final inbox = _helperInboxCount();
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9F9F9),
       appBar: AppBar(
         backgroundColor: isDark ? const Color(0xFF0F0F0F) : Colors.white,
         foregroundColor: isDark ? Colors.white : Colors.black,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => NgmyNavigator.pop(context),
+        ),
         titleSpacing: 8,
         title: Row(
           children: [
@@ -19569,6 +19609,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
         ],
       ),
       body: _businessesFeed(isDark),
+    ),
     );
   }
 }
@@ -19675,7 +19716,7 @@ class _HelpBusinessEditorPageState extends State<_HelpBusinessEditorPage> {
       'updatedAt': now,
     };
     widget.onPublish(biz);
-    Navigator.pop(context);
+    NgmyNavigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(_isEdit ? 'Business updated.' : 'Your business is now open on Help Center!')),
     );
@@ -19687,6 +19728,10 @@ class _HelpBusinessEditorPageState extends State<_HelpBusinessEditorPage> {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F0F0F) : Colors.white,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => NgmyNavigator.pop(context),
+        ),
         title: Text(_isEdit ? 'Edit My Business' : 'Open Helper Business', style: const TextStyle(fontWeight: FontWeight.w900)),
         backgroundColor: isDark ? const Color(0xFF0F0F0F) : Colors.white,
         foregroundColor: isDark ? Colors.white : Colors.black,
@@ -20853,6 +20898,10 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF5F7FB),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => NgmyNavigator.pop(context),
+        ),
         title: const Text('Job Marketplace', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -21380,6 +21429,10 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF080B16) : const Color(0xFFF3F7FF),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => NgmyNavigator.pop(context),
+        ),
         title: const Text('MEDIA HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
         centerTitle: false,
         backgroundColor: Colors.transparent,
@@ -22335,7 +22388,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => NgmyNavigator.pop(context),
                     icon: const Icon(Icons.close_rounded, color: Colors.white),
                   ),
                 ],

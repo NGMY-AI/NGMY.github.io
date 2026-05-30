@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+/// Slide-from-right transitions (matches iOS / natural back gesture) on all platforms.
 Route<T> ngmyBuildRoute<T extends Object?>(
   WidgetBuilder builder, {
   RouteSettings? settings,
@@ -9,15 +9,7 @@ Route<T> ngmyBuildRoute<T extends Object?>(
   bool maintainState = true,
 }) {
   final routeSettings = settings ?? const RouteSettings();
-  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-    return CupertinoPageRoute<T>(
-      builder: builder,
-      settings: routeSettings,
-      fullscreenDialog: fullscreenDialog,
-      maintainState: maintainState,
-    );
-  }
-  return MaterialPageRoute<T>(
+  return CupertinoPageRoute<T>(
     builder: builder,
     settings: routeSettings,
     fullscreenDialog: fullscreenDialog,

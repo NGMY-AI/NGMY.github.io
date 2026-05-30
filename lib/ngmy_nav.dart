@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_nav_stub.dart' if (dart.library.html) 'ngmy_nav_web.dart' as nav_platform;
 
-/// Root navigator — used for web swipe-back → [Navigator.pop].
+/// Root navigator — used for web swipe-back and reliable one-step [pop].
 final GlobalKey<NavigatorState> ngmyRootNavigatorKey = GlobalKey<NavigatorState>();
 
 class NgmyHistoryObserver extends NavigatorObserver {
@@ -19,9 +19,21 @@ class NgmyHistoryObserver extends NavigatorObserver {
   }
 }
 
-/// App-wide navigation: iOS interactive pop + web history stays in sync with routes.
+/// App-wide navigation: one step back per action, swipe-back on web/iOS.
 class NgmyNavigator {
   static void install() => nav_platform.installWebHistorySync(ngmyRootNavigatorKey);
+
+  static NavigatorState? get root => ngmyRootNavigatorKey.currentState;
+
+  /// Pops exactly one route on the app root navigator (never jumps to home).
+  static void pop<T extends Object?>(BuildContext context, [T? result]) {
+    final nav = ngmyRootNavigatorKey.currentState;
+    if (nav != null && nav.canPop()) {
+      nav.pop<T>(result);
+      return;
+    }
+    Navigator.of(context).maybePop<T>(result);
+  }
 
   static Route<T> route<T extends Object?>(
     WidgetBuilder builder, {
@@ -41,7 +53,6 @@ class NgmyNavigator {
     BuildContext context,
     Widget page, {
     bool fullscreenDialog = false,
-    bool rootNavigator = false,
     String? routeName,
   }) {
     final name = routeName ?? page.runtimeType.toString();
@@ -52,16 +63,14 @@ class NgmyNavigator {
         settings: RouteSettings(name: name),
         fullscreenDialog: fullscreenDialog,
       ),
-      rootNavigator: rootNavigator,
     );
   }
 
   static Future<T?> pushRoute<T extends Object?>(
     BuildContext context,
-    Route<T> route, {
-    bool rootNavigator = false,
-  }) {
-    final nav = Navigator.of(context, rootNavigator: rootNavigator);
+    Route<T> route,
+  ) {
+    final nav = ngmyRootNavigatorKey.currentState ?? Navigator.of(context);
     return nav.push<T>(route);
   }
 }

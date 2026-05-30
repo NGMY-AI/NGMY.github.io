@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_nav_stub.dart' as stub;
 
-bool _suppressPopState = false;
+int _stackDepth = 0;
+int _suppressPopState = 0;
 bool _popFromBrowser = false;
 
 Route<T> ngmyBuildRoute<T extends Object?>(
@@ -22,25 +23,28 @@ Route<T> ngmyBuildRoute<T extends Object?>(
   );
 }
 
-/// Keeps browser back / swipe in sync with Flutter routes without double-popping.
+/// Browser back / swipe: one Flutter pop per gesture. Flutter pops never chain extra pops.
 void installWebHistorySync(GlobalKey<NavigatorState> navigatorKey) {
   html.window.history.replaceState(<String, dynamic>{'ngmy': 0}, '', html.window.location.href);
+  _stackDepth = 0;
 
   html.window.onPopState.listen((_) {
-    if (_suppressPopState) {
-      _suppressPopState = false;
+    if (_suppressPopState > 0) {
+      _suppressPopState--;
       return;
     }
     final nav = navigatorKey.currentState;
     if (nav != null && nav.canPop()) {
       _popFromBrowser = true;
       nav.maybePop();
+      if (_stackDepth > 0) _stackDepth--;
     }
   });
 }
 
 void onNavigatorDidPush() {
-  html.window.history.pushState(<String, dynamic>{'ngmy': 'page'}, '', html.window.location.href);
+  _stackDepth++;
+  html.window.history.pushState(<String, dynamic>{'ngmy': _stackDepth}, '', html.window.location.href);
 }
 
 void onNavigatorDidPop({bool fromBrowser = false}) {
@@ -48,8 +52,9 @@ void onNavigatorDidPop({bool fromBrowser = false}) {
     _popFromBrowser = false;
     return;
   }
-  if (html.window.history.length > 1) {
-    _suppressPopState = true;
+  if (_stackDepth > 0) {
+    _stackDepth--;
+    _suppressPopState++;
     html.window.history.back();
   }
 }

@@ -1,37 +1,37 @@
-{
-    "name": "NGMY",
-    "short_name": "NGMY",
-    "id": ".",
-    "start_url": ".",
-    "scope": ".",
-    "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#ffffff",
-    "description": "Next Generation - Make Yours",
-    "orientation": "portrait-primary",
-    "prefer_related_applications": false,
-    "icons": [
-        {
-            "src": "icons/Icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/Icon-512.png",
-            "sizes": "512x512",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/Icon-maskable-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "maskable"
-        },
-        {
-            "src": "icons/Icon-maskable-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "maskable"
-        }
-    ]
+﻿{
+    "id":  "/NGMY.github.io/",
+    "short_name":  "NGMY",
+    "background_color":  "#ffffff",
+    "icons":  [
+                  {
+                      "type":  "image/png",
+                      "sizes":  "192x192",
+                      "src":  "icons/Icon-192.png"
+                  },
+                  {
+                      "type":  "image/png",
+                      "sizes":  "512x512",
+                      "src":  "icons/Icon-512.png"
+                  },
+                  {
+                      "purpose":  "maskable",
+                      "type":  "image/png",
+                      "sizes":  "192x192",
+                      "src":  "icons/Icon-maskable-192.png"
+                  },
+                  {
+                      "purpose":  "maskable",
+                      "type":  "image/png",
+                      "sizes":  "512x512",
+                      "src":  "icons/Icon-maskable-512.png"
+                  }
+              ],
+    "prefer_related_applications":  false,
+    "theme_color":  "#ffffff",
+    "display":  "standalone",
+    "name":  "NGMY",
+    "description":  "Next Generation - Make Yours",
+    "scope":  "/NGMY.github.io/",
+    "start_url":  "/NGMY.github.io/",
+    "orientation":  "portrait-primary"
 }

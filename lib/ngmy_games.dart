@@ -5,6 +5,7 @@ import 'ngmy_dice_config.dart';
 import 'ngmy_dice_cube.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_result_popup.dart';
+import 'ngmy_nav.dart';
 import 'ngmy_multiplayer.dart';
 
 export 'ngmy_game_result_popup.dart' show showNgmyGameResultPopup;
@@ -268,7 +269,6 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
     });
 
     if (!mounted) return;
-    final nav = Navigator.of(context);
     if (win) {
       final payout = wager * 1.46 + bonus;
       widget.onPayout(payout, 'Dice Roll $label', bonus: bonus);
@@ -280,7 +280,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
         subtitle: bonus > 0
             ? '+\$${payout.toStringAsFixed(2)} total (includes \$3 bonus for +3!)'
             : '+\$${payout.toStringAsFixed(2)} added to your balance',
-        onGoBack: () => ngmyGameGoBack(nav),
+        onGoBack: ngmyGameGoBack,
         onPlayAgain: () => setState(() {
           _betLocked = false;
           _landedOutcome = null;
@@ -294,7 +294,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
         title: 'YOU LOSE',
         outcomeLabel: label,
         subtitle: 'Better luck on the next roll!',
-        onGoBack: () => ngmyGameGoBack(nav),
+        onGoBack: ngmyGameGoBack,
         onPlayAgain: () => setState(() {
           _betLocked = false;
           _landedOutcome = null;
@@ -353,7 +353,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
               child: Row(
                 children: [
                   TextButton.icon(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => NgmyNavigator.pop(context),
                     icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: Colors.white70),
                     label: const Text('Back', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
                   ),
