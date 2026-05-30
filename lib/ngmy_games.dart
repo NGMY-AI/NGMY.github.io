@@ -343,9 +343,8 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
   Widget build(BuildContext context) {
     final bal = widget.balance;
     final wager = _effectiveBet();
-    final screenH = MediaQuery.sizeOf(context).height;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final dicePanelH = (screenH * 0.40).clamp(250.0, 340.0);
+    final diceSize = math.min(MediaQuery.sizeOf(context).width * 0.44, 200.0);
     return Scaffold(
       backgroundColor: const Color(0xFF2B1454),
       body: SafeArea(
@@ -386,13 +385,12 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
               child: Column(
                 children: [
                   Expanded(
-                    child: SingleChildScrollView(
+                    child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          SizedBox(
-                            height: dicePanelH,
+                          Expanded(
                             child: Container(
                               width: double.infinity,
                               decoration: BoxDecoration(
@@ -400,115 +398,109 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                                 borderRadius: BorderRadius.circular(18),
                                 border: Border.all(color: Colors.white.withOpacity(0.12)),
                               ),
-                              child: LayoutBuilder(
-                                builder: (context, box) {
-                                  final side = math.min(box.maxWidth, box.maxHeight);
-                                  final diceSize = (side * 0.82).clamp(190.0, 300.0);
-                                  return Center(
-                                    child: Ngmy3DDiceCube(
-                                      rolling: _rolling,
-                                      outcome: _rolling ? _rollPreview : _landedOutcome,
-                                      size: diceSize,
-                                    ),
-                                  );
-                                },
+                              child: Center(
+                                child: Ngmy3DDiceCube(
+                                  rolling: _rolling,
+                                  outcome: _rolling ? _rollPreview : _landedOutcome,
+                                  size: diceSize,
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                    Text(
-                      'Roll lands on one of:',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        for (final o in kNgmyDiceOutcomes)
-                          _outcomeChip(
-                            ngmyDiceOutcomeLabel(o),
-                            o > 0 ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
-                            landed: !_rolling && _landedOutcome == o,
+                          const SizedBox(height: 12),
+                          Text(
+                            'Roll lands on one of:',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 11, fontWeight: FontWeight.w600),
                           ),
-                      ],
-                    ),
-                    if (!_rolling && _landedOutcome != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          'Landed on ${ngmyDiceOutcomeLabel(_landedOutcome!)}',
-                          style: TextStyle(
-                            color: _landedOutcome! > 0 ? const Color(0xFF4ADE80) : const Color(0xFFF87171),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 20,
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              for (final o in kNgmyDiceOutcomes)
+                                _outcomeChip(
+                                  ngmyDiceOutcomeLabel(o),
+                                  o > 0 ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                                  landed: !_rolling && _landedOutcome == o,
+                                ),
+                            ],
                           ),
-                        ),
-                      ),
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text('Bet Amount', style: TextStyle(color: Colors.white.withOpacity(0.85), fontWeight: FontWeight.w800, fontSize: 12)),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [2.0, 5.0, 10.0, 25.0].map((v) {
-                        final sel = _bet == v && _customBetC.text.trim().isEmpty;
-                        return Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 3),
-                            child: Material(
-                              color: sel ? const Color(0xFF22C55E) : Colors.white.withOpacity(0.14),
-                              borderRadius: BorderRadius.circular(10),
-                              child: InkWell(
-                                onTap: _betLocked
-                                    ? null
-                                    : () => setState(() {
-                                        _bet = v;
-                                        _customBetC.clear();
-                                      }),
-                                borderRadius: BorderRadius.circular(10),
-                                child: SizedBox(
-                                  height: 38,
-                                  child: Center(
-                                    child: Text(
-                                      '\$${v.toStringAsFixed(0)}',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: v >= 10 ? 13 : 15,
+                          if (!_rolling && _landedOutcome != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                'Landed on ${ngmyDiceOutcomeLabel(_landedOutcome!)}',
+                                style: TextStyle(
+                                  color: _landedOutcome! > 0 ? const Color(0xFF4ADE80) : const Color(0xFFF87171),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 20,
+                                ),
+                              ),
+                            ),
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text('Bet Amount', style: TextStyle(color: Colors.white.withOpacity(0.85), fontWeight: FontWeight.w800, fontSize: 12)),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [2.0, 5.0, 10.0, 25.0].map((v) {
+                              final sel = _bet == v && _customBetC.text.trim().isEmpty;
+                              return Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                                  child: Material(
+                                    color: sel ? const Color(0xFF22C55E) : Colors.white.withOpacity(0.14),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: InkWell(
+                                      onTap: _betLocked
+                                          ? null
+                                          : () => setState(() {
+                                              _bet = v;
+                                              _customBetC.clear();
+                                            }),
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: SizedBox(
+                                        height: 38,
+                                        child: Center(
+                                          child: Text(
+                                            '\$${v.toStringAsFixed(0)}',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: v >= 10 ? 13 : 15,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList()
+                              ..add(
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(left: 3),
+                                    child: TextField(
+                                      controller: _customBetC,
+                                      enabled: !_betLocked,
+                                      keyboardType: TextInputType.number,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                                      decoration: InputDecoration(
+                                        hintText: '\$',
+                                        hintStyle: const TextStyle(color: Colors.white54),
+                                        filled: true,
+                                        fillColor: Colors.white.withOpacity(0.14),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                        isDense: true,
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
                           ),
-                        );
-                      }).toList()
-                        ..add(
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.only(left: 3),
-                              child: TextField(
-                                controller: _customBetC,
-                                enabled: !_betLocked,
-                                keyboardType: TextInputType.number,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-                                decoration: InputDecoration(
-                                  hintText: '\$',
-                                  hintStyle: const TextStyle(color: Colors.white54),
-                                  filled: true,
-                                  fillColor: Colors.white.withOpacity(0.14),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                                  isDense: true,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Align(
                             alignment: Alignment.centerRight,
                             child: Text(
@@ -516,7 +508,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                               style: const TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w800, fontSize: 11),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                         ],
                       ),
                     ),
