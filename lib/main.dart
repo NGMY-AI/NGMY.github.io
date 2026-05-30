@@ -30,6 +30,7 @@ import 'ngmy_multiplayer.dart';
 import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
 import 'ngmy_dice_config.dart';
+import 'ngmy_fun_games.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -11101,7 +11102,17 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                               ),
                             ),
                           ),
-                          const TextSpan(text: 'MY Services'),
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: GestureDetector(
+                              onTap: _openMFunGames,
+                              child: const Text(
+                                'M',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
+                              ),
+                            ),
+                          ),
+                          const TextSpan(text: 'Y Services'),
                         ],
                       ),
                     ),
@@ -11436,6 +11447,8 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       }
     }
   }
+
+  void _openMFunGames() => showNgmyFunGamesDialog(context);
 
   void _openGServicesTool() {
     showDialog(
