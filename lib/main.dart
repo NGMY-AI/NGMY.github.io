@@ -1329,6 +1329,12 @@ String _geminiKeyFromMap(Map<String, dynamic> json) {
   return '';
 }
 
+String? _missingColumnFromError(Object error) {
+  final text = error.toString();
+  final m = RegExp("Could not find the '([^']+)' column").firstMatch(text);
+  return m?.group(1);
+}
+
 Future<String> _fetchRemoteGeminiApiKey() async {
   try {
     final row = await Supabase.instance.client.from('config').select().eq('id', 1).maybeSingle();
@@ -2845,12 +2851,6 @@ class _NGMYAppState extends State<NGMYApp> {
       }
     } catch (e) { debugPrint("General load error: $e"); }
     if (mounted) setState(() => _isLoading = false);
-  }
-
-  String? _missingColumnFromError(Object error) {
-    final text = error.toString();
-    final m = RegExp("Could not find the '([^']+)' column").firstMatch(text);
-    return m?.group(1);
   }
 
   bool _isMissingTableError(Object error, String table) {
