@@ -52,6 +52,27 @@ alter table public.config add column if not exists "privacyPolicy" text default 
 alter table public.config add column if not exists "storeOrders" jsonb default '[]'::jsonb;
 alter table public.config add column if not exists "investmentPlans" jsonb default '[]'::jsonb;
 
+-- ========== GLOBAL SETTINGS (legal + investment plans) ==========
+create table if not exists public.ngmy_settings (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists ngmy_settings_updated_at_idx on public.ngmy_settings (updated_at desc);
+
+alter table public.ngmy_settings enable row level security;
+
+drop policy if exists "ngmy_settings_read" on public.ngmy_settings;
+drop policy if exists "ngmy_settings_write" on public.ngmy_settings;
+drop policy if exists "ngmy_settings_update" on public.ngmy_settings;
+drop policy if exists "ngmy_settings_delete" on public.ngmy_settings;
+
+create policy "ngmy_settings_read" on public.ngmy_settings for select using (true);
+create policy "ngmy_settings_write" on public.ngmy_settings for insert with check (true);
+create policy "ngmy_settings_update" on public.ngmy_settings for update using (true);
+create policy "ngmy_settings_delete" on public.ngmy_settings for delete using (true);
+
 -- ========== MEDIA HUB ==========
 create table if not exists public.media (
   id text primary key,

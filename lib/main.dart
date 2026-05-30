@@ -700,6 +700,252 @@ void _applyRemoteLegalToConfig(AppConfig config, Map<String, dynamic> remoteMap)
   if (privacy.isNotEmpty) config.privacyPolicy = privacy;
 }
 
+const _kNgmySettingsTermsKey = 'terms_and_conditions';
+const _kNgmySettingsPrivacyKey = 'privacy_policy';
+const _kNgmySettingsPlansKey = 'investment_plans';
+const _kStoreSystemTermsId = 'ngmy:system:terms';
+const _kStoreSystemPrivacyId = 'ngmy:system:privacy';
+const _kStoreSystemPlansId = 'ngmy:system:investment_plans';
+
+bool _isNgmySystemStoreListingId(String id) => id.startsWith('ngmy:system:');
+
+DateTime? _parseSettingUpdatedAt(Object? raw) => DateTime.tryParse((raw ?? '').toString());
+
+Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) async {
+  final row = <String, dynamic>{
+    'key': key,
+    'value': value,
+    'updated_at': DateTime.now().toUtc().toIso8601String(),
+  };
+  for (int i = 0; i < 8; i++) {
+    try {
+      await Supabase.instance.client.from('ngmy_settings').upsert([row]);
+      return true;
+    } catch (e) {
+      if (_isMissingTablePostgrestError(e, 'ngmy_settings')) {
+        debugPrint('[ngmy_settings] table missing — run supabase/ngmy_settings_table.sql');
+        return false;
+      }
+      final missing = _missingColumnFromPostgrestError(e);
+      if (missing != null && missing.isNotEmpty) {
+        row.remove(missing);
+        continue;
+      }
+      debugPrint('[ngmy_settings] upsert error: $e');
+      return false;
+    }
+  }
+  return false;
+}
+
+Future<Map<String, dynamic>?> _fetchNgmySettingSafe(String key) async {
+  try {
+    final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', key).maybeSingle();
+    if (row == null) return null;
+    final value = row['value'];
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
+  } catch (e) {
+    if (!_isMissingTablePostgrestError(e, 'ngmy_settings')) {
+      debugPrint('[ngmy_settings] fetch error: $e');
+    }
+    return null;
+  }
+}
+
+Future<bool> _upsertConfigLegalColumns(String terms, String privacy) async {
+  final row = <String, dynamic>{
+    'id': 1,
+    'termsAndConditions': terms,
+    'privacyPolicy': privacy,
+  };
+  for (int i = 0; i < 8; i++) {
+    try {
+      await Supabase.instance.client.from('config').upsert([row]);
+      return true;
+    } catch (e) {
+      final missing = _missingColumnFromPostgrestError(e);
+      if (missing != null && missing.isNotEmpty) {
+        row.remove(missing);
+        if (row.length <= 1) return false;
+        continue;
+      }
+      debugPrint('[config] legal column upsert error: $e');
+      return false;
+    }
+  }
+  return false;
+}
+
+Future<bool> _upsertConfigInvestmentPlansColumn(List<Map<String, dynamic>> plans) async {
+  final row = <String, dynamic>{'id': 1, 'investmentPlans': plans};
+  for (int i = 0; i < 8; i++) {
+    try {
+      await Supabase.instance.client.from('config').upsert([row]);
+      return true;
+    } catch (e) {
+      final missing = _missingColumnFromPostgrestError(e);
+      if (missing != null && missing.isNotEmpty) {
+        row.remove(missing);
+        if (row.length <= 1) return false;
+        continue;
+      }
+      debugPrint('[config] investmentPlans column upsert error: $e');
+      return false;
+    }
+  }
+  return false;
+}
+
+Future<bool> _persistLegalViaStoreListing(String terms, String privacy) async {
+  final now = DateTime.now().toUtc().toIso8601String();
+  final termsOk = await _upsertStoreListingRowSafe({
+    'id': _kStoreSystemTermsId,
+    'content': terms,
+    'updatedAt': now,
+  });
+  final privacyOk = await _upsertStoreListingRowSafe({
+    'id': _kStoreSystemPrivacyId,
+    'content': privacy,
+    'updatedAt': now,
+  });
+  return termsOk && privacyOk;
+}
+
+Future<bool> _persistPlansViaStoreListing(List<Map<String, dynamic>> plans) async {
+  return _upsertStoreListingRowSafe({
+    'id': _kStoreSystemPlansId,
+    'plans': plans,
+    'updatedAt': DateTime.now().toUtc().toIso8601String(),
+  });
+}
+
+Future<Map<String, String>> _fetchLegalViaStoreListings() async {
+  try {
+    final rows = await Supabase.instance.client
+        .from('store_listings')
+        .select()
+        .inFilter('id', [_kStoreSystemTermsId, _kStoreSystemPrivacyId]);
+    if (rows is! List) return {};
+    var terms = '';
+    var privacy = '';
+    for (final raw in rows) {
+      final listing = _storeListingFromRow(Map<String, dynamic>.from(raw));
+      final id = (listing['id'] ?? '').toString();
+      final content = (listing['content'] ?? '').toString().trim();
+      if (id == _kStoreSystemTermsId && content.isNotEmpty) terms = content;
+      if (id == _kStoreSystemPrivacyId && content.isNotEmpty) privacy = content;
+    }
+    return {'terms': terms, 'privacy': privacy};
+  } catch (e) {
+    debugPrint('[legal] store_listings fetch error: $e');
+    return {};
+  }
+}
+
+Future<List<Map<String, dynamic>>> _fetchPlansViaStoreListings() async {
+  try {
+    final row = await Supabase.instance.client.from('store_listings').select().eq('id', _kStoreSystemPlansId).maybeSingle();
+    if (row == null) return [];
+    final listing = _storeListingFromRow(Map<String, dynamic>.from(row));
+    final plans = listing['plans'];
+    if (plans is! List) return [];
+    return plans.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  } catch (e) {
+    debugPrint('[investmentPlans] store_listings fetch error: $e');
+    return [];
+  }
+}
+
+Future<Map<String, String>> _fetchAuthoritativeLegalContent() async {
+  var terms = '';
+  var privacy = '';
+  DateTime? termsAt;
+  DateTime? privacyAt;
+
+  void considerTerms(String content, DateTime? at) {
+    final c = content.trim();
+    if (c.isEmpty) return;
+    if (termsAt == null || (at != null && !at.isBefore(termsAt!))) {
+      terms = c;
+      termsAt = at ?? DateTime.now();
+    }
+  }
+
+  void considerPrivacy(String content, DateTime? at) {
+    final c = content.trim();
+    if (c.isEmpty) return;
+    if (privacyAt == null || (at != null && !at.isBefore(privacyAt!))) {
+      privacy = c;
+      privacyAt = at ?? DateTime.now();
+    }
+  }
+
+  final settingsTerms = await _fetchNgmySettingSafe(_kNgmySettingsTermsKey);
+  if (settingsTerms != null) {
+    considerTerms((settingsTerms['content'] ?? '').toString(), _parseSettingUpdatedAt(settingsTerms['updatedAt']));
+  }
+  final settingsPrivacy = await _fetchNgmySettingSafe(_kNgmySettingsPrivacyKey);
+  if (settingsPrivacy != null) {
+    considerPrivacy((settingsPrivacy['content'] ?? '').toString(), _parseSettingUpdatedAt(settingsPrivacy['updatedAt']));
+  }
+
+  final storeLegal = await _fetchLegalViaStoreListings();
+  considerTerms(storeLegal['terms'] ?? '', null);
+  considerPrivacy(storeLegal['privacy'] ?? '', null);
+
+  final configLegal = await _fetchRemoteLegalContent();
+  considerTerms(configLegal['terms'] ?? '', null);
+  considerPrivacy(configLegal['privacy'] ?? '', null);
+
+  return {'terms': terms, 'privacy': privacy};
+}
+
+Future<List<Map<String, dynamic>>> _fetchAuthoritativeInvestmentPlans() async {
+  List<Map<String, dynamic>>? best;
+  DateTime? bestAt;
+
+  void consider(List<Map<String, dynamic>> plans, DateTime? at) {
+    if (plans.isEmpty) return;
+    if (best == null || bestAt == null || (at != null && !at.isBefore(bestAt!))) {
+      best = plans;
+      bestAt = at ?? DateTime.now();
+    }
+  }
+
+  final settingsPlans = await _fetchNgmySettingSafe(_kNgmySettingsPlansKey);
+  if (settingsPlans != null) {
+    final raw = settingsPlans['plans'];
+    if (raw is List) {
+      consider(raw.map((e) => Map<String, dynamic>.from(e as Map)).toList(), _parseSettingUpdatedAt(settingsPlans['updatedAt']));
+    }
+  }
+
+  consider(await _fetchPlansViaStoreListings(), null);
+  consider(await _fetchRemoteInvestmentPlans(), null);
+
+  return best ?? [];
+}
+
+Future<bool> _persistLegalContentToCloud(String terms, String privacy) async {
+  final now = DateTime.now().toUtc().toIso8601String();
+  var ok = false;
+  ok = await _upsertNgmySettingSafe(_kNgmySettingsTermsKey, {'content': terms, 'updatedAt': now}) || ok;
+  ok = await _upsertNgmySettingSafe(_kNgmySettingsPrivacyKey, {'content': privacy, 'updatedAt': now}) || ok;
+  ok = await _upsertConfigLegalColumns(terms, privacy) || ok;
+  ok = await _persistLegalViaStoreListing(terms, privacy) || ok;
+  return ok;
+}
+
+Future<bool> _persistInvestmentPlansToCloud(List<Map<String, dynamic>> plans) async {
+  final now = DateTime.now().toUtc().toIso8601String();
+  var ok = false;
+  ok = await _upsertNgmySettingSafe(_kNgmySettingsPlansKey, {'plans': plans, 'updatedAt': now}) || ok;
+  ok = await _upsertConfigInvestmentPlansColumn(plans) || ok;
+  ok = await _persistPlansViaStoreListing(plans) || ok;
+  return ok;
+}
+
 bool _mediaPostIsImage(MediaPost post) {
   if (post.contentType == 'image') return true;
   final url = post.videoUrl.toLowerCase();
@@ -1078,7 +1324,10 @@ Future<List<Map<String, dynamic>>> _fetchStoreListingsFromSupabase() async {
       if (rows is! List) return [];
       return rows
           .map((e) => _storeListingFromRow(Map<String, dynamic>.from(e)))
-          .where((l) => (l['id'] ?? '').toString().isNotEmpty)
+          .where((l) {
+            final id = (l['id'] ?? '').toString();
+            return id.isNotEmpty && !_isNgmySystemStoreListingId(id);
+          })
           .toList();
     } catch (e) {
       lastError = e;
@@ -1818,6 +2067,7 @@ class _NGMYAppState extends State<NGMYApp> {
   RealtimeChannel? _announcementsChannel;
   RealtimeChannel? _configChannel;
   RealtimeChannel? _storeListingsChannel;
+  RealtimeChannel? _ngmySettingsChannel;
   StreamSubscription<AuthState>? _authSub;
   bool _isSyncing = false;
   Timer? _autoThemeTimer;
@@ -1852,6 +2102,7 @@ class _NGMYAppState extends State<NGMYApp> {
     try { _announcementsChannel?.unsubscribe(); } catch (_) {}
     try { _configChannel?.unsubscribe(); } catch (_) {}
     try { _storeListingsChannel?.unsubscribe(); } catch (_) {}
+    try { _ngmySettingsChannel?.unsubscribe(); } catch (_) {}
     try { _authSub?.cancel(); } catch (_) {}
     super.dispose();
   }
@@ -2035,9 +2286,19 @@ class _NGMYAppState extends State<NGMYApp> {
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
-        if (next.investmentPlans.isEmpty && keepPlans.isNotEmpty) next.investmentPlans = keepPlans;
         final plansSigBefore = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
-        if (next.investmentPlans.isNotEmpty) {
+        final legal = await _fetchAuthoritativeLegalContent();
+        final remotePlans = await _fetchAuthoritativeInvestmentPlans();
+        final terms = (legal['terms'] ?? '').trim();
+        final privacy = (legal['privacy'] ?? '').trim();
+        if (terms.isNotEmpty) next.termsAndConditions = terms;
+        if (privacy.isNotEmpty) next.privacyPolicy = privacy;
+        if (remotePlans.isNotEmpty) {
+          next.investmentPlans = remotePlans;
+          _globalPlans = _investmentPlansFromMaps(remotePlans);
+        } else if (next.investmentPlans.isEmpty && keepPlans.isNotEmpty) {
+          next.investmentPlans = keepPlans;
+        } else if (next.investmentPlans.isNotEmpty) {
           _globalPlans = _investmentPlansFromMaps(next.investmentPlans);
         }
         final plansSigAfter = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
@@ -2056,12 +2317,12 @@ class _NGMYAppState extends State<NGMYApp> {
     final byId = <String, Map<String, dynamic>>{};
     for (final l in remote) {
       final id = (l['id'] ?? '').toString();
-      if (id.isEmpty) continue;
+      if (id.isEmpty || _isNgmySystemStoreListingId(id)) continue;
       byId[id] = _normalizeStoreListing(Map<String, dynamic>.from(l));
     }
     for (final l in _config.storeListings) {
       final id = (l['id'] ?? '').toString();
-      if (id.isEmpty) continue;
+      if (id.isEmpty || _isNgmySystemStoreListingId(id)) continue;
       final existing = byId[id];
       final local = _normalizeStoreListing(Map<String, dynamic>.from(l));
       byId[id] = existing == null ? local : _pickNewerListing(existing, local);
@@ -2220,18 +2481,40 @@ class _NGMYAppState extends State<NGMYApp> {
         _config.termsAndConditions = terms;
         _config.privacyPolicy = privacy;
       });
-      final row = <String, dynamic>{
-        'id': 1,
-        'termsAndConditions': terms,
-        'privacyPolicy': privacy,
-      };
-      await _safeUpsertRows('config', [row]);
+      final saved = await _persistLegalContentToCloud(terms, privacy);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('app_config', jsonEncode(_config.toJson()));
-      return true;
+      return saved;
     } catch (e) {
       debugPrint('[legal] save error: $e');
       return false;
+    }
+  }
+
+  Future<void> _refreshLegalAndPlansFromCloud({bool updateUi = true}) async {
+    try {
+      final legal = await _fetchAuthoritativeLegalContent();
+      final remotePlans = await _fetchAuthoritativeInvestmentPlans();
+      final terms = (legal['terms'] ?? '').trim();
+      final privacy = (legal['privacy'] ?? '').trim();
+      final termsChanged = terms.isNotEmpty && terms != _config.termsAndConditions.trim();
+      final privacyChanged = privacy.isNotEmpty && privacy != _config.privacyPolicy.trim();
+      final plansSigBefore = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
+      if (terms.isNotEmpty) _config.termsAndConditions = terms;
+      if (privacy.isNotEmpty) _config.privacyPolicy = privacy;
+      if (remotePlans.isNotEmpty) {
+        _config.investmentPlans = remotePlans;
+        _globalPlans = _investmentPlansFromMaps(remotePlans);
+      }
+      final plansSigAfter = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
+      if (!updateUi || (!termsChanged && !privacyChanged && plansSigBefore == plansSigAfter)) return;
+      if (!mounted) return;
+      setState(() {});
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(_config.toJson()));
+      await prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
+    } catch (e) {
+      debugPrint('[legal/plans] cloud refresh error: $e');
     }
   }
 
@@ -2541,6 +2824,16 @@ class _NGMYAppState extends State<NGMYApp> {
             callback: (payload) => _onStoreListingChange(payload),
           )
           .subscribe();
+
+      _ngmySettingsChannel = supabase
+          .channel('public:ngmy_settings')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'ngmy_settings',
+            callback: (payload) => _onNgmySettingsChange(payload),
+          )
+          .subscribe();
       debugPrint('Realtime subscriptions active');
     } catch (e) {
       debugPrint('Realtime subscribe error: $e');
@@ -2624,33 +2917,56 @@ class _NGMYAppState extends State<NGMYApp> {
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
-        if (next.investmentPlans.isEmpty && keepPlans.isNotEmpty) next.investmentPlans = keepPlans;
         if (remoteGemini.isNotEmpty) {
           next.geminiApiKey = remoteGemini;
         } else if (next.geminiApiKey.trim().isEmpty && keepGeminiKey.isNotEmpty) {
           next.geminiApiKey = keepGeminiKey;
         }
-        final plansSigBefore = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
-        if (next.investmentPlans.isNotEmpty) {
-          _globalPlans = _investmentPlansFromMaps(next.investmentPlans);
-        }
-        final plansSigAfter = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
-        if (_appConfigSig(_config) == _appConfigSig(next) && plansSigBefore == plansSigAfter) return;
-        _notifySellerOfNewStoreOrders(_config, next);
-        setState(() => _config = next);
-        SharedPreferences.getInstance().then((prefs) {
-          prefs.setString('app_config', jsonEncode(_config.toJson()));
-          prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
-        }).catchError((_) {});
+        unawaited(() async {
+          final legal = await _fetchAuthoritativeLegalContent();
+          final remotePlans = await _fetchAuthoritativeInvestmentPlans();
+          final terms = (legal['terms'] ?? '').trim();
+          final privacy = (legal['privacy'] ?? '').trim();
+          if (terms.isNotEmpty) next.termsAndConditions = terms;
+          if (privacy.isNotEmpty) next.privacyPolicy = privacy;
+          if (remotePlans.isNotEmpty) {
+            next.investmentPlans = remotePlans;
+          } else if (next.investmentPlans.isEmpty && keepPlans.isNotEmpty) {
+            next.investmentPlans = keepPlans;
+          }
+          final plansSigBefore = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
+          if (next.investmentPlans.isNotEmpty) {
+            _globalPlans = _investmentPlansFromMaps(next.investmentPlans);
+          }
+          if (!mounted) return;
+          final plansSigAfter = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
+          if (_appConfigSig(_config) == _appConfigSig(next) && plansSigBefore == plansSigAfter) return;
+          _notifySellerOfNewStoreOrders(_config, next);
+          setState(() => _config = next);
+          SharedPreferences.getInstance().then((prefs) {
+            prefs.setString('app_config', jsonEncode(_config.toJson()));
+            prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
+          }).catchError((_) {});
+        }());
       }
     } catch (e) {
       debugPrint('Config realtime apply error: $e');
     }
   }
 
+  void _onNgmySettingsChange(PostgresChangePayload payload) {
+    if (_isSyncing) return;
+    unawaited(_refreshLegalAndPlansFromCloud());
+  }
+
   void _onStoreListingChange(PostgresChangePayload payload) {
     if (_isSyncing) return;
     try {
+      final recordId = (payload.newRecord['id'] ?? payload.oldRecord['id'] ?? '').toString();
+      if (_isNgmySystemStoreListingId(recordId)) {
+        unawaited(_refreshLegalAndPlansFromCloud());
+        return;
+      }
       if (payload.eventType == PostgresChangeEvent.delete) {
         final id = (payload.oldRecord['id'] ?? '').toString();
         if (id.isEmpty) return;
@@ -2894,6 +3210,7 @@ class _NGMYAppState extends State<NGMYApp> {
             _globalPlans = _investmentPlansFromMaps(_config.investmentPlans);
           }
         }
+        await _refreshLegalAndPlansFromCloud(updateUi: false);
         await _reloadStoreFromSupabase();
         await _reloadMediaFromSupabase();
       } catch (e) {
@@ -3066,6 +3383,7 @@ class _NGMYAppState extends State<NGMYApp> {
       await _syncStoreToSupabase();
       if (_currentUser?.isAdmin == true) {
         _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
+        await _persistInvestmentPlansToCloud(_config.investmentPlans);
       }
       final configRow = await _configRowForSupabaseUpsert(
         config: _config,
@@ -3354,7 +3672,10 @@ class _NGMYAppState extends State<NGMYApp> {
                     _globalPlans.sort((a, b) => a.price.compareTo(b.price));
                     _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
                   });
-                  _saveData();
+                  unawaited(() async {
+                    await _persistInvestmentPlansToCloud(_config.investmentPlans);
+                    await _saveData();
+                  }());
                 },
                 onPostMedia: (post) {
                   setState(() => _allMedia.insert(0, post));
@@ -7581,7 +7902,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 SnackBar(
                   content: Text(saved
                       ? 'Terms & Privacy saved to database for all users.'
-                      : 'Saved locally. Run supabase/legal_content_columns.sql in Supabase if changes do not sync.'),
+                      : 'Could not sync to cloud. Run supabase/ngmy_settings_table.sql in Supabase SQL Editor, then save again.'),
                 ),
               );
             },
