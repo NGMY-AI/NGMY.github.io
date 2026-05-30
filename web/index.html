@@ -11,66 +11,122 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 
-  <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <!-- 'default' allows iOS to automatically handle white background in light mode and black in dark mode -->
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="NGMY">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
-
   <title>NGMY</title>
-
-  <!-- Dynamic Theme Color for iOS PWA Shell -->
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
-
   <link rel="manifest" href="manifest.json">
 
   <style>
     html, body {
       margin: 0;
       padding: 0;
+      height: 100%;
       background-color: #ffffff;
     }
     @media (prefers-color-scheme: dark) {
-      html, body {
-        background-color: #121212;
-      }
+      html, body { background-color: #121212; }
+    }
+    #ngmy-loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      background: #ffffff;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      #ngmy-loading { background: #121212; color: #f3f4f6; }
+    }
+    #ngmy-loading .spinner {
+      width: 42px;
+      height: 42px;
+      border: 4px solid rgba(0, 178, 90, 0.2);
+      border-top-color: #00B25A;
+      border-radius: 50%;
+      animation: ngmy-spin 0.9s linear infinite;
+    }
+    @keyframes ngmy-spin { to { transform: rotate(360deg); } }
+    #ngmy-error {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      padding: 24px;
+      text-align: center;
+      background: #121212;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
     }
   </style>
-</head>
-<body style="overflow: hidden;">
-  <!-- Clears stale PWA/service-worker cache when a new build is deployed -->
   <script>
     (function () {
-      var CURRENT = "__NGMY_DEPLOY_ID__";
-      var KEY = "ngmy_deploy_id";
-      var prev = null;
-      try { prev = localStorage.getItem(KEY); } catch (e) {}
-      function finish() {
-        try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
-      }
-      if (prev && prev !== CURRENT && "serviceWorker" in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function (regs) {
-          return Promise.all(regs.map(function (r) { return r.unregister(); }));
-        }).then(function () {
-          if ("caches" in window) {
-            return caches.keys().then(function (keys) {
-              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-            });
-          }
-        }).then(function () {
-          try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
-          location.reload();
-        }).catch(finish);
-      } else {
-        finish();
+      var p = location.pathname || "";
+      if (p.indexOf("NGMY.github.io") !== -1 && p !== "/NGMY.github.io/" && p !== "/NGMY.github.io") {
+        location.replace(location.origin + "/" + location.search + location.hash);
       }
     })();
   </script>
-  <script src="flutter_bootstrap.js?v=__NGMY_DEPLOY_ID__"></script>
+</head>
+<body style="overflow: hidden;">
+  <div id="ngmy-loading">
+    <div class="spinner"></div>
+    <p style="margin-top:16px;font-weight:700;color:#00B25A">Loading NGMY…</p>
+  </div>
+  <div id="ngmy-error">
+    <p style="font-size:18px;font-weight:800">NGMY could not start</p>
+    <p id="ngmy-error-msg" style="opacity:0.8;max-width:320px"></p>
+    <button onclick="location.reload()" style="margin-top:16px;padding:12px 24px;border:none;border-radius:8px;background:#00B25A;color:#fff;font-weight:700">Reload</button>
+  </div>
+  <script>
+    (function () {
+      var KEY = "ngmy_deploy_id";
+      var CURRENT = "__NGMY_DEPLOY_ID__";
+      function hideLoaderSoon() {
+        setTimeout(function () {
+          var el = document.getElementById("ngmy-loading");
+          if (el) el.style.display = "none";
+        }, 8000);
+      }
+      function showError(msg) {
+        var el = document.getElementById("ngmy-loading");
+        var err = document.getElementById("ngmy-error");
+        var msgEl = document.getElementById("ngmy-error-msg");
+        if (el) el.style.display = "none";
+        if (err) err.style.display = "flex";
+        if (msgEl) msgEl.textContent = msg || "Try clearing site data or open in a private tab.";
+      }
+      window.__ngmyShowLoadError = showError;
+      hideLoaderSoon();
+      try {
+        var prev = localStorage.getItem(KEY);
+        if (prev && prev !== CURRENT && "serviceWorker" in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            return Promise.all(regs.map(function (r) { return r.unregister(); }));
+          }).then(function () {
+            if ("caches" in window) {
+              return caches.keys().then(function (keys) {
+                return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+              });
+            }
+          }).then(function () {
+            try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
+          }).catch(function () {});
+        }
+        try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
+      } catch (e) {}
+    })();
+  </script>
+  <script src="flutter_bootstrap.js?v=__NGMY_DEPLOY_ID__" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Failed to load app. Clear browser cache for this site and reload.')"></script>
 </body>
 </html>

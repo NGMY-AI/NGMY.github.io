@@ -55,6 +55,20 @@ $html = Get-Content $indexPath -Raw
 $html = $html.Replace("__NGMY_DEPLOY_ID__", $DeployId)
 Set-Content -Path $indexPath -Value $html -Encoding UTF8 -NoNewline
 
+# Fix Flutter bootstrap: empty build entry + service worker often cause black screen on phones
+$bootPath = Join-Path $PSScriptRoot "docs\flutter_bootstrap.js"
+if (Test-Path $bootPath) {
+    $boot = Get-Content $bootPath -Raw
+    $boot = $boot -replace ',\{\}', ''
+    $boot = $boot -replace '_flutter\.loader\.load\(\{\s*serviceWorkerSettings:\s*\{[^}]*\}[^}]*\}\s*\);', '_flutter.loader.load();'
+    Set-Content -Path $bootPath -Value $boot -Encoding UTF8 -NoNewline
+    Write-Host "  Patched flutter_bootstrap.js (no service worker)" -ForegroundColor DarkGray
+}
+if (Test-Path (Join-Path $PSScriptRoot "docs\flutter_service_worker.js")) {
+    Remove-Item (Join-Path $PSScriptRoot "docs\flutter_service_worker.js") -Force
+    Write-Host "  Removed flutter_service_worker.js" -ForegroundColor DarkGray
+}
+
 $mainJs = Join-Path $PSScriptRoot "docs\main.dart.js"
 $mainJsSize = if (Test-Path $mainJs) { (Get-Item $mainJs).Length } else { 0 }
 Write-Host "  main.dart.js size: $mainJsSize bytes"

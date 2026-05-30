@@ -22,11 +22,15 @@ const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Supabase.initialize(
-    url: 'https://gvufllqqxjnpicmkxzcg.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2dWZsbHFxeGpucGljbWt4emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA1OTksImV4cCI6MjA5NTM5NjU5OX0.NoJnis6t_RLSJOHu5iLdjGaCTxVj5ZAFnG3gBZ3XYbM',
-  );
+  try {
+    await Supabase.initialize(
+      url: 'https://gvufllqqxjnpicmkxzcg.supabase.co',
+      anonKey:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2dWZsbHFxeGpucGljbWt4emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA1OTksImV4cCI6MjA5NTM5NjU5OX0.NoJnis6t_RLSJOHu5iLdjGaCTxVj5ZAFnG3gBZ3XYbM',
+    );
+  } catch (e) {
+    debugPrint('Supabase init failed (app still starts): $e');
+  }
   runApp(const NGMYApp());
 }
 
@@ -14765,25 +14769,31 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You can only resell your own items.')));
       return;
     }
+    final listingId = (src['id'] ?? '').toString();
+    final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == listingId);
+    if (idx < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Listing not found.')));
+      return;
+    }
     final unitCount = units ?? (src['units'] as num?)?.toInt() ?? 1;
     if (unitCount < 1) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter at least 1 unit.')));
       return;
     }
     final now = DateTime.now().toUtc().toIso8601String();
-    final copy = Map<String, dynamic>.from(src);
-    copy['id'] = DateTime.now().microsecondsSinceEpoch.toString();
-    copy['status'] = 'active';
-    copy['units'] = unitCount;
-    copy['unitsRemaining'] = unitCount;
-    copy['buyerEmail'] = '';
-    copy['buyerName'] = '';
-    copy['soldAt'] = '';
-    copy['paidVia'] = '';
-    copy['createdAt'] = now;
-    copy['updatedAt'] = now;
-    _upsertListingLocal(copy);
-    final cloudOk = await _upsertStoreListingRowSafe(copy);
+    setState(() {
+      _listings[idx]['status'] = 'active';
+      _listings[idx]['units'] = unitCount;
+      _listings[idx]['unitsRemaining'] = unitCount;
+      _listings[idx]['buyerEmail'] = '';
+      _listings[idx]['buyerName'] = '';
+      _listings[idx]['soldAt'] = '';
+      _listings[idx]['paidVia'] = '';
+      _listings[idx]['updatedAt'] = now;
+    });
+    final relisted = _normalizeStoreListing(_listings[idx]);
+    _listings[idx] = relisted;
+    final cloudOk = await _upsertStoreListingRowSafe(relisted);
     _listingsSig = _storeListingsSignature(_listings);
     _save(refreshCloud: true);
     if (!mounted) return;
@@ -14791,8 +14801,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       SnackBar(
         content: Text(
           cloudOk
-              ? '“${src['title'] ?? 'Item'}” is live again in the shop ($unitCount unit${unitCount == 1 ? '' : 's'}).'
-              : 'Relisted on this device. Push to GitHub / Supabase so all users see it.',
+              ? '“${src['title'] ?? 'Item'}” moved back to Shop ($unitCount unit${unitCount == 1 ? '' : 's'}). No duplicate listing.'
+              : 'Moved to Shop on this device. Push website update so all users see it.',
         ),
       ),
     );
@@ -14811,7 +14821,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Post “${listing['title'] ?? 'Item'}” again as a new listing. Photos, price, and description are copied.',
+                'Move “${listing['title'] ?? 'Item'}” back to the Shop. The same listing is reactivated (no duplicate copy).',
                 style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54),
               ),
               const SizedBox(height: 14),
@@ -15470,16 +15480,16 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                       ),
                       const SizedBox(height: 8),
                     ],
-                    if (isOwner && status == 'active')
+                    if (isOwner)
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
                           onPressed: () {
                             Navigator.pop(ctx);
-                            _removeListing(listing);
+                            _confirmDeleteListing(listing);
                           },
-                          icon: const Icon(Icons.delete_outline),
-                          label: const Text('Remove listing'),
+                          icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                          label: const Text('Delete listing'),
                         ),
                       ),
                     if (!isOwner || status == 'active')
@@ -16325,19 +16335,42 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     );
   }
 
-  void _removeListing(Map<String, dynamic> listing) {
+  Future<void> _confirmDeleteListing(Map<String, dynamic> listing) async {
+    final title = (listing['title'] ?? 'Item').toString();
+    final status = (listing['status'] ?? '').toString();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete listing?'),
+        content: Text(
+          status == 'sold'
+              ? 'Remove "$title" from your Listings history? This cannot be undone.'
+              : 'Remove "$title" from the Shop and your Listings?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await _removeListing(listing);
+  }
+
+  Future<void> _removeListing(Map<String, dynamic> listing) async {
     final id = (listing['id'] ?? '').toString();
     final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == id);
     if (idx < 0) return;
-    if ((_listings[idx]['status'] ?? '') == 'sold') {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sold listings cannot be removed.')));
-      return;
+    setState(() => _listings.removeAt(idx));
+    unawaited(_deleteStoreListingRowsFromSupabase([id]));
+    _listingsSig = _storeListingsSignature(_listings);
+    _save(refreshCloud: true);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Listing deleted.')));
     }
-    setState(() {
-      _listings[idx]['status'] = 'removed';
-      _listings[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-    });
-    _save();
   }
 
   Widget _listingCard(Map<String, dynamic> listing, {required bool showBuy, required bool showManage}) {
@@ -16399,10 +16432,20 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                 Row(
                   children: [
                     Expanded(child: Text((listing['title'] ?? '').toString(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+                    if (showManage)
+                      IconButton(
+                        onPressed: () => _confirmDeleteListing(listing),
+                        icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                        tooltip: 'Delete listing',
+                        visualDensity: VisualDensity.compact,
+                      ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(color: statusColor.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
-                      child: Text(status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w800)),
+                      child: Text(
+                        status == 'active' ? 'IN SHOP' : status.toUpperCase(),
+                        style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w800),
+                      ),
                     ),
                   ],
                 ),
@@ -16460,29 +16503,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                       ),
                     ),
                   ),
-                if (showManage && status == 'active') ...[
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => _removeListing(listing),
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('Remove Listing'),
-                    ),
+                if (showManage && status == 'active')
+                  Text(
+                    'Live in Shop for all buyers',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A)),
                   ),
-                  if (((listing['unitsRemaining'] as num?)?.toInt() ?? 1) <= 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () => _promptResellListing(listing),
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('Restock / Resell'),
-                          style: OutlinedButton.styleFrom(foregroundColor: _storePurple),
-                        ),
-                      ),
-                    ),
-                ],
               ],
             ),
           ),
@@ -16671,6 +16696,32 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   Widget _listingList(List<Map<String, dynamic>> items, {required String empty, required bool showBuy, required bool showManage}) {
     if (items.isEmpty) {
       return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(empty, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey))));
+    }
+    if (showManage) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final sold = items.where((l) => (l['status'] ?? '').toString() == 'sold').toList();
+      final active = items.where((l) => (l['status'] ?? '').toString() == 'active').toList();
+      final other = items.where((l) {
+        final s = (l['status'] ?? '').toString();
+        return s != 'sold' && s != 'active';
+      }).toList();
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        children: [
+          if (sold.isNotEmpty) ...[
+            Text('Sold (Resell moves item back to Shop)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+            const SizedBox(height: 8),
+            ...sold.map((l) => _listingCard(l, showBuy: false, showManage: true)),
+            const SizedBox(height: 16),
+          ],
+          if (active.isNotEmpty) ...[
+            Text('Live in Shop', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+            const SizedBox(height: 8),
+            ...active.map((l) => _listingCard(l, showBuy: false, showManage: true)),
+          ],
+          ...other.map((l) => _listingCard(l, showBuy: false, showManage: true)),
+        ],
+      );
     }
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
