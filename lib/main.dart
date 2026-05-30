@@ -15758,30 +15758,88 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 }
 
-/// Animated live shipment track (vehicle moves with real-time progress).
+/// Animated live shipment track (vehicle moves smoothly along the route).
 class _LiveTrackingPanel extends StatefulWidget {
   final Map<String, dynamic> order;
   final bool isDark;
+  final int replayTrigger;
 
-  const _LiveTrackingPanel({super.key, required this.order, required this.isDark});
+  const _LiveTrackingPanel({
+    super.key,
+    required this.order,
+    required this.isDark,
+    this.replayTrigger = 0,
+  });
 
   @override
   State<_LiveTrackingPanel> createState() => _LiveTrackingPanelState();
 }
 
-class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTickerProviderStateMixin {
+class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with WidgetsBindingObserver {
   Timer? _tick;
+  double _displayT = 0.0;
+  bool _replayActive = false;
+  DateTime? _replayStartedAt;
+  double _replayTarget = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _tick = Timer.periodic(const Duration(milliseconds: 250), (_) {
-      if (mounted) setState(() {});
-    });
+    WidgetsBinding.instance.addObserver(this);
+    _startReplayDrive();
+    _tick = Timer.periodic(const Duration(milliseconds: 40), (_) => _onAnimationTick());
+  }
+
+  @override
+  void didUpdateWidget(covariant _LiveTrackingPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.replayTrigger != widget.replayTrigger) {
+      _startReplayDrive();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startReplayDrive();
+    }
+  }
+
+  void _startReplayDrive() {
+    _replayActive = true;
+    _replayStartedAt = DateTime.now();
+    _displayT = 0.0;
+    _replayTarget = _shipmentProgressFraction(widget.order);
+  }
+
+  void _onAnimationTick() {
+    if (!mounted) return;
+    final target = _shipmentProgressFraction(widget.order);
+    if (_replayActive && _replayStartedAt != null) {
+      const durationMs = 4500.0;
+      final elapsed = DateTime.now().difference(_replayStartedAt!).inMilliseconds;
+      final linear = (elapsed / durationMs).clamp(0.0, 1.0);
+      final curved = Curves.easeInOutCubic.transform(linear);
+      _displayT = (_replayTarget * curved).clamp(0.0, 1.0);
+      if (linear >= 1.0) {
+        _replayActive = false;
+        _displayT = target;
+      }
+    } else {
+      const step = 0.0012;
+      final diff = target - _displayT;
+      if (diff.abs() <= step) {
+        _displayT = target;
+      } else {
+        _displayT += diff.sign * step;
+      }
+    }
+    setState(() {});
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tick?.cancel();
     super.dispose();
   }
@@ -15790,8 +15848,8 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
   Widget build(BuildContext context) {
     final order = widget.order;
     final dark = widget.isDark;
-    final progress = _shipmentProgressPercent(order);
-    final progressFrac = _shipmentProgressFraction(order);
+    final progress = (_displayT * 100).round().clamp(0, 100);
+    final t = _displayT.clamp(0.0, 1.0);
     final etaMins = _minutesUntilEta(order);
     final trackingId = (order['trackingId'] ?? '').toString();
     final status = (order['fulfillmentStatus'] ?? '').toString();
@@ -15801,11 +15859,10 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
     final eta = DateTime.tryParse((order['estimatedArrival'] ?? '').toString());
     final currentLoc = (order['currentLocation'] ?? '').toString();
     final steps = ['Shipped', 'In Transit', 'Arriving', 'Delivered'];
-    int activeStep = 0;
+    var activeStep = 0;
     if (status == 'in_transit') activeStep = 1;
     if (status == 'arriving') activeStep = 2;
     if (status == 'delivered') activeStep = 3;
-    final t = progressFrac.clamp(0.0, 1.0);
 
     final panelBg = dark ? const Color(0xFF12182A) : const Color(0xFFEFF6FF);
     final panelBorder = dark ? const Color(0xFF3B82F6) : const Color(0xFFBFDBFE);
@@ -15835,7 +15892,7 @@ class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTicke
             ],
           ),
           const SizedBox(height: 6),
-          Text('$vehicleLabel · updates every few seconds', style: TextStyle(fontSize: 11, color: mutedColor, fontWeight: FontWeight.w600)),
+          Text('$vehicleLabel · live drive animation', style: TextStyle(fontSize: 11, color: mutedColor, fontWeight: FontWeight.w600)),
           if (eta != null)
             Text('ETA: ${_formatStoreTrackingWhen(eta.toUtc().toIso8601String())}', style: TextStyle(fontSize: 11, color: dark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB), fontWeight: FontWeight.w800)),
           if (currentLoc.isNotEmpty)
@@ -16284,7 +16341,7 @@ class NgmyStoreScreen extends StatefulWidget {
   State<NgmyStoreScreen> createState() => _NgmyStoreScreenState();
 }
 
-class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProviderStateMixin {
+class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static const Color _storeAccent = Color(0xFF00B25A);
   static const Color _storePurple = Color(0xFF7C3AED);
 
@@ -16300,16 +16357,19 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   Timer? _liveOrderPollTimer;
   Timer? _autoGpsTimer;
   final Set<String> _autoGpsOrderIds = {};
+  int _trackingReplayToken = 0;
 
   bool get _canSell => widget.user.isAdmin || widget.user.canSellOnStore;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabCtrl = TabController(length: _canSell ? 3 : 2, vsync: this)..addListener(() {
       if (!mounted) return;
       final ordersTab = _canSell ? 2 : 1;
       if (_tabCtrl.index == ordersTab) {
+        _trackingReplayToken++;
         unawaited(_syncLiveOrders());
       }
       setState(() {});
@@ -16366,27 +16426,51 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   Future<void> _applyGpsToOrder(String orderId, {bool fromAuto = false}) async {
-    final label = await ngmyFetchCurrentLocationLabel();
+    final reading = await ngmyFetchCurrentGpsReading();
     if (!mounted) return;
-    if (label == null) {
+    if (reading == null) {
       if (!fromAuto) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not get GPS. Allow location access in browser/phone settings.')),
+          const SnackBar(
+            content: Text(
+              'Could not get GPS. Tap Allow when your browser/phone asks for location, then try again.',
+            ),
+          ),
         );
       }
       return;
     }
     await _patchOrder(orderId, (o) {
-      o['currentLocation'] = label;
+      o['currentLocation'] = reading.label;
+      o['currentLat'] = reading.lat;
+      o['currentLng'] = reading.lng;
       o['lastGpsAt'] = DateTime.now().toUtc().toIso8601String();
       if (fromAuto) o['autoLocationEnabled'] = true;
-      _appendLocationHistory(o, label, fromAuto ? 'Auto GPS update' : 'Live GPS shared');
-    }, successMessage: fromAuto ? null : 'Live location updated for buyer.');
+      _appendLocationHistory(
+        o,
+        reading.label,
+        fromAuto ? 'Auto GPS update' : 'Live GPS shared',
+        lat: reading.lat,
+        lng: reading.lng,
+      );
+    }, successMessage: fromAuto ? null : 'Live location shared with buyer.');
   }
 
-  void _appendLocationHistory(Map<String, dynamic> o, String location, String note) {
+  void _appendLocationHistory(
+    Map<String, dynamic> o,
+    String location,
+    String note, {
+    double? lat,
+    double? lng,
+  }) {
     final hist = List<Map<String, dynamic>>.from((o['locationHistory'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? []);
-    hist.insert(0, {'location': location, 'note': note, 'at': DateTime.now().toLocal().toString()});
+    hist.insert(0, {
+      'location': location,
+      'note': note,
+      'at': DateTime.now().toLocal().toString(),
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
+    });
     o['locationHistory'] = hist;
     final s = (o['fulfillmentStatus'] ?? '').toString();
     if (s == 'shipped') o['fulfillmentStatus'] = 'in_transit';
@@ -16509,7 +16593,16 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() => _trackingReplayToken++);
+      unawaited(_syncLiveOrders());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _liveOrderPollTimer?.cancel();
     _autoGpsTimer?.cancel();
     _tabCtrl.dispose();
@@ -17613,7 +17706,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           ],
           if (fulfillment != 'pending' && fulfillment != 'refunded') ...[
             const SizedBox(height: 12),
-            _LiveTrackingPanel(key: ValueKey('track_${orderId}_${order['updatedAt']}'), order: order, isDark: isDark),
+            _LiveTrackingPanel(
+              key: ValueKey('track_${orderId}_${order['updatedAt']}_$_trackingReplayToken'),
+              order: order,
+              isDark: isDark,
+              replayTrigger: _trackingReplayToken,
+            ),
           ],
           if (fulfillment == 'refunded')
             Padding(
@@ -17980,6 +18078,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final c = TextEditingController(text: (order['currentLocation'] ?? '').toString());
     final orderId = (order['id'] ?? '').toString();
     var autoEnabled = order['autoLocationEnabled'] == true;
+    var gpsLoading = false;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -18005,17 +18104,42 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                     child: TextField(
                       controller: c,
                       style: TextStyle(color: _storeSheetTextPrimary(ctx)),
-                      decoration: _storeSheetInputDecoration(ctx, hintText: 'Type address or landmark', prefixIcon: Icons.place_outlined),
+                      decoration: _storeSheetInputDecoration(ctx, hintText: 'Address from GPS or type manually', prefixIcon: Icons.place_outlined),
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
                     tooltip: 'Share live GPS now',
-                    onPressed: () async {
-                      Navigator.pop(ctx);
-                      await _applyGpsToOrder(orderId);
-                    },
-                    icon: const Icon(Icons.my_location_rounded),
+                    onPressed: gpsLoading
+                        ? null
+                        : () async {
+                            setDlg(() => gpsLoading = true);
+                            final reading = await ngmyFetchCurrentGpsReading();
+                            if (!ctx.mounted) return;
+                            setDlg(() => gpsLoading = false);
+                            if (reading == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'GPS failed. Allow location when prompted, enable Location Services, then tap again.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            c.text = reading.label;
+                            setDlg(() {});
+                            await _patchOrder(orderId, (o) {
+                              o['currentLocation'] = reading.label;
+                              o['currentLat'] = reading.lat;
+                              o['currentLng'] = reading.lng;
+                              o['lastGpsAt'] = DateTime.now().toUtc().toIso8601String();
+                              _appendLocationHistory(o, reading.label, 'Live GPS shared', lat: reading.lat, lng: reading.lng);
+                            }, successMessage: 'Live GPS shared with buyer.');
+                          },
+                    icon: gpsLoading
+                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.my_location_rounded),
                     style: IconButton.styleFrom(backgroundColor: const Color(0xFF7C3AED), foregroundColor: Colors.white, minimumSize: const Size(52, 52)),
                   ),
                 ],

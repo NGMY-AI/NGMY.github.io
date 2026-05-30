@@ -30,6 +30,8 @@
 	<string>NGMY uses the camera to scan product barcodes in Purchases.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>NGMY saves QR codes you download to your photo gallery.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>NGMY uses your location for live store package tracking while you deliver orders.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
