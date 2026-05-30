@@ -1,0 +1,11 @@
+-- NGMY MEDIA FIX — Run once in Supabase SQL Editor (after your other steps)
+-- Fixes "Sync failed / database row failed" when posting photos or videos
+
+alter table public.media add column if not exists data jsonb default '{}'::jsonb;
+alter table public.media add column if not exists updated_at timestamptz default now();
+
+alter table public.media add column if not exists "userEmail" text default '';
+alter table public.media add column if not exists "videoUrl" text default '';
+alter table public.media add column if not exists "contentType" text default 'video';
+alter table public.media add column if not exists "likedBy" jsonb default '[]'::jsonb;
+alter table public.media add column if not exists "savedBy" jsonb default '[]'::jsonb;

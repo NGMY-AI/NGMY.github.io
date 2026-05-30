@@ -20,6 +20,14 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import 'ngmy_nav.dart';
+import 'ngmy_barcode_lookup.dart';
+import 'ngmy_games.dart';
+import 'ngmy_game_admin_sheet.dart';
+import 'ngmy_game_result_popup.dart';
+import 'ngmy_multiplayer.dart';
+import 'ngmy_pro_games.dart';
+import 'ngmy_typing_game.dart';
+import 'ngmy_dice_config.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -262,6 +270,10 @@ class AppConfig {
   List<Map<String, dynamic>> helpRequests;
   List<Map<String, dynamic>> helpBusinesses;
   int maxMediaPostsPerWeek;
+  List<Map<String, dynamic>> investmentPlans;
+  Map<String, int> gameTimeLimits;
+  Map<String, dynamic> diceSettings;
+  List<Map<String, dynamic>> gameInvites;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -295,7 +307,13 @@ class AppConfig {
     this.helpRequests = const [],
     this.helpBusinesses = const [],
     this.maxMediaPostsPerWeek = 3,
-  });
+    this.investmentPlans = const [],
+    Map<String, int>? gameTimeLimits,
+    Map<String, dynamic>? diceSettings,
+    List<Map<String, dynamic>>? gameInvites,
+  })  : gameTimeLimits = gameTimeLimits ?? ngmyDefaultGameTimeLimits(),
+        diceSettings = diceSettings ?? NgmyDiceSettings().toJson(),
+        gameInvites = gameInvites ?? [];
   Map<String, dynamic> toJson() => {
     'officialCashApp': officialCashApp,
     'officialBitcoin': officialBitcoin,
@@ -328,6 +346,10 @@ class AppConfig {
     'helpRequests': helpRequests,
     'helpBusinesses': helpBusinesses,
     'maxMediaPostsPerWeek': maxMediaPostsPerWeek,
+    'investmentPlans': investmentPlans,
+    'gameTimeLimits': gameTimeLimits,
+    'diceSettings': diceSettings,
+    'gameInvites': gameInvites,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
@@ -361,7 +383,36 @@ class AppConfig {
     helpRequests: List<Map<String, dynamic>>.from((json['helpRequests'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     helpBusinesses: List<Map<String, dynamic>>.from((json['helpBusinesses'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     maxMediaPostsPerWeek: json['maxMediaPostsPerWeek'] ?? 3,
+    investmentPlans: List<Map<String, dynamic>>.from((json['investmentPlans'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
+    gameTimeLimits: ngmyParseGameTimeLimits(json['gameTimeLimits']),
+    diceSettings: NgmyDiceSettings.fromJson(json['diceSettings']).toJson(),
+    gameInvites: parseGameInvites(json['gameInvites']),
   );
+}
+
+List<InvestmentPlan> _investmentPlansFromMaps(List<Map<String, dynamic>> maps) {
+  final plans = maps.map((e) => InvestmentPlan.fromJson(e)).toList();
+  for (final pl in plans) {
+    pl.applyFixedRoi();
+  }
+  plans.sort((a, b) => a.price.compareTo(b.price));
+  return plans;
+}
+
+List<Map<String, dynamic>> _investmentPlansToMaps(List<InvestmentPlan> plans) =>
+    plans.map((e) => e.toJson()).toList();
+
+Future<List<Map<String, dynamic>>> _fetchRemoteInvestmentPlans() async {
+  try {
+    final cfg = await Supabase.instance.client.from('config').select('investmentPlans').eq('id', 1).maybeSingle();
+    if (cfg == null) return [];
+    final raw = cfg['investmentPlans'];
+    if (raw is! List) return [];
+    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  } catch (e) {
+    debugPrint('[investmentPlans] fetch error: $e');
+    return [];
+  }
 }
 
 class InvestmentPlan {
@@ -635,6 +686,8 @@ String _newStoreTrackingId() {
   return List.generate(8, (_) => chars[r.nextInt(chars.length)]).join();
 }
 
+const Duration kStoreShipByWindow = Duration(days: 3);
+
 Map<String, dynamic> _normalizeStoreOrder(Map<String, dynamic> order) {
   final copy = Map<String, dynamic>.from(order);
   if ((copy['fulfillmentStatus'] ?? '').toString().isEmpty) copy['fulfillmentStatus'] = 'pending';
@@ -642,11 +695,46 @@ Map<String, dynamic> _normalizeStoreOrder(Map<String, dynamic> order) {
   final hist = copy['locationHistory'];
   if (hist is! List) copy['locationHistory'] = <Map<String, dynamic>>[];
   if (copy['quantity'] == null) copy['quantity'] = 1;
+  final created = DateTime.tryParse((copy['createdAt'] ?? '').toString());
+  if ((copy['shipByDeadline'] ?? '').toString().isEmpty && created != null) {
+    copy['shipByDeadline'] = created.add(kStoreShipByWindow).toUtc().toIso8601String();
+  }
+  if ((copy['shippingMethod'] ?? '').toString().isEmpty) copy['shippingMethod'] = 'car';
   return copy;
+}
+
+DateTime? _storeShipByDeadline(Map<String, dynamic> order) {
+  final d = DateTime.tryParse((order['shipByDeadline'] ?? '').toString());
+  if (d != null) return d.toLocal();
+  final created = DateTime.tryParse((order['createdAt'] ?? '').toString());
+  return created?.add(kStoreShipByWindow).toLocal();
+}
+
+IconData _storeVehicleIcon(String method) {
+  switch (method) {
+    case 'truck':
+      return Icons.local_shipping_rounded;
+    case 'plane':
+      return Icons.flight_rounded;
+    default:
+      return Icons.directions_car_rounded;
+  }
+}
+
+String _storeVehicleLabel(String method) {
+  switch (method) {
+    case 'truck':
+      return 'Truck';
+    case 'plane':
+      return 'Plane';
+    default:
+      return 'Car';
+  }
 }
 
 int _shipmentProgressPercent(Map<String, dynamic> order) {
   final status = (order['fulfillmentStatus'] ?? 'pending').toString();
+  if (status == 'refunded') return 0;
   if (status == 'delivered') return 100;
   if (status == 'pending') return 0;
   if (status == 'shipped') return 15;
@@ -677,6 +765,8 @@ String _orderStatusLabel(Map<String, dynamic> order) {
       return 'Arriving';
     case 'delivered':
       return 'Delivered';
+    case 'refunded':
+      return 'Refunded';
     default:
       return 'Pending';
   }
@@ -1256,6 +1346,7 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   if (isAdmin) {
     row['termsAndConditions'] = config.termsAndConditions;
     row['privacyPolicy'] = config.privacyPolicy;
+    row['investmentPlans'] = config.investmentPlans;
   } else {
     if (remoteTerms.isNotEmpty) {
       row['termsAndConditions'] = remoteTerms;
@@ -1268,6 +1359,13 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
       config.privacyPolicy = remotePrivacy;
     } else {
       row.remove('privacyPolicy');
+    }
+    final remotePlans = await _fetchRemoteInvestmentPlans();
+    if (remotePlans.isNotEmpty) {
+      row['investmentPlans'] = remotePlans;
+      config.investmentPlans = remotePlans;
+    } else {
+      row.remove('investmentPlans');
     }
   }
   return row;
@@ -1703,6 +1801,7 @@ class _NGMYAppState extends State<NGMYApp> {
         final keepHelpReqs = List<Map<String, dynamic>>.from(_config.helpRequests.map((e) => Map<String, dynamic>.from(e)));
         final keepHelpBiz = List<Map<String, dynamic>>.from(_config.helpBusinesses.map((e) => Map<String, dynamic>.from(e)));
         final keepOrders = List<Map<String, dynamic>>.from(_config.storeOrders.map((e) => Map<String, dynamic>.from(e)));
+        final keepPlans = List<Map<String, dynamic>>.from(_config.investmentPlans.map((e) => Map<String, dynamic>.from(e)));
         final cfgMap = Map<String, dynamic>.from(cfg);
         final next = AppConfig.fromJson(cfgMap);
         _applyRemoteLegalToConfig(next, cfgMap);
@@ -1718,8 +1817,17 @@ class _NGMYAppState extends State<NGMYApp> {
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
-        if (_appConfigSig(_config) == _appConfigSig(next)) return;
+        if (next.investmentPlans.isEmpty && keepPlans.isNotEmpty) next.investmentPlans = keepPlans;
+        final plansSigBefore = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
+        if (next.investmentPlans.isNotEmpty) {
+          _globalPlans = _investmentPlansFromMaps(next.investmentPlans);
+        }
+        final plansSigAfter = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
+        if (_appConfigSig(_config) == _appConfigSig(next) && plansSigBefore == plansSigAfter) return;
         setState(() => _config = next);
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
+        }).catchError((_) {});
       } catch (_) {
         // Silent fallback; realtime/local cache still handles config.
       }
@@ -2285,6 +2393,7 @@ class _NGMYAppState extends State<NGMYApp> {
         final keepHelpReqs = List<Map<String, dynamic>>.from(_config.helpRequests.map((e) => Map<String, dynamic>.from(e)));
         final keepHelpBiz = List<Map<String, dynamic>>.from(_config.helpBusinesses.map((e) => Map<String, dynamic>.from(e)));
         final keepOrders = List<Map<String, dynamic>>.from(_config.storeOrders.map((e) => Map<String, dynamic>.from(e)));
+        final keepPlans = List<Map<String, dynamic>>.from(_config.investmentPlans.map((e) => Map<String, dynamic>.from(e)));
         final keepGeminiKey = _config.geminiApiKey.trim();
         final remoteGemini = _geminiKeyFromMap(Map<String, dynamic>.from(payload.newRecord));
         final record = Map<String, dynamic>.from(payload.newRecord);
@@ -2296,16 +2405,23 @@ class _NGMYAppState extends State<NGMYApp> {
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
+        if (next.investmentPlans.isEmpty && keepPlans.isNotEmpty) next.investmentPlans = keepPlans;
         if (remoteGemini.isNotEmpty) {
           next.geminiApiKey = remoteGemini;
         } else if (next.geminiApiKey.trim().isEmpty && keepGeminiKey.isNotEmpty) {
           next.geminiApiKey = keepGeminiKey;
         }
-        if (_appConfigSig(_config) == _appConfigSig(next)) return;
+        final plansSigBefore = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
+        if (next.investmentPlans.isNotEmpty) {
+          _globalPlans = _investmentPlansFromMaps(next.investmentPlans);
+        }
+        final plansSigAfter = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
+        if (_appConfigSig(_config) == _appConfigSig(next) && plansSigBefore == plansSigAfter) return;
         _notifySellerOfNewStoreOrders(_config, next);
         setState(() => _config = next);
         SharedPreferences.getInstance().then((prefs) {
           prefs.setString('app_config', jsonEncode(_config.toJson()));
+          prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
         }).catchError((_) {});
       }
     } catch (e) {
@@ -2552,8 +2668,11 @@ class _NGMYAppState extends State<NGMYApp> {
           final remoteGemini = _geminiKeyFromMap(cfgMap);
           if (remoteGemini.isNotEmpty) {
             _config.geminiApiKey = remoteGemini;
-          } else if (_config.geminiApiKey.trim().isEmpty && localGeminiKey.isNotEmpty) {
+          } else           if (_config.geminiApiKey.trim().isEmpty && localGeminiKey.isNotEmpty) {
             _config.geminiApiKey = localGeminiKey;
+          }
+          if (_config.investmentPlans.isNotEmpty) {
+            _globalPlans = _investmentPlansFromMaps(_config.investmentPlans);
           }
         }
         await _reloadStoreFromSupabase();
@@ -2719,6 +2838,9 @@ class _NGMYAppState extends State<NGMYApp> {
 
       await _reloadStoreFromSupabase();
       await _syncStoreToSupabase();
+      if (_currentUser?.isAdmin == true) {
+        _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
+      }
       final configRow = await _configRowForSupabaseUpsert(
         config: _config,
         isAdmin: _currentUser?.isAdmin ?? false,
@@ -2982,7 +3104,15 @@ class _NGMYAppState extends State<NGMYApp> {
                   }
                   if (_currentUser != null && _currentUser!.email == t.userEmail) _currentUser = targetUser;
                 }); _saveData(); _notifyTransactionEvent(t, statusChanged: true); },
-                onAddPlan: (p) { setState(() { _globalPlans.add(p); _globalPlans.sort((a, b) => a.price.compareTo(b.price)); }); _saveData(); },
+                onAddPlan: (p) {
+                  setState(() {
+                    _globalPlans.add(p);
+                    p.applyFixedRoi();
+                    _globalPlans.sort((a, b) => a.price.compareTo(b.price));
+                    _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
+                  });
+                  _saveData();
+                },
                 onPostMedia: (post) {
                   setState(() => _allMedia.insert(0, post));
                   unawaited(() async {
@@ -4124,6 +4254,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       context,
       GameCenterScreen(
         user: widget.user,
+        config: widget.config,
         onAddTransaction: widget.onAddTransaction,
         onDataChanged: widget.onDataChanged,
       ),
@@ -4899,11 +5030,13 @@ class _GameRewardPopupState extends State<_GameRewardPopup> with SingleTickerPro
 
 class GameCenterScreen extends StatefulWidget {
   final UserData user;
+  final AppConfig config;
   final Function(AppTransaction) onAddTransaction;
   final VoidCallback onDataChanged;
   const GameCenterScreen({
     super.key,
     required this.user,
+    required this.config,
     required this.onAddTransaction,
     required this.onDataChanged,
   });
@@ -4929,13 +5062,29 @@ class _GameDef {
 
 class _GameCenterScreenState extends State<GameCenterScreen> {
   int _sessionGamesPlayed = 0;
+  Timer? _invitePoll;
 
   int get _sessionPointsEarned => _sessionGamesPlayed * 20;
+
+  @override
+  void initState() {
+    super.initState();
+    _invitePoll = Timer.periodic(const Duration(seconds: 4), (_) {
+      widget.onDataChanged();
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _invitePoll?.cancel();
+    super.dispose();
+  }
 
   final List<_GameDef> _games = const [
     _GameDef(id: 'dice', title: 'Dice Roll', subtitle: 'Roll for cash & prizes!', icon: Icons.casino_rounded, colors: [Color(0xFF6D28D9), Color(0xFF7C3AED)]),
     _GameDef(id: 'puzzle', title: '8-Puzzle Solver', subtitle: 'Solve puzzle, win up to \$10', icon: Icons.grid_view_rounded, colors: [Color(0xFF0EA5E9), Color(0xFF1D4ED8)]),
-    _GameDef(id: 'typing', title: 'Typing Speed', subtitle: 'Type fast, win up to \$10', icon: Icons.keyboard_rounded, colors: [Color(0xFF16A34A), Color(0xFF2563EB)]),
+    _GameDef(id: 'typing', title: 'Sentence Typing', subtitle: 'Type full sentences — earn by accuracy', icon: Icons.keyboard_rounded, colors: [Color(0xFF16A34A), Color(0xFF2563EB)]),
     _GameDef(id: 'memory', title: 'Memory Match', subtitle: 'Match pairs, win \$5', icon: Icons.psychology_rounded, colors: [Color(0xFFDB2777), Color(0xFF9333EA)]),
     _GameDef(id: 'math', title: 'Math Quiz', subtitle: '500+ questions, rewards', icon: Icons.calculate_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
     _GameDef(id: 'reflex', title: 'Reflex Test', subtitle: 'Quick clicks, win up to \$10', icon: Icons.flash_on_rounded, colors: [Color(0xFFF97316), Color(0xFFDC2626)]),
@@ -4945,51 +5094,175 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
     _GameDef(id: 'simon', title: 'Simon Says', subtitle: 'Memory color game!', icon: Icons.sports_esports_rounded, colors: [Color(0xFF7C3AED), Color(0xFF6D28D9)]),
     _GameDef(id: 'color', title: 'Color Rush', subtitle: 'Match colors fast!', icon: Icons.palette_rounded, colors: [Color(0xFFDB2777), Color(0xFFBE185D)]),
     _GameDef(id: 'card', title: 'Card Match', subtitle: 'Find all the pairs!', icon: Icons.style_rounded, colors: [Color(0xFFDB2777), Color(0xFF9333EA)]),
+    _GameDef(id: 'checkers_deluxe', title: 'Checkers Deluxe', subtitle: 'Wood board — play solo or invite a friend', icon: Icons.grid_on_rounded, colors: [Color(0xFF8B4513), Color(0xFF5D4037)]),
+    _GameDef(id: 'tic_tac_go', title: 'Tic Tac Go', subtitle: '3 in a row — real-time multiplayer', icon: Icons.close_rounded, colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
+    _GameDef(id: 'pool_8ball', title: '8-Ball Pool', subtitle: 'Aim, shoot, pocket the 8-ball', icon: Icons.sports_baseball_rounded, colors: [Color(0xFF166534), Color(0xFF14532D)]),
+    _GameDef(id: 'blackjack_vegas', title: 'Blackjack Vegas', subtitle: 'Beat the dealer — casino classic', icon: Icons.style_rounded, colors: [Color(0xFF0F172A), Color(0xFF334155)]),
+    _GameDef(id: 'roulette_euro', title: 'European Roulette', subtitle: 'Pick your number and spin', icon: Icons.trip_origin_rounded, colors: [Color(0xFF7F1D1D), Color(0xFFB91C1C)]),
+    _GameDef(id: 'slots_jackpot', title: 'Slots Jackpot', subtitle: 'Match symbols for big wins', icon: Icons.casino_rounded, colors: [Color(0xFF7C3AED), Color(0xFFDB2777)]),
+    _GameDef(id: 'poker_texas', title: 'Texas Hold\'em', subtitle: 'Poker skill — invite opponents', icon: Icons.account_balance_wallet_rounded, colors: [Color(0xFF15803D), Color(0xFF166534)]),
+    _GameDef(id: 'chess_royale', title: 'Chess Royale', subtitle: 'Classic chess — multiplayer', icon: Icons.extension_rounded, colors: [Color(0xFF1E293B), Color(0xFF475569)]),
+    _GameDef(id: 'connect_four_pro', title: 'Connect Four Pro', subtitle: 'Drop discs — beat your rival', icon: Icons.view_column_rounded, colors: [Color(0xFFDC2626), Color(0xFF991B1B)]),
+    _GameDef(id: 'domino_block', title: 'Domino Block', subtitle: 'Strategic domino tiles', icon: Icons.view_module_rounded, colors: [Color(0xFFF5F5F4), Color(0xFF78716C)]),
+    _GameDef(id: 'plinko_prizes', title: 'Plinko Prizes', subtitle: 'Drop the chip — win prizes', icon: Icons.grain_rounded, colors: [Color(0xFF06B6D4), Color(0xFF0891B2)]),
+    _GameDef(id: 'spin_wheel', title: 'Spin Wheel', subtitle: 'Spin for cash multipliers', icon: Icons.attractions_rounded, colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
+    _GameDef(id: 'baccarat_punto', title: 'Baccarat', subtitle: 'High-stakes punto banco', icon: Icons.diamond_rounded, colors: [Color(0xFF1E1B4B), Color(0xFF312E81)]),
+    _GameDef(id: 'craps_table', title: 'Craps Table', subtitle: 'Roll the dice — casino table', icon: Icons.casino_outlined, colors: [Color(0xFF065F46), Color(0xFF047857)]),
+    _GameDef(id: 'casino_war', title: 'Casino War', subtitle: 'Higher card wins the pot', icon: Icons.compare_arrows_rounded, colors: [Color(0xFFBE123C), Color(0xFF9F1239)]),
+    _GameDef(id: 'bingo_live', title: 'Bingo Live', subtitle: 'Mark numbers — shout bingo', icon: Icons.apps_rounded, colors: [Color(0xFFEC4899), Color(0xFFBE185D)]),
+    _GameDef(id: 'solitaire_klondike', title: 'Solitaire Klondike', subtitle: 'Clear the deck — earn rewards', icon: Icons.filter_none_rounded, colors: [Color(0xFF22C55E), Color(0xFF16A34A)]),
+    _GameDef(id: 'backgammon_pro', title: 'Backgammon Pro', subtitle: 'Race your pieces home', icon: Icons.dashboard_rounded, colors: [Color(0xFFB45309), Color(0xFF92400E)]),
+    _GameDef(id: 'billiards_snooker', title: 'Billiards Snooker', subtitle: 'Pro snooker table physics', icon: Icons.sports_rounded, colors: [Color(0xFF14532D), Color(0xFF052E16)]),
+    _GameDef(id: 'profit_solve', title: 'Profit Solve', subtitle: 'Business profit — type the answer', icon: Icons.attach_money_rounded, colors: [Color(0xFF10B981), Color(0xFF047857)]),
   ];
 
-  Widget _gameTile(String id, String title, String subtitle, List<Color> colors, IconData icon) {
-    return InkWell(
-      onTap: () => NgmyNavigator.push(
+  void _sendInvite(_GameDef g, String toAccountId) {
+    addGameInvite(
+      widget.config.gameInvites,
+      fromEmail: widget.user.email,
+      fromName: widget.user.username,
+      toEmail: toAccountId,
+      gameId: g.id,
+      gameTitle: g.title,
+    );
+    widget.onDataChanged();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Invite sent to $toAccountId for ${g.title}')));
+  }
+
+  void _openGame(_GameDef g) {
+    if (g.id == 'dice') {
+      NgmyNavigator.push(
         context,
-        GameBetScreen(
+        _NgmyDiceGameHost(
           user: widget.user,
-          gameId: id,
-          gameTitle: title,
-          gameSubtitle: subtitle,
-          colors: colors,
+          config: widget.config,
           onAddTransaction: widget.onAddTransaction,
           onDataChanged: widget.onDataChanged,
-          onGameStarted: () {
-            setState(() => _sessionGamesPlayed++);
-          },
+          onGameStarted: () => setState(() => _sessionGamesPlayed++),
         ),
+      );
+      return;
+    }
+    NgmyNavigator.push(
+      context,
+      GameBetScreen(
+        user: widget.user,
+        config: widget.config,
+        gameId: g.id,
+        gameTitle: g.title,
+        gameSubtitle: g.subtitle,
+        colors: g.colors,
+        onAddTransaction: widget.onAddTransaction,
+        onDataChanged: widget.onDataChanged,
+        onGameStarted: () => setState(() => _sessionGamesPlayed++),
       ),
-      borderRadius: BorderRadius.circular(14),
+    );
+  }
+
+  Widget _inviteBanner() {
+    final pending = pendingInvitesFor(widget.user.email, widget.config.gameInvites);
+    if (pending.isEmpty) return const SizedBox.shrink();
+    final inv = pending.first;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF7C3AED),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Multiplayer invite', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+          Text('${inv['fromName'] ?? inv['fromEmail']} wants to play ${inv['gameTitle']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    respondInvite(widget.config.gameInvites, inv['id'].toString(), 'rejected');
+                    widget.onDataChanged();
+                    setState(() {});
+                  },
+                  child: const Text('Decline'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () {
+                    respondInvite(widget.config.gameInvites, inv['id'].toString(), 'accepted');
+                    widget.onDataChanged();
+                    final g = _games.firstWhere((e) => e.id == inv['gameId'], orElse: () => _games.first);
+                    _openGame(g);
+                  },
+                  child: const Text('Accept & Play'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _gameTile(_GameDef g) {
+    final mp = kNgmyMultiplayerGameIds.contains(g.id);
+    return InkWell(
+      onTap: () => _openGame(g),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        margin: const EdgeInsets.only(bottom: 12),
+        height: 92,
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: colors),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.25)),
-          boxShadow: [BoxShadow(color: colors.first.withOpacity(0.35), blurRadius: 10)],
+          gradient: LinearGradient(colors: g.colors),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.28)),
+          boxShadow: [BoxShadow(color: g.colors.first.withOpacity(0.4), blurRadius: 12)],
         ),
         child: Row(
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.22), borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, color: Colors.white),
+            SizedBox(
+              width: 100,
+              child: Center(child: Icon(g.icon, color: Colors.white, size: 64)),
             ),
-            const SizedBox(width: 12),
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
-                Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-              ]),
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: Text(g.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17))),
+                        if (mp)
+                          const Icon(Icons.groups_rounded, color: Color(0xFFFBBF24), size: 18),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(g.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                  ],
+                ),
+              ),
             ),
-            const Icon(Icons.play_arrow_rounded, color: Colors.lightBlueAccent),
+            if (mp)
+              IconButton(
+                icon: const Icon(Icons.person_add_rounded, color: Color(0xFFFBBF24)),
+                tooltip: 'Invite player',
+                onPressed: () => showMultiplayerInviteDialog(
+                  context: context,
+                  gameTitle: g.title,
+                  onSend: (id) => _sendInvite(g, id),
+                ),
+              ),
+            const Padding(
+              padding: EdgeInsets.only(right: 10),
+              child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 36),
+            ),
           ],
         ),
       ),
@@ -5036,7 +5309,8 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
                 child: const Text('🎮  All Games\nWin real money playing skill games!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
               ),
               const SizedBox(height: 10),
-              ..._games.map((g) => _gameTile(g.id, g.title, g.subtitle, g.colors, g.icon)),
+              _inviteBanner(),
+              ..._games.map(_gameTile),
             ],
           ),
         ),
@@ -5055,8 +5329,89 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
   }
 }
 
+class _NgmyDiceGameHost extends StatefulWidget {
+  final UserData user;
+  final AppConfig config;
+  final Function(AppTransaction) onAddTransaction;
+  final VoidCallback onDataChanged;
+  final VoidCallback onGameStarted;
+  const _NgmyDiceGameHost({
+    required this.user,
+    required this.config,
+    required this.onAddTransaction,
+    required this.onDataChanged,
+    required this.onGameStarted,
+  });
+
+  @override
+  State<_NgmyDiceGameHost> createState() => _NgmyDiceGameHostState();
+}
+
+class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> {
+  late NgmyDiceSettings _dice;
+
+  @override
+  void initState() {
+    super.initState();
+    _dice = NgmyDiceSettings.fromJson(widget.config.diceSettings);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NgmyDiceGameScreen(
+      balance: widget.user.accountBalance,
+      userEmail: widget.user.email,
+      diceSettings: _dice,
+      onDiceSettingsChanged: () {
+        widget.config.diceSettings = _dice.toJson();
+        widget.onDataChanged();
+        setState(() {});
+      },
+      onSessionStarted: widget.onGameStarted,
+      onChargeBet: (bet, note) {
+        if (widget.user.accountBalance < bet) return false;
+        setState(() => widget.user.accountBalance -= bet);
+        widget.user.points += 20;
+        widget.onAddTransaction(
+          AppTransaction(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            userEmail: widget.user.email,
+            amount: bet,
+            type: TransactionType.adminRemove,
+            method: PaymentMethod.system,
+            sourceDetails: note,
+            status: TransactionStatus.approved,
+            timestamp: DateTime.now(),
+          ),
+        );
+        widget.onDataChanged();
+        return true;
+      },
+      onPayout: (payout, note, {double bonus = 0}) {
+        setState(() {
+          widget.user.accountBalance += payout;
+        });
+        widget.onAddTransaction(
+          AppTransaction(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            userEmail: widget.user.email,
+            amount: payout,
+            type: TransactionType.reimbursement,
+            method: PaymentMethod.system,
+            sourceDetails: note,
+            status: TransactionStatus.approved,
+            timestamp: DateTime.now(),
+          ),
+        );
+        widget.onDataChanged();
+      },
+    );
+  }
+}
+
 class GameBetScreen extends StatefulWidget {
   final UserData user;
+  final AppConfig config;
   final String gameId;
   final String gameTitle;
   final String gameSubtitle;
@@ -5067,6 +5422,7 @@ class GameBetScreen extends StatefulWidget {
   const GameBetScreen({
     super.key,
     required this.user,
+    required this.config,
     required this.gameId,
     required this.gameTitle,
     required this.gameSubtitle,
@@ -5121,8 +5477,10 @@ class _GameBetScreenState extends State<GameBetScreen> {
       context,
       GamePlayScreen(
         user: widget.user,
+        config: widget.config,
         gameId: widget.gameId,
         gameTitle: widget.gameTitle,
+        gameSubtitle: widget.gameSubtitle,
         colors: widget.colors,
         wager: wager,
         onAddTransaction: widget.onAddTransaction,
@@ -5266,8 +5624,10 @@ class _GameBetScreenState extends State<GameBetScreen> {
 
 class GamePlayScreen extends StatefulWidget {
   final UserData user;
+  final AppConfig config;
   final String gameId;
   final String gameTitle;
+  final String gameSubtitle;
   final List<Color> colors;
   final double wager;
   final Function(AppTransaction) onAddTransaction;
@@ -5275,8 +5635,10 @@ class GamePlayScreen extends StatefulWidget {
   const GamePlayScreen({
     super.key,
     required this.user,
+    required this.config,
     required this.gameId,
     required this.gameTitle,
+    required this.gameSubtitle,
     required this.colors,
     required this.wager,
     required this.onAddTransaction,
@@ -5290,70 +5652,275 @@ class GamePlayScreen extends StatefulWidget {
 class _GamePlayScreenState extends State<GamePlayScreen> {
   final math.Random _rng = math.Random();
   final TextEditingController _inputC = TextEditingController();
+  static final List<NgmyMathQuestion> _mathBank = buildNgmyMathBank();
   bool _won = false;
   late String _prompt;
   late String _answer;
   List<String> _optionChoices = [];
-  int _dice = 1;
   bool _readyReflex = false;
   DateTime? _reflexStart;
-  int _secondsLeft = 90;
+  late int _secondsLeft;
   Timer? _roundTimer;
-  int _tapScore = 0;
-  int _tapGoal = 10;
-  int _activeTapCell = 0;
-  final List<String> _memoryBase = ['🎮', '💎', '🚀', '🎯', '⚡', '🔥', '💰', '🧠'];
+  int _bankIndex = 0;
+  String _scrambled = '';
+  // Memory / card
+  List<String> _memoryBase = [];
   List<String> _memoryValues = [];
   List<int> _revealedCards = [];
   final Set<int> _matchedCards = {};
   bool _lockingCards = false;
   int _pairsFound = 0;
+  int _memoryCols = 4;
+  // Puzzle
+  List<int> _puzzleTiles = [];
+  // Simon
+  final List<int> _simonSeq = [];
+  int _simonShow = -1;
+  int _simonInputAt = 0;
+  bool _simonPlaying = false;
+  final List<Color> _simonColors = const [Color(0xFFEF4444), Color(0xFF22C55E), Color(0xFF3B82F6), Color(0xFFF59E0B)];
+  // Pattern
+  List<int> _patternSeq = [];
+  int _patternFlash = -1;
+  int _patternProgress = 0;
+  bool _patternShowing = false;
+  // Color rush
+  late String _colorWord;
+  late Color _colorInk;
+  late String _colorTarget;
+  // Sequence number
+  late String _sequencePrompt;
+  // Pro / casino / board games
+  Timer? _miniTicker;
+  NgmyProState? _pro;
+
+  bool get _isPro => kNgmyProGameIds.contains(widget.gameId);
+
+  Future<void> _showEndPopup({required bool win, required String title, String? subtitle, String? outcomeLabel}) async {
+    if (!mounted) return;
+    await showNgmyGameResultPopup(
+      context,
+      win: win,
+      title: title,
+      subtitle: subtitle,
+      outcomeLabel: outcomeLabel,
+      onGoBack: () {
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        Navigator.of(context).pop();
+      },
+      onPlayAgain: () {
+        if (!mounted) return;
+        Navigator.of(context).pop();
+      },
+    );
+  }
+
+  int _gameProgressDone() {
+    switch (widget.gameId) {
+      case 'puzzle':
+        var n = 0;
+        for (var i = 0; i < 8; i++) {
+          if (_puzzleTileCorrect(i)) n++;
+        }
+        return n;
+      case 'typing':
+        return ngmyTypingCorrectCount(_answer, _inputC.text);
+      case 'memory':
+      case 'card':
+        return _pairsFound;
+      case 'simon':
+        return _simonInputAt.clamp(0, _simonSeq.length);
+      case 'pattern':
+        return _patternProgress.clamp(0, _patternSeq.length);
+      default:
+        if (_pro != null) return _pro!.progressDone(widget.gameId);
+        return _won ? 1 : 0;
+    }
+  }
+
+  int _gameProgressTotal() {
+    switch (widget.gameId) {
+      case 'puzzle':
+        return 8;
+      case 'typing':
+        return _answer.isEmpty ? 1 : _answer.length;
+      case 'memory':
+      case 'card':
+        return _memoryBase.length;
+      case 'simon':
+        return _simonSeq.isEmpty ? 1 : _simonSeq.length;
+      case 'pattern':
+        return _patternSeq.isEmpty ? 1 : _patternSeq.length;
+      default:
+        if (_pro != null) return _pro!.progressTotal(widget.gameId);
+        return 1;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _secondsLeft = ngmyGameTimeLimitSeconds(widget.gameId, widget.config.gameTimeLimits);
     _setupRound();
+    unawaited(_loadBankIndex());
+    if (_isPro) {
+      _pro = NgmyProState()..setup(widget.gameId, _rng);
+      _miniTicker = Timer.periodic(const Duration(milliseconds: 50), (_) => _tickPro());
+    }
     _roundTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _won) return;
       if (_secondsLeft <= 0) {
         setState(() => _secondsLeft = 0);
         _roundTimer?.cancel();
+        unawaited(_settleProgress());
         return;
       }
       setState(() => _secondsLeft--);
     });
   }
 
+  Future<void> _loadBankIndex() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'ngmy_game_${widget.gameId}_${widget.user.email.toLowerCase().trim()}';
+    final idx = prefs.getInt(key) ?? 0;
+    if (!mounted) return;
+    setState(() {
+      _bankIndex = idx;
+      _setupRound();
+    });
+  }
+
+  Future<void> _advanceBank() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'ngmy_game_${widget.gameId}_${widget.user.email.toLowerCase().trim()}';
+    final bankLen = widget.gameId == 'math'
+        ? _mathBank.length
+        : widget.gameId == 'typing'
+            ? kNgmySentenceBank.length
+            : kNgmyWordBank.length;
+    final next = (_bankIndex + 1) % bankLen;
+    await prefs.setInt(key, next);
+    _bankIndex = next;
+  }
+
   @override
   void dispose() {
     _roundTimer?.cancel();
+    _miniTicker?.cancel();
     _inputC.dispose();
     super.dispose();
+  }
+
+  void _tickPro() {
+    if (!mounted || _won || _secondsLeft <= 0 || _pro == null) return;
+    var win = false;
+    setState(() => win = _pro!.tick(widget.gameId, _rng));
+    if (win) unawaited(_payoutWin(subtitle: 'Goal completed!'));
   }
 
   void _setupRound() {
     _optionChoices = [];
     switch (widget.gameId) {
-      case 'math':
-      case 'typing':
-      case 'scramble':
-      case 'sequence':
-      case 'pattern':
-      case 'simon':
-      case 'color':
-      case 'card':
-      case 'puzzle':
-        _setupTapGame();
-        break;
       case 'memory':
-        _prompt = 'Match all pairs to win full amount!';
-        _answer = 'MEMORY';
+        _memoryBase = ['🎮', '💎', '🚀', '🎯', '⚡', '🔥', '💰', '🧠'];
+        _memoryCols = 4;
+        _prompt = 'Match all pairs!';
         _setupMemoryBoard();
         break;
+      case 'card':
+        _memoryBase = ['♠', '♥', '♦', '♣', '★', '✦'];
+        _memoryCols = 4;
+        _prompt = 'Match all cards!';
+        _setupMemoryBoard();
+        break;
+      case 'scramble':
+        final word = kNgmyWordBank[_bankIndex % kNgmyWordBank.length];
+        _answer = word;
+        _scrambled = scrambleWord(word);
+        _prompt = 'Unscramble (${_bankIndex + 1}/${kNgmyWordBank.length})';
+        break;
+      case 'typing':
+        _answer = kNgmySentenceBank[_bankIndex % kNgmySentenceBank.length];
+        _prompt = 'Sentence ${_bankIndex + 1} of ${kNgmySentenceBank.length} — type every character';
+        _inputC.clear();
+        break;
+      case 'math':
+        final q = _mathBank[_bankIndex % _mathBank.length];
+        _prompt = q.prompt;
+        _answer = q.answer;
+        _optionChoices = q.choices;
+        break;
+      case 'sequence':
+        final bases = [2, 3, 4, 5];
+        final b = bases[_bankIndex % bases.length];
+        final n = 3 + (_bankIndex % 4);
+        final seq = List<int>.generate(n, (i) => math.pow(b, i + 1).toInt());
+        final next = math.pow(b, n).toInt();
+        _answer = next.toString();
+        _sequencePrompt = seq.join(', ');
+        _optionChoices = _shuffleChoices(_answer, [(next + b).toString(), (next - b).toString(), (next + b * 2).toString()]);
+        _prompt = 'What comes next?';
+        break;
+      case 'puzzle':
+        _puzzleTiles = List<int>.generate(9, (i) => i);
+        _puzzleTiles.shuffle(_rng);
+        if (!_puzzleSolvable()) _puzzleTiles = List<int>.generate(9, (i) => i)..shuffle(_rng);
+        _prompt = 'Slide tiles 1–8 into order';
+        break;
+      case 'simon':
+        _simonSeq.clear();
+        _simonSeq.add(_rng.nextInt(4));
+        _simonInputAt = 0;
+        _prompt = 'Repeat the color pattern';
+        unawaited(_playSimonSequence());
+        break;
+      case 'pattern':
+        _patternSeq = List<int>.generate(3 + (_bankIndex % 3), (_) => _rng.nextInt(9));
+        _patternProgress = 0;
+        _prompt = 'Tap the tiles in order';
+        unawaited(_flashPattern());
+        break;
+      case 'color':
+        final names = ['RED', 'GREEN', 'BLUE', 'YELLOW'];
+        final colors = [Colors.red, Colors.green, Colors.blue, Colors.amber];
+        final idx = _bankIndex % names.length;
+        final targetIdx = _rng.nextInt(names.length);
+        _colorTarget = names[targetIdx];
+        _colorWord = names[idx];
+        _colorInk = colors[idx];
+        _answer = _colorTarget;
+        _prompt = 'Tap the COLOR of the text (not the word)';
+        break;
+      case 'reflex':
+        _prompt = 'Wait for green, then tap fast';
+        break;
       default:
-        _prompt = 'Complete this round to win!';
-        _answer = 'OK';
+        if (kNgmyProGameIds.contains(widget.gameId)) {
+          _pro = NgmyProState()..setup(widget.gameId, _rng);
+          _prompt = _pro!.prompt;
+        } else {
+          _prompt = 'Complete this round to win!';
+          _answer = 'OK';
+        }
     }
+  }
+
+  bool _puzzleTileCorrect(int index) {
+    final v = _puzzleTiles[index];
+    if (index == 8) return v == 0;
+    return v == index + 1;
+  }
+
+  bool _puzzleSolvable() {
+    var inv = 0;
+    for (var i = 0; i < 9; i++) {
+      if (_puzzleTiles[i] == 0) continue;
+      for (var j = i + 1; j < 9; j++) {
+        if (_puzzleTiles[j] != 0 && _puzzleTiles[i] > _puzzleTiles[j]) inv++;
+      }
+    }
+    return inv % 2 == 0;
   }
 
   List<String> _shuffleChoices(String correct, List<String> wrong) {
@@ -5383,7 +5950,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         _pairsFound++;
         _revealedCards = [];
       });
-      if (_pairsFound >= _memoryBase.length) _payoutWin();
+      if (_pairsFound >= _memoryBase.length) {
+        unawaited(_advanceBank());
+        _payoutWin();
+      }
       return;
     }
     _lockingCards = true;
@@ -5399,86 +5969,114 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   void _selectOption(String value) {
     if (_won) return;
     if (value.toUpperCase() == _answer.toUpperCase()) {
+      unawaited(_advanceBank());
       _payoutWin();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wrong move, try again.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wrong — try again!')));
     }
   }
 
-  void _setupTapGame() {
-    _tapScore = 0;
-    _activeTapCell = _rng.nextInt(9);
-    _tapGoal = switch (widget.gameId) {
-      'typing' => 12,
-      'math' => 10,
-      'scramble' => 10,
-      'sequence' => 11,
-      'pattern' => 11,
-      'simon' => 12,
-      'color' => 12,
-      'card' => 10,
-      'puzzle' => 12,
-      _ => 10,
-    };
-    _prompt = 'Hit the glowing tile before time runs out.';
+  void _checkTextAnswer() {
+    if (_won) return;
+    if (_inputC.text.trim().toUpperCase() == _answer.toUpperCase()) {
+      unawaited(_advanceBank());
+      _payoutWin();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incorrect spelling.')));
+    }
   }
 
-  void _tapHotCell(int index) {
-    if (_won || _secondsLeft <= 0) return;
-    if (index != _activeTapCell) return;
-    setState(() {
-      _tapScore++;
-      _activeTapCell = _rng.nextInt(9);
-    });
-    if (_tapScore >= _tapGoal) _payoutWin();
+  void _tapPuzzle(int i) {
+    if (_won) return;
+    final empty = _puzzleTiles.indexOf(0);
+    final row = i ~/ 3, col = i % 3;
+    final er = empty ~/ 3, ec = empty % 3;
+    if ((row == er && (col - ec).abs() == 1) || (col == ec && (row - er).abs() == 1)) {
+      setState(() {
+        final t = _puzzleTiles[i];
+        _puzzleTiles[i] = _puzzleTiles[empty];
+        _puzzleTiles[empty] = t;
+      });
+      if (_puzzleTiles.join() == '123456780') {
+        unawaited(_advanceBank());
+        _payoutWin();
+      }
+    }
   }
 
-  Widget _buildTapArena() {
-    return Column(
-      children: [
-        Text('Score: $_tapScore / $_tapGoal', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 30 * 0.7)),
-        const SizedBox(height: 4),
-        Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-        const SizedBox(height: 10),
-        Expanded(
-          child: GridView.builder(
-            itemCount: 9,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8),
-            itemBuilder: (_, i) {
-              final active = i == _activeTapCell;
-              return InkWell(
-                onTap: () => _tapHotCell(i),
-                borderRadius: BorderRadius.circular(10),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 120),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    gradient: active
-                        ? const LinearGradient(colors: [Color(0xFF34D399), Color(0xFF059669)])
-                        : const LinearGradient(colors: [Color(0xFFA855F7), Color(0xFF7C3AED)]),
-                    boxShadow: active
-                        ? [BoxShadow(color: const Color(0xFF34D399).withOpacity(0.6), blurRadius: 14)]
-                        : [],
-                  ),
-                  child: Center(
-                    child: Icon(
-                      active ? Icons.sports_esports_rounded : Icons.crop_square_rounded,
-                      color: Colors.white,
-                      size: active ? 30 : 22,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
+  Future<void> _playSimonSequence() async {
+    _simonPlaying = true;
+    for (var i = 0; i < _simonSeq.length; i++) {
+      if (!mounted) return;
+      setState(() => _simonShow = _simonSeq[i]);
+      await Future<void>.delayed(const Duration(milliseconds: 450));
+      if (!mounted) return;
+      setState(() => _simonShow = -1);
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+    if (mounted) setState(() => _simonPlaying = false);
   }
 
-  void _payoutWin() {
+  void _tapSimon(int c) {
+    if (_won || _simonPlaying) return;
+    if (_simonSeq[_simonInputAt] != c) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wrong color!')));
+      setState(() {
+        _simonSeq.clear();
+        _simonSeq.add(_rng.nextInt(4));
+        _simonInputAt = 0;
+      });
+      unawaited(_playSimonSequence());
+      return;
+    }
+    setState(() => _simonInputAt++);
+    if (_simonInputAt >= _simonSeq.length) {
+      if (_simonSeq.length >= 6) {
+        unawaited(_advanceBank());
+        _payoutWin();
+        return;
+      }
+      setState(() {
+        _simonSeq.add(_rng.nextInt(4));
+        _simonInputAt = 0;
+      });
+      unawaited(_playSimonSequence());
+    }
+  }
+
+  Future<void> _flashPattern() async {
+    _patternShowing = true;
+    for (final cell in _patternSeq) {
+      if (!mounted) return;
+      setState(() => _patternFlash = cell);
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+      setState(() => _patternFlash = -1);
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+    }
+    if (mounted) setState(() => _patternShowing = false);
+  }
+
+  void _tapPattern(int i) {
+    if (_won || _patternShowing) return;
+    if (_patternSeq[_patternProgress] != i) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wrong tile!')));
+      setState(() => _patternProgress = 0);
+      unawaited(_flashPattern());
+      return;
+    }
+    setState(() => _patternProgress++);
+    if (_patternProgress >= _patternSeq.length) {
+      unawaited(_advanceBank());
+      _payoutWin();
+    }
+  }
+
+  Future<void> _payoutWin({String? subtitle}) async {
     if (_won) return;
     _won = true;
+    _roundTimer?.cancel();
+    _miniTicker?.cancel();
     final payout = widget.wager * 1.46;
     setState(() {
       widget.user.accountBalance += payout;
@@ -5497,7 +6095,71 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       ),
     );
     widget.onDataChanged();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('You won \$${payout.toStringAsFixed(2)}')));
+    if (!mounted) return;
+    await _showEndPopup(win: true, title: 'YOU WIN!', subtitle: subtitle ?? '+\$${payout.toStringAsFixed(2)} added to your balance!');
+  }
+
+  Future<void> _settleProgress() async {
+    if (_won) return;
+    final done = _gameProgressDone();
+    final total = _gameProgressTotal();
+    if (total <= 0 || done <= 0) {
+      await _gameLose(reason: "Time's up — no progress to pay.");
+      return;
+    }
+    final ratio = (done / total).clamp(0.0, 1.0);
+    if (ratio >= 1.0) {
+      await _payoutWin(subtitle: 'Complete! Max payout earned.');
+    } else {
+      await _payoutPartial(ratio, done: done, total: total);
+    }
+  }
+
+  Future<void> _payoutPartial(double ratio, {required int done, required int total}) async {
+    if (_won) return;
+    _won = true;
+    _roundTimer?.cancel();
+    _miniTicker?.cancel();
+    final payout = widget.wager * 1.46 * ratio;
+    setState(() {
+      widget.user.accountBalance += payout;
+      widget.user.totalProfit += (payout - widget.wager * ratio);
+    });
+    widget.onAddTransaction(
+      AppTransaction(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        userEmail: widget.user.email,
+        amount: payout,
+        type: TransactionType.reimbursement,
+        method: PaymentMethod.system,
+        sourceDetails: 'Game partial: ${widget.gameTitle} ($done/$total)',
+        status: TransactionStatus.approved,
+        timestamp: DateTime.now(),
+      ),
+    );
+    widget.onDataChanged();
+    if (!mounted) return;
+    final pct = (ratio * 100).round();
+    final acc = widget.gameId == 'typing' ? ngmyTypingCorrectCount(_answer, _inputC.text) : done;
+    final tot = widget.gameId == 'typing' ? _answer.length : total;
+    final wrong = widget.gameId == 'typing' ? tot - acc : null;
+    await _showEndPopup(
+      win: true,
+      title: 'PARTIAL WIN',
+      outcomeLabel: '$acc/$tot',
+      subtitle: wrong != null && wrong > 0
+          ? '+\$${payout.toStringAsFixed(2)} ($pct% — $wrong mistakes/missed)'
+          : '+\$${payout.toStringAsFixed(2)} ($pct% of full prize)',
+    );
+  }
+
+  Future<void> _gameLose({String reason = 'Try again next time!'}) async {
+    if (_won) return;
+    _won = true;
+    _roundTimer?.cancel();
+    _miniTicker?.cancel();
+    if (!mounted) return;
+    await _showEndPopup(win: false, title: 'YOU LOSE', subtitle: reason);
   }
 
   @override
@@ -5505,70 +6167,58 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     final timerText = '${_secondsLeft ~/ 60}:${(_secondsLeft % 60).toString().padLeft(2, '0')}';
     return Scaffold(
       backgroundColor: const Color(0xFF1C1236),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        title: Text(widget.gameTitle, style: const TextStyle(fontWeight: FontWeight.w900)),
-      ),
-      body: Center(
-        child: Container(
-          margin: const EdgeInsets.all(16),
-          height: math.min(MediaQuery.of(context).size.height * 0.74, 560),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: widget.colors),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white24),
-          ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
+                  ),
+                  Expanded(
+                    child: Text(widget.gameTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(10)),
+                    child: Text('\$${formatCurrency(widget.user.accountBalance)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                  ),
+                ],
+              ),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.18),
+                  gradient: LinearGradient(colors: widget.colors),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(widget.gameTitle, style: const TextStyle(color: Colors.white, fontSize: 30 * 0.7, fontWeight: FontWeight.w900)),
-                          Text('Win +46%  Bet: \$${widget.wager.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                        ],
+                      child: Text(
+                        'Bet \$${widget.wager.toStringAsFixed(2)} • Progress ${_gameProgressDone()}/${_gameProgressTotal()} • Paid by progress',
+                        style: const TextStyle(color: Colors.white70, fontSize: 10),
                       ),
                     ),
-                    Row(
-                      children: [
-                        const Icon(Icons.timer_outlined, color: Colors.white70, size: 16),
-                        const SizedBox(width: 4),
-                        Text(timerText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-                      ],
-                    ),
+                    const Icon(Icons.timer_outlined, color: Colors.white70, size: 14),
+                    const SizedBox(width: 4),
+                    Text(timerText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.16),
-                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(colors: widget.colors.map((c) => c.withOpacity(0.85)).toList()),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: Colors.white24),
                   ),
                   child: _gameBoard(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
-                  child: const Text('End Game Now', style: TextStyle(fontWeight: FontWeight.w800)),
                 ),
               ),
             ],
@@ -5578,88 +6228,336 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     );
   }
 
+  Widget _memoryGrid() {
+    final cols = _memoryCols;
+    final rows = (_memoryValues.length / cols).ceil();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 6.0;
+        final cellW = (constraints.maxWidth - gap * (cols - 1)) / cols;
+        final cellH = (constraints.maxHeight - gap * (rows - 1)) / rows;
+        final side = math.min(cellW, cellH);
+        return Column(
+          children: [
+            Text('Pairs $_pairsFound/${_memoryBase.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+            const SizedBox(height: 6),
+            Expanded(
+              child: Center(
+                child: SizedBox(
+                  width: side * cols + gap * (cols - 1),
+                  height: side * rows + gap * (rows - 1),
+                  child: GridView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _memoryValues.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: cols,
+                      crossAxisSpacing: gap,
+                      mainAxisSpacing: gap,
+                      mainAxisExtent: side,
+                    ),
+                    itemBuilder: (_, i) {
+                      final isOpen = _revealedCards.contains(i) || _matchedCards.contains(i);
+                      return InkWell(
+                        onTap: () => _pickMemoryCard(i),
+                        borderRadius: BorderRadius.circular(10),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            gradient: isOpen
+                                ? const LinearGradient(colors: [Color(0xFF4ADE80), Color(0xFF14B8A6)])
+                                : const LinearGradient(colors: [Color(0xFFA855F7), Color(0xFFEC4899)]),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4)],
+                          ),
+                          child: Center(
+                            child: FittedBox(
+                              child: Text(isOpen ? _memoryValues[i] : '?', style: TextStyle(fontSize: side * 0.42, fontWeight: FontWeight.w900, color: Colors.white)),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _gameBoard() {
-    if (widget.gameId == 'memory') {
+    if (widget.gameId == 'memory' || widget.gameId == 'card') return _memoryGrid();
+
+    if (widget.gameId == 'scramble') {
       return Column(
         children: [
-          Text('Pairs: $_pairsFound/${_memoryBase.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 30 * 0.7)),
-          const SizedBox(height: 4),
-          const Text('Match all pairs to win full amount!', style: TextStyle(color: Colors.white70, fontSize: 11)),
-          const SizedBox(height: 10),
-          Expanded(
-            child: GridView.builder(
-              itemCount: _memoryValues.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, crossAxisSpacing: 8, mainAxisSpacing: 8),
-              itemBuilder: (_, i) {
-                final isOpen = _revealedCards.contains(i) || _matchedCards.contains(i);
-                return InkWell(
-                  onTap: () => _pickMemoryCard(i),
-                  borderRadius: BorderRadius.circular(8),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      gradient: isOpen
-                          ? const LinearGradient(colors: [Color(0xFF4ADE80), Color(0xFF14B8A6)])
-                          : const LinearGradient(colors: [Color(0xFFA855F7), Color(0xFFEC4899)]),
+          Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          const SizedBox(height: 8),
+          FittedBox(
+            child: Text(_scrambled, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: 4)),
+          ),
+          const Spacer(),
+          TextField(
+            controller: _inputC,
+            textCapitalization: TextCapitalization.characters,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 2),
+            decoration: InputDecoration(
+              hintText: 'Your answer',
+              hintStyle: const TextStyle(color: Colors.white38),
+              filled: true,
+              fillColor: Colors.black26,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+            onSubmitted: (_) => _checkTextAnswer(),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(onPressed: _checkTextAnswer, child: const Text('Submit')),
+          ),
+        ],
+      );
+    }
+
+    if (widget.gameId == 'typing') {
+      return NgmyTypingSentencePanel(
+        sentence: _answer,
+        controller: _inputC,
+        onCorrectCount: (_) => setState(() {}),
+        onCompleted: () {
+          unawaited(_advanceBank());
+          unawaited(_payoutWin(subtitle: 'Perfect sentence — full payout!'));
+        },
+      );
+    }
+
+    if (widget.gameId == 'math' || widget.gameId == 'sequence') {
+      return Column(
+        children: [
+          Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          const SizedBox(height: 12),
+          FittedBox(
+            child: Text(
+              widget.gameId == 'sequence' ? '$_sequencePrompt, ?' : _prompt,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26),
+            ),
+          ),
+          const Spacer(),
+          ..._optionChoices.map((c) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => _selectOption(c),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.15), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                    child: Text(c, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                  ),
+                ),
+              )),
+        ],
+      );
+    }
+
+    if (widget.gameId == 'puzzle') {
+      return LayoutBuilder(
+        builder: (context, c) {
+          final side = (math.min(c.maxWidth, c.maxHeight) - 16) / 3;
+          return Column(
+            children: [
+              Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Center(
+                  child: SizedBox(
+                    width: side * 3 + 8,
+                    height: side * 3 + 8,
+                    child: GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: 9,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 4, crossAxisSpacing: 4, mainAxisExtent: side),
+                      itemBuilder: (_, i) {
+                        final v = _puzzleTiles[i];
+                        final correct = _puzzleTileCorrect(i);
+                        return Material(
+                          color: v == 0
+                              ? Colors.transparent
+                              : (correct ? const Color(0xFF22C55E) : Colors.white.withOpacity(0.2)),
+                          borderRadius: BorderRadius.circular(10),
+                          child: InkWell(
+                            onTap: v == 0 ? null : () => _tapPuzzle(i),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Center(
+                              child: Text(
+                                v == 0 ? '' : '$v',
+                                style: TextStyle(
+                                  color: correct ? Colors.white : Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: side * 0.38,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                    child: Center(
-                      child: Text(isOpen ? _memoryValues[i] : '', style: const TextStyle(fontSize: 20)),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
+    if (widget.gameId == 'simon') {
+      return Column(
+        children: [
+          Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          const SizedBox(height: 8),
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              physics: const NeverScrollableScrollPhysics(),
+              children: List.generate(4, (i) {
+                final lit = _simonShow == i;
+                return InkWell(
+                  onTap: () => _tapSimon(i),
+                  borderRadius: BorderRadius.circular(16),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    decoration: BoxDecoration(
+                      color: lit ? _simonColors[i] : _simonColors[i].withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: lit ? [BoxShadow(color: _simonColors[i].withOpacity(0.8), blurRadius: 18)] : [],
                     ),
                   ),
                 );
-              },
+              }),
             ),
           ),
         ],
       );
     }
 
-    if (widget.gameId == 'dice') {
-      return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Text('🎲 $_dice', style: const TextStyle(fontSize: 42)),
-        const SizedBox(height: 10),
-        ElevatedButton(
-          onPressed: () {
-            setState(() => _dice = _rng.nextInt(6) + 1);
-            if (_dice >= 5) _payoutWin();
-          },
-          child: const Text('Roll Dice'),
-        ),
-      ]);
+    if (widget.gameId == 'pattern') {
+      return LayoutBuilder(
+        builder: (context, c) {
+          final side = (math.min(c.maxWidth, c.maxHeight) - 24) / 3;
+          return Column(
+            children: [
+              Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+              Expanded(
+                child: Center(
+                  child: SizedBox(
+                    width: side * 3 + 12,
+                    height: side * 3 + 12,
+                    child: GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: 9,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 6, mainAxisSpacing: 6, mainAxisExtent: side),
+                      itemBuilder: (_, i) {
+                        final lit = _patternFlash == i;
+                        return InkWell(
+                          onTap: () => _tapPattern(i),
+                          borderRadius: BorderRadius.circular(10),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 100),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              color: lit ? const Color(0xFF4ADE80) : Colors.white.withOpacity(0.12),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
+    if (widget.gameId == 'color') {
+      final names = ['RED', 'GREEN', 'BLUE', 'YELLOW'];
+      final colors = [Colors.red, Colors.green, Colors.blue, Colors.amber];
+      return Column(
+        children: [
+          Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          const Spacer(),
+          Text(_colorWord, style: TextStyle(color: _colorInk, fontWeight: FontWeight.w900, fontSize: 42)),
+          const Spacer(),
+          ...List.generate(names.length, (i) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => _selectOption(names[i]),
+                    style: ElevatedButton.styleFrom(backgroundColor: colors[i].withOpacity(0.85), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                    child: Text(names[i], style: const TextStyle(fontWeight: FontWeight.w900)),
+                  ),
+                ),
+              )),
+        ],
+      );
     }
 
     if (widget.gameId == 'reflex') {
-      return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Container(
-          width: 90,
-          height: 90,
-          decoration: BoxDecoration(color: _readyReflex ? Colors.green : Colors.red, shape: BoxShape.circle),
-        ),
-        const SizedBox(height: 8),
-        Text(_readyReflex ? 'Tap Now!' : 'Wait for green', style: const TextStyle(color: Colors.white)),
-        const SizedBox(height: 10),
-        ElevatedButton(
-          onPressed: () {
-            if (!_readyReflex) {
-              Future.delayed(Duration(milliseconds: 800 + _rng.nextInt(1200)), () {
-                if (!mounted) return;
-                setState(() {
-                  _readyReflex = true;
-                  _reflexStart = DateTime.now();
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () {
+              if (!_readyReflex) {
+                Future.delayed(Duration(milliseconds: 700 + _rng.nextInt(1400)), () {
+                  if (!mounted) return;
+                  setState(() {
+                    _readyReflex = true;
+                    _reflexStart = DateTime.now();
+                  });
                 });
-              });
-              return;
-            }
-            final ms = _reflexStart == null ? 999 : DateTime.now().difference(_reflexStart!).inMilliseconds;
-            if (ms < 420) _payoutWin();
-          },
-          child: Text(_readyReflex ? 'Tap' : 'Ready'),
-        ),
-      ]);
+                return;
+              }
+              final ms = _reflexStart == null ? 999 : DateTime.now().difference(_reflexStart!).inMilliseconds;
+              if (ms < 450) {
+                unawaited(_advanceBank());
+                _payoutWin();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Too slow (${ms}ms). Tap under 450ms.')));
+                setState(() => _readyReflex = false);
+              }
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(color: _readyReflex ? const Color(0xFF22C55E) : const Color(0xFFEF4444), shape: BoxShape.circle, boxShadow: [BoxShadow(color: (_readyReflex ? Colors.green : Colors.red).withOpacity(0.5), blurRadius: 24)]),
+              child: Center(child: Text(_readyReflex ? 'TAP!' : 'WAIT', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22))),
+            ),
+          ),
+        ],
+      );
     }
 
-    return _buildTapArena();
+    if (_isPro && _pro != null) {
+      return buildNgmyProGameBoard(
+        gameId: widget.gameId,
+        state: _pro!,
+        rng: _rng,
+        onChanged: () => setState(() {}),
+        onFullWin: () => unawaited(_payoutWin(subtitle: 'You won this round!')),
+      );
+    }
+
+
+    return Center(child: Text(_prompt, style: const TextStyle(color: Colors.white)));
   }
 }
 
@@ -5915,6 +6813,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Users', Icons.people_alt_outlined, Colors.blue, () => setState(() => _idx = 1), isDark),
             _menuFrame('Plans', Icons.trending_up_rounded, Colors.green, () => setState(() => _idx = 2), isDark),
             _menuFrame('Wallet', Icons.account_balance_wallet_outlined, Colors.pink, () => setState(() => _idx = 4), isDark),
+            _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => _showGamesAdmin(isDark), isDark),
           ],
         ),
         const SizedBox(height: 28),
@@ -5946,6 +6845,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ],
     ),
   );
+
+  void _showGamesAdmin(bool isDark) {
+    showNgmyGameCenterAdminSheet(
+      context: context,
+      isDark: isDark,
+      initialLimits: widget.config.gameTimeLimits,
+      initialDice: widget.config.diceSettings,
+      users: widget.allUsers
+          .map((u) => NgmyAdminUserEntry(email: u.email, username: u.username))
+          .toList(),
+      onSave: (limits, diceJson) {
+        widget.config.gameTimeLimits = limits;
+        widget.config.diceSettings = diceJson;
+        widget.onDataChanged();
+      },
+    );
+  }
 
   void _showJobApplicationsAdmin(bool isDark) {
     showModalBottomSheet(
@@ -6698,7 +7614,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                 widget.onDataChanged();
                               } else {
                                 widget.onAddPlan(InvestmentPlan(name: name, price: price));
-                                setState(() {});
                               }
                               Navigator.pop(ctx);
                             },
@@ -6799,6 +7714,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           onPressed: () {
                             setState(() => widget.globalPlans.remove(pl));
                             widget.onDataChanged();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Plan removed for all users.')),
+                            );
                           },
                         ),
                       ],
@@ -10149,6 +11067,49 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     return points.any((p) => p != null);
   }
 
+  static const double _invoiceSigPadHeight = 120;
+  static const double _invoiceSigPreviewHeight = 36;
+
+  List<Offset?> _scaleSignaturePoints(List<Offset?> points, {required double scale}) {
+    return points.map((p) => p == null ? null : Offset(p.dx * scale, p.dy * scale)).toList();
+  }
+
+  Widget _invoicePreviewSignature(List<Offset?> points) {
+    if (!_hasSignature(points)) {
+      return const SizedBox(height: _invoiceSigPreviewHeight);
+    }
+    final scale = _invoiceSigPreviewHeight / _invoiceSigPadHeight;
+    return SizedBox(
+      height: _invoiceSigPreviewHeight,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _SignaturePainter(
+          _scaleSignaturePoints(points, scale: scale),
+          color: const Color(0xFF0F172A),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _invoiceBizAddressLines(Color headerTextColor) {
+    final lines = <String>[
+      if (_bizStreetC.text.trim().isNotEmpty) _bizStreetC.text.trim(),
+      if (_bizCityStateZipC.text.trim().isNotEmpty) _bizCityStateZipC.text.trim(),
+      if (_bizPhoneC.text.trim().isNotEmpty) _bizPhoneC.text.trim(),
+    ];
+    return lines
+        .map(
+          (line) => Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              line,
+              style: TextStyle(fontSize: 10, color: headerTextColor.withOpacity(0.88)),
+            ),
+          ),
+        )
+        .toList();
+  }
+
   Future<void> _cleanupExpiredPaidInvoices() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('saved_invoices_v1');
@@ -10641,8 +11602,8 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       key: localPreviewKey,
                       child: Container(
                         width: double.infinity,
-                        constraints: const BoxConstraints(minHeight: 780),
-                        padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
+                        constraints: const BoxConstraints(minHeight: 520),
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: colors,
@@ -10674,37 +11635,38 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                                         Text(
                                           'INVOICE',
                                           style: TextStyle(
-                                            letterSpacing: 2,
-                                            fontSize: 50,
+                                            letterSpacing: 1.5,
+                                            fontSize: 26,
                                             fontWeight: FontWeight.w300,
                                             color: headerTextColor.withOpacity(0.95),
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 3),
                                         Text(
                                           _bizNameC.text.isEmpty ? 'Your Business' : _bizNameC.text,
                                           style: TextStyle(
-                                            fontSize: 21,
+                                            fontSize: 14,
                                             fontWeight: FontWeight.w700,
                                             color: headerTextColor.withOpacity(0.95),
                                           ),
                                         ),
+                                        ..._invoiceBizAddressLines(headerTextColor),
                                       ],
                                     ),
                                   ),
                                   Container(
-                                    width: 84,
-                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                    width: 56,
+                                    padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 5),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withOpacity(useDarkText ? 0.55 : 0.06),
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(8),
                                       border: Border.all(color: Colors.white.withOpacity(0.24)),
                                     ),
                                     child: Column(
                                       children: [
-                                        Text('INVOICE', style: TextStyle(fontSize: 12, letterSpacing: 1.2, color: headerTextColor.withOpacity(0.85))),
-                                        const SizedBox(height: 4),
-                                        Text('#${_invoiceNoC.text.isEmpty ? '1' : _invoiceNoC.text}', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w300, color: headerTextColor)),
+                                        Text('INVOICE', style: TextStyle(fontSize: 8, letterSpacing: 0.8, color: headerTextColor.withOpacity(0.85))),
+                                        const SizedBox(height: 2),
+                                        Text('#${_invoiceNoC.text.isEmpty ? '1' : _invoiceNoC.text}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: headerTextColor)),
                                       ],
                                     ),
                                   ),
@@ -10713,10 +11675,10 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                               const SizedBox(height: 14),
                               Container(
                                 width: double.infinity,
-                                padding: const EdgeInsets.all(16),
+                                padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(useDarkText ? 0.58 : 0.05),
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(10),
                                   border: Border.all(color: Colors.white.withOpacity(0.2)),
                                 ),
                                 child: Row(
@@ -10726,20 +11688,28 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text('CLIENT', style: TextStyle(fontSize: 11, letterSpacing: 2, fontWeight: FontWeight.w700, color: headerTextColor.withOpacity(0.75))),
-                                          const SizedBox(height: 4),
+                                          Text('CLIENT', style: TextStyle(fontSize: 9, letterSpacing: 1.4, fontWeight: FontWeight.w700, color: headerTextColor.withOpacity(0.75))),
+                                          const SizedBox(height: 3),
                                           Text(
                                             _clientNameC.text.isEmpty ? 'Client Name' : _clientNameC.text,
-                                            style: TextStyle(fontSize: 34 * 0.7, fontWeight: FontWeight.w800, color: headerTextColor),
+                                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: headerTextColor),
                                           ),
+                                          if (_clientEmailC.text.trim().isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 2),
+                                              child: Text(
+                                                _clientEmailC.text.trim(),
+                                                style: TextStyle(fontSize: 10, color: headerTextColor.withOpacity(0.88)),
+                                              ),
+                                            ),
                                         ],
                                       ),
                                     ),
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
-                                        Text('Issued: ${_issuedDateC.text.isEmpty ? '--/--/----' : _issuedDateC.text}', style: TextStyle(fontSize: 12, color: headerTextColor.withOpacity(0.9))),
-                                        Text('Due: ${_dueDateC.text.isEmpty ? '—' : _dueDateC.text}', style: TextStyle(fontSize: 12, color: headerTextColor.withOpacity(0.9))),
+                                        Text('Issued: ${_issuedDateC.text.isEmpty ? '--/--/----' : _issuedDateC.text}', style: TextStyle(fontSize: 10, color: headerTextColor.withOpacity(0.9))),
+                                        Text('Due: ${_dueDateC.text.isEmpty ? '—' : _dueDateC.text}', style: TextStyle(fontSize: 10, color: headerTextColor.withOpacity(0.9))),
                                       ],
                                     ),
                                   ],
@@ -10747,40 +11717,40 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                               ),
                               const SizedBox(height: 14),
                               Container(
-                                padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(useDarkText ? 0.52 : 0.08),
                                   borderRadius: BorderRadius.circular(7),
                                 ),
                                 child: Row(
                                   children: [
-                                    Expanded(child: Text('ITEM', style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor))),
-                                    SizedBox(width: 110, child: Text('PRICE', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor))),
-                                    SizedBox(width: 74, child: Text('QTY', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor))),
-                                    SizedBox(width: 90, child: Text('DISC.', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor))),
-                                    SizedBox(width: 120, child: Text('AMOUNT', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor))),
+                                    Expanded(child: Text('ITEM', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: headerTextColor))),
+                                    SizedBox(width: 72, child: Text('PRICE', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: headerTextColor))),
+                                    SizedBox(width: 44, child: Text('QTY', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: headerTextColor))),
+                                    SizedBox(width: 52, child: Text('DISC.', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: headerTextColor))),
+                                    SizedBox(width: 72, child: Text('AMOUNT', textAlign: TextAlign.right, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: headerTextColor))),
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
+                                padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 10),
                                 child: Row(
                                   children: [
                                     Expanded(
                                       child: Text(
                                         _itemNameC.text.isEmpty ? 'Item' : _itemNameC.text,
                                         style: TextStyle(
-                                          fontSize: 15,
+                                          fontSize: 11,
                                           fontWeight: FontWeight.w700,
                                           color: headerTextColor,
                                         ),
                                       ),
                                     ),
-                                    SizedBox(width: 110, child: Text('\$${_num(_itemPriceC.text).toStringAsFixed(2)}', textAlign: TextAlign.center, style: TextStyle(color: headerTextColor))),
-                                    SizedBox(width: 74, child: Text(_itemQtyC.text.isEmpty ? '1' : _itemQtyC.text, textAlign: TextAlign.center, style: TextStyle(color: headerTextColor))),
-                                    SizedBox(width: 90, child: Text('${_num(_itemDiscountC.text).toStringAsFixed(0)}%', textAlign: TextAlign.center, style: TextStyle(color: headerTextColor))),
-                                    SizedBox(width: 120, child: Text('\$${subtotal.toStringAsFixed(2)}', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor))),
+                                    SizedBox(width: 72, child: Text('\$${_num(_itemPriceC.text).toStringAsFixed(2)}', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: headerTextColor))),
+                                    SizedBox(width: 44, child: Text(_itemQtyC.text.isEmpty ? '1' : _itemQtyC.text, textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: headerTextColor))),
+                                    SizedBox(width: 52, child: Text('${_num(_itemDiscountC.text).toStringAsFixed(0)}%', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: headerTextColor))),
+                                    SizedBox(width: 72, child: Text('\$${subtotal.toStringAsFixed(2)}', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: headerTextColor))),
                                   ],
                                 ),
                               ),
@@ -10788,40 +11758,47 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                               Align(
                                 alignment: Alignment.centerRight,
                                 child: Container(
-                                  width: 330,
-                                  padding: const EdgeInsets.all(16),
+                                  width: 220,
+                                  padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withOpacity(useDarkText ? 0.54 : 0.08),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(10),
                                     border: Border.all(color: Colors.white.withOpacity(0.22)),
                                   ),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Subtotal', style: TextStyle(fontSize: 18 * 0.75, color: headerTextColor.withOpacity(0.8))),
-                                      const SizedBox(height: 10),
+                                      Text('Subtotal', style: TextStyle(fontSize: 11, color: headerTextColor.withOpacity(0.8))),
+                                      const SizedBox(height: 6),
                                       Row(
                                         children: [
-                                          Text('Total', style: TextStyle(fontSize: 42 * 0.7, fontWeight: FontWeight.w900, color: headerTextColor)),
+                                          Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: headerTextColor)),
                                           const Spacer(),
-                                          Text('\$${subtotal.toStringAsFixed(2)}', style: TextStyle(fontSize: 42 * 0.7, fontWeight: FontWeight.w900, color: headerTextColor)),
+                                          Text('\$${subtotal.toStringAsFixed(2)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: headerTextColor)),
                                         ],
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 10),
                               if (_itemDescC.text.trim().isNotEmpty)
                                 Text(
                                   _itemDescC.text.trim(),
-                                  style: TextStyle(color: headerTextColor.withOpacity(0.95), fontSize: 14),
+                                  style: TextStyle(color: headerTextColor.withOpacity(0.95), fontSize: 11),
                                 ),
-                              const SizedBox(height: 14),
+                              if (_paymentInfoC.text.trim().isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  _paymentInfoC.text.trim(),
+                                  style: TextStyle(color: headerTextColor.withOpacity(0.92), fontSize: 11, height: 1.35),
+                                ),
+                              ],
+                              const SizedBox(height: 10),
                               Center(
                                 child: Text(
                                   'By signing, both parties agree to the services and conditions described herein.',
-                                  style: TextStyle(color: headerTextColor.withOpacity(0.84), fontSize: 14),
+                                  style: TextStyle(color: headerTextColor.withOpacity(0.84), fontSize: 10),
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -10829,48 +11806,52 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                                 children: [
                                   Expanded(
                                     child: Container(
-                                      padding: const EdgeInsets.all(14),
+                                      padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
                                         color: Colors.white.withOpacity(useDarkText ? 0.5 : 0.07),
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text('SERVICE PROVIDER', style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor)),
-                                          const SizedBox(height: 38),
+                                          Text('SERVICE PROVIDER', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: headerTextColor)),
+                                          const SizedBox(height: 6),
+                                          _invoicePreviewSignature(_providerSignaturePoints),
+                                          const SizedBox(height: 4),
                                           Container(height: 1, color: headerTextColor.withOpacity(0.5)),
-                                          const SizedBox(height: 8),
+                                          const SizedBox(height: 6),
                                           Text(
                                             _hasSignature(_providerSignaturePoints)
                                                 ? 'NGMY • ${_issuedDateC.text.isEmpty ? '--/--/----' : _issuedDateC.text}'
                                                 : 'Pending signature',
-                                            style: TextStyle(color: headerTextColor.withOpacity(0.9)),
+                                            style: TextStyle(fontSize: 9, color: headerTextColor.withOpacity(0.9)),
                                           ),
                                         ],
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: Container(
-                                      padding: const EdgeInsets.all(14),
+                                      padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
                                         color: Colors.white.withOpacity(useDarkText ? 0.5 : 0.07),
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text('CLIENT', style: TextStyle(fontWeight: FontWeight.w700, color: headerTextColor)),
-                                          const SizedBox(height: 38),
+                                          Text('CLIENT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: headerTextColor)),
+                                          const SizedBox(height: 6),
+                                          _invoicePreviewSignature(_clientSignaturePoints),
+                                          const SizedBox(height: 4),
                                           Container(height: 1, color: headerTextColor.withOpacity(0.5)),
-                                          const SizedBox(height: 8),
+                                          const SizedBox(height: 6),
                                           Text(
                                             _hasSignature(_clientSignaturePoints)
                                                 ? '${_clientNameC.text.isEmpty ? 'Client' : _clientNameC.text} • ${_issuedDateC.text.isEmpty ? '--/--/----' : _issuedDateC.text}'
                                                 : 'Client • __/__/____',
-                                            style: TextStyle(color: headerTextColor.withOpacity(0.9)),
+                                            style: TextStyle(fontSize: 9, color: headerTextColor.withOpacity(0.9)),
                                           ),
                                         ],
                                       ),
@@ -11053,14 +12034,15 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
 class _SignaturePainter extends CustomPainter {
   final List<Offset?> points;
-  const _SignaturePainter(this.points);
+  final Color color;
+  const _SignaturePainter(this.points, {this.color = const Color(0xFF0F172A)});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF0F172A)
+      ..color = color
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 2.2;
+      ..strokeWidth = 2.0;
     for (int i = 0; i < points.length - 1; i++) {
       final p1 = points[i];
       final p2 = points[i + 1];
@@ -11072,7 +12054,7 @@ class _SignaturePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SignaturePainter oldDelegate) {
-    return oldDelegate.points != points;
+    return oldDelegate.points != points || oldDelegate.color != color;
   }
 }
 
@@ -13605,6 +14587,474 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 }
 
+/// Animated live shipment track (vehicle moves with real-time progress).
+class _LiveTrackingPanel extends StatefulWidget {
+  final Map<String, dynamic> order;
+  final bool isDark;
+
+  const _LiveTrackingPanel({super.key, required this.order, required this.isDark});
+
+  @override
+  State<_LiveTrackingPanel> createState() => _LiveTrackingPanelState();
+}
+
+class _LiveTrackingPanelState extends State<_LiveTrackingPanel> with SingleTickerProviderStateMixin {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final order = widget.order;
+    final progress = _shipmentProgressPercent(order);
+    final trackingId = (order['trackingId'] ?? '').toString();
+    final status = (order['fulfillmentStatus'] ?? '').toString();
+    final method = (order['shippingMethod'] ?? 'car').toString();
+    final vehicle = _storeVehicleIcon(method);
+    final vehicleLabel = _storeVehicleLabel(method);
+    final eta = DateTime.tryParse((order['estimatedArrival'] ?? '').toString());
+    final currentLoc = (order['currentLocation'] ?? '').toString();
+    final steps = ['Shipped', 'In Transit', 'Arriving', 'Delivered'];
+    int activeStep = 0;
+    if (status == 'in_transit') activeStep = 1;
+    if (status == 'arriving') activeStep = 2;
+    if (status == 'delivered') activeStep = 3;
+    final t = progress / 100.0;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Live Tracking', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF1D4ED8))),
+              const Spacer(),
+              Text('#$trackingId', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF6D28D9))),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('$vehicleLabel · updates every few seconds', style: const TextStyle(fontSize: 10, color: Color(0xFF475569), fontWeight: FontWeight.w600)),
+          if (eta != null)
+            Text('ETA: ${_formatStoreTrackingWhen(eta.toUtc().toIso8601String())}', style: const TextStyle(fontSize: 10, color: Color(0xFF2563EB), fontWeight: FontWeight.w700)),
+          if (currentLoc.isNotEmpty)
+            Text('Now: $currentLoc', style: const TextStyle(fontSize: 10, color: Color(0xFF334155))),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (_, constraints) {
+              final w = constraints.maxWidth;
+              final vehicleSize = 36.0;
+              final x = (w - vehicleSize) * t.clamp(0.0, 1.0);
+              return SizedBox(
+                height: 52,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 22,
+                      child: Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      top: 22,
+                      width: (w * t).clamp(vehicleSize * 0.5, w),
+                      child: Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFF2563EB)]),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: x,
+                      top: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [BoxShadow(color: const Color(0xFF7C3AED).withOpacity(0.35), blurRadius: 8, offset: const Offset(0, 2))],
+                          border: Border.all(color: const Color(0xFF7C3AED), width: 2),
+                        ),
+                        child: Icon(vehicle, size: 22, color: const Color(0xFF7C3AED)),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(4, (i) {
+              final done = i <= activeStep;
+              return Column(
+                children: [
+                  Icon(done ? Icons.check_circle : Icons.circle_outlined, size: 18, color: done ? Colors.green : Colors.grey),
+                  Text(steps[i], style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: done ? const Color(0xFF2563EB) : Colors.grey)),
+                ],
+              );
+            }),
+          ),
+          if ((order['locationHistory'] as List?)?.isNotEmpty == true) ...[
+            const SizedBox(height: 10),
+            ...((order['locationHistory'] as List).cast<Map>().map((e) => Map<String, dynamic>.from(e))).take(4).map((h) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.circle, size: 8, color: Color(0xFF2563EB)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text((h['location'] ?? '').toString(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                          Text('${h['note'] ?? ''} · ${(h['at'] ?? '').toString()}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+          const SizedBox(height: 8),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+              child: Text(status == 'delivered' ? '✓ Delivered' : '$progress% · Live', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatStoreTrackingWhen(String iso) {
+  final dt = DateTime.tryParse(iso);
+  if (dt == null) return iso;
+  final local = dt.toLocal();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return '${months[local.month - 1]} ${local.day}, ${local.year} ${local.hour}:${local.minute.toString().padLeft(2, '0')}';
+}
+
+class _StoreReceiptsPage extends StatefulWidget {
+  final Future<void> Function() onPoll;
+  final Widget Function(BuildContext context) bodyBuilder;
+
+  const _StoreReceiptsPage({required this.onPoll, required this.bodyBuilder});
+
+  @override
+  State<_StoreReceiptsPage> createState() => _StoreReceiptsPageState();
+}
+
+class _StoreReceiptsPageState extends State<_StoreReceiptsPage> {
+  Timer? _poll;
+
+  Future<void> _runPoll() async {
+    await widget.onPoll();
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _poll = Timer.periodic(const Duration(seconds: 3), (_) => unawaited(_runPoll()));
+    unawaited(_runPoll());
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.bodyBuilder(context);
+}
+
+/// Stable listing photo — resolves Supabase URLs once and avoids blink on parent rebuild.
+class _NgmyListingPhoto extends StatefulWidget {
+  final String imageRef;
+  final Map<String, String> urlCache;
+  final double? height;
+  final double? width;
+  final BoxFit fit;
+
+  const _NgmyListingPhoto({
+    super.key,
+    required this.imageRef,
+    required this.urlCache,
+    this.height,
+    this.width,
+    this.fit = BoxFit.cover,
+  });
+
+  @override
+  State<_NgmyListingPhoto> createState() => _NgmyListingPhotoState();
+}
+
+class _NgmyListingPhotoState extends State<_NgmyListingPhoto> {
+  String? _resolvedUrl;
+  bool _failed = false;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _bootstrap();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NgmyListingPhoto oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageRef != widget.imageRef) {
+      _resolvedUrl = null;
+      _failed = false;
+      _bootstrap();
+    }
+  }
+
+  void _bootstrap() {
+    final src = widget.imageRef.trim();
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      _resolvedUrl = src;
+      return;
+    }
+    final cached = widget.urlCache[src];
+    if (cached != null) {
+      _resolvedUrl = cached;
+      return;
+    }
+    if (src.startsWith('supabase://')) {
+      unawaited(_resolveRemote(src));
+    }
+  }
+
+  Future<void> _resolveRemote(String src) async {
+    if (_loading) return;
+    _loading = true;
+    try {
+      final url = await _resolveSupabaseStorageUrl(src);
+      widget.urlCache[src] = url;
+      if (mounted) setState(() => _resolvedUrl = url);
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    } finally {
+      _loading = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final src = widget.imageRef.trim();
+    if (src.startsWith('data:image')) {
+      try {
+        return Image.memory(
+          base64Decode(src.split(',').last),
+          height: widget.height,
+          width: widget.width,
+          fit: widget.fit,
+          gaplessPlayback: true,
+        );
+      } catch (_) {
+        return _placeholder();
+      }
+    }
+    if (!kIsWeb && src.isNotEmpty && !src.startsWith('supabase://') && !src.startsWith('http')) {
+      return Image.file(
+        File(src),
+        height: widget.height,
+        width: widget.width,
+        fit: widget.fit,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => _placeholder(),
+      );
+    }
+    if (_resolvedUrl != null) {
+      return Image.network(
+        _resolvedUrl!,
+        height: widget.height,
+        width: widget.width,
+        fit: widget.fit,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => _placeholder(),
+      );
+    }
+    if (_failed) return _placeholder();
+    return _placeholder(loading: true);
+  }
+
+  Widget _placeholder({bool loading = false}) {
+    return Container(
+      height: widget.height,
+      width: widget.width,
+      color: Colors.grey.shade300,
+      child: loading
+          ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)))
+          : const Icon(Icons.image_not_supported_outlined, color: Colors.white54),
+    );
+  }
+}
+
+/// Plays store listing videos (Supabase, network, file, or data URL).
+class _StoreListingVideoPlayer extends StatefulWidget {
+  final String videoRef;
+  const _StoreListingVideoPlayer({required this.videoRef});
+
+  @override
+  State<_StoreListingVideoPlayer> createState() => _StoreListingVideoPlayerState();
+}
+
+class _StoreListingVideoPlayerState extends State<_StoreListingVideoPlayer> {
+  VideoPlayerController? _controller;
+  bool _ready = false;
+  bool _error = false;
+  bool _playing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_init());
+  }
+
+  Future<String?> _playbackUrl() async {
+    final ref = widget.videoRef.trim();
+    if (ref.isEmpty) return null;
+    if (ref.startsWith('http://') || ref.startsWith('https://')) return ref;
+    if (ref.startsWith('supabase://')) return _resolveSupabaseStorageUrl(ref);
+    if (ref.startsWith('data:video') && ref.contains('base64,')) {
+      if (!kIsWeb) {
+        final bytes = base64Decode(ref.split('base64,').last);
+        final dir = await Directory.systemTemp.createTemp('ngmy_vid_');
+        final file = File('${dir.path}/listing.mp4');
+        await file.writeAsBytes(bytes);
+        return file.path;
+      }
+      return ref;
+    }
+    if (!kIsWeb && ref.isNotEmpty) {
+      final file = File(ref);
+      if (await file.exists()) return ref;
+    }
+    return ref;
+  }
+
+  Future<void> _init() async {
+    try {
+      final url = await _playbackUrl();
+      if (url == null || url.isEmpty) throw Exception('empty video');
+      if (url.startsWith('http') || url.startsWith('data:')) {
+        _controller = VideoPlayerController.networkUrl(
+          Uri.parse(url),
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        );
+      } else if (!kIsWeb) {
+        _controller = VideoPlayerController.file(File(url));
+      } else {
+        throw Exception('unsupported video path on web');
+      }
+      await _controller!.initialize().timeout(const Duration(seconds: 25));
+      if (!mounted) return;
+      _controller!.setLooping(false);
+      setState(() => _ready = true);
+    } catch (e) {
+      debugPrint('[store video] $e');
+      if (mounted) setState(() => _error = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    final c = _controller;
+    if (c == null || !_ready) return;
+    if (c.value.isPlaying) {
+      c.pause();
+      setState(() => _playing = false);
+    } else {
+      c.play();
+      setState(() => _playing = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_error) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.videocam_off_rounded, color: Colors.white54, size: 48),
+            SizedBox(height: 8),
+            Text('Could not play video', style: TextStyle(color: Colors.white70, fontSize: 12)),
+          ],
+        ),
+      );
+    }
+    if (!_ready || _controller == null) {
+      return const Center(child: CircularProgressIndicator(color: Colors.white));
+    }
+    final c = _controller!;
+    return GestureDetector(
+      onTap: _togglePlay,
+      child: Stack(
+        alignment: Alignment.center,
+        fit: StackFit.expand,
+        children: [
+          Center(
+            child: AspectRatio(
+              aspectRatio: c.value.aspectRatio == 0 ? 16 / 9 : c.value.aspectRatio,
+              child: VideoPlayer(c),
+            ),
+          ),
+          if (!_playing)
+            Container(
+              color: Colors.black38,
+              child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 72),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class NgmyStoreScreen extends StatefulWidget {
   final UserData user;
   final List<UserData> allUsers;
@@ -13637,6 +15087,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   bool _storeLoading = false;
   DateTime? _lastCloudRefresh;
   final Set<String> _likedListingIds = {};
+  final Map<String, String> _listingMediaUrlCache = {};
+  Timer? _liveOrderPollTimer;
 
   bool get _canSell => widget.user.isAdmin || widget.user.canSellOnStore;
 
@@ -13645,10 +15097,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     super.initState();
     _tabCtrl = TabController(length: _canSell ? 3 : 2, vsync: this)..addListener(() {
       if (!mounted) return;
-      if (_canSell && _tabCtrl.index == 2) {
-        unawaited(_refreshStoreOrdersFromConfig().then((_) {
-          if (mounted) setState(() {});
-        }));
+      final ordersTab = _canSell ? 2 : 1;
+      if (_tabCtrl.index == ordersTab) {
+        unawaited(_syncLiveOrders());
       }
       setState(() {});
     });
@@ -13672,6 +15123,36 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _listingsSig = _storeListingsSignature(_listings);
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStoreListingsFromCloud(silent: true));
     _searchC.addListener(() => setState(() => _searchQuery = _searchC.text.trim().toLowerCase()));
+    _liveOrderPollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (!mounted) return;
+      final ordersTab = _canSell ? 2 : 1;
+      if (_tabCtrl.index != ordersTab) return;
+      unawaited(_syncLiveOrders());
+    });
+  }
+
+  String _storeOrdersDigest() {
+    return _orders
+        .map((o) => '${o['id']}|${o['fulfillmentStatus']}|${o['refunded']}|${o['updatedAt']}')
+        .join(';');
+  }
+
+  Future<void> _syncLiveOrders() async {
+    if (!mounted) return;
+    final before = _storeOrdersDigest();
+    await _refreshStoreOrdersFromConfig();
+    _advanceOrderStatuses();
+    final refunded = _processUnshippedRefunds();
+    if (refunded && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A late order was auto-refunded to the buyer (not shipped within 3 days).')),
+      );
+    }
+    final after = _storeOrdersDigest();
+    if (!mounted) return;
+    if (after != before || refunded) {
+      setState(() {});
+    }
   }
 
   Future<void> _refreshStoreOrdersFromConfig() async {
@@ -13779,9 +15260,69 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   @override
   void dispose() {
+    _liveOrderPollTimer?.cancel();
     _tabCtrl.dispose();
     _searchC.dispose();
     super.dispose();
+  }
+
+  bool _processUnshippedRefunds() {
+    final now = DateTime.now();
+    var any = false;
+    for (final o in _orders) {
+      if (o['refunded'] == true) continue;
+      final status = (o['fulfillmentStatus'] ?? 'pending').toString();
+      if (status != 'pending') continue;
+      final deadline = _storeShipByDeadline(o);
+      if (deadline == null || now.isBefore(deadline)) continue;
+      final total = (o['total'] as num?)?.toDouble() ?? 0;
+      if (total <= 0) continue;
+      final paidVia = (o['paidVia'] ?? 'ngmy').toString();
+      final sellerEmail = (o['sellerEmail'] ?? '').toString().toLowerCase().trim();
+      final buyerEmail = (o['buyerEmail'] ?? '').toString().toLowerCase().trim();
+      final sellerIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sellerEmail);
+      final buyerIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == buyerEmail);
+      if (paidVia == 'ngmy' && sellerIdx >= 0 && buyerIdx >= 0) {
+        final seller = widget.allUsers[sellerIdx];
+        final buyer = widget.allUsers[buyerIdx];
+        final refund = math.min(total, seller.accountBalance);
+        seller.accountBalance -= refund;
+        buyer.accountBalance += refund;
+        final ts = DateTime.now().microsecondsSinceEpoch.toString();
+        widget.onAddTransaction(AppTransaction(
+          id: 'store_refund_buy_$ts',
+          userEmail: buyer.email,
+          amount: refund,
+          type: TransactionType.adminAdd,
+          method: PaymentMethod.system,
+          status: TransactionStatus.approved,
+          timestamp: DateTime.now(),
+          sourceDetails: 'NGMY Store refund (seller did not ship in 3 days): ${o['title']}',
+        ));
+        if (refund > 0) {
+          widget.onAddTransaction(AppTransaction(
+            id: 'store_refund_sell_$ts',
+            userEmail: seller.email,
+            amount: refund,
+            type: TransactionType.adminRemove,
+            method: PaymentMethod.system,
+            status: TransactionStatus.approved,
+            timestamp: DateTime.now(),
+            sourceDetails: 'NGMY Store refund charge (late shipment): ${o['title']}',
+          ));
+        }
+      }
+      o['fulfillmentStatus'] = 'refunded';
+      o['refunded'] = true;
+      o['refundedAt'] = DateTime.now().toUtc().toIso8601String();
+      o['updatedAt'] = o['refundedAt'];
+      any = true;
+    }
+    if (any) {
+      _save(refreshCloud: true);
+      widget.onDataChanged();
+    }
+    return any;
   }
 
   bool _matchesSearch(Map<String, dynamic> listing) {
@@ -13816,28 +15357,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     }
   }
 
-  int _unreadSellerInquiries() {
+  int _unreadMessageCount() {
     final me = widget.user.email.toLowerCase().trim();
-    return _inquiries.where((m) {
-      final seller = (m['sellerEmail'] ?? '').toString().toLowerCase().trim();
-      final read = m['read'] == true;
-      return seller == me && !read;
-    }).length;
+    return _groupedStoreMessageThreads(me).where((t) => t['unread'] == true).length;
   }
-
-  int _unreadBuyerInquiries() {
-    final me = widget.user.email.toLowerCase().trim();
-    return _inquiries.where((m) {
-      final buyer = (m['buyerEmail'] ?? '').toString().toLowerCase().trim();
-      if (buyer != me) return false;
-      final replies = _inquiryReplies(m);
-      if (replies.isEmpty) return false;
-      final last = replies.last;
-      return (last['role'] ?? '').toString() == 'seller' && m['buyerRead'] != true;
-    }).length;
-  }
-
-  int _unreadMessageCount() => _unreadSellerInquiries() + _unreadBuyerInquiries();
 
   void _markInquiryRead(String id) {
     final idx = _inquiries.indexWhere((m) => (m['id'] ?? '').toString() == id);
@@ -13855,6 +15378,200 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     }
   }
 
+  bool _storeSheetIsDark(BuildContext ctx) => Theme.of(ctx).brightness == Brightness.dark;
+
+  Color _storeSheetBackground(BuildContext ctx) =>
+      _storeSheetIsDark(ctx) ? const Color(0xFF121726) : Colors.white;
+
+  Color _storeSheetTextPrimary(BuildContext ctx) =>
+      _storeSheetIsDark(ctx) ? Colors.white : const Color(0xFF0F172A);
+
+  Color _storeSheetTextMuted(BuildContext ctx) =>
+      _storeSheetIsDark(ctx) ? Colors.white54 : Colors.black54;
+
+  InputDecoration _storeSheetInputDecoration(
+    BuildContext ctx, {
+    String? labelText,
+    String? hintText,
+    IconData? prefixIcon,
+  }) {
+    final dark = _storeSheetIsDark(ctx);
+    return InputDecoration(
+      labelText: labelText,
+      hintText: hintText,
+      prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: dark ? Colors.white54 : null) : null,
+      labelStyle: TextStyle(color: dark ? Colors.white70 : null),
+      hintStyle: TextStyle(color: dark ? Colors.white38 : null),
+      filled: true,
+      fillColor: dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: dark ? Colors.white24 : const Color(0xFFE2E8F0)),
+      ),
+    );
+  }
+
+  String _storeMsgThreadKey(String sellerEmail, String buyerEmail) =>
+      '${sellerEmail.toLowerCase().trim()}|${buyerEmail.toLowerCase().trim()}';
+
+  int? _findInquiryThreadIndex(String sellerEmail, String buyerEmail) {
+    final sk = sellerEmail.toLowerCase().trim();
+    final bk = buyerEmail.toLowerCase().trim();
+    for (var i = 0; i < _inquiries.length; i++) {
+      final m = _inquiries[i];
+      if ((m['sellerEmail'] ?? '').toString().toLowerCase().trim() == sk &&
+          (m['buyerEmail'] ?? '').toString().toLowerCase().trim() == bk) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  String _inquiryLastPreview(Map<String, dynamic> m) {
+    final replies = _inquiryReplies(m);
+    if (replies.isNotEmpty) return (replies.last['message'] ?? '').toString();
+    return (m['message'] ?? '').toString();
+  }
+
+  String _inquiryLastAt(Map<String, dynamic> m) {
+    final replies = _inquiryReplies(m);
+    if (replies.isNotEmpty) return (replies.last['createdAt'] ?? m['createdAt'] ?? '').toString();
+    return (m['createdAt'] ?? '').toString();
+  }
+
+  bool _threadUnreadForUser(String me, List<Map<String, dynamic>> threadInquiries) {
+    final isSeller = threadInquiries.any((m) => (m['sellerEmail'] ?? '').toString().toLowerCase().trim() == me);
+    for (final m in threadInquiries) {
+      if (isSeller) {
+        if (m['read'] != true) return true;
+        final replies = _inquiryReplies(m);
+        if (replies.isNotEmpty && (replies.last['role'] ?? '').toString() == 'buyer') return true;
+      } else {
+        final replies = _inquiryReplies(m);
+        if (replies.isNotEmpty && (replies.last['role'] ?? '').toString() == 'seller' && m['buyerRead'] != true) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  List<Map<String, dynamic>> _groupedStoreMessageThreads(String me) {
+    final buckets = <String, List<Map<String, dynamic>>>{};
+    for (final m in _inquiries) {
+      final seller = (m['sellerEmail'] ?? '').toString().toLowerCase().trim();
+      final buyer = (m['buyerEmail'] ?? '').toString().toLowerCase().trim();
+      if (seller != me && buyer != me) continue;
+      final key = _storeMsgThreadKey(seller, buyer);
+      buckets.putIfAbsent(key, () => []).add(Map<String, dynamic>.from(m));
+    }
+    final rows = <Map<String, dynamic>>[];
+    for (final entry in buckets.entries) {
+      final list = entry.value
+        ..sort((a, b) => _inquiryLastAt(b).compareTo(_inquiryLastAt(a)));
+      var preview = '';
+      var lastAt = '';
+      for (final inq in list) {
+        final p = _inquiryLastPreview(inq);
+        final at = _inquiryLastAt(inq);
+        if (lastAt.isEmpty || at.compareTo(lastAt) > 0) {
+          preview = p;
+          lastAt = at;
+        }
+      }
+      final latest = list.first;
+      final seller = (latest['sellerEmail'] ?? '').toString();
+      final buyer = (latest['buyerEmail'] ?? '').toString();
+      rows.add({
+        'threadKey': entry.key,
+        'sellerEmail': seller,
+        'buyerEmail': buyer,
+        'buyerName': latest['buyerName'] ?? 'Buyer',
+        'listingTitle': latest['listingTitle'] ?? 'Item',
+        'preview': preview,
+        'lastAt': lastAt,
+        'unread': _threadUnreadForUser(me, list),
+        'inquiries': list,
+      });
+    }
+    rows.sort((a, b) => (b['lastAt'] ?? '').toString().compareTo((a['lastAt'] ?? '').toString()));
+    return rows;
+  }
+
+  List<({DateTime at, String who, String text, bool mine, String? itemHint})> _allMessagesInThread(
+    List<Map<String, dynamic>> inquiries,
+    String me,
+  ) {
+    final isSeller = inquiries.any((m) => (m['sellerEmail'] ?? '').toString().toLowerCase().trim() == me);
+    final items = <({DateTime at, String who, String text, bool mine, String? itemHint})>[];
+    for (final inq in inquiries) {
+      final title = (inq['listingTitle'] ?? 'Item').toString();
+      final created = DateTime.tryParse((inq['createdAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      items.add((
+        at: created,
+        who: (inq['buyerName'] ?? 'Buyer').toString(),
+        text: (inq['message'] ?? '').toString(),
+        mine: !isSeller,
+        itemHint: title,
+      ));
+      for (final r in _inquiryReplies(inq)) {
+        final at = DateTime.tryParse((r['createdAt'] ?? '').toString()) ?? created;
+        final role = (r['role'] ?? '').toString();
+        final mine = role == 'seller' ? isSeller : !isSeller;
+        items.add((
+          at: at,
+          who: (r['name'] ?? (role == 'seller' ? 'Seller' : 'Buyer')).toString(),
+          text: (r['message'] ?? '').toString(),
+          mine: mine,
+          itemHint: (r['listingTitle'] ?? '').toString().isEmpty ? null : (r['listingTitle'] ?? '').toString(),
+        ));
+      }
+    }
+    items.sort((a, b) => a.at.compareTo(b.at));
+    return items;
+  }
+
+  void _markThreadRead(String me, List<Map<String, dynamic>> inquiries) {
+    final isSeller = inquiries.any((m) => (m['sellerEmail'] ?? '').toString().toLowerCase().trim() == me);
+    for (final inq in inquiries) {
+      final id = (inq['id'] ?? '').toString();
+      if (isSeller) {
+        _markInquiryRead(id);
+      } else {
+        _markInquiryBuyerRead(id);
+      }
+    }
+  }
+
+  void _sendThreadReply({
+    required String sellerEmail,
+    required String buyerEmail,
+    required String text,
+    required bool isSeller,
+  }) {
+    final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+    if (idx == null || text.trim().isEmpty) return;
+    final list = _inquiryReplies(_inquiries[idx]);
+    list.add({
+      'role': isSeller ? 'seller' : 'buyer',
+      'name': widget.user.username,
+      'email': widget.user.email,
+      'message': text.trim(),
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+    });
+    _inquiries[idx]['replies'] = list;
+    if (isSeller) {
+      _inquiries[idx]['read'] = true;
+      _inquiries[idx]['buyerRead'] = false;
+    } else {
+      _inquiries[idx]['buyerRead'] = true;
+      _inquiries[idx]['read'] = false;
+    }
+    unawaited(_upsertStoreInquiryRowSafe(_inquiries[idx]));
+    _save();
+  }
+
   List<Map<String, dynamic>> _inquiryReplies(Map<String, dynamic> m) {
     final raw = m['replies'];
     if (raw is! List) return [];
@@ -13865,130 +15582,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final me = widget.user.email.toLowerCase().trim();
     final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) {
-          final sheetMessages = List<Map<String, dynamic>>.from(
-            _inquiries.where((m) {
-              final seller = (m['sellerEmail'] ?? '').toString().toLowerCase().trim();
-              final buyer = (m['buyerEmail'] ?? '').toString().toLowerCase().trim();
-              return seller == me || buyer == me;
-            }),
-          )..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
-          return Container(
-            height: MediaQuery.of(ctx).size.height * 0.72,
-            margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF121726) : Colors.white,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: border, width: 1.4),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: _storePurple.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: _storePurple.withOpacity(0.35)),
-                      ),
-                      child: const Icon(Icons.chat_bubble_rounded, color: _storePurple),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(child: Text('Messages', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18))),
-                    IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text('Tap a thread to read and reply', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54)),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: sheetMessages.isEmpty
-                      ? const Center(child: Text('No messages yet.', style: TextStyle(color: Colors.grey)))
-                      : ListView.builder(
-                          itemCount: sheetMessages.length,
-                          itemBuilder: (_, i) {
-                            final m = sheetMessages[i];
-                            final id = (m['id'] ?? '').toString();
-                            final isSellerThread = (m['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
-                            final isBuyerThread = (m['buyerEmail'] ?? '').toString().toLowerCase().trim() == me;
-                            final replies = _inquiryReplies(m);
-                            final unread = isSellerThread
-                                ? m['read'] != true
-                                : (replies.isNotEmpty && (replies.last['role'] ?? '').toString() == 'seller' && m['buyerRead'] != true);
-                            return GestureDetector(
-                              onTap: () {
-                                if (isSellerThread) _markInquiryRead(id);
-                                if (isBuyerThread) _markInquiryBuyerRead(id);
-                                setSheet(() {});
-                                _openInquiryThread(m, isDark);
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: unread ? _storePurple : border, width: unread ? 1.6 : 1.1),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text((m['listingTitle'] ?? 'Item').toString(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                                        ),
-                                        if (unread)
-                                          Container(
-                                            width: 8,
-                                            height: 8,
-                                            decoration: const BoxDecoration(color: _storePurple, shape: BoxShape.circle),
-                                          ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      isSellerThread
-                                          ? 'From: ${(m['buyerName'] ?? 'User').toString()}'
-                                          : 'To seller: ${(m['listingTitle'] ?? 'Item').toString()}',
-                                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text((m['message'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
-                                    if (replies.isNotEmpty)
-                                      Text('${replies.length} repl${replies.length == 1 ? 'y' : 'ies'}', style: TextStyle(fontSize: 10, color: _storePurple.withOpacity(0.85))),
-                                    const SizedBox(height: 4),
-                                    Text(_safeStoreDate((m['createdAt'] ?? '').toString()), style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black45)),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  void _openInquiryThread(Map<String, dynamic> inquiry, bool isDark) {
     final replyC = TextEditingController();
-    final me = widget.user.email.toLowerCase().trim();
-    final isSeller = (inquiry['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
-    final isBuyer = (inquiry['buyerEmail'] ?? '').toString().toLowerCase().trim() == me;
-    final inquiryId = (inquiry['id'] ?? '').toString();
+    final sheetNav = <String, dynamic>{'threadKey': null};
 
     showModalBottomSheet(
       context: context,
@@ -13996,99 +15591,272 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
-          final idx = _inquiries.indexWhere((m) => (m['id'] ?? '').toString() == inquiryId);
-          final thread = idx >= 0 ? _inquiries[idx] : inquiry;
-          final replies = _inquiryReplies(thread);
+          final sheetMessages = _groupedStoreMessageThreads(me);
+          final openKey = sheetNav['threadKey'] as String?;
+          Map<String, dynamic>? openRow;
+          if (openKey != null) {
+            for (final row in sheetMessages) {
+              if ((row['threadKey'] ?? '').toString() == openKey) {
+                openRow = row;
+                break;
+              }
+            }
+            if (openRow == null) sheetNav['threadKey'] = null;
+          }
+
           return Padding(
             padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
             child: Container(
-              height: MediaQuery.of(ctx).size.height * 0.65,
+              height: MediaQuery.of(ctx).size.height * 0.72,
               margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF121726) : Colors.white,
                 borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: border, width: 1.4),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: Text((thread['listingTitle'] ?? 'Item').toString(), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16))),
-                      IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-                    ],
-                  ),
-                  Expanded(
-                    child: ListView(
+              child: openRow == null
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _inquiryBubble(
-                          isDark: isDark,
-                          who: (thread['buyerName'] ?? 'Buyer').toString(),
-                          text: (thread['message'] ?? '').toString(),
-                          mine: !isSeller,
-                        ),
-                        ...replies.map((r) => _inquiryBubble(
-                              isDark: isDark,
-                              who: (r['name'] ?? r['role'] ?? 'User').toString(),
-                              text: (r['message'] ?? '').toString(),
-                              mine: (r['role'] ?? '').toString() == 'seller' ? isSeller : !isSeller,
-                            )),
-                      ],
-                    ),
-                  ),
-                  if (isSeller || isBuyer)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: replyC,
-                            minLines: 1,
-                            maxLines: 3,
-                            decoration: InputDecoration(
-                              hintText: isSeller ? 'Reply to buyer…' : 'Reply to seller…',
-                              filled: true,
-                              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: _storePurple.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: _storePurple.withOpacity(0.35)),
+                              ),
+                              child: const Icon(Icons.chat_bubble_rounded, color: _storePurple),
                             ),
-                          ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Messages',
+                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: _storeSheetTextPrimary(ctx)),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              icon: Icon(Icons.close_rounded, color: _storeSheetTextPrimary(ctx)),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        IconButton.filled(
-                          onPressed: () {
-                            final text = replyC.text.trim();
-                            if (text.isEmpty || idx < 0) return;
-                            final list = _inquiryReplies(thread);
-                            final role = isSeller ? 'seller' : 'buyer';
-                            list.add({
-                              'role': role,
-                              'name': widget.user.username,
-                              'email': widget.user.email,
-                              'message': text,
-                              'createdAt': DateTime.now().toUtc().toIso8601String(),
-                            });
-                            _inquiries[idx]['replies'] = list;
-                            if (isSeller) {
-                              _inquiries[idx]['read'] = true;
-                              _inquiries[idx]['buyerRead'] = false;
-                            } else {
-                              _inquiries[idx]['buyerRead'] = true;
-                              _inquiries[idx]['read'] = false;
-                            }
-                            replyC.clear();
-                            unawaited(_upsertStoreInquiryRowSafe(_inquiries[idx]));
-                            _save();
-                            setSheet(() {});
-                          },
-                          icon: const Icon(Icons.send_rounded),
+                        const SizedBox(height: 8),
+                        Text(
+                          'One chat per buyer — tap to open the full conversation',
+                          style: TextStyle(fontSize: 12, color: _storeSheetTextMuted(ctx)),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: sheetMessages.isEmpty
+                              ? const Center(child: Text('No messages yet.', style: TextStyle(color: Colors.grey)))
+                              : ListView.builder(
+                                  itemCount: sheetMessages.length,
+                                  itemBuilder: (_, i) {
+                                    final row = sheetMessages[i];
+                                    final inquiries = List<Map<String, dynamic>>.from((row['inquiries'] as List).map((e) => Map<String, dynamic>.from(e as Map)));
+                                    final unread = row['unread'] == true;
+                                    final isSellerView = (row['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
+                                    return GestureDetector(
+                                      onTap: () {
+                                        _markThreadRead(me, inquiries);
+                                        sheetNav['threadKey'] = (row['threadKey'] ?? '').toString();
+                                        setSheet(() {});
+                                      },
+                                      child: Container(
+                                        margin: const EdgeInsets.only(bottom: 10),
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(14),
+                                          border: Border.all(color: unread ? _storePurple : border, width: unread ? 1.6 : 1.1),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 22,
+                                              backgroundColor: _storePurple.withOpacity(0.2),
+                                              child: Icon(
+                                                isSellerView ? Icons.person_rounded : Icons.storefront_rounded,
+                                                color: _storePurple,
+                                                size: 22,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          isSellerView
+                                                              ? (row['buyerName'] ?? 'Buyer').toString()
+                                                              : 'Seller chat',
+                                                          style: TextStyle(
+                                                            fontWeight: FontWeight.w800,
+                                                            fontSize: 14,
+                                                            color: _storeSheetTextPrimary(ctx),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (unread)
+                                                        Container(
+                                                          width: 8,
+                                                          height: 8,
+                                                          decoration: const BoxDecoration(color: _storePurple, shape: BoxShape.circle),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                  Text(
+                                                    isSellerView
+                                                        ? 'About: ${(row['listingTitle'] ?? 'Item').toString()}'
+                                                        : 'Item: ${(row['listingTitle'] ?? 'Item').toString()}',
+                                                    style: TextStyle(fontSize: 11, color: _storeSheetTextMuted(ctx)),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    (row['preview'] ?? '').toString(),
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(fontSize: 13, color: _storeSheetTextPrimary(ctx)),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    _safeStoreDate((row['lastAt'] ?? '').toString()),
+                                                    style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black45),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
                         ),
                       ],
+                    )
+                  : _storeInboxThreadPane(
+                      ctx: ctx,
+                      isDark: isDark,
+                      me: me,
+                      row: openRow,
+                      replyC: replyC,
+                      onBack: () {
+                        sheetNav['threadKey'] = null;
+                        setSheet(() {});
+                      },
+                      onClose: () => Navigator.pop(ctx),
+                      onSent: () => setSheet(() {}),
                     ),
-                ],
-              ),
             ),
           );
         },
       ),
+    ).whenComplete(replyC.dispose);
+  }
+
+  Widget _storeInboxThreadPane({
+    required BuildContext ctx,
+    required bool isDark,
+    required String me,
+    required Map<String, dynamic> row,
+    required TextEditingController replyC,
+    required VoidCallback onBack,
+    required VoidCallback onClose,
+    required VoidCallback onSent,
+  }) {
+    final inquiries = List<Map<String, dynamic>>.from((row['inquiries'] as List).map((e) => Map<String, dynamic>.from(e as Map)));
+    final sellerEmail = (row['sellerEmail'] ?? '').toString();
+    final buyerEmail = (row['buyerEmail'] ?? '').toString();
+    final buyerName = (row['buyerName'] ?? 'Buyer').toString();
+    final isSeller = sellerEmail.toLowerCase().trim() == me;
+    final messages = _allMessagesInThread(inquiries, me);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            IconButton(
+              onPressed: onBack,
+              icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: _storeSheetTextPrimary(ctx)),
+            ),
+            Expanded(
+              child: Text(
+                isSeller ? buyerName : 'Chat with seller',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: _storeSheetTextPrimary(ctx)),
+              ),
+            ),
+            IconButton(
+              onPressed: onClose,
+              icon: Icon(Icons.close_rounded, color: _storeSheetTextPrimary(ctx)),
+            ),
+          ],
+        ),
+        Text(
+          'All messages with this ${isSeller ? 'buyer' : 'seller'} stay in one thread',
+          style: TextStyle(fontSize: 11, color: _storeSheetTextMuted(ctx)),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: ListView(
+            children: messages.map((msg) {
+              return Column(
+                crossAxisAlignment: msg.mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  if (msg.itemHint != null && msg.itemHint!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        'Re: ${msg.itemHint}',
+                        style: TextStyle(fontSize: 10, color: _storeSheetTextMuted(ctx), fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  _inquiryBubble(isDark: isDark, who: msg.who, text: msg.text, mine: msg.mine),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: replyC,
+                minLines: 1,
+                maxLines: 3,
+                style: TextStyle(color: _storeSheetTextPrimary(ctx)),
+                decoration: _storeSheetInputDecoration(
+                  ctx,
+                  hintText: isSeller ? 'Reply to buyer…' : 'Reply to seller…',
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              onPressed: () {
+                final text = replyC.text.trim();
+                if (text.isEmpty) return;
+                _sendThreadReply(
+                  sellerEmail: sellerEmail,
+                  buyerEmail: buyerEmail,
+                  text: text,
+                  isSeller: isSeller,
+                );
+                replyC.clear();
+                onSent();
+              },
+              icon: const Icon(Icons.send_rounded),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -14129,11 +15897,14 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Ask Seller'),
+        backgroundColor: _storeSheetBackground(ctx),
+        title: Text('Ask Seller', style: TextStyle(color: _storeSheetTextPrimary(ctx))),
         content: TextField(
           controller: msgC,
           maxLines: 3,
-          decoration: const InputDecoration(
+          style: TextStyle(color: _storeSheetTextPrimary(ctx)),
+          decoration: _storeSheetInputDecoration(
+            ctx,
             labelText: 'Your message',
             hintText: 'Is this item still available?',
           ),
@@ -14144,24 +15915,50 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             onPressed: () {
               final message = msgC.text.trim();
               if (message.isEmpty) return;
-              final inquiry = {
-                'id': DateTime.now().microsecondsSinceEpoch.toString(),
-                'listingId': (listing['id'] ?? '').toString(),
-                'listingTitle': (listing['title'] ?? 'Item').toString(),
-                'sellerEmail': (listing['sellerEmail'] ?? '').toString(),
-                'buyerEmail': widget.user.email,
-                'buyerName': widget.user.username,
-                'message': message,
-                'createdAt': DateTime.now().toUtc().toIso8601String(),
-                'read': false,
-                'buyerRead': true,
-                'replies': <Map<String, dynamic>>[],
-              };
-              _inquiries.add(inquiry);
-              unawaited(_upsertStoreInquiryRowSafe(inquiry));
+              final sellerEmail = (listing['sellerEmail'] ?? '').toString();
+              final buyerEmail = widget.user.email;
+              final listingTitle = (listing['title'] ?? 'Item').toString();
+              final listingId = (listing['id'] ?? '').toString();
+              final existingIdx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+              if (existingIdx != null) {
+                final list = _inquiryReplies(_inquiries[existingIdx]);
+                list.add({
+                  'role': 'buyer',
+                  'name': widget.user.username,
+                  'email': buyerEmail,
+                  'message': message,
+                  'listingTitle': listingTitle,
+                  'listingId': listingId,
+                  'createdAt': DateTime.now().toUtc().toIso8601String(),
+                });
+                _inquiries[existingIdx]['replies'] = list;
+                _inquiries[existingIdx]['read'] = false;
+                _inquiries[existingIdx]['buyerRead'] = true;
+                _inquiries[existingIdx]['listingTitle'] = listingTitle;
+                _inquiries[existingIdx]['listingId'] = listingId;
+                unawaited(_upsertStoreInquiryRowSafe(_inquiries[existingIdx]));
+              } else {
+                final inquiry = {
+                  'id': DateTime.now().microsecondsSinceEpoch.toString(),
+                  'listingId': listingId,
+                  'listingTitle': listingTitle,
+                  'sellerEmail': sellerEmail,
+                  'buyerEmail': buyerEmail,
+                  'buyerName': widget.user.username,
+                  'message': message,
+                  'createdAt': DateTime.now().toUtc().toIso8601String(),
+                  'read': false,
+                  'buyerRead': true,
+                  'replies': <Map<String, dynamic>>[],
+                };
+                _inquiries.add(inquiry);
+                unawaited(_upsertStoreInquiryRowSafe(inquiry));
+              }
               _save();
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Message sent to seller.')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(existingIdx != null ? 'Message added to your chat with the seller.' : 'Message sent to seller.')),
+              );
             },
             style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white),
             child: const Text('Send'),
@@ -14230,27 +16027,14 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   Widget _listingPhoto(String? imageRef, {double? height, double? width, BoxFit fit = BoxFit.cover}) {
     if (imageRef == null || imageRef.trim().isEmpty) return const SizedBox.shrink();
-    final src = imageRef.trim();
-    if (src.startsWith('supabase://') || src.startsWith('http://') || src.startsWith('https://')) {
-      final future = src.startsWith('supabase://') ? _resolveSupabaseStorageUrl(src) : Future<String>.value(src);
-      return FutureBuilder<String>(
-        future: future,
-        builder: (context, snap) {
-          if (!snap.hasData) {
-            return Container(
-              height: height,
-              width: width,
-              color: Colors.grey.shade300,
-              child: const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
-            );
-          }
-          return Image.network(snap.data!, height: height, width: width, fit: fit, errorBuilder: (_, __, ___) => Container(height: height, color: Colors.grey.shade300));
-        },
-      );
-    }
-    final provider = _listingImage(src);
-    if (provider == null) return const SizedBox.shrink();
-    return Image(image: provider, height: height, width: width, fit: fit);
+    return _NgmyListingPhoto(
+      key: ValueKey(imageRef.trim()),
+      imageRef: imageRef.trim(),
+      urlCache: _listingMediaUrlCache,
+      height: height,
+      width: width,
+      fit: fit,
+    );
   }
 
   Future<String> _persistStoreMediaRef(String ref, {bool isVideo = false}) async {
@@ -14332,35 +16116,70 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _orders[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     _orders[idx] = _normalizeStoreOrder(_orders[idx]);
     _save(refreshCloud: true);
+    unawaited(_syncLiveOrders());
     if (mounted) setState(() {});
   }
 
+  Widget _shipByDeadlineBanner(Map<String, dynamic> order, {required bool isDark, required bool forSeller}) {
+    final deadline = _storeShipByDeadline(order);
+    if (deadline == null) return const SizedBox.shrink();
+    final left = deadline.difference(DateTime.now());
+    final late = left.isNegative;
+    final text = late
+        ? (forSeller
+            ? 'Not shipped in 3 days — buyer is refunded only because the order was never marked shipped.'
+            : 'Seller did not ship within 3 days. Your refund is processing…')
+        : 'Mark shipped within ${left.inDays}d ${left.inHours % 24}h ${left.inMinutes % 60}m (refund only if you never ship)';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: late ? Colors.red.withOpacity(0.12) : Colors.orange.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: late ? Colors.red : Colors.orange),
+      ),
+      child: Row(
+        children: [
+          Icon(late ? Icons.warning_amber_rounded : Icons.timer_outlined, size: 18, color: late ? Colors.red : Colors.orange),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87))),
+        ],
+      ),
+    );
+  }
+
   void _showStoreReceipts() {
-    final purchases = _myPurchases();
-    final sales = _mySalesOrders();
     NgmyNavigator.pushRoute(
       context,
       NgmyNavigator.route(
-        (ctx) => DefaultTabController(
-          length: 2,
-          child: Scaffold(
-            appBar: AppBar(
-              title: const Text('Receipts', style: TextStyle(fontWeight: FontWeight.w900)),
-              bottom: TabBar(
-                labelColor: _storePurple,
-                tabs: [
-                  Tab(text: 'My Purchases (${purchases.length})'),
-                  Tab(text: 'My Sales (${sales.length})'),
-                ],
-              ),
-            ),
-            body: TabBarView(
-              children: [
-                _receiptsScroll(purchases, isBuyer: true),
-                _receiptsScroll(sales, isBuyer: false),
-              ],
-            ),
-          ),
+        (ctx) => _StoreReceiptsPage(
+          onPoll: _syncLiveOrders,
+          bodyBuilder: (ctx) {
+              final purchases = _myPurchases();
+              final sales = _mySalesOrders();
+              final receiptsDark = Theme.of(ctx).brightness == Brightness.dark;
+              return DefaultTabController(
+                length: 2,
+                child: Scaffold(
+                  appBar: AppBar(
+                    title: const Text('Receipts', style: TextStyle(fontWeight: FontWeight.w900)),
+                    bottom: TabBar(
+                      labelColor: _storePurple,
+                      tabs: [
+                        Tab(text: 'My Purchases (${purchases.length})'),
+                        Tab(text: 'My Sales (${sales.length})'),
+                      ],
+                    ),
+                  ),
+                  body: TabBarView(
+                    children: [
+                      _buyerPurchasesTab(purchases, receiptsDark),
+                      _receiptsScroll(sales, isBuyer: false),
+                    ],
+                  ),
+                ),
+              );
+          },
         ),
       ),
     ).then((_) {
@@ -14376,6 +16195,37 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 120),
       itemCount: orders.length,
       itemBuilder: (_, i) => _orderReceiptCard(orders[i], isBuyer: isBuyer),
+    );
+  }
+
+  Widget _buyerPurchasesTab(List<Map<String, dynamic>> bought, bool isDark) {
+    return RefreshIndicator(
+      color: _storePurple,
+      onRefresh: () async {
+        await _syncLiveOrders();
+        if (mounted) setState(() {});
+      },
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          if (bought.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Text('No purchases yet.', style: TextStyle(color: Colors.grey))),
+            )
+          else
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (_, i) => Padding(
+                  padding: EdgeInsets.fromLTRB(14, i == 0 ? 4 : 0, 14, 0),
+                  child: _orderReceiptCard(bought[i], isBuyer: true),
+                ),
+                childCount: bought.length,
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
+        ],
+      ),
     );
   }
 
@@ -14443,7 +16293,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final total = (order['total'] as num?)?.toDouble() ?? (((order['price'] as num?) ?? 0).toDouble() + ((order['deliveryFee'] as num?) ?? 0).toDouble());
     final status = _orderStatusLabel(order);
     final fulfillment = (order['fulfillmentStatus'] ?? 'pending').toString();
-    final progress = _shipmentProgressPercent(order);
     final orderId = (order['id'] ?? '').toString();
     final isSeller = !isBuyer;
 
@@ -14484,10 +16333,22 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
               ),
             ],
           ),
-          if (fulfillment != 'pending') ...[
-            const SizedBox(height: 12),
-            _liveTrackingPanel(order, progress: progress, isDark: isDark),
+          if (fulfillment == 'pending' && _storeShipByDeadline(order) != null) ...[
+            const SizedBox(height: 10),
+            _shipByDeadlineBanner(order, isDark: isDark, forSeller: isSeller),
           ],
+          if (fulfillment != 'pending' && fulfillment != 'refunded') ...[
+            const SizedBox(height: 12),
+            _LiveTrackingPanel(key: ValueKey('track_${orderId}_${order['updatedAt']}'), order: order, isDark: isDark),
+          ],
+          if (fulfillment == 'refunded')
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                'Refunded — seller did not ship within 3 days.',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.orange.shade800),
+              ),
+            ),
           const SizedBox(height: 10),
           _receiptInfoRow(Icons.inventory_2_outlined, 'Payment Method', _paymentDisplayLabel((order['paidVia'] ?? 'ngmy').toString()), isDark),
           _receiptInfoRow(Icons.location_on_outlined, 'Delivery Address', (order['buyerAddress'] ?? '').toString(), isDark),
@@ -14579,91 +16440,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     );
   }
 
-  Widget _liveTrackingPanel(Map<String, dynamic> order, {required int progress, required bool isDark}) {
-    final trackingId = (order['trackingId'] ?? '').toString();
-    final steps = ['Shipped', 'In Transit', 'Arriving', 'Delivered'];
-    final status = (order['fulfillmentStatus'] ?? '').toString();
-    int activeStep = 0;
-    if (status == 'in_transit') activeStep = 1;
-    if (status == 'arriving') activeStep = 2;
-    if (status == 'delivered') activeStep = 3;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFBFDBFE)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text('Live Tracking', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF1D4ED8))),
-              const Spacer(),
-              Text('#$trackingId', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF6D28D9))),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress / 100,
-              minHeight: 8,
-              backgroundColor: Colors.white,
-              color: const Color(0xFF7C3AED),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(4, (i) {
-              final done = i <= activeStep;
-              return Column(
-                children: [
-                  Icon(done ? Icons.check_circle : Icons.circle_outlined, size: 18, color: done ? Colors.green : Colors.grey),
-                  Text(steps[i], style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: done ? const Color(0xFF2563EB) : Colors.grey)),
-                ],
-              );
-            }),
-          ),
-          if ((order['locationHistory'] as List?)?.isNotEmpty == true) ...[
-            const SizedBox(height: 10),
-            ...((order['locationHistory'] as List).cast<Map>().map((e) => Map<String, dynamic>.from(e))).take(3).map((h) {
-              return Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.circle, size: 8, color: Color(0xFF2563EB)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text((h['location'] ?? '').toString(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                          Text('${h['note'] ?? ''} · ${(h['at'] ?? '').toString()}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ],
-          const SizedBox(height: 8),
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-              child: Text(status == 'delivered' ? '✓ Delivered' : '$progress% Complete', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _sellerActionChip(String label, IconData icon, Color color, VoidCallback onTap) {
     return Material(
@@ -14697,38 +16473,67 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlg) => Padding(
+        builder: (ctx, setDlg) {
+          final dark = _storeSheetIsDark(ctx);
+          final noteBg = dark ? const Color(0xFF422006) : const Color(0xFFFFF7ED);
+          final noteBorder = dark ? const Color(0xFFF97316) : Colors.orange;
+          final noteText = dark ? const Color(0xFFFED7AA) : const Color(0xFF9A3412);
+          return Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: Container(
             margin: const EdgeInsets.all(14),
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+            decoration: BoxDecoration(
+              color: _storeSheetBackground(ctx),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: dark ? Colors.white12 : const Color(0xFFE5E7EB)),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Text('Ship Order', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                    Text('Ship Order', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: _storeSheetTextPrimary(ctx))),
                     const Spacer(),
-                    IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: Icon(Icons.close, color: _storeSheetTextPrimary(ctx)),
+                    ),
                   ],
                 ),
-                const Text('Shipping Method', style: TextStyle(fontWeight: FontWeight.w700)),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: noteBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: noteBorder),
+                  ),
+                  child: Text(
+                    'Ship within 3 days of purchase. The buyer is refunded from your NGMY balance only if you never mark the order as shipped.',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: noteText),
+                  ),
+                ),
+                Text('Shipping Method', style: TextStyle(fontWeight: FontWeight.w700, color: _storeSheetTextPrimary(ctx))),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _shipMethodBtn('car', Icons.directions_car, method, setDlg, (m) => method = m),
-                    _shipMethodBtn('truck', Icons.local_shipping, method, setDlg, (m) => method = m),
-                    _shipMethodBtn('plane', Icons.flight, method, setDlg, (m) => method = m),
+                    _shipMethodBtn(ctx, 'car', Icons.directions_car, method, setDlg, (m) => method = m),
+                    _shipMethodBtn(ctx, 'truck', Icons.local_shipping, method, setDlg, (m) => method = m),
+                    _shipMethodBtn(ctx, 'plane', Icons.flight, method, setDlg, (m) => method = m),
                   ],
                 ),
                 const SizedBox(height: 14),
-                const Text('Estimated Arrival (Date & Time)', style: TextStyle(fontWeight: FontWeight.w700)),
+                Text('Estimated Arrival (Date & Time)', style: TextStyle(fontWeight: FontWeight.w700, color: _storeSheetTextPrimary(ctx))),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.calendar_today),
-                  title: Text(eta == null ? 'Pick date & time' : _formatReceiptWhen(eta!.toUtc().toIso8601String())),
+                  leading: Icon(Icons.calendar_today, color: _storeSheetTextMuted(ctx)),
+                  title: Text(
+                    eta == null ? 'Pick date & time' : _formatReceiptWhen(eta!.toUtc().toIso8601String()),
+                    style: TextStyle(color: _storeSheetTextPrimary(ctx)),
+                  ),
                   onTap: () async {
                     final d = await showDatePicker(context: ctx, initialDate: eta ?? DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
                     if (d == null) return;
@@ -14737,7 +16542,16 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                     setDlg(() => eta = DateTime(d.year, d.month, d.day, t.hour, t.minute));
                   },
                 ),
-                TextField(controller: locationC, decoration: const InputDecoration(labelText: 'Current Location (optional)', hintText: 'e.g. Warehouse in Nairobi', prefixIcon: Icon(Icons.place))),
+                TextField(
+                  controller: locationC,
+                  style: TextStyle(color: _storeSheetTextPrimary(ctx)),
+                  decoration: _storeSheetInputDecoration(
+                    ctx,
+                    labelText: 'Current Location (optional)',
+                    hintText: 'e.g. Warehouse in Nairobi',
+                    prefixIcon: Icons.place,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
@@ -14751,10 +16565,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                               o['shippingMethod'] = method;
                               o['estimatedArrival'] = eta!.toUtc().toIso8601String();
                               o['shippedAt'] = DateTime.now().toUtc().toIso8601String();
+                              final loc = locationC.text.trim().isEmpty ? 'Shipped — ${_storeVehicleLabel(method)}' : locationC.text.trim();
+                              o['currentLocation'] = loc;
                               final hist = List<Map<String, dynamic>>.from((o['locationHistory'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? []);
                               hist.insert(0, {
-                                'location': locationC.text.trim().isEmpty ? 'Shipped' : locationC.text.trim(),
-                                'note': 'Order shipped',
+                                'location': loc,
+                                'note': 'Order shipped via ${_storeVehicleLabel(method)}',
                                 'at': DateTime.now().toLocal().toString(),
                               });
                               o['locationHistory'] = hist;
@@ -14762,6 +16578,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                 o['fulfillmentStatus'] = 'in_transit';
                               }
                             });
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Shipped! Buyer sees live tracking now.')),
+                              );
+                            }
                           },
                     icon: const Icon(Icons.send_rounded),
                     label: const Text('Ship Order'),
@@ -14771,13 +16592,22 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
               ],
             ),
           ),
-        ),
+        );
+        },
       ),
     );
   }
 
-  Widget _shipMethodBtn(String key, IconData icon, String selected, void Function(void Function()) setDlg, void Function(String) onPick) {
+  Widget _shipMethodBtn(
+    BuildContext ctx,
+    String key,
+    IconData icon,
+    String selected,
+    void Function(void Function()) setDlg,
+    void Function(String) onPick,
+  ) {
     final sel = selected == key;
+    final dark = _storeSheetIsDark(ctx);
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -14788,10 +16618,15 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: sel ? const Color(0xFF2563EB) : Colors.grey.shade300, width: sel ? 2 : 1),
-              color: sel ? const Color(0xFFEFF6FF) : Colors.white,
+              border: Border.all(
+                color: sel ? const Color(0xFF2563EB) : (dark ? Colors.white24 : Colors.grey.shade300),
+                width: sel ? 2 : 1,
+              ),
+              color: sel
+                  ? (dark ? const Color(0xFF1E3A5F) : const Color(0xFFEFF6FF))
+                  : (dark ? const Color(0xFF0F172A) : Colors.white),
             ),
-            child: Icon(icon, color: sel ? const Color(0xFF2563EB) : Colors.grey),
+            child: Icon(icon, color: sel ? const Color(0xFF2563EB) : (dark ? Colors.white54 : Colors.grey)),
           ),
         ),
       ),
@@ -14804,8 +16639,13 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Update location'),
-        content: TextField(controller: c, decoration: const InputDecoration(hintText: 'Current package location')),
+        backgroundColor: _storeSheetBackground(ctx),
+        title: Text('Update location', style: TextStyle(color: _storeSheetTextPrimary(ctx))),
+        content: TextField(
+          controller: c,
+          style: TextStyle(color: _storeSheetTextPrimary(ctx)),
+          decoration: _storeSheetInputDecoration(ctx, hintText: 'Current package location'),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
@@ -14837,10 +16677,14 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
-          title: const Text('Update ETA'),
+          backgroundColor: _storeSheetBackground(ctx),
+          title: Text('Update ETA', style: TextStyle(color: _storeSheetTextPrimary(ctx))),
           content: ListTile(
-            title: Text(eta == null ? 'Pick arrival time' : _formatReceiptWhen(eta!.toUtc().toIso8601String())),
-            leading: const Icon(Icons.schedule),
+            title: Text(
+              eta == null ? 'Pick arrival time' : _formatReceiptWhen(eta!.toUtc().toIso8601String()),
+              style: TextStyle(color: _storeSheetTextPrimary(ctx)),
+            ),
+            leading: Icon(Icons.schedule, color: _storeSheetTextMuted(ctx)),
             onTap: () async {
               final d = await showDatePicker(context: ctx, initialDate: eta ?? DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
               if (d == null) return;
@@ -15523,12 +17367,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         itemCount: pageCount == 0 ? 1 : pageCount,
                         itemBuilder: (_, i) {
                           if (videoRef.isNotEmpty && i == images.length) {
-                            return Center(
-                              child: FutureBuilder<Widget>(
-                                future: _listingVideoWidget(videoRef),
-                                builder: (c, snap) => snap.data ?? const CircularProgressIndicator(color: Colors.white),
-                              ),
-                            );
+                            return _StoreListingVideoPlayer(videoRef: videoRef);
                           }
                           final ref = images[i];
                           return InteractiveViewer(child: Center(child: _listingPhoto(ref, fit: BoxFit.contain)));
@@ -15642,25 +17481,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         ),
       ),
     );
-  }
-
-  Future<Widget> _listingVideoWidget(String ref) async {
-    if (ref.startsWith('supabase://')) {
-      final url = await _resolveSupabaseStorageUrl(ref);
-      return Container(
-        alignment: Alignment.center,
-        color: Colors.black87,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 64),
-            const SizedBox(height: 8),
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Text(url, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 11))),
-          ],
-        ),
-      );
-    }
-    return const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 64);
   }
 
   String _paymentLabel(String key) {
@@ -16185,6 +18005,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       'createdAt': now,
       'updatedAt': now,
       'fulfillmentStatus': 'pending',
+      'shipByDeadline': DateTime.now().toUtc().add(kStoreShipByWindow).toIso8601String(),
       'locationHistory': <Map<String, dynamic>>[],
     });
 
@@ -16511,7 +18332,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: isMyListing ? () => _openListingDetail(listing) : null,
+        onTap: (images.isNotEmpty || videoRef.isNotEmpty) ? () => _openListingDetail(listing) : null,
         borderRadius: BorderRadius.circular(16),
         child: Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -16721,7 +18542,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                     ]
                   : [
                       _shopGrid(shop),
-                      _receiptsScroll(bought, isBuyer: true),
+                      _buyerPurchasesTab(bought, isDark),
                     ],
             ),
           ),
@@ -16742,6 +18563,19 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       ),
       child: Row(
         children: [
+          IconButton(
+            tooltip: 'Scan barcode',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
+            icon: const Icon(Icons.qr_code_scanner_rounded, color: _storePurple, size: 22),
+            onPressed: () => openNgmyBarcodeScanner(context),
+          ),
+          Container(
+            height: 36,
+            width: 1,
+            margin: const EdgeInsets.only(right: 6),
+            color: frameBorder,
+          ),
           const Icon(Icons.search_rounded, color: _storePurple, size: 20),
           const SizedBox(width: 6),
           Expanded(
