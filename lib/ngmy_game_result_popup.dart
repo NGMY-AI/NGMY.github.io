@@ -15,7 +15,7 @@ Future<void> showNgmyGameResultPopup(
 }) {
   return showGeneralDialog<void>(
     context: context,
-    useRootNavigator: false,
+    useRootNavigator: true,
     barrierDismissible: false,
     barrierLabel: win ? 'Win' : 'Lose',
     barrierColor: Colors.black54,
