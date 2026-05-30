@@ -381,13 +381,13 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
                 child: Column(
                   children: [
-                    Expanded(
-                      flex: 5,
+                    SizedBox(
+                      height: math.min(MediaQuery.sizeOf(context).height * 0.30, 200),
+                      width: double.infinity,
                       child: Container(
-                        width: double.infinity,
                         decoration: BoxDecoration(
                           color: const Color(0xFF6B4C9A).withOpacity(0.55),
                           borderRadius: BorderRadius.circular(18),
@@ -397,17 +397,17 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                           child: Ngmy3DDiceCube(
                             rolling: _rolling,
                             outcome: _rolling ? _rollPreview : _landedOutcome,
-                            size: math.min(MediaQuery.of(context).size.width * 0.46, 156),
+                            size: math.min(MediaQuery.sizeOf(context).width * 0.40, 132),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
                       'Roll lands on one of:',
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 11, fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         for (final o in kNgmyDiceOutcomes)
@@ -420,7 +420,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                     ),
                     if (!_rolling && _landedOutcome != null)
                       Padding(
-                        padding: const EdgeInsets.only(top: 10),
+                        padding: const EdgeInsets.only(top: 6),
                         child: Text(
                           'Landed on ${ngmyDiceOutcomeLabel(_landedOutcome!)}',
                           style: TextStyle(
@@ -430,12 +430,12 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                           ),
                         ),
                       ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text('Bet Amount', style: TextStyle(color: Colors.white.withOpacity(0.85), fontWeight: FontWeight.w800, fontSize: 12)),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       children: [2.0, 5.0, 10.0, 25.0].map((v) {
                         final sel = _bet == v && _customBetC.text.trim().isEmpty;
@@ -495,7 +495,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                           ),
                         ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text(
@@ -503,10 +503,10 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                         style: const TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w800, fontSize: 11),
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,
-                      height: 52,
+                      height: 48,
                       child: ElevatedButton(
                         onPressed: _rolling ? null : _roll,
                         style: ElevatedButton.styleFrom(

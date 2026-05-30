@@ -5594,10 +5594,10 @@ class _GameBetScreenState extends State<GameBetScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
           decoration: BoxDecoration(
             gradient: const LinearGradient(colors: [Color(0xFF6B21A8), Color(0xFF7E22CE)]),
             borderRadius: BorderRadius.circular(16),
@@ -5605,15 +5605,15 @@ class _GameBetScreenState extends State<GameBetScreen> {
           ),
           child: Column(
             children: [
-              Icon(Icons.psychology, color: Colors.pink.shade200, size: 36),
-              const SizedBox(height: 8),
-              Text(widget.gameTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 34 * 0.7)),
+              Icon(Icons.psychology, color: Colors.pink.shade200, size: 28),
               const SizedBox(height: 4),
-              Text(widget.gameSubtitle, style: const TextStyle(color: Colors.white70)),
-              const SizedBox(height: 14),
+              Text(widget.gameTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
+              const SizedBox(height: 2),
+              Text(widget.gameSubtitle, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              const SizedBox(height: 10),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
                 child: Column(
                   children: [
@@ -5653,18 +5653,18 @@ class _GameBetScreenState extends State<GameBetScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(color: const Color(0xFF2A3A6E), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.tealAccent.withOpacity(0.4))),
                 child: Column(
                   children: [
-                    const Text('💰 Partial Payout System', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 10),
+                    const Text('💰 Partial Payout System', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w900, fontSize: 13)),
+                    const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
                       child: Column(
                         children: [
@@ -5674,10 +5674,10 @@ class _GameBetScreenState extends State<GameBetScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
                       child: Column(
                         children: [
@@ -5690,12 +5690,12 @@ class _GameBetScreenState extends State<GameBetScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _startGame,
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF22C55E), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 54)),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF22C55E), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 48)),
                   child: Text('Start Game (\$${_bet.toStringAsFixed(2)})', style: const TextStyle(fontWeight: FontWeight.w800)),
                 ),
               ),
@@ -6268,29 +6268,29 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: widget.colors),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
                         'Bet \$${widget.wager.toStringAsFixed(2)} • Progress ${_gameProgressDone()}/${_gameProgressTotal()} • Paid by progress',
-                        style: const TextStyle(color: Colors.white70, fontSize: 10),
+                        style: const TextStyle(color: Colors.white70, fontSize: 9),
                       ),
                     ),
-                    const Icon(Icons.timer_outlined, color: Colors.white70, size: 14),
+                    const Icon(Icons.timer_outlined, color: Colors.white70, size: 13),
                     const SizedBox(width: 4),
-                    Text(timerText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+                    Text(timerText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(colors: widget.colors.map((c) => c.withOpacity(0.85)).toList()),
                     borderRadius: BorderRadius.circular(14),
@@ -6376,7 +6376,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
           FittedBox(
             child: Text(_scrambled, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: 4)),
           ),
-          const Spacer(),
+          const SizedBox(height: 16),
           TextField(
             controller: _inputC,
             textCapitalization: TextCapitalization.characters,
@@ -6422,7 +6422,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26),
             ),
           ),
-          const Spacer(),
+          const SizedBox(height: 16),
           ..._optionChoices.map((c) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: SizedBox(
@@ -6567,9 +6567,9 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       return Column(
         children: [
           Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-          const Spacer(),
+          const SizedBox(height: 12),
           Text(_colorWord, style: TextStyle(color: _colorInk, fontWeight: FontWeight.w900, fontSize: 42)),
-          const Spacer(),
+          const SizedBox(height: 16),
           ...List.generate(names.length, (i) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: SizedBox(
