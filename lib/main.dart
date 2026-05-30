@@ -31,6 +31,8 @@ import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
 import 'ngmy_dice_config.dart';
 import 'ngmy_fun_games.dart';
+import 'ngmy_invoice_storage.dart';
+import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
@@ -11372,39 +11374,11 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
         .toList();
   }
 
-  Future<void> _cleanupExpiredPaidInvoices() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('saved_invoices_v1');
-    if (raw == null || raw.isEmpty) return;
-    try {
-      final now = DateTime.now();
-      final decoded = (jsonDecode(raw) as List).cast<dynamic>();
-      final keep = decoded.where((entry) {
-        if (entry is! Map) return false;
-        final paidAtRaw = entry['paidAt']?.toString();
-        if (paidAtRaw == null || paidAtRaw.isEmpty) return true;
-        final paidAt = DateTime.tryParse(paidAtRaw);
-        if (paidAt == null) return true;
-        return now.isBefore(paidAt.add(const Duration(days: 5)));
-      }).toList();
-      await prefs.setString('saved_invoices_v1', jsonEncode(keep));
-    } catch (_) {
-      // If old/corrupt local invoice cache exists, leave it untouched.
-    }
-  }
+  Future<void> _cleanupExpiredPaidInvoices() => cleanupExpiredPaidInvoices();
 
-  Future<void> _saveInvoiceLocally(BuildContext dialogContext, double subtotal) async {
-    await _cleanupExpiredPaidInvoices();
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('saved_invoices_v1');
-    final entries = <dynamic>[];
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        entries.addAll((jsonDecode(raw) as List).cast<dynamic>());
-      } catch (_) {}
-    }
+  Map<String, dynamic> _invoiceEntryFromForm(double subtotal) {
     final now = DateTime.now().toIso8601String();
-    entries.add({
+    return {
       'id': DateTime.now().microsecondsSinceEpoch.toString(),
       'template': _invoiceTemplate,
       'invoiceNo': _invoiceNoC.text.trim(),
@@ -11418,6 +11392,9 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       'clientEmail': _clientEmailC.text.trim(),
       'item': _itemNameC.text.trim(),
       'description': _itemDescC.text.trim(),
+      'itemPrice': _itemPriceC.text.trim(),
+      'itemQty': _itemQtyC.text.trim(),
+      'itemDiscount': _itemDiscountC.text.trim(),
       'paymentInfo': _paymentInfoC.text.trim(),
       'subtotal': subtotal,
       'isPaid': _invoicePaid,
@@ -11425,63 +11402,268 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       'createdAt': now,
       'providerSignature': _serializeSignature(_providerSignaturePoints),
       'clientSignature': _serializeSignature(_clientSignaturePoints),
-    });
-    await prefs.setString('saved_invoices_v1', jsonEncode(entries));
+    };
+  }
+
+  void _applyInvoiceEntryToForm(Map<String, dynamic> entry, VoidCallback refresh) {
+    _invoiceTemplate = (entry['template'] ?? 'Modern').toString();
+    _invoiceNoC.text = (entry['invoiceNo'] ?? '1').toString();
+    _issuedDateC.text = (entry['issuedDate'] ?? '').toString();
+    _dueDateC.text = (entry['dueDate'] ?? '').toString();
+    _bizNameC.text = (entry['business'] ?? '').toString();
+    _bizStreetC.text = (entry['street'] ?? '').toString();
+    _bizCityStateZipC.text = (entry['cityStateZip'] ?? '').toString();
+    _bizPhoneC.text = (entry['phone'] ?? '').toString();
+    _clientNameC.text = (entry['clientName'] ?? '').toString();
+    _clientEmailC.text = (entry['clientEmail'] ?? '').toString();
+    _itemNameC.text = (entry['item'] ?? '').toString();
+    _itemDescC.text = (entry['description'] ?? '').toString();
+    _itemPriceC.text = (entry['itemPrice'] ?? '0').toString();
+    _itemQtyC.text = (entry['itemQty'] ?? '1').toString();
+    _itemDiscountC.text = (entry['itemDiscount'] ?? '0').toString();
+    _paymentInfoC.text = (entry['paymentInfo'] ?? '').toString();
+    _invoicePaid = entry['isPaid'] == true;
+    _providerSignaturePoints
+      ..clear()
+      ..addAll(_deserializeSignature(entry['providerSignature']));
+    _clientSignaturePoints
+      ..clear()
+      ..addAll(_deserializeSignature(entry['clientSignature']));
+    refresh();
+  }
+
+  List<Offset?> _deserializeSignature(dynamic raw) {
+    if (raw is! List) return [];
+    return raw.map((p) {
+      if (p is! Map) return null;
+      final x = p['x'];
+      final y = p['y'];
+      if (x is num && y is num) return Offset(x.toDouble(), y.toDouble());
+      return null;
+    }).whereType<Offset>().toList();
+  }
+
+  Future<int> _saveInvoiceLocally(BuildContext dialogContext, double subtotal) async {
+    await addSavedInvoice(_invoiceEntryFromForm(subtotal));
+    final count = await savedInvoiceCount();
     if (dialogContext.mounted) {
       ScaffoldMessenger.of(dialogContext).showSnackBar(
         SnackBar(
           content: Text(
             _invoicePaid
-                ? 'Invoice saved. Paid invoices auto-delete after 5 days.'
-                : 'Invoice saved locally.',
+                ? 'Invoice saved. Tap the receipt icon to view it. Paid invoices auto-delete after 5 days.'
+                : 'Invoice saved. Tap the receipt icon next to Create Invoice to view it.',
           ),
+          backgroundColor: const Color(0xFF16A34A),
         ),
       );
     }
+    return count;
   }
 
   Future<void> _downloadInvoiceImage(BuildContext dialogContext, GlobalKey previewKey) async {
     try {
-      await Future.delayed(const Duration(milliseconds: 40));
+      await Future.delayed(const Duration(milliseconds: 180));
       await WidgetsBinding.instance.endOfFrame;
       final boundary = previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) throw Exception('Preview is not ready yet.');
-      final image = await boundary.toImage(pixelRatio: 3.2);
+      if (boundary == null) throw Exception('Preview is not ready yet. Scroll to the invoice preview and try again.');
+      final image = await boundary.toImage(pixelRatio: 3.0);
       final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
       if (bytes == null) throw Exception('Could not render invoice image.');
 
-      if (kIsWeb) {
-        await Clipboard.setData(ClipboardData(text: base64Encode(bytes)));
-        if (dialogContext.mounted) {
-          ScaffoldMessenger.of(dialogContext).showSnackBar(
-            const SnackBar(content: Text('Web mode: invoice image copied as Base64 to clipboard.')),
-          );
-        }
-        return;
-      }
-
-      final dir = _downloadDirectory();
-      await dir.create(recursive: true);
       final invoiceNo = _invoiceNoC.text.trim().isEmpty ? 'invoice' : _invoiceNoC.text.trim();
-      final file = File(
-        '${dir.path}${Platform.pathSeparator}invoice_${invoiceNo}_${DateTime.now().millisecondsSinceEpoch}.png',
-      );
-      await file.writeAsBytes(bytes, flush: true);
-      if (!await file.exists()) {
-        throw Exception('File write failed.');
-      }
+      final filename = 'invoice_${invoiceNo}_${DateTime.now().millisecondsSinceEpoch}';
+      final msg = await downloadNgmyQrImage(bytes, filename);
       if (dialogContext.mounted) {
         ScaffoldMessenger.of(dialogContext).showSnackBar(
-          SnackBar(content: Text('Invoice downloaded to: ${file.path}')),
+          SnackBar(content: Text(msg), backgroundColor: const Color(0xFF16A34A)),
         );
       }
     } catch (e) {
       if (dialogContext.mounted) {
         ScaffoldMessenger.of(dialogContext).showSnackBar(
-          SnackBar(content: Text('Download failed: $e')),
+          SnackBar(content: Text('Download failed: $e'), backgroundColor: const Color(0xFFEF4444)),
         );
       }
     }
+  }
+
+  Future<void> _showSavedInvoicesSheet(
+    BuildContext context, {
+    required VoidCallback refreshParent,
+    GlobalKey? previewKey,
+  }) async {
+    var invoices = await loadSavedInvoices();
+    if (!context.mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0B1020),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setSheet) {
+          Future<void> reload() async {
+            invoices = await loadSavedInvoices();
+            setSheet(() {});
+            refreshParent();
+          }
+
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(left: 16, right: 16, top: 12, bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.receipt_long_rounded, color: Color(0xFF10B981)),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text('Saved Invoices', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                      ),
+                      IconButton(onPressed: () => Navigator.pop(sheetCtx), icon: const Icon(Icons.close, color: Colors.white54)),
+                    ],
+                  ),
+                  Text(
+                    'Stored on this device only · unpaid invoices stay until you delete them',
+                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+                  ),
+                  const SizedBox(height: 12),
+                  if (invoices.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 28),
+                      child: Column(
+                        children: [
+                          Icon(Icons.receipt_outlined, size: 48, color: Colors.white.withOpacity(0.15)),
+                          const SizedBox(height: 10),
+                          Text('No saved invoices yet', style: TextStyle(color: Colors.white.withOpacity(0.7), fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Text('Tap Save Invoice to keep one here.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 12)),
+                        ],
+                      ),
+                    )
+                  else
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetCtx).size.height * 0.55),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: invoices.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) {
+                          final inv = invoices[i];
+                          final id = (inv['id'] ?? '').toString();
+                          final no = (inv['invoiceNo'] ?? '—').toString();
+                          final client = (inv['clientName'] ?? 'Client').toString();
+                          final item = (inv['item'] ?? '').toString();
+                          final sub = inv['subtotal'];
+                          final amount = sub is num ? sub.toDouble() : double.tryParse('$sub') ?? 0;
+                          final paid = inv['isPaid'] == true;
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF12182A),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: paid ? Colors.white12 : const Color(0xFF10B981).withOpacity(0.35)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Invoice #$no', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                                          Text(client, style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 13)),
+                                          if (item.isNotEmpty) Text(item, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11)),
+                                        ],
+                                      ),
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text('\$${amount.toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 16)),
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: paid ? Colors.white10 : const Color(0xFFF97316).withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: Text(paid ? 'Paid' : 'Unpaid', style: TextStyle(color: paid ? Colors.white54 : const Color(0xFFF97316), fontSize: 10, fontWeight: FontWeight.w800)),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () {
+                                          _applyInvoiceEntryToForm(inv, refreshParent);
+                                          Navigator.pop(sheetCtx);
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Invoice loaded into editor.')),
+                                          );
+                                        },
+                                        child: const Text('Open'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    if (previewKey != null)
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: () async {
+                                            _applyInvoiceEntryToForm(inv, refreshParent);
+                                            await Future.delayed(const Duration(milliseconds: 250));
+                                            if (context.mounted) {
+                                              await _downloadInvoiceImage(context, previewKey);
+                                            }
+                                          },
+                                          icon: const Icon(Icons.download_rounded, size: 16),
+                                          label: const Text('Download'),
+                                        ),
+                                      ),
+                                    IconButton(
+                                      onPressed: () async {
+                                        final ok = await showDialog<bool>(
+                                          context: sheetCtx,
+                                          builder: (dCtx) => AlertDialog(
+                                            title: const Text('Delete invoice?'),
+                                            content: Text('Remove invoice #$no from this device?'),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Cancel')),
+                                              TextButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('Delete')),
+                                            ],
+                                          ),
+                                        );
+                                        if (ok == true) {
+                                          await deleteSavedInvoice(id);
+                                          await reload();
+                                        }
+                                      },
+                                      icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _openMFunGames() => showNgmyFunGamesDialog(context);
@@ -11845,11 +12027,12 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     );
   }
 
-  void _openInvoiceGenerator() {
+  void _openInvoiceGenerator() async {
     _providerSignaturePoints.clear();
     _clientSignaturePoints.clear();
     _invoicePaid = false;
-    _cleanupExpiredPaidInvoices();
+    await _cleanupExpiredPaidInvoices();
+    var savedCount = await savedInvoiceCount();
     final templateStyles = _invoiceTemplateStyles();
     final templates = templateStyles.keys.toList();
     final GlobalKey localPreviewKey = GlobalKey();
@@ -11867,6 +12050,12 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
             final useDarkText = _invoiceTemplate == 'Marble' || _invoiceTemplate == 'Diamond';
             final headerTextColor = useDarkText ? const Color(0xFF0F172A) : Colors.white;
             final screen = MediaQuery.of(ctx).size;
+
+            Future<void> refreshSavedCount() async {
+              savedCount = await savedInvoiceCount();
+              setDialog(() {});
+            }
+
             return Dialog(
               insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               backgroundColor: isDark ? const Color(0xFF0A1020) : Colors.white,
@@ -11882,8 +12071,20 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       Row(children: [
                         const Icon(Icons.receipt_long_rounded),
                         const SizedBox(width: 8),
-                        const Text('Create Invoice', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-                        const Spacer(),
+                        const Expanded(child: Text('Create Invoice', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18))),
+                        IconButton(
+                          tooltip: 'Saved invoices',
+                          onPressed: () => _showSavedInvoicesSheet(
+                            ctx,
+                            refreshParent: () => setDialog(() {}),
+                            previewKey: localPreviewKey,
+                          ).then((_) => refreshSavedCount()),
+                          icon: Badge(
+                            isLabelVisible: savedCount > 0,
+                            label: Text('$savedCount'),
+                            child: const Icon(Icons.folder_special_rounded, color: Color(0xFF10B981)),
+                          ),
+                        ),
                         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
                       ]),
                     const Text('Choose Template', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -12337,7 +12538,10 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => _saveInvoiceLocally(ctx, subtotal),
+                            onPressed: () async {
+                              final count = await _saveInvoiceLocally(ctx, subtotal);
+                              setDialog(() => savedCount = count);
+                            },
                             icon: const Icon(Icons.save_alt_rounded),
                             label: const Text('Save Invoice'),
                           ),
