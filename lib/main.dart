@@ -11235,10 +11235,10 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   }
 
   String _triangleResult() {
-    if (_triCheap && _triGood) return 'Cheap + Good = Not Fast — Quality at low cost takes time.';
-    if (_triFast && _triGood) return 'Fast + Good = Not Cheap — Speed with quality costs more.';
-    if (_triFast && _triCheap) return 'Fast + Cheap = Not Good — Rush and low cost reduce quality.';
-    return 'Pick any 2 options. The 3rd one turns off automatically.';
+    if (_triCheap && _triGood) return '⚡ Cheap + Good = Not Fast — Quality at low cost takes time.';
+    if (_triFast && _triGood) return '⚡ Fast + Good = Not Cheap — Speed with quality costs more.';
+    if (_triFast && _triCheap) return '⚡ Fast + Cheap = Not Good — Quick and affordable, but quality suffers.';
+    return '⚡ Pick any 2 options. The 3rd one turns off automatically.';
   }
 
   double _invoiceSubtotal() {
@@ -11469,120 +11469,184 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       barrierColor: Colors.black87,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) {
+          void refresh() => setDialog(() {});
+
           final others = _num(_othersPriceC.text);
           final mine = _num(_myPriceC.text);
           final netMine = mine - (mine * (_discount / 100));
+          final discountAmt = mine - netMine;
+          final belowMarket = others - netMine;
+          final city = _calcCityC.text.trim();
+          final service = _calcServiceC.text.trim();
+          final showPriceResult = mine > 0 || others > 0;
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final dialogW = MediaQuery.of(ctx).size.width > 480 ? 380.0 : MediaQuery.of(ctx).size.width - 28;
           const chrome = [Color(0xFF252A32), Color(0xFF0A0D14)];
+
+          InputDecoration calcDec(String hint) => InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 13),
+                filled: true,
+                fillColor: Colors.black.withOpacity(0.25),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF10B981))),
+              );
 
           Widget triRow({
             required String keyName,
             required String label,
             required bool active,
-            required Color dot,
+            required Color labelColor,
+            required Color trackColor,
           }) {
             return Container(
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
               decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.08))),
+                border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.07))),
               ),
               child: Row(
                 children: [
-                  Container(width: 7, height: 7, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-                  const SizedBox(width: 10),
-                  Text(label, style: TextStyle(color: active ? Colors.white : Colors.white54, fontSize: 28 * 0.7, fontWeight: FontWeight.w800, letterSpacing: 2)),
+                  Container(width: 6, height: 6, decoration: BoxDecoration(color: labelColor, shape: BoxShape.circle)),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: active ? labelColor : Colors.white38,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
                   const Spacer(),
-                  Switch(
-                    value: active,
-                    onChanged: (v) {
-                      _setTriangleOption(keyName, v);
-                      setDialog(() {});
-                    },
+                  Transform.scale(
+                    scale: 0.78,
+                    child: Switch(
+                      value: active,
+                      activeTrackColor: trackColor.withOpacity(0.55),
+                      activeThumbColor: trackColor,
+                      onChanged: (v) {
+                        _setTriangleOption(keyName, v);
+                        setDialog(() {});
+                      },
+                    ),
                   ),
                 ],
               ),
             );
           }
 
+          Widget rivet(Alignment align) {
+            return Align(
+              alignment: align,
+              child: Container(
+                width: 7,
+                height: 7,
+                margin: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.18),
+                  border: Border.all(color: Colors.black54),
+                ),
+              ),
+            );
+          }
+
           return Dialog(
-            insetPadding: const EdgeInsets.all(14),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
             backgroundColor: isDark ? const Color(0xFF0A1222) : const Color(0xFF091323),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             child: SizedBox(
-              width: 840,
+              width: dialogW,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.bolt, size: 18, color: Colors.white),
-                        const SizedBox(width: 8),
-                        const Text('Pick Two', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 30 * 0.7, color: Colors.white)),
+                        const Icon(Icons.bolt, size: 16, color: Colors.white),
+                        const SizedBox(width: 6),
+                        const Text('Pick Two', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: Colors.white)),
                         const Spacer(),
-                        IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close, color: Colors.white70)),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close, color: Colors.white70, size: 20),
+                        ),
                       ],
                     ),
+                    const SizedBox(height: 6),
+                    Stack(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: chrome, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFF4B5563)),
+                          ),
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 10),
+                              Text(
+                                'THE IRON TRIANGLE',
+                                style: TextStyle(color: Colors.white.withOpacity(0.55), letterSpacing: 3, fontSize: 9, fontWeight: FontWeight.w800),
+                              ),
+                              const SizedBox(height: 4),
+                              triRow(keyName: 'fast', label: 'FAST', active: _triFast, labelColor: const Color(0xFFF97316), trackColor: const Color(0xFFF97316)),
+                              triRow(keyName: 'cheap', label: 'CHEAP', active: _triCheap, labelColor: const Color(0xFF34D399), trackColor: const Color(0xFF34D399)),
+                              triRow(keyName: 'good', label: 'GOOD', active: _triGood, labelColor: const Color(0xFF94A3B8), trackColor: const Color(0xFF60A5FA)),
+                              const SizedBox(height: 6),
+                            ],
+                          ),
+                        ),
+                        rivet(Alignment.topLeft),
+                        rivet(Alignment.topRight),
+                        rivet(Alignment.bottomLeft),
+                        rivet(Alignment.bottomRight),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     Container(
-                      margin: const EdgeInsets.only(top: 8),
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: chrome, begin: Alignment.topLeft, end: Alignment.bottomRight),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF4B5563)),
-                        boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 18)],
+                        color: const Color(0xFF0F2744),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.45)),
                       ),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 14),
-                          Text('THE IRON TRIANGLE', style: TextStyle(color: Colors.white.withOpacity(0.7), letterSpacing: 5, fontSize: 12, fontWeight: FontWeight.w800)),
-                          const SizedBox(height: 10),
-                          triRow(keyName: 'fast', label: 'FAST', active: _triFast, dot: const Color(0xFF94A3B8)),
-                          triRow(keyName: 'cheap', label: 'CHEAP', active: _triCheap, dot: const Color(0xFF34D399)),
-                          triRow(keyName: 'good', label: 'GOOD', active: _triGood, dot: const Color(0xFF60A5FA)),
-                          const SizedBox(height: 10),
-                        ],
-                      ),
+                      child: Text(_triangleResult(), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 11, height: 1.35)),
                     ),
                     const SizedBox(height: 10),
                     Container(
-                      width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF113152),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF3B82F6)),
-                      ),
-                      child: Text(_triangleResult(), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
                         gradient: const LinearGradient(colors: [Color(0xFF0A3A46), Color(0xFF0A2D4F)]),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF06B6D4)),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.55)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              const Text('💰 Price Calculator', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+                              const Text('💰', style: TextStyle(fontSize: 14)),
+                              const SizedBox(width: 6),
+                              const Text('Price Calculator', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 14)),
                               const Spacer(),
                               GestureDetector(
                                 onTap: () => _openInvoiceFromGDialog(ctx),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                  decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(10)),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.receipt_long_rounded, color: Colors.white, size: 18),
-                                      SizedBox(width: 4),
-                                      Text('Invoice', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                                    ],
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
+                                  child: const Icon(Icons.attach_money_rounded, color: Colors.white, size: 20),
                                 ),
                               ),
                             ],
@@ -11590,34 +11654,146 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              Expanded(child: TextField(style: const TextStyle(color: Colors.white), controller: _calcCityC, decoration: const InputDecoration(hintText: 'City (e.g., Macon)'))),
-                              const SizedBox(width: 8),
-                              Expanded(child: TextField(style: const TextStyle(color: Colors.white), controller: _calcServiceC, decoration: const InputDecoration(hintText: 'Service name'))),
+                              Expanded(
+                                child: TextField(
+                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                  controller: _calcCityC,
+                                  onChanged: (_) => refresh(),
+                                  decoration: calcDec('City (e.g., Macon)'),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: TextField(
+                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                  controller: _calcServiceC,
+                                  onChanged: (_) => refresh(),
+                                  decoration: calcDec('Service name'),
+                                ),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Row(
                             children: [
-                              Expanded(child: TextField(style: const TextStyle(color: Colors.white), controller: _othersPriceC, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'Others charge (\$)'))),
-                              const SizedBox(width: 8),
-                              Expanded(child: TextField(style: const TextStyle(color: Colors.white), controller: _myPriceC, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'My price (\$)'))),
+                              Expanded(
+                                child: TextField(
+                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                  controller: _othersPriceC,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  onChanged: (_) => refresh(),
+                                  decoration: calcDec('Others charge (\$)'),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: TextField(
+                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                  controller: _myPriceC,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  onChanged: (_) => refresh(),
+                                  decoration: calcDec('My price (\$)'),
+                                ),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Text('Discount: ${_discount.toStringAsFixed(0)}%', style: const TextStyle(color: Colors.white70)),
-                          Slider(
-                            value: _discount,
-                            min: 0,
-                            max: 20,
-                            divisions: 20,
-                            onChanged: (v) => setDialog(() => _discount = v),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Text('Discount', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                              Expanded(
+                                child: Slider(
+                                  value: _discount,
+                                  min: 0,
+                                  max: 20,
+                                  divisions: 20,
+                                  activeColor: const Color(0xFF10B981),
+                                  onChanged: (v) => setDialog(() => _discount = v),
+                                ),
+                              ),
+                              Text('${_discount.toStringAsFixed(0)}%', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                            ],
                           ),
-                          Text(
-                            'After discount: \$${netMine.toStringAsFixed(2)}  |  Difference vs market: \$${(netMine - others).toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('0%', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10)),
+                              Text('Max 20%', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10)),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          const Text('Offline ready: this calculator and invoice generator work without internet.', style: TextStyle(fontSize: 11, color: Colors.white70)),
+                          if (showPriceResult) ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.22),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF10B981)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    service.isNotEmpty && city.isNotEmpty
+                                        ? '$service in $city'
+                                        : service.isNotEmpty
+                                            ? service
+                                            : city.isNotEmpty
+                                                ? city
+                                                : 'Your quote',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
+                                  ),
+                                  if (others > 0) ...[
+                                    const SizedBox(height: 6),
+                                    Text('Market rate: \$${others.toStringAsFixed(2)}', style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 12)),
+                                  ],
+                                  if (mine > 0) ...[
+                                    const SizedBox(height: 10),
+                                    Text('YOUR PRICE', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                                    Text(
+                                      '\$${netMine.toStringAsFixed(2)}',
+                                      style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 32, height: 1.05),
+                                    ),
+                                    if (discountAmt > 0.009) ...[
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            '\$${mine.toStringAsFixed(2)}',
+                                            style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 13, decoration: TextDecoration.lineThrough),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF10B981).withOpacity(0.2),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
+                                            ),
+                                            child: Text('Save \$${discountAmt.toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFF34D399), fontSize: 11, fontWeight: FontWeight.w800)),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                  if (others > 0 && mine > 0 && belowMarket > 0.009) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '✓ \$${belowMarket.toStringAsFixed(2)} below market rate!',
+                                      style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w700, fontSize: 12),
+                                    ),
+                                  ] else if (others > 0 && mine > 0 && belowMarket < -0.009) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Above market by \$${(-belowMarket).toStringAsFixed(2)}',
+                                      style: const TextStyle(color: Color(0xFFF97316), fontWeight: FontWeight.w700, fontSize: 12),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

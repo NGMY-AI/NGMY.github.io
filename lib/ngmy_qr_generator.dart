@@ -550,75 +550,150 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       );
     }
 
-    return Column(
-      children: _saved.map((record) => _savedTile(record)).toList(),
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 0.78,
+      ),
+      itemCount: _saved.length,
+      itemBuilder: (context, index) => _savedGridTile(_saved[index]),
     );
   }
 
-  Widget _savedTile(NgmySavedQrRecord record) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _panel,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _accent.withOpacity(0.22)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  void _openSavedQrFullscreen(NgmySavedQrRecord record) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.94),
+      builder: (ctx) => Dialog.fullscreen(
+        backgroundColor: _bg,
+        child: SafeArea(
+          child: Column(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                child: Row(
                   children: [
-                    Text(record.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-                    const SizedBox(height: 4),
-                    Text(record.typeLabel, style: TextStyle(color: _accent.withOpacity(0.9), fontSize: 12, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 2),
-                    Text(
-                      _formatSavedDate(record.savedAt),
-                      style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(record.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text(record.typeLabel, style: TextStyle(color: _accent.withOpacity(0.9), fontSize: 12, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _busy
+                          ? null
+                          : () async {
+                              await _deleteSaved(record);
+                              if (ctx.mounted) Navigator.pop(ctx);
+                            },
+                      icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: _busy ? null : () => _deleteSaved(record),
-                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
-                tooltip: 'Delete',
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        NgmyBrandedQrWidget(data: record.payload, large: true),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Scan with any camera app',
+                          style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _busy ? null : () => _downloadQr(payload: record.payload, label: record.label),
+                    icon: const Icon(Icons.download_rounded),
+                    label: const Text('Download to gallery'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Center(
-            child: NgmyBrandedQrWidget(data: record.payload, compact: true),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _busy ? null : () => _downloadQr(payload: record.payload, label: record.label),
-              icon: const Icon(Icons.download_rounded, size: 18),
-              label: const Text('Download to gallery'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _accent,
-                side: BorderSide(color: _accent.withOpacity(0.55)),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  String _formatSavedDate(String iso) {
-    final dt = DateTime.tryParse(iso);
-    if (dt == null) return '';
-    final local = dt.toLocal();
-    return 'Saved ${local.month}/${local.day}/${local.year}';
+  Widget _savedGridTile(NgmySavedQrRecord record) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _openSavedQrFullscreen(record),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: _panel,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _accent.withOpacity(0.22)),
+          ),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      record.label,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _busy ? null : () => _deleteSaved(record),
+                    child: const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: Icon(Icons.close_rounded, size: 16, color: Color(0xFFEF4444)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(record.typeLabel, style: TextStyle(color: _accent.withOpacity(0.85), fontSize: 9, fontWeight: FontWeight.w700)),
+              ),
+              const Spacer(),
+              FittedBox(
+                child: NgmyBrandedQrWidget(data: record.payload, compact: true),
+              ),
+              const SizedBox(height: 4),
+              Text('Tap to scan', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 9, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _formFields() {
@@ -800,8 +875,9 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
 class NgmyBrandedQrWidget extends StatelessWidget {
   final String data;
   final bool compact;
+  final bool large;
 
-  const NgmyBrandedQrWidget({super.key, required this.data, this.compact = false});
+  const NgmyBrandedQrWidget({super.key, required this.data, this.compact = false, this.large = false});
 
   static const _accent = Color(0xFF06B6D4);
   static const _accentDeep = Color(0xFF0891B2);
@@ -809,13 +885,14 @@ class NgmyBrandedQrWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = compact ? 160.0 : 248.0;
-    final logoSize = compact ? 34.0 : 52.0;
-    final ring = compact ? 16.0 : 22.0;
+    final size = large ? 300.0 : (compact ? 130.0 : 248.0);
+    final logoSize = large ? 64.0 : (compact ? 28.0 : 52.0);
+    final ring = large ? 26.0 : (compact ? 14.0 : 22.0);
+    final outerPad = large ? 36.0 : 28.0;
 
     return SizedBox(
-      width: size + 28,
-      height: size + 28,
+      width: size + outerPad,
+      height: size + outerPad,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -849,20 +926,20 @@ class NgmyBrandedQrWidget extends StatelessWidget {
                   height: logoSize + 8,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(compact ? 8 : 12),
+                    borderRadius: BorderRadius.circular(compact ? 8 : (large ? 14 : 12)),
                     border: Border.all(color: _accent.withOpacity(0.35), width: 2),
                     boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
                   ),
                   padding: const EdgeInsets.all(4),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(compact ? 6 : 8),
+                    borderRadius: BorderRadius.circular(compact ? 6 : (large ? 10 : 8)),
                     child: Image.network(
                       _kNgmyLogoUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: _accent.withOpacity(0.12),
                         alignment: Alignment.center,
-                        child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: compact ? 8 : 11, color: _accentDeep)),
+                        child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: large ? 13 : (compact ? 8 : 11), color: _accentDeep)),
                       ),
                     ),
                   ),
