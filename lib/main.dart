@@ -11410,53 +11410,101 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showLegal(BuildContext ctx, String title, String content) {
-    showModalBottomSheet(
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    showDialog<void>(
       context: ctx,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (c) => Container(
-        height: MediaQuery.of(ctx).size.height * 0.85,
-        decoration: BoxDecoration(
-          color: Theme.of(ctx).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 10),
-              width: 50, height: 5,
-              decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10)),
+      barrierColor: Colors.black.withOpacity(0.45),
+      builder: (dialogCtx) {
+        final maxHeight = MediaQuery.sizeOf(dialogCtx).height * 0.72;
+        return Dialog(
+          insetPadding: EdgeInsets.fromLTRB(
+            20,
+            MediaQuery.paddingOf(dialogCtx).top + 28,
+            20,
+            MediaQuery.paddingOf(dialogCtx).bottom + 28,
+          ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF121726) : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFE2E8F0), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.35 : 0.12),
+                  blurRadius: 28,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(25, 20, 15, 10),
-              child: Row(
-                children: [
-                  Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.pop(c),
-                    icon: Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(color: Colors.grey.withOpacity(0.1), shape: BoxShape.circle),
-                      child: const Icon(Icons.close_rounded, size: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 18, 12, 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00B25A).withOpacity(0.14),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          title.toLowerCase().contains('privacy') ? Icons.privacy_tip_outlined : Icons.gavel_rounded,
+                          color: const Color(0xFF00B25A),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.4,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(dialogCtx),
+                        icon: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.withOpacity(0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.close_rounded, size: 18, color: isDark ? Colors.white70 : Colors.black54),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: isDark ? Colors.white12 : Colors.black12),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+                    child: Text(
+                      content.trim().isEmpty ? 'No content available yet.' : content,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.65,
+                        letterSpacing: 0.2,
+                        fontWeight: FontWeight.w400,
+                        color: isDark ? Colors.white.withOpacity(0.88) : const Color(0xFF334155),
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(25),
-                child: Text(
-                  content,
-                  style: const TextStyle(fontSize: 14, height: 1.6, letterSpacing: 0.3, fontWeight: FontWeight.w400),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
   Widget _row(IconData i, String l, String v) => Container(
@@ -22335,20 +22383,31 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   bool _isPosting = false;
   OverlayEntry? _noticeEntry;
   Timer? _mediaSyncTimer;
+  String _lastFeedSig = '';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _cleanupExpiredPosts();
-      await widget.onRefreshFromCloud?.call();
-      if (mounted) setState(() {});
+      await _silentRefreshFeed();
     });
-    _mediaSyncTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
-      if (!mounted) return;
-      await widget.onRefreshFromCloud?.call();
-      if (mounted) setState(() {});
-    });
+    _mediaSyncTimer = Timer.periodic(const Duration(seconds: 30), (_) => _silentRefreshFeed());
+  }
+
+  String _feedSignature() {
+    final feed = widget.allMedia.where((m) => !_isExpired(m)).map((m) => m.id).join('|');
+    return feed;
+  }
+
+  Future<void> _silentRefreshFeed() async {
+    if (!mounted || _isPosting) return;
+    await widget.onRefreshFromCloud?.call();
+    if (!mounted || _isPosting) return;
+    final sig = _feedSignature();
+    if (sig == _lastFeedSig) return;
+    _lastFeedSig = sig;
+    setState(() {});
   }
 
   bool _isExpired(MediaPost post) {
@@ -22383,15 +22442,41 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       }
       return;
     }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete post?'),
+        content: const Text('This removes the photo or video for everyone. This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
     if (widget.onDeleteMedia != null) {
       await widget.onDeleteMedia!(post);
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post deleted for everyone.')),
+        );
+      }
+      widget.onDataChanged();
       return;
     }
     await _deleteMediaRowFromSupabase(post.id);
     await _deletePostFromStorage(post);
     if (mounted) {
       setState(() => widget.allMedia.removeWhere((m) => m.id == post.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post deleted for everyone.')),
+      );
     } else {
       widget.allMedia.removeWhere((m) => m.id == post.id);
     }
@@ -22461,9 +22546,18 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       return;
     }
     final picker = ImagePicker();
-    final media = isVideo
-        ? await picker.pickVideo(source: ImageSource.gallery)
-        : await picker.pickImage(source: ImageSource.gallery, imageQuality: 78, maxWidth: 1280);
+    XFile? media;
+    try {
+      media = isVideo
+          ? await picker.pickVideo(source: ImageSource.gallery)
+          : await picker.pickImage(source: ImageSource.gallery, imageQuality: 78, maxWidth: 1280);
+    } catch (e) {
+      debugPrint('[media] picker error: $e');
+      if (mounted) {
+        _showGlassNotice('Picker failed', 'Could not open your gallery. Try again.', isError: true);
+      }
+      return;
+    }
     if (media == null) return;
 
     setState(() => _isPosting = true);
@@ -22476,36 +22570,49 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       } else if (media.path.contains('.')) {
         ext = media.path.split('.').last.toLowerCase();
       }
-      
-      final bytes = await media.readAsBytes();
-      final maxBytes = isVideo ? 60 * 1024 * 1024 : 10 * 1024 * 1024;
+
+      final maxBytes = isVideo
+          ? (kIsWeb ? 25 * 1024 * 1024 : 60 * 1024 * 1024)
+          : (kIsWeb ? 8 * 1024 * 1024 : 10 * 1024 * 1024);
+
+      Uint8List bytes;
+      try {
+        bytes = await media.readAsBytes();
+      } catch (e) {
+        debugPrint('[media] read bytes error: $e');
+        if (mounted) {
+          _showGlassNotice('File read failed', 'Could not read that file. Try a smaller photo or video.', isError: true);
+        }
+        return;
+      }
+
       if (bytes.length > maxBytes) {
         if (mounted) {
           _showGlassNotice(
             'File too large',
-            isVideo ? 'Video/Audio must be under 60 MB.' : 'Photo must be under 10 MB.',
+            isVideo
+                ? (kIsWeb ? 'Video must be under 25 MB on web.' : 'Video must be under 60 MB.')
+                : (kIsWeb ? 'Photo must be under 8 MB on web.' : 'Photo must be under 10 MB.'),
             isError: true,
           );
         }
-        setState(() => _isPosting = false);
         return;
       }
 
       final fileName = '${DateTime.now().microsecondsSinceEpoch}_${widget.user.email.hashCode.abs()}.$ext';
       final storagePath = 'uploads/$fileName';
       final contentType = isVideo ? _mimeForVideoExt(ext) : _mimeForImageExt(ext);
-      
+
       final upload = await _uploadNgmyMediaBytes(
-        bytes: bytes, // No Uint8List.fromList here
+        bytes: bytes,
         storagePath: storagePath,
         contentType: contentType,
       );
-      
+
       if (upload.ref == null) {
         if (mounted) {
           _showGlassNotice('Upload failed', upload.error ?? 'Could not upload to cloud.', isError: true);
         }
-        setState(() => _isPosting = false);
         return;
       }
       final mediaUrl = upload.ref!;
@@ -22524,17 +22631,16 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       if (!saved) {
         if (mounted) {
           _showGlassNotice(
-            'Sync failed',
-            'Post created but DB sync failed. Check Supabase → SQL Editor → media_tables.sql.',
+            'Sync warning',
+            'Uploaded to storage but database sync failed. Run supabase/media_tables.sql if this keeps happening.',
             isError: true,
           );
         }
-        // Even if DB fails, we already have the storage ref, so we add it locally
       }
 
       widget.onPost(post);
       _captionController.clear();
-      await widget.onRefreshFromCloud?.call();
+      _lastFeedSig = _feedSignature();
 
       if (mounted) {
         _showGlassNotice(
@@ -22684,111 +22790,165 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF080B16) : const Color(0xFFF3F7FF),
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => NgmyNavigator.pop(context),
-        ),
-        title: const Text('MEDIA HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-        centerTitle: false,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Feed',
-            onPressed: () async {
-              await widget.onRefreshFromCloud?.call();
-              if (mounted) setState(() {});
-            },
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
-      ),
-      body: Column(
+      body: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark
-                      ? const [Color(0xFF131D3A), Color(0xFF3B0E7A)]
-                      : const [Color(0xFFCCFBFF), Color(0xFFE9D5FF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+          Column(
+            children: [
+              SizedBox(height: MediaQuery.paddingOf(context).top + 78),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? const [Color(0xFF131D3A), Color(0xFF3B0E7A)]
+                          : const [Color(0xFFCCFBFF), Color(0xFFE9D5FF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withOpacity(isDark ? 0.15 : 0.6)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Share photos and videos with everyone in the feed.',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.95),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withOpacity(isDark ? 0.15 : 0.6)),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF8B5CF6).withOpacity(0.23),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Share videos with a modern live media feed.',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
-                    ),
+              Expanded(
+                child: mediaFeed.isEmpty
+                    ? Center(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF111731) : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withOpacity(isDark ? 0.1 : 0.8)),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.perm_media_rounded, size: 58, color: Colors.grey.withOpacity(0.55)),
+                              const SizedBox(height: 12),
+                              const Text('No media posted yet', style: TextStyle(fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 4),
+                              const Text('Tap the + button above to upload.', style: TextStyle(color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 120),
+                        cacheExtent: 400,
+                        addAutomaticKeepAlives: false,
+                        itemCount: mediaFeed.length,
+                        itemBuilder: (context, index) => VideoPostWidget(
+                          key: ValueKey(mediaFeed[index].id),
+                          post: mediaFeed[index],
+                          currentUser: widget.user,
+                          allUsers: widget.allUsers,
+                          onChanged: widget.onDataChanged,
+                          onDelete: () => _deletePost(mediaFeed[index]),
+                          onPruneIfDeleted: _prunePostIfDeletedFromCloud,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(15, 8, 15, 0),
+                child: Container(
+                  height: 60,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.88),
+                    borderRadius: BorderRadius.circular(35),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                    border: Border.all(color: Colors.white.withOpacity(0.10)),
                   ),
-                  FilledButton(
-                    onPressed: _showPostDialog,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.16),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('Post'),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                        onPressed: () => NgmyNavigator.pop(context),
+                      ),
+                      const Expanded(
+                        child: Center(
+                          child: Text(
+                            'MEDIA HUB',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Material(
+                          color: const Color(0xFF7C3AED),
+                          borderRadius: BorderRadius.circular(20),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: _isPosting ? null : _showPostDialog,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_isPosting)
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  else
+                                    const Icon(Icons.add_photo_alternate_rounded, color: Colors.white, size: 18),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _isPosting ? '...' : 'Post',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: mediaFeed.isEmpty
-                ? Center(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF111731) : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withOpacity(isDark ? 0.1 : 0.8)),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.perm_media_rounded, size: 58, color: Colors.grey.withOpacity(0.55)),
-                          const SizedBox(height: 12),
-                          const Text('No media posted yet', style: TextStyle(fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 4),
-                          const Text('Tap Post to upload photo or video.', style: TextStyle(color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 150),
-                    itemCount: mediaFeed.length,
-                    itemBuilder: (context, index) => VideoPostWidget(
-                      key: ValueKey(mediaFeed[index].id),
-                      post: mediaFeed[index],
-                      currentUser: widget.user,
-                      allUsers: widget.allUsers,
-                      onChanged: widget.onDataChanged,
-                      onDelete: () => _deletePost(mediaFeed[index]),
-                      onPruneIfDeleted: _prunePostIfDeletedFromCloud,
-                    ),
-                  ),
           ),
         ],
       ),
@@ -22879,7 +23039,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
         _loadingMedia = false;
         _errorText = 'Media loading failed. Check your internet.';
       });
-      _schedulePruneIfDeleted();
     }
   }
 
@@ -22915,7 +23074,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
           _hasError = true;
           _loadingMedia = false;
         });
-        _schedulePruneIfDeleted();
       }
     }
   }
@@ -23215,7 +23373,12 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                           ? const Center(child: CircularProgressIndicator())
                           : isVideo
                           ? (_hasError
-                              ? const SizedBox.shrink()
+                              ? Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Text(_errorText, style: const TextStyle(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center),
+                                  ),
+                                )
                               : (_isInitialized && _controller != null)
                                   ? VideoPlayer(_controller!)
                                   : Center(
@@ -23229,12 +23392,23 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                                     ))
                           : Builder(builder: (context) {
                               final resolved = _resolvedMediaUrl ?? widget.post.videoUrl;
+                              if (_hasError) {
+                                return Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42),
+                                      const SizedBox(height: 8),
+                                      Text(_errorText, style: const TextStyle(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center),
+                                    ],
+                                  ),
+                                );
+                              }
                               if (resolved.startsWith('data:image')) {
                                 try {
                                   return Image.memory(base64Decode(resolved.split(',').last), fit: BoxFit.cover, width: double.infinity);
                                 } catch (_) {
-                                  _schedulePruneIfDeleted();
-                                  return const SizedBox.shrink();
+                                  return Center(child: Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42));
                                 }
                               }
                               if (resolved.startsWith('http')) {
@@ -23243,10 +23417,13 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                                   fit: BoxFit.cover,
                                   width: double.infinity,
                                   gaplessPlayback: true,
-                                  errorBuilder: (_, __, ___) {
-                                    _schedulePruneIfDeleted();
-                                    return const SizedBox.shrink();
+                                  loadingBuilder: (_, child, progress) {
+                                    if (progress == null) return child;
+                                    return const Center(child: CircularProgressIndicator());
                                   },
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42),
+                                  ),
                                 );
                               }
                               if (!kIsWeb) {
@@ -23254,14 +23431,14 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                                   File(resolved),
                                   fit: BoxFit.cover,
                                   width: double.infinity,
-                                  errorBuilder: (_, __, ___) {
-                                    _schedulePruneIfDeleted();
-                                    return const SizedBox.shrink();
-                                  },
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42),
+                                  ),
                                 );
                               }
-                              _schedulePruneIfDeleted();
-                              return const SizedBox.shrink();
+                              return Center(
+                                child: Icon(Icons.image_not_supported_outlined, color: Colors.white.withOpacity(0.7), size: 42),
+                              );
                             }),
                     ),
                   ),
