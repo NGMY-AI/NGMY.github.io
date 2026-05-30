@@ -7,10 +7,10 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
-# Repo remote is kbpabloqr-lgtm.github.io → site root is https://kbpabloqr-lgtm.github.io/
-$BaseHref = "/"
+# Live app URL (project site) — must match base-href
+$BaseHref = "/NGMY.github.io/"
 $DeployId = Get-Date -Format "yyyyMMddHHmmss"
-$LiveUrl = "https://kbpabloqr-lgtm.github.io/"
+$LiveUrl = "https://ngmy-ai.github.io/NGMY.github.io/"
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host " NGMY Web Publish" -ForegroundColor Cyan
@@ -53,7 +53,38 @@ Set-Content -Path "docs\version.json" -Value $versionJson -Encoding UTF8
 $indexPath = Join-Path $PSScriptRoot "docs\index.html"
 $html = Get-Content $indexPath -Raw
 $html = $html.Replace("__NGMY_DEPLOY_ID__", $DeployId)
+# Ensure base href matches project path (fixes black screen / failed to load app)
+$html = $html -replace '<base href="/">', '<base href="/NGMY.github.io/">'
+$html = $html -replace '<base href="/NGMY.github.io/">', '<base href="/NGMY.github.io/">'
+if ($html -notmatch 'href="/NGMY.github.io/"') {
+    $html = $html -replace '<base href="[^"]*">', '<base href="/NGMY.github.io/">'
+}
 Set-Content -Path $indexPath -Value $html -Encoding UTF8 -NoNewline
+
+# PWA manifest paths for project subfolder
+$manifestPath = Join-Path $PSScriptRoot "docs\manifest.json"
+if (Test-Path $manifestPath) {
+    $manifest = @{
+        name = "NGMY"
+        short_name = "NGMY"
+        id = "/NGMY.github.io/"
+        start_url = "/NGMY.github.io/"
+        scope = "/NGMY.github.io/"
+        display = "standalone"
+        background_color = "#ffffff"
+        theme_color = "#ffffff"
+        description = "Next Generation - Make Yours"
+        orientation = "portrait-primary"
+        prefer_related_applications = $false
+        icons = @(
+            @{ src = "icons/Icon-192.png"; sizes = "192x192"; type = "image/png" },
+            @{ src = "icons/Icon-512.png"; sizes = "512x512"; type = "image/png" },
+            @{ src = "icons/Icon-maskable-192.png"; sizes = "192x192"; type = "image/png"; purpose = "maskable" },
+            @{ src = "icons/Icon-maskable-512.png"; sizes = "512x512"; type = "image/png"; purpose = "maskable" }
+        )
+    }
+    $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path $manifestPath -Encoding UTF8
+}
 
 # Fix Flutter bootstrap: empty build entry + service worker often cause black screen on phones
 $bootPath = Join-Path $PSScriptRoot "docs\flutter_bootstrap.js"

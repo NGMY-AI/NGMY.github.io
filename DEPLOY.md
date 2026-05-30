@@ -1,80 +1,60 @@
-# NGMY — Deploy website so phone and PC see the same app
+# NGMY — Deploy website (correct URL)
 
-## Why the phone does not update
+## Your live app URL (bookmark this)
 
-| What you did | What it updates |
-|--------------|-----------------|
-| `.\publish-web.ps1` only | Files in `docs\` on **your PC only** |
-| `git push` | **GitHub** (what phones load) |
-| Old Home Screen bookmark | May point to **wrong/old URL** or cached PWA |
+**https://ngmy-ai.github.io/NGMY.github.io/**
 
-Running publish and seeing "Done" on PC does **not** update the phone until you **push** and **GitHub Pages** is enabled.
+Do not use `kbpabloqr-lgtm.github.io` unless you moved the site.  
+Black screen / “Failed to load app” happens when `base href` does not match this path.
 
 ---
 
-## Step 1 — Enable GitHub Pages (do once)
-
-1. Open: https://github.com/kbpabloqr-lgtm/kbpabloqr-lgtm.github.io/settings/pages  
-2. **Build and deployment → Source:** Deploy from a branch  
-3. **Branch:** `main`  
-4. **Folder:** `/docs`  
-5. Click **Save**  
-6. Wait 2–5 minutes until the site shows a green check.
-
-**Correct phone URL (bookmark this):**  
-https://kbpabloqr-lgtm.github.io/
-
-(Not `/NGMY.github.io/` — that path was wrong for this repo.)
-
----
-
-## Step 2 — Publish from PowerShell (every update)
+## Publish from PowerShell
 
 ```powershell
 cd C:\Users\appbu\StudioProjects\ngmy
 .\publish-web.ps1
 git add docs web lib publish-web.ps1 DEPLOY.md
 git add -u
-git commit -m "Deploy web build"
+git commit -m "Fix web base href for ngmy-ai.github.io"
 git push origin main
 ```
 
-Wait 2–3 minutes, then on PC verify:
+If your GitHub Pages site is fed from a **different** repo (e.g. `ngmy-ai/NGMY.github.io`), push the same `docs` folder there too.
+
+Wait 2–5 minutes after push.
+
+---
+
+## Verify it works (PC)
 
 ```powershell
-Invoke-WebRequest "https://kbpabloqr-lgtm.github.io/version.json" -UseBasicParsing | Select-Object -Expand Content
+Invoke-WebRequest "https://ngmy-ai.github.io/NGMY.github.io/version.json" -UseBasicParsing | Select-Object -Expand Content
 ```
 
-You should see a recent `build_number` (today’s date).
+Open in browser: https://ngmy-ai.github.io/NGMY.github.io/  
+You should see “Loading NGMY…” then the login screen — not a black error page.
 
 ---
 
-## Step 3 — Phone (after push)
+## Phone / PWA
 
-1. **Delete** the old NGMY icon from your home screen (if any).  
-2. Close all NGMY browser tabs.  
-3. Open **Safari/Chrome private tab:** https://kbpabloqr-lgtm.github.io/  
-4. If it still looks old: **Settings → clear website data** for that site.  
-5. Log in and use the app; optionally **Add to Home Screen** again from that URL.
-
----
-
-## Supabase (separate from website deploy)
-
-Run SQL in Supabase SQL Editor only (not PowerShell):
-
-- `supabase/SUPABASE_SETUP.sql`
-- `supabase/legal_content_columns.sql`
-- `supabase/store_orders_columns.sql`
+1. Delete old home-screen icon.
+2. Settings → clear **website data** for `ngmy-ai.github.io`.
+3. Open **private tab**: https://ngmy-ai.github.io/NGMY.github.io/
+4. Add to Home Screen again from that URL.
 
 ---
 
-## Native app on phone (optional)
+## GitHub Pages settings
 
-`flutter run` or an APK updates only **that install**, not the website other users open:
+Repo that serves **ngmy-ai.github.io/NGMY.github.io/** must use:
 
-```powershell
-cd C:\Users\appbu\StudioProjects\ngmy
-flutter pub get
-flutter run
-```
+- **Branch:** `main` (or your deploy branch)
+- **Folder:** `/docs`
+
+---
+
+## Supabase SQL (not PowerShell)
+
+Run in Supabase SQL Editor: `supabase/SUPABASE_SETUP.sql` and related `.sql` files in `supabase/`.

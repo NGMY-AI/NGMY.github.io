@@ -1,7 +1,16 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
-  <base href="/">
+  <base href="/NGMY.github.io/">
+  <script>
+    (function () {
+      var p = location.pathname || "/";
+      if (p.indexOf("/NGMY.github.io") === 0) {
+        var b = document.querySelector("base");
+        if (b) b.setAttribute("href", "/NGMY.github.io/");
+      }
+    })();
+  </script>
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
@@ -69,14 +78,6 @@
       flex-direction: column;
     }
   </style>
-  <script>
-    (function () {
-      var p = location.pathname || "";
-      if (p.indexOf("NGMY.github.io") !== -1 && p !== "/NGMY.github.io/" && p !== "/NGMY.github.io") {
-        location.replace(location.origin + "/" + location.search + location.hash);
-      }
-    })();
-  </script>
 </head>
 <body style="overflow: hidden;">
   <div id="ngmy-loading">
@@ -91,12 +92,12 @@
   <script>
     (function () {
       var KEY = "ngmy_deploy_id";
-      var CURRENT = "20260529225612";
+      var CURRENT = "20260529230601";
       function hideLoaderSoon() {
         setTimeout(function () {
           var el = document.getElementById("ngmy-loading");
           if (el) el.style.display = "none";
-        }, 8000);
+        }, 12000);
       }
       function showError(msg) {
         var el = document.getElementById("ngmy-loading");
@@ -104,7 +105,7 @@
         var msgEl = document.getElementById("ngmy-error-msg");
         if (el) el.style.display = "none";
         if (err) err.style.display = "flex";
-        if (msgEl) msgEl.textContent = msg || "Try clearing site data or open in a private tab.";
+        if (msgEl) msgEl.textContent = msg || "Clear site data for this URL, then reload.";
       }
       window.__ngmyShowLoadError = showError;
       hideLoaderSoon();
@@ -119,14 +120,12 @@
                 return Promise.all(keys.map(function (k) { return caches.delete(k); }));
               });
             }
-          }).then(function () {
-            try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
           }).catch(function () {});
         }
         try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
       } catch (e) {}
     })();
   </script>
-  <script src="flutter_bootstrap.js?v=20260529225612" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Failed to load app. Clear browser cache for this site and reload.')"></script>
+  <script src="flutter_bootstrap.js?v=20260529230601" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/')"></script>
 </body>
 </html>
