@@ -250,6 +250,7 @@ class AppConfig {
   List<Map<String, dynamic>> jobWorkerApplications;
   List<Map<String, dynamic>> storeListings;
   List<Map<String, dynamic>> storeInquiries;
+  List<Map<String, dynamic>> storeOrders;
   List<Map<String, dynamic>> helpHelperApplications;
   List<Map<String, dynamic>> helpRequests;
   List<Map<String, dynamic>> helpBusinesses;
@@ -282,6 +283,7 @@ class AppConfig {
     this.jobWorkerApplications = const [],
     this.storeListings = const [],
     this.storeInquiries = const [],
+    this.storeOrders = const [],
     this.helpHelperApplications = const [],
     this.helpRequests = const [],
     this.helpBusinesses = const [],
@@ -314,6 +316,7 @@ class AppConfig {
     'jobWorkerApplications': jobWorkerApplications,
     'storeListings': storeListings,
     'storeInquiries': storeInquiries,
+    'storeOrders': storeOrders,
     'helpHelperApplications': helpHelperApplications,
     'helpRequests': helpRequests,
     'helpBusinesses': helpBusinesses,
@@ -346,6 +349,7 @@ class AppConfig {
     jobWorkerApplications: List<Map<String, dynamic>>.from((json['jobWorkerApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     storeListings: List<Map<String, dynamic>>.from((json['storeListings'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     storeInquiries: List<Map<String, dynamic>>.from((json['storeInquiries'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
+    storeOrders: List<Map<String, dynamic>>.from((json['storeOrders'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     helpHelperApplications: List<Map<String, dynamic>>.from((json['helpHelperApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     helpRequests: List<Map<String, dynamic>>.from((json['helpRequests'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     helpBusinesses: List<Map<String, dynamic>>.from((json['helpBusinesses'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
@@ -524,17 +528,65 @@ bool _mediaUrlIsCloudSynced(String url) {
   return u.startsWith('supabase://') || u.startsWith('http://') || u.startsWith('https://');
 }
 
-/// Merges Supabase media with local-only drafts. Remote list is authoritative for removals.
-List<MediaPost> _mergeMediaWithRemote(List<MediaPost> local, List<MediaPost> remote) {
+/// Merges Supabase media with local-only drafts. Remote list is authoritative for cloud posts.
+List<MediaPost> _mergeMediaWithRemote(
+  List<MediaPost> local,
+  List<MediaPost> remote, {
+  Set<String> tombstones = const {},
+}) {
   final merged = <String, MediaPost>{};
   for (final m in remote) {
-    if (m.id.isNotEmpty) merged[m.id] = m;
+    if (m.id.isNotEmpty && !tombstones.contains(m.id)) merged[m.id] = m;
   }
   for (final m in local) {
-    if (m.id.isEmpty || merged.containsKey(m.id)) continue;
-    if (!_mediaUrlIsCloudSynced(m.videoUrl)) merged[m.id] = m;
+    if (m.id.isEmpty || merged.containsKey(m.id) || tombstones.contains(m.id)) continue;
+    // Never resurrect cloud posts removed from Supabase (stale SharedPreferences).
+    if (_mediaUrlIsCloudSynced(m.videoUrl)) continue;
+    merged[m.id] = m;
   }
   return merged.values.toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+}
+
+Future<Set<String>> _loadTombstonedMediaIds() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('deleted_media_ids');
+    if (raw == null || raw.trim().isEmpty) return {};
+    final list = jsonDecode(raw);
+    if (list is! List) return {};
+    return list.map((e) => e.toString()).where((id) => id.isNotEmpty).toSet();
+  } catch (_) {
+    return {};
+  }
+}
+
+Future<void> _persistTombstonedMediaIds(Set<String> ids) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('deleted_media_ids', jsonEncode(ids.toList()));
+  } catch (_) {}
+}
+
+Future<Map<String, String>> _fetchRemoteLegalContent() async {
+  try {
+    final row = await Supabase.instance.client.from('config').select().eq('id', 1).maybeSingle();
+    if (row == null) return {};
+    final map = Map<String, dynamic>.from(row);
+    return {
+      'terms': (map['termsAndConditions'] ?? '').toString(),
+      'privacy': (map['privacyPolicy'] ?? '').toString(),
+    };
+  } catch (e) {
+    debugPrint('[legal] fetch error: $e');
+    return {};
+  }
+}
+
+void _applyRemoteLegalToConfig(AppConfig config, Map<String, dynamic> remoteMap) {
+  final terms = (remoteMap['termsAndConditions'] ?? '').toString().trim();
+  final privacy = (remoteMap['privacyPolicy'] ?? '').toString().trim();
+  if (terms.isNotEmpty) config.termsAndConditions = terms;
+  if (privacy.isNotEmpty) config.privacyPolicy = privacy;
 }
 
 bool _mediaPostIsImage(MediaPost post) {
@@ -555,6 +607,12 @@ Map<String, dynamic> _normalizeStoreListing(Map<String, dynamic> listing) {
   if ((copy['status'] ?? '').toString().isEmpty) copy['status'] = 'active';
   if (copy['negotiable'] == null) copy['negotiable'] = true;
   if (copy['deliveryFee'] == null) copy['deliveryFee'] = 0;
+  final units = (copy['units'] as num?)?.toInt() ?? 1;
+  copy['units'] = units < 1 ? 1 : units;
+  final remaining = (copy['unitsRemaining'] as num?)?.toInt();
+  if (remaining == null || (copy['status'] ?? '') == 'active') {
+    copy['unitsRemaining'] = remaining ?? units;
+  }
   final liked = copy['likedBy'];
   if (liked is! List) copy['likedBy'] = <String>[];
   final payments = copy['acceptedPayments'];
@@ -562,6 +620,104 @@ Map<String, dynamic> _normalizeStoreListing(Map<String, dynamic> listing) {
     copy['acceptedPayments'] = ['ngmy'];
   }
   return copy;
+}
+
+String _newStoreTrackingId() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  final r = math.Random();
+  return List.generate(8, (_) => chars[r.nextInt(chars.length)]).join();
+}
+
+Map<String, dynamic> _normalizeStoreOrder(Map<String, dynamic> order) {
+  final copy = Map<String, dynamic>.from(order);
+  if ((copy['fulfillmentStatus'] ?? '').toString().isEmpty) copy['fulfillmentStatus'] = 'pending';
+  if ((copy['trackingId'] ?? '').toString().isEmpty) copy['trackingId'] = _newStoreTrackingId();
+  final hist = copy['locationHistory'];
+  if (hist is! List) copy['locationHistory'] = <Map<String, dynamic>>[];
+  if (copy['quantity'] == null) copy['quantity'] = 1;
+  return copy;
+}
+
+int _shipmentProgressPercent(Map<String, dynamic> order) {
+  final status = (order['fulfillmentStatus'] ?? 'pending').toString();
+  if (status == 'delivered') return 100;
+  if (status == 'pending') return 0;
+  if (status == 'shipped') return 15;
+  final eta = DateTime.tryParse((order['estimatedArrival'] ?? '').toString());
+  final shippedAt = DateTime.tryParse((order['shippedAt'] ?? order['updatedAt'] ?? order['createdAt'] ?? '').toString());
+  if (eta != null && shippedAt != null) {
+    final totalSec = eta.difference(shippedAt).inSeconds;
+    if (totalSec > 0) {
+      final elapsed = DateTime.now().difference(shippedAt).inSeconds;
+      final pct = 15 + ((elapsed / totalSec) * 84).floor();
+      if (status == 'arriving') return pct.clamp(75, 99);
+      if (status == 'in_transit') return pct.clamp(30, 74);
+      return pct.clamp(15, 99);
+    }
+  }
+  if (status == 'in_transit') return 45;
+  if (status == 'arriving') return 75;
+  return 15;
+}
+
+String _orderStatusLabel(Map<String, dynamic> order) {
+  switch ((order['fulfillmentStatus'] ?? 'pending').toString()) {
+    case 'shipped':
+      return 'Shipped';
+    case 'in_transit':
+      return 'In Transit';
+    case 'arriving':
+      return 'Arriving';
+    case 'delivered':
+      return 'Delivered';
+    default:
+      return 'Pending';
+  }
+}
+
+String _paymentDisplayLabel(String pay) {
+  switch (pay) {
+    case 'cashapp':
+      return 'CASHAPP';
+    case 'zelle':
+      return 'ZELLE';
+    default:
+      return 'ACCOUNT BALANCE';
+  }
+}
+
+void _migrateLegacySoldListingsToOrders(AppConfig config) {
+  final orders = List<Map<String, dynamic>>.from(config.storeOrders.map((e) => Map<String, dynamic>.from(e)));
+  final existingListingIds = orders.map((o) => '${o['listingId']}_${o['buyerEmail']}').toSet();
+  for (final l in config.storeListings) {
+    if ((l['status'] ?? '').toString() != 'sold') continue;
+    final buyer = (l['buyerEmail'] ?? '').toString().toLowerCase().trim();
+    if (buyer.isEmpty) continue;
+    final key = '${l['id']}_$buyer';
+    if (existingListingIds.contains(key)) continue;
+    final price = (l['price'] as num?)?.toDouble() ?? 0;
+    final delivery = (l['deliveryFee'] as num?)?.toDouble() ?? 0;
+    orders.add(_normalizeStoreOrder({
+      'id': 'order_${l['id']}_${l['soldAt'] ?? l['updatedAt']}',
+      'listingId': l['id'],
+      'title': l['title'],
+      'price': price,
+      'deliveryFee': delivery,
+      'total': price + delivery,
+      'sellerEmail': l['sellerEmail'],
+      'sellerName': l['sellerName'],
+      'buyerEmail': l['buyerEmail'],
+      'buyerName': l['buyerName'],
+      'buyerPhone': l['buyerPhone'] ?? '',
+      'buyerAddress': l['buyerAddress'] ?? l['deliveryAddress'] ?? '',
+      'paidVia': l['paidVia'] ?? 'ngmy',
+      'createdAt': l['soldAt'] ?? l['updatedAt'] ?? DateTime.now().toUtc().toIso8601String(),
+      'updatedAt': l['soldAt'] ?? l['updatedAt'] ?? DateTime.now().toUtc().toIso8601String(),
+      'fulfillmentStatus': l['fulfillmentStatus'] ?? 'pending',
+      'quantity': 1,
+    }));
+  }
+  config.storeOrders = orders.map(_normalizeStoreOrder).toList();
 }
 
 String _storeListingsSignature(List<Map<String, dynamic>> listings) {
@@ -1087,6 +1243,26 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
     row.remove('geminiApiKey');
     row.remove('gemini_api_key');
   }
+  final remoteLegal = await _fetchRemoteLegalContent();
+  final remoteTerms = (remoteLegal['terms'] ?? '').trim();
+  final remotePrivacy = (remoteLegal['privacy'] ?? '').trim();
+  if (isAdmin) {
+    row['termsAndConditions'] = config.termsAndConditions;
+    row['privacyPolicy'] = config.privacyPolicy;
+  } else {
+    if (remoteTerms.isNotEmpty) {
+      row['termsAndConditions'] = remoteTerms;
+      config.termsAndConditions = remoteTerms;
+    } else {
+      row.remove('termsAndConditions');
+    }
+    if (remotePrivacy.isNotEmpty) {
+      row['privacyPolicy'] = remotePrivacy;
+      config.privacyPolicy = remotePrivacy;
+    } else {
+      row.remove('privacyPolicy');
+    }
+  }
   return row;
 }
 
@@ -1333,6 +1509,7 @@ class _NGMYAppState extends State<NGMYApp> {
   ];
   List<MediaPost> _allMedia = [];
   List<Announcement> _allAnnouncements = [];
+  Set<String> _tombstonedMediaIds = {};
 
   RealtimeChannel? _usersChannel;
   RealtimeChannel? _transactionsChannel;
@@ -1516,8 +1693,11 @@ class _NGMYAppState extends State<NGMYApp> {
         final keepHelpApps = List<Map<String, dynamic>>.from(_config.helpHelperApplications.map((e) => Map<String, dynamic>.from(e)));
         final keepHelpReqs = List<Map<String, dynamic>>.from(_config.helpRequests.map((e) => Map<String, dynamic>.from(e)));
         final keepHelpBiz = List<Map<String, dynamic>>.from(_config.helpBusinesses.map((e) => Map<String, dynamic>.from(e)));
-        final next = AppConfig.fromJson(Map<String, dynamic>.from(cfg));
-        final remoteGemini = _geminiKeyFromMap(Map<String, dynamic>.from(cfg));
+        final keepOrders = List<Map<String, dynamic>>.from(_config.storeOrders.map((e) => Map<String, dynamic>.from(e)));
+        final cfgMap = Map<String, dynamic>.from(cfg);
+        final next = AppConfig.fromJson(cfgMap);
+        _applyRemoteLegalToConfig(next, cfgMap);
+        final remoteGemini = _geminiKeyFromMap(cfgMap);
         if (remoteGemini.isNotEmpty) {
           next.geminiApiKey = remoteGemini;
         } else if (next.geminiApiKey.trim().isEmpty && keepGemini.isNotEmpty) {
@@ -1525,6 +1705,7 @@ class _NGMYAppState extends State<NGMYApp> {
         }
         if (next.storeListings.isEmpty && keepListings.isNotEmpty) next.storeListings = keepListings;
         if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) next.storeInquiries = keepInquiries;
+        if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
@@ -1633,27 +1814,28 @@ class _NGMYAppState extends State<NGMYApp> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _reloadMediaFromSupabase() async {
-    final remote = await _fetchMediaPostsFromSupabase();
-    if (!mounted) return;
-    final next = _mergeMediaWithRemote(_allMedia, remote);
-    setState(() => _allMedia = next);
+  Future<void> _persistAllMediaLocally() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
     } catch (_) {}
   }
 
+  Future<void> _reloadMediaFromSupabase() async {
+    final remote = await _fetchMediaPostsFromSupabase();
+    if (!mounted) return;
+    final next = _mergeMediaWithRemote(_allMedia, remote, tombstones: _tombstonedMediaIds);
+    setState(() => _allMedia = next);
+    await _persistAllMediaLocally();
+  }
+
   Future<void> _pruneStaleMediaAgainstCloud() async {
     final remote = await _fetchMediaPostsFromSupabase();
     if (!mounted) return;
-    final next = _mergeMediaWithRemote(_allMedia, remote);
+    final next = _mergeMediaWithRemote(_allMedia, remote, tombstones: _tombstonedMediaIds);
     if (next.length != _allMedia.length || !_mediaListsSameIds(_allMedia, next)) {
       setState(() => _allMedia = next);
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
-      } catch (_) {}
+      await _persistAllMediaLocally();
     }
   }
 
@@ -1668,17 +1850,18 @@ class _NGMYAppState extends State<NGMYApp> {
     if (post.id.isEmpty) return;
     final exists = await _mediaPostExistsInSupabase(post.id);
     if (exists) return;
+    _tombstonedMediaIds.add(post.id);
+    await _persistTombstonedMediaIds(_tombstonedMediaIds);
     if (!mounted) return;
     setState(() => _allMedia.removeWhere((m) => m.id == post.id));
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
-    } catch (_) {}
+    await _persistAllMediaLocally();
   }
 
   Future<void> _deleteMediaPostGlobally(MediaPost post) async {
     final id = post.id;
     if (id.isEmpty) return;
+    _tombstonedMediaIds.add(id);
+    await _persistTombstonedMediaIds(_tombstonedMediaIds);
     final deleted = await _deleteMediaRowFromSupabase(id);
     if (!deleted) {
       debugPrint('[media] database delete failed for $id');
@@ -1693,10 +1876,28 @@ class _NGMYAppState extends State<NGMYApp> {
     }
     if (!mounted) return;
     setState(() => _allMedia.removeWhere((m) => m.id == id));
+    await _persistAllMediaLocally();
+  }
+
+  Future<bool> _saveLegalContentToSupabase(String terms, String privacy) async {
     try {
+      setState(() {
+        _config.termsAndConditions = terms;
+        _config.privacyPolicy = privacy;
+      });
+      final row = <String, dynamic>{
+        'id': 1,
+        'termsAndConditions': terms,
+        'privacyPolicy': privacy,
+      };
+      await _safeUpsertRows('config', [row]);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
-    } catch (_) {}
+      await prefs.setString('app_config', jsonEncode(_config.toJson()));
+      return true;
+    } catch (e) {
+      debugPrint('[legal] save error: $e');
+      return false;
+    }
   }
 
   Future<void> _syncStoreToSupabase() async {
@@ -2052,9 +2253,13 @@ class _NGMYAppState extends State<NGMYApp> {
         final keepHelpApps = List<Map<String, dynamic>>.from(_config.helpHelperApplications.map((e) => Map<String, dynamic>.from(e)));
         final keepHelpReqs = List<Map<String, dynamic>>.from(_config.helpRequests.map((e) => Map<String, dynamic>.from(e)));
         final keepHelpBiz = List<Map<String, dynamic>>.from(_config.helpBusinesses.map((e) => Map<String, dynamic>.from(e)));
+        final keepOrders = List<Map<String, dynamic>>.from(_config.storeOrders.map((e) => Map<String, dynamic>.from(e)));
         final keepGeminiKey = _config.geminiApiKey.trim();
         final remoteGemini = _geminiKeyFromMap(Map<String, dynamic>.from(payload.newRecord));
-        final next = AppConfig.fromJson(payload.newRecord);
+        final record = Map<String, dynamic>.from(payload.newRecord);
+        final next = AppConfig.fromJson(record);
+        _applyRemoteLegalToConfig(next, record);
+        if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
         if (next.storeListings.isEmpty && keepListings.isNotEmpty) next.storeListings = keepListings;
         if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) next.storeInquiries = keepInquiries;
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
@@ -2067,6 +2272,9 @@ class _NGMYAppState extends State<NGMYApp> {
         }
         if (_appConfigSig(_config) == _appConfigSig(next)) return;
         setState(() => _config = next);
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('app_config', jsonEncode(_config.toJson()));
+        }).catchError((_) {});
       }
     } catch (e) {
       debugPrint('Config realtime apply error: $e');
@@ -2108,10 +2316,10 @@ class _NGMYAppState extends State<NGMYApp> {
         final id = (payload.oldRecord['id'] ?? payload.newRecord['id'] ?? '').toString();
         if (id.isEmpty) return;
         if (!mounted) return;
+        _tombstonedMediaIds.add(id);
+        _persistTombstonedMediaIds(_tombstonedMediaIds);
         setState(() => _allMedia.removeWhere((m) => m.id == id));
-        SharedPreferences.getInstance().then((prefs) {
-          prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
-        }).catchError((_) {});
+        _persistAllMediaLocally();
         return;
       }
       if (_isSyncing) return;
@@ -2210,6 +2418,8 @@ class _NGMYAppState extends State<NGMYApp> {
         } catch (_) { return null; }
       }
 
+      _tombstonedMediaIds = await _loadTombstonedMediaIds();
+
       // 1. Load Local Config & Plans First
       final plansJson = safeGet('investment_plans');
       if (plansJson != null) {
@@ -2235,7 +2445,10 @@ class _NGMYAppState extends State<NGMYApp> {
       List<MediaPost> localMedia = [];
       if (localMediaJson != null) {
         try {
-          localMedia = (jsonDecode(localMediaJson) as List).map((e) => MediaPost.fromJson(e)).toList();
+          localMedia = (jsonDecode(localMediaJson) as List)
+              .map((e) => MediaPost.fromJson(e))
+              .where((m) => !_tombstonedMediaIds.contains(m.id))
+              .toList();
           _allMedia = localMedia;
         } catch (_) {
           prefs.remove('all_media');
@@ -2257,7 +2470,7 @@ class _NGMYAppState extends State<NGMYApp> {
         final mediaData = await supabase.from('media').select();
         if (mediaData != null) {
           final remoteMedia = (mediaData as List).map((e) => MediaPost.fromJson(e)).toList();
-          _allMedia = _mergeMediaWithRemote(localMedia, remoteMedia);
+          _allMedia = _mergeMediaWithRemote(localMedia, remoteMedia, tombstones: _tombstonedMediaIds);
         }
 
         final annData = await supabase.from('announcements').select();
@@ -2272,6 +2485,7 @@ class _NGMYAppState extends State<NGMYApp> {
         if (configData != null) {
           final cfgMap = Map<String, dynamic>.from(configData);
           _config = AppConfig.fromJson(cfgMap);
+          _applyRemoteLegalToConfig(_config, cfgMap);
           _mergeStoreListingsIntoConfig(localStoreListings);
           _mergeStoreInquiriesIntoConfig(localStoreInquiries);
           final remoteGemini = _geminiKeyFromMap(cfgMap);
@@ -2446,6 +2660,7 @@ class _NGMYAppState extends State<NGMYApp> {
       );
       configRow['storeListings'] = _config.storeListings;
       configRow['storeInquiries'] = _config.storeInquiries;
+      configRow['storeOrders'] = _config.storeOrders;
       configRow['helpHelperApplications'] = _config.helpHelperApplications;
       configRow['helpRequests'] = _config.helpRequests;
       configRow['helpBusinesses'] = _config.helpBusinesses;
@@ -2701,10 +2916,18 @@ class _NGMYAppState extends State<NGMYApp> {
                   if (_currentUser != null && _currentUser!.email == t.userEmail) _currentUser = targetUser;
                 }); _saveData(); _notifyTransactionEvent(t, statusChanged: true); },
                 onAddPlan: (p) { setState(() { _globalPlans.add(p); _globalPlans.sort((a, b) => a.price.compareTo(b.price)); }); _saveData(); },
-                onPostMedia: (post) { setState(() => _allMedia.insert(0, post)); _saveData(); },
+                onPostMedia: (post) {
+                  setState(() => _allMedia.insert(0, post));
+                  unawaited(() async {
+                    await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+                    await _reloadMediaFromSupabase();
+                    await _persistAllMediaLocally();
+                  }());
+                },
                 onRefreshMediaFromCloud: _reloadMediaFromSupabase,
                 onDeleteMedia: _deleteMediaPostGlobally,
                 onPruneMedia: _pruneDeletedMediaPost,
+                onSaveLegalContent: _saveLegalContentToSupabase,
                 onAddAnnouncement: (ann) {
                   setState(() => _allAnnouncements.insert(0, ann));
                   _upsertAnnouncement(ann);
@@ -3136,10 +3359,11 @@ class MainScreen extends StatefulWidget {
   final Future<void> Function()? onRefreshMediaFromCloud;
   final Future<void> Function(MediaPost)? onDeleteMedia;
   final Future<void> Function(MediaPost)? onPruneMedia;
+  final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 class _MainScreenState extends State<MainScreen> {
@@ -3297,7 +3521,7 @@ class _MainScreenState extends State<MainScreen> {
           );
         }
         widget.onDataChanged();
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onSaveLegalContent: widget.onSaveLegalContent),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
         if (cost <= 0) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -3500,7 +3724,8 @@ class HomeScreen extends StatefulWidget {
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
   final Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
+  final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, this.onSaveLegalContent});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -3551,7 +3776,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               FloatingTitle(
                 title: 'GROWTH INCOME',
-                onTap: widget.user.isAdmin ? () => Navigator.push(context, MaterialPageRoute(builder: (c) => AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement))) : null,
+                onTap: widget.user.isAdmin ? () => Navigator.push(context, MaterialPageRoute(builder: (c) => AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onSaveLegalContent: widget.onSaveLegalContent))) : null,
                 leading: InkWell(
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => LoanServiceScreen(user: widget.user, config: widget.config))),
                   child: Container(
@@ -5386,7 +5611,8 @@ class AdminDashboard extends StatefulWidget {
   final Function(String) onDeleteAnnouncement;
   final Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
 
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
+  final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, this.onSaveLegalContent});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 class _AdminDashboardState extends State<AdminDashboard> {
@@ -6183,13 +6409,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
           _editorBox('Privacy Policy', pCtrl, isDark),
           const SizedBox(height: 30),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
+              final terms = tCtrl.text.trim();
+              final privacy = pCtrl.text.trim();
               setState(() {
-                widget.config.termsAndConditions = tCtrl.text.trim();
-                widget.config.privacyPolicy = pCtrl.text.trim();
+                widget.config.termsAndConditions = terms;
+                widget.config.privacyPolicy = privacy;
               });
-              widget.onDataChanged();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Legal info saved globally for all users.')));
+              final saved = widget.onSaveLegalContent != null
+                  ? await widget.onSaveLegalContent!(terms, privacy)
+                  : false;
+              if (!saved) widget.onDataChanged();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(saved
+                      ? 'Terms & Privacy saved to database for all users.'
+                      : 'Saved locally. Run supabase/legal_content_columns.sql in Supabase if changes do not sync.'),
+                ),
+              );
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
             child: const Text('SAVE ALL CHANGES'),
@@ -13360,6 +13598,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     widget.config.storeInquiries = List<Map<String, dynamic>>.from(
       widget.config.storeInquiries.map((e) => Map<String, dynamic>.from(e)),
     );
+    widget.config.storeOrders = List<Map<String, dynamic>>.from(
+      widget.config.storeOrders.map((e) => Map<String, dynamic>.from(e)),
+    );
+    _migrateLegacySoldListingsToOrders(widget.config);
     for (final l in widget.config.storeListings) {
       final liked = l['likedBy'];
       if (liked is List && liked.contains(widget.user.email)) {
@@ -13370,6 +13612,55 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _listingsSig = _storeListingsSignature(_listings);
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStoreListingsFromCloud(silent: true));
     _searchC.addListener(() => setState(() => _searchQuery = _searchC.text.trim().toLowerCase()));
+  }
+
+  Future<void> _refreshStoreOrdersFromConfig() async {
+    try {
+      final cfg = await Supabase.instance.client.from('config').select('storeOrders').eq('id', 1).maybeSingle();
+      if (cfg == null || cfg['storeOrders'] is! List) return;
+      final remote = (cfg['storeOrders'] as List).map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
+      final byId = <String, Map<String, dynamic>>{};
+      for (final o in remote) {
+        final id = (o['id'] ?? '').toString();
+        if (id.isNotEmpty) byId[id] = o;
+      }
+      for (final o in widget.config.storeOrders) {
+        final id = (o['id'] ?? '').toString();
+        if (id.isEmpty) continue;
+        final existing = byId[id];
+        final local = _normalizeStoreOrder(Map<String, dynamic>.from(o));
+        if (existing == null) {
+          byId[id] = local;
+        } else {
+          final localAt = DateTime.tryParse((local['updatedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final remoteAt = DateTime.tryParse((existing['updatedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+          byId[id] = remoteAt.isAfter(localAt) ? existing : local;
+        }
+      }
+      widget.config.storeOrders = byId.values.toList();
+    } catch (e) {
+      debugPrint('[storeOrders] refresh error: $e');
+    }
+  }
+
+  void _advanceOrderStatuses() {
+    var changed = false;
+    final now = DateTime.now();
+    for (final o in _orders) {
+      final s = (o['fulfillmentStatus'] ?? '').toString();
+      if (s == 'delivered' || s == 'pending') continue;
+      final eta = DateTime.tryParse((o['estimatedArrival'] ?? '').toString());
+      if (eta == null) continue;
+      if (s == 'shipped' && now.isAfter(eta.subtract(const Duration(hours: 12)))) {
+        o['fulfillmentStatus'] = 'in_transit';
+        changed = true;
+      }
+      if ((s == 'shipped' || s == 'in_transit') && now.isAfter(eta.subtract(const Duration(hours: 2)))) {
+        o['fulfillmentStatus'] = 'arriving';
+        changed = true;
+      }
+    }
+    if (changed) _save(refreshCloud: true);
   }
 
   void _mergeRemoteStoreListings(List<Map<String, dynamic>> remote) {
@@ -13398,6 +13689,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     if (!silent && mounted) setState(() {});
     final remote = await _fetchStoreListingsFromSupabase();
     _mergeRemoteStoreListings(remote);
+    await _refreshStoreOrdersFromConfig();
+    _advanceOrderStatuses();
     _lastCloudRefresh = DateTime.now();
     _storeLoading = false;
     if (!mounted) return;
@@ -13450,6 +13743,18 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   List<Map<String, dynamic>> get _listings => widget.config.storeListings;
   List<Map<String, dynamic>> get _inquiries => widget.config.storeInquiries;
+  List<Map<String, dynamic>> get _orders => widget.config.storeOrders;
+
+  void _upsertOrderLocal(Map<String, dynamic> order) {
+    final normalized = _normalizeStoreOrder(order);
+    final id = (normalized['id'] ?? '').toString();
+    final idx = _orders.indexWhere((o) => (o['id'] ?? '').toString() == id);
+    if (idx >= 0) {
+      _orders[idx] = normalized;
+    } else {
+      _orders.add(normalized);
+    }
+  }
 
   int _unreadSellerInquiries() {
     final me = widget.user.email.toLowerCase().trim();
@@ -13936,66 +14241,508 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   List<Map<String, dynamic>> _myPurchases() {
     final me = widget.user.email.toLowerCase().trim();
-    return _listings
-        .where((l) => (l['buyerEmail'] ?? '').toString().toLowerCase().trim() == me && (l['status'] ?? '') == 'sold' && _matchesSearch(l))
+    return _orders
+        .where((o) => (o['buyerEmail'] ?? '').toString().toLowerCase().trim() == me)
         .toList()
-      ..sort((a, b) => (b['soldAt'] ?? b['createdAt'] ?? '').toString().compareTo((a['soldAt'] ?? a['createdAt'] ?? '').toString()));
+      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+  }
+
+  List<Map<String, dynamic>> _mySalesOrders() {
+    final me = widget.user.email.toLowerCase().trim();
+    return _orders
+        .where((o) => (o['sellerEmail'] ?? '').toString().toLowerCase().trim() == me)
+        .toList()
+      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+  }
+
+  String _formatReceiptWhen(String iso) {
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return iso;
+    final local = dt.toLocal();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final h = local.hour > 12 ? local.hour - 12 : (local.hour == 0 ? 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    return '${months[local.month - 1]} ${local.day}, ${local.year} at $h:${local.minute.toString().padLeft(2, '0')} $ampm';
+  }
+
+  void _patchOrder(String orderId, void Function(Map<String, dynamic>) edit) {
+    final idx = _orders.indexWhere((o) => (o['id'] ?? '').toString() == orderId);
+    if (idx < 0) return;
+    edit(_orders[idx]);
+    _orders[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+    _orders[idx] = _normalizeStoreOrder(_orders[idx]);
+    _save(refreshCloud: true);
+    if (mounted) setState(() {});
   }
 
   void _showStoreReceipts() {
+    final purchases = _myPurchases();
+    final sales = _mySalesOrders();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => DefaultTabController(
+          length: 2,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Receipts', style: TextStyle(fontWeight: FontWeight.w900)),
+              bottom: TabBar(
+                labelColor: _storePurple,
+                tabs: [
+                  Tab(text: 'My Purchases (${purchases.length})'),
+                  Tab(text: 'My Sales (${sales.length})'),
+                ],
+              ),
+            ),
+            body: TabBarView(
+              children: [
+                _receiptsScroll(purchases, isBuyer: true),
+                _receiptsScroll(sales, isBuyer: false),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  Widget _receiptsScroll(List<Map<String, dynamic>> orders, {required bool isBuyer}) {
+    if (orders.isEmpty) {
+      return Center(child: Text(isBuyer ? 'No purchases yet.' : 'No sales yet.', style: const TextStyle(color: Colors.grey)));
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 120),
+      itemCount: orders.length,
+      itemBuilder: (_, i) => _orderReceiptCard(orders[i], isBuyer: isBuyer),
+    );
+  }
+
+  Widget _orderReceiptCard(Map<String, dynamic> order, {required bool isBuyer}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final me = widget.user.email.toLowerCase().trim();
-    final bought = _listings.where((l) => (l['buyerEmail'] ?? '').toString().toLowerCase().trim() == me && (l['status'] ?? '') == 'sold').toList();
-    final sold = _listings.where((l) => (l['sellerEmail'] ?? '').toString().toLowerCase().trim() == me && (l['status'] ?? '') == 'sold').toList();
-    final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
+    final total = (order['total'] as num?)?.toDouble() ?? (((order['price'] as num?) ?? 0).toDouble() + ((order['deliveryFee'] as num?) ?? 0).toDouble());
+    final status = _orderStatusLabel(order);
+    final fulfillment = (order['fulfillmentStatus'] ?? 'pending').toString();
+    final progress = _shipmentProgressPercent(order);
+    final orderId = (order['id'] ?? '').toString();
+    final isSeller = !isBuyer;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE5E7EB)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.shopping_bag_outlined, color: _storePurple, size: 22),
+              const SizedBox(width: 8),
+              Expanded(child: Text((order['title'] ?? 'Item').toString(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87))),
+              Text('\$${formatCurrency(total)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(child: Text(_formatReceiptWhen((order['createdAt'] ?? '').toString()), style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54))),
+              Row(
+                children: [
+                  Icon(
+                    fulfillment == 'delivered' ? Icons.check_circle : Icons.schedule,
+                    size: 14,
+                    color: fulfillment == 'delivered' ? Colors.green : (fulfillment == 'pending' ? Colors.orange : Colors.blue),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(status, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fulfillment == 'delivered' ? Colors.green : Colors.blue)),
+                ],
+              ),
+            ],
+          ),
+          if (fulfillment != 'pending') ...[
+            const SizedBox(height: 12),
+            _liveTrackingPanel(order, progress: progress, isDark: isDark),
+          ],
+          const SizedBox(height: 10),
+          _receiptInfoRow(Icons.inventory_2_outlined, 'Payment Method', _paymentDisplayLabel((order['paidVia'] ?? 'ngmy').toString()), isDark),
+          _receiptInfoRow(Icons.location_on_outlined, 'Delivery Address', (order['buyerAddress'] ?? '').toString(), isDark),
+          if ((order['buyerPhone'] ?? '').toString().isNotEmpty)
+            _receiptInfoRow(Icons.phone_outlined, 'Phone', (order['buyerPhone'] ?? '').toString(), isDark),
+          if (isSeller && fulfillment == 'pending') ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _showShipOrderSheet(order),
+                icon: const Icon(Icons.local_shipping_outlined),
+                label: const Text('Mark as Shipped'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E3A5F), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              ),
+            ),
+          ],
+          if (isSeller && fulfillment != 'pending' && fulfillment != 'delivered') ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _sellerActionChip('Location', Icons.place, const Color(0xFF7C3AED), () => _showUpdateLocationSheet(order))),
+                const SizedBox(width: 8),
+                Expanded(child: _sellerActionChip('ETA', Icons.schedule, const Color(0xFFF97316), () => _showUpdateEtaSheet(order))),
+                const SizedBox(width: 8),
+                Expanded(child: _sellerActionChip('Delivered', Icons.check_circle, const Color(0xFF00B25A), () => _markOrderDelivered(orderId))),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Waiting for buyer to confirm delivery…',
+              style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ],
+          if (fulfillment == 'delivered')
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Center(child: Text('✓ Transaction Complete', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w800))),
+            ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () {
+              final lid = (order['listingId'] ?? '').toString();
+              Map<String, dynamic>? listing;
+              for (final l in _listings) {
+                if ((l['id'] ?? '').toString() == lid) {
+                  listing = l;
+                  break;
+                }
+              }
+              if (listing != null) _openListingDetail(listing);
+            },
+            icon: const Icon(Icons.storefront_outlined, size: 18),
+            label: const Text('View Seller Store'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 42)),
+          ),
+          if (isSeller && fulfillment == 'delivered')
+            TextButton.icon(
+              onPressed: () => _resellFromOrder(order),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Resell this item'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _receiptInfoRow(IconData icon, String label, String value, bool isDark) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: isDark ? Colors.white38 : Colors.black45),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black45)),
+                Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _liveTrackingPanel(Map<String, dynamic> order, {required int progress, required bool isDark}) {
+    final trackingId = (order['trackingId'] ?? '').toString();
+    final steps = ['Shipped', 'In Transit', 'Arriving', 'Delivered'];
+    final status = (order['fulfillmentStatus'] ?? '').toString();
+    int activeStep = 0;
+    if (status == 'in_transit') activeStep = 1;
+    if (status == 'arriving') activeStep = 2;
+    if (status == 'delivered') activeStep = 3;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Live Tracking', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF1D4ED8))),
+              const Spacer(),
+              Text('#$trackingId', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF6D28D9))),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progress / 100,
+              minHeight: 8,
+              backgroundColor: Colors.white,
+              color: const Color(0xFF7C3AED),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(4, (i) {
+              final done = i <= activeStep;
+              return Column(
+                children: [
+                  Icon(done ? Icons.check_circle : Icons.circle_outlined, size: 18, color: done ? Colors.green : Colors.grey),
+                  Text(steps[i], style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: done ? const Color(0xFF2563EB) : Colors.grey)),
+                ],
+              );
+            }),
+          ),
+          if ((order['locationHistory'] as List?)?.isNotEmpty == true) ...[
+            const SizedBox(height: 10),
+            ...((order['locationHistory'] as List).cast<Map>().map((e) => Map<String, dynamic>.from(e))).take(3).map((h) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.circle, size: 8, color: Color(0xFF2563EB)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text((h['location'] ?? '').toString(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                          Text('${h['note'] ?? ''} · ${(h['at'] ?? '').toString()}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+          const SizedBox(height: 8),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+              child: Text(status == 'delivered' ? '✓ Delivered' : '$progress% Complete', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sellerActionChip(String label, IconData icon, Color color, VoidCallback onTap) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(height: 4),
+              Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showShipOrderSheet(Map<String, dynamic> order) {
+    String method = 'car';
+    DateTime? eta = DateTime.now().add(const Duration(days: 3));
+    final locationC = TextEditingController();
+    final orderId = (order['id'] ?? '').toString();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        height: MediaQuery.of(ctx).size.height * 0.72,
-        margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF121726) : Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: border, width: 1.4),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            margin: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _storeAccent.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _storeAccent.withOpacity(0.35)),
-                  ),
-                  child: const Icon(Icons.receipt_long_rounded, color: _storeAccent),
+                Row(
+                  children: [
+                    const Text('Ship Order', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                    const Spacer(),
+                    IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                const Expanded(child: Text('Store Receipts', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18))),
-                IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                const Text('Shipping Method', style: TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _shipMethodBtn('car', Icons.directions_car, method, setDlg, (m) => method = m),
+                    _shipMethodBtn('truck', Icons.local_shipping, method, setDlg, (m) => method = m),
+                    _shipMethodBtn('plane', Icons.flight, method, setDlg, (m) => method = m),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Text('Estimated Arrival (Date & Time)', style: TextStyle(fontWeight: FontWeight.w700)),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.calendar_today),
+                  title: Text(eta == null ? 'Pick date & time' : _formatReceiptWhen(eta!.toUtc().toIso8601String())),
+                  onTap: () async {
+                    final d = await showDatePicker(context: ctx, initialDate: eta ?? DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+                    if (d == null) return;
+                    final t = await showTimePicker(context: ctx, initialTime: TimeOfDay.fromDateTime(eta ?? DateTime.now()));
+                    if (t == null) return;
+                    setDlg(() => eta = DateTime(d.year, d.month, d.day, t.hour, t.minute));
+                  },
+                ),
+                TextField(controller: locationC, decoration: const InputDecoration(labelText: 'Current Location (optional)', hintText: 'e.g. Warehouse in Nairobi', prefixIcon: Icon(Icons.place))),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: eta == null
+                        ? null
+                        : () {
+                            Navigator.pop(ctx);
+                            _patchOrder(orderId, (o) {
+                              o['fulfillmentStatus'] = 'shipped';
+                              o['shippingMethod'] = method;
+                              o['estimatedArrival'] = eta!.toUtc().toIso8601String();
+                              o['shippedAt'] = DateTime.now().toUtc().toIso8601String();
+                              final hist = List<Map<String, dynamic>>.from((o['locationHistory'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? []);
+                              hist.insert(0, {
+                                'location': locationC.text.trim().isEmpty ? 'Shipped' : locationC.text.trim(),
+                                'note': 'Order shipped',
+                                'at': DateTime.now().toLocal().toString(),
+                              });
+                              o['locationHistory'] = hist;
+                              if (DateTime.now().isAfter(eta!.subtract(const Duration(hours: 2)))) {
+                                o['fulfillmentStatus'] = 'in_transit';
+                              }
+                            });
+                          },
+                    icon: const Icon(Icons.send_rounded),
+                    label: const Text('Ship Order'),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: ListView(
-                children: [
-                  Text('Purchases', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white70 : Colors.black54)),
-                  const SizedBox(height: 8),
-                  if (bought.isEmpty) const Text('No purchases yet.', style: TextStyle(color: Colors.grey)),
-                  ...bought.map((l) => _receiptTile(l, isPurchase: true, isDark: isDark)),
-                  const SizedBox(height: 16),
-                  Text('Sales', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white70 : Colors.black54)),
-                  const SizedBox(height: 8),
-                  if (sold.isEmpty) const Text('No sales yet.', style: TextStyle(color: Colors.grey)),
-                  ...sold.map((l) => _receiptTile(l, isPurchase: false, isDark: isDark)),
-                ],
-              ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _shipMethodBtn(String key, IconData icon, String selected, void Function(void Function()) setDlg, void Function(String) onPick) {
+    final sel = selected == key;
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: InkWell(
+          onTap: () => setDlg(() => onPick(key)),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: sel ? const Color(0xFF2563EB) : Colors.grey.shade300, width: sel ? 2 : 1),
+              color: sel ? const Color(0xFFEFF6FF) : Colors.white,
+            ),
+            child: Icon(icon, color: sel ? const Color(0xFF2563EB) : Colors.grey),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showUpdateLocationSheet(Map<String, dynamic> order) {
+    final c = TextEditingController(text: (order['currentLocation'] ?? '').toString());
+    final orderId = (order['id'] ?? '').toString();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Update location'),
+        content: TextField(controller: c, decoration: const InputDecoration(hintText: 'Current package location')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _patchOrder(orderId, (o) {
+                o['currentLocation'] = c.text.trim();
+                final hist = List<Map<String, dynamic>>.from((o['locationHistory'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? []);
+                hist.insert(0, {'location': c.text.trim(), 'note': 'Location updated', 'at': DateTime.now().toLocal().toString()});
+                o['locationHistory'] = hist;
+                if ((o['fulfillmentStatus'] ?? '') == 'shipped') o['fulfillmentStatus'] = 'in_transit';
+                final eta = DateTime.tryParse((o['estimatedArrival'] ?? '').toString());
+                if (eta != null && DateTime.now().isAfter(eta.subtract(const Duration(hours: 6)))) {
+                  o['fulfillmentStatus'] = 'arriving';
+                }
+              });
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUpdateEtaSheet(Map<String, dynamic> order) {
+    DateTime? eta = DateTime.tryParse((order['estimatedArrival'] ?? '').toString()) ?? DateTime.now().add(const Duration(days: 2));
+    final orderId = (order['id'] ?? '').toString();
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: const Text('Update ETA'),
+          content: ListTile(
+            title: Text(eta == null ? 'Pick arrival time' : _formatReceiptWhen(eta!.toUtc().toIso8601String())),
+            leading: const Icon(Icons.schedule),
+            onTap: () async {
+              final d = await showDatePicker(context: ctx, initialDate: eta ?? DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+              if (d == null) return;
+              final t = await showTimePicker(context: ctx, initialTime: TimeOfDay.fromDateTime(eta ?? DateTime.now()));
+              if (t == null) return;
+              setDlg(() => eta = DateTime(d.year, d.month, d.day, t.hour, t.minute));
+            },
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: eta == null
+                  ? null
+                  : () {
+                      Navigator.pop(ctx);
+                      _patchOrder(orderId, (o) {
+                        o['estimatedArrival'] = eta!.toUtc().toIso8601String();
+                        o['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+                      });
+                    },
+              child: const Text('Save'),
             ),
           ],
         ),
@@ -14003,34 +14750,111 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     );
   }
 
-  Widget _receiptTile(Map<String, dynamic> l, {required bool isPurchase, required bool isDark}) {
-    final price = (l['price'] as num?)?.toDouble() ?? 0;
-    final when = (l['soldAt'] ?? l['createdAt'] ?? '').toString();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
-      ),
-      child: Row(
-        children: [
-          Icon(isPurchase ? Icons.shopping_bag_outlined : Icons.payments_outlined, color: _storeAccent, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text((l['title'] ?? '').toString(), style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
-                Text(isPurchase ? 'Bought from ${l['sellerName']}' : 'Sold to ${l['buyerName']}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
-              ],
-            ),
-          ),
-          Text('\$${formatCurrency(price)}', style: const TextStyle(fontWeight: FontWeight.w900, color: _storeAccent)),
-        ],
+  void _markOrderDelivered(String orderId) {
+    _patchOrder(orderId, (o) {
+      o['fulfillmentStatus'] = 'delivered';
+      final hist = List<Map<String, dynamic>>.from((o['locationHistory'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? []);
+      hist.insert(0, {'location': (o['buyerAddress'] ?? '').toString(), 'note': 'Delivered', 'at': DateTime.now().toLocal().toString()});
+      o['locationHistory'] = hist;
+    });
+  }
+
+  Future<void> _resellListing(Map<String, dynamic> src, {int? units}) async {
+    final me = widget.user.email.toLowerCase().trim();
+    if ((src['sellerEmail'] ?? '').toString().toLowerCase().trim() != me) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You can only resell your own items.')));
+      return;
+    }
+    final unitCount = units ?? (src['units'] as num?)?.toInt() ?? 1;
+    if (unitCount < 1) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter at least 1 unit.')));
+      return;
+    }
+    final now = DateTime.now().toUtc().toIso8601String();
+    final copy = Map<String, dynamic>.from(src);
+    copy['id'] = DateTime.now().microsecondsSinceEpoch.toString();
+    copy['status'] = 'active';
+    copy['units'] = unitCount;
+    copy['unitsRemaining'] = unitCount;
+    copy['buyerEmail'] = '';
+    copy['buyerName'] = '';
+    copy['soldAt'] = '';
+    copy['paidVia'] = '';
+    copy['createdAt'] = now;
+    copy['updatedAt'] = now;
+    _upsertListingLocal(copy);
+    final cloudOk = await _upsertStoreListingRowSafe(copy);
+    _listingsSig = _storeListingsSignature(_listings);
+    _save(refreshCloud: true);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          cloudOk
+              ? '“${src['title'] ?? 'Item'}” is live again in the shop ($unitCount unit${unitCount == 1 ? '' : 's'}).'
+              : 'Relisted on this device. Push to GitHub / Supabase so all users see it.',
+        ),
       ),
     );
+  }
+
+  Future<void> _promptResellListing(Map<String, dynamic> listing) async {
+    final unitsC = TextEditingController(text: '${(listing['units'] as num?)?.toInt() ?? 1}');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          title: const Text('Resell item'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Post “${listing['title'] ?? 'Item'}” again as a new listing. Photos, price, and description are copied.',
+                style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: unitsC,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Units in stock',
+                  prefixIcon: Icon(Icons.inventory_2_outlined),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white),
+              child: const Text('Resell'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    final units = int.tryParse(unitsC.text.trim()) ?? 1;
+    await _resellListing(listing, units: units);
+  }
+
+  void _resellFromOrder(Map<String, dynamic> order) {
+    final listingId = (order['listingId'] ?? '').toString();
+    Map<String, dynamic>? src;
+    for (final l in _listings) {
+      if ((l['id'] ?? '').toString() == listingId) {
+        src = l;
+        break;
+      }
+    }
+    if (src == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Original listing not found.')));
+      return;
+    }
+    unawaited(_promptResellListing(src));
   }
 
   Widget _storeTabChip(int index, String label, int count, bool isDark) {
@@ -14550,6 +15374,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final pageCount = images.length + (videoRef.isNotEmpty ? 1 : 0);
     final pageCtrl = PageController();
+    final me = widget.user.email.toLowerCase().trim();
+    final isOwner = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
+    final status = (listing['status'] ?? 'active').toString();
 
     Navigator.push(
       context,
@@ -14628,32 +15455,60 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                       );
                     }),
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              _askAvailability(listing);
-                            },
-                            icon: const Icon(Icons.chat_bubble_outline),
-                            label: const Text('Message'),
-                          ),
+                    if (isOwner && status == 'sold') ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _promptResellListing(listing);
+                          },
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Resell this item'),
+                          style: ElevatedButton.styleFrom(backgroundColor: _storePurple, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
                         ),
-                        const SizedBox(width: 8),
-                        if ((listing['status'] ?? '') == 'active' && (listing['sellerEmail'] ?? '').toString().toLowerCase() != widget.user.email.toLowerCase())
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (isOwner && status == 'active')
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _removeListing(listing);
+                          },
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Remove listing'),
+                        ),
+                      ),
+                    if (!isOwner || status == 'active')
+                      Row(
+                        children: [
                           Expanded(
-                            child: ElevatedButton(
+                            child: OutlinedButton.icon(
                               onPressed: () {
                                 Navigator.pop(ctx);
-                                _buyListing(listing);
+                                _askAvailability(listing);
                               },
-                              style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white),
-                              child: const Text('Buy'),
+                              icon: const Icon(Icons.chat_bubble_outline),
+                              label: const Text('Message'),
                             ),
                           ),
-                      ],
-                    ),
+                          const SizedBox(width: 8),
+                          if (status == 'active' && !isOwner)
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(ctx);
+                                  _buyListing(listing);
+                                },
+                                style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white),
+                                child: const Text('Buy'),
+                              ),
+                            ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -14703,6 +15558,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final descC = TextEditingController();
     final priceC = TextEditingController();
     final deliveryC = TextEditingController(text: '0');
+    final unitsC = TextEditingController(text: '1');
     final locationC = TextEditingController(text: widget.user.city ?? '');
     String category = 'Electronics';
     String condition = 'Used - Good';
@@ -14788,6 +15644,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                               Expanded(child: TextField(controller: deliveryC, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Delivery (\$)', Icons.local_shipping_outlined, isDark))),
                             ],
                           ),
+                          const SizedBox(height: 8),
+                          TextField(controller: unitsC, keyboardType: TextInputType.number, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Units in stock *', Icons.inventory_2_outlined, isDark)),
                           const SizedBox(height: 8),
                           TextField(controller: locationC, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Location', Icons.location_on_outlined, isDark)),
                           const SizedBox(height: 8),
@@ -15083,6 +15941,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                 'videoRef': uploadedVideo,
                                 'imageRef': uploadedImages.isNotEmpty ? uploadedImages.first : '',
                                 'status': 'active',
+                                'units': int.tryParse(unitsC.text.trim()) ?? 1,
+                                'unitsRemaining': int.tryParse(unitsC.text.trim()) ?? 1,
                                 'buyerEmail': '',
                                 'buyerName': '',
                                 'createdAt': now,
@@ -15146,176 +16006,319 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     zelleInfoC.dispose();
   }
 
+  void _completeStorePurchase({
+    required Map<String, dynamic> listing,
+    required String selectedPay,
+    required String address,
+    required String phone,
+    required String buyerName,
+    required int quantity,
+  }) {
+    final price = (listing['price'] as num?)?.toDouble() ?? 0;
+    final delivery = (listing['deliveryFee'] as num?)?.toDouble() ?? 0;
+    final unitTotal = price + delivery;
+    final total = unitTotal * quantity;
+    final sellerEmail = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
+    final title = (listing['title'] ?? 'Item').toString();
+    final sellerIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sellerEmail);
+    if (sellerIdx < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Seller account not found.')));
+      return;
+    }
+    final listingId = (listing['id'] ?? '').toString();
+    final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == listingId);
+    if (idx < 0 || (_listings[idx]['status'] ?? '') != 'active') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This item is no longer available.')));
+      return;
+    }
+    final remaining = ((_listings[idx]['unitsRemaining'] as num?)?.toInt() ?? 1);
+    if (quantity > remaining) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Only $remaining unit(s) left.')));
+      return;
+    }
+    if (selectedPay == 'ngmy' && widget.user.accountBalance < total) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Not enough NGMY balance. Need \$${formatCurrency(total)}.')));
+      return;
+    }
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    final order = _normalizeStoreOrder({
+      'id': 'order_${DateTime.now().microsecondsSinceEpoch}',
+      'listingId': listingId,
+      'title': title,
+      'price': price,
+      'deliveryFee': delivery,
+      'total': total,
+      'quantity': quantity,
+      'sellerEmail': sellerEmail,
+      'sellerName': listing['sellerName'] ?? 'Seller',
+      'buyerEmail': widget.user.email,
+      'buyerName': buyerName.isNotEmpty ? buyerName : widget.user.username,
+      'buyerPhone': phone,
+      'buyerAddress': address,
+      'paidVia': selectedPay,
+      'createdAt': now,
+      'updatedAt': now,
+      'fulfillmentStatus': 'pending',
+      'locationHistory': <Map<String, dynamic>>[],
+    });
+
+    setState(() {
+      if (selectedPay == 'ngmy') {
+        widget.user.accountBalance -= total;
+        widget.allUsers[sellerIdx].accountBalance += total;
+      }
+      final newRemaining = remaining - quantity;
+      _listings[idx]['unitsRemaining'] = newRemaining;
+      _listings[idx]['updatedAt'] = now;
+      if (newRemaining <= 0) {
+        _listings[idx]['status'] = 'sold';
+        _listings[idx]['buyerEmail'] = widget.user.email;
+        _listings[idx]['buyerName'] = widget.user.username;
+        _listings[idx]['soldAt'] = now;
+        _listings[idx]['paidVia'] = selectedPay;
+      }
+      _upsertOrderLocal(order);
+    });
+
+    final ts = DateTime.now().microsecondsSinceEpoch.toString();
+    if (selectedPay == 'ngmy') {
+      widget.onAddTransaction(AppTransaction(
+        id: 'store_buy_$ts',
+        userEmail: widget.user.email,
+        amount: total,
+        type: TransactionType.adminRemove,
+        method: PaymentMethod.system,
+        status: TransactionStatus.approved,
+        timestamp: DateTime.now(),
+        sourceDetails: 'NGMY Store purchase: $title x$quantity',
+      ));
+      widget.onAddTransaction(AppTransaction(
+        id: 'store_sale_$ts',
+        userEmail: widget.allUsers[sellerIdx].email,
+        amount: total,
+        type: TransactionType.adminAdd,
+        method: PaymentMethod.system,
+        status: TransactionStatus.approved,
+        timestamp: DateTime.now(),
+        sourceDetails: 'NGMY Store sale: $title x$quantity',
+      ));
+    }
+    unawaited(_upsertStoreListingRowSafe(_listings[idx]));
+    _listingsSig = _storeListingsSignature(_listings);
+    _save(refreshCloud: true);
+    if (selectedPay == 'ngmy') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Purchase complete! Track shipment in Receipts.')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Order placed. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}. Track in Receipts.')),
+      );
+      _showExternalPaymentSheet(selectedPay, listing, total);
+    }
+  }
+
   void _buyListing(Map<String, dynamic> listing) {
     final price = (listing['price'] as num?)?.toDouble() ?? 0;
     final delivery = (listing['deliveryFee'] as num?)?.toDouble() ?? 0;
-    final total = price + delivery;
-    if (total <= 0) return;
+    final unitTotal = price + delivery;
+    if (unitTotal <= 0) return;
     final sellerEmail = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
-    final buyerEmail = widget.user.email.toLowerCase().trim();
-    if (sellerEmail == buyerEmail) {
+    if (sellerEmail == widget.user.email.toLowerCase().trim()) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You cannot buy your own listing.')));
       return;
     }
     final payments = _listingAcceptedPayments(listing);
     String selectedPay = payments.contains('ngmy') ? 'ngmy' : payments.first;
     final title = (listing['title'] ?? 'Item').toString();
+    final unitsRemaining = (listing['unitsRemaining'] as num?)?.toInt() ?? (listing['units'] as num?)?.toInt() ?? 1;
+    final addressC = TextEditingController(text: widget.user.homeAddress ?? '');
+    final phoneC = TextEditingController(text: widget.user.phone);
+    final nameC = TextEditingController(text: widget.user.fullName ?? widget.user.username);
+    int buyQty = 1;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) {
-          final needsBalance = selectedPay == 'ngmy';
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final total = unitTotal * buyQty;
           final balanceOk = widget.user.accountBalance >= total;
-          final canConfirm = selectedPay == 'ngmy'
-              ? balanceOk
-              : selectedPay == 'cashapp'
-                  ? _listingSellerCashTag(listing).isNotEmpty
-                  : selectedPay == 'zelle'
-                      ? _listingSellerZelle(listing).isNotEmpty
-                      : true;
-          return AlertDialog(
-            title: const Text('Confirm Purchase'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Buy "$title" for \$${formatCurrency(total)}${delivery > 0 ? ' (includes delivery)' : ''}.'),
-                const SizedBox(height: 12),
-                const Text('Pay seller via:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                const SizedBox(height: 8),
-                ...payments.map((p) => RadioListTile<String>(
-                      dense: true,
-                      title: Text(_paymentLabel(p), style: const TextStyle(fontSize: 13)),
-                      subtitle: p == 'ngmy'
-                          ? Text(
-                              'Deducted from your NGMY account (\$${formatCurrency(widget.user.accountBalance)} available)',
-                              style: TextStyle(fontSize: 10, color: balanceOk ? Colors.grey : const Color(0xFFEF4444)),
-                            )
-                          : p == 'cashapp'
-                              ? Text(
-                                  _listingSellerCashTag(listing).isEmpty ? 'Seller Cash App not set' : 'Pay ${_listingSellerCashTag(listing)} in Cash App',
-                                  style: const TextStyle(fontSize: 10),
-                                )
-                              : Text(
-                                  _listingSellerZelle(listing).isEmpty ? 'Seller Zelle not set' : 'Zelle: ${_listingSellerZelle(listing)}',
-                                  style: const TextStyle(fontSize: 10),
-                                ),
-                      value: p,
-                      groupValue: selectedPay,
-                      onChanged: (v) => setDlg(() => selectedPay = v ?? selectedPay),
-                    )),
-                if (needsBalance && !balanceOk)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      'Not enough money in your NGMY account. You need \$${formatCurrency(total)} but only have \$${formatCurrency(widget.user.accountBalance)}.',
-                      style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                if (selectedPay == 'cashapp' && _listingSellerCashTag(listing).isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _storePaymentInfoTile(
-                    label: 'Tap to open seller Cash App',
-                    value: _listingSellerCashTag(listing),
-                    icon: Icons.payments_rounded,
-                    color: const Color(0xFF00D632),
-                    onTap: () => _openSellerCashApp(_listingSellerCashTag(listing)),
-                  ),
-                ],
-                if (selectedPay == 'zelle' && _listingSellerZelle(listing).isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _storePaymentInfoTile(
-                    label: 'Tap seller Zelle phone/email',
-                    value: _listingSellerZelle(listing),
-                    icon: Icons.account_balance_rounded,
-                    color: const Color(0xFF6D1ED4),
-                    onTap: () => _openSellerZelle(_listingSellerZelle(listing)),
-                  ),
-                ],
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-              ElevatedButton(
-                onPressed: !canConfirm
-                    ? null
-                    : () {
-                        if (selectedPay == 'ngmy' && widget.user.accountBalance < total) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Not enough NGMY balance. Need \$${formatCurrency(total)}.')),
-                          );
-                          return;
-                        }
-                        final sellerIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sellerEmail);
-                        if (sellerIdx < 0) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Seller account not found.')));
-                          Navigator.pop(ctx);
-                          return;
-                        }
-                        final listingId = (listing['id'] ?? '').toString();
-                        final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == listingId);
-                        if (idx < 0 || (_listings[idx]['status'] ?? '') != 'active') {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This item is no longer available.')));
-                          Navigator.pop(ctx);
-                          return;
-                        }
+          final canConfirm = addressC.text.trim().isNotEmpty &&
+              phoneC.text.trim().isNotEmpty &&
+              (selectedPay != 'ngmy' || balanceOk) &&
+              (selectedPay != 'cashapp' || _listingSellerCashTag(listing).isNotEmpty) &&
+              (selectedPay != 'zelle' || _listingSellerZelle(listing).isNotEmpty);
 
-                        setState(() {
-                          if (selectedPay == 'ngmy') {
-                            widget.user.accountBalance -= total;
-                            widget.allUsers[sellerIdx].accountBalance += total;
-                          }
-                          final soldNow = DateTime.now().toUtc().toIso8601String();
-                          _listings[idx]['status'] = 'sold';
-                          _listings[idx]['buyerEmail'] = widget.user.email;
-                          _listings[idx]['buyerName'] = widget.user.username;
-                          _listings[idx]['soldAt'] = soldNow;
-                          _listings[idx]['updatedAt'] = soldNow;
-                          _listings[idx]['paidVia'] = selectedPay;
-                        });
-
-                        final ts = DateTime.now().microsecondsSinceEpoch.toString();
-                        if (selectedPay == 'ngmy') {
-                          widget.onAddTransaction(AppTransaction(
-                            id: 'store_buy_$ts',
-                            userEmail: widget.user.email,
-                            amount: total,
-                            type: TransactionType.adminRemove,
-                            method: PaymentMethod.system,
-                            status: TransactionStatus.approved,
-                            timestamp: DateTime.now(),
-                            sourceDetails: 'NGMY Store purchase: $title',
-                          ));
-                          widget.onAddTransaction(AppTransaction(
-                            id: 'store_sale_$ts',
-                            userEmail: widget.allUsers[sellerIdx].email,
-                            amount: total,
-                            type: TransactionType.adminAdd,
-                            method: PaymentMethod.system,
-                            status: TransactionStatus.approved,
-                            timestamp: DateTime.now(),
-                            sourceDetails: 'NGMY Store sale: $title',
-                          ));
-                        }
-                        unawaited(_upsertStoreListingRowSafe(_listings[idx]));
-                        _listingsSig = _storeListingsSignature(_listings);
-                        _save();
-                        Navigator.pop(ctx);
-                        if (selectedPay == 'ngmy') {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Purchase complete! \$${formatCurrency(total)} paid from your NGMY account.')),
-                          );
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Order placed. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}.')),
-                          );
-                          _showExternalPaymentSheet(selectedPay, listing, total);
-                        }
-                      },
-                child: const Text('Confirm'),
+          Widget payTile(String key, String emoji, String label, String? sub) {
+            final sel = selectedPay == key;
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => setDlg(() => selectedPay = key),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: sel ? _storePurple : (isDark ? Colors.white24 : const Color(0xFFE5E7EB)), width: sel ? 2 : 1),
+                    color: sel ? _storePurple.withOpacity(0.08) : (isDark ? const Color(0xFF0F172A) : Colors.white),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(sel ? Icons.radio_button_checked : Icons.radio_button_off, color: sel ? _storePurple : Colors.grey, size: 20),
+                      const SizedBox(width: 10),
+                      Text(emoji, style: const TextStyle(fontSize: 20)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                            if (sub != null && sub.isNotEmpty)
+                              Text(sub, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ],
+            );
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF121726) : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        ShaderMask(
+                          shaderCallback: (b) => const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFF2563EB)]).createShader(b),
+                          child: const Text('Buy Item', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+                        ),
+                        const Spacer(),
+                        IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                      ],
+                    ),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '\$${formatCurrency(price)}${delivery > 0 ? ' +\$${formatCurrency(delivery)} delivery' : ''}${buyQty > 1 ? ' × $buyQty' : ''}',
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF2563EB)),
+                          ),
+                          Text(title, style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.black87 : Colors.black87)),
+                          if (unitsRemaining > 1) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Text('Quantity:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                                IconButton(
+                                  onPressed: buyQty > 1 ? () => setDlg(() => buyQty--) : null,
+                                  icon: const Icon(Icons.remove_circle_outline),
+                                ),
+                                Text('$buyQty', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                                IconButton(
+                                  onPressed: buyQty < unitsRemaining ? () => setDlg(() => buyQty++) : null,
+                                  icon: const Icon(Icons.add_circle_outline),
+                                ),
+                                Text('($unitsRemaining available)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    if (payments.contains('ngmy')) payTile('ngmy', '💰', 'Account Balance', 'Balance: \$${formatCurrency(widget.user.accountBalance)}'),
+                    if (payments.contains('cashapp'))
+                      payTile('cashapp', '💵', 'Cash App', _listingSellerCashTag(listing).isEmpty ? null : '\$${_listingSellerCashTag(listing)}'),
+                    if (payments.contains('zelle'))
+                      payTile('zelle', '🏦', 'Zelle', _listingSellerZelle(listing).isEmpty ? null : 'Send to: ${_listingSellerZelle(listing)}'),
+                    if (selectedPay == 'ngmy' && !balanceOk)
+                      Text('Not enough balance for \$${formatCurrency(total)}.', style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+                    const SizedBox(height: 14),
+                    const Text('Full name', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    const SizedBox(height: 6),
+                    TextField(controller: nameC, decoration: _storeFieldDec('Your name', Icons.person_outline, isDark)),
+                    const SizedBox(height: 10),
+                    const Text('Phone number', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    const SizedBox(height: 6),
+                    TextField(controller: phoneC, keyboardType: TextInputType.phone, decoration: _storeFieldDec('Phone for delivery updates', Icons.phone_outlined, isDark)),
+                    const SizedBox(height: 10),
+                    const Text('Delivery Address', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: addressC,
+                      maxLines: 3,
+                      onChanged: (_) => setDlg(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Street, city, state, zip — everything needed to ship',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFFDB2777)]),
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: !canConfirm
+                              ? null
+                              : () {
+                                  Navigator.pop(ctx);
+                                  _completeStorePurchase(
+                                    listing: listing,
+                                    selectedPay: selectedPay,
+                                    address: addressC.text.trim(),
+                                    phone: phoneC.text.trim(),
+                                    buyerName: nameC.text.trim(),
+                                    quantity: buyQty,
+                                  );
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                          ),
+                          child: const Text('Confirm Purchase 🎉', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           );
         },
       ),
@@ -15348,7 +16351,15 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     if (status == 'sold') statusColor = Colors.blue;
     if (status == 'removed') statusColor = Colors.grey;
 
-    return Container(
+    final me = widget.user.email.toLowerCase().trim();
+    final isMyListing = showManage && (listing['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: isMyListing ? () => _openListingDetail(listing) : null,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
@@ -15435,7 +16446,21 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                     ),
                   ),
                 ],
-                if (showManage && status == 'active')
+                if (showManage && status == 'sold')
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _promptResellListing(listing),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Resell Item'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _storePurple,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                if (showManage && status == 'active') ...[
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -15444,10 +16469,26 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                       label: const Text('Remove Listing'),
                     ),
                   ),
+                  if (((listing['unitsRemaining'] as num?)?.toInt() ?? 1) <= 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _promptResellListing(listing),
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Restock / Resell'),
+                          style: OutlinedButton.styleFrom(foregroundColor: _storePurple),
+                        ),
+                      ),
+                    ),
+                ],
               ],
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }
@@ -15525,11 +16566,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                   ? [
                       _shopGrid(shop),
                       _listingList(mine, empty: 'You have no listings. Tap Sell Item to post.', showBuy: false, showManage: true),
-                      _listingList(bought, empty: 'No purchases yet.', showBuy: false, showManage: false),
+                      _receiptsScroll(bought, isBuyer: true),
                     ]
                   : [
                       _shopGrid(shop),
-                      _listingList(bought, empty: 'No purchases yet.', showBuy: false, showManage: false),
+                      _receiptsScroll(bought, isBuyer: true),
                     ],
             ),
           ),
@@ -17932,7 +18973,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       await widget.onRefreshFromCloud?.call();
       if (mounted) setState(() {});
     });
-    _mediaSyncTimer = Timer.periodic(const Duration(seconds: 12), (_) async {
+    _mediaSyncTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
       if (!mounted) return;
       await widget.onRefreshFromCloud?.call();
       if (mounted) setState(() {});
@@ -17962,6 +19003,15 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   }
 
   Future<void> _deletePost(MediaPost post, {bool triggerSave = true}) async {
+    final owner = post.userEmail.toLowerCase().trim() == widget.user.email.toLowerCase().trim();
+    if (!owner && !widget.user.isAdmin) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You can only delete your own posts.')),
+        );
+      }
+      return;
+    }
     if (widget.onDeleteMedia != null) {
       await widget.onDeleteMedia!(post);
       if (mounted) setState(() {});
