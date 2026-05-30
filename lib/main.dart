@@ -20,6 +20,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import 'ngmy_nav.dart';
+import 'ngmy_back_scope.dart';
 import 'ngmy_barcode_lookup.dart';
 import 'ngmy_games.dart';
 import 'ngmy_game_admin_sheet.dart';
@@ -151,6 +152,37 @@ String formatCurrency(double amount) {
   RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
   parts[0] = parts[0].replaceAllMapped(reg, (Match m) => '${m[1]},');
   return parts.join('.');
+}
+
+bool _ngmyTxnIncreasesBalance(AppTransaction t) {
+  return t.type == TransactionType.deposit ||
+      t.type == TransactionType.adminAdd ||
+      t.type == TransactionType.reimbursement ||
+      t.type == TransactionType.claim;
+}
+
+double ngmyBalanceFromApprovedTransactions(String email, List<AppTransaction> transactions) {
+  final key = email.toLowerCase().trim();
+  var balance = 0.0;
+  for (final t in transactions) {
+    if (t.userEmail.toLowerCase().trim() != key) continue;
+    if (t.status != TransactionStatus.approved) continue;
+    if (_ngmyTxnIncreasesBalance(t)) {
+      balance += t.amount;
+    } else {
+      balance -= t.amount;
+    }
+  }
+  return balance;
+}
+
+void ngmyApplyApprovedTransactionToBalance(UserData user, AppTransaction t) {
+  if (t.status != TransactionStatus.approved) return;
+  if (_ngmyTxnIncreasesBalance(t)) {
+    user.accountBalance += t.amount;
+  } else {
+    user.accountBalance -= t.amount;
+  }
 }
 
 enum TransactionType { deposit, withdrawal, adminAdd, adminRemove, reimbursement, contribution, claim }
@@ -1343,6 +1375,9 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   final remoteLegal = await _fetchRemoteLegalContent();
   final remoteTerms = (remoteLegal['terms'] ?? '').trim();
   final remotePrivacy = (remoteLegal['privacy'] ?? '').trim();
+  row['gameTimeLimits'] = config.gameTimeLimits;
+  row['diceSettings'] = config.diceSettings;
+  row['gameInvites'] = config.gameInvites;
   if (isAdmin) {
     row['termsAndConditions'] = config.termsAndConditions;
     row['privacyPolicy'] = config.privacyPolicy;
@@ -1802,8 +1837,29 @@ class _NGMYAppState extends State<NGMYApp> {
         final keepHelpBiz = List<Map<String, dynamic>>.from(_config.helpBusinesses.map((e) => Map<String, dynamic>.from(e)));
         final keepOrders = List<Map<String, dynamic>>.from(_config.storeOrders.map((e) => Map<String, dynamic>.from(e)));
         final keepPlans = List<Map<String, dynamic>>.from(_config.investmentPlans.map((e) => Map<String, dynamic>.from(e)));
+        final keepGameLimits = Map<String, int>.from(_config.gameTimeLimits);
+        final keepDice = Map<String, dynamic>.from(_config.diceSettings);
+        final keepInvites = List<Map<String, dynamic>>.from(_config.gameInvites.map((e) => Map<String, dynamic>.from(e)));
         final cfgMap = Map<String, dynamic>.from(cfg);
         final next = AppConfig.fromJson(cfgMap);
+        final remoteLimits = cfgMap['gameTimeLimits'];
+        if (remoteLimits is Map && remoteLimits.isNotEmpty) {
+          next.gameTimeLimits = ngmyParseGameTimeLimits(remoteLimits);
+        } else if (keepGameLimits.isNotEmpty) {
+          next.gameTimeLimits = keepGameLimits;
+        }
+        final remoteDice = cfgMap['diceSettings'];
+        if (remoteDice is Map && remoteDice.isNotEmpty) {
+          next.diceSettings = NgmyDiceSettings.fromJson(remoteDice).toJson();
+        } else if (keepDice.isNotEmpty) {
+          next.diceSettings = keepDice;
+        }
+        final remoteInvites = cfgMap['gameInvites'];
+        if (remoteInvites is List && remoteInvites.isNotEmpty) {
+          next.gameInvites = remoteInvites.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        } else if (keepInvites.isNotEmpty) {
+          next.gameInvites = keepInvites;
+        }
         _applyRemoteLegalToConfig(next, cfgMap);
         final remoteGemini = _geminiKeyFromMap(cfgMap);
         if (remoteGemini.isNotEmpty) {
@@ -2722,6 +2778,16 @@ class _NGMYAppState extends State<NGMYApp> {
         } catch (_) {}
       }
 
+      for (final u in _allUsers) {
+        final computed = ngmyBalanceFromApprovedTransactions(u.email, _allTransactions);
+        if (computed > u.accountBalance + 0.001) u.accountBalance = computed;
+      }
+      if (_currentUser != null) {
+        final key = _currentUser!.email.toLowerCase().trim();
+        final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+        if (idx != -1) _currentUser = _allUsers[idx];
+      }
+
       // Ensure admins are updated
       final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
       for (var u in _allUsers) if (admins.contains(u.email.toLowerCase().trim())) u.isAdmin = true;
@@ -3039,6 +3105,14 @@ class _NGMYAppState extends State<NGMYApp> {
                 onAddTransaction: (t) {
                   setState(() {
                     _allTransactions.add(t);
+                    final userKey = t.userEmail.toLowerCase().trim();
+                    final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
+                    if (userIdx != -1) {
+                      ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], t);
+                      if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
+                        _currentUser = _allUsers[userIdx];
+                      }
+                    }
                     final userTrans = _allTransactions.where((tx) => tx.userEmail == t.userEmail).toList();
                     if (userTrans.length > 30) {
                       userTrans.sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -5271,12 +5345,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        _exitToHome();
-        return false;
-      },
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: const Color(0xFF2B1454),
         appBar: AppBar(
           leading: IconButton(
@@ -5314,7 +5383,6 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -8101,7 +8169,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _sBtn('Add \$', Icons.add, Colors.blue, () => _prompt(context, 'Add Money', (val) {
               final amt = double.tryParse(val) ?? 0;
               if (amt <= 0) return;
-              u.accountBalance += amt;
               widget.onAddTransaction(AppTransaction(
                 id: DateTime.now().toString(),
                 userEmail: u.email,
@@ -13869,7 +13936,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final receiptGroups = _groupContributionReceipts(_visibleContributionTx(), unreadOnly: true);
     final receiptCount = receiptGroups.length;
 
-    return Scaffold(
+    return NgmyTabBackScope(
+      activeTab: _activeTab,
+      onTabBack: () => setState(() => _activeTab = (_activeTab - 1).clamp(0, 3)),
+      child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF5F7FB),
       appBar: AppBar(
         title: const Text('Civic Registry', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
@@ -14071,6 +14141,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -20796,7 +20867,10 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     }).toList();
     final tabJobs = _activeTab == 0 ? findJobs : (_activeTab == 1 ? myJobs : claimedJobs);
 
-    return Scaffold(
+    return NgmyTabBackScope(
+      activeTab: _activeTab,
+      onTabBack: () => setState(() => _activeTab = (_activeTab - 1).clamp(0, 2)),
+      child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF5F7FB),
       appBar: AppBar(
         title: const Text('Job Marketplace', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -20890,6 +20964,7 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -22227,7 +22302,10 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     const primaryColor = Color(0xFF00B25A);
     final chatBg = isDark ? const Color(0xFF0B1220) : const Color(0xFFE8F5E9);
 
-    return Scaffold(
+    return NgmyTabBackScope(
+      activeTab: _activeTab,
+      onTabBack: () => setState(() => _activeTab = 0),
+      child: Scaffold(
       backgroundColor: chatBg,
       body: SafeArea(
         child: Column(
@@ -22389,6 +22467,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 

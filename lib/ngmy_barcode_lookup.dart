@@ -2,6 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+// Web on phones still has a camera — only desktop web should use manual entry.
+import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
 import 'package:http/http.dart' as http;
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -217,7 +220,7 @@ class _NgmyBarcodeScannerPageState extends State<NgmyBarcodeScannerPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final useCamera = !kIsWeb;
+    final useCamera = barcode_platform.ngmyBarcodeUseCamera;
 
     return Scaffold(
       backgroundColor: Colors.black,

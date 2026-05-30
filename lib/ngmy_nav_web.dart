@@ -41,8 +41,6 @@ void onNavigatorDidPush() {
 }
 
 void onNavigatorDidPop() {
-  if (html.window.history.length > 1) {
-    _skipNextPopState = true;
-    html.window.history.back();
-  }
+  // Do not call history.back() here — it triggers a second popstate and can
+  // pop two routes (e.g. service screen then app shell / home tab).
 }

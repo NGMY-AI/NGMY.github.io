@@ -58,3 +58,7 @@ Repo that serves **ngmy-ai.github.io/NGMY.github.io/** must use:
 ## Supabase SQL (not PowerShell)
 
 Run in Supabase SQL Editor: `supabase/SUPABASE_SETUP.sql` and related `.sql` files in `supabase/`.
+
+**Game Center timers / dice (required for admin settings to sync to all users):**
+
+`supabase/game_center_settings_columns.sql`
