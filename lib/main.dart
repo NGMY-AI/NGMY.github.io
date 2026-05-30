@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
+
+import 'ngmy_nav.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -1535,6 +1538,7 @@ class _NGMYAppState extends State<NGMYApp> {
 
   @override void initState() {
     super.initState();
+    NgmyNavigator.install();
     _initLocalNotifications();
     _loadData().then((_) {
       _scheduleAutoThemeTick();
@@ -2775,6 +2779,8 @@ class _NGMYAppState extends State<NGMYApp> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: style,
       child: MaterialApp(
+        navigatorKey: ngmyRootNavigatorKey,
+        navigatorObservers: [NgmyHistoryObserver()],
         title: 'NGMY', debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
@@ -2785,8 +2791,8 @@ class _NGMYAppState extends State<NGMYApp> {
           pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
               TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
-              TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
-              TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+              TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
               TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
               TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
             },
@@ -2810,8 +2816,8 @@ class _NGMYAppState extends State<NGMYApp> {
           pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
               TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
-              TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
-              TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+              TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
               TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
               TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
             },
@@ -3629,21 +3635,19 @@ class _MainScreenState extends State<MainScreen> {
           widget.user.pendingInvestmentRoi = r;
         });
         widget.onDataChanged();
-        Navigator.push(
+        NgmyNavigator.push(
           context,
-          MaterialPageRoute(
-            builder: (c) => SubmitPaymentPage(
-              user: widget.user,
-              amount: cost,
-              onAdd: widget.onAddTransaction,
-              config: widget.config,
-              requestTitle: 'Submit Investment Request',
-              successHint: 'Your investment request was sent to admin for approval.',
-              requestKind: 'investment',
-              investmentPlanName: n,
-              investmentPlanAmount: p,
-              investmentPlanRoi: r,
-            ),
+          SubmitPaymentPage(
+            user: widget.user,
+            amount: cost,
+            onAdd: widget.onAddTransaction,
+            config: widget.config,
+            requestTitle: 'Submit Investment Request',
+            successHint: 'Your investment request was sent to admin for approval.',
+            requestKind: 'investment',
+            investmentPlanName: n,
+            investmentPlanAmount: p,
+            investmentPlanRoi: r,
           ),
         );
       }),
@@ -3841,9 +3845,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               FloatingTitle(
                 title: 'GROWTH INCOME',
-                onTap: widget.user.isAdmin ? () => Navigator.push(context, MaterialPageRoute(builder: (c) => AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onSaveLegalContent: widget.onSaveLegalContent))) : null,
+                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onSaveLegalContent: widget.onSaveLegalContent)) : null,
                 leading: InkWell(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => LoanServiceScreen(user: widget.user, config: widget.config))),
+                  onTap: () => NgmyNavigator.push(context, LoanServiceScreen(user: widget.user, config: widget.config)),
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(color: isLight ? const Color(0xFF00B25A) : Colors.transparent, shape: BoxShape.circle),
@@ -3861,16 +3865,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                     child: const Icon(Icons.forum_rounded, color: Color(0xFF00B25A), size: 20),
                   ),
-                  onPressed: () => Navigator.push(
+                  onPressed: () => NgmyNavigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (c) => AnnouncementScreen(
-                        user: widget.user,
-                        allUsers: widget.allUsers,
-                        announcements: widget.allAnnouncements,
-                        config: widget.config,
-                        onPostToNews: widget.onAddAnnouncement,
-                      ),
+                    AnnouncementScreen(
+                      user: widget.user,
+                      allUsers: widget.allUsers,
+                      announcements: widget.allAnnouncements,
+                      config: widget.config,
+                      onPostToNews: widget.onAddAnnouncement,
                     ),
                   ),
                 ),
@@ -4118,14 +4120,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _openGameCenter() async {
-    final result = await Navigator.push<Map<String, dynamic>>(
+    final result = await NgmyNavigator.push<Map<String, dynamic>>(
       context,
-      MaterialPageRoute(
-        builder: (c) => GameCenterScreen(
-          user: widget.user,
-          onAddTransaction: widget.onAddTransaction,
-          onDataChanged: widget.onDataChanged,
-        ),
+      GameCenterScreen(
+        user: widget.user,
+        onAddTransaction: widget.onAddTransaction,
+        onDataChanged: widget.onDataChanged,
       ),
     );
     if (!mounted || result == null) return;
@@ -4949,21 +4949,19 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
 
   Widget _gameTile(String id, String title, String subtitle, List<Color> colors, IconData icon) {
     return InkWell(
-      onTap: () => Navigator.push(
+      onTap: () => NgmyNavigator.push(
         context,
-        MaterialPageRoute(
-          builder: (c) => GameBetScreen(
-            user: widget.user,
-            gameId: id,
-            gameTitle: title,
-            gameSubtitle: subtitle,
-            colors: colors,
-            onAddTransaction: widget.onAddTransaction,
-            onDataChanged: widget.onDataChanged,
-            onGameStarted: () {
-              setState(() => _sessionGamesPlayed++);
-            },
-          ),
+        GameBetScreen(
+          user: widget.user,
+          gameId: id,
+          gameTitle: title,
+          gameSubtitle: subtitle,
+          colors: colors,
+          onAddTransaction: widget.onAddTransaction,
+          onDataChanged: widget.onDataChanged,
+          onGameStarted: () {
+            setState(() => _sessionGamesPlayed++);
+          },
         ),
       ),
       borderRadius: BorderRadius.circular(14),
@@ -5119,18 +5117,16 @@ class _GameBetScreenState extends State<GameBetScreen> {
       ),
     );
     widget.onDataChanged();
-    Navigator.push(
+    NgmyNavigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => GamePlayScreen(
-          user: widget.user,
-          gameId: widget.gameId,
-          gameTitle: widget.gameTitle,
-          colors: widget.colors,
-          wager: wager,
-          onAddTransaction: widget.onAddTransaction,
-          onDataChanged: widget.onDataChanged,
-        ),
+      GamePlayScreen(
+        user: widget.user,
+        gameId: widget.gameId,
+        gameTitle: widget.gameTitle,
+        colors: widget.colors,
+        wager: wager,
+        onAddTransaction: widget.onAddTransaction,
+        onDataChanged: widget.onDataChanged,
       ),
     );
   }
@@ -7532,7 +7528,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 onPressed: () {
                   final double? a = double.tryParse(_amt.text);
                   if (a != null && a > 0) {
-                    Navigator.push(context, MaterialPageRoute(builder: (c) => SubmitPaymentPage(user: widget.user, amount: a, onAdd: widget.onAdd, config: widget.config)));
+                    NgmyNavigator.push(context, SubmitPaymentPage(user: widget.user, amount: a, onAdd: widget.onAdd, config: widget.config));
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -10001,17 +9997,15 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     'Civic Registry',
                     Icons.shield_outlined,
                     civicColors,
-                    () => Navigator.push(
+                    () => NgmyNavigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (c) => CivicRegistryScreen(
-                          user: widget.user,
-                          allUsers: widget.allUsers,
-                          allTransactions: widget.allTransactions,
-                          onAddTransaction: widget.onAddTransaction,
-                          onDataChanged: widget.onDataChanged,
-                          config: widget.config,
-                        ),
+                      CivicRegistryScreen(
+                        user: widget.user,
+                        allUsers: widget.allUsers,
+                        allTransactions: widget.allTransactions,
+                        onAddTransaction: widget.onAddTransaction,
+                        onDataChanged: widget.onDataChanged,
+                        config: widget.config,
                       ),
                     ),
                   ),
@@ -10019,33 +10013,29 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     'NGMY Store',
                     Icons.shopping_bag_outlined,
                     storeColors,
-                    () => Navigator.push(
+                    () => NgmyNavigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (c) => NgmyStoreScreen(
-                          user: widget.user,
-                          allUsers: widget.allUsers,
-                          config: widget.config,
-                          onAddTransaction: widget.onAddTransaction,
-                          onDataChanged: widget.onDataChanged,
-                        ),
+                      NgmyStoreScreen(
+                        user: widget.user,
+                        allUsers: widget.allUsers,
+                        config: widget.config,
+                        onAddTransaction: widget.onAddTransaction,
+                        onDataChanged: widget.onDataChanged,
                       ),
                     ),
                   ),
-                  _hubBox('Job Marketplace', Icons.business_center_outlined, jobColors, () => Navigator.push(context, MaterialPageRoute(builder: (c) => JobMarketplaceScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onDataChanged: widget.onDataChanged)))),
+                  _hubBox('Job Marketplace', Icons.business_center_outlined, jobColors, () => NgmyNavigator.push(context, JobMarketplaceScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onDataChanged: widget.onDataChanged))),
                   _hubBox(
                     'Help Center',
                     Icons.support_agent_rounded,
                     helpColors,
-                    () => Navigator.push(
+                    () => NgmyNavigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (c) => NgmyHelpCenterScreen(
-                          user: widget.user,
-                          allUsers: widget.allUsers,
-                          config: widget.config,
-                          onDataChanged: widget.onDataChanged,
-                        ),
+                      NgmyHelpCenterScreen(
+                        user: widget.user,
+                        allUsers: widget.allUsers,
+                        config: widget.config,
+                        onDataChanged: widget.onDataChanged,
                       ),
                     ),
                   ),
@@ -14348,10 +14338,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   void _showStoreReceipts() {
     final purchases = _myPurchases();
     final sales = _mySalesOrders();
-    Navigator.push(
+    NgmyNavigator.pushRoute(
       context,
-      MaterialPageRoute(
-        builder: (ctx) => DefaultTabController(
+      NgmyNavigator.route(
+        (ctx) => DefaultTabController(
           length: 2,
           child: Scaffold(
             appBar: AppBar(
@@ -15513,10 +15503,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final isOwner = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
     final status = (listing['status'] ?? 'active').toString();
 
-    Navigator.push(
+    NgmyNavigator.pushRoute(
       context,
-      MaterialPageRoute(
-        builder: (ctx) => Scaffold(
+      NgmyNavigator.route(
+        (ctx) => Scaffold(
           backgroundColor: Colors.black,
           appBar: AppBar(
             backgroundColor: Colors.black,
@@ -17251,31 +17241,31 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You must be an approved helper to open a business.')));
       return;
     }
-    await Navigator.of(context, rootNavigator: true).push<void>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (ctx) => _HelpBusinessEditorPage(
-          existing: existing,
-          user: widget.user,
-          me: _me,
-          presetThumbUrls: _presetThumbUrls,
-          presetThumbLabels: _presetThumbLabels,
-          buildThumbnail: _buildThumbnail,
-          placeholderForIndex: _gradientThumbPlaceholder,
-          formFrame: _helpFormFrame,
-          fieldDec: _helpFieldDec,
-          onPublish: (biz) {
-            final idx = _businesses.indexWhere((b) => (b['id'] ?? '').toString() == biz['id']);
-            if (idx >= 0) {
-              _businesses[idx] = biz;
-            } else {
-              _businesses.add(biz);
-            }
-            unawaited(_upsertHelpRowSafe('help_businesses', biz));
-            _save();
-          },
-        ),
+    await NgmyNavigator.push<void>(
+      context,
+      _HelpBusinessEditorPage(
+        existing: existing,
+        user: widget.user,
+        me: _me,
+        presetThumbUrls: _presetThumbUrls,
+        presetThumbLabels: _presetThumbLabels,
+        buildThumbnail: _buildThumbnail,
+        placeholderForIndex: _gradientThumbPlaceholder,
+        formFrame: _helpFormFrame,
+        fieldDec: _helpFieldDec,
+        onPublish: (biz) {
+          final idx = _businesses.indexWhere((b) => (b['id'] ?? '').toString() == biz['id']);
+          if (idx >= 0) {
+            _businesses[idx] = biz;
+          } else {
+            _businesses.add(biz);
+          }
+          unawaited(_upsertHelpRowSafe('help_businesses', biz));
+          _save();
+        },
       ),
+      fullscreenDialog: true,
+      rootNavigator: true,
     );
     if (mounted) setState(() {});
   }
@@ -17342,15 +17332,15 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
   }
 
   void _openBusinessPage(Map<String, dynamic> biz) {
-    Navigator.push(
+    NgmyNavigator.pushRoute(
       context,
-      MaterialPageRoute(
-        builder: (ctx) => _HelpBusinessDetailPage(
+      NgmyNavigator.route(
+        (detailCtx) => _HelpBusinessDetailPage(
           biz: biz,
           me: _me,
           thumbBuilder: _buildThumbnail,
           onMessage: () {
-            Navigator.pop(ctx);
+            Navigator.pop(detailCtx);
             _showMessageHelper(biz);
           },
         ),
