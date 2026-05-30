@@ -64,3 +64,29 @@ Future<void> deleteSavedInvoice(String id) async {
 }
 
 Future<int> savedInvoiceCount() async => (await loadSavedInvoices()).length;
+
+const String _invoiceProviderKeyPrefix = 'invoice_provider_v1_';
+
+String _invoiceProviderKey(String userEmail) =>
+    '$_invoiceProviderKeyPrefix${userEmail.toLowerCase().trim().hashCode.abs()}';
+
+Future<Map<String, String>> loadInvoiceProviderProfile(String userEmail) async {
+  final prefs = await SharedPreferences.getInstance();
+  final raw = prefs.getString(_invoiceProviderKey(userEmail));
+  if (raw == null || raw.isEmpty) return {};
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return {};
+    return decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
+  } catch (_) {
+    return {};
+  }
+}
+
+Future<void> saveInvoiceProviderProfile(
+  String userEmail,
+  Map<String, String> profile,
+) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString(_invoiceProviderKey(userEmail), jsonEncode(profile));
+}

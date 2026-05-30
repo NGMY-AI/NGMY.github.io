@@ -35,6 +35,7 @@ import 'ngmy_invoice_storage.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_store_location.dart';
+import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 
@@ -51,7 +52,7 @@ void main() async {
   } catch (e) {
     debugPrint('Supabase init failed (app still starts): $e');
   }
-  runApp(const NGMYApp());
+  runApp(kIsWeb ? const ExcludeSemantics(child: NGMYApp()) : const NGMYApp());
 }
 
 // --- DATA MODELS ---
@@ -314,6 +315,9 @@ class AppConfig {
   Map<String, int> gameTimeLimits;
   Map<String, dynamic> diceSettings;
   List<Map<String, dynamic>> gameInvites;
+  String adminAnnouncementName;
+  String adminAnnouncementImageUrl;
+  bool ngmyChatClosed;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -351,6 +355,9 @@ class AppConfig {
     Map<String, int>? gameTimeLimits,
     Map<String, dynamic>? diceSettings,
     List<Map<String, dynamic>>? gameInvites,
+    this.adminAnnouncementName = '',
+    this.adminAnnouncementImageUrl = '',
+    this.ngmyChatClosed = false,
   })  : gameTimeLimits = gameTimeLimits ?? ngmyDefaultGameTimeLimits(),
         diceSettings = diceSettings ?? NgmyDiceSettings().toJson(),
         gameInvites = gameInvites ?? [];
@@ -390,6 +397,9 @@ class AppConfig {
     'gameTimeLimits': gameTimeLimits,
     'diceSettings': diceSettings,
     'gameInvites': gameInvites,
+    'adminAnnouncementName': adminAnnouncementName,
+    'adminAnnouncementImageUrl': adminAnnouncementImageUrl,
+    'ngmyChatClosed': ngmyChatClosed,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
@@ -427,6 +437,9 @@ class AppConfig {
     gameTimeLimits: ngmyParseGameTimeLimits(json['gameTimeLimits']),
     diceSettings: NgmyDiceSettings.fromJson(json['diceSettings']).toJson(),
     gameInvites: parseGameInvites(json['gameInvites']),
+    adminAnnouncementName: (json['adminAnnouncementName'] ?? '').toString(),
+    adminAnnouncementImageUrl: (json['adminAnnouncementImageUrl'] ?? '').toString(),
+    ngmyChatClosed: json['ngmyChatClosed'] == true,
   );
 }
 
@@ -3092,6 +3105,14 @@ class _NGMYAppState extends State<NGMYApp> {
     }
   }
 
+  Future<void> _clearAllAnnouncementsRemote() async {
+    try {
+      await supabase.from('announcements').delete().neq('id', '');
+    } catch (e) {
+      debugPrint('Clear all announcements error: $e');
+    }
+  }
+
   @override Widget build(BuildContext context) {
     if (_isLoading) return const MaterialApp(debugShowCheckedModeBanner: false, home: Scaffold(body: Center(child: CircularProgressIndicator())));
 
@@ -3355,6 +3376,11 @@ class _NGMYAppState extends State<NGMYApp> {
               onDeleteAnnouncement: (id) {
                 setState(() => _allAnnouncements.removeWhere((a) => a.id == id));
                 _deleteAnnouncementById(id);
+                _saveData();
+              },
+              onClearAllAnnouncements: () {
+                setState(() => _allAnnouncements.clear());
+                _clearAllAnnouncementsRemote();
                 _saveData();
               },
             ),
@@ -3781,8 +3807,9 @@ class MainScreen extends StatefulWidget {
   final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
+  final VoidCallback onClearAllAnnouncements;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 class _MainScreenState extends State<MainScreen> {
@@ -3940,7 +3967,7 @@ class _MainScreenState extends State<MainScreen> {
           );
         }
         widget.onDataChanged();
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onSaveLegalContent: widget.onSaveLegalContent),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
         if (cost <= 0) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -4144,9 +4171,10 @@ class HomeScreen extends StatefulWidget {
   final List<Announcement> allAnnouncements;
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
+  final VoidCallback onClearAllAnnouncements;
   final Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
   final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, this.onSaveLegalContent});
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -4197,7 +4225,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               FloatingTitle(
                 title: 'GROWTH INCOME',
-                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onSaveLegalContent: widget.onSaveLegalContent), routeName: 'AdminDashboard') : null,
+                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent), routeName: 'AdminDashboard') : null,
                 leading: InkWell(
                   onTap: () => NgmyNavigator.push(context, LoanServiceScreen(user: widget.user, config: widget.config), routeName: 'LoanServiceScreen'),
                   child: Container(
@@ -6853,10 +6881,11 @@ class AdminDashboard extends StatefulWidget {
   final List<Announcement> allAnnouncements;
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
+  final VoidCallback onClearAllAnnouncements;
   final Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
 
   final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, this.onSaveLegalContent});
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 class _AdminDashboardState extends State<AdminDashboard> {
@@ -7107,9 +7136,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Loan Center', Icons.handshake_outlined, Colors.teal, () => _showLoanAdmin(isDark), isDark),
             _menuFrame('Announcements', Icons.campaign_outlined, Colors.orange, () => _showAnnouncementAdmin(isDark), isDark),
             _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => _showJobApplicationsAdmin(isDark), isDark),
-            _menuFrame('Users', Icons.people_alt_outlined, Colors.blue, () => setState(() => _idx = 1), isDark),
-            _menuFrame('Plans', Icons.trending_up_rounded, Colors.green, () => setState(() => _idx = 2), isDark),
-            _menuFrame('Wallet', Icons.account_balance_wallet_outlined, Colors.pink, () => setState(() => _idx = 4), isDark),
             _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => _showGamesAdmin(isDark), isDark),
           ],
         ),
@@ -7322,173 +7348,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   void _showAnnouncementAdmin(bool isDark) {
-    final titleC = TextEditingController();
-    final msgC = TextEditingController();
-    final imgC = TextEditingController();
-    final apiC = TextEditingController(text: widget.config.geminiApiKey);
-    final logoC = TextEditingController(text: widget.config.logoUrl);
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (c) => StatefulBuilder(builder: (ctx, setST) {
-        return Align(
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.84),
-            margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F111A) : Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.20), blurRadius: 24, offset: const Offset(0, 10))],
-            ),
-            padding: const EdgeInsets.fromLTRB(22, 10, 22, 18),
-            child: Column(
-            children: [
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10))),
-              const SizedBox(height: 15),
-              const Text('Management Hub', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 15),
-
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      // Logo & API Configuration Section
-                      Container(
-                        padding: const EdgeInsets.all(15),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(color: Colors.blue.withOpacity(0.2)),
-                        ),
-                        child: Column(
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.settings_suggest_rounded, color: Colors.blue, size: 20),
-                                SizedBox(width: 10),
-                                Text('App Configuration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                              ],
-                            ),
-                            const SizedBox(height: 15),
-                            TextField(controller: logoC, decoration: _adminInputDecoration(label: 'App Logo URL', hint: 'Paste image link here', isDark: isDark)),
-                            const SizedBox(height: 12),
-                            TextField(controller: apiC, decoration: _adminInputDecoration(label: 'Gemini API Key', hint: 'Paste AI key here', isDark: isDark)),
-                            const SizedBox(height: 15),
-                            ElevatedButton(
-                              onPressed: () async {
-                                final logo = logoC.text.trim();
-                                final apiKey = apiC.text.trim();
-                                setState(() {
-                                  widget.config.logoUrl = logo;
-                                  widget.config.geminiApiKey = apiKey;
-                                });
-                                var geminiSynced = true;
-                                if (apiKey.isNotEmpty) {
-                                  geminiSynced = await _persistGeminiApiKeyToSupabase(apiKey);
-                                  if (!geminiSynced && mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'API key saved on this device only. Supabase sync failed — open Supabase SQL Editor and run supabase/gemini_api_key_column.sql, then tap Save Global Settings again.',
-                                        ),
-                                        backgroundColor: Color(0xFFEF4444),
-                                        duration: Duration(seconds: 8),
-                                      ),
-                                    );
-                                  }
-                                }
-                                widget.onDataChanged();
-                                if (!mounted) return;
-                                if (apiKey.isEmpty || geminiSynced) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        apiKey.isNotEmpty
-                                            ? 'Gemini API key saved — NGMY Helper works for all users.'
-                                            : 'Configuration updated.',
-                                      ),
-                                      backgroundColor: apiKey.isNotEmpty ? const Color(0xFF16A34A) : null,
-                                    ),
-                                  );
-                                }
-                                setState(() {});
-                              },
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                              child: const Text('SAVE GLOBAL SETTINGS', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 25),
-                      const Divider(),
-                      const SizedBox(height: 15),
-
-                      const Align(alignment: Alignment.centerLeft, child: Text('CREATE ANNOUNCEMENT', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold))),
-                      const SizedBox(height: 15),
-                      TextField(controller: titleC, decoration: _adminInputDecoration(label: 'Title', isDark: isDark)),
-                      const SizedBox(height: 10),
-                      TextField(controller: msgC, maxLines: 3, decoration: _adminInputDecoration(label: 'Message', isDark: isDark)),
-                      const SizedBox(height: 10),
-                      TextField(controller: imgC, decoration: _adminInputDecoration(label: 'Image URL (Optional)', isDark: isDark)),
-                      const SizedBox(height: 15),
-                      ElevatedButton(
-                        onPressed: () {
-                          if (titleC.text.isEmpty || msgC.text.isEmpty) return;
-                          final ann = Announcement(
-                            id: DateTime.now().millisecondsSinceEpoch.toString(),
-                            title: titleC.text.trim(),
-                            message: msgC.text.trim(),
-                            imageUrl: imgC.text.isEmpty ? null : imgC.text.trim(),
-                            timestamp: DateTime.now(),
-                            authorEmail: widget.user.email,
-                            authorUsername: widget.user.username,
-                            postType: 'official',
-                          );
-                          widget.onAddAnnouncement(ann);
-                          titleC.clear(); msgC.clear(); imgC.clear();
-                          setST(() {});
-                        },
-                        style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: Colors.orange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                        child: const Text('POST ANNOUNCEMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                      const SizedBox(height: 25),
-                      const Divider(),
-                      const SizedBox(height: 15),
-                      const Align(alignment: Alignment.centerLeft, child: Text('ACTIVE ANNOUNCEMENTS', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold))),
-                      const SizedBox(height: 10),
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: widget.allAnnouncements.length,
-                        itemBuilder: (ctx, i) {
-                          final a = widget.allAnnouncements[i];
-                          return Card(
-                            child: ListTile(
-                              title: Text(a.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text(a.message, maxLines: 2, overflow: TextOverflow.ellipsis),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () {
-                                  widget.onDeleteAnnouncement(a.id);
-                                  setST(() {});
-                                },
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ));
-      }),
+      builder: (_) => _AnnouncementManagementSheet(
+        isDark: isDark,
+        config: widget.config,
+        user: widget.user,
+        allAnnouncements: widget.allAnnouncements,
+        onAddAnnouncement: widget.onAddAnnouncement,
+        onDeleteAnnouncement: widget.onDeleteAnnouncement,
+        onClearAllAnnouncements: widget.onClearAllAnnouncements,
+        onDataChanged: widget.onDataChanged,
+        persistGeminiKey: _persistGeminiApiKeyToSupabase,
+        adminInputDecoration: _adminInputDecoration,
+      ),
     );
   }
 
@@ -10337,6 +10212,366 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 }
 
+class _AnnouncementManagementSheet extends StatefulWidget {
+  final bool isDark;
+  final AppConfig config;
+  final UserData user;
+  final List<Announcement> allAnnouncements;
+  final Function(Announcement) onAddAnnouncement;
+  final Function(String) onDeleteAnnouncement;
+  final VoidCallback onClearAllAnnouncements;
+  final VoidCallback onDataChanged;
+  final Future<bool> Function(String apiKey) persistGeminiKey;
+  final InputDecoration Function({required String label, required bool isDark, String? hint}) adminInputDecoration;
+
+  const _AnnouncementManagementSheet({
+    required this.isDark,
+    required this.config,
+    required this.user,
+    required this.allAnnouncements,
+    required this.onAddAnnouncement,
+    required this.onDeleteAnnouncement,
+    required this.onClearAllAnnouncements,
+    required this.onDataChanged,
+    required this.persistGeminiKey,
+    required this.adminInputDecoration,
+  });
+
+  @override
+  State<_AnnouncementManagementSheet> createState() => _AnnouncementManagementSheetState();
+}
+
+class _AnnouncementManagementSheetState extends State<_AnnouncementManagementSheet> {
+  late final TextEditingController _titleC;
+  late final TextEditingController _msgC;
+  late final TextEditingController _attachImgC;
+  late final TextEditingController _apiC;
+  late final TextEditingController _logoC;
+  late final TextEditingController _adminNameC;
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _titleC = TextEditingController();
+    _msgC = TextEditingController();
+    _attachImgC = TextEditingController();
+    _apiC = TextEditingController(text: widget.config.geminiApiKey);
+    _logoC = TextEditingController(text: widget.config.logoUrl);
+    _adminNameC = TextEditingController(
+      text: widget.config.adminAnnouncementName.isNotEmpty
+          ? widget.config.adminAnnouncementName
+          : widget.user.username,
+    );
+    _adminNameC.addListener(_saveAdminProfile);
+  }
+
+  @override
+  void dispose() {
+    _adminNameC.removeListener(_saveAdminProfile);
+    _titleC.dispose();
+    _msgC.dispose();
+    _attachImgC.dispose();
+    _apiC.dispose();
+    _logoC.dispose();
+    _adminNameC.dispose();
+    super.dispose();
+  }
+
+  void _saveAdminProfile() {
+    widget.config.adminAnnouncementName = _adminNameC.text.trim();
+    widget.onDataChanged();
+  }
+
+  Future<void> _pickAdminPhoto() async {
+    final img = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 78, maxWidth: 800);
+    if (img == null) return;
+    final bytes = await img.readAsBytes();
+    setState(() {
+      widget.config.adminAnnouncementImageUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    });
+    widget.onDataChanged();
+  }
+
+  ImageProvider? _adminPhotoProvider() {
+    final ref = widget.config.adminAnnouncementImageUrl.trim();
+    if (ref.isEmpty) return null;
+    if (ref.startsWith('data:image')) {
+      try {
+        return MemoryImage(base64Decode(ref.split(',').last));
+      } catch (_) {
+        return null;
+      }
+    }
+    if (ref.startsWith('http')) return NetworkImage(ref);
+    return null;
+  }
+
+  void _postAnnouncement() {
+    if (_titleC.text.trim().isEmpty || _msgC.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Title and message are required.')),
+      );
+      return;
+    }
+    final displayName = _adminNameC.text.trim().isNotEmpty
+        ? _adminNameC.text.trim()
+        : widget.user.username;
+    widget.config.adminAnnouncementName = displayName;
+    widget.onDataChanged();
+    final ann = Announcement(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: _titleC.text.trim(),
+      message: _msgC.text.trim(),
+      imageUrl: _attachImgC.text.trim().isEmpty ? null : _attachImgC.text.trim(),
+      timestamp: DateTime.now(),
+      authorEmail: widget.user.email,
+      authorUsername: displayName,
+      postType: 'official',
+    );
+    widget.onAddAnnouncement(ann);
+    _titleC.clear();
+    _msgC.clear();
+    _attachImgC.clear();
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Announcement posted.')),
+    );
+  }
+
+  Future<void> _confirmClearAll() async {
+    if (widget.allAnnouncements.isEmpty) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear all announcements?'),
+        content: const Text('This removes every announcement for all users.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      widget.onClearAllAnnouncements();
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final panel = isDark ? const Color(0xFF0F111A) : Colors.white;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+        margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+        decoration: BoxDecoration(
+          color: panel,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 10, 22, 18),
+        child: Column(
+          children: [
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10))),
+            const SizedBox(height: 15),
+            Row(
+              children: [
+                const Expanded(child: Text('Management Hub', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.settings_suggest_rounded, color: Colors.blue, size: 20),
+                              SizedBox(width: 10),
+                              Text('App Configuration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            ],
+                          ),
+                          const SizedBox(height: 15),
+                          TextField(controller: _logoC, decoration: widget.adminInputDecoration(label: 'App Logo URL', hint: 'Paste image link here', isDark: isDark)),
+                          const SizedBox(height: 12),
+                          TextField(controller: _apiC, decoration: widget.adminInputDecoration(label: 'Gemini API Key', hint: 'Paste AI key here', isDark: isDark)),
+                          const SizedBox(height: 15),
+                          ElevatedButton(
+                            onPressed: () async {
+                              widget.config.logoUrl = _logoC.text.trim();
+                              widget.config.geminiApiKey = _apiC.text.trim();
+                              var geminiSynced = true;
+                              if (widget.config.geminiApiKey.isNotEmpty) {
+                                geminiSynced = await widget.persistGeminiKey(widget.config.geminiApiKey);
+                              }
+                              widget.onDataChanged();
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(geminiSynced ? 'Global settings saved.' : 'Saved locally. Supabase sync failed.'),
+                                  backgroundColor: geminiSynced ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
+                                ),
+                              );
+                              setState(() {});
+                            },
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45)),
+                            child: const Text('SAVE GLOBAL SETTINGS', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.red.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('NGMY Chat', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                Text(
+                                  widget.config.ngmyChatClosed ? 'Chat is closed for users' : 'Chat is open',
+                                  style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+                                ),
+                              ],
+                            ),
+                          ),
+                          FilledButton.icon(
+                            onPressed: () {
+                              setState(() => widget.config.ngmyChatClosed = !widget.config.ngmyChatClosed);
+                              widget.onDataChanged();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(widget.config.ngmyChatClosed
+                                      ? 'Chat closed — users cannot send messages.'
+                                      : 'Chat reopened for all users.'),
+                                ),
+                              );
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: widget.config.ngmyChatClosed ? const Color(0xFF16A34A) : Colors.redAccent,
+                            ),
+                            icon: Icon(widget.config.ngmyChatClosed ? Icons.lock_open_rounded : Icons.lock_rounded, size: 18),
+                            label: Text(widget.config.ngmyChatClosed ? 'Reopen Chat' : 'Close Chat'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text('ADMIN PROFILE (SAVED)', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: _pickAdminPhoto,
+                          child: CircleAvatar(
+                            radius: 32,
+                            backgroundColor: Colors.orange.withOpacity(0.15),
+                            backgroundImage: _adminPhotoProvider(),
+                            child: _adminPhotoProvider() == null
+                                ? const Icon(Icons.add_a_photo_outlined, color: Colors.orange)
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _adminNameC,
+                            decoration: widget.adminInputDecoration(label: 'Display name (saved)', isDark: isDark),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Photo and name appear on official announcements.',
+                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                    ),
+                    const SizedBox(height: 20),
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    const Text('CREATE ANNOUNCEMENT', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    TextField(controller: _titleC, decoration: widget.adminInputDecoration(label: 'Title', isDark: isDark)),
+                    const SizedBox(height: 10),
+                    TextField(controller: _msgC, maxLines: 3, decoration: widget.adminInputDecoration(label: 'Message', isDark: isDark)),
+                    const SizedBox(height: 10),
+                    TextField(controller: _attachImgC, decoration: widget.adminInputDecoration(label: 'Attachment image URL (optional)', isDark: isDark)),
+                    const SizedBox(height: 15),
+                    ElevatedButton(
+                      onPressed: _postAnnouncement,
+                      style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: Colors.orange),
+                      child: const Text('POST ANNOUNCEMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 22),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text('ACTIVE ANNOUNCEMENTS', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+                        ),
+                        TextButton.icon(
+                          onPressed: _confirmClearAll,
+                          icon: const Icon(Icons.delete_sweep_outlined, size: 18, color: Colors.redAccent),
+                          label: const Text('Clear All', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (widget.allAnnouncements.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text('No active announcements.', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),
+                      )
+                    else
+                      ...widget.allAnnouncements.map((a) => Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              title: Text(a.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(a.message, maxLines: 2, overflow: TextOverflow.ellipsis),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () {
+                                  widget.onDeleteAnnouncement(a.id);
+                                  setState(() {});
+                                },
+                              ),
+                            ),
+                          )),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class ProfileScreen extends StatefulWidget {
   final UserData user; final List<UserData> allUsers; final AppConfig config; final Function(ThemeMode) onThemeChanged; final ThemeMode currentThemeMode; final VoidCallback onLogout; final VoidCallback onDataChanged; final Function(AppTransaction) onAddTransaction;
   const ProfileScreen({super.key, required this.user, required this.allUsers, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction});
@@ -10841,19 +11076,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ]), const SizedBox(height: 15),
-      _box(context, 'Legal Information', [
-        _legalTile(
-          icon: Icons.description_outlined,
-          title: 'Terms & Conditions',
-          onTap: () => _showLegal(context, 'Terms & Conditions', widget.config.termsAndConditions),
-        ),
-        const SizedBox(height: 10),
-        _legalTile(
-          icon: Icons.privacy_tip_outlined,
-          title: 'Privacy Policy',
-          onTap: () => _showLegal(context, 'Privacy Policy', widget.config.privacyPolicy),
-        ),
-      ]),
+      _legalInformationSection(context),
       const SizedBox(height: 15),
       _box(context, 'Appearance', [Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_tOp(context, ThemeMode.light, Icons.light_mode, 'Light'), _tOp(context, ThemeMode.dark, Icons.dark_mode, 'Dark'), _tOp(context, ThemeMode.system, Icons.brightness_auto, 'Auto')])]), const SizedBox(height: 30),
       ElevatedButton(onPressed: widget.onLogout, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), elevation: 5), child: const Text('LOGOUT ACCOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -10989,30 +11212,184 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     ),
   );
-  Widget _legalTile({required IconData icon, required String title, required VoidCallback onTap}) => Material(
-    color: Colors.transparent,
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.withOpacity(0.22)),
-          color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.03) : Colors.grey.withOpacity(0.03),
+  Widget _legalInformationSection(BuildContext ctx) {
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    final frameBg = isDark ? const Color(0xFF0C1320) : const Color(0xFFFFFFFF);
+    final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
+    final titleColor = isDark ? Colors.white : const Color(0xFF1E3A5F);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: frameBg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: frameBorder, width: 1.25),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(isDark ? 0.24 : 0.10), blurRadius: 14, offset: const Offset(0, 6)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Legal Information',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: titleColor),
+              ),
+              const SizedBox(height: 14),
+              _legalTile(
+                icon: Icons.description_outlined,
+                title: 'Terms & Conditions',
+                iconBg: const Color(0xFF3B82F6),
+                onTap: () => _showLegal(context, 'Terms & Conditions', widget.config.termsAndConditions),
+              ),
+              const SizedBox(height: 10),
+              _legalTile(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Privacy Policy',
+                iconBg: const Color(0xFF8B5CF6),
+                onTap: () => _showLegal(context, 'Privacy Policy', widget.config.privacyPolicy),
+              ),
+            ],
+          ),
         ),
-        child: Row(
-          children: [
-            Icon(icon, size: 20),
-            const SizedBox(width: 12),
-            Expanded(child: Text(title)),
-            const Icon(Icons.chevron_right, color: Colors.grey),
-          ],
+        const SizedBox(height: 12),
+        _worksheetsPromoTile(ctx),
+      ],
+    );
+  }
+
+  Widget _worksheetsPromoTile(BuildContext ctx) {
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    final outerBg = isDark ? const Color(0xFF0B1526) : const Color(0xFFEFF6FF);
+    final outerBorder = isDark ? const Color(0xFF1E3A8A) : const Color(0xFFBFDBFE);
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isDark ? 6 : 10),
+      decoration: BoxDecoration(
+        color: outerBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: outerBorder, width: isDark ? 1 : 1.5),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => NgmyNavigator.push(
+            ctx,
+            NgmyWorksheetsScreen(userEmail: widget.user.email),
+            routeName: 'NgmyWorksheetsScreen',
+          ),
+          borderRadius: BorderRadius.circular(12),
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDark
+                    ? const [Color(0xFF1D4ED8), Color(0xFF2563EB)]
+                    : const [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: isDark ? Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.45)) : null,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.article_outlined, color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Worksheets',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Track project spending',
+                          style: TextStyle(
+                            color: Color(0xE6FFFFFF),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.white, size: 26),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _legalTile({
+    required IconData icon,
+    required String title,
+    required Color iconBg,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.withOpacity(0.22)),
+            color: isDark ? Colors.white.withOpacity(0.03) : const Color(0xFFF9FAFB),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 20, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF111827),
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey.shade400),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
   Widget _tOp(BuildContext ctx, ThemeMode m, IconData i, String l) { bool sel = widget.currentThemeMode == m; return GestureDetector(onTap: () => widget.onThemeChanged(m), child: Column(children: [Icon(i, color: sel ? Theme.of(ctx).colorScheme.primary : Colors.grey, size: 28), const SizedBox(height: 5), Text(l, style: TextStyle(fontSize: 10, color: sel ? Theme.of(ctx).colorScheme.primary : Colors.grey))])); }
 }
 class NgmyHubScreen extends StatefulWidget {
@@ -11082,6 +11459,37 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     final now = DateTime.now();
     _issuedDateC.text = '${now.month}/${now.day}/${now.year}';
     _dueDateC.text = '${now.month}/${now.day + 7}/${now.year}';
+    _loadInvoiceProviderProfile();
+    for (final c in [_bizNameC, _bizStreetC, _bizCityStateZipC, _bizPhoneC, _paymentInfoC]) {
+      c.addListener(_persistInvoiceProviderProfile);
+    }
+  }
+
+  bool _loadingInvoiceProvider = false;
+
+  Future<void> _loadInvoiceProviderProfile() async {
+    _loadingInvoiceProvider = true;
+    final profile = await loadInvoiceProviderProfile(widget.user.email);
+    if (!mounted) return;
+    if (profile.isNotEmpty) {
+      _bizNameC.text = profile['business'] ?? _bizNameC.text;
+      _bizStreetC.text = profile['street'] ?? _bizStreetC.text;
+      _bizCityStateZipC.text = profile['cityStateZip'] ?? _bizCityStateZipC.text;
+      _bizPhoneC.text = profile['phone'] ?? _bizPhoneC.text;
+      _paymentInfoC.text = profile['paymentInfo'] ?? _paymentInfoC.text;
+    }
+    _loadingInvoiceProvider = false;
+  }
+
+  void _persistInvoiceProviderProfile() {
+    if (_loadingInvoiceProvider) return;
+    saveInvoiceProviderProfile(widget.user.email, {
+      'business': _bizNameC.text.trim(),
+      'street': _bizStreetC.text.trim(),
+      'cityStateZip': _bizCityStateZipC.text.trim(),
+      'phone': _bizPhoneC.text.trim(),
+      'paymentInfo': _paymentInfoC.text.trim(),
+    });
   }
 
   @override
@@ -11111,6 +11519,9 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     _itemQtyC.dispose();
     _itemDiscountC.dispose();
     _paymentInfoC.dispose();
+    for (final c in [_bizNameC, _bizStreetC, _bizCityStateZipC, _bizPhoneC, _paymentInfoC]) {
+      c.removeListener(_persistInvoiceProviderProfile);
+    }
     super.dispose();
   }
 
@@ -12157,15 +12568,15 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       ],
                     ),
                     const SizedBox(height: 10),
-                    TextField(controller: _bizNameC, decoration: const InputDecoration(labelText: 'Your Business Name')),
+                    TextField(controller: _bizNameC, decoration: const InputDecoration(labelText: 'Your Business Name (auto-saved)')),
                     const SizedBox(height: 8),
-                    TextField(controller: _bizStreetC, decoration: const InputDecoration(labelText: 'Street Address')),
+                    TextField(controller: _bizStreetC, decoration: const InputDecoration(labelText: 'Street Address (auto-saved)')),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Expanded(child: TextField(controller: _bizCityStateZipC, decoration: const InputDecoration(labelText: 'City, State ZIP'))),
+                        Expanded(child: TextField(controller: _bizCityStateZipC, decoration: const InputDecoration(labelText: 'City, State ZIP (auto-saved)'))),
                         const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: _bizPhoneC, decoration: const InputDecoration(labelText: 'Phone Number'))),
+                        Expanded(child: TextField(controller: _bizPhoneC, decoration: const InputDecoration(labelText: 'Phone Number (auto-saved)'))),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -12191,7 +12602,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     const SizedBox(height: 8),
                     TextField(controller: _itemDescC, decoration: const InputDecoration(labelText: 'Description')),
                     const SizedBox(height: 8),
-                    TextField(controller: _paymentInfoC, maxLines: 2, decoration: const InputDecoration(labelText: 'Notes & Payment Instructions')),
+                    TextField(controller: _paymentInfoC, maxLines: 2, decoration: const InputDecoration(labelText: 'Notes & Payment Instructions (auto-saved)')),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -22683,6 +23094,14 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   Future<void> _sendMessage() async {
+    if (widget.config.ngmyChatClosed && !widget.user.isAdmin) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Chat is temporarily closed by an admin.')),
+        );
+      }
+      return;
+    }
     final text = _chatController.text.trim();
     if (text.isEmpty) return;
 
@@ -22955,7 +23374,29 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                 isDark: isDark,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                  child: Column(
+                  child: widget.config.ngmyChatClosed && !widget.user.isAdmin
+                      ? Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.redAccent.withOpacity(0.35)),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.lock_rounded, color: Colors.redAccent, size: 20),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Chat is closed. Please check back later.',
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (_messages.isEmpty)
@@ -23327,6 +23768,24 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     );
   }
 
+  Widget _officialAnnAvatar(double size) {
+    final ref = widget.config.adminAnnouncementImageUrl.trim();
+    if (ref.isNotEmpty) {
+      ImageProvider? img;
+      if (ref.startsWith('data:image')) {
+        try {
+          img = MemoryImage(base64Decode(ref.split(',').last));
+        } catch (_) {}
+      } else if (ref.startsWith('http')) {
+        img = NetworkImage(ref);
+      }
+      if (img != null) {
+        return CircleAvatar(radius: size / 2, backgroundImage: img);
+      }
+    }
+    return _ngmyLogoCircle(widget.config.logoUrl, size: size);
+  }
+
   Widget _annCard(Announcement a, bool isDark) {
     final official = a.isOfficial;
     final accent = official ? const Color(0xFFFF9800) : const Color(0xFF00B25A);
@@ -23345,7 +23804,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (official)
-            _ngmyLogoCircle(widget.config.logoUrl, size: 44)
+            _officialAnnAvatar(44)
           else
             CircleAvatar(
               radius: 22,
