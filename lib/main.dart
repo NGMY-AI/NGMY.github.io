@@ -22,6 +22,7 @@ import 'package:video_player/video_player.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_back_scope.dart';
 import 'ngmy_barcode_lookup.dart';
+import 'ngmy_game_nav.dart';
 import 'ngmy_games.dart';
 import 'ngmy_game_admin_sheet.dart';
 import 'ngmy_game_result_popup.dart';
@@ -5766,21 +5767,15 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   Future<void> _showEndPopup({required bool win, required String title, String? subtitle, String? outcomeLabel}) async {
     if (!mounted) return;
+    final nav = Navigator.of(context);
     await showNgmyGameResultPopup(
       context,
       win: win,
       title: title,
       subtitle: subtitle,
       outcomeLabel: outcomeLabel,
-      onGoBack: () {
-        if (!mounted) return;
-        Navigator.of(context).pop();
-        Navigator.of(context).pop();
-      },
-      onPlayAgain: () {
-        if (!mounted) return;
-        Navigator.of(context).pop();
-      },
+      onGoBack: () => ngmyPopRouteCount(nav, 2),
+      onPlayAgain: () => ngmyPopRouteCount(nav, 1),
     );
   }
 
@@ -19007,7 +19002,9 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
   void _openBusinessEditor({Map<String, dynamic>? existing}) {
     _persistDebounce?.cancel();
     if (!_isHelper) {
-      unawaited(_applyToBecomeHelper());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tap the person icon in the top bar to apply as a helper.')),
+      );
       return;
     }
     unawaited(_showOpenBusinessDialog(existing: existing));
@@ -19042,7 +19039,8 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
     final phoneC = TextEditingController(text: widget.user.phone);
     final ok = await showDialog<bool>(
       context: context,
-      useRootNavigator: true,
+      useRootNavigator: false,
+      barrierDismissible: true,
       builder: (ctx) => AlertDialog(
         title: const Text('Apply to Become a Helper'),
         content: SingleChildScrollView(
@@ -19313,40 +19311,6 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
     );
   }
 
-  Widget _applyBanner(bool isDark) {
-    if (_isHelper) return const SizedBox.shrink();
-    final app = _myApplication();
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _accent.withOpacity(0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Want to help others?', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-          const SizedBox(height: 6),
-          const Text('Apply to become a helper. Users cannot help others until admin approves them.', style: TextStyle(fontSize: 11, color: Colors.grey)),
-          if (app != null) ...[
-            const SizedBox(height: 8),
-            Text('Status: ${(app['status'] ?? 'pending').toString().toUpperCase()}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: _accent)),
-          ],
-          if (app == null || (app['status'] ?? '') == 'rejected') ...[
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _applyToBecomeHelper,
-              style: ElevatedButton.styleFrom(backgroundColor: _accent, foregroundColor: Colors.white),
-              child: const Text('Apply to Become a Helper'),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _youtubeBusinessCard(Map<String, dynamic> b, bool isDark) {
     final name = (b['businessName'] ?? 'Business').toString();
     final owner = (b['ownerName'] ?? 'Helper').toString();
@@ -19484,7 +19448,6 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _applyBanner(isDark),
           const SizedBox(height: 40),
           Center(
             child: Text(
@@ -19500,11 +19463,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
     }
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
-      itemCount: open.length + 1,
-      itemBuilder: (_, i) {
-        if (i == 0) return _applyBanner(isDark);
-        return Padding(padding: const EdgeInsets.only(bottom: 20), child: _youtubeBusinessCard(open[i - 1], isDark));
-      },
+      itemCount: open.length,
+      itemBuilder: (_, i) => Padding(
+        padding: const EdgeInsets.only(bottom: 20),
+        child: _youtubeBusinessCard(open[i], isDark),
+      ),
     );
   }
 
@@ -19578,12 +19541,22 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> {
               tooltip: 'Customer messages',
               onPressed: _showHelperMessagesInbox,
             ),
+          if (!_isHelper)
+            IconButton(
+              icon: Icon(
+                Icons.person_add_alt_1_rounded,
+                size: 24,
+                color: _myApplication() != null ? Colors.orange : (isDark ? Colors.white70 : Colors.black54),
+              ),
+              tooltip: 'Apply to become a helper',
+              onPressed: _applyToBecomeHelper,
+            ),
           IconButton(
             icon: Icon(
               _isHelper ? (myBiz == null ? Icons.add_business_rounded : Icons.edit_rounded) : Icons.storefront_rounded,
               size: 26,
             ),
-            tooltip: _isHelper ? (myBiz == null ? 'Open my business' : 'Edit my business') : 'Apply to become a helper',
+            tooltip: _isHelper ? (myBiz == null ? 'Open my business' : 'Edit my business') : 'Open a business (helpers only)',
             onPressed: () => _openBusinessEditor(existing: myBiz),
           ),
         ],

@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+import 'ngmy_game_nav.dart';
+
 /// Win/lose popup with 3D celebration, particles, Go Back & Play Again.
 Future<void> showNgmyGameResultPopup(
   BuildContext context, {
@@ -13,6 +15,7 @@ Future<void> showNgmyGameResultPopup(
 }) {
   return showGeneralDialog<void>(
     context: context,
+    useRootNavigator: false,
     barrierDismissible: false,
     barrierLabel: win ? 'Win' : 'Lose',
     barrierColor: Colors.black54,
@@ -24,11 +27,11 @@ Future<void> showNgmyGameResultPopup(
       outcomeLabel: outcomeLabel,
       onGoBack: () {
         Navigator.pop(ctx);
-        onGoBack();
+        ngmyCloseDialogThen(onGoBack);
       },
       onPlayAgain: () {
         Navigator.pop(ctx);
-        onPlayAgain();
+        ngmyCloseDialogThen(onPlayAgain);
       },
     ),
   );

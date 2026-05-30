@@ -8,11 +8,13 @@ final GlobalKey<NavigatorState> ngmyRootNavigatorKey = GlobalKey<NavigatorState>
 class NgmyHistoryObserver extends NavigatorObserver {
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (route is PopupRoute) return;
     nav_platform.onNavigatorDidPush();
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (route is PopupRoute) return;
     nav_platform.onNavigatorDidPop();
   }
 }

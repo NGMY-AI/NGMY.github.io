@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_dice_config.dart';
 import 'ngmy_dice_cube.dart';
+import 'ngmy_game_nav.dart';
 import 'ngmy_game_result_popup.dart';
 import 'ngmy_multiplayer.dart';
 
@@ -266,6 +267,8 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
       _landedOutcome = outcome;
     });
 
+    if (!mounted) return;
+    final nav = Navigator.of(context);
     if (win) {
       final payout = wager * 1.46 + bonus;
       widget.onPayout(payout, 'Dice Roll $label', bonus: bonus);
@@ -277,7 +280,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
         subtitle: bonus > 0
             ? '+\$${payout.toStringAsFixed(2)} total (includes \$3 bonus for +3!)'
             : '+\$${payout.toStringAsFixed(2)} added to your balance',
-        onGoBack: () => Navigator.of(context).pop(),
+        onGoBack: () => ngmyPopRouteCount(nav, 1),
         onPlayAgain: () => setState(() {
           _betLocked = false;
           _landedOutcome = null;
@@ -291,7 +294,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
         title: 'YOU LOSE',
         outcomeLabel: label,
         subtitle: 'Better luck on the next roll!',
-        onGoBack: () => Navigator.of(context).pop(),
+        onGoBack: () => ngmyPopRouteCount(nav, 1),
         onPlayAgain: () => setState(() {
           _betLocked = false;
           _landedOutcome = null;
@@ -307,12 +310,12 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
   }
 
   Widget _outcomeChip(String label, Color bg, {required bool landed}) {
+    // Use Container (not AnimatedContainer): animating null ↔ boxShadow with
+    // easeOutBack lerps blurRadius below 0 and crashes the app.
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 3),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutBack,
+        child: Container(
           height: landed ? 48 : 40,
           alignment: Alignment.center,
           decoration: BoxDecoration(
@@ -321,7 +324,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
             border: Border.all(color: landed ? Colors.white : bg.withValues(alpha: 0.7), width: landed ? 2.5 : 1.2),
             boxShadow: landed
                 ? [BoxShadow(color: bg.withValues(alpha: 0.65), blurRadius: 14, spreadRadius: 1)]
-                : null,
+                : const [],
           ),
           child: Text(
             label,
