@@ -32,6 +32,8 @@ import 'ngmy_typing_game.dart';
 import 'ngmy_dice_config.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_invoice_storage.dart';
+import 'ngmy_invoice_templates.dart';
+import 'ngmy_invoice_signature.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 
@@ -738,6 +740,45 @@ Map<String, dynamic> _normalizeStoreOrder(Map<String, dynamic> order) {
   }
   if ((copy['shippingMethod'] ?? '').toString().isEmpty) copy['shippingMethod'] = 'car';
   return copy;
+}
+
+List<Map<String, dynamic>> _mergeStoreOrdersLists(
+  List<Map<String, dynamic>> local,
+  List<Map<String, dynamic>> remote,
+) {
+  final byId = <String, Map<String, dynamic>>{};
+  for (final raw in remote) {
+    final id = (raw['id'] ?? '').toString();
+    if (id.isEmpty) continue;
+    byId[id] = _normalizeStoreOrder(Map<String, dynamic>.from(raw));
+  }
+  for (final raw in local) {
+    final id = (raw['id'] ?? '').toString();
+    if (id.isEmpty) continue;
+    final normLocal = _normalizeStoreOrder(Map<String, dynamic>.from(raw));
+    final existing = byId[id];
+    if (existing == null) {
+      byId[id] = normLocal;
+      continue;
+    }
+    final localAt = DateTime.tryParse((normLocal['updatedAt'] ?? normLocal['shippedAt'] ?? normLocal['createdAt'] ?? '').toString()) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    final remoteAt = DateTime.tryParse((existing['updatedAt'] ?? existing['shippedAt'] ?? existing['createdAt'] ?? '').toString()) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    byId[id] = localAt.isAfter(remoteAt) ? normLocal : existing;
+  }
+  return byId.values.toList();
+}
+
+Future<bool> _pushStoreOrdersToSupabase(List<Map<String, dynamic>> orders) async {
+  try {
+    final payload = orders.map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e))).toList();
+    await Supabase.instance.client.from('config').update({'storeOrders': payload}).eq('id', 1);
+    return true;
+  } catch (e) {
+    debugPrint('[storeOrders] push error: $e');
+    return false;
+  }
 }
 
 DateTime? _storeShipByDeadline(Map<String, dynamic> order) {
@@ -1926,6 +1967,7 @@ class _NGMYAppState extends State<NGMYApp> {
         if (next.storeListings.isEmpty && keepListings.isNotEmpty) next.storeListings = keepListings;
         if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) next.storeInquiries = keepInquiries;
         if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
+        else next.storeOrders = _mergeStoreOrdersLists(keepOrders, next.storeOrders);
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
@@ -2512,6 +2554,7 @@ class _NGMYAppState extends State<NGMYApp> {
         final next = AppConfig.fromJson(record);
         _applyRemoteLegalToConfig(next, record);
         if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
+        else next.storeOrders = _mergeStoreOrdersLists(keepOrders, next.storeOrders);
         if (next.storeListings.isEmpty && keepListings.isNotEmpty) next.storeListings = keepListings;
         if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) next.storeInquiries = keepInquiries;
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
@@ -2897,6 +2940,9 @@ class _NGMYAppState extends State<NGMYApp> {
 
   Future<void> _saveData() async {
     _isSyncing = true;
+    final ordersSnapshot = List<Map<String, dynamic>>.from(
+      _config.storeOrders.map((e) => Map<String, dynamic>.from(e)),
+    );
     try {
       final prefs = await SharedPreferences.getInstance();
 
@@ -2963,7 +3009,8 @@ class _NGMYAppState extends State<NGMYApp> {
       );
       configRow['storeListings'] = _config.storeListings;
       configRow['storeInquiries'] = _config.storeInquiries;
-      configRow['storeOrders'] = _config.storeOrders;
+      configRow['storeOrders'] = ordersSnapshot;
+      _config.storeOrders = ordersSnapshot;
       configRow['helpHelperApplications'] = _config.helpHelperApplications;
       configRow['helpRequests'] = _config.helpRequests;
       configRow['helpBusinesses'] = _config.helpBusinesses;
@@ -10947,7 +10994,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   bool _triGood = true;
   int _triDropCursor = 0;
   double _discount = 0;
-  String _invoiceTemplate = 'Modern';
+  String _invoiceTemplate = 'modern';
   bool _invoicePaid = false;
   final List<Offset?> _providerSignaturePoints = [];
   final List<Offset?> _clientSignaturePoints = [];
@@ -11289,21 +11336,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     });
   }
 
-  Map<String, List<Color>> _invoiceTemplateStyles() => {
-        'Modern': [const Color(0xFF3B82F6), const Color(0xFF1D4ED8)],
-        'Classic': [const Color(0xFF1E293B), const Color(0xFF0F172A)],
-        'Minimal': [const Color(0xFF111827), const Color(0xFF030712)],
-        'Executive': [const Color(0xFF06B6D4), const Color(0xFF0E7490)],
-        'Corporate': [const Color(0xFF2563EB), const Color(0xFF1E40AF)],
-        'Creative': [const Color(0xFF7C3AED), const Color(0xFFDB2777)],
-        'Gold Foil': [const Color(0xFFFFC107), const Color(0xFFFF8F00)],
-        'Marble': [const Color(0xFFF8FAFC), const Color(0xFFCBD5E1)],
-        'Rose Gold': [const Color(0xFFFF6F91), const Color(0xFFFF3F7F)],
-        'Emerald': [const Color(0xFF10B981), const Color(0xFF047857)],
-        'Midnight': [const Color(0xFF0B1020), const Color(0xFF111827)],
-        'Diamond': [const Color(0xFF8BE9FD), const Color(0xFFB794F4)],
-      };
-
   Directory _downloadDirectory() {
     if (!kIsWeb && Platform.isWindows) {
       final root = Platform.environment['USERPROFILE'];
@@ -11329,49 +11361,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
   bool _hasSignature(List<Offset?> points) {
     return points.any((p) => p != null);
-  }
-
-  static const double _invoiceSigPadHeight = 120;
-  static const double _invoiceSigPreviewHeight = 36;
-
-  List<Offset?> _scaleSignaturePoints(List<Offset?> points, {required double scale}) {
-    return points.map((p) => p == null ? null : Offset(p.dx * scale, p.dy * scale)).toList();
-  }
-
-  Widget _invoicePreviewSignature(List<Offset?> points) {
-    if (!_hasSignature(points)) {
-      return const SizedBox(height: _invoiceSigPreviewHeight);
-    }
-    final scale = _invoiceSigPreviewHeight / _invoiceSigPadHeight;
-    return SizedBox(
-      height: _invoiceSigPreviewHeight,
-      width: double.infinity,
-      child: CustomPaint(
-        painter: _SignaturePainter(
-          _scaleSignaturePoints(points, scale: scale),
-          color: const Color(0xFF0F172A),
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _invoiceBizAddressLines(Color headerTextColor) {
-    final lines = <String>[
-      if (_bizStreetC.text.trim().isNotEmpty) _bizStreetC.text.trim(),
-      if (_bizCityStateZipC.text.trim().isNotEmpty) _bizCityStateZipC.text.trim(),
-      if (_bizPhoneC.text.trim().isNotEmpty) _bizPhoneC.text.trim(),
-    ];
-    return lines
-        .map(
-          (line) => Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              line,
-              style: TextStyle(fontSize: 10, color: headerTextColor.withOpacity(0.88)),
-            ),
-          ),
-        )
-        .toList();
   }
 
   Future<void> _cleanupExpiredPaidInvoices() => cleanupExpiredPaidInvoices();
@@ -11406,7 +11395,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   }
 
   void _applyInvoiceEntryToForm(Map<String, dynamic> entry, VoidCallback refresh) {
-    _invoiceTemplate = (entry['template'] ?? 'Modern').toString();
+    _invoiceTemplate = ngmyNormalizeInvoiceTemplateId((entry['template'] ?? 'modern').toString());
     _invoiceNoC.text = (entry['invoiceNo'] ?? '1').toString();
     _issuedDateC.text = (entry['issuedDate'] ?? '').toString();
     _dueDateC.text = (entry['dueDate'] ?? '').toString();
@@ -12033,8 +12022,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     _invoicePaid = false;
     await _cleanupExpiredPaidInvoices();
     var savedCount = await savedInvoiceCount();
-    final templateStyles = _invoiceTemplateStyles();
-    final templates = templateStyles.keys.toList();
     final GlobalKey localPreviewKey = GlobalKey();
 
     // Use SchedulerBinding to ensure we are outside of any current build/frame processing
@@ -12046,10 +12033,35 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
           builder: (ctx, setDialog) {
             final isDark = Theme.of(ctx).brightness == Brightness.dark;
             final subtotal = _invoiceSubtotal();
-            final colors = templateStyles[_invoiceTemplate] ?? [const Color(0xFF3B82F6), const Color(0xFF1D4ED8)];
-            final useDarkText = _invoiceTemplate == 'Marble' || _invoiceTemplate == 'Diamond';
-            final headerTextColor = useDarkText ? const Color(0xFF0F172A) : Colors.white;
             final screen = MediaQuery.of(ctx).size;
+
+            Future<void> openFullscreenSignature({
+              required String title,
+              required List<Offset?> target,
+            }) async {
+              const inlineW = 280.0;
+              const inlineH = NgmyInvoiceSignaturePad.padHeight;
+              final seed = scaleSignaturePoints(
+                target,
+                scaleX: 400 / inlineW,
+                scaleY: 600 / inlineH,
+              );
+              await showNgmyFullscreenSignature(
+                ctx,
+                title: title,
+                points: seed,
+                onSave: (saved, canvasSize) {
+                  target
+                    ..clear()
+                    ..addAll(scaleSignaturePoints(
+                      saved,
+                      scaleX: inlineW / canvasSize.width,
+                      scaleY: inlineH / canvasSize.height,
+                    ));
+                  setDialog(() {});
+                },
+              );
+            }
 
             Future<void> refreshSavedCount() async {
               savedCount = await savedInvoiceCount();
@@ -12089,25 +12101,9 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       ]),
                     const Text('Choose Template', style: TextStyle(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: templates.map((t) {
-                        final c = templateStyles[t]!;
-                        return GestureDetector(
-                          onTap: () => setDialog(() => _invoiceTemplate = t),
-                          child: Container(
-                            width: 120,
-                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(colors: c),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: _invoiceTemplate == t ? Colors.white : Colors.transparent, width: 2),
-                            ),
-                            child: Text(t, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
-                          ),
-                        );
-                      }).toList(),
+                    ngmyInvoiceTemplatePicker(
+                      selectedId: _invoiceTemplate,
+                      onSelect: (id) => setDialog(() => _invoiceTemplate = id),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -12159,87 +12155,27 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     Row(
                       children: [
                         Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF0F1B33) : const Color(0xFFF3F6FF),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFCAD6F3)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Service Provider Signature', style: TextStyle(fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 8),
-                                Container(
-                                  height: 120,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFCBD5E1)),
-                                  ),
-                                  child: GestureDetector(
-                                    onPanStart: (d) => setDialog(() => _providerSignaturePoints.add(d.localPosition)),
-                                    onPanUpdate: (d) => setDialog(() => _providerSignaturePoints.add(d.localPosition)),
-                                    onPanEnd: (_) => setDialog(() => _providerSignaturePoints.add(null)),
-                                    child: SizedBox.expand(
-                                      child: CustomPaint(
-                                        painter: _SignaturePainter(_providerSignaturePoints),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    onPressed: () => setDialog(() => _providerSignaturePoints.clear()),
-                                    child: const Text('Clear'),
-                                  ),
-                                ),
-                              ],
+                          child: NgmyInvoiceSignaturePad(
+                            title: 'Service Provider Signature',
+                            points: _providerSignaturePoints,
+                            onChanged: () => setDialog(() {}),
+                            onClear: () => setDialog(() => _providerSignaturePoints.clear()),
+                            onFullscreen: () => openFullscreenSignature(
+                              title: 'Service Provider Signature',
+                              target: _providerSignaturePoints,
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF0F1B33) : const Color(0xFFF3F6FF),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFCAD6F3)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Client Signature', style: TextStyle(fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 8),
-                                Container(
-                                  height: 120,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFCBD5E1)),
-                                  ),
-                                  child: GestureDetector(
-                                    onPanStart: (d) => setDialog(() => _clientSignaturePoints.add(d.localPosition)),
-                                    onPanUpdate: (d) => setDialog(() => _clientSignaturePoints.add(d.localPosition)),
-                                    onPanEnd: (_) => setDialog(() => _clientSignaturePoints.add(null)),
-                                    child: SizedBox.expand(
-                                      child: CustomPaint(
-                                        painter: _SignaturePainter(_clientSignaturePoints),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    onPressed: () => setDialog(() => _clientSignaturePoints.clear()),
-                                    child: const Text('Clear'),
-                                  ),
-                                ),
-                              ],
+                          child: NgmyInvoiceSignaturePad(
+                            title: 'Client Signature',
+                            points: _clientSignaturePoints,
+                            onChanged: () => setDialog(() {}),
+                            onClear: () => setDialog(() => _clientSignaturePoints.clear()),
+                            onFullscreen: () => openFullscreenSignature(
+                              title: 'Client Signature',
+                              target: _clientSignaturePoints,
                             ),
                           ),
                         ),
@@ -12256,278 +12192,27 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     const SizedBox(height: 8),
                     RepaintBoundary(
                       key: localPreviewKey,
-                      child: Container(
-                        width: double.infinity,
-                        constraints: const BoxConstraints(minHeight: 520),
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: colors,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.white.withOpacity(0.2)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: colors.first.withOpacity(0.35),
-                              blurRadius: 18,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                        child: DefaultTextStyle(
-                          style: TextStyle(color: headerTextColor),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'INVOICE',
-                                          style: TextStyle(
-                                            letterSpacing: 1.5,
-                                            fontSize: 26,
-                                            fontWeight: FontWeight.w300,
-                                            color: headerTextColor.withOpacity(0.95),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          _bizNameC.text.isEmpty ? 'Your Business' : _bizNameC.text,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: headerTextColor.withOpacity(0.95),
-                                          ),
-                                        ),
-                                        ..._invoiceBizAddressLines(headerTextColor),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    width: 56,
-                                    padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 5),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(useDarkText ? 0.55 : 0.06),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.white.withOpacity(0.24)),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Text('INVOICE', style: TextStyle(fontSize: 8, letterSpacing: 0.8, color: headerTextColor.withOpacity(0.85))),
-                                        const SizedBox(height: 2),
-                                        Text('#${_invoiceNoC.text.isEmpty ? '1' : _invoiceNoC.text}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: headerTextColor)),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(useDarkText ? 0.58 : 0.05),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: Colors.white.withOpacity(0.2)),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text('CLIENT', style: TextStyle(fontSize: 9, letterSpacing: 1.4, fontWeight: FontWeight.w700, color: headerTextColor.withOpacity(0.75))),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            _clientNameC.text.isEmpty ? 'Client Name' : _clientNameC.text,
-                                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: headerTextColor),
-                                          ),
-                                          if (_clientEmailC.text.trim().isNotEmpty)
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 2),
-                                              child: Text(
-                                                _clientEmailC.text.trim(),
-                                                style: TextStyle(fontSize: 10, color: headerTextColor.withOpacity(0.88)),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text('Issued: ${_issuedDateC.text.isEmpty ? '--/--/----' : _issuedDateC.text}', style: TextStyle(fontSize: 10, color: headerTextColor.withOpacity(0.9))),
-                                        Text('Due: ${_dueDateC.text.isEmpty ? '—' : _dueDateC.text}', style: TextStyle(fontSize: 10, color: headerTextColor.withOpacity(0.9))),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              Container(
-                                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(useDarkText ? 0.52 : 0.08),
-                                  borderRadius: BorderRadius.circular(7),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(child: Text('ITEM', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: headerTextColor))),
-                                    SizedBox(width: 72, child: Text('PRICE', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: headerTextColor))),
-                                    SizedBox(width: 44, child: Text('QTY', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: headerTextColor))),
-                                    SizedBox(width: 52, child: Text('DISC.', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: headerTextColor))),
-                                    SizedBox(width: 72, child: Text('AMOUNT', textAlign: TextAlign.right, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: headerTextColor))),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 10),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _itemNameC.text.isEmpty ? 'Item' : _itemNameC.text,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: headerTextColor,
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 72, child: Text('\$${_num(_itemPriceC.text).toStringAsFixed(2)}', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: headerTextColor))),
-                                    SizedBox(width: 44, child: Text(_itemQtyC.text.isEmpty ? '1' : _itemQtyC.text, textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: headerTextColor))),
-                                    SizedBox(width: 52, child: Text('${_num(_itemDiscountC.text).toStringAsFixed(0)}%', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: headerTextColor))),
-                                    SizedBox(width: 72, child: Text('\$${subtotal.toStringAsFixed(2)}', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: headerTextColor))),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: Container(
-                                  width: 220,
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(useDarkText ? 0.54 : 0.08),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: Colors.white.withOpacity(0.22)),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Subtotal', style: TextStyle(fontSize: 11, color: headerTextColor.withOpacity(0.8))),
-                                      const SizedBox(height: 6),
-                                      Row(
-                                        children: [
-                                          Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: headerTextColor)),
-                                          const Spacer(),
-                                          Text('\$${subtotal.toStringAsFixed(2)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: headerTextColor)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              if (_itemDescC.text.trim().isNotEmpty)
-                                Text(
-                                  _itemDescC.text.trim(),
-                                  style: TextStyle(color: headerTextColor.withOpacity(0.95), fontSize: 11),
-                                ),
-                              if (_paymentInfoC.text.trim().isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  _paymentInfoC.text.trim(),
-                                  style: TextStyle(color: headerTextColor.withOpacity(0.92), fontSize: 11, height: 1.35),
-                                ),
-                              ],
-                              const SizedBox(height: 10),
-                              Center(
-                                child: Text(
-                                  'By signing, both parties agree to the services and conditions described herein.',
-                                  style: TextStyle(color: headerTextColor.withOpacity(0.84), fontSize: 10),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Container(
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(useDarkText ? 0.5 : 0.07),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text('SERVICE PROVIDER', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: headerTextColor)),
-                                          const SizedBox(height: 6),
-                                          _invoicePreviewSignature(_providerSignaturePoints),
-                                          const SizedBox(height: 4),
-                                          Container(height: 1, color: headerTextColor.withOpacity(0.5)),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            _hasSignature(_providerSignaturePoints)
-                                                ? 'NGMY • ${_issuedDateC.text.isEmpty ? '--/--/----' : _issuedDateC.text}'
-                                                : 'Pending signature',
-                                            style: TextStyle(fontSize: 9, color: headerTextColor.withOpacity(0.9)),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Container(
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(useDarkText ? 0.5 : 0.07),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text('CLIENT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: headerTextColor)),
-                                          const SizedBox(height: 6),
-                                          _invoicePreviewSignature(_clientSignaturePoints),
-                                          const SizedBox(height: 4),
-                                          Container(height: 1, color: headerTextColor.withOpacity(0.5)),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            _hasSignature(_clientSignaturePoints)
-                                                ? '${_clientNameC.text.isEmpty ? 'Client' : _clientNameC.text} • ${_issuedDateC.text.isEmpty ? '--/--/----' : _issuedDateC.text}'
-                                                : 'Client • __/__/____',
-                                            style: TextStyle(fontSize: 9, color: headerTextColor.withOpacity(0.9)),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Center(
-                                child: Text(
-                                  'POWERED BY: NGMY.SITE',
-                                  style: TextStyle(
-                                    color: headerTextColor.withOpacity(0.92),
-                                    letterSpacing: 1.4,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                      child: NgmyInvoicePreview(
+                        data: NgmyInvoicePreviewData(
+                          templateId: _invoiceTemplate,
+                          businessName: _bizNameC.text,
+                          bizStreet: _bizStreetC.text,
+                          bizCityStateZip: _bizCityStateZipC.text,
+                          bizPhone: _bizPhoneC.text,
+                          invoiceNo: _invoiceNoC.text,
+                          issuedDate: _issuedDateC.text,
+                          dueDate: _dueDateC.text,
+                          clientName: _clientNameC.text,
+                          clientEmail: _clientEmailC.text,
+                          itemName: _itemNameC.text,
+                          itemPrice: _itemPriceC.text,
+                          itemQty: _itemQtyC.text,
+                          itemDiscount: _itemDiscountC.text,
+                          itemDesc: _itemDescC.text,
+                          paymentInfo: _paymentInfoC.text,
+                          subtotal: subtotal,
+                          providerSignature: _providerSignaturePoints,
+                          clientSignature: _clientSignaturePoints,
                         ),
                       ),
                     ),
@@ -12688,32 +12373,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
         ),
       ),
     );
-  }
-}
-
-class _SignaturePainter extends CustomPainter {
-  final List<Offset?> points;
-  final Color color;
-  const _SignaturePainter(this.points, {this.color = const Color(0xFF0F172A)});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 2.0;
-    for (int i = 0; i < points.length - 1; i++) {
-      final p1 = points[i];
-      final p2 = points[i + 1];
-      if (p1 != null && p2 != null) {
-        canvas.drawLine(p1, p2, paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _SignaturePainter oldDelegate) {
-    return oldDelegate.points != points || oldDelegate.color != color;
   }
 }
 
@@ -15792,10 +15451,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _searchC.addListener(() => setState(() => _searchQuery = _searchC.text.trim().toLowerCase()));
     _liveOrderPollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
       if (!mounted) return;
-      final ordersTab = _canSell ? 2 : 1;
-      if (_tabCtrl.index != ordersTab) return;
       unawaited(_syncLiveOrders());
     });
+    unawaited(_syncLiveOrders());
   }
 
   String _storeOrdersDigest() {
@@ -15808,7 +15466,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     if (!mounted) return;
     final before = _storeOrdersDigest();
     await _refreshStoreOrdersFromConfig();
-    _advanceOrderStatuses();
+    final advanced = _advanceOrderStatuses();
+    if (advanced) await _pushStoreOrdersToSupabase(_orders);
     final refunded = _processUnshippedRefunds();
     if (refunded && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -15827,31 +15486,13 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       final cfg = await Supabase.instance.client.from('config').select('storeOrders').eq('id', 1).maybeSingle();
       if (cfg == null || cfg['storeOrders'] is! List) return;
       final remote = (cfg['storeOrders'] as List).map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
-      final byId = <String, Map<String, dynamic>>{};
-      for (final o in remote) {
-        final id = (o['id'] ?? '').toString();
-        if (id.isNotEmpty) byId[id] = o;
-      }
-      for (final o in widget.config.storeOrders) {
-        final id = (o['id'] ?? '').toString();
-        if (id.isEmpty) continue;
-        final existing = byId[id];
-        final local = _normalizeStoreOrder(Map<String, dynamic>.from(o));
-        if (existing == null) {
-          byId[id] = local;
-        } else {
-          final localAt = DateTime.tryParse((local['updatedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
-          final remoteAt = DateTime.tryParse((existing['updatedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
-          byId[id] = remoteAt.isAfter(localAt) ? existing : local;
-        }
-      }
-      widget.config.storeOrders = byId.values.toList();
+      widget.config.storeOrders = _mergeStoreOrdersLists(widget.config.storeOrders, remote);
     } catch (e) {
       debugPrint('[storeOrders] refresh error: $e');
     }
   }
 
-  void _advanceOrderStatuses() {
+  bool _advanceOrderStatuses() {
     var changed = false;
     final now = DateTime.now();
     for (final o in _orders) {
@@ -15861,14 +15502,16 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       if (eta == null) continue;
       if (s == 'shipped' && now.isAfter(eta.subtract(const Duration(hours: 12)))) {
         o['fulfillmentStatus'] = 'in_transit';
+        o['updatedAt'] = DateTime.now().toUtc().toIso8601String();
         changed = true;
       }
       if ((s == 'shipped' || s == 'in_transit') && now.isAfter(eta.subtract(const Duration(hours: 2)))) {
         o['fulfillmentStatus'] = 'arriving';
+        o['updatedAt'] = DateTime.now().toUtc().toIso8601String();
         changed = true;
       }
     }
-    if (changed) _save(refreshCloud: true);
+    return changed;
   }
 
   void _mergeRemoteStoreListings(List<Map<String, dynamic>> remote) {
@@ -16658,10 +16301,17 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _listingsSig = _storeListingsSignature(_listings);
     widget.onDataChanged();
     if (refreshCloud) {
-      unawaited(_refreshStoreListingsFromCloud(silent: true, force: true));
+      unawaited(_persistOrdersAndRefresh());
     } else if (mounted) {
       setState(() {});
     }
+  }
+
+  Future<void> _persistOrdersAndRefresh() async {
+    _advanceOrderStatuses();
+    await _pushStoreOrdersToSupabase(_orders);
+    await _refreshStoreOrdersFromConfig();
+    if (mounted) setState(() {});
   }
 
   void _upsertListingLocal(Map<String, dynamic> listing) {
@@ -16782,8 +16432,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     edit(_orders[idx]);
     _orders[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     _orders[idx] = _normalizeStoreOrder(_orders[idx]);
-    _save(refreshCloud: true);
-    unawaited(_syncLiveOrders());
+    unawaited(_persistOrdersAndRefresh());
+    widget.onDataChanged();
     if (mounted) setState(() {});
   }
 
