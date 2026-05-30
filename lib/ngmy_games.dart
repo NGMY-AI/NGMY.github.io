@@ -343,6 +343,9 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
   Widget build(BuildContext context) {
     final bal = widget.balance;
     final wager = _effectiveBet();
+    final screenH = MediaQuery.sizeOf(context).height;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final dicePanelH = (screenH * 0.30).clamp(190.0, 250.0);
     return Scaffold(
       backgroundColor: const Color(0xFF2B1454),
       body: SafeArea(
@@ -380,12 +383,13 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
               ),
             ),
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(14, 0, 14, 12 + bottomInset),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      flex: 5,
+                    SizedBox(
+                      height: dicePanelH,
                       child: Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
@@ -396,7 +400,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                         child: LayoutBuilder(
                           builder: (context, box) {
                             final side = math.min(box.maxWidth, box.maxHeight);
-                            final diceSize = (side * 0.88).clamp(210.0, 360.0);
+                            final diceSize = (side * 0.72).clamp(155.0, 220.0);
                             return Center(
                               child: Ngmy3DDiceCube(
                                 rolling: _rolling,
@@ -509,10 +513,10 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                         style: const TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.w800, fontSize: 11),
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     SizedBox(
                       width: double.infinity,
-                      height: 50,
+                      height: 48,
                       child: ElevatedButton(
                         onPressed: _rolling ? null : _roll,
                         style: ElevatedButton.styleFrom(
