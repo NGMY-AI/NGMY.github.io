@@ -28,11 +28,9 @@ class NgmyNavigator {
   /// Pops exactly one route on the app root navigator (never jumps to home).
   static void pop<T extends Object?>(BuildContext context, [T? result]) {
     final nav = ngmyRootNavigatorKey.currentState;
-    if (nav != null && nav.canPop()) {
+    if (nav != null && nav.mounted && nav.canPop()) {
       nav.pop<T>(result);
-      return;
     }
-    Navigator.of(context).maybePop<T>(result);
   }
 
   static Route<T> route<T extends Object?>(

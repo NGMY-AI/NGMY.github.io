@@ -5350,17 +5350,17 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: true,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        _exitToHome();
+        _exitGameCenter();
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF2B1454),
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
-            onPressed: _exitToHome,
+            onPressed: _exitGameCenter,
           ),
           backgroundColor: const Color(0xFF7B1FA2),
           title: const Text('GAME CENTER', style: TextStyle(fontWeight: FontWeight.w900)),
@@ -5397,7 +5397,8 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
     );
   }
 
-  void _exitToHome() {
+  /// One step back to the main app (home tab shell), not through the whole stack.
+  void _exitGameCenter() {
     final result = _sessionGamesPlayed > 0
         ? <String, dynamic>{
             'gamesPlayed': _sessionGamesPlayed,
@@ -6654,6 +6655,14 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard> {
   int _idx = 0; final _search = TextEditingController(); bool _isSearching = false; String _query = '';
 
+  void _adminBack() {
+    if (_idx > 0) {
+      setState(() => _idx--);
+      return;
+    }
+    NgmyNavigator.pop(context);
+  }
+
   @override Widget build(BuildContext context) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
     final pages = [
@@ -6665,15 +6674,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _adminMedia(isDark),
       _adminStore(isDark),
     ];
-    return PopScope(
-      canPop: true,
+    return NgmyTabBackScope(
+      activeTab: _idx,
+      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 6)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
       appBar: AppBar(
         backgroundColor: isDark ? const Color(0xFF161922) : Colors.white,
         elevation: 0,
         centerTitle: false,
-        leading: IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : Colors.black, size: 18), onPressed: () => NgmyNavigator.pop(context)),
+        leading: IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : Colors.black, size: 18), onPressed: _adminBack),
         title: Text(_menuName(), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(78),
