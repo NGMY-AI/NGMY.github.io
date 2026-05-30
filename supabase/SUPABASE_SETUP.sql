@@ -42,6 +42,9 @@ create policy "store_inquiries_delete" on public.store_inquiries for delete usin
 alter table public.config add column if not exists storeListings jsonb default '[]'::jsonb;
 alter table public.config add column if not exists storeInquiries jsonb default '[]'::jsonb;
 alter table public.config add column if not exists geminiApiKey text default '';
+alter table public.config add column if not exists "termsAndConditions" text default '';
+alter table public.config add column if not exists "privacyPolicy" text default '';
+alter table public.config add column if not exists "storeOrders" jsonb default '[]'::jsonb;
 
 -- ========== MEDIA HUB ==========
 create table if not exists public.media (

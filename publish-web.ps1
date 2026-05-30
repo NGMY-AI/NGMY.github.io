@@ -7,9 +7,10 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
-$BaseHref = "/NGMY.github.io/"
+# Repo remote is kbpabloqr-lgtm.github.io → site root is https://kbpabloqr-lgtm.github.io/
+$BaseHref = "/"
 $DeployId = Get-Date -Format "yyyyMMddHHmmss"
-$LiveUrl = "https://kbpabloqr-lgtm.github.io/NGMY.github.io/"
+$LiveUrl = "https://kbpabloqr-lgtm.github.io/"
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host " NGMY Web Publish" -ForegroundColor Cyan
@@ -62,7 +63,7 @@ Write-Host "  version.json build_number: $DeployId"
 Write-Host "`n[5/6] Git status ..."
 git status -sb
 
-Write-Host "`n[6/6] Ready to push. Run these commands if git shows changes:" -ForegroundColor Yellow
+Write-Host "`n[6/7] Ready to push. Run these commands if git shows changes:" -ForegroundColor Yellow
 Write-Host "  git add docs web lib publish-web.ps1" -ForegroundColor White
 Write-Host "  git add -u" -ForegroundColor White
 Write-Host "  git commit -m ""Deploy web build $DeployId""" -ForegroundColor White
@@ -72,12 +73,32 @@ Write-Host "Live URL (after push, wait 1-3 min):" -ForegroundColor Green
 Write-Host "  $LiveUrl" -ForegroundColor Green
 Write-Host ""
 Write-Host "Verify deploy from PC:" -ForegroundColor Green
-Write-Host "  Invoke-WebRequest `"$LiveUrl`version.json?d=$DeployId`" -UseBasicParsing | Select-Object -Expand Content" -ForegroundColor White
+Write-Host ('  Invoke-WebRequest "' + $LiveUrl + 'version.json?d=' + $DeployId + '" -UseBasicParsing | Select-Object -Expand Content') -ForegroundColor White
 Write-Host ""
 Write-Host "On PHONE after push:" -ForegroundColor Yellow
-Write-Host "  1. Close every NGMY tab / remove from recent apps" -ForegroundColor White
-Write-Host "  2. Open $LiveUrl in a NEW private/incognito tab first" -ForegroundColor White
-Write-Host "  3. If still old: clear website data for this URL in browser settings" -ForegroundColor White
-Write-Host "  4. If added to Home Screen: delete icon and add again after update" -ForegroundColor White
+Write-Host "  1. Delete old Home Screen icon if you have one (wrong URL may be cached)" -ForegroundColor White
+Write-Host "  2. Close every NGMY tab / remove from recent apps" -ForegroundColor White
+Write-Host "  3. Open $LiveUrl in a NEW private/incognito tab first" -ForegroundColor White
+Write-Host "  4. If still old: clear website data for this URL in browser settings" -ForegroundColor White
+Write-Host "  5. Add to Home Screen again from the NEW URL only" -ForegroundColor White
+Write-Host ""
+Write-Host "GITHUB PAGES (required once):" -ForegroundColor Magenta
+Write-Host "  github.com/kbpabloqr-lgtm/kbpabloqr-lgtm.github.io - Settings - Pages" -ForegroundColor White
+Write-Host "  Source: Deploy from branch main, folder /docs, then Save" -ForegroundColor White
+Write-Host ""
+Write-Host "[7/7] Checking live site (only works AFTER push + Pages enabled) ..." -ForegroundColor Cyan
+try {
+    $checkUrl = "${LiveUrl}version.json?t=$DeployId"
+    $resp = Invoke-WebRequest -Uri $checkUrl -UseBasicParsing -TimeoutSec 20
+    if ($resp.Content -match $DeployId) {
+        Write-Host "  LIVE OK: version.json matches deploy $DeployId" -ForegroundColor Green
+    } else {
+        Write-Host "  LIVE: site responded but build may be older. Content: $($resp.Content)" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "  LIVE NOT REACHABLE yet (404 = enable GitHub Pages or wait 2 min after push)" -ForegroundColor Red
+    Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "  PC updated only means docs on THIS computer. Phone uses the GitHub URL above." -ForegroundColor Yellow
+}
 Write-Host ""
 Write-Host "Done." -ForegroundColor Cyan

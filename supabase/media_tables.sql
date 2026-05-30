@@ -33,6 +33,7 @@ create policy "media_delete" on public.media for delete using (true);
 alter table public.media add column if not exists url text;
 alter table public.media add column if not exists type text;
 
--- Realtime (run once if deletes don't sync to other devices immediately):
+-- Realtime (required for deletes to disappear on other users' phones immediately):
+-- Supabase Dashboard → Database → Publications → supabase_realtime → enable table "media"
+-- Or run once (if your project allows):
 -- alter publication supabase_realtime add table public.media;
--- Or: Supabase Dashboard → Database → Publications → supabase_realtime → add "media"
