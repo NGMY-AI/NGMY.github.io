@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
   <base href="/NGMY.github.io/">
@@ -7,6 +7,9 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="Next Generation - Make Yours">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -40,6 +43,34 @@
   </style>
 </head>
 <body style="overflow: hidden;">
-  <script src="flutter_bootstrap.js" async></script>
+  <!-- Clears stale PWA/service-worker cache when a new build is deployed -->
+  <script>
+    (function () {
+      var CURRENT = "20260529212455";
+      var KEY = "ngmy_deploy_id";
+      var prev = null;
+      try { prev = localStorage.getItem(KEY); } catch (e) {}
+      function finish() {
+        try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
+      }
+      if (prev && prev !== CURRENT && "serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          return Promise.all(regs.map(function (r) { return r.unregister(); }));
+        }).then(function () {
+          if ("caches" in window) {
+            return caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            });
+          }
+        }).then(function () {
+          try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
+          location.reload();
+        }).catch(finish);
+      } else {
+        finish();
+      }
+    })();
+  </script>
+  <script src="flutter_bootstrap.js?v=20260529212455"></script>
 </body>
 </html>

@@ -28,3 +28,11 @@ create policy "media_read" on public.media for select using (true);
 create policy "media_insert" on public.media for insert with check (true);
 create policy "media_update" on public.media for update using (true);
 create policy "media_delete" on public.media for delete using (true);
+
+-- Optional: add url column if your table uses it (app sends videoUrl + url)
+alter table public.media add column if not exists url text;
+alter table public.media add column if not exists type text;
+
+-- Realtime (run once if deletes don't sync to other devices immediately):
+-- alter publication supabase_realtime add table public.media;
+-- Or: Supabase Dashboard → Database → Publications → supabase_realtime → add "media"

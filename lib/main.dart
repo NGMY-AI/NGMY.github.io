@@ -253,6 +253,7 @@ class AppConfig {
   List<Map<String, dynamic>> helpHelperApplications;
   List<Map<String, dynamic>> helpRequests;
   List<Map<String, dynamic>> helpBusinesses;
+  int maxMediaPostsPerWeek;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -284,6 +285,7 @@ class AppConfig {
     this.helpHelperApplications = const [],
     this.helpRequests = const [],
     this.helpBusinesses = const [],
+    this.maxMediaPostsPerWeek = 3,
   });
   Map<String, dynamic> toJson() => {
     'officialCashApp': officialCashApp,
@@ -315,6 +317,7 @@ class AppConfig {
     'helpHelperApplications': helpHelperApplications,
     'helpRequests': helpRequests,
     'helpBusinesses': helpBusinesses,
+    'maxMediaPostsPerWeek': maxMediaPostsPerWeek,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
@@ -346,6 +349,7 @@ class AppConfig {
     helpHelperApplications: List<Map<String, dynamic>>.from((json['helpHelperApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     helpRequests: List<Map<String, dynamic>>.from((json['helpRequests'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     helpBusinesses: List<Map<String, dynamic>>.from((json['helpBusinesses'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
+    maxMediaPostsPerWeek: json['maxMediaPostsPerWeek'] ?? 3,
   );
 }
 
@@ -491,6 +495,46 @@ Future<List<MediaPost>> _fetchMediaPostsFromSupabase() async {
     debugPrint('[media] fetch error: $e');
     return [];
   }
+}
+
+Future<bool> _deleteMediaRowFromSupabase(String id) async {
+  if (id.isEmpty) return false;
+  try {
+    await Supabase.instance.client.from('media').delete().eq('id', id);
+    return true;
+  } catch (e) {
+    debugPrint('[media] delete error: $e');
+    return false;
+  }
+}
+
+Future<bool> _mediaPostExistsInSupabase(String id) async {
+  if (id.isEmpty) return false;
+  try {
+    final row = await Supabase.instance.client.from('media').select('id').eq('id', id).maybeSingle();
+    return row != null;
+  } catch (e) {
+    debugPrint('[media] exists check error: $e');
+    return true;
+  }
+}
+
+bool _mediaUrlIsCloudSynced(String url) {
+  final u = url.trim();
+  return u.startsWith('supabase://') || u.startsWith('http://') || u.startsWith('https://');
+}
+
+/// Merges Supabase media with local-only drafts. Remote list is authoritative for removals.
+List<MediaPost> _mergeMediaWithRemote(List<MediaPost> local, List<MediaPost> remote) {
+  final merged = <String, MediaPost>{};
+  for (final m in remote) {
+    if (m.id.isNotEmpty) merged[m.id] = m;
+  }
+  for (final m in local) {
+    if (m.id.isEmpty || merged.containsKey(m.id)) continue;
+    if (!_mediaUrlIsCloudSynced(m.videoUrl)) merged[m.id] = m;
+  }
+  return merged.values.toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 }
 
 bool _mediaPostIsImage(MediaPost post) {
@@ -758,20 +802,28 @@ Future<List<Map<String, dynamic>>> _fetchHelpTableFromSupabase(String table) asy
   return (bucket: withoutScheme.substring(0, slashIdx), path: withoutScheme.substring(slashIdx + 1));
 }
 
-Future<String> _resolveSupabaseStorageUrl(String rawUrl) async {
+Future<String> _resolveSupabaseStorageUrlResilient(String rawUrl) async {
   if (!rawUrl.startsWith('supabase://')) return rawUrl;
   final ref = _parseSupabaseStorageRef(rawUrl);
   if (ref == null) return rawUrl;
-  final publicUrl = Supabase.instance.client.storage.from(ref.bucket).getPublicUrl(ref.path);
+  
+  final storage = Supabase.instance.client.storage.from(ref.bucket);
+  final publicUrl = storage.getPublicUrl(ref.path);
+  
   try {
-    final signed = await Supabase.instance.client.storage
-        .from(ref.bucket)
-        .createSignedUrl(ref.path, 60 * 60 * 24 * 7);
-    return signed.isNotEmpty ? signed : publicUrl;
-  } catch (_) {
-    return publicUrl;
+    // 1. Check if public URL is reachable (optional, but good for public buckets)
+    // 2. Try to get a signed URL with a long expiry (1 month)
+    final signed = await storage.createSignedUrl(ref.path, 60 * 60 * 24 * 30);
+    if (signed.isNotEmpty) return signed;
+  } catch (e) {
+    debugPrint('[storage] signed url error for ${ref.path}: $e');
   }
+  
+  // 3. Fallback to public URL
+  return publicUrl;
 }
+
+Future<String> _resolveSupabaseStorageUrl(String rawUrl) => _resolveSupabaseStorageUrlResilient(rawUrl);
 
 String _mimeForVideoExt(String ext) {
   switch (ext) {
@@ -783,6 +835,14 @@ String _mimeForVideoExt(String ext) {
       return 'video/x-matroska';
     case 'avi':
       return 'video/x-msvideo';
+    case 'mp3':
+      return 'audio/mpeg';
+    case 'wav':
+      return 'audio/wav';
+    case 'm4a':
+      return 'audio/mp4';
+    case 'ogg':
+      return 'audio/ogg';
     default:
       return 'video/mp4';
   }
@@ -818,18 +878,21 @@ Future<void> _ensureSupabaseSessionForStorage() async {
 String _friendlyStorageError(Object error) {
   final msg = error.toString().toLowerCase();
   if (msg.contains('bucket') && msg.contains('not found')) {
-    return 'Storage bucket "media" is missing. Run supabase/storage_media_bucket.sql in Supabase.';
+    return 'Storage bucket "media" is missing. Please create a public bucket named "media" in Supabase Storage.';
   }
   if (msg.contains('row-level security') || msg.contains('policy') || msg.contains('403')) {
-    return 'Storage upload blocked. Run supabase/storage_media_bucket.sql in Supabase SQL Editor.';
+    return 'Storage upload blocked by RLS policies. Enable public uploads for the "media" bucket in Supabase.';
   }
   if (msg.contains('anonymous') || msg.contains('signup')) {
-    return 'Enable Anonymous sign-in: Supabase → Authentication → Providers → Anonymous.';
+    return 'Anonymous uploads are disabled. Enable Anonymous sign-in in Supabase → Auth → Providers.';
   }
   if (msg.contains('payload too large') || msg.contains('413')) {
-    return 'File is too large for storage. Try a smaller photo or video.';
+    return 'File is too large. Try a shorter video (under 60MB) or a smaller photo.';
   }
-  return 'Upload failed. Run storage_media_bucket.sql and media_tables.sql in Supabase, then try again.';
+  if (msg.contains('connection') || msg.contains('timeout')) {
+    return 'Upload timed out. Check your internet connection and try again.';
+  }
+  return 'Cloud upload failed. Ensure "media" bucket exists and policies allow uploads.';
 }
 
 Future<({String? ref, String? error})> _uploadNgmyMediaBytes({
@@ -837,29 +900,33 @@ Future<({String? ref, String? error})> _uploadNgmyMediaBytes({
   required String storagePath,
   required String contentType,
 }) async {
-  await _ensureSupabaseSessionForStorage();
-  final storage = Supabase.instance.client.storage.from('media');
-  Object? lastError;
-  for (var attempt = 0; attempt < 3; attempt++) {
-    try {
-      await storage.uploadBinary(
-        storagePath,
-        bytes,
-        fileOptions: FileOptions(
-          upsert: attempt > 0,
-          contentType: contentType,
-        ),
-      );
-      return (ref: 'supabase://media/$storagePath', error: null);
-    } catch (e) {
-      lastError = e;
-      debugPrint('[storage] upload $storagePath attempt ${attempt + 1}: $e');
-      if (attempt < 2) {
-        await Future.delayed(Duration(milliseconds: 350 * (attempt + 1)));
+  try {
+    await _ensureSupabaseSessionForStorage();
+    final storage = Supabase.instance.client.storage.from('media');
+    Object? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        await storage.uploadBinary(
+          storagePath,
+          bytes,
+          fileOptions: FileOptions(
+            upsert: true,
+            contentType: contentType,
+          ),
+        ).timeout(const Duration(seconds: 45));
+        return (ref: 'supabase://media/$storagePath', error: null);
+      } catch (e) {
+        lastError = e;
+        debugPrint('[storage] upload $storagePath attempt ${attempt + 1}: $e');
+        if (attempt < 2) {
+          await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+        }
       }
     }
+    return (ref: null, error: _friendlyStorageError(lastError ?? 'unknown'));
+  } catch (e) {
+    return (ref: null, error: 'Connection error: ${e.toString()}');
   }
-  return (ref: null, error: _friendlyStorageError(lastError ?? 'unknown'));
 }
 
 Widget _ngmyLogoImage(String? logoUrl, {double? width, double? height, BoxFit fit = BoxFit.cover}) {
@@ -1569,26 +1636,67 @@ class _NGMYAppState extends State<NGMYApp> {
   Future<void> _reloadMediaFromSupabase() async {
     final remote = await _fetchMediaPostsFromSupabase();
     if (!mounted) return;
-    setState(() {
-      final byId = <String, MediaPost>{};
-      for (final m in _allMedia) {
-        if (m.id.isNotEmpty) byId[m.id] = m;
+    final next = _mergeMediaWithRemote(_allMedia, remote);
+    setState(() => _allMedia = next);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
+    } catch (_) {}
+  }
+
+  Future<void> _pruneStaleMediaAgainstCloud() async {
+    final remote = await _fetchMediaPostsFromSupabase();
+    if (!mounted) return;
+    final next = _mergeMediaWithRemote(_allMedia, remote);
+    if (next.length != _allMedia.length || !_mediaListsSameIds(_allMedia, next)) {
+      setState(() => _allMedia = next);
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
+      } catch (_) {}
+    }
+  }
+
+  bool _mediaListsSameIds(List<MediaPost> a, List<MediaPost> b) {
+    if (a.length != b.length) return false;
+    final aIds = a.map((m) => m.id).toSet();
+    final bIds = b.map((m) => m.id).toSet();
+    return aIds.length == bIds.length && aIds.containsAll(bIds);
+  }
+
+  Future<void> _pruneDeletedMediaPost(MediaPost post) async {
+    if (post.id.isEmpty) return;
+    final exists = await _mediaPostExistsInSupabase(post.id);
+    if (exists) return;
+    if (!mounted) return;
+    setState(() => _allMedia.removeWhere((m) => m.id == post.id));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
+    } catch (_) {}
+  }
+
+  Future<void> _deleteMediaPostGlobally(MediaPost post) async {
+    final id = post.id;
+    if (id.isEmpty) return;
+    final deleted = await _deleteMediaRowFromSupabase(id);
+    if (!deleted) {
+      debugPrint('[media] database delete failed for $id');
+    }
+    final ref = _parseSupabaseStorageRef(post.videoUrl);
+    if (ref != null) {
+      try {
+        await supabase.storage.from(ref.bucket).remove([ref.path]);
+      } catch (e) {
+        debugPrint('[media] storage remove warning: $e');
       }
-      for (final m in remote) {
-        if (m.id.isEmpty) continue;
-        final existing = byId[m.id];
-        if (existing == null) {
-          byId[m.id] = m;
-          continue;
-        }
-        final remoteCloud = m.videoUrl.startsWith('supabase://') || m.videoUrl.startsWith('http');
-        final localCloud = existing.videoUrl.startsWith('supabase://') || existing.videoUrl.startsWith('http');
-        if (remoteCloud || !localCloud) {
-          byId[m.id] = m;
-        }
-      }
-      _allMedia = byId.values.toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    });
+    }
+    if (!mounted) return;
+    setState(() => _allMedia.removeWhere((m) => m.id == id));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
+    } catch (_) {}
   }
 
   Future<void> _syncStoreToSupabase() async {
@@ -1995,23 +2103,29 @@ class _NGMYAppState extends State<NGMYApp> {
   }
 
   void _onMediaChange(PostgresChangePayload payload) {
-    if (_isSyncing) return;
     try {
       if (payload.eventType == PostgresChangeEvent.delete) {
-        final id = (payload.oldRecord['id'] ?? '').toString();
+        final id = (payload.oldRecord['id'] ?? payload.newRecord['id'] ?? '').toString();
         if (id.isEmpty) return;
+        if (!mounted) return;
         setState(() => _allMedia.removeWhere((m) => m.id == id));
-      } else {
-        final post = MediaPost.fromJson(payload.newRecord);
-        setState(() {
-          final idx = _allMedia.indexWhere((m) => m.id == post.id);
-          if (idx == -1) {
-            _allMedia.add(post);
-          } else {
-            _allMedia[idx] = post;
-          }
-        });
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
+        }).catchError((_) {});
+        return;
       }
+      if (_isSyncing) return;
+      final post = MediaPost.fromJson(payload.newRecord);
+      if (!mounted) return;
+      setState(() {
+        final idx = _allMedia.indexWhere((m) => m.id == post.id);
+        if (idx == -1) {
+          _allMedia.insert(0, post);
+        } else {
+          _allMedia[idx] = post;
+        }
+        _allMedia.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      });
     } catch (e) {
       debugPrint('Media realtime apply error: $e');
     }
@@ -2143,18 +2257,7 @@ class _NGMYAppState extends State<NGMYApp> {
         final mediaData = await supabase.from('media').select();
         if (mediaData != null) {
           final remoteMedia = (mediaData as List).map((e) => MediaPost.fromJson(e)).toList();
-          if (remoteMedia.isEmpty && localMedia.isNotEmpty) {
-            _allMedia = localMedia;
-          } else {
-            final byId = <String, MediaPost>{};
-            for (final m in localMedia) {
-              if (m.id.isNotEmpty) byId[m.id] = m;
-            }
-            for (final m in remoteMedia) {
-              if (m.id.isNotEmpty) byId[m.id] = m;
-            }
-            _allMedia = byId.values.toList();
-          }
+          _allMedia = _mergeMediaWithRemote(localMedia, remoteMedia);
         }
 
         final annData = await supabase.from('announcements').select();
@@ -2325,13 +2428,8 @@ class _NGMYAppState extends State<NGMYApp> {
         );
       }
 
-      for (final post in _allMedia) {
-        final row = Map<String, dynamic>.from(post.toJson());
-        final mediaType = (row['contentType'] ?? row['type'] ?? 'video').toString();
-        row['type'] = mediaType;
-        row['contentType'] = mediaType;
-        await _upsertMediaRowSafe(row);
-      }
+      // Do not bulk-upsert media here — it resurrected deleted posts from stale cache.
+      await _pruneStaleMediaAgainstCloud();
 
       if (_allAnnouncements.isNotEmpty) {
         await _safeUpsertRows(
@@ -2605,6 +2703,8 @@ class _NGMYAppState extends State<NGMYApp> {
                 onAddPlan: (p) { setState(() { _globalPlans.add(p); _globalPlans.sort((a, b) => a.price.compareTo(b.price)); }); _saveData(); },
                 onPostMedia: (post) { setState(() => _allMedia.insert(0, post)); _saveData(); },
                 onRefreshMediaFromCloud: _reloadMediaFromSupabase,
+                onDeleteMedia: _deleteMediaPostGlobally,
+                onPruneMedia: _pruneDeletedMediaPost,
                 onAddAnnouncement: (ann) {
                   setState(() => _allAnnouncements.insert(0, ann));
                   _upsertAnnouncement(ann);
@@ -3034,10 +3134,12 @@ class MainScreen extends StatefulWidget {
   final Function(AppTransaction) onAddTransaction; final Function(AppTransaction, bool) onProcessTransaction; final Function(InvestmentPlan) onAddPlan;
   final Function(MediaPost) onPostMedia;
   final Future<void> Function()? onRefreshMediaFromCloud;
+  final Future<void> Function(MediaPost)? onDeleteMedia;
+  final Future<void> Function(MediaPost)? onPruneMedia;
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, required this.onAddAnnouncement, required this.onDeleteAnnouncement});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 class _MainScreenState extends State<MainScreen> {
@@ -3273,9 +3375,12 @@ class _MainScreenState extends State<MainScreen> {
         user: widget.user,
         allUsers: widget.allUsers,
         allMedia: widget.allMedia,
+        config: widget.config,
         onPost: widget.onPostMedia,
         onDataChanged: widget.onDataChanged,
         onRefreshFromCloud: widget.onRefreshMediaFromCloud,
+        onDeleteMedia: widget.onDeleteMedia,
+        onPruneMedia: widget.onPruneMedia,
       ),
       StatsScreen(user: widget.user, transactions: sorted),
       ProfileScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged, onAddTransaction: widget.onAddTransaction),
@@ -3344,7 +3449,10 @@ class _MainScreenState extends State<MainScreen> {
   }
   Widget _nav(int i, IconData icon) => GestureDetector(
     behavior: HitTestBehavior.opaque,
-    onTap: () => setState(() => _idx = i),
+    onTap: () {
+      setState(() => _idx = i);
+      if (i == 4) unawaited(widget.onRefreshMediaFromCloud?.call());
+    },
     child: SizedBox(
       width: 48,
       height: 48,
@@ -6001,7 +6109,64 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _adminMedia(bool isDark) => Center(child: Text('MEDIA MODERATION CONTENT', style: TextStyle(color: isDark ? Colors.white : Colors.black)));
+  Widget _adminMedia(bool isDark) {
+    final limitC = TextEditingController(text: widget.config.maxMediaPostsPerWeek.toString());
+    final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
+    final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Media Hub Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isDark ? Colors.white : Colors.black)),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(color: panelBg, borderRadius: BorderRadius.circular(20), border: Border.all(color: frameBorder)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('User Upload Limits', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 8),
+                Text(
+                  'Set the maximum number of media posts a user can create every 7 days.',
+                  style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: limitC,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                  decoration: _adminInputDecoration(label: 'Max posts per week', isDark: isDark),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    final val = int.tryParse(limitC.text.trim()) ?? 3;
+                    setState(() {
+                      widget.config.maxMediaPostsPerWeek = val;
+                    });
+                    widget.onDataChanged();
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Media limit updated.')));
+                  },
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
+                    backgroundColor: const Color(0xFF7C3AED),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('SAVE MEDIA SETTINGS'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
+          const Center(child: Text('MEDIA MODERATION CONTENT', style: TextStyle(color: Colors.grey))),
+        ],
+      ),
+    );
+  }
 
   Widget _adminLegal(bool isDark) {
     final tCtrl = TextEditingController(text: widget.config.termsAndConditions);
@@ -17729,18 +17894,24 @@ class MediaHubScreen extends StatefulWidget {
   final UserData user;
   final List<UserData> allUsers;
   final List<MediaPost> allMedia;
+  final AppConfig config;
   final Function(MediaPost) onPost;
   final VoidCallback onDataChanged;
   final Future<void> Function()? onRefreshFromCloud;
+  final Future<void> Function(MediaPost)? onDeleteMedia;
+  final Future<void> Function(MediaPost)? onPruneMedia;
 
   const MediaHubScreen({
     super.key,
     required this.user,
     required this.allUsers,
     required this.allMedia,
+    required this.config,
     required this.onPost,
     required this.onDataChanged,
     this.onRefreshFromCloud,
+    this.onDeleteMedia,
+    this.onPruneMedia,
   });
 
   @override
@@ -17750,14 +17921,19 @@ class MediaHubScreen extends StatefulWidget {
 class _MediaHubScreenState extends State<MediaHubScreen> {
   final _captionController = TextEditingController();
   bool _isPosting = false;
-  final int _maxPostsPerWeek = 3;
   OverlayEntry? _noticeEntry;
+  Timer? _mediaSyncTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _cleanupExpiredPosts();
+      await widget.onRefreshFromCloud?.call();
+      if (mounted) setState(() {});
+    });
+    _mediaSyncTimer = Timer.periodic(const Duration(seconds: 12), (_) async {
+      if (!mounted) return;
       await widget.onRefreshFromCloud?.call();
       if (mounted) setState(() {});
     });
@@ -17786,12 +17962,17 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   }
 
   Future<void> _deletePost(MediaPost post, {bool triggerSave = true}) async {
-    setState(() => widget.allMedia.removeWhere((m) => m.id == post.id));
+    if (widget.onDeleteMedia != null) {
+      await widget.onDeleteMedia!(post);
+      if (mounted) setState(() {});
+      return;
+    }
+    await _deleteMediaRowFromSupabase(post.id);
     await _deletePostFromStorage(post);
-    try {
-      await Supabase.instance.client.from('media').delete().eq('id', post.id);
-    } catch (e) {
-      debugPrint('Media delete warning: $e');
+    if (mounted) {
+      setState(() => widget.allMedia.removeWhere((m) => m.id == post.id));
+    } else {
+      widget.allMedia.removeWhere((m) => m.id == post.id);
     }
     if (triggerSave) widget.onDataChanged();
   }
@@ -17815,56 +17996,46 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
 
   void _showGlassNotice(String title, String body, {bool isError = false}) {
     if (!mounted) return;
-    _noticeEntry?.remove();
-    final overlay = Overlay.of(context, rootOverlay: true);
-    final accent = isError ? const Color(0xFFEF4444) : const Color(0xFF22D3EE);
-    _noticeEntry = OverlayEntry(
-      builder: (_) => IgnorePointer(
-        child: SafeArea(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0B1020).withOpacity(0.92),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: accent.withOpacity(0.55)),
-                boxShadow: [BoxShadow(color: accent.withOpacity(0.28), blurRadius: 16, offset: const Offset(0, 6))],
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isError ? const Color(0xFFEF4444) : const Color(0xFF7C3AED),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: Row(
+            children: [
+              Icon(isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text(body, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  ],
+                ),
               ),
-              child: Row(
-                children: [
-                  Icon(isError ? Icons.error_outline_rounded : Icons.notifications_active_rounded, color: accent),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 2),
-                        Text(body, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            ],
           ),
         ),
       ),
     );
-    overlay.insert(_noticeEntry!);
-    Future.delayed(const Duration(seconds: 4), () {
-      _noticeEntry?.remove();
-      _noticeEntry = null;
-    });
   }
 
   Future<void> _pickAndPost({required bool isVideo}) async {
     if (_isPosting) return;
-    if (_weeklyPostsForCurrentUser() >= _maxPostsPerWeek) {
+    final limit = widget.config.maxMediaPostsPerWeek;
+    if (_weeklyPostsForCurrentUser() >= limit) {
       if (mounted) {
-        _showGlassNotice('Upload limit reached', 'You can upload only 3 posts per 7 days.', isError: true);
+        _showGlassNotice('Limit Reached', 'You can only upload $limit posts every 7 days.', isError: true);
       }
       return;
     }
@@ -17884,31 +18055,36 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       } else if (media.path.contains('.')) {
         ext = media.path.split('.').last.toLowerCase();
       }
+      
       final bytes = await media.readAsBytes();
-      final maxBytes = isVideo ? 45 * 1024 * 1024 : 8 * 1024 * 1024;
+      final maxBytes = isVideo ? 60 * 1024 * 1024 : 10 * 1024 * 1024;
       if (bytes.length > maxBytes) {
         if (mounted) {
           _showGlassNotice(
             'File too large',
-            isVideo ? 'Video must be under 45 MB.' : 'Photo must be under 8 MB.',
+            isVideo ? 'Video/Audio must be under 60 MB.' : 'Photo must be under 10 MB.',
             isError: true,
           );
         }
+        setState(() => _isPosting = false);
         return;
       }
 
       final fileName = '${DateTime.now().microsecondsSinceEpoch}_${widget.user.email.hashCode.abs()}.$ext';
       final storagePath = 'uploads/$fileName';
       final contentType = isVideo ? _mimeForVideoExt(ext) : _mimeForImageExt(ext);
+      
       final upload = await _uploadNgmyMediaBytes(
-        bytes: Uint8List.fromList(bytes),
+        bytes: bytes, // No Uint8List.fromList here
         storagePath: storagePath,
         contentType: contentType,
       );
+      
       if (upload.ref == null) {
         if (mounted) {
           _showGlassNotice('Upload failed', upload.error ?? 'Could not upload to cloud.', isError: true);
         }
+        setState(() => _isPosting = false);
         return;
       }
       final mediaUrl = upload.ref!;
@@ -17928,11 +18104,11 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
         if (mounted) {
           _showGlassNotice(
             'Sync failed',
-            'Media uploaded but database row failed. Run supabase/media_tables.sql in Supabase.',
+            'Post created but DB sync failed. Check Supabase → SQL Editor → media_tables.sql.',
             isError: true,
           );
         }
-        return;
+        // Even if DB fails, we already have the storage ref, so we add it locally
       }
 
       widget.onPost(post);
@@ -17941,8 +18117,8 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
 
       if (mounted) {
         _showGlassNotice(
-          'Post uploaded',
-          '${isVideo ? 'Video' : 'Photo'} is live for all users.',
+          'Post live!',
+          '${isVideo ? 'Video' : 'Photo'} shared successfully.',
         );
         setState(() {});
       }
@@ -17950,7 +18126,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     } catch (e, st) {
       debugPrint('Media post error: $e\n$st');
       if (mounted) {
-        _showGlassNotice('Post failed', 'Something went wrong while posting. Please try again.', isError: true);
+        _showGlassNotice('Post failed', 'Something went wrong. Try a smaller file or check your internet.', isError: true);
       }
     } finally {
       if (mounted) setState(() => _isPosting = false);
@@ -18067,9 +18243,17 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
 
   @override
   void dispose() {
+    _mediaSyncTimer?.cancel();
     _noticeEntry?.remove();
     _captionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _prunePostIfDeletedFromCloud(MediaPost post) async {
+    if (widget.onPruneMedia != null) {
+      await widget.onPruneMedia!(post);
+      if (mounted) setState(() {});
+    }
   }
 
   @override
@@ -18085,6 +18269,16 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Refresh Feed',
+            onPressed: () async {
+              await widget.onRefreshFromCloud?.call();
+              if (mounted) setState(() {});
+            },
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -18161,11 +18355,13 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 150),
                     itemCount: mediaFeed.length,
                     itemBuilder: (context, index) => VideoPostWidget(
+                      key: ValueKey(mediaFeed[index].id),
                       post: mediaFeed[index],
                       currentUser: widget.user,
                       allUsers: widget.allUsers,
                       onChanged: widget.onDataChanged,
                       onDelete: () => _deletePost(mediaFeed[index]),
+                      onPruneIfDeleted: _prunePostIfDeletedFromCloud,
                     ),
                   ),
           ),
@@ -18181,6 +18377,7 @@ class VideoPostWidget extends StatefulWidget {
   final List<UserData> allUsers;
   final VoidCallback onChanged;
   final VoidCallback onDelete;
+  final Future<void> Function(MediaPost post)? onPruneIfDeleted;
   const VideoPostWidget({
     super.key,
     required this.post,
@@ -18188,6 +18385,7 @@ class VideoPostWidget extends StatefulWidget {
     required this.allUsers,
     required this.onChanged,
     required this.onDelete,
+    this.onPruneIfDeleted,
   });
 
   @override
@@ -18203,24 +18401,44 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   ImageProvider? _authorImage;
   bool _loadingMedia = false;
   bool _videoLoadRequested = false;
+  bool _pruneCheckScheduled = false;
 
   bool get _isImagePost => _mediaPostIsImage(widget.post);
 
+  bool get _isCloudMedia => _mediaUrlIsCloudSynced(widget.post.videoUrl);
+
+  void _schedulePruneIfDeleted() {
+    if (!_isCloudMedia || _pruneCheckScheduled || widget.onPruneIfDeleted == null) return;
+    _pruneCheckScheduled = true;
+    if (mounted) setState(() {});
+    Future.microtask(() async {
+      if (!mounted) return;
+      await widget.onPruneIfDeleted!(widget.post);
+    });
+  }
+
   Future<void> _initializePlayer(String resolvedUrl) async {
     if (_controller != null) {
-      await _controller!.dispose();
+      try {
+        await _controller!.dispose();
+      } catch (_) {}
       _controller = null;
     }
     try {
       if (resolvedUrl.startsWith('http')) {
-        _controller = VideoPlayerController.networkUrl(Uri.parse(resolvedUrl));
+        _controller = VideoPlayerController.networkUrl(
+          Uri.parse(resolvedUrl),
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        );
       } else if (!kIsWeb) {
-        _controller = VideoPlayerController.file(File(resolvedUrl));
+        final file = File(resolvedUrl);
+        if (!await file.exists()) throw Exception('File not found at $resolvedUrl');
+        _controller = VideoPlayerController.file(file);
       } else {
-        throw Exception('Invalid media path for web.');
+        throw Exception('Invalid path for web.');
       }
 
-      await _controller!.initialize().timeout(const Duration(seconds: 15));
+      await _controller!.initialize().timeout(const Duration(seconds: 20));
       if (!mounted) return;
       _controller!.setLooping(true);
       setState(() {
@@ -18229,37 +18447,52 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
         _loadingMedia = false;
       });
     } catch (e) {
-      debugPrint('Media init error: $e');
+      debugPrint('Media init error ($resolvedUrl): $e');
       if (!mounted) return;
       setState(() {
         _hasError = true;
         _loadingMedia = false;
-        _errorText = 'Unable to load this media.';
+        _errorText = 'Media loading failed. Check your internet.';
       });
+      _schedulePruneIfDeleted();
     }
   }
 
   Future<void> _prepareMedia({bool loadVideo = false}) async {
     if (!mounted) return;
     if (!_isImagePost && !loadVideo) return;
+    
     setState(() {
       _loadingMedia = true;
       _hasError = false;
     });
 
-    final avatar = await _profileImageProviderForEmail(widget.post.userEmail);
-    if (!mounted) return;
-    setState(() => _authorImage = avatar);
+    try {
+      final avatar = await _profileImageProviderForEmail(widget.post.userEmail);
+      if (mounted) setState(() => _authorImage = avatar);
 
-    final resolved = await _resolveSupabaseStorageUrl(widget.post.videoUrl);
-    if (!mounted) return;
-    _resolvedMediaUrl = resolved;
+      // 1. Try to resolve URL from storage
+      final resolved = await _resolveSupabaseStorageUrlResilient(widget.post.videoUrl);
+      if (!mounted) return;
+      _resolvedMediaUrl = resolved;
 
-    if (_isImagePost) {
-      setState(() => _loadingMedia = false);
-      return;
+      if (_isImagePost) {
+        setState(() => _loadingMedia = false);
+        return;
+      }
+      
+      // 2. Initialize video player
+      await _initializePlayer(resolved);
+    } catch (e) {
+      debugPrint('Media preparation failed: $e');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _loadingMedia = false;
+        });
+        _schedulePruneIfDeleted();
+      }
     }
-    await _initializePlayer(resolved);
   }
 
   Future<void> _requestVideoLoad() async {
@@ -18297,6 +18530,13 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   bool get _isOwner => widget.currentUser.email.toLowerCase().trim() == widget.post.userEmail.toLowerCase().trim();
 
   Future<void> _persistPostChange() async {
+    if (_isCloudMedia) {
+      final exists = await _mediaPostExistsInSupabase(widget.post.id);
+      if (!exists) {
+        await widget.onPruneIfDeleted?.call(widget.post);
+        return;
+      }
+    }
     await _upsertMediaRowSafe(Map<String, dynamic>.from(widget.post.toJson()));
     widget.onChanged();
   }
@@ -18458,6 +18698,10 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (_pruneCheckScheduled && _isCloudMedia) {
+      return const SizedBox.shrink();
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final isImage = _isImagePost;
@@ -18546,26 +18790,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                           ? const Center(child: CircularProgressIndicator())
                           : isVideo
                           ? (_hasError
-                              ? Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.error_outline_rounded, color: Colors.white38, size: 40),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        _errorText,
-                                        style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      TextButton.icon(
-                                        onPressed: () => _prepareMedia(loadVideo: true),
-                                        icon: const Icon(Icons.refresh_rounded, size: 18),
-                                        label: const Text('Retry'),
-                                        style: TextButton.styleFrom(foregroundColor: Colors.white),
-                                      ),
-                                    ],
-                                  ),
-                                )
+                              ? const SizedBox.shrink()
                               : (_isInitialized && _controller != null)
                                   ? VideoPlayer(_controller!)
                                   : Center(
@@ -18583,7 +18808,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                                 try {
                                   return Image.memory(base64Decode(resolved.split(',').last), fit: BoxFit.cover, width: double.infinity);
                                 } catch (_) {
-                                  return const Center(child: Text('Unable to load image.', style: TextStyle(color: Colors.white70)));
+                                  _schedulePruneIfDeleted();
+                                  return const SizedBox.shrink();
                                 }
                               }
                               if (resolved.startsWith('http')) {
@@ -18592,17 +18818,10 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                                   fit: BoxFit.cover,
                                   width: double.infinity,
                                   gaplessPlayback: true,
-                                  errorBuilder: (_, __, ___) => Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.broken_image_outlined, color: Colors.white38, size: 40),
-                                        const SizedBox(height: 8),
-                                        const Text('Unable to load image.', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                                        TextButton(onPressed: () => _prepareMedia(loadVideo: false), child: const Text('Retry', style: TextStyle(color: Colors.white))),
-                                      ],
-                                    ),
-                                  ),
+                                  errorBuilder: (_, __, ___) {
+                                    _schedulePruneIfDeleted();
+                                    return const SizedBox.shrink();
+                                  },
                                 );
                               }
                               if (!kIsWeb) {
@@ -18610,20 +18829,14 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                                   File(resolved),
                                   fit: BoxFit.cover,
                                   width: double.infinity,
-                                  errorBuilder: (_, __, ___) => Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.broken_image_outlined, color: Colors.white38, size: 40),
-                                        const SizedBox(height: 8),
-                                        const Text('Local image missing.', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                                        TextButton(onPressed: () => _prepareMedia(loadVideo: false), child: const Text('Retry', style: TextStyle(color: Colors.white))),
-                                      ],
-                                    ),
-                                  ),
+                                  errorBuilder: (_, __, ___) {
+                                    _schedulePruneIfDeleted();
+                                    return const SizedBox.shrink();
+                                  },
                                 );
                               }
-                              return const Center(child: Text('Unable to load image.', style: TextStyle(color: Colors.white70)));
+                              _schedulePruneIfDeleted();
+                              return const SizedBox.shrink();
                             }),
                     ),
                   ),
