@@ -10943,6 +10943,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   bool _triFast = false;
   bool _triCheap = true;
   bool _triGood = true;
+  int _triDropCursor = 0;
   double _discount = 0;
   String _invoiceTemplate = 'Modern';
   bool _invoicePaid = false;
@@ -11206,31 +11207,55 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
   double _num(String raw) => double.tryParse(raw.trim()) ?? 0;
 
+  void _triangleSetOn(String key, bool on) {
+    switch (key) {
+      case 'fast':
+        _triFast = on;
+      case 'cheap':
+        _triCheap = on;
+      case 'good':
+        _triGood = on;
+    }
+  }
+
+  /// When a 3rd toggle turns on, drop one of the other two using fair rotation (fast → cheap → good → …).
+  String _nextTriangleDrop(Set<String> candidates) {
+    const order = ['fast', 'cheap', 'good'];
+    for (var i = 0; i < order.length; i++) {
+      final idx = (_triDropCursor + i) % order.length;
+      final k = order[idx];
+      if (candidates.contains(k)) {
+        _triDropCursor = (idx + 1) % order.length;
+        return k;
+      }
+    }
+    return candidates.first;
+  }
+
   void _setTriangleOption(String key, bool value) {
     if (!value) {
-      setState(() {
-        if (key == 'fast') _triFast = false;
-        if (key == 'cheap') _triCheap = false;
-        if (key == 'good') _triGood = false;
-      });
+      setState(() => _triangleSetOn(key, false));
       return;
     }
 
-    final selected = <String>[
-      if (_triFast) 'fast',
-      if (_triCheap) 'cheap',
-      if (_triGood) 'good',
-    ];
-    if (selected.length >= 2) {
-      final toDrop = selected.first;
-      if (toDrop == 'fast') _triFast = false;
-      if (toDrop == 'cheap') _triCheap = false;
-      if (toDrop == 'good') _triGood = false;
-    }
     setState(() {
-      if (key == 'fast') _triFast = true;
-      if (key == 'cheap') _triCheap = true;
-      if (key == 'good') _triGood = true;
+      final onKeys = <String>{
+        if (_triFast) 'fast',
+        if (_triCheap) 'cheap',
+        if (_triGood) 'good',
+      };
+
+      if (onKeys.length >= 2 && !onKeys.contains(key)) {
+        final dropCandidates = onKeys.difference({key});
+        if (dropCandidates.isNotEmpty) {
+          final toDrop = dropCandidates.length == 1
+              ? dropCandidates.first
+              : _nextTriangleDrop(dropCandidates);
+          _triangleSetOn(toDrop, false);
+        }
+      }
+
+      _triangleSetOn(key, true);
     });
   }
 
@@ -11618,7 +11643,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.45)),
                       ),
-                      child: Text(_triangleResult(), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 11, height: 1.35)),
+                      child: Text(_triangleResult(), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 11, height: 1.35)),
                     ),
                     const SizedBox(height: 10),
                     Container(
@@ -11732,7 +11757,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                                 border: Border.all(color: const Color(0xFF10B981)),
                               ),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   Text(
                                     service.isNotEmpty && city.isNotEmpty
@@ -11742,22 +11767,33 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                                             : city.isNotEmpty
                                                 ? city
                                                 : 'Your quote',
+                                    textAlign: TextAlign.center,
                                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
                                   ),
                                   if (others > 0) ...[
                                     const SizedBox(height: 6),
-                                    Text('Market rate: \$${others.toStringAsFixed(2)}', style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 12)),
+                                    Text(
+                                      'Market rate: \$${others.toStringAsFixed(2)}',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 12),
+                                    ),
                                   ],
                                   if (mine > 0) ...[
                                     const SizedBox(height: 10),
-                                    Text('YOUR PRICE', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                                    Text(
+                                      'YOUR PRICE',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1),
+                                    ),
                                     Text(
                                       '\$${netMine.toStringAsFixed(2)}',
+                                      textAlign: TextAlign.center,
                                       style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 32, height: 1.05),
                                     ),
                                     if (discountAmt > 0.009) ...[
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 6),
                                       Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           Text(
                                             '\$${mine.toStringAsFixed(2)}',
@@ -11781,12 +11817,14 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                                     const SizedBox(height: 8),
                                     Text(
                                       '✓ \$${belowMarket.toStringAsFixed(2)} below market rate!',
+                                      textAlign: TextAlign.center,
                                       style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w700, fontSize: 12),
                                     ),
                                   ] else if (others > 0 && mine > 0 && belowMarket < -0.009) ...[
                                     const SizedBox(height: 8),
                                     Text(
                                       'Above market by \$${(-belowMarket).toStringAsFixed(2)}',
+                                      textAlign: TextAlign.center,
                                       style: const TextStyle(color: Color(0xFFF97316), fontWeight: FontWeight.w700, fontSize: 12),
                                     ),
                                   ],
