@@ -6,6 +6,8 @@ import 'package:geolocator_android/geolocator_android.dart';
 import 'package:geolocator_web/web_settings.dart';
 import 'package:http/http.dart' as http;
 
+import 'ngmy_geolocation_stub.dart' if (dart.library.html) 'ngmy_geolocation_web.dart';
+
 /// Device GPS reading with coordinates and a human-readable label.
 class NgmyGpsReading {
   final double lat;
@@ -15,43 +17,104 @@ class NgmyGpsReading {
   const NgmyGpsReading({required this.lat, required this.lng, required this.label});
 }
 
+enum NgmyGpsFailure {
+  permissionDenied,
+  serviceDisabled,
+  timeout,
+  unavailable,
+}
+
 String ngmyFormatCoords(double lat, double lng) =>
     'Live GPS · ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
 
-LocationSettings _freshLocationSettings() {
+String ngmyGpsFailureMessage(NgmyGpsFailure failure) {
+  switch (failure) {
+    case NgmyGpsFailure.permissionDenied:
+      return 'Location blocked. In your browser tap the lock icon → Site settings → Allow Location, then try again.';
+    case NgmyGpsFailure.serviceDisabled:
+      return 'Turn on Location Services / GPS on your phone, then try again.';
+    case NgmyGpsFailure.timeout:
+      return 'GPS timed out. Move near a window or outdoors and tap Share location again.';
+    case NgmyGpsFailure.unavailable:
+      return 'Could not read GPS. Use Chrome/Safari over HTTPS and allow location when prompted.';
+  }
+}
+
+LocationSettings _freshLocationSettings({bool highAccuracy = true}) {
   if (kIsWeb) {
     return WebSettings(
-      accuracy: LocationAccuracy.best,
+      accuracy: highAccuracy ? LocationAccuracy.best : LocationAccuracy.medium,
       maximumAge: Duration.zero,
-      timeLimit: const Duration(seconds: 25),
+      timeLimit: const Duration(seconds: 30),
     );
   }
   if (defaultTargetPlatform == TargetPlatform.android) {
     return AndroidSettings(
-      accuracy: LocationAccuracy.best,
+      accuracy: highAccuracy ? LocationAccuracy.best : LocationAccuracy.medium,
       forceLocationManager: true,
       intervalDuration: const Duration(seconds: 1),
-      timeLimit: const Duration(seconds: 25),
+      timeLimit: const Duration(seconds: 30),
     );
   }
-  return const LocationSettings(
-    accuracy: LocationAccuracy.best,
-    timeLimit: Duration(seconds: 25),
+  return LocationSettings(
+    accuracy: highAccuracy ? LocationAccuracy.best : LocationAccuracy.medium,
+    timeLimit: const Duration(seconds: 30),
   );
 }
 
-Future<bool> ngmyEnsureLocationPermission() async {
-  try {
-    if (!await Geolocator.isLocationServiceEnabled()) return false;
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    return permission == LocationPermission.always || permission == LocationPermission.whileInUse;
-  } catch (e) {
-    debugPrint('[ngmy_store_location] permission error: $e');
-    return false;
+Future<LocationPermission> _requestLocationPermission() async {
+  var permission = await Geolocator.checkPermission();
+  if (permission == LocationPermission.denied) {
+    permission = await Geolocator.requestPermission();
   }
+  return permission;
+}
+
+Future<Position?> _readPositionViaGeolocator({bool highAccuracy = true}) async {
+  try {
+    return await Geolocator.getCurrentPosition(
+      locationSettings: _freshLocationSettings(highAccuracy: highAccuracy),
+    );
+  } catch (e) {
+    debugPrint('[ngmy_store_location] geolocator read: $e');
+    return null;
+  }
+}
+
+Future<({double lat, double lng})?> _readCoordsWithFallback() async {
+  if (kIsWeb) {
+    final web = await ngmyPlatformGeolocationFallback();
+    if (web != null) return web;
+  }
+
+  final permission = await _requestLocationPermission();
+  if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+    return null;
+  }
+
+  if (!kIsWeb) {
+    final enabled = await Geolocator.isLocationServiceEnabled();
+    if (!enabled) return null;
+  }
+
+  var pos = await _readPositionViaGeolocator(highAccuracy: true);
+  pos ??= await _readPositionViaGeolocator(highAccuracy: false);
+
+  if (pos != null) {
+    return (lat: pos.latitude, lng: pos.longitude);
+  }
+
+  if (kIsWeb) {
+    final web = await ngmyPlatformGeolocationFallback();
+    if (web != null) return web;
+  }
+
+  try {
+    final last = await Geolocator.getLastKnownPosition();
+    if (last != null) return (lat: last.latitude, lng: last.longitude);
+  } catch (_) {}
+
+  return null;
 }
 
 Future<String?> _reverseGeocodeAddress(double lat, double lng) async {
@@ -86,25 +149,52 @@ Future<String?> _reverseGeocodeAddress(double lat, double lng) async {
   return null;
 }
 
-/// Reads fresh GPS from the device (never uses stale cached web positions).
-Future<NgmyGpsReading?> ngmyFetchCurrentGpsReading() async {
+Future<({NgmyGpsReading? reading, NgmyGpsFailure? failure})> ngmyFetchCurrentGpsDetailed() async {
   try {
-    if (!await ngmyEnsureLocationPermission()) return null;
+    if (!kIsWeb) {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        final requested = await Geolocator.requestPermission();
+        if (requested == LocationPermission.denied || requested == LocationPermission.deniedForever) {
+          return (reading: null, failure: NgmyGpsFailure.permissionDenied);
+        }
+      } else if (permission == LocationPermission.deniedForever) {
+        return (reading: null, failure: NgmyGpsFailure.permissionDenied);
+      }
 
-    final pos = await Geolocator.getCurrentPosition(
-      locationSettings: _freshLocationSettings(),
-    );
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        return (reading: null, failure: NgmyGpsFailure.serviceDisabled);
+      }
+    }
 
-    final address = await _reverseGeocodeAddress(pos.latitude, pos.longitude);
+    final coords = await _readCoordsWithFallback();
+    if (coords == null) {
+      return (reading: null, failure: NgmyGpsFailure.unavailable);
+    }
+
+    final address = await _reverseGeocodeAddress(coords.lat, coords.lng);
     final label = address != null && address.isNotEmpty
         ? address
-        : ngmyFormatCoords(pos.latitude, pos.longitude);
+        : ngmyFormatCoords(coords.lat, coords.lng);
 
-    return NgmyGpsReading(lat: pos.latitude, lng: pos.longitude, label: label);
+    return (
+      reading: NgmyGpsReading(lat: coords.lat, lng: coords.lng, label: label),
+      failure: null,
+    );
   } catch (e) {
-    debugPrint('[ngmy_store_location] $e');
-    return null;
+    debugPrint('[ngmy_store_location] detailed fetch: $e');
+    final msg = e.toString().toLowerCase();
+    if (msg.contains('timeout')) {
+      return (reading: null, failure: NgmyGpsFailure.timeout);
+    }
+    return (reading: null, failure: NgmyGpsFailure.unavailable);
   }
+}
+
+/// Reads fresh GPS from the device (never uses stale cached web positions).
+Future<NgmyGpsReading?> ngmyFetchCurrentGpsReading() async {
+  final result = await ngmyFetchCurrentGpsDetailed();
+  return result.reading;
 }
 
 /// Returns a human-readable location string from device GPS (web + mobile).

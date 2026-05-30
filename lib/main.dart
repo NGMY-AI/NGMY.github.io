@@ -503,6 +503,7 @@ class MediaPost {
   List<String> likedBy;
   List<String> savedBy;
   List<Map<String, dynamic>> comments;
+  double? mediaAspectRatio;
 
   MediaPost({
     required this.id,
@@ -516,6 +517,7 @@ class MediaPost {
     this.likedBy = const [],
     this.savedBy = const [],
     this.comments = const [],
+    this.mediaAspectRatio,
   });
 
   Map<String, dynamic> toJson() => {
@@ -532,6 +534,7 @@ class MediaPost {
     'likedBy': likedBy,
     'savedBy': savedBy,
     'comments': comments,
+    if (mediaAspectRatio != null) 'mediaAspectRatio': mediaAspectRatio,
   };
 
   factory MediaPost.fromJson(Map<String, dynamic> json) {
@@ -552,7 +555,30 @@ class MediaPost {
       savedBy: savedBy,
       comments: comments,
       likes: likedBy.isNotEmpty ? likedBy.length : (json['likes'] ?? 0),
+      mediaAspectRatio: (json['mediaAspectRatio'] as num?)?.toDouble(),
     );
+  }
+}
+
+double _clampMediaAspectRatio(double ratio) => ratio.clamp(0.45, 2.35);
+
+double _mediaFrameHeightForWidth(double width, double aspectRatio, double maxScreenFraction) {
+  final safeRatio = _clampMediaAspectRatio(aspectRatio);
+  final maxH = width / safeRatio;
+  return maxH;
+}
+
+Future<double?> _aspectRatioFromImageBytes(Uint8List bytes) async {
+  try {
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final w = frame.image.width;
+    final h = frame.image.height;
+    if (w <= 0 || h <= 0) return null;
+    return _clampMediaAspectRatio(w / h);
+  } catch (e) {
+    debugPrint('[media] aspect ratio decode: $e');
+    return null;
   }
 }
 
@@ -1549,7 +1575,7 @@ String _friendlyStorageError(Object error) {
     return 'Anonymous uploads are disabled. Enable Anonymous sign-in in Supabase → Auth → Providers.';
   }
   if (msg.contains('payload too large') || msg.contains('413')) {
-    return 'File is too large. Try a shorter video (under 60MB) or a smaller photo.';
+    return 'File is too large for cloud storage. Try a shorter clip or lower resolution.';
   }
   if (msg.contains('connection') || msg.contains('timeout')) {
     return 'Upload timed out. Check your internet connection and try again.';
@@ -1575,7 +1601,7 @@ Future<({String? ref, String? error})> _uploadNgmyMediaBytes({
             upsert: true,
             contentType: contentType,
           ),
-        ).timeout(const Duration(seconds: 45));
+        ).timeout(Duration(seconds: bytes.length > 80 * 1024 * 1024 ? 300 : (bytes.length > 30 * 1024 * 1024 ? 120 : 45)));
         return (ref: 'supabase://media/$storagePath', error: null);
       } catch (e) {
         lastError = e;
@@ -16426,17 +16452,15 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   Future<void> _applyGpsToOrder(String orderId, {bool fromAuto = false}) async {
-    final reading = await ngmyFetchCurrentGpsReading();
+    final result = await ngmyFetchCurrentGpsDetailed();
     if (!mounted) return;
+    final reading = result.reading;
     if (reading == null) {
       if (!fromAuto) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Could not get GPS. Tap Allow when your browser/phone asks for location, then try again.',
-            ),
-          ),
-        );
+        final msg = result.failure != null
+            ? ngmyGpsFailureMessage(result.failure!)
+            : 'Could not get GPS. Allow location when your phone/browser asks.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }
       return;
     }
@@ -18114,17 +18138,15 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         ? null
                         : () async {
                             setDlg(() => gpsLoading = true);
-                            final reading = await ngmyFetchCurrentGpsReading();
+                            final result = await ngmyFetchCurrentGpsDetailed();
                             if (!ctx.mounted) return;
                             setDlg(() => gpsLoading = false);
+                            final reading = result.reading;
                             if (reading == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'GPS failed. Allow location when prompted, enable Location Services, then tap again.',
-                                  ),
-                                ),
-                              );
+                              final msg = result.failure != null
+                                  ? ngmyGpsFailureMessage(result.failure!)
+                                  : 'Could not get GPS. Allow location when prompted.';
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
                               return;
                             }
                             c.text = reading.label;
@@ -22713,9 +22735,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
           ? await picker.pickVideo(source: ImageSource.gallery)
           : await picker.pickImage(
               source: ImageSource.gallery,
-              imageQuality: 72,
-              maxWidth: 1080,
-              maxHeight: 1080,
+              imageQuality: 85,
             );
     } catch (e) {
       debugPrint('[media] picker error: $e');
@@ -22738,8 +22758,8 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       }
 
       final maxBytes = isVideo
-          ? (kIsWeb ? 20 * 1024 * 1024 : 45 * 1024 * 1024)
-          : (kIsWeb ? 6 * 1024 * 1024 : 8 * 1024 * 1024);
+          ? (kIsWeb ? 120 * 1024 * 1024 : 280 * 1024 * 1024)
+          : (kIsWeb ? 12 * 1024 * 1024 : 16 * 1024 * 1024);
 
       Uint8List bytes;
       try {
@@ -22757,12 +22777,17 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
           _showGlassNotice(
             'File too large',
             isVideo
-                ? (kIsWeb ? 'Video must be under 20 MB on web.' : 'Video must be under 45 MB.')
-                : (kIsWeb ? 'Photo must be under 6 MB on web.' : 'Photo must be under 8 MB.'),
+                ? (kIsWeb ? 'Video must be under 120 MB on web (about 5+ min).' : 'Video must be under 280 MB.')
+                : (kIsWeb ? 'Photo must be under 12 MB on web.' : 'Photo must be under 16 MB.'),
             isError: true,
           );
         }
         return;
+      }
+
+      double? aspectRatio;
+      if (!isVideo) {
+        aspectRatio = await _aspectRatioFromImageBytes(bytes);
       }
 
       final fileName = '${DateTime.now().microsecondsSinceEpoch}_${widget.user.email.hashCode.abs()}.$ext';
@@ -22790,6 +22815,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
         contentType: isVideo ? 'video' : 'image',
         caption: _captionController.text.trim(),
         timestamp: DateTime.now(),
+        mediaAspectRatio: aspectRatio,
       );
 
       final saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
@@ -23154,7 +23180,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   String? _resolvedMediaUrl;
   ImageProvider? _authorImage;
   bool _loadingMedia = false;
-  bool _videoLoadRequested = false;
 
   bool get _isImagePost => _mediaPostIsImage(widget.post);
 
@@ -23179,9 +23204,15 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
         throw Exception('Invalid path for web.');
       }
 
-      await _controller!.initialize().timeout(const Duration(seconds: 20));
+      await _controller!.initialize().timeout(const Duration(seconds: 30));
       if (!mounted) return;
       _controller!.setLooping(true);
+      await _controller!.pause();
+      final ar = _controller!.value.aspectRatio;
+      if (ar > 0) {
+        widget.post.mediaAspectRatio = _clampMediaAspectRatio(ar);
+        unawaited(_upsertMediaRowSafe(Map<String, dynamic>.from(widget.post.toJson())));
+      }
       setState(() {
         _isInitialized = true;
         _hasError = false;
@@ -23201,7 +23232,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   Future<void> _prepareMedia({bool loadVideo = false}) async {
     if (!mounted) return;
     if (!_isImagePost && !loadVideo) return;
-    
+
     setState(() {
       _loadingMedia = true;
       _hasError = false;
@@ -23234,10 +23265,123 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
     }
   }
 
-  Future<void> _requestVideoLoad() async {
-    if (_videoLoadRequested && (_isInitialized || _hasError)) return;
-    _videoLoadRequested = true;
-    await _prepareMedia(loadVideo: true);
+  double _effectiveAspectRatio(bool isVideo) {
+    if (widget.post.mediaAspectRatio != null && widget.post.mediaAspectRatio! > 0) {
+      return _clampMediaAspectRatio(widget.post.mediaAspectRatio!);
+    }
+    if (isVideo && _isInitialized && _controller != null && _controller!.value.aspectRatio > 0) {
+      return _clampMediaAspectRatio(_controller!.value.aspectRatio);
+    }
+    return 1.0;
+  }
+
+  Widget _buildMediaFrame(bool isVideo, bool isImage) {
+    final ratio = _effectiveAspectRatio(isVideo);
+    final maxH = MediaQuery.of(context).size.height * 0.68;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final naturalH = w / ratio;
+        final h = naturalH > maxH ? maxH : naturalH;
+        return SizedBox(
+          width: w,
+          height: h.clamp(72.0, maxH),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  color: Colors.black,
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: _loadingMedia
+                      ? const Center(child: CircularProgressIndicator())
+                      : isVideo
+                      ? (_hasError
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Text(_errorText, style: const TextStyle(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center),
+                              ),
+                            )
+                          : (_isInitialized && _controller != null)
+                              ? FittedBox(
+                                  fit: BoxFit.contain,
+                                  child: SizedBox(
+                                    width: _controller!.value.size.width,
+                                    height: _controller!.value.size.height,
+                                    child: VideoPlayer(_controller!),
+                                  ),
+                                )
+                              : const Center(child: CircularProgressIndicator()))
+                      : _buildImageContent(),
+                ),
+              ),
+              if (isVideo && _isInitialized && _controller != null && !_controller!.value.isPlaying)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), shape: BoxShape.circle),
+                  child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 40),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildImageContent() {
+    final resolved = _resolvedMediaUrl ?? widget.post.videoUrl;
+    if (_hasError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42),
+            const SizedBox(height: 8),
+            Text(_errorText, style: const TextStyle(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center),
+          ],
+        ),
+      );
+    }
+    if (resolved.startsWith('data:image')) {
+      try {
+        return Image.memory(base64Decode(resolved.split(',').last), fit: BoxFit.contain, width: double.infinity, height: double.infinity);
+      } catch (_) {
+        return Center(child: Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42));
+      }
+    }
+    if (resolved.startsWith('http')) {
+      return Image.network(
+        resolved,
+        fit: BoxFit.contain,
+        width: double.infinity,
+        height: double.infinity,
+        gaplessPlayback: true,
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return const Center(child: CircularProgressIndicator());
+        },
+        errorBuilder: (_, __, ___) => Center(
+          child: Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42),
+        ),
+      );
+    }
+    if (!kIsWeb) {
+      return Image.file(
+        File(resolved),
+        fit: BoxFit.contain,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => Center(
+          child: Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42),
+        ),
+      );
+    }
+    return Center(
+      child: Icon(Icons.image_not_supported_outlined, color: Colors.white.withOpacity(0.7), size: 42),
+    );
   }
 
   Future<ImageProvider?> _profileImageProviderForEmail(String email) async {
@@ -23416,9 +23560,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_isImagePost) {
-        _prepareMedia(loadVideo: true);
-      }
+      _prepareMedia(loadVideo: true);
     });
   }
 
@@ -23493,109 +23635,13 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
           GestureDetector(
             onTap: () async {
               if (!isVideo) return;
-              if (!_videoLoadRequested) {
-                await _requestVideoLoad();
-                return;
-              }
               if (!_isInitialized || _controller == null) return;
               setState(() {
                 _controller!.value.isPlaying ? _controller!.pause() : _controller!.play();
               });
             },
             onDoubleTap: _quickLike,
-            child: AspectRatio(
-              aspectRatio: isVideo
-                  ? (_isInitialized && _controller != null ? _controller!.value.aspectRatio : 16 / 9)
-                  : 4 / 5,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      color: Colors.black,
-                      child: _loadingMedia
-                          ? const Center(child: CircularProgressIndicator())
-                          : isVideo
-                          ? (_hasError
-                              ? Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Text(_errorText, style: const TextStyle(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center),
-                                  ),
-                                )
-                              : (_isInitialized && _controller != null)
-                                  ? VideoPlayer(_controller!)
-                                  : Center(
-                                      child: _videoLoadRequested
-                                          ? const CircularProgressIndicator()
-                                          : TextButton.icon(
-                                              onPressed: _requestVideoLoad,
-                                              icon: const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 42),
-                                              label: const Text('Load video', style: TextStyle(color: Colors.white)),
-                                            ),
-                                    ))
-                          : Builder(builder: (context) {
-                              final resolved = _resolvedMediaUrl ?? widget.post.videoUrl;
-                              if (_hasError) {
-                                return Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42),
-                                      const SizedBox(height: 8),
-                                      Text(_errorText, style: const TextStyle(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center),
-                                    ],
-                                  ),
-                                );
-                              }
-                              if (resolved.startsWith('data:image')) {
-                                try {
-                                  return Image.memory(base64Decode(resolved.split(',').last), fit: BoxFit.cover, width: double.infinity);
-                                } catch (_) {
-                                  return Center(child: Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42));
-                                }
-                              }
-                              if (resolved.startsWith('http')) {
-                                return Image.network(
-                                  resolved,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  gaplessPlayback: true,
-                                  loadingBuilder: (_, child, progress) {
-                                    if (progress == null) return child;
-                                    return const Center(child: CircularProgressIndicator());
-                                  },
-                                  errorBuilder: (_, __, ___) => Center(
-                                    child: Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42),
-                                  ),
-                                );
-                              }
-                              if (!kIsWeb) {
-                                return Image.file(
-                                  File(resolved),
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  errorBuilder: (_, __, ___) => Center(
-                                    child: Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42),
-                                  ),
-                                );
-                              }
-                              return Center(
-                                child: Icon(Icons.image_not_supported_outlined, color: Colors.white.withOpacity(0.7), size: 42),
-                              );
-                            }),
-                    ),
-                  ),
-                  if (isVideo && _videoLoadRequested && _isInitialized && _controller != null && !_controller!.value.isPlaying)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), shape: BoxShape.circle),
-                      child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 40),
-                    ),
-                ],
-              ),
-            ),
+            child: _buildMediaFrame(isVideo, isImage),
           ),
           Padding(
             padding: const EdgeInsets.all(12),
