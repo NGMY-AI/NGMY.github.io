@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import 'ngmy_studio_html_video.dart' if (dart.library.io) 'ngmy_studio_html_video_stub.dart' as html_vid;
 import 'ngmy_studio_slot_video_io.dart' if (dart.library.html) 'ngmy_studio_slot_video_stub.dart' as slot_io;
 
-/// Loads and plays a studio slot video without blocking the picker UI.
+/// Local video preview for a studio frame — no network upload.
 class NgmyStudioSlotVideo extends StatefulWidget {
   final String? source;
 
@@ -20,16 +22,24 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
   String? _error;
   int _generation = 0;
 
+  bool get _useWebHtml {
+    if (!kIsWeb) return false;
+    final s = widget.source?.trim() ?? '';
+    return s.startsWith('blob:') || s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:');
+  }
+
   @override
   void initState() {
     super.initState();
-    unawaited(_load());
+    if (!_useWebHtml) {
+      unawaited(_load());
+    }
   }
 
   @override
   void didUpdateWidget(covariant NgmyStudioSlotVideo oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.source != widget.source) {
+    if (oldWidget.source != widget.source && !_useWebHtml) {
       unawaited(_load());
     }
   }
@@ -90,16 +100,24 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
     super.dispose();
   }
 
-  Widget _loading() {
+  Widget _localAttachedPlaceholder() {
     return Container(
-      color: Colors.black87,
+      color: Colors.black,
       alignment: Alignment.center,
-      child: const Column(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70)),
-          SizedBox(height: 8),
-          Text('Loading video…', style: TextStyle(color: Colors.white54, fontSize: 10)),
+          Icon(Icons.check_circle_rounded, color: Colors.greenAccent.shade400, size: 36),
+          const SizedBox(height: 6),
+          Text(
+            'Video added',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 11, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'On your device only',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 9),
+          ),
         ],
       ),
     );
@@ -129,27 +147,50 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
     );
   }
 
+  Widget _nativePlayer() {
+    final c = _controller;
+    if (_error != null) return _errorBox();
+
+    final ready = c != null && c.value.isInitialized && !c.value.hasError;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (!ready) _localAttachedPlaceholder(),
+        if (c != null)
+          ValueListenableBuilder<VideoPlayerValue>(
+            valueListenable: c,
+            builder: (context, value, _) {
+              if (!value.isInitialized || value.hasError) {
+                return const SizedBox.shrink();
+              }
+              final w = value.size.width > 0 ? value.size.width : 16.0;
+              final h = value.size.height > 0 ? value.size.height : 9.0;
+              return Opacity(
+                opacity: ready ? 1 : 0,
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  clipBehavior: Clip.hardEdge,
+                  child: SizedBox(width: w, height: h, child: VideoPlayer(c)),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_error != null) return _errorBox();
-    final c = _controller;
-    if (c == null) return _loading();
+    final src = widget.source?.trim() ?? '';
+    if (src.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
-    return ValueListenableBuilder<VideoPlayerValue>(
-      valueListenable: c,
-      builder: (context, value, _) {
-        if (!value.isInitialized) return _loading();
-        if (value.hasError) {
-          return _errorBox();
-        }
-        final w = value.size.width > 0 ? value.size.width : 16.0;
-        final h = value.size.height > 0 ? value.size.height : 9.0;
-        return FittedBox(
-          fit: BoxFit.cover,
-          clipBehavior: Clip.hardEdge,
-          child: SizedBox(width: w, height: h, child: VideoPlayer(c)),
-        );
-      },
-    );
+    if (_useWebHtml) {
+      return html_vid.NgmyStudioHtmlVideo(key: ValueKey(src), source: src);
+    }
+
+    return _nativePlayer();
   }
 }

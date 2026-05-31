@@ -17784,7 +17784,7 @@ class _StoreListingMediaGalleryState extends State<_StoreListingMediaGallery> {
                 }
                 final imgIndex = widget.videoRef.isNotEmpty ? i - 1 : i;
                 final ref = widget.imageRefs[imgIndex];
-                return Center(child: widget.photoBuilder(ref, fit: BoxFit.contain));
+                return SizedBox.expand(child: widget.photoBuilder(ref, fit: BoxFit.cover));
               },
             ),
           ),
@@ -17873,7 +17873,7 @@ class _StoreListingFullscreenGalleryState extends State<_StoreListingFullscreenG
               return InteractiveViewer(
                 minScale: 0.85,
                 maxScale: 4,
-                child: Center(child: widget.photoBuilder(ref, fit: BoxFit.contain)),
+                child: SizedBox.expand(child: widget.photoBuilder(ref, fit: BoxFit.cover)),
               );
             },
           ),
@@ -20552,7 +20552,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final sellerName = (listing['sellerName'] ?? 'User').toString();
     final title = (listing['title'] ?? 'Item').toString();
 
-    Widget photo(String ref, {BoxFit fit = BoxFit.contain}) {
+    Widget photo(String ref, {BoxFit fit = BoxFit.cover}) {
       return LayoutBuilder(
         builder: (context, constraints) {
           return _listingPhoto(

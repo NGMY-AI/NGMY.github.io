@@ -194,10 +194,8 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       setState(() => _activeSlotId = slotId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Video added to "${_def.slots.where((s) => s.id == slotId).map((s) => s.label).firstOrNull ?? slotId}".',
-            ),
+          const SnackBar(
+            content: Text('Video added — stays on your device until you download.'),
           ),
         );
       }
