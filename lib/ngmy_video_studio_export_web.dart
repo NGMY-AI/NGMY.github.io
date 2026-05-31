@@ -3,6 +3,7 @@ import 'dart:html' as html;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'ngmy_news_banner_painter.dart';
@@ -62,6 +63,45 @@ Future<bool> _waitVideoMeta(html.VideoElement v) async {
   }
 }
 
+bool _webSupportsComposedCapture() {
+  final probe = html.CanvasElement(width: 4, height: 4);
+  try {
+    final stream = probe.captureStream(1);
+    return stream.getVideoTracks().isNotEmpty;
+  } catch (_) {
+    return false;
+  }
+}
+
+html.MediaStream? _safeCaptureStream(dynamic element, {int fps = 30}) {
+  try {
+    if (element is html.CanvasElement) {
+      return element.captureStream(fps);
+    }
+    if (element is html.VideoElement) {
+      return element.captureStream();
+    }
+  } catch (e) {
+    debugPrint('[studio export] captureStream failed: $e');
+  }
+  return null;
+}
+
+Future<String> _downloadAllVideoClips(Map<String, String> sources) async {
+  var n = 0;
+  for (final src in sources.values) {
+    if (src.trim().isEmpty) continue;
+    await exportNgmyVideoStudioDirect(videoSourceUrl: src);
+    n++;
+    if (n < sources.length) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    }
+  }
+  if (n == 0) return 'No video to download.';
+  if (n == 1) return 'Download started — your video is saving now.';
+  return 'Download started — saving $n clip(s). Full studio merge works best in Chrome on desktop.';
+}
+
 void _configureVideoElement(html.VideoElement v, String src) {
   v.src = src;
   v.preload = 'auto';
@@ -84,6 +124,11 @@ Future<String> exportNgmyVideoStudioComposed({
 
   if (config.canDirectDownload) {
     return exportNgmyVideoStudioDirect(videoSourceUrl: sources.values.first);
+  }
+
+  if (!_webSupportsComposedCapture()) {
+    onProgress?.call(0.5);
+    return _downloadAllVideoClips(sources);
   }
 
   onProgress?.call(0.03);
@@ -127,6 +172,7 @@ Future<String> exportNgmyVideoStudioComposed({
   }
 
   html.CanvasElement? exportCanvas;
+  var usedCanvasStream = false;
 
   try {
     onProgress?.call(0.08);
@@ -155,42 +201,60 @@ Future<String> exportNgmyVideoStudioComposed({
     final ctx = canvas.context2D;
 
     final composed = html.MediaStream();
-    var usedCanvasStream = false;
-    try {
-      canvas
-        ..style.position = 'fixed'
-        ..style.left = '0'
-        ..style.top = '0'
-        ..style.opacity = '0.01'
-        ..style.pointerEvents = 'none'
-        ..style.zIndex = '-1';
-      html.document.body?.append(canvas);
-      final canvasStream = canvas.captureStream(30);
+    canvas
+      ..style.position = 'fixed'
+      ..style.left = '0'
+      ..style.top = '0'
+      ..style.opacity = '0.01'
+      ..style.pointerEvents = 'none'
+      ..style.zIndex = '-1';
+    html.document.body?.append(canvas);
+
+    final canvasStream = _safeCaptureStream(canvas, fps: 30);
+    if (canvasStream != null) {
       for (final t in canvasStream.getVideoTracks()) {
         composed.addTrack(t);
       }
       usedCanvasStream = composed.getVideoTracks().isNotEmpty;
-    } catch (e) {
-      debugPrint('[studio export] canvas.captureStream unavailable: $e');
     }
 
     if (!usedCanvasStream) {
-      try {
-        final vStream = videos.values.first.captureStream();
+      final vStream = _safeCaptureStream(videos.values.first);
+      if (vStream != null) {
         for (final t in vStream.getVideoTracks()) {
           composed.addTrack(t);
         }
-      } catch (e) {
+      } else {
         exportCanvas?.remove();
-        return 'Download failed on this browser. Try Chrome on a computer, or use one video only for instant download.';
+        for (final v in videos.values) {
+          v.remove();
+        }
+        for (final i in logos.values) {
+          i.remove();
+        }
+        return _downloadAllVideoClips(sources);
       }
     }
 
-    try {
-      for (final t in videos.values.first.captureStream().getAudioTracks()) {
-        composed.addTrack(t);
+    final audioStream = _safeCaptureStream(videos.values.first);
+    if (audioStream != null) {
+      try {
+        for (final t in audioStream.getAudioTracks()) {
+          composed.addTrack(t);
+        }
+      } catch (_) {}
+    }
+
+    if (composed.getTracks().isEmpty) {
+      exportCanvas?.remove();
+      for (final v in videos.values) {
+        v.remove();
       }
-    } catch (_) {}
+      for (final i in logos.values) {
+        i.remove();
+      }
+      return _downloadAllVideoClips(sources);
+    }
 
     String? mimeType;
     for (final m in ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']) {
@@ -325,6 +389,22 @@ Future<String> exportNgmyVideoStudioComposed({
       return 'Downloaded $filename (video track — full studio merge needs Chrome/Edge on desktop).';
     }
     return 'Downloaded $filename';
+  } catch (e, st) {
+    debugPrint('[studio export] composed failed: $e\n$st');
+    try {
+      exportCanvas?.remove();
+    } catch (_) {}
+    for (final v in videos.values) {
+      try {
+        v.remove();
+      } catch (_) {}
+    }
+    for (final i in logos.values) {
+      try {
+        i.remove();
+      } catch (_) {}
+    }
+    return _downloadAllVideoClips(sources);
   } finally {
     try {
       exportCanvas?.remove();

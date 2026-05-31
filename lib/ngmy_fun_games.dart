@@ -1,4 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+
+import 'ngmy_fun_games_cache.dart';
+import 'ngmy_love_content.dart';
+import 'ngmy_love_popups.dart';
 
 /// Fun & Games — Entertainment Hub (opened from the **M** in NGMY Services).
 void showNgmyFunGamesDialog(BuildContext context) {
@@ -16,29 +22,61 @@ class _NgmyFunGamesDialog extends StatefulWidget {
   State<_NgmyFunGamesDialog> createState() => _NgmyFunGamesDialogState();
 }
 
-class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
+class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerProviderStateMixin {
   static const _bg = Color(0xFF0B0E18);
   static const _panel = Color(0xFF12182A);
   static const _pink = Color(0xFFEC4899);
   static const _pinkDeep = Color(0xFFDB2777);
   static const _pinkGlow = Color(0xFFF472B6);
+  static const _redLove = Color(0xFFEF4444);
 
-  int _category = 0; // 0 Love, 1 Confidence, 2 Brain, 3 Fortune
-  int _loveTab = 0; // 0 Match, 1 Next, 2 Keep, 3 Date
+  int _category = 0;
+  int _loveTab = 0;
 
   final _yourNameC = TextEditingController();
   final _theirNameC = TextEditingController();
   int? _matchScore;
   String? _matchMessage;
 
+  String? _currentIdea;
+  int _ideaIndex = 0;
+  bool _pulseBtn = false;
+
+  late final AnimationController _heartCtrl;
+  final _rng = math.Random();
+
+  static const _categories = [
+    _CatItem('Love', Icons.favorite_rounded, '💕', Color(0xFFEC4899)),
+    _CatItem('Confidence', Icons.bolt_rounded, '💪', Color(0xFFF59E0B)),
+    _CatItem('Brain', Icons.psychology_alt_rounded, '🧠', Color(0xFF8B5CF6)),
+    _CatItem('Fortune', Icons.auto_awesome_rounded, '🔮', Color(0xFF06B6D4)),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _heartCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat();
+    _loadCache();
+  }
+
+  Future<void> _loadCache() async {
+    final saved = await NgmyFunGamesCache.load();
+    if (!mounted) return;
+    setState(() {
+      _category = saved.category;
+      _loveTab = saved.loveTab;
+    });
+  }
+
   @override
   void dispose() {
+    _heartCtrl.dispose();
     _yourNameC.dispose();
     _theirNameC.dispose();
     super.dispose();
   }
 
-  void _calculateLoveMatch() {
+  void _calculateLoveMatch() async {
     final a = _yourNameC.text.trim();
     final b = _theirNameC.text.trim();
     if (a.isEmpty || b.isEmpty) {
@@ -48,10 +86,16 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
       return;
     }
     final score = _loveCompatibility(a, b);
+    final message = _loveMessage(score);
     setState(() {
       _matchScore = score;
-      _matchMessage = _loveMessage(score);
+      _matchMessage = message;
+      _pulseBtn = true;
     });
+    Future<void>.delayed(const Duration(milliseconds: 120), () {
+      if (mounted) setState(() => _pulseBtn = false);
+    });
+    await showNgmyLoveMatchPopup(context, score: score, message: message);
   }
 
   int _loveCompatibility(String a, String b) {
@@ -71,6 +115,35 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
     if (score >= 70) return 'A sweet match with room to grow even closer.';
     if (score >= 60) return 'Good vibes! Friendship could bloom into something more.';
     return 'Every great story starts somewhere — keep exploring together.';
+  }
+
+  void _pickIdea({required int tab}) {
+    setState(() {
+      _ideaIndex = _rng.nextInt(NgmyLoveContent.ideaCount);
+      _pulseBtn = true;
+      if (tab == 1) {
+        _currentIdea = NgmyLoveContent.randomNext(_ideaIndex);
+      } else if (tab == 2) {
+        _currentIdea = NgmyLoveContent.randomKeep(_ideaIndex);
+      } else if (tab == 3) {
+        _currentIdea = NgmyLoveContent.randomDate(_ideaIndex);
+      } else {
+        _currentIdea = null;
+      }
+    });
+    Future<void>.delayed(const Duration(milliseconds: 140), () {
+      if (mounted) setState(() => _pulseBtn = false);
+    });
+
+    final meta = switch (tab) {
+      1 => ('Next step for you two', '🌹'),
+      2 => ('Keep the spark alive', '💞'),
+      3 => ('Date idea', '🌙'),
+      _ => ('', ''),
+    };
+    if (_currentIdea != null && meta.$1.isNotEmpty) {
+      showNgmyLoveIdeaPopup(context, title: meta.$1, emoji: meta.$2, idea: _currentIdea!);
+    }
   }
 
   @override
@@ -131,7 +204,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [_pink, _pinkDeep], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              gradient: const LinearGradient(colors: [_pink, _pinkDeep]),
               borderRadius: BorderRadius.circular(10),
               boxShadow: [BoxShadow(color: _pink.withOpacity(0.45), blurRadius: 10)],
             ),
@@ -142,7 +215,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Fun & Games', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 0.2)),
+                Text('Fun & Games', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
                 Text('Entertainment Hub', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600)),
               ],
             ),
@@ -156,49 +229,58 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
     );
   }
 
+  Widget _categoryIcon(_CatItem item, bool selected) {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        gradient: selected
+            ? LinearGradient(colors: [item.color, item.color.withValues(alpha: 0.65)])
+            : null,
+        color: selected ? null : item.color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: selected ? Colors.white38 : Colors.white12),
+      ),
+      child: Icon(item.icon, color: selected ? Colors.white : item.color, size: 18),
+    );
+  }
+
   Widget _categoryRow() {
-    const items = [
-      _CatItem('Love', '💕', Color(0xFFEC4899)),
-      _CatItem('Confidence', '💪', Color(0xFFF59E0B)),
-      _CatItem('Brain', '🧠', Color(0xFF8B5CF6)),
-      _CatItem('Fortune', '🔮', Color(0xFF06B6D4)),
-    ];
     return Row(
-      children: List.generate(items.length, (i) {
-        final item = items[i];
+      children: List.generate(_categories.length, (i) {
+        final item = _categories[i];
         final selected = _category == i;
         return Expanded(
           child: Padding(
-            padding: EdgeInsets.only(left: i == 0 ? 0 : 4, right: i == items.length - 1 ? 0 : 4),
+            padding: EdgeInsets.only(left: i == 0 ? 0 : 4, right: i == _categories.length - 1 ? 0 : 4),
             child: GestureDetector(
-              onTap: () => setState(() {
-                _category = i;
-                _matchScore = null;
-                _matchMessage = null;
-              }),
+              onTap: () {
+                setState(() {
+                  _category = i;
+                  _matchScore = null;
+                  _matchMessage = null;
+                  _currentIdea = null;
+                });
+                NgmyFunGamesCache.saveCategory(i);
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
                   color: selected ? _panel : Colors.transparent,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: selected ? Colors.white.withOpacity(0.22) : Colors.white.withOpacity(0.06),
-                    width: selected ? 1.2 : 1,
-                  ),
+                  border: Border.all(color: selected ? Colors.white.withOpacity(0.22) : Colors.white.withOpacity(0.06)),
                 ),
                 child: Column(
                   children: [
-                    Text(item.emoji, style: TextStyle(fontSize: 20, color: selected ? Colors.white : Colors.white38)),
+                    _categoryIcon(item, selected),
                     const SizedBox(height: 4),
+                    Text(item.emoji, style: const TextStyle(fontSize: 12)),
+                    const SizedBox(height: 2),
                     Text(
                       item.label,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: selected ? Colors.white : Colors.white38,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: TextStyle(color: selected ? Colors.white : Colors.white38, fontSize: 9, fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
@@ -211,28 +293,24 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
   }
 
   Widget _sectionBanner() {
-    const banners = [
-      ('💕', 'Your Love Journey', _pink),
-      ('💪', 'Build Your Confidence', const Color(0xFFF59E0B)),
-      ('🧠', 'Train Your Brain', const Color(0xFF8B5CF6)),
-      ('🔮', 'Discover Your Fortune', const Color(0xFF06B6D4)),
-    ];
-    final (emoji, title, color) = banners[_category];
+    final item = _categories[_category];
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.06),
+        color: item.color.withOpacity(0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.55), width: 1.2),
-        boxShadow: [BoxShadow(color: color.withOpacity(0.12), blurRadius: 12)],
+        border: Border.all(color: item.color.withOpacity(0.55), width: 1.2),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 16)),
+          Icon(item.icon, color: item.color, size: 18),
           const SizedBox(width: 8),
-          Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: 0.3)),
+          Text(
+            _category == 0 ? 'Your Love Journey' : '${item.label} Zone',
+            style: TextStyle(color: item.color, fontWeight: FontWeight.w800, fontSize: 14),
+          ),
         ],
       ),
     );
@@ -240,10 +318,10 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
 
   Widget _loveSubTabs() {
     const tabs = [
-      _SubTab('Match', '💘'),
-      _SubTab('Next', '🌹'),
-      _SubTab('Keep', '💞'),
-      _SubTab('Date', '🌙'),
+      _SubTab('Match', '💘', Icons.favorite_rounded),
+      _SubTab('Next', '🌹', Icons.north_east_rounded),
+      _SubTab('Keep', '💞', Icons.favorite_border_rounded),
+      _SubTab('Date', '🌙', Icons.nightlight_round),
     ];
     return Row(
       children: List.generate(tabs.length, (i) {
@@ -253,36 +331,36 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
           child: Padding(
             padding: EdgeInsets.only(left: i == 0 ? 0 : 3, right: i == tabs.length - 1 ? 0 : 3),
             child: GestureDetector(
-              onTap: () => setState(() {
-                _loveTab = i;
-                _matchScore = null;
-                _matchMessage = null;
-              }),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                decoration: BoxDecoration(
-                  gradient: selected
-                      ? const LinearGradient(colors: [_pink, _pinkDeep], begin: Alignment.topLeft, end: Alignment.bottomRight)
-                      : null,
-                  color: selected ? null : _panel.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: selected ? _pinkGlow.withOpacity(0.5) : Colors.white.withOpacity(0.06)),
-                  boxShadow: selected ? [BoxShadow(color: _pink.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4))] : null,
-                ),
-                child: Column(
-                  children: [
-                    Text(tab.emoji, style: TextStyle(fontSize: 16, color: selected ? Colors.white : Colors.white38)),
-                    const SizedBox(height: 2),
-                    Text(
-                      tab.label,
-                      style: TextStyle(
-                        color: selected ? Colors.white : Colors.white38,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
+              onTap: () {
+                setState(() {
+                  _loveTab = i;
+                  _matchScore = null;
+                  _matchMessage = null;
+                });
+                NgmyFunGamesCache.saveLoveTab(i);
+              },
+              child: AnimatedScale(
+                scale: selected ? 1.04 : 1.0,
+                duration: const Duration(milliseconds: 180),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  decoration: BoxDecoration(
+                    gradient: selected
+                        ? const LinearGradient(colors: [_redLove, _pinkDeep], begin: Alignment.topLeft, end: Alignment.bottomRight)
+                        : null,
+                    color: selected ? null : _panel.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: selected ? _pinkGlow.withOpacity(0.55) : Colors.white.withOpacity(0.06)),
+                    boxShadow: selected ? [BoxShadow(color: _redLove.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))] : null,
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(tab.icon, size: 16, color: selected ? Colors.white : Colors.white38),
+                      Text(tab.emoji, style: TextStyle(fontSize: 12, color: selected ? Colors.white : Colors.white38)),
+                      Text(tab.label, style: TextStyle(color: selected ? Colors.white : Colors.white38, fontSize: 10, fontWeight: FontWeight.w800)),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -293,23 +371,151 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
   }
 
   Widget _loveContent() {
-    if (_loveTab == 0) return _loveMatchCalculator();
-    const placeholders = [
-      ('Next Step', '🌹', 'Discover what comes next in your love story.'),
-      ('Keep the Spark', '💞', 'Tips to nurture and protect your connection.'),
-      ('Date Ideas', '🌙', 'Romantic plans tailored for memorable evenings.'),
-    ];
-    final (title, emoji, subtitle) = placeholders[_loveTab - 1];
-    return _comingSoonCard(title: title, emoji: emoji, subtitle: subtitle, accent: _pink);
+    switch (_loveTab) {
+      case 0:
+        return _loveMatchCalculator();
+      case 1:
+        return _loveIdeaPanel(
+          emoji: '🌹',
+          title: 'What happens next?',
+          subtitle: 'You just met — here is a romantic first-step idea.',
+          buttonLabel: 'Show me what\'s next',
+          onGenerate: () => _pickIdea(tab: 1),
+        );
+      case 2:
+        return _loveIdeaPanel(
+          emoji: '💞',
+          title: 'Keep the connection growing',
+          subtitle: 'Tap for a relationship tip — what to do after the first spark.',
+          buttonLabel: 'Get relationship tip',
+          onGenerate: () => _pickIdea(tab: 2),
+        );
+      case 3:
+        return _loveIdeaPanel(
+          emoji: '🌙',
+          title: 'Date inspiration',
+          subtitle: 'Romantic date ideas when you are ready to plan something special.',
+          buttonLabel: 'Generate date idea',
+          onGenerate: () => _pickIdea(tab: 3),
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _loveIdeaPanel({
+    required String emoji,
+    required String title,
+    required String subtitle,
+    required String buttonLabel,
+    required VoidCallback onGenerate,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(top: 12, right: 16, child: _mini3DHeart(36)),
+        Positioned(bottom: 40, left: 10, child: _mini3DHeart(28)),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
+          decoration: BoxDecoration(
+            color: _panel,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: _redLove.withOpacity(0.35)),
+            boxShadow: [BoxShadow(color: _pink.withOpacity(0.12), blurRadius: 18)],
+          ),
+          child: Column(
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 36)),
+              const SizedBox(height: 8),
+              Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+              const SizedBox(height: 6),
+              Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12)),
+              const SizedBox(height: 16),
+              if (_currentIdea != null && _loveTab != 0) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [_redLove.withOpacity(0.15), _pinkDeep.withOpacity(0.1)]),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _pink.withOpacity(0.4)),
+                  ),
+                  child: Text(_currentIdea!, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.45, fontWeight: FontWeight.w500)),
+                ),
+                const SizedBox(height: 14),
+              ],
+              _loveActionButton(label: buttonLabel, onTap: onGenerate),
+              const SizedBox(height: 8),
+              Text(
+                '${NgmyLoveContent.ideaCount} romantic ideas · saved on your device',
+                style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _mini3DHeart(double size) {
+    return AnimatedBuilder(
+      animation: _heartCtrl,
+      builder: (context, _) {
+        final t = _heartCtrl.value * math.pi * 2;
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.002)
+            ..rotateY(math.sin(t) * 0.35)
+            ..rotateX(0.4),
+          child: Icon(Icons.favorite_rounded, color: _redLove.withValues(alpha: 0.35 + math.sin(t) * 0.15), size: size),
+        );
+      },
+    );
+  }
+
+  Widget _loveActionButton({required String label, required VoidCallback onTap}) {
+    return AnimatedScale(
+      scale: _pulseBtn ? 0.96 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      child: SizedBox(
+        width: double.infinity,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [_redLove, _pinkDeep, Color(0xFF9F1239)]),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [BoxShadow(color: _redLove.withOpacity(0.45), blurRadius: 14, offset: const Offset(0, 6))],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _loveMatchCalculator() {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Positioned(top: 8, right: 12, child: _floatingHeart(14, 0.35)),
-        Positioned(top: 48, left: 8, child: _floatingHeart(10, 0.25)),
-        Positioned(bottom: 72, right: 20, child: _floatingHeart(12, 0.3)),
+        Positioned(top: 8, right: 12, child: _mini3DHeart(42)),
+        Positioned(top: 48, left: 8, child: _mini3DHeart(30)),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
@@ -322,86 +528,19 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
             children: [
               const Text('💘', style: TextStyle(fontSize: 32)),
               const SizedBox(height: 8),
-              const Text(
-                'Love Match Calculator',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20),
-              ),
+              const Text('Love Match Calculator', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
               const SizedBox(height: 6),
-              Text(
-                'Enter your names to discover your compatibility',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12, fontWeight: FontWeight.w500),
-              ),
+              Text('Enter your names — we will show your match in a 3D love popup', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12)),
               const SizedBox(height: 20),
               _nameField(controller: _yourNameC, hint: 'Your name', icon: Icons.person_outline_rounded),
               const SizedBox(height: 12),
               _nameField(controller: _theirNameC, hint: 'Their name', icon: Icons.favorite_border_rounded),
               if (_matchScore != null) ...[
-                const SizedBox(height: 18),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [_pink.withOpacity(0.18), _pinkDeep.withOpacity(0.12)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: _pink.withOpacity(0.45)),
-                  ),
-                  child: Column(
-                    children: [
-                      Text('$_matchScore%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 36)),
-                      const SizedBox(height: 4),
-                      Text(
-                        _matchMessage ?? '',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ),
+                const SizedBox(height: 14),
+                Text('Last result: $_matchScore%', style: TextStyle(color: _pinkGlow.withOpacity(0.85), fontWeight: FontWeight.w800, fontSize: 13)),
               ],
               const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFF472B6), _pinkDeep, Color(0xFF9D174D)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [BoxShadow(color: _pink.withOpacity(0.4), blurRadius: 14, offset: const Offset(0, 6))],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: _calculateLoveMatch,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 15),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text('✨', style: TextStyle(fontSize: 14)),
-                            SizedBox(width: 8),
-                            Text(
-                              'Calculate Love Match',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.2),
-                            ),
-                            SizedBox(width: 8),
-                            Text('✨', style: TextStyle(fontSize: 14)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              _loveActionButton(label: 'Calculate Love Match', onTap: _calculateLoveMatch),
             ],
           ),
         ),
@@ -416,19 +555,13 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
       textCapitalization: TextCapitalization.words,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.white.withOpacity(0.35), fontWeight: FontWeight.w500),
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.35)),
         prefixIcon: Icon(icon, color: _pinkGlow, size: 20),
         filled: true,
         fillColor: const Color(0xFF0A0F1C),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: _pink.withOpacity(0.45), width: 1.2),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: _pinkGlow, width: 1.5),
-        ),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: _pink.withOpacity(0.45), width: 1.2)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _pinkGlow, width: 1.5)),
       ),
       onChanged: (_) {
         if (_matchScore != null) setState(() { _matchScore = null; _matchMessage = null; });
@@ -436,21 +569,9 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
     );
   }
 
-  Widget _floatingHeart(double size, double opacity) {
-    return Opacity(
-      opacity: opacity,
-      child: Text('💕', style: TextStyle(fontSize: size)),
-    );
-  }
-
   Widget _placeholderCategory() {
-    const data = [
-      ('Confidence Boost', '💪', 'Daily affirmations and power challenges coming soon.', Color(0xFFF59E0B)),
-      ('Brain Games', '🧠', 'Puzzles and quick quizzes to sharpen your mind.', Color(0xFF8B5CF6)),
-      ('Fortune Teller', '🔮', 'Daily luck readings and cosmic insights.', Color(0xFF06B6D4)),
-    ];
-    final (title, emoji, subtitle, accent) = data[_category - 1];
-    return _comingSoonCard(title: title, emoji: emoji, subtitle: subtitle, accent: accent);
+    final item = _categories[_category];
+    return _comingSoonCard(title: '${item.label} Zone', emoji: item.emoji, subtitle: 'More games and challenges coming soon.', accent: item.color);
   }
 
   Widget _comingSoonCard({required String title, required String emoji, required String subtitle, required Color accent}) {
@@ -468,21 +589,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
           const SizedBox(height: 12),
           Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
           const SizedBox(height: 8),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: accent.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: accent.withOpacity(0.35)),
-            ),
-            child: Text('Coming soon', style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 12)),
-          ),
+          Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13)),
         ],
       ),
     );
@@ -491,13 +598,15 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> {
 
 class _CatItem {
   final String label;
+  final IconData icon;
   final String emoji;
   final Color color;
-  const _CatItem(this.label, this.emoji, this.color);
+  const _CatItem(this.label, this.icon, this.emoji, this.color);
 }
 
 class _SubTab {
   final String label;
   final String emoji;
-  const _SubTab(this.label, this.emoji);
+  final IconData icon;
+  const _SubTab(this.label, this.emoji, this.icon);
 }
