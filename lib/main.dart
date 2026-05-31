@@ -13440,11 +13440,20 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       text: TextSpan(
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
                         children: [
-                          const TextSpan(text: 'N'),
                           WidgetSpan(
                             alignment: PlaceholderAlignment.middle,
                             child: GestureDetector(
-                              onTap: _openGServicesTool,
+                              onTap: _openDocumentScanner,
+                              child: const Text(
+                                'N',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
+                              ),
+                            ),
+                          ),
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: GestureDetector(
+                              onTap: _openGServicesPriceCalculator,
                               child: const Text(
                                 'G',
                                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
@@ -13957,7 +13966,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
   void _openYQrGenerator() => showNgmyQrGeneratorDialog(context);
 
-  void _openGServicesTool() {
+  void _openDocumentScanner() {
     showNgmyDocumentScanner(
       context,
       geminiApiKey: widget.config.geminiApiKey,
@@ -13968,7 +13977,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
         }
         return widget.config.geminiApiKey.trim();
       },
-      onOpenPriceCalculator: _openGServicesPriceCalculator,
     );
   }
 
