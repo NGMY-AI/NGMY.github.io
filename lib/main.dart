@@ -44,6 +44,7 @@ import 'ngmy_local_cache.dart';
 import 'ngmy_media_monetization.dart';
 import 'ngmy_media_reward_tracker.dart';
 import 'ngmy_offline.dart';
+import 'ngmy_network_resilience.dart';
 import 'ngmy_store_gift_celebration.dart';
 import 'ngmy_store_listing_extras.dart';
 import 'ngmy_document_scanner.dart';
@@ -1994,17 +1995,17 @@ Future<String> _resolveSupabaseStorageUrlResilient(String rawUrl) async {
   
   final storage = Supabase.instance.client.storage.from(ref.bucket);
   final publicUrl = storage.getPublicUrl(ref.path);
+  if (!await ngmyDeviceIsOnline()) return publicUrl;
   
   try {
-    // 1. Check if public URL is reachable (optional, but good for public buckets)
-    // 2. Try to get a signed URL with a long expiry (1 month)
-    final signed = await storage.createSignedUrl(ref.path, 60 * 60 * 24 * 30);
+    final signed = await storage
+        .createSignedUrl(ref.path, 60 * 60 * 24 * 30)
+        .timeout(const Duration(seconds: 8));
     if (signed.isNotEmpty) return signed;
   } catch (e) {
     debugPrint('[storage] signed url error for ${ref.path}: $e');
   }
   
-  // 3. Fallback to public URL
   return publicUrl;
 }
 
@@ -3957,9 +3958,9 @@ class _NGMYAppState extends State<NGMYApp> {
 
       if (mounted) setState(() => _isLoading = false);
 
-      // 2. Fetch from Supabase when online (offline uses local cache above).
-      if (!await ngmyDeviceIsOnline()) {
-        debugPrint('[ngmy] offline — using cached local data');
+      // 2. Fetch from Supabase when reachable (slow/offline uses local cache above).
+      if (!await ngmyCanReachCloud()) {
+        debugPrint('[ngmy] offline or slow network — using cached local data');
         await _persistLocalSnapshot();
         if (mounted) setState(() {});
         return;
@@ -3968,6 +3969,7 @@ class _NGMYAppState extends State<NGMYApp> {
         for (final u in _allUsers) u.email.toLowerCase().trim(): u,
       };
       final localCurrent = _currentUser;
+      await ngmyIgnoreTimeout(() async {
       try {
         final usersData = await supabase.from('users').select();
         if (usersData != null) {
@@ -4055,6 +4057,7 @@ class _NGMYAppState extends State<NGMYApp> {
           }
         }
       }
+      }, timeout: kNgmyCloudLoadTimeout);
 
       // 3. Handle Current User Session
       final userJson = safeGet('current_user');
@@ -4130,7 +4133,7 @@ class _NGMYAppState extends State<NGMYApp> {
 
     for (int i = 0; i < 12; i++) {
       try {
-        await supabase.from(table).upsert(working);
+        await supabase.from(table).upsert(working).timeout(kNgmyCloudWriteTimeout);
         if (removed.isNotEmpty) {
           debugPrint('[$table] synced with removed columns: ${removed.join(', ')}');
         }
@@ -4161,7 +4164,7 @@ class _NGMYAppState extends State<NGMYApp> {
     var ordersSnapshot = List<Map<String, dynamic>>.from(
       _config.storeOrders.map((e) => Map<String, dynamic>.from(e)),
     );
-    final online = await ngmyDeviceIsOnline();
+    final online = await ngmyCanReachCloud();
     try {
       final prefs = await SharedPreferences.getInstance();
 
@@ -4197,8 +4200,19 @@ class _NGMYAppState extends State<NGMYApp> {
         }
       }
 
+      // Always persist locally first so slow/offline Wi‑Fi never blocks the UI.
+      await prefs.setString('all_transactions', jsonEncode(_allTransactions.map((e) => e.toJson()).toList()));
+      await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+      await prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
+      await prefs.setString('app_config', jsonEncode(_config.toJson()));
+      await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
+      await prefs.setString('all_announcements', jsonEncode(_allAnnouncements.map((e) => e.toJson()).toList()));
+      await _persistLocalSnapshot();
+
+      if (online) {
+      await ngmyIgnoreTimeout(() async {
       // Sync all transactions to Supabase
-      if (online && _allTransactions.isNotEmpty) {
+      if (_allTransactions.isNotEmpty) {
         await _safeUpsertRows(
           'transactions',
           _allTransactions.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
@@ -4206,7 +4220,7 @@ class _NGMYAppState extends State<NGMYApp> {
       }
 
       // Sync all users to Supabase (deduped list)
-      if (online && _allUsers.isNotEmpty) {
+      if (_allUsers.isNotEmpty) {
         await _safeUpsertRows(
           'users',
           _allUsers.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
@@ -4214,11 +4228,8 @@ class _NGMYAppState extends State<NGMYApp> {
       }
 
       // Do not bulk-upsert media here — it resurrected deleted posts from stale cache.
-      if (online) {
         await _pruneStaleMediaAgainstCloud();
-      }
 
-      if (online) {
         await _pruneExpiredAnnouncements(updateUi: false);
         if (_allAnnouncements.isNotEmpty) {
           await _safeUpsertRows(
@@ -4226,9 +4237,7 @@ class _NGMYAppState extends State<NGMYApp> {
             _allAnnouncements.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
           );
         }
-      }
 
-      if (online) {
         await _reloadStoreFromSupabase();
         if (_maintainStoreOrders(_config.storeOrders)) {
           await _pushStoreOrdersToSupabase(_config.storeOrders);
@@ -4257,16 +4266,10 @@ class _NGMYAppState extends State<NGMYApp> {
           await _persistNgmyPopupsToCloud(_config.ngmyPopups, _config.ngmyVideoPopups);
         }
         await _safeUpsertRows('config', [configRow]);
+      }, timeout: const Duration(seconds: 28));
       } else {
         _config.storeOrders = ordersSnapshot;
       }
-
-      await prefs.setString('all_transactions', jsonEncode(_allTransactions.map((e) => e.toJson()).toList()));
-      await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
-      await prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
-      await prefs.setString('app_config', jsonEncode(_config.toJson()));
-      await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
-      await prefs.setString('all_announcements', jsonEncode(_allAnnouncements.map((e) => e.toJson()).toList()));
 
     } catch (e) { debugPrint("Save error: $e"); }
     finally {
@@ -5315,7 +5318,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _refreshOnlineStatus() async {
-    final online = await ngmyDeviceIsOnline();
+    final online = await ngmyCanReachCloud();
     if (!mounted) return;
     final nextOffline = !online;
     if (nextOffline != _offline) setState(() => _offline = nextOffline);
@@ -5642,7 +5645,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Offline mode — your saved data is available on this device.',
+                              'Offline or slow connection — using data saved on this device.',
                               style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -5652,36 +5655,40 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                   ),
                 ),
               Positioned(
-                left: 15,
-                right: 15,
-                bottom: 25,
+                left: 12,
+                right: 12,
+                bottom: 12,
                 child: SafeArea(
                   top: false,
-                  child: Container(
-                    height: 75,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface.withOpacity(0.78),
-                      borderRadius: BorderRadius.circular(35),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                      border: Border.all(color: Colors.white.withOpacity(0.10)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _nav(0, Icons.home_rounded),
-                        _nav(1, Icons.trending_up_rounded),
-                        _nav(2, Icons.account_balance_wallet_rounded),
-                        _navC(3),
-                        _nav(4, Icons.play_circle_fill_rounded),
-                        _nav(5, Icons.bar_chart_rounded),
-                        _nav(6, Icons.person_rounded),
-                      ],
+                  minimum: const EdgeInsets.only(bottom: 4),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(36),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _nav(0, Icons.home_rounded),
+                          _nav(1, Icons.trending_up_rounded),
+                          _nav(2, Icons.account_balance_wallet_rounded),
+                          _navC(3),
+                          _nav(4, Icons.play_circle_fill_rounded),
+                          _nav(5, Icons.bar_chart_rounded),
+                          _nav(6, Icons.person_rounded),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -5692,51 +5699,72 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       ),
     );
   }
-  Widget _nav(int i, IconData icon) => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onTap: () {
-      setState(() => _idx = i);
-      if (i == 4) unawaited(widget.onRefreshMediaFromCloud?.call());
-    },
-    child: SizedBox(
-      width: 48,
-      height: 48,
-      child: Center(
-        child: Icon(
-          icon,
-          color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey,
-          size: 28,
+  Widget _nav(int i, IconData icon) {
+    final selected = _idx == i;
+    final color = selected ? Theme.of(context).colorScheme.primary : Colors.grey;
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            setState(() => _idx = i);
+            if (i == 4) unawaited(widget.onRefreshMediaFromCloud?.call());
+          },
+          customBorder: const StadiumBorder(),
+          splashColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
+          child: Center(
+            child: Icon(icon, color: color, size: 30),
+          ),
         ),
       ),
-    ),
-  );
-  Widget _navC(int i) => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onTap: () => setState(() => _idx = i),
-    child: Transform.translate(
-      offset: const Offset(0, -10),
-      child: Container(
-        width: 60, height: 60,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]),
-          shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: const Color(0xFF6200EE).withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))],
-          border: Border.all(color: _idx == i ? Colors.white : Colors.transparent, width: 2)
-        ),
-        child: Center(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: Image.network(
-              widget.config.logoUrl,
-              width: 40, height: 40,
-              fit: BoxFit.cover,
-              errorBuilder: (c, e, s) => const Text('NGMY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+    );
+  }
+
+  Widget _navC(int i) {
+    final selected = _idx == i;
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _idx = i),
+          customBorder: const CircleBorder(),
+          child: Center(
+            child: Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6200EE).withValues(alpha: 0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+                border: Border.all(color: selected ? Colors.white : Colors.transparent, width: 2),
+              ),
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(27),
+                  child: Image.network(
+                    widget.config.logoUrl,
+                    width: 38,
+                    height: 38,
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, e, s) => const Text(
+                      'NGMY',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                    ),
+                  ),
+                ),
+              ),
             ),
-          )
-        )
-      )
-    )
-  );
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class HomeScreen extends StatefulWidget {
@@ -8547,36 +8575,43 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _navItem(int i, IconData icon, String label, bool isDark, Color frameBg, Color frameBorder) {
     final selected = _idx == i;
-    return GestureDetector(
-      onTap: () => setState(() => _idx = i),
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? (isDark ? const Color(0xFF1F2937) : Colors.white) : frameBg,
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _idx = i),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? const Color(0xFF00B25A) : frameBorder,
-            width: selected ? 2.2 : 1.8,
-          ),
-          boxShadow: selected
-              ? [BoxShadow(color: const Color(0xFF00B25A).withOpacity(isDark ? 0.22 : 0.12), blurRadius: 8, offset: const Offset(0, 3))]
-              : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: selected ? const Color(0xFF00B25A) : (isDark ? Colors.white54 : Colors.grey), size: 18),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white54 : Colors.grey),
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                fontSize: 10,
+          child: Ink(
+            decoration: BoxDecoration(
+              color: selected ? (isDark ? const Color(0xFF1F2937) : Colors.white) : frameBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected ? const Color(0xFF00B25A) : frameBorder,
+                width: selected ? 2.2 : 1.8,
               ),
+              boxShadow: selected
+                  ? [BoxShadow(color: const Color(0xFF00B25A).withOpacity(isDark ? 0.22 : 0.12), blurRadius: 8, offset: const Offset(0, 3))]
+                  : null,
             ),
-          ],
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: selected ? const Color(0xFF00B25A) : (isDark ? Colors.white54 : Colors.grey), size: 22),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: selected ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white54 : Colors.grey),
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -13215,7 +13250,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  Widget _tOp(BuildContext ctx, ThemeMode m, IconData i, String l) { bool sel = widget.currentThemeMode == m; return GestureDetector(onTap: () => widget.onThemeChanged(m), child: Column(children: [Icon(i, color: sel ? Theme.of(ctx).colorScheme.primary : Colors.grey, size: 28), const SizedBox(height: 5), Text(l, style: TextStyle(fontSize: 10, color: sel ? Theme.of(ctx).colorScheme.primary : Colors.grey))])); }
+  Widget _tOp(BuildContext ctx, ThemeMode m, IconData i, String l) {
+    final sel = widget.currentThemeMode == m;
+    final color = sel ? Theme.of(ctx).colorScheme.primary : Colors.grey;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => widget.onThemeChanged(m),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(i, color: color, size: 28),
+              const SizedBox(height: 5),
+              Text(l, style: TextStyle(fontSize: 10, color: color)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 class NgmyHubScreen extends StatefulWidget {
   final UserData user;
@@ -24663,7 +24719,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
 
   Future<void> _silentRefreshFeed() async {
     if (!mounted || _isPosting) return;
-    if (!await ngmyDeviceIsOnline()) return;
+    if (!await ngmyCanReachCloud()) return;
     await widget.onRefreshFromCloud?.call();
     if (!mounted || _isPosting) return;
     final sig = _feedSignature();

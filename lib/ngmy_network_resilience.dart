@@ -1,0 +1,75 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+
+import 'ngmy_network_resilience_io.dart' if (dart.library.html) 'ngmy_network_resilience_io_stub.dart';
+import 'ngmy_network_resilience_web_stub.dart' if (dart.library.html) 'ngmy_network_resilience_web.dart';
+import 'ngmy_offline.dart';
+
+/// Max wait for cloud reads on startup / refresh (slow Wi‑Fi should fall back to cache).
+const Duration kNgmyCloudLoadTimeout = Duration(seconds: 12);
+
+/// Max wait per Supabase write batch.
+const Duration kNgmyCloudWriteTimeout = Duration(seconds: 14);
+
+/// Quick probe before treating device as "online" for sync.
+const Duration kNgmyReachabilityTimeout = Duration(seconds: 3);
+
+DateTime? _lastReachableAt;
+bool _lastReachable = true;
+
+/// True when the device reports online and a short network probe succeeds (or recently did).
+Future<bool> ngmyCanReachCloud() async {
+  if (!await ngmyDeviceIsOnline()) {
+    _lastReachable = false;
+    return false;
+  }
+  if (_lastReachableAt != null &&
+      _lastReachable &&
+      DateTime.now().difference(_lastReachableAt!) < const Duration(seconds: 20)) {
+    return true;
+  }
+  final ok = await _probeReachability();
+  _lastReachable = ok;
+  _lastReachableAt = DateTime.now();
+  return ok;
+}
+
+Future<bool> _probeReachability() async {
+  try {
+    if (kIsWeb) {
+      final uri = Uri.parse('${Uri.base.origin}${Uri.base.path}version.json?t=${DateTime.now().millisecondsSinceEpoch}');
+      return await ngmyWebFetchOk(uri.toString(), kNgmyReachabilityTimeout);
+    }
+    return await ngmyNativeReachabilityProbe(kNgmyReachabilityTimeout);
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Runs [action] with a timeout; returns [onTimeout] or rethrows on other errors.
+Future<T> ngmyWithTimeout<T>(
+  Future<T> Function() action, {
+  Duration timeout = kNgmyCloudLoadTimeout,
+  T Function()? onTimeout,
+}) async {
+  try {
+    return await action().timeout(timeout);
+  } on TimeoutException {
+    if (onTimeout != null) return onTimeout();
+    rethrow;
+  }
+}
+
+Future<void> ngmyIgnoreTimeout(
+  Future<void> Function() action, {
+  Duration timeout = kNgmyCloudLoadTimeout,
+}) async {
+  try {
+    await action().timeout(timeout);
+  } on TimeoutException {
+    debugPrint('[ngmy] network action timed out after ${timeout.inSeconds}s');
+  } catch (e) {
+    debugPrint('[ngmy] network action failed: $e');
+  }
+}
