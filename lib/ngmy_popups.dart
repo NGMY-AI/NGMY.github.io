@@ -504,32 +504,24 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
     );
   }
 
-  Widget _faceBox(double size, double glow, double rotY, {bool mirror = false}) {
-    return Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.identity()..rotateY(rotY),
-      child: Transform(
-        alignment: Alignment.center,
-        transform: mirror ? (Matrix4.identity()..rotateY(math.pi)) : Matrix4.identity(),
-        child: _faceContent(size, glow),
-      ),
-    );
-  }
+  Widget _faceBox(double size, double glow) => _faceContent(size, glow);
 
   Widget _core(double size, double spinY, double glow) {
+    // Single face swap: when spinning past 90°, flip so text stays readable (same as front).
+    final showFront = math.cos(spinY) >= 0;
     return Transform(
       alignment: Alignment.center,
       transform: Matrix4.identity()
         ..setEntry(3, 2, 0.002)
         ..rotateX(0.12 + math.sin(spinY) * 0.06)
         ..rotateY(spinY),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          _faceBox(size, glow, 0),
-          _faceBox(size, glow, math.pi, mirror: true),
-        ],
-      ),
+      child: showFront
+          ? _faceBox(size, glow)
+          : Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()..rotateY(math.pi),
+              child: _faceBox(size, glow),
+            ),
     );
   }
 
@@ -541,8 +533,8 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
         final enter = Curves.easeOutBack.transform(_enter.value);
         final fade = _enter.value;
         final spinY = _spin.value * math.pi * 2;
-        const size = 290.0;
-        final floatY = math.sin(_float.value * math.pi) * 12;
+        const size = 200.0;
+        final floatY = math.sin(_float.value * math.pi) * 8;
 
         return Material(
           type: MaterialType.transparency,
@@ -862,9 +854,9 @@ class _NgmyPopupsAdminSheetState extends State<_NgmyPopupsAdminSheet> {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 0.92,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 1.85,
       ),
       itemCount: items.length,
       itemBuilder: (_, i) => _popupGridCard(items[i], isVideo: isVideo),
@@ -885,15 +877,15 @@ class _NgmyPopupsAdminSheetState extends State<_NgmyPopupsAdminSheet> {
         borderRadius: BorderRadius.circular(16),
         onTap: () => _openPopupEditor(p, isVideo: isVideo),
         child: Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [c0.withValues(alpha: 0.85), c1.withValues(alpha: 0.75)],
             ),
-            boxShadow: [BoxShadow(color: c1.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 5))],
+            boxShadow: [BoxShadow(color: c1.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3))],
             border: Border.all(color: enabled ? Colors.white.withValues(alpha: 0.45) : Colors.white24),
           ),
           child: Column(
@@ -902,15 +894,18 @@ class _NgmyPopupsAdminSheetState extends State<_NgmyPopupsAdminSheet> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
+                    child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10)),
                   ),
-                  Switch(value: enabled, onChanged: (v) => setState(() => p['enabled'] = v), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                  Transform.scale(
+                    scale: 0.72,
+                    child: Switch(value: enabled, onChanged: (v) => setState(() => p['enabled'] = v), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                  ),
                 ],
               ),
               const Spacer(),
-              Text(isVideo ? 'Video ad' : (p['type'] ?? 'standard').toString(), style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 9)),
-              Text(enabled ? 'ON · tap to edit' : 'OFF', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 9, fontWeight: FontWeight.w600)),
+              Text(isVideo ? 'Video ad' : (p['type'] ?? 'standard').toString(), style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 8)),
+              Text(enabled ? 'ON · tap to edit' : 'OFF', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 8, fontWeight: FontWeight.w600)),
             ],
           ),
         ),

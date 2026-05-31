@@ -9257,19 +9257,31 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _adminActionBtn(String label, IconData icon, Color color, VoidCallback onTap) => SizedBox(
-    width: double.infinity,
-    child: ElevatedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 16, color: Colors.white),
-      label: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 4,
-        shadowColor: color.withOpacity(0.45),
+  Widget _adminActionBtn(String label, IconData icon, Color color, VoidCallback onTap) => Material(
+    color: color,
+    elevation: 2,
+    shadowColor: color.withOpacity(0.35),
+    borderRadius: BorderRadius.circular(8),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 3),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: Colors.white),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Colors.white, height: 1.1),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -9368,9 +9380,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 3,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 1.05,
+            mainAxisSpacing: 6,
+            crossAxisSpacing: 6,
+            childAspectRatio: 2.6,
             children: [
               _adminActionBtn('Active', Icons.person_outline, const Color(0xFF22C55E), () { u.status = 'active'; widget.onDataChanged(); setState(() {}); }),
               _adminActionBtn('Suspend', Icons.block, const Color(0xFFF59E0B), () { u.status = 'suspended'; widget.onDataChanged(); setState(() {}); }),
@@ -9458,9 +9470,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Row(
             children: [
               Expanded(child: _adminActionBtn('King', Icons.emoji_events, const Color(0xFFF59E0B), () { u.crownBadge = 'king'; widget.onDataChanged(); setState(() {}); })),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(child: _adminActionBtn('Queen', Icons.workspace_premium, const Color(0xFFEC4899), () { u.crownBadge = 'queen'; widget.onDataChanged(); setState(() {}); })),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(child: _adminActionBtn('Remove', Icons.close, const Color(0xFF374151), () { u.crownBadge = ''; widget.onDataChanged(); setState(() {}); })),
             ],
           ),
