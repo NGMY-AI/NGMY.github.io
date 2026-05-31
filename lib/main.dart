@@ -841,6 +841,7 @@ void _applyRemoteLegalToConfig(AppConfig config, Map<String, dynamic> remoteMap)
 const _kNgmySettingsTermsKey = 'terms_and_conditions';
 const _kNgmySettingsPrivacyKey = 'privacy_policy';
 const _kNgmySettingsPlansKey = 'investment_plans';
+const _kNgmySettingsPopupsKey = 'ngmy_popups';
 const _kStoreSystemTermsId = 'ngmy:system:terms';
 const _kStoreSystemPrivacyId = 'ngmy:system:privacy';
 const _kStoreSystemPlansId = 'ngmy:system:investment_plans';
@@ -1283,9 +1284,147 @@ List<Map<String, dynamic>> _mergeNgmyPopupsFromRemote(
   List<Map<String, dynamic>>? remote,
   List<Map<String, dynamic>> Function(List<Map<String, dynamic>>?) ensure,
 ) {
-  if (remote != null && remote.isNotEmpty) return ensure(remote);
-  if (local.isNotEmpty) return local;
+  final remoteList = remote?.map((e) => _normalizeNgmyPopupItem(Map<String, dynamic>.from(e))).toList() ?? [];
+  if (remoteList.isNotEmpty) return ensure(remoteList);
+  if (local.isNotEmpty) return ensure(local.map((e) => _normalizeNgmyPopupItem(Map<String, dynamic>.from(e))).toList());
   return ensure(null);
+}
+
+bool _ngmyPopupEnabledValue(dynamic raw) =>
+    raw == true || raw == 1 || raw.toString().toLowerCase() == 'true';
+
+Map<String, dynamic> _normalizeNgmyPopupItem(Map<String, dynamic> raw) {
+  final m = Map<String, dynamic>.from(raw);
+  m['enabled'] = _ngmyPopupEnabledValue(m['enabled']);
+  return m;
+}
+
+Future<({List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos})> _fetchAuthoritativeNgmyPopups() async {
+  List<Map<String, dynamic>> bestPopups = [];
+  List<Map<String, dynamic>> bestVideos = [];
+  DateTime? bestAt;
+
+  void consider(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos, DateTime? at) {
+    if (popups.isEmpty && videos.isEmpty) return;
+    final when = at ?? DateTime.fromMillisecondsSinceEpoch(0);
+    if (bestAt == null || !when.isBefore(bestAt!)) {
+      bestPopups = popups;
+      bestVideos = videos;
+      bestAt = when;
+    }
+  }
+
+  final settings = await _fetchNgmySettingSafe(_kNgmySettingsPopupsKey);
+  if (settings != null) {
+    final popups = (settings['popups'] as List?)
+            ?.map((e) => _normalizeNgmyPopupItem(Map<String, dynamic>.from(e as Map)))
+            .toList() ??
+        [];
+    final videos = (settings['videoPopups'] as List?)
+            ?.map((e) => _normalizeNgmyPopupItem(Map<String, dynamic>.from(e as Map)))
+            .toList() ??
+        [];
+    consider(popups, videos, _parseSettingUpdatedAt(settings['updatedAt']));
+  }
+
+  try {
+    final row = await Supabase.instance.client.from('config').select('ngmyPopups, ngmyVideoPopups').eq('id', 1).maybeSingle();
+    if (row != null) {
+      final popups = (row['ngmyPopups'] as List?)
+              ?.map((e) => _normalizeNgmyPopupItem(Map<String, dynamic>.from(e as Map)))
+              .toList() ??
+          [];
+      final videos = (row['ngmyVideoPopups'] as List?)
+              ?.map((e) => _normalizeNgmyPopupItem(Map<String, dynamic>.from(e as Map)))
+              .toList() ??
+          [];
+      consider(popups, videos, DateTime.now());
+    }
+  } catch (e) {
+    debugPrint('[popups] config fetch error: $e');
+  }
+
+  return (popups: bestPopups, videos: bestVideos);
+}
+
+Future<bool> _upsertConfigNgmyPopupsColumns(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos) async {
+  var row = <String, dynamic>{'id': 1, 'ngmyPopups': popups, 'ngmyVideoPopups': videos};
+  for (int i = 0; i < 8; i++) {
+    try {
+      await Supabase.instance.client.from('config').upsert(row);
+      return true;
+    } catch (e) {
+      final missing = _missingColumnFromPostgrestError(e);
+      if (missing != null && missing.isNotEmpty && row.containsKey(missing)) {
+        row = Map<String, dynamic>.from(row)..remove(missing);
+        if (row.length <= 1) break;
+        continue;
+      }
+      try {
+        await Supabase.instance.client.from('config').update({'ngmyPopups': popups, 'ngmyVideoPopups': videos}).eq('id', 1);
+        return true;
+      } catch (e2) {
+        debugPrint('[popups] config column save error: $e2');
+        return false;
+      }
+    }
+  }
+  return false;
+}
+
+Future<bool> _persistNgmyPopupsToCloud(List<Map<String, dynamic>> popupsRaw, List<Map<String, dynamic>> videosRaw) async {
+  final now = DateTime.now().toUtc().toIso8601String();
+  final popups = NgmyPopupDefaults.ensurePopups(
+    popupsRaw.map((e) {
+      final m = _normalizeNgmyPopupItem(Map<String, dynamic>.from(e));
+      m['updatedAt'] = now;
+      return m;
+    }).toList(),
+  );
+  final videos = NgmyPopupDefaults.ensureVideoPopups(
+    videosRaw.map((e) {
+      final m = _normalizeNgmyPopupItem(Map<String, dynamic>.from(e));
+      m['updatedAt'] = now;
+      return m;
+    }).toList(),
+  );
+  var ok = false;
+  ok = await _upsertNgmySettingSafe(_kNgmySettingsPopupsKey, {
+        'popups': popups,
+        'videoPopups': videos,
+        'updatedAt': now,
+      }) ||
+      ok;
+  ok = await _upsertConfigNgmyPopupsColumns(popups, videos) || ok;
+  if (ok) debugPrint('[popups] synced to cloud for all users.');
+  return ok;
+}
+
+Future<String> _uploadPopupVideoRef(String ref) async {
+  final src = ref.trim();
+  if (src.isEmpty || src.startsWith('supabase://') || src.startsWith('http')) return src;
+  try {
+    late List<int> bytes;
+    var ext = 'mp4';
+    if (src.startsWith('data:')) {
+      bytes = base64Decode(src.split(',').last);
+    } else if (!kIsWeb) {
+      bytes = await File(src).readAsBytes();
+      if (src.contains('.')) ext = src.split('.').last.toLowerCase();
+    } else {
+      return src;
+    }
+    final storagePath = 'popups/${DateTime.now().microsecondsSinceEpoch}.$ext';
+    await Supabase.instance.client.storage.from('media').uploadBinary(
+          storagePath,
+          Uint8List.fromList(bytes),
+          fileOptions: FileOptions(upsert: false, contentType: 'video/mp4'),
+        );
+    return 'supabase://media/$storagePath';
+  } catch (e) {
+    debugPrint('[popups] video upload error: $e');
+    return src;
+  }
 }
 
 List<Map<String, dynamic>> _mergeStoreOrdersLists(
@@ -2585,6 +2724,11 @@ class _NGMYAppState extends State<NGMYApp> {
         final remoteVideoPopups = (cfgMap['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         next.ngmyPopups = _mergeNgmyPopupsFromRemote(keepPopups, remotePopups, NgmyPopupDefaults.ensurePopups);
         next.ngmyVideoPopups = _mergeNgmyPopupsFromRemote(keepVideoPopups, remoteVideoPopups, NgmyPopupDefaults.ensureVideoPopups);
+        final authPopups = await _fetchAuthoritativeNgmyPopups();
+        if (authPopups.popups.isNotEmpty || authPopups.videos.isNotEmpty) {
+          next.ngmyPopups = NgmyPopupDefaults.ensurePopups(authPopups.popups);
+          next.ngmyVideoPopups = NgmyPopupDefaults.ensureVideoPopups(authPopups.videos);
+        }
         final plansSigBefore = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
         final legal = await _fetchAuthoritativeLegalContent();
         final remotePlans = await _fetchAuthoritativeInvestmentPlans();
@@ -2792,6 +2936,40 @@ class _NGMYAppState extends State<NGMYApp> {
     }
   }
 
+  Future<bool> _savePopupsSettingsToCloud(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos) async {
+    try {
+      _config.ngmyPopups = popups.map((e) => Map<String, dynamic>.from(e)).toList();
+      _config.ngmyVideoPopups = videos.map((e) => Map<String, dynamic>.from(e)).toList();
+      final saved = await _persistNgmyPopupsToCloud(_config.ngmyPopups, _config.ngmyVideoPopups);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(_config.toJson()));
+      if (mounted) setState(() {});
+      return saved;
+    } catch (e) {
+      debugPrint('[popups] save error: $e');
+      return false;
+    }
+  }
+
+  Future<void> _refreshPopupsFromCloud({bool updateUi = true}) async {
+    try {
+      final remote = await _fetchAuthoritativeNgmyPopups();
+      if (remote.popups.isEmpty && remote.videos.isEmpty) return;
+      final nextPopups = NgmyPopupDefaults.ensurePopups(remote.popups);
+      final nextVideos = NgmyPopupDefaults.ensureVideoPopups(remote.videos);
+      final sigBefore = jsonEncode({'p': _config.ngmyPopups, 'v': _config.ngmyVideoPopups});
+      final sigAfter = jsonEncode({'p': nextPopups, 'v': nextVideos});
+      if (sigBefore == sigAfter) return;
+      _config.ngmyPopups = nextPopups;
+      _config.ngmyVideoPopups = nextVideos;
+      if (updateUi && mounted) setState(() {});
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(_config.toJson()));
+    } catch (e) {
+      debugPrint('[popups] cloud refresh error: $e');
+    }
+  }
+
   Future<void> _refreshLegalAndPlansFromCloud({bool updateUi = true}) async {
     try {
       final legal = await _fetchAuthoritativeLegalContent();
@@ -2807,6 +2985,7 @@ class _NGMYAppState extends State<NGMYApp> {
         _config.investmentPlans = remotePlans;
         _globalPlans = _investmentPlansFromMaps(remotePlans);
       }
+      await _refreshPopupsFromCloud(updateUi: updateUi);
       final plansSigAfter = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
       if (!updateUi || (!termsChanged && !privacyChanged && plansSigBefore == plansSigAfter)) return;
       if (!mounted) return;
@@ -3525,6 +3704,7 @@ class _NGMYAppState extends State<NGMYApp> {
           }
         }
         await _refreshLegalAndPlansFromCloud(updateUi: false);
+        await _refreshPopupsFromCloud(updateUi: false);
         await _reloadStoreFromSupabase();
         await _reloadMediaFromSupabase();
       } catch (e) {
@@ -3723,6 +3903,7 @@ class _NGMYAppState extends State<NGMYApp> {
         if (_currentUser?.isAdmin == true) {
           configRow['ngmyPopups'] = _config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)).toList();
           configRow['ngmyVideoPopups'] = _config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)).toList();
+          await _persistNgmyPopupsToCloud(_config.ngmyPopups, _config.ngmyVideoPopups);
         }
         await _safeUpsertRows('config', [configRow]);
       } else {
@@ -4025,6 +4206,8 @@ class _NGMYAppState extends State<NGMYApp> {
                 onDeleteMedia: _deleteMediaPostGlobally,
                 onPruneMedia: _pruneDeletedMediaPost,
                 onSaveLegalContent: _saveLegalContentToSupabase,
+                onSavePopups: _savePopupsSettingsToCloud,
+                onUploadPopupVideo: _uploadPopupVideoRef,
                 onAddAnnouncement: (ann) {
                   setState(() => _allAnnouncements.insert(0, ann));
                   _upsertAnnouncement(ann);
@@ -4718,11 +4901,13 @@ class MainScreen extends StatefulWidget {
   final Future<void> Function(MediaPost)? onDeleteMedia;
   final Future<void> Function(MediaPost)? onPruneMedia;
   final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
+  final Future<bool> Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos)? onSavePopups;
+  final Future<String> Function(String localRef)? onUploadPopupVideo;
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
   final VoidCallback onClearAllAnnouncements;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
@@ -4815,9 +5000,18 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     );
   }
 
+  @override
+  void didUpdateWidget(MainScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldSig = jsonEncode({'p': oldWidget.config.ngmyPopups, 'v': oldWidget.config.ngmyVideoPopups});
+    final newSig = jsonEncode({'p': widget.config.ngmyPopups, 'v': widget.config.ngmyVideoPopups});
+    if (oldSig != newSig) _runScheduledPopups();
+  }
+
   @override void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    NgmyPopupOrchestrator.resolveVideoUrl = _resolveSupabaseStorageUrlResilient;
     _ngmyApplyMidnightClockReset(widget.user);
     _refreshOnlineStatus();
     _runScheduledPopups();
@@ -4936,7 +5130,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         });
         widget.onDataChanged();
         await _showLateClockInDialog(penalty, now);
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
         if (cost <= 0) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -5172,7 +5366,9 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onClearAllAnnouncements;
   final Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
   final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent});
+  final Future<bool> Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos)? onSavePopups;
+  final Future<String> Function(String localRef)? onUploadPopupVideo;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -5223,7 +5419,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               FloatingTitle(
                 title: 'GROWTH INCOME',
-                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent), routeName: 'AdminDashboard') : null,
+                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo), routeName: 'AdminDashboard') : null,
                 leading: InkWell(
                   onTap: () => NgmyNavigator.push(context, LoanServiceScreen(user: widget.user, config: widget.config), routeName: 'LoanServiceScreen'),
                   child: Container(
@@ -7890,7 +8086,9 @@ class AdminDashboard extends StatefulWidget {
   final Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
 
   final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent});
+  final Future<bool> Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos)? onSavePopups;
+  final Future<String> Function(String localRef)? onUploadPopupVideo;
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 class _AdminDashboardState extends State<AdminDashboard> {
@@ -8186,10 +8384,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
       isDark: isDark,
       popups: widget.config.ngmyPopups,
       videoPopups: widget.config.ngmyVideoPopups,
-      onSave: (popups, videos) {
+      onUploadVideo: widget.onUploadPopupVideo,
+      onSave: (popups, videos) async {
         widget.config.ngmyPopups = popups;
         widget.config.ngmyVideoPopups = videos;
+        if (widget.onSavePopups != null) {
+          return widget.onSavePopups!(popups, videos);
+        }
         widget.onDataChanged();
+        return true;
       },
     );
   }
@@ -9259,26 +9462,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _adminActionBtn(String label, IconData icon, Color color, VoidCallback onTap) => Material(
     color: color,
-    elevation: 2,
-    shadowColor: color.withOpacity(0.35),
-    borderRadius: BorderRadius.circular(8),
+    elevation: 1,
+    shadowColor: color.withOpacity(0.25),
+    borderRadius: BorderRadius.circular(6),
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(6),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 3),
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13, color: Colors.white),
-            const SizedBox(height: 2),
+            Icon(icon, size: 11, color: Colors.white),
+            const SizedBox(height: 1),
             Text(
               label,
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Colors.white, height: 1.1),
+              style: const TextStyle(fontSize: 7, fontWeight: FontWeight.w800, color: Colors.white, height: 1.05),
             ),
           ],
         ),
@@ -9380,9 +9583,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 3,
-            mainAxisSpacing: 6,
-            crossAxisSpacing: 6,
-            childAspectRatio: 2.6,
+            mainAxisSpacing: 5,
+            crossAxisSpacing: 5,
+            childAspectRatio: 3.4,
             children: [
               _adminActionBtn('Active', Icons.person_outline, const Color(0xFF22C55E), () { u.status = 'active'; widget.onDataChanged(); setState(() {}); }),
               _adminActionBtn('Suspend', Icons.block, const Color(0xFFF59E0B), () { u.status = 'suspended'; widget.onDataChanged(); setState(() {}); }),

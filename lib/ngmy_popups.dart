@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
@@ -200,6 +204,9 @@ class NgmyPopupDefaults {
       mergeWithDefaults(raw, buildVideoPopups());
 
   /// Merge saved admin settings with defaults so toggles/fields are never wiped on sync.
+  static bool popupEnabled(dynamic raw) =>
+      raw == true || raw == 1 || raw.toString().toLowerCase() == 'true';
+
   static List<Map<String, dynamic>> mergeWithDefaults(
     List<Map<String, dynamic>>? raw,
     List<Map<String, dynamic>> defaults,
@@ -212,7 +219,9 @@ class NgmyPopupDefaults {
         final id = (item['id'] ?? '').toString();
         if (id.isEmpty) continue;
         final base = byId[id] ?? <String, dynamic>{'id': id};
-        byId[id] = {...base, ...Map<String, dynamic>.from(item)};
+        final merged = {...base, ...Map<String, dynamic>.from(item)};
+        merged['enabled'] = popupEnabled(merged['enabled']);
+        byId[id] = merged;
       }
     }
     final ids = defaults.map((e) => (e['id'] ?? '').toString()).where((e) => e.isNotEmpty);
@@ -236,6 +245,8 @@ class NgmyPopupDefaults {
 }
 
 class NgmyPopupOrchestrator {
+  static Future<String> Function(String rawUrl)? resolveVideoUrl;
+
   static Future<void> handleAppOpen(
     BuildContext context, {
     required List<Map<String, dynamic>> popupsRaw,
@@ -255,7 +266,7 @@ class NgmyPopupOrchestrator {
     for (final raw in popups) {
       if (!context.mounted) return;
       final p = Map<String, dynamic>.from(raw);
-      if (p['enabled'] != true) continue;
+      if (!NgmyPopupDefaults.popupEnabled(p['enabled'])) continue;
       if (!_shouldShow3d(p, prefs, email, today, now)) continue;
       await Ngmy3DFloatingPopup.show(context, config: p);
       await _markShown(prefs, email, p['id'].toString(), today, p);
@@ -264,7 +275,7 @@ class NgmyPopupOrchestrator {
     for (final raw in videos) {
       if (!context.mounted) return;
       final p = Map<String, dynamic>.from(raw);
-      if (p['enabled'] != true) continue;
+      if (!NgmyPopupDefaults.popupEnabled(p['enabled'])) continue;
       final url = (p['videoUrl'] ?? '').toString().trim();
       if (url.isEmpty) continue;
       if (!_shouldShow3d(p, prefs, email, today, now)) continue;
@@ -633,8 +644,14 @@ class _NgmyVideoPopupBodyState extends State<_NgmyVideoPopupBody> with SingleTic
   }
 
   Future<void> _initVideo() async {
-    final url = (widget.config['videoUrl'] ?? '').toString().trim();
+    var url = (widget.config['videoUrl'] ?? '').toString().trim();
     if (url.isEmpty) return;
+    if (NgmyPopupOrchestrator.resolveVideoUrl != null) {
+      try {
+        url = await NgmyPopupOrchestrator.resolveVideoUrl!(url);
+      } catch (_) {}
+    }
+    if (!mounted || url.isEmpty) return;
     final c = VideoPlayerController.networkUrl(Uri.parse(url));
     _controller = c;
     try {
@@ -728,7 +745,8 @@ void showNgmyPopupsAdminSheet({
   required bool isDark,
   required List<Map<String, dynamic>> popups,
   required List<Map<String, dynamic>> videoPopups,
-  required void Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos) onSave,
+  required Future<bool> Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos) onSave,
+  Future<String> Function(String localRef)? onUploadVideo,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -739,6 +757,7 @@ void showNgmyPopupsAdminSheet({
       initialPopups: popups,
       initialVideos: videoPopups,
       onSave: onSave,
+      onUploadVideo: onUploadVideo,
     ),
   );
 }
@@ -747,13 +766,15 @@ class _NgmyPopupsAdminSheet extends StatefulWidget {
   final bool isDark;
   final List<Map<String, dynamic>> initialPopups;
   final List<Map<String, dynamic>> initialVideos;
-  final void Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos) onSave;
+  final Future<bool> Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos) onSave;
+  final Future<String> Function(String localRef)? onUploadVideo;
 
   const _NgmyPopupsAdminSheet({
     required this.isDark,
     required this.initialPopups,
     required this.initialVideos,
     required this.onSave,
+    this.onUploadVideo,
   });
 
   @override
@@ -763,6 +784,7 @@ class _NgmyPopupsAdminSheet extends StatefulWidget {
 class _NgmyPopupsAdminSheetState extends State<_NgmyPopupsAdminSheet> {
   late List<Map<String, dynamic>> _popups;
   late List<Map<String, dynamic>> _videos;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -830,16 +852,29 @@ class _NgmyPopupsAdminSheetState extends State<_NgmyPopupsAdminSheet> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: FilledButton(
-                onPressed: () {
-                  widget.onSave(
-                    _popups.map((e) => Map<String, dynamic>.from(e)).toList(),
-                    _videos.map((e) => Map<String, dynamic>.from(e)).toList(),
-                  );
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pop-up settings saved.')));
-                },
+                onPressed: _saving
+                    ? null
+                    : () async {
+                        setState(() => _saving = true);
+                        final ok = await widget.onSave(
+                          _popups.map((e) => Map<String, dynamic>.from(e)).toList(),
+                          _videos.map((e) => Map<String, dynamic>.from(e)).toList(),
+                        );
+                        if (!context.mounted) return;
+                        setState(() => _saving = false);
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(ok
+                                ? 'Pop-up settings saved for all users.'
+                                : 'Saved locally — cloud sync failed. Check connection and try again.'),
+                          ),
+                        );
+                      },
                 style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48), backgroundColor: const Color(0xFF00B25A)),
-                child: const Text('SAVE POP UP SETTINGS', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: _saving
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('SAVE POP UP SETTINGS', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -854,9 +889,9 @@ class _NgmyPopupsAdminSheetState extends State<_NgmyPopupsAdminSheet> {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 1.85,
+        crossAxisSpacing: 6,
+        mainAxisSpacing: 6,
+        childAspectRatio: 2.55,
       ),
       itemCount: items.length,
       itemBuilder: (_, i) => _popupGridCard(items[i], isVideo: isVideo),
@@ -865,7 +900,7 @@ class _NgmyPopupsAdminSheetState extends State<_NgmyPopupsAdminSheet> {
 
   Widget _popupGridCard(Map<String, dynamic> p, {required bool isVideo}) {
     final title = (p['title'] ?? p['id'] ?? 'Pop Up').toString();
-    final enabled = p['enabled'] == true;
+    final enabled = NgmyPopupDefaults.popupEnabled(p['enabled']);
     final theme = NgmyPopupDefaults.themeById((p['themeId'] ?? 'ngmy').toString());
     final colors = theme?['colors'] as List?;
     final c0 = colors != null && colors.isNotEmpty ? Color((colors[0] as num).toInt()) : const Color(0xFF6366F1);
@@ -877,9 +912,9 @@ class _NgmyPopupsAdminSheetState extends State<_NgmyPopupsAdminSheet> {
         borderRadius: BorderRadius.circular(16),
         onTap: () => _openPopupEditor(p, isVideo: isVideo),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -895,17 +930,21 @@ class _NgmyPopupsAdminSheetState extends State<_NgmyPopupsAdminSheet> {
                 children: [
                   Expanded(
                     child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10)),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9)),
                   ),
                   Transform.scale(
-                    scale: 0.72,
-                    child: Switch(value: enabled, onChanged: (v) => setState(() => p['enabled'] = v), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                    scale: 0.62,
+                    child: Switch(
+                      value: enabled,
+                      onChanged: (v) => setState(() => p['enabled'] = v),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                   ),
                 ],
               ),
               const Spacer(),
-              Text(isVideo ? 'Video ad' : (p['type'] ?? 'standard').toString(), style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 8)),
-              Text(enabled ? 'ON · tap to edit' : 'OFF', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 8, fontWeight: FontWeight.w600)),
+              Text(isVideo ? 'Video ad' : (p['type'] ?? 'standard').toString(), style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 7)),
+              Text(enabled ? 'ON · tap to edit' : 'OFF', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 7, fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -923,6 +962,7 @@ class _NgmyPopupsAdminSheetState extends State<_NgmyPopupsAdminSheet> {
         isVideo: isVideo,
         isDark: widget.isDark,
         onPreview: () => isVideo ? _previewVideo(p) : _preview3d(p),
+        onUploadVideo: widget.onUploadVideo,
       ),
     ).then((_) => setState(() {}));
   }
@@ -934,12 +974,14 @@ class _NgmyPopupEditorSheet extends StatefulWidget {
   final bool isVideo;
   final bool isDark;
   final VoidCallback onPreview;
+  final Future<String> Function(String localRef)? onUploadVideo;
 
   const _NgmyPopupEditorSheet({
     required this.popup,
     required this.isVideo,
     required this.isDark,
     required this.onPreview,
+    this.onUploadVideo,
   });
 
   @override
@@ -957,6 +999,8 @@ class _NgmyPopupEditorSheetState extends State<_NgmyPopupEditorSheet> {
   late final TextEditingController _intervalC;
   late final TextEditingController _maxC;
   late final TextEditingController _durationC;
+  bool _uploadingVideo = false;
+  final _picker = ImagePicker();
 
   Map<String, dynamic> get p => widget.popup;
 
@@ -1008,6 +1052,32 @@ class _NgmyPopupEditorSheetState extends State<_NgmyPopupEditorSheet> {
     p['intervalHours'] = int.tryParse(_intervalC.text.trim()) ?? 3;
     p['maxPerDay'] = int.tryParse(_maxC.text.trim()) ?? 1;
     p['durationMs'] = int.tryParse(_durationC.text.trim()) ?? 7000;
+    p['enabled'] = NgmyPopupDefaults.popupEnabled(p['enabled']);
+  }
+
+  Future<void> _pickVideoFromGallery() async {
+    if (widget.onUploadVideo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Video upload is not available on this device.')));
+      return;
+    }
+    final picked = await _picker.pickVideo(source: ImageSource.gallery);
+    if (picked == null) return;
+    setState(() => _uploadingVideo = true);
+    try {
+      String ref;
+      if (kIsWeb) {
+        ref = 'data:video/mp4;base64,${base64Encode(await picked.readAsBytes())}';
+      } else {
+        ref = picked.path;
+      }
+      final url = await widget.onUploadVideo!(ref);
+      if (url.trim().isNotEmpty) {
+        _videoC.text = url.trim();
+        p['videoUrl'] = url.trim();
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingVideo = false);
+    }
   }
 
   @override
@@ -1025,7 +1095,14 @@ class _NgmyPopupEditorSheetState extends State<_NgmyPopupEditorSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text((p['title'] ?? 'Edit Pop Up').toString(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Pop-up enabled'),
+                value: NgmyPopupDefaults.popupEnabled(p['enabled']),
+                onChanged: (v) => setState(() => p['enabled'] = v),
+              ),
+              const SizedBox(height: 8),
               TextField(controller: _titleC, decoration: _dec('Title')),
               const SizedBox(height: 8),
               TextField(controller: _subtitleC, decoration: _dec('Subtitle')),
@@ -1035,7 +1112,15 @@ class _NgmyPopupEditorSheetState extends State<_NgmyPopupEditorSheet> {
               TextField(controller: _linkLabelC, decoration: _dec('Link label')),
               if (widget.isVideo) ...[
                 const SizedBox(height: 8),
-                TextField(controller: _videoC, decoration: _dec('Video URL')),
+                TextField(controller: _videoC, decoration: _dec('Video URL (optional if uploaded)')),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _uploadingVideo ? null : _pickVideoFromGallery,
+                  icon: _uploadingVideo
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.video_library_outlined),
+                  label: Text(_uploadingVideo ? 'Uploading...' : 'Upload video from gallery'),
+                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: (p['frameStyle'] ?? 'gold_luxury').toString(),
