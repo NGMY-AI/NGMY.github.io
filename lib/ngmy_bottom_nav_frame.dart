@@ -9,8 +9,8 @@ class NgmyBottomNavMetrics {
   static const sideIconSize = 26.0;
   static const centerButtonSize = 44.0;
   static const iconPad = 8.0;
-  static const cornerRadius = 26.0;
-  static const blend = 14.0;
+  static const wingCorner = 20.0;
+  static const bottomJoin = 10.0;
 
   /// Total painted frame height (center dome + flat bottom).
   static double get frameHeight => iconPad * 2 + centerButtonSize;
@@ -28,9 +28,15 @@ class NgmyBottomNavMetrics {
     final cy = iconCenterY(frameH);
     return cy - centerButtonSize / 2 - iconPad;
   }
+
+  /// Side wings stop here at the bottom — same inset as top padding around small icons.
+  static double wingBottomY(double frameH) {
+    final cy = iconCenterY(frameH);
+    return cy + sideIconSize / 2 + iconPad;
+  }
 }
 
-/// One continuous bottom nav frame — low wings + raised center, frosted glass.
+/// One continuous bottom nav frame — side wings inset at bottom, clean center arch on top.
 class NgmySculptedBottomNavFrame extends StatelessWidget {
   const NgmySculptedBottomNavFrame({
     super.key,
@@ -66,9 +72,7 @@ class NgmySculptedBottomNavFrame extends StatelessWidget {
               ),
             ),
           ),
-          Positioned.fill(
-            child: child,
-          ),
+          Positioned.fill(child: child),
         ],
       ),
     );
@@ -92,55 +96,69 @@ class _NgmyUnifiedNavPainter extends CustomPainter {
   final Color fillColor;
   final Color borderColor;
 
-  static double _topY(double x, double w, double h) {
+  static Path buildPath(double w, double h) {
     final wingTop = NgmyBottomNavMetrics.wingTopY(h);
     final centerTop = NgmyBottomNavMetrics.centerTopY(h);
+    final wingBottom = NgmyBottomNavMetrics.wingBottomY(h);
+    final bottom = h;
     final leftEnd = w * (3 / 7);
     final rightStart = w * (4 / 7);
-    final blend = NgmyBottomNavMetrics.blend;
+    final cx = w / 2;
+    final r = NgmyBottomNavMetrics.wingCorner;
+    final join = NgmyBottomNavMetrics.bottomJoin;
+    final sideInset = NgmyBottomNavMetrics.iconPad * 0.65;
 
-    if (x <= leftEnd) return wingTop;
-    if (x >= rightStart) return wingTop;
+    final path = Path();
 
-    if (x < leftEnd + blend) {
-      final t = (x - leftEnd) / blend;
-      return wingTop + (centerTop - wingTop) * _ease(t);
-    }
-    if (x > rightStart - blend) {
-      final t = (rightStart - x) / blend;
-      return wingTop + (centerTop - wingTop) * _ease(t);
-    }
-    return centerTop;
-  }
+    // ── Left wing bottom (inset up to match top padding) ──
+    path.moveTo(r, wingBottom);
+    path.lineTo(leftEnd - sideInset, wingBottom);
 
-  static double _ease(double t) {
-    if (t <= 0) return 0;
-    if (t >= 1) return 1;
-    return t * t * (3 - 2 * t);
-  }
+    // Inner join: curve down into full NGMY bottom (unchanged).
+    path.cubicTo(
+      leftEnd - 2,
+      wingBottom,
+      leftEnd + 2,
+      bottom - 2,
+      leftEnd + join,
+      bottom,
+    );
 
-  static Path buildPath(double w, double h) {
-    final r = NgmyBottomNavMetrics.cornerRadius;
-    const steps = 48;
-    final bottom = h;
+    // ── NGMY flat bottom (do not change) ──
+    path.lineTo(rightStart - join, bottom);
 
-    final path = Path()..moveTo(r, _topY(r, w, h));
+    // Inner join on right wing.
+    path.cubicTo(
+      rightStart - 2,
+      bottom - 2,
+      rightStart + 2,
+      wingBottom,
+      rightStart + sideInset,
+      wingBottom,
+    );
 
-    for (var i = 1; i <= steps; i++) {
-      final x = r + (w - r * 2) * (i / steps);
-      path.lineTo(x, _topY(x, w, h));
-    }
+    // ── Right wing bottom ──
+    path.lineTo(w - r, wingBottom);
+    path.quadraticBezierTo(w, wingBottom, w, wingBottom - r);
 
-    path
-      ..lineTo(w - r, _topY(w - r, w, h))
-      ..quadraticBezierTo(w, _topY(w - r, w, h), w, _topY(w - r, w, h) + r)
-      ..lineTo(w, bottom - r)
-      ..quadraticBezierTo(w, bottom, w - r, bottom)
-      ..lineTo(r, bottom)
-      ..quadraticBezierTo(0, bottom, 0, bottom - r)
-      ..lineTo(0, _topY(r, w, h) + r)
-      ..quadraticBezierTo(0, _topY(r, w, h), r, _topY(r, w, h))
-      ..close();
+    // Right outer edge.
+    path.lineTo(w, wingTop + r);
+    path.quadraticBezierTo(w, wingTop, w - r, wingTop);
+
+    // Right wing top (pushed in slightly on inner edge).
+    path.lineTo(rightStart + sideInset, wingTop);
+
+    // ── Clean top curve over NGMY (one arc, end to end) ──
+    path.quadraticBezierTo(cx, centerTop, leftEnd + sideInset, wingTop);
+
+    // Left wing top.
+    path.lineTo(r, wingTop);
+    path.quadraticBezierTo(0, wingTop, 0, wingTop + r);
+
+    // Left outer edge.
+    path.lineTo(0, wingBottom - r);
+    path.quadraticBezierTo(0, wingBottom, r, wingBottom);
+    path.close();
 
     return path;
   }
