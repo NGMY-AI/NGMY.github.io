@@ -5967,8 +5967,20 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       padding: const EdgeInsets.fromLTRB(15, 0, 15, 25),
       child: SafeArea(
         top: false,
-        child: SizedBox(
+        child: Container(
           height: 75,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
           child: Row(
             children: [
               _nav(0, Icons.home_rounded),
