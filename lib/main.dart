@@ -2353,6 +2353,30 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   return row;
 }
 
+/// Persists chat open/closed for all users (Supabase + local cache).
+Future<void> ngmyPersistNgmyChatClosed(AppConfig config, bool closed) async {
+  config.ngmyChatClosed = closed;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_config', jsonEncode(config.toJson()));
+    if (!await ngmyDeviceIsOnline()) return;
+    final row = await _configRowForSupabaseUpsert(config: config, isAdmin: true);
+    row['ngmyChatClosed'] = closed;
+    await Supabase.instance.client.from('config').upsert(row);
+  } catch (e) {
+    debugPrint('[ngmyChatClosed] persist error: $e');
+  }
+}
+
+void _applyNgmyChatClosedFromRemote(AppConfig next, Map<String, dynamic> record, {required bool localClosed}) {
+  if (record.containsKey('ngmyChatClosed')) {
+    next.ngmyChatClosed = record['ngmyChatClosed'] == true;
+  } else {
+    // Remote row may omit the column — keep the last known local state.
+    next.ngmyChatClosed = localClosed;
+  }
+}
+
 Future<String?> _geminiGenerateReply(
   String apiKey,
   String userQuery, {
@@ -2860,8 +2884,10 @@ class _NGMYAppState extends State<NGMYApp> {
         final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepLoans = List<Map<String, dynamic>>.from(_config.loanApplications.map((e) => Map<String, dynamic>.from(e)));
+        final keepChatClosed = _config.ngmyChatClosed;
         final cfgMap = Map<String, dynamic>.from(cfg);
         final next = AppConfig.fromJson(cfgMap);
+        _applyNgmyChatClosedFromRemote(next, cfgMap, localClosed: keepChatClosed);
         final remoteLimits = cfgMap['gameTimeLimits'];
         if (remoteLimits is Map && remoteLimits.isNotEmpty) {
           next.gameTimeLimits = ngmyParseGameTimeLimits(remoteLimits);
@@ -3572,6 +3598,7 @@ class _NGMYAppState extends State<NGMYApp> {
         final record = Map<String, dynamic>.from(payload.newRecord);
         final next = AppConfig.fromJson(record);
         _applyRemoteLegalToConfig(next, record);
+        _applyNgmyChatClosedFromRemote(next, record, localClosed: _config.ngmyChatClosed);
         if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
         else next.storeOrders = _mergeStoreOrdersLists(keepOrders, next.storeOrders);
         _maintainStoreOrders(next.storeOrders);
@@ -12097,12 +12124,15 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                             ),
                           ),
                           FilledButton.icon(
-                            onPressed: () {
-                              setState(() => widget.config.ngmyChatClosed = !widget.config.ngmyChatClosed);
+                            onPressed: () async {
+                              final closed = !widget.config.ngmyChatClosed;
+                              setState(() => widget.config.ngmyChatClosed = closed);
+                              await ngmyPersistNgmyChatClosed(widget.config, closed);
                               widget.onDataChanged();
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(widget.config.ngmyChatClosed
+                                  content: Text(closed
                                       ? 'Chat closed — users cannot send messages.'
                                       : 'Chat reopened for all users.'),
                                 ),
@@ -25966,6 +25996,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   bool _isPostingNews = false;
   bool _isTyping = false;
   bool _memoryLoaded = false;
+  bool _chatClosedForUsers = false;
+  Timer? _chatGateTimer;
 
   final ScrollController _scrollController = ScrollController();
 
@@ -25988,8 +26020,50 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   @override
   void initState() {
     super.initState();
+    _chatClosedForUsers = widget.config.ngmyChatClosed;
     _loadChatMemory();
+    _startChatGateWatcher();
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshGeminiKeyFromCloud());
+  }
+
+  void _startChatGateWatcher() {
+    _chatGateTimer?.cancel();
+    _chatGateTimer = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(_syncChatClosedFromCloud()));
+    unawaited(_syncChatClosedFromCloud());
+  }
+
+  Future<void> _syncChatClosedFromCloud() async {
+    bool closed = widget.config.ngmyChatClosed;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('app_config');
+      if (raw != null && raw.isNotEmpty) {
+        final map = jsonDecode(raw);
+        if (map is Map) {
+          closed = AppConfig.fromJson(Map<String, dynamic>.from(map)).ngmyChatClosed;
+          widget.config.ngmyChatClosed = closed;
+        }
+      }
+      if (await ngmyDeviceIsOnline()) {
+        final row = await Supabase.instance.client.from('config').select('ngmyChatClosed').eq('id', 1).maybeSingle();
+        if (row != null && row.containsKey('ngmyChatClosed')) {
+          closed = row['ngmyChatClosed'] == true;
+          widget.config.ngmyChatClosed = closed;
+        }
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    if (closed != _chatClosedForUsers) {
+      setState(() => _chatClosedForUsers = closed);
+    }
+  }
+
+  void _sortMessagesChronological() {
+    _messages.sort((a, b) {
+      final ta = DateTime.tryParse((a['at'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final tb = DateTime.tryParse((b['at'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return ta.compareTo(tb);
+    });
   }
 
   Future<void> _loadChatMemory() async {
@@ -25999,6 +26073,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       _messages.clear();
       if (stored.isNotEmpty) {
         _messages.addAll(stored);
+        _sortMessagesChronological();
       } else {
         _messages.add({
           'role': 'ai',
@@ -26010,7 +26085,10 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       }
       _memoryLoaded = true;
     });
-    _scrollToBottom();
+    _scrollToBottom(jump: true);
+    Future<void>.delayed(const Duration(milliseconds: 120), () {
+      if (mounted) _scrollToBottom(jump: true);
+    });
   }
 
   Future<void> _persistChatMemory() async {
@@ -26019,6 +26097,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   @override
   void dispose() {
+    _chatGateTimer?.cancel();
     _chatController.dispose();
     _newsController.dispose();
     _scrollController.dispose();
@@ -26026,17 +26105,19 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     super.dispose();
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool jump = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+      if (!_scrollController.hasClients) return;
+      final target = _scrollController.position.maxScrollExtent;
+      if (jump) {
+        _scrollController.jumpTo(target);
+      } else {
+        _scrollController.animateTo(target, duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
       }
     });
   }
+
+  bool get _userChatLocked => _chatClosedForUsers && !widget.user.isAdmin;
 
   Future<void> _refreshGeminiKeyFromCloud() async {
     final remote = await _fetchRemoteGeminiApiKey();
@@ -26047,7 +26128,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   Future<void> _sendMessage() async {
-    if (widget.config.ngmyChatClosed && !widget.user.isAdmin) {
+    if (_userChatLocked) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Chat is temporarily closed by an admin.')),
@@ -26064,6 +26145,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         'text': text,
         'at': DateTime.now().toUtc().toIso8601String(),
       });
+      _sortMessagesChronological();
       _chatController.clear();
       _isTyping = true;
     });
@@ -26104,6 +26186,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           'text': reply,
           'at': DateTime.now().toUtc().toIso8601String(),
         });
+        _sortMessagesChronological();
       });
       unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: reply));
     } catch (e) {
@@ -26355,7 +26438,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                 isDark: isDark,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                  child: widget.config.ngmyChatClosed && !widget.user.isAdmin
+                  child: _userChatLocked
                       ? Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
@@ -26366,12 +26449,12 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                           ),
                           child: const Row(
                             children: [
-                              Icon(Icons.lock_rounded, color: Colors.redAccent, size: 20),
+                              Icon(Icons.lock_rounded, color: Colors.redAccent, size: 22),
                               SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  'Chat is closed. Please check back later.',
-                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                  'Chat is locked by admin. You cannot send messages right now.',
+                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                                 ),
                               ),
                             ],
@@ -26402,6 +26485,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                           Expanded(
                             child: TextField(
                               controller: _chatController,
+                              enabled: !_userChatLocked,
+                              readOnly: _userChatLocked,
                               minLines: 1,
                               maxLines: 4,
                               style: TextStyle(color: isDark ? Colors.white : Colors.black87),
@@ -26458,7 +26543,10 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _activeTab = idx),
+        onTap: () {
+          setState(() => _activeTab = idx);
+          if (idx == 0) _scrollToBottom(jump: true);
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 11),
@@ -26489,6 +26577,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   Widget _chatView(bool isDark, Color chatBg) {
+    final count = _messages.length + (_isTyping ? 1 : 0);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
@@ -26496,12 +26585,13 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
       ),
-      child: ListView(
+      child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
-        children: [
-          if (_messages.isEmpty)
-            Center(
+        itemCount: count == 0 ? 1 : count,
+        itemBuilder: (context, index) {
+          if (_messages.isEmpty && !_isTyping) {
+            return Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Column(
@@ -26526,10 +26616,13 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                   ],
                 ),
               ),
-            ),
-          ..._messages.map((m) => _chatBubble(m, isDark)),
-          if (_isTyping) _chatBubble({'role': 'ai', 'text': '…'}, isDark, typing: true),
-        ],
+            );
+          }
+          if (index < _messages.length) {
+            return _chatBubble(_messages[index], isDark);
+          }
+          return _chatBubble({'role': 'ai', 'text': '…'}, isDark, typing: true);
+        },
       ),
     );
   }

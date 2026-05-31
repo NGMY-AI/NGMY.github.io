@@ -68,6 +68,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   late final AnimationController _ambient;
   late final AnimationController _framePulse;
   late final AnimationController _inner3d;
+  late final AnimationController _flagFx;
 
   final List<_ScannedPage> _pages = [];
   bool _analyzing = false;
@@ -84,6 +85,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     _ambient = AnimationController(vsync: this, duration: const Duration(seconds: 14))..repeat();
     _framePulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
     _inner3d = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
+    _flagFx = AnimationController(vsync: this, duration: const Duration(milliseconds: 520));
   }
 
   @override
@@ -91,6 +93,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     _ambient.dispose();
     _framePulse.dispose();
     _inner3d.dispose();
+    _flagFx.dispose();
     _questionC.dispose();
     super.dispose();
   }
@@ -468,41 +471,56 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     );
   }
 
-  Widget _languageFlags() {
-    Widget flagBtn({required String code, required String emoji, required String label}) {
-      final on = _responseLanguage == code;
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _analyzing ? null : () => setState(() => _responseLanguage = code),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: on ? _mint : Colors.white.withValues(alpha: 0.25), width: on ? 2 : 1),
-              color: on ? Colors.white.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.05),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(emoji, style: const TextStyle(fontSize: 20)),
-                const SizedBox(width: 4),
-                Text(label, style: TextStyle(color: Colors.white.withValues(alpha: on ? 0.95 : 0.55), fontSize: 10, fontWeight: FontWeight.w700)),
-              ],
-            ),
+  String get _flagEmoji => _responseLanguage == 'sw' ? '🇹🇿' : '🇺🇸';
+
+  Future<void> _toggleLanguageFlag() async {
+    if (_analyzing) return;
+    await _flagFx.forward(from: 0);
+    if (!mounted) return;
+    setState(() => _responseLanguage = _responseLanguage == 'en' ? 'sw' : 'en');
+    _flagFx.reset();
+  }
+
+  Widget _magicLanguageFlag() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _toggleLanguageFlag,
+        customBorder: const CircleBorder(),
+        child: AnimatedBuilder(
+          animation: _flagFx,
+          builder: (context, child) {
+            final t = Curves.easeInOutCubic.transform(_flagFx.value);
+            final spin = t * math.pi;
+            final scale = 1.0 + math.sin(t * math.pi) * 0.22;
+            return Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.002)
+                ..rotateY(spin)
+                ..scale(scale, scale, 1.0),
+              child: Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(color: _cyan.withValues(alpha: 0.35 * t), blurRadius: 16 + 8 * t),
+                    BoxShadow(color: _violet.withValues(alpha: 0.28 * t), blurRadius: 12),
+                  ],
+                ),
+                child: child,
+              ),
+            );
+          },
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+            child: Text(_flagEmoji, key: ValueKey<String>(_responseLanguage), style: const TextStyle(fontSize: 28)),
           ),
         ),
-      );
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        flagBtn(code: 'en', emoji: '🇺🇸', label: 'EN'),
-        const SizedBox(width: 8),
-        flagBtn(code: 'sw', emoji: '🇹🇿', label: 'SW'),
-      ],
+      ),
     );
   }
 
@@ -588,13 +606,9 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   }
 
   Widget _modernChatPrefix() {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, right: 4),
-      child: Icon(
-        Icons.chat_bubble_outline_rounded,
-        size: 26,
-        color: Colors.white.withValues(alpha: 0.72),
-      ),
+    return const Padding(
+      padding: EdgeInsets.only(left: 8, right: 4),
+      child: _NgmyMessengerOutlineIcon(size: 26, color: Color(0xFFE2E8F0)),
     );
   }
 
@@ -735,7 +749,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                               ),
                             ),
                           ),
-                          _languageFlags(),
+                          _magicLanguageFlag(),
                         ],
                       ),
                     ),
@@ -952,6 +966,48 @@ class _ScanCornerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ScanCornerPainter old) => old.progress != progress;
+}
+
+/// Modern messenger-style outline (circle + tail) — no filled box.
+class _NgmyMessengerOutlineIcon extends StatelessWidget {
+  const _NgmyMessengerOutlineIcon({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(size: Size(size, size), painter: _NgmyMessengerOutlinePainter(color: color));
+  }
+}
+
+class _NgmyMessengerOutlinePainter extends CustomPainter {
+  _NgmyMessengerOutlinePainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.07
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final cx = size.width * 0.48;
+    final cy = size.height * 0.4;
+    final r = size.width * 0.28;
+    canvas.drawCircle(Offset(cx, cy), r, paint);
+
+    final tail = Path()
+      ..moveTo(cx - r * 0.55, cy + r * 0.62)
+      ..quadraticBezierTo(cx - r * 1.05, cy + r * 1.05, cx - r * 0.15, cy + r * 0.88);
+    canvas.drawPath(tail, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _NgmyMessengerOutlinePainter old) => old.color != color;
 }
 
 class _HoloGridPainter extends CustomPainter {
