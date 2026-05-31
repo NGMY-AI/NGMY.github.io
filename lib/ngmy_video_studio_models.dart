@@ -1,0 +1,280 @@
+import 'package:flutter/material.dart';
+
+enum NgmyVideoFormat { youtube, tiktok }
+
+enum NgmyVideoSlotShape { rect, circle }
+
+enum NgmySlotKind { video, logoAnim }
+
+enum NgmyVideoTemplateId {
+  ytStudioCurved,
+  ytNewsDesk,
+  ytThanksTriple,
+  ytDualEnd,
+  ttVerticalStudio,
+  ttThanksTriple,
+  ttNewsTag,
+}
+
+extension NgmyVideoFormatExt on NgmyVideoFormat {
+  double get aspectRatio => this == NgmyVideoFormat.youtube ? 16 / 9 : 9 / 16;
+
+  int get exportWidth => this == NgmyVideoFormat.youtube ? 1920 : 1080;
+
+  int get exportHeight => this == NgmyVideoFormat.youtube ? 1080 : 1920;
+
+  String get label => this == NgmyVideoFormat.youtube ? 'YouTube' : 'TikTok';
+
+  String get sizeLabel => '${exportWidth}×$exportHeight';
+}
+
+class NgmyVideoSlotDef {
+  final String id;
+  final String label;
+  final Rect youtubeRect;
+  final Rect tiktokRect;
+  final NgmyVideoSlotShape shape;
+  final NgmySlotKind kind;
+
+  const NgmyVideoSlotDef({
+    required this.id,
+    required this.label,
+    required this.youtubeRect,
+    required this.tiktokRect,
+    this.shape = NgmyVideoSlotShape.rect,
+    this.kind = NgmySlotKind.video,
+  });
+
+  Rect defaultRect(NgmyVideoFormat format) =>
+      format == NgmyVideoFormat.youtube ? youtubeRect : tiktokRect;
+}
+
+class NgmyVideoTemplateDef {
+  final NgmyVideoTemplateId id;
+  final String name;
+  final String category;
+  final IconData icon;
+  final NgmyVideoFormat forFormat;
+  final String? assetPath;
+  final List<NgmyVideoSlotDef> slots;
+  final String defaultHeadline;
+  final String defaultTitle;
+  final String defaultSubtitle;
+  final String defaultLive;
+  final bool showTextOverlay;
+
+  const NgmyVideoTemplateDef({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.icon,
+    required this.forFormat,
+    this.assetPath,
+    required this.slots,
+    this.defaultHeadline = '',
+    this.defaultTitle = 'NEWS',
+    this.defaultSubtitle = 'BREAKING',
+    this.defaultLive = 'LIVE',
+    this.showTextOverlay = false,
+  });
+
+  bool get usesPhotoBackdrop => assetPath != null && assetPath!.isNotEmpty;
+}
+
+const List<NgmyVideoTemplateDef> kNgmyVideoTemplates = [
+  // —— YouTube (16:9) photo studios — keep screenshot colors; only screens are video/logo ——
+  NgmyVideoTemplateDef(
+    id: NgmyVideoTemplateId.ytStudioCurved,
+    name: 'Blue Curved Studio',
+    category: '3D News Studio',
+    icon: Icons.tv_rounded,
+    forFormat: NgmyVideoFormat.youtube,
+    assetPath: 'assets/video_studio/yt_studio_curved.png',
+    slots: [
+      NgmyVideoSlotDef(
+        id: 'main',
+        label: 'Main TV screen',
+        youtubeRect: Rect.fromLTWH(0.48, 0.14, 0.46, 0.52),
+        tiktokRect: Rect.fromLTWH(0.08, 0.20, 0.84, 0.38),
+      ),
+      NgmyVideoSlotDef(
+        id: 'logo',
+        label: 'Side screen (logo animation)',
+        youtubeRect: Rect.fromLTWH(0.06, 0.18, 0.36, 0.42),
+        tiktokRect: Rect.fromLTWH(0.10, 0.62, 0.80, 0.22),
+        kind: NgmySlotKind.logoAnim,
+      ),
+    ],
+    showTextOverlay: false,
+  ),
+  NgmyVideoTemplateDef(
+    id: NgmyVideoTemplateId.ytNewsDesk,
+    name: 'News Desk Studio',
+    category: '3D News Studio',
+    icon: Icons.desktop_windows_rounded,
+    forFormat: NgmyVideoFormat.youtube,
+    assetPath: 'assets/video_studio/yt_news_desk.png',
+    slots: [
+      NgmyVideoSlotDef(
+        id: 'main',
+        label: 'Big backdrop screen',
+        youtubeRect: Rect.fromLTWH(0.30, 0.06, 0.40, 0.40),
+        tiktokRect: Rect.fromLTWH(0.10, 0.12, 0.80, 0.32),
+      ),
+      NgmyVideoSlotDef(
+        id: 'logo',
+        label: 'Side monitor (logo pop-up)',
+        youtubeRect: Rect.fromLTWH(0.70, 0.26, 0.24, 0.30),
+        tiktokRect: Rect.fromLTWH(0.12, 0.48, 0.76, 0.20),
+        kind: NgmySlotKind.logoAnim,
+      ),
+    ],
+    showTextOverlay: false,
+  ),
+  NgmyVideoTemplateDef(
+    id: NgmyVideoTemplateId.ytThanksTriple,
+    name: 'Thanks — 3 Frames',
+    category: 'End Screen',
+    icon: Icons.thumb_up_alt_outlined,
+    forFormat: NgmyVideoFormat.youtube,
+    slots: [
+      NgmyVideoSlotDef(id: 'left', label: 'Left clip', youtubeRect: Rect.fromLTWH(0.04, 0.24, 0.27, 0.40), tiktokRect: Rect.fromLTWH(0.05, 0.18, 0.42, 0.22)),
+      NgmyVideoSlotDef(id: 'center', label: 'Center circle', youtubeRect: Rect.fromLTWH(0.37, 0.28, 0.26, 0.46), tiktokRect: Rect.fromLTWH(0.28, 0.42, 0.44, 0.22), shape: NgmyVideoSlotShape.circle),
+      NgmyVideoSlotDef(id: 'right', label: 'Right clip', youtubeRect: Rect.fromLTWH(0.69, 0.24, 0.27, 0.40), tiktokRect: Rect.fromLTWH(0.53, 0.18, 0.42, 0.22)),
+    ],
+    defaultHeadline: '@yourchannel',
+    defaultTitle: 'THANKS FOR WATCHING',
+    defaultSubtitle: 'ANOTHER ONE!',
+    defaultLive: 'SUBSCRIBE',
+    showTextOverlay: true,
+  ),
+  NgmyVideoTemplateDef(
+    id: NgmyVideoTemplateId.ytDualEnd,
+    name: 'Dual End Boxes',
+    category: 'End Screen',
+    icon: Icons.view_column_outlined,
+    forFormat: NgmyVideoFormat.youtube,
+    slots: [
+      NgmyVideoSlotDef(id: 'left', label: 'Left clip', youtubeRect: Rect.fromLTWH(0.05, 0.22, 0.40, 0.48), tiktokRect: Rect.fromLTWH(0.06, 0.16, 0.88, 0.36)),
+      NgmyVideoSlotDef(id: 'right', label: 'Right clip', youtubeRect: Rect.fromLTWH(0.55, 0.22, 0.40, 0.48), tiktokRect: Rect.fromLTWH(0.06, 0.54, 0.88, 0.36)),
+    ],
+    defaultHeadline: 'Watch next',
+    defaultTitle: 'THANKS FOR WATCHING',
+    defaultSubtitle: 'ANOTHER ONE!',
+    defaultLive: 'FOLLOW',
+    showTextOverlay: true,
+  ),
+  // —— TikTok (9:16) ——
+  NgmyVideoTemplateDef(
+    id: NgmyVideoTemplateId.ttVerticalStudio,
+    name: 'Vertical News Studio',
+    category: 'News',
+    icon: Icons.phone_android_outlined,
+    forFormat: NgmyVideoFormat.tiktok,
+    assetPath: 'assets/video_studio/yt_news_desk.png',
+    slots: [
+      NgmyVideoSlotDef(
+        id: 'main',
+        label: 'Main video',
+        youtubeRect: Rect.fromLTWH(0, 0, 1, 1),
+        tiktokRect: Rect.fromLTWH(0.06, 0.14, 0.88, 0.48),
+      ),
+      NgmyVideoSlotDef(
+        id: 'logo',
+        label: 'Logo pop-up',
+        youtubeRect: Rect.fromLTWH(0.7, 0.3, 0.25, 0.25),
+        tiktokRect: Rect.fromLTWH(0.10, 0.66, 0.80, 0.18),
+        kind: NgmySlotKind.logoAnim,
+      ),
+    ],
+    showTextOverlay: false,
+  ),
+  NgmyVideoTemplateDef(
+    id: NgmyVideoTemplateId.ttThanksTriple,
+    name: 'Thanks — 3 Frames',
+    category: 'End Screen',
+    icon: Icons.favorite_border,
+    forFormat: NgmyVideoFormat.tiktok,
+    slots: [
+      NgmyVideoSlotDef(id: 'left', label: 'Top clip', youtubeRect: Rect.fromLTWH(0.04, 0.24, 0.27, 0.40), tiktokRect: Rect.fromLTWH(0.06, 0.14, 0.88, 0.24)),
+      NgmyVideoSlotDef(id: 'center', label: 'Middle circle', youtubeRect: Rect.fromLTWH(0.37, 0.28, 0.26, 0.46), tiktokRect: Rect.fromLTWH(0.28, 0.40, 0.44, 0.20), shape: NgmyVideoSlotShape.circle),
+      NgmyVideoSlotDef(id: 'right', label: 'Bottom clip', youtubeRect: Rect.fromLTWH(0.69, 0.24, 0.27, 0.40), tiktokRect: Rect.fromLTWH(0.06, 0.64, 0.88, 0.24)),
+    ],
+    defaultHeadline: '@you',
+    defaultTitle: 'THANKS FOR WATCHING',
+    defaultSubtitle: 'NEXT VIDEO',
+    defaultLive: 'FOLLOW',
+    showTextOverlay: true,
+  ),
+  NgmyVideoTemplateDef(
+    id: NgmyVideoTemplateId.ttNewsTag,
+    name: 'Vertical Live Tag',
+    category: 'News Tag',
+    icon: Icons.tag,
+    forFormat: NgmyVideoFormat.tiktok,
+    slots: [
+      NgmyVideoSlotDef(id: 'main', label: 'Full video', youtubeRect: Rect.fromLTWH(0, 0, 1, 1), tiktokRect: Rect.fromLTWH(0, 0, 1, 1)),
+    ],
+    defaultHeadline: 'Happening now',
+    defaultTitle: 'NEWS',
+    defaultSubtitle: 'LIVE UPDATE',
+    defaultLive: 'LIVE',
+    showTextOverlay: true,
+  ),
+];
+
+List<NgmyVideoTemplateDef> ngmyTemplatesForFormat(NgmyVideoFormat format) =>
+    kNgmyVideoTemplates.where((t) => t.forFormat == format).toList();
+
+NgmyVideoTemplateDef ngmyTemplateDef(NgmyVideoTemplateId id) =>
+    kNgmyVideoTemplates.firstWhere((t) => t.id == id);
+
+NgmyVideoTemplateId ngmyDefaultTemplateFor(NgmyVideoFormat format) =>
+    format == NgmyVideoFormat.youtube
+        ? NgmyVideoTemplateId.ytStudioCurved
+        : NgmyVideoTemplateId.ttVerticalStudio;
+
+/// Web export loads backdrop from deployed assets folder.
+String ngmyStudioAssetWebUrl(String assetPath) {
+  const base = '/NGMY.github.io/';
+  return '$base$assetPath';
+}
+
+class NgmyVideoStudioExportConfig {
+  final NgmyVideoTemplateId templateId;
+  final NgmyVideoFormat format;
+  final String? backgroundAsset;
+  final Map<String, String> videoSourcesBySlot;
+  final Map<String, String> logoDataUrlBySlot;
+  final Map<String, Rect> slotRects;
+  final Map<String, NgmyVideoSlotShape> slotShapes;
+  final Map<String, NgmySlotKind> slotKinds;
+  final String headline;
+  final String title;
+  final String subtitle;
+  final String liveLabel;
+  final double headlineFontScale;
+  final double titleFontScale;
+  final bool showTextOverlay;
+
+  const NgmyVideoStudioExportConfig({
+    required this.templateId,
+    required this.format,
+    this.backgroundAsset,
+    required this.videoSourcesBySlot,
+    this.logoDataUrlBySlot = const {},
+    required this.slotRects,
+    required this.slotShapes,
+    required this.slotKinds,
+    required this.headline,
+    required this.title,
+    required this.subtitle,
+    required this.liveLabel,
+    this.headlineFontScale = 1.0,
+    this.titleFontScale = 1.0,
+    this.showTextOverlay = false,
+  });
+
+  int get outputWidth => format.exportWidth;
+  int get outputHeight => format.exportHeight;
+}

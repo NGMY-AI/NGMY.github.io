@@ -44,6 +44,7 @@ import 'ngmy_oauth.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
+import 'ngmy_video_studio.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -595,6 +596,38 @@ class MediaPost {
 
 double _clampMediaAspectRatio(double ratio) => ratio.clamp(0.45, 2.35);
 
+/// Display name for media posts — never show generic "User" when we can resolve the account.
+String _mediaAuthorName(UserData user) {
+  final full = user.fullName?.trim();
+  if (full != null && full.isNotEmpty) return full;
+  final un = user.username.trim();
+  if (un.isNotEmpty && un != 'User') return un;
+  final email = user.email.trim().toLowerCase();
+  if (email.contains('@')) return email.split('@').first;
+  return un.isNotEmpty ? un : 'Member';
+}
+
+String _mediaPostDisplayName(MediaPost post, List<UserData> allUsers) {
+  final stored = post.username.trim();
+  if (stored.isNotEmpty && stored != 'User') return stored;
+  final email = post.userEmail.toLowerCase().trim();
+  if (email.isNotEmpty) {
+    final user = allUsers.firstWhere(
+      (x) => x.email.toLowerCase().trim() == email,
+      orElse: () => UserData(email: post.userEmail),
+    );
+    return _mediaAuthorName(user);
+  }
+  return stored.isNotEmpty ? stored : 'Member';
+}
+
+String _pickMediaUsername(String remote, String local) {
+  bool good(String s) => s.trim().isNotEmpty && s.trim() != 'User';
+  if (good(remote)) return remote.trim();
+  if (good(local)) return local.trim();
+  return remote.trim().isNotEmpty ? remote.trim() : local.trim();
+}
+
 double _mediaFrameHeightForWidth(double width, double aspectRatio, double maxScreenFraction) {
   final safeRatio = _clampMediaAspectRatio(aspectRatio);
   final maxH = width / safeRatio;
@@ -770,7 +803,7 @@ MediaPost _combineMediaPosts(MediaPost remote, MediaPost local) {
   return MediaPost(
     id: remote.id,
     userEmail: remote.userEmail,
-    username: remote.username,
+    username: _pickMediaUsername(remote.username, local.username),
     videoUrl: remote.videoUrl.isNotEmpty ? remote.videoUrl : local.videoUrl,
     contentType: remote.contentType.isNotEmpty ? remote.contentType : local.contentType,
     caption: remote.caption.isNotEmpty ? remote.caption : local.caption,
@@ -24165,7 +24198,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       final post = MediaPost(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         userEmail: widget.user.email,
-        username: widget.user.username,
+        username: _mediaAuthorName(widget.user),
         videoUrl: upload.ref!,
         contentType: isVideo ? 'video' : 'image',
         caption: _captionController.text.trim(),
@@ -24510,6 +24543,25 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                       ),
                       child: Row(
                         children: [
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: Material(
+                              color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB),
+                              shape: const CircleBorder(),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: () => showNgmyVideoStudio(context),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Icon(
+                                    Icons.auto_fix_high_rounded,
+                                    color: isDark ? Colors.white : Colors.black87,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                           Expanded(
                             child: Center(
                               child: Text(
@@ -24547,25 +24599,14 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                                 borderRadius: BorderRadius.circular(20),
                                 onTap: _isPosting ? null : _showPostDialog,
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (_isPosting)
-                                        const SizedBox(
-                                          width: 14,
-                                          height: 14,
+                                  padding: const EdgeInsets.all(9),
+                                  child: _isPosting
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
                                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                         )
-                                      else
-                                        const Icon(Icons.add_rounded, color: Colors.white, size: 18),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _isPosting ? '...' : 'Post',
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
-                                      ),
-                                    ],
-                                  ),
+                                      : const Icon(Icons.add_rounded, color: Colors.white, size: 22),
                                 ),
                               ),
                             ),
@@ -24870,7 +24911,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                             )
                           : (_isInitialized && _controller != null)
                               ? FittedBox(
-                                  fit: BoxFit.contain,
+                                  fit: BoxFit.cover,
+                                  clipBehavior: Clip.hardEdge,
                                   child: SizedBox(
                                     width: _controller!.value.size.width,
                                     height: _controller!.value.size.height,
@@ -24921,7 +24963,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
     }
     if (resolved.startsWith('data:image')) {
       try {
-        return Image.memory(base64Decode(resolved.split(',').last), fit: BoxFit.contain, width: double.infinity, height: double.infinity);
+        return Image.memory(base64Decode(resolved.split(',').last), fit: BoxFit.cover, width: double.infinity, height: double.infinity);
       } catch (_) {
         return Center(child: Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42));
       }
@@ -24929,7 +24971,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
     if (resolved.startsWith('http')) {
       return Image.network(
         resolved,
-        fit: BoxFit.contain,
+        fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
         gaplessPlayback: true,
@@ -24945,7 +24987,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
     if (!kIsWeb) {
       return Image.file(
         File(resolved),
-        fit: BoxFit.contain,
+        fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
         errorBuilder: (_, __, ___) => Center(
@@ -24985,6 +25027,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   bool get _liked => widget.post.likedBy.contains(widget.currentUser.email);
   bool get _saved => widget.post.savedBy.contains(widget.currentUser.email);
   bool get _isOwner => widget.currentUser.email.toLowerCase().trim() == widget.post.userEmail.toLowerCase().trim();
+
+  String get _displayUsername => _mediaPostDisplayName(widget.post, widget.allUsers);
 
   Future<void> _persistPostChange() async {
     await _upsertMediaRowSafe(Map<String, dynamic>.from(widget.post.toJson()));
@@ -25142,7 +25186,17 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
     int depth = 0,
   }) {
     final email = (cm['userEmail'] ?? '').toString();
-    final username = (cm['username'] ?? 'User').toString();
+    final storedName = (cm['username'] ?? 'User').toString();
+    final username = storedName.trim().isNotEmpty && storedName.trim() != 'User'
+        ? storedName.trim()
+        : (email.isNotEmpty
+            ? _mediaAuthorName(
+                widget.allUsers.firstWhere(
+                  (x) => x.email.toLowerCase().trim() == email.toLowerCase().trim(),
+                  orElse: () => UserData(email: email),
+                ),
+              )
+            : storedName);
     final text = (cm['text'] ?? '').toString();
     final id = (cm['id'] ?? '').toString();
     final isVirtual = cm['isVirtual'] == true || email.startsWith('vp_');
@@ -25210,7 +25264,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
               final node = {
                 'id': DateTime.now().microsecondsSinceEpoch.toString(),
                 'userEmail': widget.currentUser.email,
-                'username': widget.currentUser.username,
+                'username': _mediaAuthorName(widget.currentUser),
                 'text': text,
                 'timestamp': DateTime.now().toUtc().toIso8601String(),
                 'replies': <Map<String, dynamic>>[],
@@ -25381,7 +25435,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(widget.post.username, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text(_displayUsername, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                         if (widget.post.caption.trim().isNotEmpty)
                           Text(widget.post.caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey, fontSize: 11)),
                       ],
@@ -25453,7 +25507,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                   text: TextSpan(
                     style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87, fontSize: 13),
                     children: [
-                      TextSpan(text: widget.post.username, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      TextSpan(text: _displayUsername, style: const TextStyle(fontWeight: FontWeight.bold)),
                       const TextSpan(text: ' '),
                       TextSpan(text: widget.post.caption),
                     ],
