@@ -41,6 +41,8 @@ import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_store_location.dart';
 import 'ngmy_local_cache.dart';
+import 'ngmy_media_monetization.dart';
+import 'ngmy_media_reward_tracker.dart';
 import 'ngmy_offline.dart';
 import 'ngmy_store_gift_celebration.dart';
 import 'ngmy_store_listing_extras.dart';
@@ -559,6 +561,12 @@ class MediaPost {
   List<Map<String, dynamic>> comments;
   List<String> taggedUsers;
   double? mediaAspectRatio;
+  String externalLink;
+  int previewSeconds;
+  double continuePrice;
+  double watchReward;
+  int watchRequiredSeconds;
+  List<String> rewardedViewers;
 
   MediaPost({
     required this.id,
@@ -574,31 +582,60 @@ class MediaPost {
     this.comments = const <Map<String, dynamic>>[],
     this.taggedUsers = const <String>[],
     this.mediaAspectRatio,
-  });
+    this.externalLink = '',
+    this.previewSeconds = 0,
+    this.continuePrice = 0,
+    this.watchReward = 0,
+    this.watchRequiredSeconds = 0,
+    List<String>? rewardedViewers,
+  }) : rewardedViewers = rewardedViewers ?? <String>[];
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'userEmail': userEmail,
-    'username': username,
-    'videoUrl': videoUrl,
-    'url': videoUrl,
-    'contentType': contentType,
-    'type': contentType,
-    'caption': caption,
-    'timestamp': timestamp.toUtc().toIso8601String(),
-    'likes': likedBy.length,
-    'likedBy': likedBy,
-    'savedBy': savedBy,
-    'comments': comments,
-    'taggedUsers': taggedUsers,
-    if (mediaAspectRatio != null) 'mediaAspectRatio': mediaAspectRatio,
-  };
+  NgmyMediaMonetization get monetization => NgmyMediaMonetization(
+        externalLink: externalLink,
+        previewSeconds: previewSeconds,
+        continuePrice: continuePrice,
+        watchReward: watchReward,
+        watchRequiredSeconds: watchRequiredSeconds,
+        rewardedViewers: rewardedViewers,
+      );
+
+  void applyMonetization(NgmyMediaMonetization m) {
+    externalLink = m.externalLink;
+    previewSeconds = m.previewSeconds;
+    continuePrice = m.continuePrice;
+    watchReward = m.watchReward;
+    watchRequiredSeconds = m.watchRequiredSeconds;
+    rewardedViewers = List<String>.from(m.rewardedViewers);
+  }
+
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{
+      'id': id,
+      'userEmail': userEmail,
+      'username': username,
+      'videoUrl': videoUrl,
+      'url': videoUrl,
+      'contentType': contentType,
+      'type': contentType,
+      'caption': caption,
+      'timestamp': timestamp.toUtc().toIso8601String(),
+      'likes': likedBy.length,
+      'likedBy': likedBy,
+      'savedBy': savedBy,
+      'comments': comments,
+      'taggedUsers': taggedUsers,
+      if (mediaAspectRatio != null) 'mediaAspectRatio': mediaAspectRatio,
+    };
+    monetization.applyTo(map);
+    return map;
+  }
 
   factory MediaPost.fromJson(Map<String, dynamic> json) {
     final likedBy = List<String>.from(json['likedBy'] ?? json['liked_by'] ?? const []);
     final savedBy = List<String>.from(json['savedBy'] ?? json['saved_by'] ?? const []);
     final comments = _jsonMapList(json['comments'] ?? json['media_comments']);
     final taggedUsers = _jsonStringList(json['taggedUsers'] ?? json['tagged_users']);
+    final mon = NgmyMediaMonetization.fromJson(json);
     return MediaPost(
       id: json['id'] ?? '',
       userEmail: json['userEmail'] ?? json['user_email'] ?? '',
@@ -613,6 +650,12 @@ class MediaPost {
       taggedUsers: taggedUsers,
       likes: likedBy.isNotEmpty ? likedBy.length : (json['likes'] ?? 0),
       mediaAspectRatio: (json['mediaAspectRatio'] as num?)?.toDouble(),
+      externalLink: mon.externalLink,
+      previewSeconds: mon.previewSeconds,
+      continuePrice: mon.continuePrice,
+      watchReward: mon.watchReward,
+      watchRequiredSeconds: mon.watchRequiredSeconds,
+      rewardedViewers: List<String>.from(mon.rewardedViewers),
     );
   }
 }
@@ -837,6 +880,12 @@ MediaPost _combineMediaPosts(MediaPost remote, MediaPost local) {
     comments: comments,
     taggedUsers: _mergeStringLists(remote.taggedUsers, local.taggedUsers),
     mediaAspectRatio: remote.mediaAspectRatio ?? local.mediaAspectRatio,
+    externalLink: remote.externalLink.isNotEmpty ? remote.externalLink : local.externalLink,
+    previewSeconds: remote.previewSeconds > 0 ? remote.previewSeconds : local.previewSeconds,
+    continuePrice: remote.continuePrice > 0 ? remote.continuePrice : local.continuePrice,
+    watchReward: remote.watchReward > 0 ? remote.watchReward : local.watchReward,
+    watchRequiredSeconds: remote.watchRequiredSeconds > 0 ? remote.watchRequiredSeconds : local.watchRequiredSeconds,
+    rewardedViewers: _mergeStringLists(remote.rewardedViewers, local.rewardedViewers),
   );
 }
 
@@ -5540,6 +5589,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         config: widget.config,
         onPost: widget.onPostMedia,
         onDataChanged: widget.onDataChanged,
+        onAddTransaction: widget.onAddTransaction,
         onRefreshFromCloud: widget.onRefreshMediaFromCloud,
         onDeleteMedia: widget.onDeleteMedia,
         onPruneMedia: widget.onPruneMedia,
@@ -24566,6 +24616,7 @@ class MediaHubScreen extends StatefulWidget {
   final AppConfig config;
   final Function(MediaPost) onPost;
   final VoidCallback onDataChanged;
+  final Function(AppTransaction) onAddTransaction;
   final Future<void> Function()? onRefreshFromCloud;
   final Future<void> Function(MediaPost)? onDeleteMedia;
   final Future<void> Function(MediaPost)? onPruneMedia;
@@ -24578,6 +24629,7 @@ class MediaHubScreen extends StatefulWidget {
     required this.config,
     required this.onPost,
     required this.onDataChanged,
+    required this.onAddTransaction,
     this.onRefreshFromCloud,
     this.onDeleteMedia,
     this.onPruneMedia,
@@ -24772,7 +24824,65 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     return out;
   }
 
-  Future<void> _pickAndPost({required bool isVideo, String tagRaw = ''}) async {
+  Future<bool> _payoutWatchReward(MediaPost post) async {
+    final mon = post.monetization;
+    if (!mon.hasWatchReward || mon.hasClaimed(widget.user.email)) return false;
+    final creatorEmail = post.userEmail.toLowerCase().trim();
+    final viewerEmail = widget.user.email.toLowerCase().trim();
+    if (creatorEmail == viewerEmail) return false;
+
+    final creatorIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == creatorEmail);
+    final viewerIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == viewerEmail);
+    if (creatorIdx < 0 || viewerIdx < 0) return false;
+    if (widget.allUsers[creatorIdx].accountBalance + 0.001 < mon.watchReward) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Creator does not have enough balance for this reward right now.')),
+        );
+      }
+      return false;
+    }
+
+    widget.allUsers[creatorIdx].accountBalance -= mon.watchReward;
+    widget.allUsers[viewerIdx].accountBalance += mon.watchReward;
+    if (!post.rewardedViewers.contains(viewerEmail)) {
+      post.rewardedViewers.add(viewerEmail);
+    }
+
+    final ts = DateTime.now().microsecondsSinceEpoch.toString();
+    widget.onAddTransaction(AppTransaction(
+      id: 'media_reward_$ts',
+      userEmail: viewerEmail,
+      amount: mon.watchReward,
+      type: TransactionType.adminAdd,
+      method: PaymentMethod.system,
+      status: TransactionStatus.approved,
+      timestamp: DateTime.now(),
+      sourceDetails: 'Media watch reward: ${post.caption.isNotEmpty ? post.caption : post.id}',
+    ));
+    widget.onAddTransaction(AppTransaction(
+      id: 'media_reward_pay_$ts',
+      userEmail: creatorEmail,
+      amount: mon.watchReward,
+      type: TransactionType.adminRemove,
+      method: PaymentMethod.system,
+      status: TransactionStatus.approved,
+      timestamp: DateTime.now(),
+      sourceDetails: 'Paid watch reward on media post',
+    ));
+
+    await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+    widget.onDataChanged();
+    await NgmyMediaRewardTracker.clearSession(post.id, viewerEmail);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You earned \$${formatCurrency(mon.watchReward)} for watching!')),
+      );
+    }
+    return true;
+  }
+
+  Future<void> _pickAndPost({required bool isVideo, String tagRaw = '', NgmyMediaMonetization monetization = const NgmyMediaMonetization()}) async {
     if (_isPosting) return;
     final limit = widget.config.maxMediaPostsPerWeek;
     if (_weeklyPostsForCurrentUser() >= limit) {
@@ -24862,6 +24972,17 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
         return;
       }
 
+      if (monetization.hasWatchReward && widget.user.accountBalance < monetization.watchReward) {
+        if (mounted) {
+          _showGlassNotice(
+            'Insufficient balance',
+            'You need at least \$${formatCurrency(monetization.watchReward)} in your account to offer this reward per viewer.',
+            isError: true,
+          );
+        }
+        return;
+      }
+
       final post = MediaPost(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         userEmail: widget.user.email,
@@ -24873,6 +24994,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
         mediaAspectRatio: aspectRatio,
         taggedUsers: _resolveTaggedEmails(tagRaw),
       );
+      post.applyMonetization(monetization);
 
       final saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
       if (!saved && mounted) {
@@ -24902,11 +25024,31 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     }
   }
 
-  Future<void> _beginPostFlow({required bool isVideo, String tagRaw = ''}) async {
+  Future<void> _beginPostFlow({required bool isVideo, String tagRaw = '', NgmyMediaMonetization monetization = const NgmyMediaMonetization()}) async {
     if (_isPosting) return;
     await Future<void>.delayed(const Duration(milliseconds: 120));
     if (!mounted) return;
-    await _pickAndPost(isVideo: isVideo, tagRaw: tagRaw);
+    await _pickAndPost(isVideo: isVideo, tagRaw: tagRaw, monetization: monetization);
+  }
+
+  NgmyMediaMonetization _monetizationFromDialog({
+    required String link,
+    required String previewSec,
+    required String continuePrice,
+    required String watchReward,
+    required String watchSec,
+    required bool enableLink,
+    required bool enablePreview,
+    required bool enablePayContinue,
+    required bool enableWatchEarn,
+  }) {
+    return NgmyMediaMonetization(
+      externalLink: enableLink ? link.trim() : '',
+      previewSeconds: enablePreview ? (int.tryParse(previewSec.trim()) ?? 0) : 0,
+      continuePrice: enablePayContinue ? (double.tryParse(continuePrice.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0) : 0,
+      watchReward: enableWatchEarn ? (double.tryParse(watchReward.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0) : 0,
+      watchRequiredSeconds: enableWatchEarn ? (int.tryParse(watchSec.trim()) ?? 0) : 0,
+    );
   }
 
   void _showPostDialog() {
@@ -24914,11 +25056,21 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final captionCtrl = TextEditingController(text: _captionController.text);
     final tagCtrl = TextEditingController();
+    final linkCtrl = TextEditingController();
+    final previewSecCtrl = TextEditingController(text: '20');
+    final continuePriceCtrl = TextEditingController();
+    final watchRewardCtrl = TextEditingController(text: '1');
+    final watchSecCtrl = TextEditingController(text: '60');
+    var enableLink = false;
+    var enablePreview = false;
+    var enablePayContinue = false;
+    var enableWatchEarn = false;
     showDialog<void>(
       context: context,
       barrierColor: Colors.black.withOpacity(0.5),
       builder: (dialogCtx) {
-        return Dialog(
+        return StatefulBuilder(
+          builder: (dialogCtx, setDlg) => Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 36),
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -24992,6 +25144,99 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
                     ),
                   ),
+                  const SizedBox(height: 14),
+                  Text('Link & monetization (optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: isDark ? Colors.white70 : Colors.black54)),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Attach link', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    subtitle: const Text('Photo tap or video continue opens this URL', style: TextStyle(fontSize: 11)),
+                    value: enableLink,
+                    activeColor: const Color(0xFF8B5CF6),
+                    onChanged: (v) => setDlg(() => enableLink = v),
+                  ),
+                  if (enableLink)
+                    TextField(
+                      controller: linkCtrl,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        hintText: 'https://youtube.com/... or any link',
+                        filled: true,
+                        fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Video preview limit (seconds)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    value: enablePreview,
+                    activeColor: const Color(0xFF8B5CF6),
+                    onChanged: (v) => setDlg(() => enablePreview = v),
+                  ),
+                  if (enablePreview)
+                    TextField(
+                      controller: previewSecCtrl,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        hintText: 'Free watch seconds (e.g. 20)',
+                        filled: true,
+                        fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Pay to continue watching', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    value: enablePayContinue,
+                    activeColor: const Color(0xFF8B5CF6),
+                    onChanged: (v) => setDlg(() => enablePayContinue = v),
+                  ),
+                  if (enablePayContinue)
+                    TextField(
+                      controller: continuePriceCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        hintText: 'NGMY balance price to unlock full video',
+                        filled: true,
+                        fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Pay viewers to watch link', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    subtitle: const Text('Deducted from your balance per viewer', style: TextStyle(fontSize: 11)),
+                    value: enableWatchEarn,
+                    activeColor: const Color(0xFF8B5CF6),
+                    onChanged: (v) => setDlg(() => enableWatchEarn = v),
+                  ),
+                  if (enableWatchEarn) ...[
+                    TextField(
+                      controller: watchRewardCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        hintText: 'Reward per viewer (\$)',
+                        filled: true,
+                        fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: watchSecCtrl,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        hintText: 'Seconds they must stay on link',
+                        filled: true,
+                        fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 18),
                   Text(
                     'Choose media type',
@@ -25015,8 +25260,19 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                                 : () {
                                     _captionController.text = captionCtrl.text.trim();
                                     final tags = tagCtrl.text.trim();
+                                    final mon = _monetizationFromDialog(
+                                      link: linkCtrl.text,
+                                      previewSec: previewSecCtrl.text,
+                                      continuePrice: continuePriceCtrl.text,
+                                      watchReward: watchRewardCtrl.text,
+                                      watchSec: watchSecCtrl.text,
+                                      enableLink: enableLink,
+                                      enablePreview: enablePreview,
+                                      enablePayContinue: enablePayContinue,
+                                      enableWatchEarn: enableWatchEarn,
+                                    );
                                     Navigator.pop(dialogCtx);
-                                    unawaited(_beginPostFlow(isVideo: false, tagRaw: tags));
+                                    unawaited(_beginPostFlow(isVideo: false, tagRaw: tags, monetization: mon));
                                   },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 18),
@@ -25047,8 +25303,19 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                                 : () {
                                     _captionController.text = captionCtrl.text.trim();
                                     final tags = tagCtrl.text.trim();
+                                    final mon = _monetizationFromDialog(
+                                      link: linkCtrl.text,
+                                      previewSec: previewSecCtrl.text,
+                                      continuePrice: continuePriceCtrl.text,
+                                      watchReward: watchRewardCtrl.text,
+                                      watchSec: watchSecCtrl.text,
+                                      enableLink: enableLink,
+                                      enablePreview: enablePreview,
+                                      enablePayContinue: enablePayContinue,
+                                      enableWatchEarn: enableWatchEarn,
+                                    );
                                     Navigator.pop(dialogCtx);
-                                    unawaited(_beginPostFlow(isVideo: true, tagRaw: tags));
+                                    unawaited(_beginPostFlow(isVideo: true, tagRaw: tags, monetization: mon));
                                   },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 18),
@@ -25069,11 +25336,17 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
               ),
             ),
           ),
+        ),
         );
       },
     ).whenComplete(() {
       captionCtrl.dispose();
       tagCtrl.dispose();
+      linkCtrl.dispose();
+      previewSecCtrl.dispose();
+      continuePriceCtrl.dispose();
+      watchRewardCtrl.dispose();
+      watchSecCtrl.dispose();
     });
   }
 
@@ -25178,6 +25451,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                       onChanged: widget.onDataChanged,
                       onDelete: () => _deletePost(mediaFeed[index]),
                       onOpenProfile: _openMediaProfile,
+                      onPayoutWatchReward: _payoutWatchReward,
                     ),
                   ),
           ),
@@ -25304,11 +25578,23 @@ class _NgmyFullscreenVideoPage extends StatefulWidget {
 class _NgmyFullscreenVideoPageState extends State<_NgmyFullscreenVideoPage> {
   VideoPlayerController? _controller;
   bool _ready = false;
+  static const _seekStep = Duration(seconds: 10);
 
   @override
   void initState() {
     super.initState();
     _init();
+  }
+
+  Future<void> _seekRelative(Duration delta) async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    final dur = c.value.duration;
+    var target = c.value.position + delta;
+    if (target < Duration.zero) target = Duration.zero;
+    if (dur.inMilliseconds > 0 && target > dur) target = dur;
+    await c.seekTo(target);
+    if (mounted) setState(() {});
   }
 
   Future<void> _init() async {
@@ -25366,15 +25652,32 @@ class _NgmyFullscreenVideoPageState extends State<_NgmyFullscreenVideoPage> {
               alignment: Alignment.bottomCenter,
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 28),
-                child: IconButton(
-                  iconSize: 56,
-                  color: Colors.white,
-                  icon: Icon(_controller!.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
-                  onPressed: () {
-                    setState(() {
-                      _controller!.value.isPlaying ? _controller!.pause() : _controller!.play();
-                    });
-                  },
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      iconSize: 44,
+                      color: Colors.white,
+                      icon: const Icon(Icons.replay_10_rounded),
+                      onPressed: () => _seekRelative(-_seekStep),
+                    ),
+                    IconButton(
+                      iconSize: 56,
+                      color: Colors.white,
+                      icon: Icon(_controller!.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
+                      onPressed: () {
+                        setState(() {
+                          _controller!.value.isPlaying ? _controller!.pause() : _controller!.play();
+                        });
+                      },
+                    ),
+                    IconButton(
+                      iconSize: 44,
+                      color: Colors.white,
+                      icon: const Icon(Icons.forward_10_rounded),
+                      onPressed: () => _seekRelative(_seekStep),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -25428,6 +25731,7 @@ class VideoPostWidget extends StatefulWidget {
   final VoidCallback onChanged;
   final VoidCallback onDelete;
   final void Function(String userEmail)? onOpenProfile;
+  final Future<bool> Function(MediaPost post)? onPayoutWatchReward;
   const VideoPostWidget({
     super.key,
     required this.post,
@@ -25436,13 +25740,14 @@ class VideoPostWidget extends StatefulWidget {
     required this.onChanged,
     required this.onDelete,
     this.onOpenProfile,
+    this.onPayoutWatchReward,
   });
 
   @override
   State<VideoPostWidget> createState() => _VideoPostWidgetState();
 }
 
-class _VideoPostWidgetState extends State<VideoPostWidget> {
+class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingObserver {
   VideoPlayerController? _controller;
   bool _isInitialized = false;
   bool _hasError = false;
@@ -25451,8 +25756,11 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   ImageProvider? _authorImage;
   bool _loadingMedia = false;
   bool _showHeartBurst = false;
+  bool _previewEnded = false;
+  bool _unlockedFullVideo = false;
 
   bool get _isImagePost => _mediaPostIsImage(widget.post);
+  NgmyMediaMonetization get _mon => widget.post.monetization;
 
   Future<void> _initializePlayer(String resolvedUrl) async {
     if (_controller != null) {
@@ -25477,7 +25785,12 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
 
       await _controller!.initialize().timeout(const Duration(seconds: 30));
       if (!mounted) return;
-      _controller!.setLooping(true);
+      if (_mon.hasPreviewLimit && !_unlockedFullVideo) {
+        _controller!.setLooping(false);
+        _controller!.addListener(_onVideoTick);
+      } else {
+        _controller!.setLooping(true);
+      }
       await _controller!.pause();
       final ar = _controller!.value.aspectRatio;
       if (ar > 0) {
@@ -25536,6 +25849,204 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
     }
   }
 
+  void _onVideoTick() {
+    if (_controller == null || !_isInitialized || _unlockedFullVideo || !_mon.hasPreviewLimit) return;
+    final pos = _controller!.value.position;
+    if (pos.inSeconds >= _mon.previewSeconds) {
+      _controller!.removeListener(_onVideoTick);
+      _controller!.pause();
+      if (mounted) setState(() => _previewEnded = true);
+    }
+  }
+
+  static const _videoSeekStep = Duration(seconds: 10);
+
+  Future<void> _seekVideoRelative(Duration delta) async {
+    final c = _controller;
+    if (c == null || !_isInitialized) return;
+    final dur = c.value.duration;
+    var target = c.value.position + delta;
+    if (target < Duration.zero) target = Duration.zero;
+    if (dur.inMilliseconds > 0 && target > dur) target = dur;
+    if (_mon.hasPreviewLimit && !_unlockedFullVideo && target.inSeconds > _mon.previewSeconds) {
+      target = Duration(seconds: _mon.previewSeconds);
+    }
+    await c.seekTo(target);
+    if (mounted) setState(() {});
+  }
+
+  Widget _videoSeekButton({required IconData icon, required VoidCallback onPressed}) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.5),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, color: Colors.white, size: 30),
+        ),
+      ),
+    );
+  }
+
+  Widget _inlineVideoSeekControls() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _videoSeekButton(
+          icon: Icons.replay_10_rounded,
+          onPressed: () => _seekVideoRelative(-_videoSeekStep),
+        ),
+        const SizedBox(width: 16),
+        _videoSeekButton(
+          icon: Icons.forward_10_rounded,
+          onPressed: () => _seekVideoRelative(_videoSeekStep),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openExternalLink({bool startWatchSession = false}) async {
+    final url = _mon.externalLink.trim();
+    if (url.isEmpty) return;
+    var uri = Uri.tryParse(url);
+    if (uri == null) return;
+    if (!uri.hasScheme) uri = Uri.parse('https://$url');
+
+    if (startWatchSession && _mon.hasWatchReward && !_isOwner && !_mon.hasClaimed(widget.currentUser.email)) {
+      await NgmyMediaRewardTracker.startSession(widget.post.id, widget.currentUser.email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Stay on the link for ${_mon.watchRequiredSeconds}s, then return here to earn \$${formatCurrency(_mon.watchReward)}.'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _payToContinueVideo() async {
+    final price = _mon.continuePrice;
+    if (price <= 0) return;
+    if (widget.currentUser.accountBalance + 0.001 < price) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Need \$${formatCurrency(price)} NGMY balance to continue.')),
+        );
+      }
+      return;
+    }
+    final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == widget.currentUser.email.toLowerCase().trim());
+    if (idx < 0) return;
+    final ownerIdx = widget.allUsers.indexWhere(
+      (u) => u.email.toLowerCase().trim() == widget.post.userEmail.toLowerCase().trim(),
+    );
+    setState(() {
+      widget.allUsers[idx].accountBalance -= price;
+      widget.currentUser.accountBalance -= price;
+      if (ownerIdx >= 0 && ownerIdx != idx) {
+        widget.allUsers[ownerIdx].accountBalance += price;
+      }
+      _unlockedFullVideo = true;
+      _previewEnded = false;
+    });
+    _controller?.removeListener(_onVideoTick);
+    _controller?.setLooping(true);
+    await _controller?.play();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unlocked full video for \$${formatCurrency(price)}.')),
+      );
+    }
+    widget.onChanged();
+  }
+
+  Future<void> _tryClaimWatchReward() async {
+    if (!_mon.hasWatchReward || _isOwner || _mon.hasClaimed(widget.currentUser.email)) return;
+    final elapsed = await NgmyMediaRewardTracker.elapsedSeconds(widget.post.id, widget.currentUser.email);
+    if (elapsed == null || elapsed < _mon.watchRequiredSeconds) return;
+    await widget.onPayoutWatchReward?.call(widget.post);
+  }
+
+  Future<void> _handleLinkAction() async {
+    final mon = _mon;
+    if (!mon.hasLink) return;
+    if (mon.hasWatchReward && !_isOwner && !mon.hasClaimed(widget.currentUser.email)) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Earn by watching'),
+          content: Text(
+            'Open the link and stay for ${mon.watchRequiredSeconds} seconds. When you return to NGMY you earn \$${formatCurrency(mon.watchReward)}.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Open link')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      await _openExternalLink(startWatchSession: true);
+      return;
+    }
+    await _openExternalLink();
+  }
+
+  Widget _previewPaywallOverlay() {
+    final mon = _mon;
+    return Container(
+      color: Colors.black.withValues(alpha: 0.82),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.lock_clock_rounded, color: Colors.white, size: 40),
+          const SizedBox(height: 10),
+          Text(
+            mon.hasPreviewLimit ? 'Preview ended (${mon.previewSeconds}s)' : 'Continue watching',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Open the link or pay to keep watching.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 14),
+          if (mon.hasLink)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => _handleLinkAction(),
+                icon: const Icon(Icons.open_in_new_rounded),
+                label: const Text('Open link'),
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6)),
+              ),
+            ),
+          if (mon.hasPayToContinue) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _payToContinueVideo,
+                icon: const Icon(Icons.payments_rounded),
+                label: Text('Pay \$${formatCurrency(mon.continuePrice)} to continue'),
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF00B25A)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   double _effectiveAspectRatio(bool isVideo) {
     if (widget.post.mediaAspectRatio != null && widget.post.mediaAspectRatio! > 0) {
       return _clampMediaAspectRatio(widget.post.mediaAspectRatio!);
@@ -25590,11 +26101,43 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
                       : _buildImageContent(),
                 ),
               ),
-              if (isVideo && _isInitialized && _controller != null && !_controller!.value.isPlaying)
+              if (isVideo && _previewEnded && !_unlockedFullVideo) _previewPaywallOverlay(),
+              if (isVideo && _isInitialized && _controller != null && (!_previewEnded || _unlockedFullVideo))
+                Positioned(
+                  bottom: 10,
+                  left: 0,
+                  right: 0,
+                  child: Center(child: _inlineVideoSeekControls()),
+                ),
+              if (isVideo && _isInitialized && _controller != null && !_controller!.value.isPlaying && !_previewEnded)
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), shape: BoxShape.circle),
                   child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 40),
+                ),
+              if (isImage && _mon.hasLink)
+                Positioned(
+                  right: 10,
+                  bottom: 10,
+                  child: Material(
+                    color: const Color(0xFF8B5CF6),
+                    borderRadius: BorderRadius.circular(20),
+                    child: InkWell(
+                      onTap: _handleLinkAction,
+                      borderRadius: BorderRadius.circular(20),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.link_rounded, color: Colors.white, size: 18),
+                            SizedBox(width: 6),
+                            Text('Open link', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               if (_showHeartBurst)
                 TweenAnimationBuilder<double>(
@@ -26048,6 +26591,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _prepareMedia(loadVideo: true);
     });
@@ -26055,8 +26599,17 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller?.removeListener(_onVideoTick);
     _controller?.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_tryClaimWatchReward());
+    }
   }
 
   @override
@@ -26131,10 +26684,49 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
             ),
           ),
           GestureDetector(
-            onTap: _openFullscreenMedia,
+            onTap: () async {
+              if (isImage && _mon.hasLink) {
+                await _handleLinkAction();
+                return;
+              }
+              if (isVideo) {
+                if (_previewEnded && !_unlockedFullVideo) return;
+                if (_isInitialized && _controller != null) {
+                  if (_controller!.value.isPlaying) {
+                    await _controller!.pause();
+                  } else {
+                    await _controller!.play();
+                  }
+                  if (mounted) setState(() {});
+                  return;
+                }
+              }
+              await _openFullscreenMedia();
+            },
             onDoubleTap: _quickLike,
             child: _buildMediaFrame(isVideo, isImage),
           ),
+          if (_mon.hasLink || _mon.hasWatchReward)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              child: Wrap(
+                spacing: 6,
+                children: [
+                  if (_mon.hasLink)
+                    Chip(
+                      avatar: const Icon(Icons.link, size: 16),
+                      label: Text(_mon.hasWatchReward ? 'Link + earn \$${formatCurrency(_mon.watchReward)}' : 'Link on post'),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  if (_mon.hasPreviewLimit)
+                    Chip(
+                      avatar: const Icon(Icons.timer, size: 16),
+                      label: Text('${_mon.previewSeconds}s free preview'),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                ],
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.all(12),
             child: Column(

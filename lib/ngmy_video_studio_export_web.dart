@@ -13,6 +13,46 @@ const _metaTimeout = Duration(seconds: 18);
 const _exportPlaybackRate = 2.0;
 const _maxRecordSeconds = 90.0;
 
+/// Triggers a file save in the browser. Revokes temporary object URLs only after a delay
+/// so mobile/desktop browsers can finish the download.
+Future<void> ngmyTriggerBrowserDownload(String href, String filename) async {
+  var downloadHref = href.trim();
+  String? tempObjectUrl;
+
+  if (downloadHref.startsWith('blob:') || downloadHref.startsWith('data:')) {
+    try {
+      final resp = await html.HttpRequest.request(downloadHref, responseType: 'blob');
+      final blob = resp.response as html.Blob?;
+      if (blob != null && blob.size > 0) {
+        tempObjectUrl = html.Url.createObjectUrlFromBlob(blob);
+        downloadHref = tempObjectUrl;
+        final type = blob.type;
+        if (!filename.contains('.') && type.isNotEmpty) {
+          final sub = type.split('/').last;
+          if (sub.isNotEmpty && sub != '*') filename = '$filename.$sub';
+        }
+      }
+    } catch (e) {
+      debugPrint('[studio download] blob read failed, using href directly: $e');
+    }
+  }
+
+  final anchor = html.AnchorElement()
+    ..href = downloadHref
+    ..download = filename
+    ..style.display = 'none';
+  html.document.body?.append(anchor);
+  anchor.click();
+
+  await Future<void>.delayed(const Duration(milliseconds: 1200));
+  anchor.remove();
+
+  if (tempObjectUrl != null) {
+    await Future<void>.delayed(const Duration(seconds: 3));
+    html.Url.revokeObjectUrl(tempObjectUrl);
+  }
+}
+
 Future<String> exportNgmyVideoStudioDirect({
   required String videoSourceUrl,
 }) async {
@@ -28,26 +68,12 @@ Future<String> exportNgmyVideoStudioDirect({
 
   final filename = 'ngmy_studio_${DateTime.now().millisecondsSinceEpoch}.$ext';
 
-  if (src.startsWith('blob:') || src.startsWith('http')) {
-    html.AnchorElement(href: src)
-      ..download = filename
-      ..click();
-    return 'Download started — your video file is saving now.';
-  }
-
-  // data: or other — fetch to blob then download
   try {
-    final resp = await html.HttpRequest.request(src, responseType: 'blob');
-    final blob = resp.response as html.Blob?;
-    if (blob == null || blob.size == 0) {
-      return 'Could not read video for download.';
+    if (src.startsWith('blob:') || src.startsWith('http') || src.startsWith('https') || src.startsWith('data:')) {
+      await ngmyTriggerBrowserDownload(src, filename);
+      return 'Download started — your video file is saving now.';
     }
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..download = filename
-      ..click();
-    html.Url.revokeObjectUrl(url);
-    return 'Download started — your video file is saving now.';
+    return 'Unsupported video source for download.';
   } catch (e) {
     return 'Download failed: $e';
   }
@@ -381,9 +407,8 @@ Future<String> exportNgmyVideoStudioComposed({
     final ext = mimeType!.contains('mp4') ? 'mp4' : 'webm';
     final filename = 'ngmy_${config.format.name}_${config.outputWidth}x${config.outputHeight}_$startMs.$ext';
     final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..download = filename
-      ..click();
+    await ngmyTriggerBrowserDownload(url, filename);
+    await Future<void>.delayed(const Duration(seconds: 3));
     html.Url.revokeObjectUrl(url);
     if (!usedCanvasStream) {
       return 'Downloaded $filename (video track — full studio merge needs Chrome/Edge on desktop).';
