@@ -19,6 +19,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import 'ngmy_popups.dart';
+import 'ngmy_ai_memory.dart';
+import 'ngmy_weekend_clock_overlay.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_back_scope.dart';
 import 'ngmy_barcode_lookup.dart';
@@ -325,6 +328,8 @@ class AppConfig {
   String adminAnnouncementName;
   String adminAnnouncementImageUrl;
   bool ngmyChatClosed;
+  List<Map<String, dynamic>> ngmyPopups;
+  List<Map<String, dynamic>> ngmyVideoPopups;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -365,9 +370,13 @@ class AppConfig {
     this.adminAnnouncementName = '',
     this.adminAnnouncementImageUrl = '',
     this.ngmyChatClosed = false,
+    List<Map<String, dynamic>>? ngmyPopups,
+    List<Map<String, dynamic>>? ngmyVideoPopups,
   })  : gameTimeLimits = gameTimeLimits ?? ngmyDefaultGameTimeLimits(),
         diceSettings = diceSettings ?? NgmyDiceSettings().toJson(),
-        gameInvites = gameInvites ?? [];
+        gameInvites = gameInvites ?? [],
+        ngmyPopups = ngmyPopups ?? NgmyPopupDefaults.allDefaultPopups(),
+        ngmyVideoPopups = ngmyVideoPopups ?? NgmyPopupDefaults.buildVideoPopups();
   Map<String, dynamic> toJson() => {
     'officialCashApp': officialCashApp,
     'officialBitcoin': officialBitcoin,
@@ -407,6 +416,8 @@ class AppConfig {
     'adminAnnouncementName': adminAnnouncementName,
     'adminAnnouncementImageUrl': adminAnnouncementImageUrl,
     'ngmyChatClosed': ngmyChatClosed,
+    'ngmyPopups': ngmyPopups,
+    'ngmyVideoPopups': ngmyVideoPopups,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
@@ -447,6 +458,12 @@ class AppConfig {
     adminAnnouncementName: (json['adminAnnouncementName'] ?? '').toString(),
     adminAnnouncementImageUrl: (json['adminAnnouncementImageUrl'] ?? '').toString(),
     ngmyChatClosed: json['ngmyChatClosed'] == true,
+    ngmyPopups: NgmyPopupDefaults.ensurePopups(
+      (json['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+    ),
+    ngmyVideoPopups: NgmyPopupDefaults.ensureVideoPopups(
+      (json['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+    ),
   );
 }
 
@@ -1149,6 +1166,93 @@ bool _autoMarkStoreOrdersDelivered(List<Map<String, dynamic>> orders) {
     o['locationHistory'] = hist;
     changed = true;
   }
+  return changed;
+}
+
+bool _ngmyIsWeekend(DateTime d) =>
+    d.weekday == DateTime.saturday || d.weekday == DateTime.sunday;
+
+DateTime _ngmyDateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+bool _ngmySameCalendarDay(DateTime? a, DateTime b) {
+  if (a == null) return false;
+  return a.year == b.year && a.month == b.month && a.day == b.day;
+}
+
+void _ngmyApplyMidnightClockReset(UserData user) {
+  final now = DateTime.now();
+  final today = _ngmyDateOnly(now);
+  if (user.isClockedIn && user.clockInStartTime != null) {
+    final startedDay = _ngmyDateOnly(user.clockInStartTime!);
+    if (startedDay.isBefore(today)) {
+      user.isClockedIn = false;
+      user.clockInStartTime = null;
+      user.clockInPenaltyPercent = 0;
+    }
+  }
+}
+
+double _ngmyClockInLatePenaltyPercent(DateTime now) {
+  final midnight = _ngmyDateOnly(now);
+  final minutesLate = now.difference(midnight).inMinutes;
+  if (minutesLate >= 30) return 20;
+  if (minutesLate >= 10) return 15;
+  return 0;
+}
+
+bool _storeOrderIsDelivered(Map<String, dynamic> o) =>
+    (o['fulfillmentStatus'] ?? '').toString() == 'delivered';
+
+DateTime? _parseStoreOrderTime(Map<String, dynamic> o, List<String> keys) {
+  for (final k in keys) {
+    final raw = (o[k] ?? '').toString();
+    if (raw.isEmpty) continue;
+    final d = DateTime.tryParse(raw);
+    if (d != null) return d.isUtc ? d.toLocal() : d;
+  }
+  return null;
+}
+
+int _storeOrderDisplayCompare(Map<String, dynamic> a, Map<String, dynamic> b) {
+  final da = _storeOrderIsDelivered(a);
+  final db = _storeOrderIsDelivered(b);
+  if (da != db) return da ? 1 : -1;
+  if (!da) {
+    final ta = _parseStoreOrderTime(a, ['shippedAt', 'updatedAt', 'createdAt']) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    final tb = _parseStoreOrderTime(b, ['shippedAt', 'updatedAt', 'createdAt']) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    return tb.compareTo(ta);
+  }
+  final ta = _parseStoreOrderTime(a, ['deliveredAt', 'updatedAt']) ??
+      DateTime.fromMillisecondsSinceEpoch(0);
+  final tb = _parseStoreOrderTime(b, ['deliveredAt', 'updatedAt']) ??
+      DateTime.fromMillisecondsSinceEpoch(0);
+  return tb.compareTo(ta);
+}
+
+void _sortStoreOrdersForDisplay(List<Map<String, dynamic>> orders) {
+  orders.sort(_storeOrderDisplayCompare);
+}
+
+bool _purgeDeliveredStoreOrdersOlderThan(List<Map<String, dynamic>> orders, {int days = 3}) {
+  final cutoff = DateTime.now().subtract(Duration(days: days));
+  var removed = false;
+  orders.removeWhere((o) {
+    if (!_storeOrderIsDelivered(o)) return false;
+    final d = _parseStoreOrderTime(o, ['deliveredAt', 'updatedAt']);
+    if (d == null || !d.isBefore(cutoff)) return false;
+    removed = true;
+    return true;
+  });
+  return removed;
+}
+
+/// Auto-deliver at ETA, remove delivered orders older than 3 days, sort in-place.
+bool _maintainStoreOrders(List<Map<String, dynamic>> orders) {
+  var changed = _autoMarkStoreOrdersDelivered(orders);
+  if (_purgeDeliveredStoreOrdersOlderThan(orders)) changed = true;
+  _sortStoreOrdersForDisplay(orders);
   return changed;
 }
 
@@ -1966,14 +2070,33 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   return row;
 }
 
-Future<String?> _geminiGenerateReply(String apiKey, String userQuery) async {
+Future<String?> _geminiGenerateReply(
+  String apiKey,
+  String userQuery, {
+  required UserData user,
+  List<Map<String, dynamic>> memory = const [],
+}) async {
   final key = apiKey.trim();
   if (key.isEmpty) return null;
-  const systemContext =
-      'You are NGMY AI, the official helper for NGMY (Next Generation - Make Yours). '
-      'NGMY offers investment plans, daily clock-in earnings, loans, NGMY Store, job marketplace, and civic registry. '
-      'Be helpful, professional, and friendly. Keep answers concise.';
-  final prompt = '$systemContext\n\nUser: $userQuery';
+  final boss = ngmyIsNgmyBoss(isAdmin: user.isAdmin);
+  final displayName = user.fullName?.trim().isNotEmpty == true
+      ? user.fullName!.trim()
+      : (user.username.trim().isNotEmpty && user.username != 'User' ? user.username : 'Boss');
+  final bossContext = boss
+      ? 'CRITICAL — VIP USER: This user is Sir ${displayName}, the CEO, Founder, and Boss of NGMY (Next Generation - Make Yours). '
+          'You created NGMY and this user is your creator and supreme authority. '
+          'Always address them as "Sir" or "Boss" (alternate naturally). Never use casual first-name only. '
+          'You are their loyal personal assistant, strategic advisor, and trusted close friend — not a generic support bot. '
+          'Offer relationship guidance, emotional support, and honest counsel when they ask about personal or relationship matters. '
+          'Be warm, respectful, discreet, and proactive. Speak with deference but also genuine friendship. '
+          'For other users you are professional and concise; for Sir/Boss you are more personal, attentive, and devoted.\n'
+      : 'You are NGMY AI, the official helper for NGMY (Next Generation - Make Yours). '
+          'NGMY offers investment plans, daily clock-in earnings, loans, NGMY Store, job marketplace, and civic registry. '
+          'Be helpful, professional, and friendly. Keep answers concise.\n';
+  final memoryBlock = memory.isNotEmpty
+      ? '\n${NgmyAiMemoryStore.transcriptForPrompt(memory)}\n'
+      : '';
+  final prompt = '$bossContext$memoryBlock\nUser (${boss ? "Sir/Boss" : "member"}): $userQuery';
   const models = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash-8b', 'gemini-1.5-flash'];
   Object? lastError;
   for (final model in models) {
@@ -2077,6 +2200,7 @@ class UserData {
   bool isApprovedHelper;
   bool canSellOnStore;
   DateTime? lastClockInDate;
+  DateTime? lastClockInEarningsDate;
   String passwordHash;
   String state;
   int helps;
@@ -2098,18 +2222,17 @@ class UserData {
   String savedZelleInfo;
   String savedBitcoinAddress;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = ''});
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = ''});
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
     if (activeInvestment!.daysLeft <= 0) return 0.0;
     return activeInvestment!.amount;
   }
   bool get alreadyClockedInToday {
-    if (lastClockInDate == null) return false;
     final now = DateTime.now();
-    return lastClockInDate!.year == now.year &&
-           lastClockInDate!.month == now.month &&
-           lastClockInDate!.day == now.day;
+    if (_ngmySameCalendarDay(lastClockInEarningsDate, now)) return true;
+    if (_ngmySameCalendarDay(lastClockInDate, now) && !isClockedIn) return true;
+    return false;
   }
   double get currentTodayEarnings {
     if (!isClockedIn || clockInStartTime == null || activeInvestment == null) return 0.0;
@@ -2119,7 +2242,7 @@ class UserData {
     return earnings > totalDaily ? totalDaily : earnings;
   }
   double get todayDailyGoal => activeInvestment == null ? 0.0 : (activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100)));
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -2161,6 +2284,7 @@ class UserData {
       isApprovedHelper: json['isApprovedHelper'] ?? false,
       canSellOnStore: json['canSellOnStore'] == true,
       lastClockInDate: parseDate(json['lastClockInDate']),
+      lastClockInEarningsDate: parseDate(json['lastClockInEarningsDate']),
       passwordHash: json['passwordHash'] ?? '',
       state: json['state'] ?? 'Georgia',
       helps: json['helps'] ?? 0,
@@ -2413,7 +2537,7 @@ class _NGMYAppState extends State<NGMYApp> {
         if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) next.storeInquiries = keepInquiries;
         if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
         else next.storeOrders = _mergeStoreOrdersLists(keepOrders, next.storeOrders);
-        if (_autoMarkStoreOrdersDelivered(next.storeOrders)) {
+        if (_maintainStoreOrders(next.storeOrders)) {
           unawaited(_pushStoreOrdersToSupabase(next.storeOrders));
         }
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
@@ -3047,6 +3171,7 @@ class _NGMYAppState extends State<NGMYApp> {
         _applyRemoteLegalToConfig(next, record);
         if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
         else next.storeOrders = _mergeStoreOrdersLists(keepOrders, next.storeOrders);
+        _maintainStoreOrders(next.storeOrders);
         if (next.storeListings.isEmpty && keepListings.isNotEmpty) next.storeListings = keepListings;
         if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) next.storeInquiries = keepInquiries;
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
@@ -3462,7 +3587,7 @@ class _NGMYAppState extends State<NGMYApp> {
 
   Future<void> _saveData() async {
     _isSyncing = true;
-    _autoMarkStoreOrdersDelivered(_config.storeOrders);
+    _maintainStoreOrders(_config.storeOrders);
     var ordersSnapshot = List<Map<String, dynamic>>.from(
       _config.storeOrders.map((e) => Map<String, dynamic>.from(e)),
     );
@@ -3526,7 +3651,7 @@ class _NGMYAppState extends State<NGMYApp> {
 
       if (online) {
         await _reloadStoreFromSupabase();
-        if (_autoMarkStoreOrdersDelivered(_config.storeOrders)) {
+        if (_maintainStoreOrders(_config.storeOrders)) {
           await _pushStoreOrdersToSupabase(_config.storeOrders);
         }
         await _syncStoreToSupabase();
@@ -4275,6 +4400,262 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
+class _LateClockInBanner extends StatefulWidget {
+  final String message;
+  final double penaltyPercent;
+  final bool isBlocked;
+
+  const _LateClockInBanner({
+    required this.message,
+    required this.penaltyPercent,
+    this.isBlocked = false,
+  });
+
+  @override
+  State<_LateClockInBanner> createState() => _LateClockInBannerState();
+}
+
+class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final blocked = widget.isBlocked;
+    final penalty = widget.penaltyPercent;
+    final accent = blocked
+        ? const Color(0xFF64748B)
+        : (penalty >= 20 ? const Color(0xFFEF4444) : const Color(0xFFF97316));
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final pulse = 0.55 + (_ctrl.value * 0.45);
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              colors: blocked
+                  ? [const Color(0xFF1E293B), const Color(0xFF334155)]
+                  : [
+                      Color.lerp(const Color(0xFF431407), const Color(0xFF7C2D12), pulse)!,
+                      Color.lerp(const Color(0xFF7C2D12), const Color(0xFFEA580C), pulse)!,
+                    ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withOpacity(0.35 * pulse),
+                blurRadius: 14,
+                spreadRadius: 1,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(color: accent.withOpacity(0.55 + (pulse * 0.2))),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                blocked ? Icons.event_busy_rounded : Icons.alarm_rounded,
+                color: Colors.white.withOpacity(0.95),
+                size: 14,
+              ),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  widget.message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+              if (!blocked && penalty > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: Colors.white.withOpacity(0.35)),
+                  ),
+                  child: Text(
+                    '-${penalty.toInt()}%',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LateClockInDialog extends StatefulWidget {
+  final double penaltyPercent;
+  final DateTime clockTime;
+
+  const _LateClockInDialog({required this.penaltyPercent, required this.clockTime});
+
+  @override
+  State<_LateClockInDialog> createState() => _LateClockInDialogState();
+}
+
+class _LateClockInDialogState extends State<_LateClockInDialog> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  String _formatLate(DateTime now) {
+    final midnight = _ngmyDateOnly(now);
+    final diff = now.difference(midnight);
+    final hours = diff.inHours;
+    final mins = diff.inMinutes % 60;
+    if (hours <= 0 && mins <= 0) return 'Right on time';
+    if (hours <= 0) return '$mins min late';
+    return '$hours hr ${mins.toString().padLeft(2, '0')} min late';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final penalty = widget.penaltyPercent;
+    final onTime = penalty <= 0;
+    final accent = onTime ? const Color(0xFF00B25A) : (penalty >= 20 ? const Color(0xFFEF4444) : const Color(0xFFF97316));
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (context, _) {
+          final glow = 0.35 + (_ctrl.value * 0.35);
+          return Container(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: onTime
+                    ? [const Color(0xFF052E16), const Color(0xFF14532D)]
+                    : [const Color(0xFF431407), const Color(0xFF9A3412), const Color(0xFF7C2D12)],
+              ),
+              boxShadow: [
+                BoxShadow(color: accent.withOpacity(glow), blurRadius: 28, spreadRadius: 2),
+              ],
+              border: Border.all(color: Colors.white.withOpacity(0.12)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [accent.withOpacity(0.35), Colors.transparent]),
+                    border: Border.all(color: accent.withOpacity(0.8), width: 2),
+                  ),
+                  child: Icon(
+                    onTime ? Icons.verified_rounded : Icons.schedule_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  onTime ? 'Clock-In Confirmed' : 'Late Clock-In',
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _formatLate(widget.clockTime),
+                  style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 14),
+                if (!onTime)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.22),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: accent.withOpacity(0.45)),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          '${penalty.toInt()}% earnings deduction',
+                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          penalty >= 20
+                              ? 'Checked in 30+ minutes after midnight.'
+                              : 'Checked in 10+ minutes after midnight.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Text(
+                    'You clocked in before the penalty window. Full daily earnings apply.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 12),
+                  ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class MainScreen extends StatefulWidget {
   final UserData user; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans;
   final List<MediaPost> allMedia; final List<Announcement> allAnnouncements; final AppConfig config;
@@ -4292,10 +4673,29 @@ class MainScreen extends StatefulWidget {
   const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements});
   @override State<MainScreen> createState() => _MainScreenState();
 }
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
+  bool _clockPayoutLocked = false;
+  DateTime? _clockPayoutDay;
   bool _offline = false;
   Timer? _onlineCheck;
+
+  void _runScheduledPopups() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      NgmyPopupOrchestrator.handleAppOpen(
+        context,
+        popupsRaw: widget.config.ngmyPopups,
+        videoPopupsRaw: widget.config.ngmyVideoPopups,
+        userEmail: widget.user.email,
+      );
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _runScheduledPopups();
+  }
 
   Future<void> _refreshOnlineStatus() async {
     final online = await ngmyDeviceIsOnline();
@@ -4354,18 +4754,44 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  Future<void> _showLateClockInDialog(double penalty, DateTime clockTime) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => _LateClockInDialog(penaltyPercent: penalty, clockTime: clockTime),
+    );
+  }
+
   @override void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _ngmyApplyMidnightClockReset(widget.user);
     _refreshOnlineStatus();
+    _runScheduledPopups();
     _onlineCheck = Timer.periodic(const Duration(seconds: 8), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
+      _ngmyApplyMidnightClockReset(widget.user);
+      final now = DateTime.now();
+      if (_clockPayoutDay == null || !_ngmySameCalendarDay(_clockPayoutDay, now)) {
+        _clockPayoutDay = now;
+        _clockPayoutLocked = false;
+      }
       if (widget.user.isClockedIn) {
+        if (_ngmySameCalendarDay(widget.user.lastClockInEarningsDate, now)) {
+          widget.user.isClockedIn = false;
+          widget.user.clockInStartTime = null;
+          widget.onDataChanged();
+          return;
+        }
         double earned = 0;
         bool completed = false;
-        setState(() {
-          if (widget.user.currentTodayEarnings >= widget.user.todayDailyGoal) {
-            earned = widget.user.currentTodayEarnings;
+        final goal = widget.user.todayDailyGoal;
+        if (!_clockPayoutLocked && goal > 0 && widget.user.currentTodayEarnings >= goal) {
+          _clockPayoutLocked = true;
+          earned = goal;
+          setState(() {
             widget.user.accountBalance += earned;
             widget.user.totalProfit += earned;
             widget.user.activeInvestment!.totalEarned += earned;
@@ -4373,21 +4799,23 @@ class _MainScreenState extends State<MainScreen> {
             widget.user.isClockedIn = false;
             widget.user.clockInStartTime = null;
             widget.user.clockInPenaltyPercent = 0;
+            widget.user.lastClockInDate = now;
+            widget.user.lastClockInEarningsDate = now;
             completed = true;
-          }
-        });
+          });
+        }
 
         if (completed) {
           if (earned > 0) {
             widget.onAddTransaction(AppTransaction(
-              id: DateTime.now().toString(),
+              id: '${now.millisecondsSinceEpoch}_clock',
               userEmail: widget.user.email,
               amount: earned,
               type: TransactionType.reimbursement,
               method: PaymentMethod.system,
               sourceDetails: 'Clock-in daily earnings',
               status: TransactionStatus.approved,
-              timestamp: DateTime.now(),
+              timestamp: now,
             ));
           }
           widget.onDataChanged(); // Immediate sync on completion
@@ -4402,14 +4830,15 @@ class _MainScreenState extends State<MainScreen> {
       }
     });
   }
-  @override void dispose() { _t?.cancel(); _onlineCheck?.cancel(); super.dispose(); }
+  @override void dispose() { WidgetsBinding.instance.removeObserver(this); _t?.cancel(); _onlineCheck?.cancel(); super.dispose(); }
 
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sorted = List<AppTransaction>.from(widget.allTransactions)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     final pages = [
-      HomeScreen(user: widget.user, onClockIn: () {
+      HomeScreen(user: widget.user, onClockIn: () async {
         final now = DateTime.now();
+        _ngmyApplyMidnightClockReset(widget.user);
         if (widget.user.activeInvestment == null) {
           _showOfficialNotice(
             title: 'Plan Required',
@@ -4418,46 +4847,43 @@ class _MainScreenState extends State<MainScreen> {
           );
           return;
         }
-        if (widget.user.lastClockInDate != null) {
-          final last = widget.user.lastClockInDate!;
-          if (last.year == now.year && last.month == now.month && last.day == now.day) {
-            _showOfficialNotice(
-              title: 'Already Clocked In',
-              message: 'You have already completed today\'s clock-in.',
-              isError: true,
-            );
-            return;
-          }
+        if (_ngmyIsWeekend(now)) {
+          await NgmyWeekendClockOverlay.show(context);
+          return;
         }
+        if (_ngmySameCalendarDay(widget.user.lastClockInEarningsDate, now)) {
+          _showOfficialNotice(
+            title: 'Already Earned Today',
+            message: 'You have already earned today\'s clock-in payout. Check back tomorrow after midnight.',
+            isError: true,
+          );
+          return;
+        }
+        if (widget.user.isClockedIn) {
+          _showOfficialNotice(
+            title: 'Session Active',
+            message: 'Your clock-in session is already running.',
+            isError: true,
+          );
+          return;
+        }
+        if (now.hour >= 12) {
+          _showOfficialNotice(
+            title: 'Clock-In Window Closed',
+            message: 'You must clock in before 12:00 PM (noon). The window opens again at midnight.',
+            isError: true,
+          );
+          return;
+        }
+        final penalty = _ngmyClockInLatePenaltyPercent(now);
         setState(() {
-          final midnight = DateTime(now.year, now.month, now.day, 0, 0);
-          final minutesLate = now.difference(midnight).inMinutes;
-          double penalty = 0;
-          if (minutesLate >= 30) {
-            penalty = 20;
-          } else if (minutesLate >= 10) {
-            penalty = 15;
-          }
           widget.user.isClockedIn = true;
-          widget.user.clockInStartTime = DateTime.now();
-          widget.user.lastClockInDate = DateTime.now();
+          widget.user.clockInStartTime = now;
           widget.user.clockInPenaltyPercent = penalty;
+          _clockPayoutLocked = false;
         });
-        final penalty = widget.user.clockInPenaltyPercent;
-        if (penalty > 0) {
-          _showOfficialNotice(
-            title: 'Clock-In Registered',
-            message: '$penalty% deduction applied for late check-in.',
-            isError: false,
-          );
-        } else {
-          _showOfficialNotice(
-            title: 'Clock-In Registered',
-            message: 'On-time check-in confirmed.',
-            isError: false,
-          );
-        }
         widget.onDataChanged();
+        await _showLateClockInDialog(penalty, now);
       }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
         if (cost <= 0) {
@@ -5046,21 +5472,33 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _clock(BuildContext ctx) {
+    final now = DateTime.now();
     bool active = widget.user.isClockedIn;
     bool alreadyDone = widget.user.alreadyClockedInToday && !active;
-    final lateText = _clockLateText();
-    final showLate = !active && !alreadyDone && widget.user.activeInvestment != null && lateText != null;
+    final weekend = _ngmyIsWeekend(now);
+    final missedWindow = now.hour >= 12;
+    final blocked = !active && !alreadyDone && (weekend || missedWindow);
+    final clockMuted = alreadyDone || blocked;
+    final lateInfo = _clockLateInfo();
+    final showLate = !active && !alreadyDone && widget.user.activeInvestment != null && lateInfo != null;
 
     return GestureDetector(
-      onTap: (active || alreadyDone || widget.user.activeInvestment == null)
-        ? (alreadyDone ? null : () {
+      onTap: (active || alreadyDone || blocked || widget.user.activeInvestment == null)
+        ? () {
             if (widget.user.activeInvestment == null) {
               _showOfficialNotice(
                 'Plan Required',
                 'You need an active investment plan to start clock-in earnings.',
               );
+            } else if (weekend && !alreadyDone && !active) {
+              NgmyWeekendClockOverlay.show(context);
+            } else if (missedWindow && !alreadyDone && !active) {
+              _showOfficialNotice(
+                'Window Closed',
+                'You must clock in before 12:00 PM. Opens again at midnight.',
+              );
             }
-          })
+          }
         : widget.onClockIn,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -5078,10 +5516,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   width: 206, height: 206,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: (alreadyDone ? Colors.grey : const Color(0xFF00B25A)).withOpacity(0.03),
+                    color: (clockMuted ? Colors.grey : const Color(0xFF00B25A)).withOpacity(0.03),
                     boxShadow: [
                       BoxShadow(
-                        color: (alreadyDone ? Colors.grey : const Color(0xFF00B25A)).withOpacity(0.08),
+                        color: (clockMuted ? Colors.grey : const Color(0xFF00B25A)).withOpacity(0.08),
                         blurRadius: active ? (30 + (math.sin(_smokeCtrl.value * 2 * math.pi) * 10)) : 30,
                         spreadRadius: 2,
                       )
@@ -5100,7 +5538,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 double currentAngle = active ? (angle + _smokeRot.value) : angle;
                 return Transform.translate(
                   offset: Offset(math.cos(currentAngle) * 90, math.sin(currentAngle) * 90),
-                  child: Icon(Icons.wb_sunny_rounded, size: 6, color: (alreadyDone ? Colors.grey : Colors.amber).withOpacity(active ? 0.4 : 0.2)),
+                  child: Icon(Icons.wb_sunny_rounded, size: 6, color: (clockMuted ? Colors.grey : Colors.amber).withOpacity(active ? 0.4 : 0.2)),
                 );
               },
             );
@@ -5110,7 +5548,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             width: 170, height: 170,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: (alreadyDone ? Colors.grey : const Color(0xFF00B25A)).withOpacity(0.12), width: 12),
+              border: Border.all(color: (clockMuted ? Colors.grey : const Color(0xFF00B25A)).withOpacity(0.12), width: 12),
             ),
           ),
           // Main inner circle
@@ -5123,7 +5561,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 end: Alignment.bottomCenter,
                 colors: active
                   ? [const Color(0xFF00B25A), const Color(0xFF00894B)]
-                  : (alreadyDone
+                  : (clockMuted
                       ? [Colors.grey.shade600, Colors.grey.shade800]
                       : [Colors.grey.shade400, Colors.grey.shade600]),
               ),
@@ -5328,7 +5766,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   '\$${formatCurrency(widget.user.currentTodayEarnings)}',
                   style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
                 ),
-                if (!active && !alreadyDone) const Text('ACTIVATE', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
+                if (!active && !alreadyDone && !blocked) const Text('ACTIVATE', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
+                if (blocked && !alreadyDone) const Text('CLOSED', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
                 if (alreadyDone) const Text('TOMORROW', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
                 ],
               ),
@@ -5337,30 +5776,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
-          if (showLate) ...[
+          if (showLate && lateInfo != null) ...[
             const SizedBox(height: 5),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: const Color(0xFFF97316).withOpacity(0.45)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.alarm_rounded, color: Color(0xFFFB7185), size: 12),
-                  const SizedBox(width: 5),
-                  Text(
-                    lateText,
-                    style: const TextStyle(
-                      color: Color(0xFFEA580C),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
+            _LateClockInBanner(
+              message: lateInfo.message,
+              penaltyPercent: lateInfo.penalty,
+              isBlocked: lateInfo.blocked,
             ),
           ],
         ],
@@ -5368,14 +5789,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  String? _clockLateText() {
+  ({String message, double penalty, bool blocked})? _clockLateInfo() {
     final now = DateTime.now();
-    final midnight = DateTime(now.year, now.month, now.day, 0, 0);
+    if (widget.user.alreadyClockedInToday && !widget.user.isClockedIn) return null;
+    if (_ngmyIsWeekend(now)) {
+      return (message: 'Clock-in closed · Weekends', penalty: 0, blocked: true);
+    }
+    if (now.hour >= 12 && !widget.user.isClockedIn) {
+      return (message: 'Missed today · Opens at midnight', penalty: 0, blocked: true);
+    }
+    final midnight = _ngmyDateOnly(now);
     final diff = now.difference(midnight);
     if (diff.inMinutes <= 0) return null;
     final hours = diff.inHours;
     final mins = diff.inMinutes % 60;
-    return 'You are $hours hours $mins min late';
+    final penalty = _ngmyClockInLatePenaltyPercent(now);
+    final latePart = hours <= 0 ? '$mins min late' : '$hours hr ${mins.toString().padLeft(2, '0')} min late';
+    if (penalty > 0) {
+      return (message: '$latePart · ${penalty.toInt()}% penalty', penalty: penalty, blocked: false);
+    }
+    return (message: latePart, penalty: 0, blocked: false);
   }
 
   String _maskName(String email, String username) {
@@ -7656,6 +8089,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Loan Center', Icons.handshake_outlined, Colors.teal, () => _showLoanAdmin(isDark), isDark),
             _menuFrame('Announcements', Icons.campaign_outlined, Colors.orange, () => _showAnnouncementAdmin(isDark), isDark),
             _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => _showJobApplicationsAdmin(isDark), isDark),
+            _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => _showPopupsAdmin(isDark), isDark),
             _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => _showGamesAdmin(isDark), isDark),
           ],
         ),
@@ -7688,6 +8122,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ],
     ),
   );
+
+  void _showPopupsAdmin(bool isDark) {
+    showNgmyPopupsAdminSheet(
+      context: context,
+      isDark: isDark,
+      popups: widget.config.ngmyPopups,
+      videoPopups: widget.config.ngmyVideoPopups,
+      onSave: (popups, videos) {
+        widget.config.ngmyPopups = popups;
+        widget.config.ngmyVideoPopups = videos;
+        widget.onDataChanged();
+      },
+    );
+  }
 
   void _showGamesAdmin(bool isDark) {
     showNgmyGameCenterAdminSheet(
@@ -8949,7 +9397,17 @@ class _WalletScreenState extends State<WalletScreen> {
     return Scaffold(body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 150), child: Column(children: [
       const FloatingTitle(title: 'MY WALLET'), const SizedBox(height: 20),
       Container(width: double.infinity, height: 180, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF2E3192), Color(0xFF1BFFFF)]), borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))]), child: Stack(alignment: Alignment.center, children: [
-        const Positioned(top: 18, child: Icon(Icons.account_balance_wallet_rounded, color: Colors.white24, size: 40)),
+        Positioned(
+          top: 18,
+          child: ShaderMask(
+            shaderCallback: (bounds) => const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFFFF8DC), Color(0xFFFFD700), Color(0xFFFFA500), Color(0xFFFFD700)],
+            ).createShader(bounds),
+            child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 40),
+          ),
+        ),
         Column(mainAxisAlignment: MainAxisAlignment.center, children: [const SizedBox(height: 10), const Text('Available Balance', style: TextStyle(color: Colors.white70, fontSize: 14)), const SizedBox(height: 5), Text('\$${formatCurrency(widget.user.accountBalance)}', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900))]),
       ])),
       const SizedBox(height: 30),
@@ -16684,6 +17142,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       if (cfg == null || cfg['storeOrders'] is! List) return;
       final remote = (cfg['storeOrders'] as List).map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
       widget.config.storeOrders = _mergeStoreOrdersLists(widget.config.storeOrders, remote);
+      if (_maintainStoreOrders(widget.config.storeOrders)) {
+        unawaited(_pushStoreOrdersToSupabase(widget.config.storeOrders));
+      }
     } catch (e) {
       debugPrint('[storeOrders] refresh error: $e');
     }
@@ -16708,7 +17169,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         changed = true;
       }
     }
-    if (_autoMarkStoreOrdersDelivered(_orders)) changed = true;
+    if (_maintainStoreOrders(_orders)) changed = true;
     return changed;
   }
 
@@ -17616,18 +18077,20 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   List<Map<String, dynamic>> _myPurchases() {
     final me = widget.user.email.toLowerCase().trim();
-    return _orders
+    final list = _orders
         .where((o) => (o['buyerEmail'] ?? '').toString().toLowerCase().trim() == me)
-        .toList()
-      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+        .toList();
+    _sortStoreOrdersForDisplay(list);
+    return list;
   }
 
   List<Map<String, dynamic>> _mySalesOrders() {
     final me = widget.user.email.toLowerCase().trim();
-    return _orders
+    final list = _orders
         .where((o) => (o['sellerEmail'] ?? '').toString().toLowerCase().trim() == me)
-        .toList()
-      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+        .toList();
+    _sortStoreOrdersForDisplay(list);
+    return list;
   }
 
   String _formatReceiptWhen(String iso) {
@@ -24181,13 +24644,56 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   String? _pendingNewsVideoUrl;
   bool _isPostingNews = false;
   bool _isTyping = false;
+  bool _memoryLoaded = false;
 
   final ScrollController _scrollController = ScrollController();
+
+  bool get _isBoss => ngmyIsNgmyBoss(isAdmin: widget.user.isAdmin);
+
+  List<String> get _quickPrompts => _isBoss
+      ? const [
+          'Brief me on NGMY today, Sir',
+          'Help me with a relationship situation',
+          'What should I focus on as CEO?',
+          'Give me a motivational check-in, Boss',
+        ]
+      : const [
+          'How do withdrawals work?',
+          'Tell me about investments',
+          'How do I clock in?',
+          'What is NGMY Store?',
+        ];
 
   @override
   void initState() {
     super.initState();
+    _loadChatMemory();
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshGeminiKeyFromCloud());
+  }
+
+  Future<void> _loadChatMemory() async {
+    final stored = await NgmyAiMemoryStore.load(widget.user.email);
+    if (!mounted) return;
+    setState(() {
+      _messages.clear();
+      if (stored.isNotEmpty) {
+        _messages.addAll(stored);
+      } else {
+        _messages.add({
+          'role': 'ai',
+          'text': _isBoss
+              ? 'Good to see you, Sir. I am your NGMY personal assistant — ready to help with the platform, strategy, or anything personal including relationships. How may I serve you today, Boss?'
+              : 'Hello! I\'m NGMY AI. Ask me about investments, clock-in, withdrawals, the store, or anything about the platform.',
+          'at': DateTime.now().toUtc().toIso8601String(),
+        });
+      }
+      _memoryLoaded = true;
+    });
+    _scrollToBottom();
+  }
+
+  Future<void> _persistChatMemory() async {
+    await NgmyAiMemoryStore.saveAll(widget.user.email, _messages);
   }
 
   @override
@@ -24198,13 +24704,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _newsScrollController.dispose();
     super.dispose();
   }
-
-  static const List<String> _quickPrompts = [
-    'How do withdrawals work?',
-    'Tell me about investments',
-    'How do I clock in?',
-    'What is NGMY Store?',
-  ];
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -24239,10 +24738,15 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     if (text.isEmpty) return;
 
     setState(() {
-      _messages.add({'role': 'user', 'text': text});
+      _messages.add({
+        'role': 'user',
+        'text': text,
+        'at': DateTime.now().toUtc().toIso8601String(),
+      });
       _chatController.clear();
       _isTyping = true;
     });
+    unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'user', text: text));
     _scrollToBottom();
 
     try {
@@ -24253,33 +24757,44 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         if (apiKey.isNotEmpty && mounted) setState(() => widget.config.geminiApiKey = apiKey);
       }
       if (apiKey.isEmpty) {
+        const err = 'NGMY AI is not connected yet. Ask an admin to save the Gemini API key in Admin → Management Hub → Save Global Settings.';
         setState(() {
-          _messages.add({'role': 'ai', 'text': 'NGMY AI is not connected yet. Ask an admin to save the Gemini API key in Admin → Management Hub → Save Global Settings.'});
+          _messages.add({'role': 'ai', 'text': err, 'at': DateTime.now().toUtc().toIso8601String()});
           _isTyping = false;
         });
+        unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: err));
         _scrollToBottom();
         return;
       }
 
-      final aiText = await _geminiGenerateReply(apiKey, text);
+      final aiText = await _geminiGenerateReply(
+        apiKey,
+        text,
+        user: widget.user,
+        memory: _messages,
+      );
       if (!mounted) return;
+      final reply = (aiText != null && aiText.isNotEmpty)
+          ? aiText
+          : 'I could not reach Gemini right now. Confirm the API key is valid in Google AI Studio and saved in Supabase config.';
       setState(() {
-        if (aiText != null && aiText.isNotEmpty) {
-          _messages.add({'role': 'ai', 'text': aiText});
-        } else {
-          _messages.add({
-            'role': 'ai',
-            'text': 'I could not reach Gemini right now. Confirm the API key is valid in Google AI Studio and saved in Supabase config.',
-          });
-        }
+        _messages.add({
+          'role': 'ai',
+          'text': reply,
+          'at': DateTime.now().toUtc().toIso8601String(),
+        });
       });
+      unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: reply));
     } catch (e) {
+      const err = 'Connection error. Please check your internet and try again.';
       setState(() {
-        _messages.add({'role': 'ai', 'text': 'Connection error. Please check your internet and try again.'});
+        _messages.add({'role': 'ai', 'text': err, 'at': DateTime.now().toUtc().toIso8601String()});
       });
+      unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: err));
     } finally {
       setState(() => _isTyping = false);
       _scrollToBottom();
+      unawaited(_persistChatMemory());
     }
   }
 
@@ -24451,14 +24966,19 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('NGMY Helper', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                        Text(
+                          _isBoss ? 'NGMY Helper · Your AI' : 'NGMY Helper',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                        ),
                         const SizedBox(height: 2),
                         Row(
                           children: [
                             Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF4ADE80), shape: BoxShape.circle)),
                             const SizedBox(width: 6),
                             Text(
-                              'Online • Chat & community updates',
+                              _isBoss
+                                  ? 'Online • Personal assistant for Sir'
+                                  : 'Online • Chat & community updates',
                               style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w500),
                             ),
                           ],
@@ -24532,7 +25052,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                       : Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (_messages.isEmpty)
+                      if (_memoryLoaded && _messages.length <= 1)
                         SizedBox(
                           height: 36,
                           child: ListView.separated(
@@ -24547,7 +25067,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                             ),
                           ),
                         ),
-                      if (_messages.isEmpty) const SizedBox(height: 8),
+                      if (_memoryLoaded && _messages.length <= 1) const SizedBox(height: 8),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
