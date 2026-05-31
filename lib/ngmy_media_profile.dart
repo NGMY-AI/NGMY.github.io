@@ -1,0 +1,1703 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+/// Instagram-style media profile, stories, highlights, follow system.
+class NgmyMediaProfile {
+  static dynamic userByEmail(List<dynamic> allUsers, String email) {
+    final key = email.toLowerCase().trim();
+    for (final u in allUsers) {
+      if (u.email.toLowerCase().trim() == key) return u;
+    }
+    return null;
+  }
+
+  static bool hasActiveStory(dynamic user) => activeStories(user).isNotEmpty;
+
+  static List<Map<String, dynamic>> asMapList(dynamic raw) {
+    if (raw == null) return <Map<String, dynamic>>[];
+    if (raw is! List) return <Map<String, dynamic>>[];
+    final out = <Map<String, dynamic>>[];
+    for (final e in raw) {
+      if (e is Map<String, dynamic>) {
+        out.add(e);
+      } else if (e is Map) {
+        out.add(Map<String, dynamic>.from(e));
+      }
+    }
+    return out;
+  }
+
+  static List<String> asStringList(dynamic raw) {
+    if (raw == null) return <String>[];
+    if (raw is! List) return <String>[];
+    return raw.map((e) => e.toString()).toList();
+  }
+
+  static List<Map<String, dynamic>> activeStories(dynamic user) {
+    final now = DateTime.now();
+    return asMapList((user as dynamic).mediaStories).where((s) {
+      final created = DateTime.tryParse((s['createdAt'] ?? '').toString());
+      if (created == null) return false;
+      return now.difference(created.toLocal()).inHours < 24;
+    }).toList();
+  }
+
+  static bool isFollowing(dynamic viewer, dynamic target) {
+    final followers = asStringList((target as dynamic).mediaFollowers);
+    return followers.map((e) => e.toLowerCase()).contains(viewer.email.toLowerCase().trim());
+  }
+
+  static void toggleFollow(dynamic viewer, dynamic target) {
+    final u = target as dynamic;
+    final v = viewer as dynamic;
+    final me = viewer.email.toLowerCase().trim();
+    final followers = asStringList(u.mediaFollowers);
+    if (followers.map((e) => e.toLowerCase()).contains(me)) {
+      u.mediaFollowers = followers.where((e) => e.toLowerCase() != me).toList();
+      v.mediaFollowing = asStringList(v.mediaFollowing).where((e) => e.toLowerCase() != target.email.toLowerCase().trim()).toList();
+    } else {
+      final nextFollowers = List<String>.from(followers);
+      if (!nextFollowers.any((e) => e.toLowerCase() == me)) nextFollowers.add(viewer.email);
+      u.mediaFollowers = nextFollowers;
+      final nextFollowing = List<String>.from(asStringList(v.mediaFollowing));
+      if (!nextFollowing.any((e) => e.toLowerCase() == target.email.toLowerCase().trim())) {
+        nextFollowing.add(target.email);
+      }
+      v.mediaFollowing = nextFollowing;
+    }
+  }
+
+  static void adminAddFollowers(dynamic target, int count) {
+    final u = target as dynamic;
+    final followers = List<String>.from(asStringList(u.mediaFollowers));
+    for (var i = 0; i < count; i++) {
+      final fake = 'ngmy_follower_${target.email.hashCode}_${followers.length + i}';
+      if (!followers.contains(fake)) followers.add(fake);
+    }
+    u.mediaFollowers = followers;
+  }
+
+  static void normalizeUserMediaFields(dynamic user) {
+    final u = user as dynamic;
+    u.mediaFollowers = asStringList(u.mediaFollowers);
+    u.mediaFollowing = asStringList(u.mediaFollowing);
+    u.mediaHighlights = asMapList(u.mediaHighlights);
+    u.mediaStories = asMapList(u.mediaStories);
+  }
+
+  static bool pruneExpiredStories(dynamic user) {
+    final u = user as dynamic;
+    final now = DateTime.now();
+    final stories = asMapList(u.mediaStories);
+    final kept = stories.where((s) {
+      final created = DateTime.tryParse((s['createdAt'] ?? '').toString());
+      if (created == null) return false;
+      return now.difference(created.toLocal()).inHours < 24;
+    }).toList();
+    if (kept.length == stories.length) return false;
+    u.mediaStories = kept;
+    return true;
+  }
+
+  static int pruneExpiredStoriesAllUsers(List<dynamic> users) {
+    var n = 0;
+    for (final u in users) {
+      if (pruneExpiredStories(u)) n++;
+    }
+    return n;
+  }
+
+  static List<Map<String, dynamic>> highlightPhotos(Map<String, dynamic> highlight) {
+    final photos = asMapList(highlight['photos']);
+    if (photos.isNotEmpty) return photos;
+    final cover = (highlight['coverUrl'] ?? '').toString();
+    if (cover.isNotEmpty) return [{'url': cover}];
+    return [];
+  }
+}
+
+class NgmyVirtualMediaProfiles {
+  static const int count = 175;
+
+  static List<Map<String, dynamic>> defaults() {
+    return List.generate(count, (i) => {
+          'id': 'vp_$i',
+          'displayName': 'Virtual User ${i + 1}',
+          'username': 'virtual_${i + 1}',
+          'profilePictureUrl': '',
+        });
+  }
+
+  static List<Map<String, dynamic>> ensure(dynamic existing) {
+    final existingList = NgmyMediaProfile.asMapList(existing);
+    final base = defaults();
+    if (existingList.isEmpty) return base;
+    final byId = <String, Map<String, dynamic>>{};
+    for (final e in existingList) {
+      byId[(e['id'] ?? '').toString()] = Map<String, dynamic>.from(e);
+    }
+    return List.generate(count, (i) {
+      final id = 'vp_$i';
+      final saved = byId[id];
+      if (saved != null) {
+        return {
+          'id': id,
+          'displayName': (saved['displayName'] ?? base[i]['displayName']).toString(),
+          'username': (saved['username'] ?? base[i]['username']).toString(),
+          'profilePictureUrl': (saved['profilePictureUrl'] ?? '').toString(),
+        };
+      }
+      return Map<String, dynamic>.from(base[i]);
+    });
+  }
+
+  static ImageProvider? avatarFor(Map<String, dynamic> profile) {
+    final url = (profile['profilePictureUrl'] ?? '').toString().trim();
+    if (url.isEmpty) return null;
+    if (url.startsWith('data:image')) {
+      try {
+        return MemoryImage(base64Decode(url.split(',').last));
+      } catch (_) {
+        return null;
+      }
+    }
+    if (url.startsWith('http') || url.startsWith('supabase://')) return null;
+    if (!kIsWeb) return FileImage(File(url));
+    return null;
+  }
+}
+
+class NgmyMediaProfileScreen extends StatefulWidget {
+  final dynamic targetUser;
+  final dynamic currentUser;
+  final List<dynamic> allUsers;
+  final List<dynamic> allMedia;
+  final ImageProvider? Function(dynamic user) avatarForUser;
+  final Future<String> Function(String url) resolveMediaUrl;
+  final Future<void> Function(dynamic post) persistPost;
+  final VoidCallback onDataChanged;
+  final bool Function(dynamic post) isPostExpired;
+  final Future<String> Function(String localRef)? uploadMediaRef;
+
+  const NgmyMediaProfileScreen({
+    super.key,
+    required this.targetUser,
+    required this.currentUser,
+    required this.allUsers,
+    required this.allMedia,
+    required this.avatarForUser,
+    required this.resolveMediaUrl,
+    required this.persistPost,
+    required this.onDataChanged,
+    required this.isPostExpired,
+    this.uploadMediaRef,
+  });
+
+  @override
+  State<NgmyMediaProfileScreen> createState() => _NgmyMediaProfileScreenState();
+}
+
+class _NgmyMediaProfileScreenState extends State<NgmyMediaProfileScreen> {
+  int _tab = 0;
+  final _bioCtrl = TextEditingController();
+  final _picker = ImagePicker();
+  bool _editingBio = false;
+
+  dynamic get _target => widget.targetUser;
+  dynamic get _me => widget.currentUser;
+  bool get _isOwn => _target.email.toLowerCase().trim() == _me.email.toLowerCase().trim();
+  bool get _following => NgmyMediaProfile.isFollowing(_me, _target);
+
+  List<Map<String, dynamic>> get _highlights => NgmyMediaProfile.asMapList((_target as dynamic).mediaHighlights);
+  int get _followerCount => NgmyMediaProfile.asStringList((_target as dynamic).mediaFollowers).length;
+  int get _followingCount => NgmyMediaProfile.asStringList((_target as dynamic).mediaFollowing).length;
+
+  List<dynamic> get _userPosts => widget.allMedia
+      .where((m) => m.userEmail.toLowerCase().trim() == _target.email.toLowerCase().trim() && !widget.isPostExpired(m))
+      .toList()
+    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+  List<dynamic> get _videoPosts => _userPosts.where((m) => (m.contentType ?? '').toString() == 'video').toList();
+
+  List<dynamic> get _taggedPosts => widget.allMedia
+      .where((m) {
+        if (widget.isPostExpired(m)) return false;
+        final tags = NgmyMediaProfile.asStringList((m as dynamic).taggedUsers);
+        return tags.map((e) => e.toLowerCase().trim()).contains(_target.email.toLowerCase().trim());
+      })
+      .toList()
+    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+  List<dynamic> get _activeTabPosts {
+    if (_tab == 1) return _videoPosts;
+    if (_tab == 2) return _taggedPosts;
+    return _userPosts;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    NgmyMediaProfile.normalizeUserMediaFields(_target);
+    NgmyMediaProfile.normalizeUserMediaFields(_me);
+    if (NgmyMediaProfile.pruneExpiredStories(_target)) widget.onDataChanged();
+    _bioCtrl.text = ((_target as dynamic).mediaBio ?? '').toString();
+  }
+
+  @override
+  void dispose() {
+    _bioCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveBio() async {
+    (_target as dynamic).mediaBio = _bioCtrl.text.trim();
+    setState(() => _editingBio = false);
+    widget.onDataChanged();
+  }
+
+  Future<void> _toggleFollow() async {
+    NgmyMediaProfile.toggleFollow(_me, _target);
+    widget.onDataChanged();
+    setState(() {});
+  }
+
+  Future<void> _openStoryViewer() async {
+    final stories = NgmyMediaProfile.activeStories(_target);
+    if (stories.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (ctx) {
+        var idx = 0;
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            final story = stories[idx];
+            final url = (story['url'] ?? '').toString();
+            final isVideo = (story['type'] ?? '').toString() == 'video';
+            return Scaffold(
+              backgroundColor: Colors.black,
+              appBar: AppBar(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                title: Text(_target.username),
+                actions: [IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx))],
+              ),
+              body: GestureDetector(
+                onTapUp: (d) {
+                  final w = MediaQuery.sizeOf(context).width;
+                  if (d.localPosition.dx > w * 0.55 && idx < stories.length - 1) {
+                    setLocal(() => idx++);
+                  } else if (d.localPosition.dx < w * 0.45 && idx > 0) {
+                    setLocal(() => idx--);
+                  } else {
+                    Navigator.pop(ctx);
+                  }
+                },
+                child: Center(child: isVideo ? _storyVideo(url) : _storyImage(url)),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _storyVideo(String url) => FutureBuilder<String>(
+        future: widget.resolveMediaUrl(url),
+        builder: (_, s) {
+          final resolved = s.data ?? url;
+          if (resolved.startsWith('http')) {
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.play_circle_fill, color: Colors.white, size: 72),
+                const SizedBox(height: 12),
+                Text('Video story', style: TextStyle(color: Colors.white.withOpacity(0.7))),
+              ],
+            );
+          }
+          return const CircularProgressIndicator(color: Colors.white);
+        },
+      );
+
+  Widget _storyImage(String url) {
+    if (url.startsWith('data:image')) {
+      try {
+        return Image.memory(base64Decode(url.split(',').last), fit: BoxFit.contain);
+      } catch (_) {}
+    }
+    if (url.startsWith('http') || url.startsWith('supabase://')) {
+      return FutureBuilder<String>(
+        future: widget.resolveMediaUrl(url),
+        builder: (_, s) {
+          if (s.hasData && s.data!.startsWith('http')) return Image.network(s.data!, fit: BoxFit.contain);
+          return const CircularProgressIndicator(color: Colors.white);
+        },
+      );
+    }
+    if (!kIsWeb && url.isNotEmpty) return Image.file(File(url), fit: BoxFit.contain);
+    return const Icon(Icons.broken_image_outlined, color: Colors.white38, size: 48);
+  }
+
+  Future<void> _addStory() async {
+    final kind = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('New 24-hour story'),
+        content: const Text('Stories disappear after 24 hours. Post unlimited stories anytime.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(c, 'image'), child: const Text('Photo')),
+          FilledButton(onPressed: () => Navigator.pop(c, 'video'), child: const Text('Video')),
+        ],
+      ),
+    );
+    if (kind == null) return;
+
+    String url;
+    String type;
+    if (kind == 'video') {
+      final picked = await _picker.pickVideo(source: ImageSource.gallery);
+      if (picked == null) return;
+      if (widget.uploadMediaRef != null) {
+        final ref = kIsWeb ? picked.path : picked.path;
+        url = await widget.uploadMediaRef!(ref);
+      } else {
+        url = picked.path;
+      }
+      type = 'video';
+    } else {
+      final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+      if (picked == null) return;
+      if (widget.uploadMediaRef != null) {
+        final ref = kIsWeb ? 'data:image/jpeg;base64,${base64Encode(await picked.readAsBytes())}' : picked.path;
+        url = await widget.uploadMediaRef!(ref);
+      } else {
+        url = kIsWeb ? 'data:image/jpeg;base64,${base64Encode(await picked.readAsBytes())}' : picked.path;
+      }
+      type = 'image';
+    }
+
+    final kept = NgmyMediaProfile.asMapList((_target as dynamic).mediaStories);
+    kept.add({
+      'id': DateTime.now().microsecondsSinceEpoch.toString(),
+      'url': url,
+      'type': type,
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+    });
+    (_target as dynamic).mediaStories = kept;
+    widget.onDataChanged();
+    setState(() {});
+  }
+
+  Future<void> _addHighlight() async {
+    final titleCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('New Highlight'),
+        content: TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Highlight name')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Next')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked == null) return;
+    String cover;
+    if (widget.uploadMediaRef != null) {
+      final ref = kIsWeb ? 'data:image/jpeg;base64,${base64Encode(await picked.readAsBytes())}' : picked.path;
+      cover = await widget.uploadMediaRef!(ref);
+    } else {
+      cover = kIsWeb ? 'data:image/jpeg;base64,${base64Encode(await picked.readAsBytes())}' : picked.path;
+    }
+    final next = List<Map<String, dynamic>>.from(_highlights)
+      ..add({
+        'id': DateTime.now().microsecondsSinceEpoch.toString(),
+        'title': titleCtrl.text.trim().isEmpty ? 'Highlight' : titleCtrl.text.trim(),
+        'coverUrl': cover,
+        'photos': [{'url': cover, 'type': 'image'}],
+      });
+    (_target as dynamic).mediaHighlights = next;
+    widget.onDataChanged();
+    setState(() {});
+  }
+
+  Future<void> _openHighlightViewer(Map<String, dynamic> highlight) async {
+    final idx = _highlights.indexWhere((h) => (h['id'] ?? '') == (highlight['id'] ?? ''));
+    if (idx < 0) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.black,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            final h = Map<String, dynamic>.from(_highlights[idx]);
+            final photos = NgmyMediaProfile.highlightPhotos(h);
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text((h['title'] ?? 'Highlight').toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 120,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: photos.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (_, i) => ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: SizedBox(width: 100, height: 120, child: _coverThumb((photos[i]['url'] ?? '').toString())),
+                        ),
+                      ),
+                    ),
+                    if (_isOwn) ...[
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                          if (picked == null) return;
+                          String url;
+                          if (widget.uploadMediaRef != null) {
+                            final ref = kIsWeb ? 'data:image/jpeg;base64,${base64Encode(await picked.readAsBytes())}' : picked.path;
+                            url = await widget.uploadMediaRef!(ref);
+                          } else {
+                            url = kIsWeb ? 'data:image/jpeg;base64,${base64Encode(await picked.readAsBytes())}' : picked.path;
+                          }
+                          final nextPhotos = List<Map<String, dynamic>>.from(photos)..add({'url': url, 'type': 'image'});
+                          h['photos'] = nextPhotos;
+                          if ((h['coverUrl'] ?? '').toString().isEmpty) h['coverUrl'] = url;
+                          final nextHighlights = List<Map<String, dynamic>>.from(_highlights);
+                          nextHighlights[idx] = h;
+                          (_target as dynamic).mediaHighlights = nextHighlights;
+                          widget.onDataChanged();
+                          setLocal(() {});
+                          setState(() {});
+                        },
+                        icon: const Icon(Icons.add_photo_alternate_outlined, color: Colors.white),
+                        label: const Text('Add photo', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _storyRingAvatar({required double radius}) {
+    final hasStory = NgmyMediaProfile.hasActiveStory(_target);
+    final avatar = widget.avatarForUser(_target);
+    final inner = CircleAvatar(
+      radius: radius - (hasStory ? 3 : 0),
+      backgroundColor: const Color(0xFF262626),
+      backgroundImage: avatar,
+      child: avatar == null ? Icon(Icons.person, size: radius, color: Colors.white54) : null,
+    );
+    if (!hasStory) return inner;
+    return Container(
+      padding: const EdgeInsets.all(2.5),
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: SweepGradient(colors: [Color(0xFFFD1D1D), Color(0xFFFCAF45), Color(0xFF833AB4), Color(0xFFFD1D1D)]),
+      ),
+      child: inner,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final posts = _userPosts.length;
+    final displayName = (_target.fullName ?? '').trim().isNotEmpty ? _target.fullName!.trim() : _target.username;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Text(_target.username, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+        actions: [
+          if (_isOwn)
+            IconButton(icon: const Icon(Icons.add_box_outlined), onPressed: _addStory, tooltip: 'Add story'),
+          IconButton(icon: const Icon(Icons.more_horiz), onPressed: () {}),
+        ],
+      ),
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: NgmyMediaProfile.hasActiveStory(_target) ? _openStoryViewer : null,
+                    child: _storyRingAvatar(radius: 42),
+                  ),
+                  const SizedBox(width: 22),
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _statCol('$posts', 'posts'),
+                        _statCol('$_followerCount', 'followers'),
+                        _statCol('$_followingCount', 'following'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(displayName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                  if ((_target.crownBadge ?? '').toString().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text('👑 ${_target.crownBadge.toUpperCase()}', style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 11)),
+                    ),
+                  const SizedBox(height: 4),
+                  if (_isOwn && _editingBio)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _bioCtrl,
+                            maxLines: 3,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            decoration: const InputDecoration(hintText: 'Write a bio...', hintStyle: TextStyle(color: Colors.white38), border: OutlineInputBorder(), isDense: true),
+                          ),
+                        ),
+                        IconButton(onPressed: _saveBio, icon: const Icon(Icons.check, color: Colors.white)),
+                      ],
+                    )
+                  else
+                    GestureDetector(
+                      onTap: _isOwn ? () => setState(() => _editingBio = true) : null,
+                      child: Text(
+                        ((_target as dynamic).mediaBio ?? '').toString().trim().isEmpty
+                            ? (_isOwn ? 'Tap to add bio' : '')
+                            : ((_target as dynamic).mediaBio ?? '').toString(),
+                        style: TextStyle(color: ((_target as dynamic).mediaBio ?? '').toString().trim().isEmpty ? Colors.white38 : Colors.white, fontSize: 13, height: 1.35),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: Row(
+                children: [
+                  if (_isOwn) ...[
+                    Expanded(child: _actionBtn('Edit profile', Icons.edit_outlined, () => setState(() => _editingBio = true))),
+                    const SizedBox(width: 8),
+                    Expanded(child: _actionBtn('Share profile', Icons.share_outlined, () {})),
+                  ] else ...[
+                    Expanded(child: _actionBtn(_following ? 'Following' : 'Follow', _following ? Icons.person_remove_outlined : Icons.person_add_alt_1_outlined, _toggleFollow, filled: !_following)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _actionBtn('Message', Icons.send_outlined, () {})),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 108,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
+                children: [
+                  if (_isOwn)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 14),
+                      child: GestureDetector(
+                        onTap: _addHighlight,
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white24), color: const Color(0xFF121212)),
+                              child: const Icon(Icons.add, color: Colors.white),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text('New', style: TextStyle(color: Colors.white, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ..._highlights.map((h) {
+                    final title = (h['title'] ?? 'Highlight').toString();
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 14),
+                      child: GestureDetector(
+                        onTap: () => _openHighlightViewer(h),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white38)),
+                              child: ClipOval(child: _coverThumb((h['coverUrl'] ?? '').toString())),
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: 68,
+                              child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 11)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Row(
+              children: [
+                _tabIcon(Icons.grid_on_rounded, 0),
+                _tabIcon(Icons.movie_outlined, 1),
+                _tabIcon(Icons.person_pin_outlined, 2),
+              ],
+            ),
+          ),
+          _postsGrid(_activeTabPosts),
+        ],
+      ),
+    );
+  }
+
+  Widget _statCol(String n, String label) => Column(
+        children: [
+          Text(n, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18)),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 13)),
+        ],
+      );
+
+  Widget _actionBtn(String label, IconData icon, VoidCallback onTap, {bool filled = false}) => Material(
+        color: filled ? const Color(0xFF0095F6) : const Color(0xFF262626),
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: filled ? null : Border.all(color: Colors.white24)),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: Colors.white, size: 16),
+                const SizedBox(width: 6),
+                Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Widget _tabIcon(IconData icon, int idx) {
+    final selected = _tab == idx;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _tab = idx),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: selected ? Colors.white : Colors.transparent, width: 1.2))),
+          child: Icon(icon, color: selected ? Colors.white : Colors.white38, size: 22),
+        ),
+      ),
+    );
+  }
+
+  Widget _coverThumb(String url) {
+    if (url.startsWith('data:image')) {
+      try {
+        return Image.memory(base64Decode(url.split(',').last), fit: BoxFit.cover, width: 64, height: 64);
+      } catch (_) {}
+    }
+    if (url.startsWith('http') || url.startsWith('supabase://')) {
+      return FutureBuilder<String>(
+        future: widget.resolveMediaUrl(url),
+        builder: (_, s) {
+          if (s.hasData && s.data!.startsWith('http')) return Image.network(s.data!, fit: BoxFit.cover, width: 64, height: 64);
+          return const ColoredBox(color: Color(0xFF262626));
+        },
+      );
+    }
+    if (!kIsWeb && url.isNotEmpty) return Image.file(File(url), fit: BoxFit.cover, width: 64, height: 64);
+    return const ColoredBox(color: Color(0xFF262626));
+  }
+
+  Widget _postsGrid(List<dynamic> posts) {
+    if (posts.isEmpty) {
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(child: Text(_tab == 1 ? 'No videos yet' : (_tab == 2 ? 'No tagged posts yet' : 'No posts yet'), style: const TextStyle(color: Colors.white54))),
+      );
+    }
+    return SliverGrid(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 2, crossAxisSpacing: 2),
+      delegate: SliverChildBuilderDelegate(
+        (context, i) {
+          final post = posts[i];
+          final isVideo = (post.contentType ?? '').toString() == 'video';
+          return FutureBuilder<String>(
+            future: widget.resolveMediaUrl(post.videoUrl),
+            builder: (_, snap) {
+              final url = snap.data ?? '';
+              if (!isVideo && (post.contentType == 'image' || url.startsWith('data:image'))) {
+                if (url.startsWith('data:image')) {
+                  try {
+                    return Image.memory(base64Decode(url.split(',').last), fit: BoxFit.cover);
+                  } catch (_) {}
+                }
+                if (url.startsWith('http')) return Image.network(url, fit: BoxFit.cover);
+              }
+              return Container(color: const Color(0xFF111111), child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 28)));
+            },
+          );
+        },
+        childCount: posts.length,
+      ),
+    );
+  }
+}
+
+class NgmyMediaAdminPanel extends StatefulWidget {
+  final List<dynamic> allMedia;
+  final List<dynamic> allUsers;
+  final dynamic adminUser;
+  final VoidCallback onDataChanged;
+  final Future<void> Function(dynamic post) persistPost;
+  final bool Function(dynamic post) isPostExpired;
+  final bool isDark;
+  final dynamic virtualProfilesRaw;
+  final void Function(List<Map<String, dynamic>> profiles) onVirtualProfilesChanged;
+  final Future<String> Function(String rawUrl) resolveMediaUrl;
+  final Future<String> Function(String localRef)? uploadMediaRef;
+
+  const NgmyMediaAdminPanel({
+    super.key,
+    required this.allMedia,
+    required this.allUsers,
+    required this.adminUser,
+    required this.onDataChanged,
+    required this.persistPost,
+    required this.isPostExpired,
+    required this.isDark,
+    required this.virtualProfilesRaw,
+    required this.onVirtualProfilesChanged,
+    required this.resolveMediaUrl,
+    this.uploadMediaRef,
+  });
+
+  @override
+  State<NgmyMediaAdminPanel> createState() => _NgmyMediaAdminPanelState();
+}
+
+class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
+  final _profileSearch = TextEditingController();
+  final _picker = ImagePicker();
+  final _rng = Random();
+
+  @override
+  void dispose() {
+    _profileSearch.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _profiles {
+    try {
+      return NgmyVirtualMediaProfiles.ensure(widget.virtualProfilesRaw);
+    } catch (_) {
+      return NgmyVirtualMediaProfiles.defaults();
+    }
+  }
+
+  void _openFollowerDemosSheet() {
+    final queryCtrl = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: widget.isDark ? const Color(0xFF111731) : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheet) {
+          final q = queryCtrl.text.trim().toLowerCase();
+          final users = widget.allUsers.where((u) {
+            if (q.isEmpty) return true;
+            return u.username.toString().toLowerCase().contains(q) || u.email.toString().toLowerCase().contains(q);
+          }).toList();
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.88,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            builder: (_, scrollCtrl) => Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Grant Followers', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: widget.isDark ? Colors.white : Colors.black)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: queryCtrl,
+                    onChanged: (_) => setSheet(() {}),
+                    decoration: const InputDecoration(hintText: 'Search users...', prefixIcon: Icon(Icons.search), border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: GridView.builder(
+                      controller: scrollCtrl,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 10, crossAxisSpacing: 8, childAspectRatio: 0.78),
+                      itemCount: users.length,
+                      itemBuilder: (_, i) {
+                        final u = users[i];
+                        final count = NgmyMediaProfile.asStringList((u as dynamic).mediaFollowers).length;
+                        return GestureDetector(
+                          onTap: () async {
+                            final amtCtrl = TextEditingController(text: '10');
+                            final ok = await showDialog<bool>(
+                              context: context,
+                              builder: (d) => AlertDialog(
+                                title: Text('Followers for ${u.username}'),
+                                content: TextField(controller: amtCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'How many followers to add?')),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
+                                  FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Grant')),
+                                ],
+                              ),
+                            );
+                            if (ok != true) return;
+                            final n = int.tryParse(amtCtrl.text.trim()) ?? 0;
+                            if (n <= 0) return;
+                            NgmyMediaProfile.adminAddFollowers(u, n);
+                            widget.onDataChanged();
+                            setSheet(() {});
+                          },
+                          child: Column(
+                            children: [
+                              CircleAvatar(radius: 26, child: Text(u.username.toString().substring(0, 1).toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w800))),
+                              const SizedBox(height: 4),
+                              Text(u.username.toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: widget.isDark ? Colors.white : Colors.black87)),
+                              Text('$count', style: TextStyle(fontSize: 9, color: widget.isDark ? Colors.white54 : Colors.black54)),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    ).whenComplete(queryCtrl.dispose);
+  }
+
+  void _openCommentDemosSheet() {
+    final profiles = _profiles;
+    final queryCtrl = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: widget.isDark ? const Color(0xFF111731) : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheet) {
+          final q = queryCtrl.text.trim().toLowerCase();
+          final list = q.isEmpty
+              ? profiles
+              : profiles.where((p) {
+                  final name = (p['displayName'] ?? '').toString().toLowerCase();
+                  final user = (p['username'] ?? '').toString().toLowerCase();
+                  return name.contains(q) || user.contains(q);
+                }).toList();
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.88,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            builder: (_, scrollCtrl) => Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Comment Demos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: widget.isDark ? Colors.white : Colors.black)),
+                  const SizedBox(height: 4),
+                  Text('${profiles.length} profiles • tap to edit • 4 per row', style: TextStyle(fontSize: 12, color: widget.isDark ? Colors.white54 : Colors.black54)),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: queryCtrl,
+                    onChanged: (_) => setSheet(() {}),
+                    decoration: const InputDecoration(hintText: 'Search profiles...', prefixIcon: Icon(Icons.search), border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: GridView.builder(
+                      controller: scrollCtrl,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 10, crossAxisSpacing: 8, childAspectRatio: 0.72),
+                      itemCount: list.length,
+                      itemBuilder: (_, i) {
+                        final p = list[i];
+                        final idx = profiles.indexWhere((e) => e['id'] == p['id']);
+                        return GestureDetector(
+                          onTap: idx >= 0
+                              ? () async {
+                                  Navigator.pop(ctx);
+                                  await _editVirtualProfile(idx);
+                                }
+                              : null,
+                          child: Column(
+                            children: [
+                              _VirtualAvatar(profile: p, resolveMediaUrl: widget.resolveMediaUrl, radius: 28),
+                              const SizedBox(height: 4),
+                              Text((p['username'] ?? '').toString(), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: widget.isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    ).whenComplete(queryCtrl.dispose);
+  }
+
+  Map<String, dynamic> _pickVirtualProfile() => _profiles.isEmpty
+      ? {'id': 'vp_0', 'displayName': 'Virtual User', 'username': 'virtual_user', 'profilePictureUrl': ''}
+      : _profiles[_rng.nextInt(_profiles.length)];
+
+  void _updateProfile(int index, Map<String, dynamic> updated) {
+    final next = List<Map<String, dynamic>>.from(_profiles.map((e) => Map<String, dynamic>.from(e)));
+    next[index] = updated;
+    widget.onVirtualProfilesChanged(NgmyVirtualMediaProfiles.ensure(next));
+    setState(() {});
+  }
+
+  Future<void> _editVirtualProfile(int index) async {
+    final profiles = _profiles;
+    if (index < 0 || index >= profiles.length) return;
+    final p = Map<String, dynamic>.from(profiles[index]);
+    final nameCtrl = TextEditingController(text: (p['displayName'] ?? '').toString());
+    final userCtrl = TextEditingController(text: (p['username'] ?? '').toString());
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Edit Profile #${index + 1}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _VirtualAvatar(profile: p, resolveMediaUrl: widget.resolveMediaUrl, radius: 36),
+              const SizedBox(height: 12),
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Display name')),
+              const SizedBox(height: 8),
+              TextField(controller: userCtrl, decoration: const InputDecoration(labelText: 'Username')),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                  if (picked == null) return;
+                  String url;
+                  if (widget.uploadMediaRef != null) {
+                    final ref = kIsWeb ? 'data:image/jpeg;base64,${base64Encode(await picked.readAsBytes())}' : picked.path;
+                    url = await widget.uploadMediaRef!(ref);
+                  } else {
+                    url = kIsWeb ? 'data:image/jpeg;base64,${base64Encode(await picked.readAsBytes())}' : picked.path;
+                  }
+                  p['profilePictureUrl'] = url;
+                  if (c.mounted) Navigator.pop(c);
+                  _updateProfile(index, p);
+                },
+                icon: const Icon(Icons.photo_camera_outlined),
+                label: const Text('Change profile picture'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () { p['displayName'] = nameCtrl.text.trim(); p['username'] = userCtrl.text.trim(); Navigator.pop(c, true); }, child: const Text('Save')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      p['displayName'] = nameCtrl.text.trim();
+      p['username'] = userCtrl.text.trim();
+      _updateProfile(index, p);
+      widget.onDataChanged();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final posts = widget.allMedia.where((m) => !widget.isPostExpired(m)).toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final profiles = _profiles;
+    final accent = const Color(0xFF7C3AED);
+    final sub = widget.isDark ? Colors.white54 : Colors.black54;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: widget.isDark
+                  ? [const Color(0xFF1A1033), const Color(0xFF121726)]
+                  : [const Color(0xFFF5F0FF), const Color(0xFFFFFFFF)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: accent.withOpacity(0.35)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: accent.withOpacity(0.18), borderRadius: BorderRadius.circular(12)),
+                    child: Icon(Icons.shield_outlined, color: accent, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Media Moderation', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: widget.isDark ? Colors.white : Colors.black87)),
+                        Text('Boost likes & comments on live posts', style: TextStyle(fontSize: 12, color: sub)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _AdminToolButton(
+                      icon: Icons.groups_rounded,
+                      label: 'Comment Demos',
+                      sub: '${profiles.length} profiles',
+                      isDark: widget.isDark,
+                      onTap: _openCommentDemosSheet,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _AdminToolButton(
+                      icon: Icons.person_add_alt_1_rounded,
+                      label: 'Grant Followers',
+                      sub: 'Pick user & amount',
+                      isDark: widget.isDark,
+                      onTap: _openFollowerDemosSheet,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        if (posts.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 28),
+            child: Center(child: Text('No active media posts.', style: TextStyle(color: sub))),
+          )
+        else
+          ...posts.take(40).map((post) => _AdminPostCard(
+                post: post,
+                isDark: widget.isDark,
+                onDataChanged: widget.onDataChanged,
+                persistPost: widget.persistPost,
+                virtualProfiles: profiles,
+                pickVirtualProfile: _pickVirtualProfile,
+                resolveMediaUrl: widget.resolveMediaUrl,
+              )),
+      ],
+    );
+  }
+}
+
+class _AdminToolButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String sub;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _AdminToolButton({
+    required this.icon,
+    required this.label,
+    required this.sub,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: const Color(0xFF7C3AED), size: 20),
+              const SizedBox(height: 6),
+              Text(label, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: isDark ? Colors.white : Colors.black87)),
+              Text(sub, style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.black45)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VirtualAvatar extends StatelessWidget {
+  final Map<String, dynamic> profile;
+  final Future<String> Function(String rawUrl) resolveMediaUrl;
+  final double radius;
+
+  const _VirtualAvatar({required this.profile, required this.resolveMediaUrl, required this.radius});
+
+  @override
+  Widget build(BuildContext context) {
+    final url = (profile['profilePictureUrl'] ?? '').toString().trim();
+    final mem = NgmyVirtualMediaProfiles.avatarFor(profile);
+    if (mem != null) return CircleAvatar(radius: radius, backgroundImage: mem);
+    if (url.startsWith('http') || url.startsWith('supabase://')) {
+      return FutureBuilder<String>(
+        future: resolveMediaUrl(url),
+        builder: (_, s) {
+          final resolved = s.data ?? '';
+          if (resolved.startsWith('http')) return CircleAvatar(radius: radius, backgroundImage: NetworkImage(resolved));
+          return CircleAvatar(radius: radius, child: Icon(Icons.person, size: radius));
+        },
+      );
+    }
+    return CircleAvatar(radius: radius, child: Icon(Icons.person, size: radius));
+  }
+}
+
+class _AdminPostCard extends StatefulWidget {
+  final dynamic post;
+  final bool isDark;
+  final VoidCallback onDataChanged;
+  final Future<void> Function(dynamic post) persistPost;
+  final List<Map<String, dynamic>> virtualProfiles;
+  final Map<String, dynamic> Function() pickVirtualProfile;
+  final Future<String> Function(String rawUrl) resolveMediaUrl;
+
+  const _AdminPostCard({
+    required this.post,
+    required this.isDark,
+    required this.onDataChanged,
+    required this.persistPost,
+    required this.virtualProfiles,
+    required this.pickVirtualProfile,
+    required this.resolveMediaUrl,
+  });
+
+  @override
+  State<_AdminPostCard> createState() => _AdminPostCardState();
+}
+
+class _AdminPostCardState extends State<_AdminPostCard> {
+  final _likesCtrl = TextEditingController(text: '10');
+  final _commentsCtrl = TextEditingController(text: '5');
+  final _commentTextCtrl = TextEditingController();
+  int? _selectedProfileIdx;
+
+  @override
+  void dispose() {
+    _likesCtrl.dispose();
+    _commentsCtrl.dispose();
+    _commentTextCtrl.dispose();
+    super.dispose();
+  }
+
+  Map<String, dynamic>? get _selectedProfile {
+    if (_selectedProfileIdx == null || widget.virtualProfiles.isEmpty) return null;
+    final i = _selectedProfileIdx!.clamp(0, widget.virtualProfiles.length - 1);
+    return widget.virtualProfiles[i];
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<bool> _ensureProfileSelected() async {
+    if (_selectedProfile != null) return true;
+    _snack('Choose a demo comment profile first.');
+    return false;
+  }
+
+  Future<void> _addLikes(int count) async {
+    if (count <= 0) return;
+    final liked = NgmyMediaProfile.asStringList((widget.post as dynamic).likedBy);
+    for (var i = 0; i < count; i++) {
+      final profile = widget.virtualProfiles.isNotEmpty ? widget.virtualProfiles[i % widget.virtualProfiles.length] : widget.pickVirtualProfile();
+      final id = (profile['id'] ?? 'vp_$i').toString();
+      if (!liked.contains(id)) liked.add(id);
+    }
+    (widget.post as dynamic).likedBy = liked;
+    widget.post.likes = liked.length;
+    await widget.persistPost(widget.post);
+    widget.onDataChanged();
+  }
+
+  Future<void> _addBulkComments(int count) async {
+    if (count <= 0 || widget.virtualProfiles.isEmpty) return;
+    if (!await _ensureProfileSelected()) return;
+    final comments = NgmyMediaProfile.asMapList((widget.post as dynamic).comments);
+    final start = _selectedProfileIdx!.clamp(0, widget.virtualProfiles.length - 1);
+    for (var i = 0; i < count; i++) {
+      final profile = widget.virtualProfiles[(start + i) % widget.virtualProfiles.length];
+      comments.add(_commentFromProfile(profile, '🔥'));
+    }
+    (widget.post as dynamic).comments = comments;
+    await widget.persistPost(widget.post);
+    widget.onDataChanged();
+    _snack('Added $count comment(s) from demo profiles.');
+  }
+
+  Map<String, dynamic> _commentFromProfile(Map<String, dynamic> profile, String text) => {
+        'id': DateTime.now().microsecondsSinceEpoch.toString(),
+        'userEmail': (profile['id'] ?? 'virtual').toString(),
+        'username': (profile['username'] ?? 'user').toString(),
+        'displayName': (profile['displayName'] ?? '').toString(),
+        'profilePictureUrl': (profile['profilePictureUrl'] ?? '').toString(),
+        'text': text,
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
+        'replies': <Map<String, dynamic>>[],
+        'isVirtual': true,
+      };
+
+  Future<void> _postCustomComment() async {
+    if (widget.virtualProfiles.isEmpty) return;
+    if (!await _ensureProfileSelected()) return;
+    final text = _commentTextCtrl.text.trim();
+    if (text.isEmpty) {
+      _snack('Write a comment first.');
+      return;
+    }
+    final profile = _selectedProfile!;
+    final comments = NgmyMediaProfile.asMapList((widget.post as dynamic).comments);
+    comments.add(_commentFromProfile(profile, text));
+    (widget.post as dynamic).comments = comments;
+    await widget.persistPost(widget.post);
+    widget.onDataChanged();
+    _commentTextCtrl.clear();
+    _snack('Comment posted as @${profile['username']}.');
+  }
+
+  Widget _profilePickerStrip() {
+    if (widget.virtualProfiles.isEmpty) {
+      return Text('No demo profiles loaded.', style: TextStyle(fontSize: 11, color: widget.isDark ? Colors.white54 : Colors.black54));
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.record_voice_over_outlined, size: 16, color: widget.isDark ? Colors.white70 : Colors.black54),
+            const SizedBox(width: 6),
+            Text('Comment as (required)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: widget.isDark ? Colors.white : Colors.black87)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_selectedProfile != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7C3AED).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.5)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _VirtualAvatar(profile: _selectedProfile!, resolveMediaUrl: widget.resolveMediaUrl, radius: 12),
+                const SizedBox(width: 8),
+                Text('@${_selectedProfile!['username']}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: widget.isDark ? Colors.white : Colors.black87)),
+              ],
+            ),
+          ),
+        SizedBox(
+          height: 78,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: widget.virtualProfiles.length.clamp(0, 40),
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, i) {
+              final p = widget.virtualProfiles[i];
+              final selected = _selectedProfileIdx == i;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedProfileIdx = i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 64,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  decoration: BoxDecoration(
+                    color: widget.isDark ? const Color(0xFF121726) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: selected ? const Color(0xFF7C3AED) : (widget.isDark ? Colors.white12 : const Color(0xFFE2E8F0)), width: selected ? 2 : 1),
+                    boxShadow: selected ? [BoxShadow(color: const Color(0xFF7C3AED).withOpacity(0.25), blurRadius: 8)] : null,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _VirtualAvatar(profile: p, resolveMediaUrl: widget.resolveMediaUrl, radius: 16),
+                      const SizedBox(height: 4),
+                      Text((p['username'] ?? '').toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 9, fontWeight: selected ? FontWeight.w800 : FontWeight.w500, color: widget.isDark ? Colors.white : Colors.black87)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _metricCard({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required TextEditingController controller,
+    required String hint,
+    required VoidCallback onApply,
+    required List<Widget> quickActions,
+  }) {
+    final bg = widget.isDark ? const Color(0xFF121726) : const Color(0xFFF8FAFC);
+    final border = widget.isDark ? Colors.white10 : const Color(0xFFE2E8F0);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: iconColor.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, color: iconColor, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: widget.isDark ? Colors.white : Colors.black87)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: widget.isDark ? Colors.white : Colors.black87),
+                  decoration: InputDecoration(
+                    hintText: hint,
+                    filled: true,
+                    fillColor: widget.isDark ? const Color(0xFF1C1F2E) : Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Material(
+                color: iconColor,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: onApply,
+                  borderRadius: BorderRadius.circular(12),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: Text('Apply', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(spacing: 6, runSpacing: 6, children: quickActions),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final likes = NgmyMediaProfile.asStringList((widget.post as dynamic).likedBy).length;
+    final comments = NgmyMediaProfile.asMapList((widget.post as dynamic).comments).length;
+    final panel = widget.isDark ? const Color(0xFF1C1F2E) : Colors.white;
+    final border = widget.isDark ? Colors.white12 : const Color(0xFFE2E8F0);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(widget.isDark ? 0.2 : 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(width: 80, height: 80, child: _PostPreviewThumb(post: widget.post, resolveMediaUrl: widget.resolveMediaUrl)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Post by ${widget.post.username}', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: widget.isDark ? Colors.white : Colors.black87)),
+                      const SizedBox(height: 2),
+                      Text(widget.post.userEmail.toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: widget.isDark ? Colors.white54 : Colors.black54)),
+                      if (widget.post.caption.toString().trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(widget.post.caption, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: widget.isDark ? Colors.white70 : Colors.black87)),
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _statChip(Icons.favorite_rounded, '$likes likes', const Color(0xFFEF4444)),
+                          const SizedBox(width: 8),
+                          _statChip(Icons.chat_bubble_rounded, '$comments comments', const Color(0xFF3B82F6)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: _metricCard(
+              icon: Icons.favorite_rounded,
+              iconColor: const Color(0xFFEF4444),
+              title: 'Add Likes',
+              controller: _likesCtrl,
+              hint: 'Amount',
+              onApply: () => _addLikes(int.tryParse(_likesCtrl.text.trim()) ?? 0),
+              quickActions: [
+                _quickChip('+1', () => _addLikes(1)),
+                _quickChip('+10', () => _addLikes(10)),
+                _quickChip('+50', () => _addLikes(50)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: widget.isDark ? const Color(0xFF121726) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: widget.isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: const Color(0xFF3B82F6).withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.chat_bubble_rounded, color: Color(0xFF3B82F6), size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Text('Add Comments', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: widget.isDark ? Colors.white : Colors.black87)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _profilePickerStrip(),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _commentTextCtrl,
+                    maxLines: 2,
+                    style: TextStyle(color: widget.isDark ? Colors.white : Colors.black87),
+                    decoration: InputDecoration(
+                      hintText: 'Write comment text...',
+                      filled: true,
+                      fillColor: widget.isDark ? const Color(0xFF1C1F2E) : Colors.white,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _commentsCtrl,
+                          keyboardType: TextInputType.number,
+                          style: TextStyle(fontWeight: FontWeight.w700, color: widget.isDark ? Colors.white : Colors.black87),
+                          decoration: InputDecoration(
+                            hintText: 'Bulk count',
+                            filled: true,
+                            fillColor: widget.isDark ? const Color(0xFF1C1F2E) : Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Material(
+                        color: const Color(0xFF3B82F6),
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          onTap: () => _addBulkComments(int.tryParse(_commentsCtrl.text.trim()) ?? 0),
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            child: Text('Bulk', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Material(
+                        color: const Color(0xFF7C3AED),
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          onTap: _postCustomComment,
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            child: Text('Post', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
+      ),
+    );
+  }
+
+  Widget _statChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+        ],
+      ),
+    );
+  }
+
+  Widget _quickChip(String label, VoidCallback onTap) {
+    return ActionChip(
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+      onPressed: onTap,
+      backgroundColor: widget.isDark ? const Color(0xFF1C1F2E) : Colors.white,
+      side: BorderSide(color: widget.isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+    );
+  }
+}
+
+class _PostPreviewThumb extends StatelessWidget {
+  final dynamic post;
+  final Future<String> Function(String rawUrl) resolveMediaUrl;
+
+  const _PostPreviewThumb({required this.post, required this.resolveMediaUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: resolveMediaUrl(post.videoUrl.toString()),
+      builder: (_, snap) {
+        final url = snap.data ?? post.videoUrl.toString();
+        if (url.startsWith('data:image')) {
+          try {
+            return Image.memory(base64Decode(url.split(',').last), fit: BoxFit.cover);
+          } catch (_) {}
+        }
+        if (post.contentType == 'image' && url.startsWith('http')) return Image.network(url, fit: BoxFit.cover);
+        return Container(color: const Color(0xFF262626), child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white70)));
+      },
+    );
+  }
+}

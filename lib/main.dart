@@ -20,6 +20,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import 'ngmy_popups.dart';
+import 'ngmy_media_profile.dart';
 import 'ngmy_ai_memory.dart';
 import 'ngmy_weekend_clock_overlay.dart';
 import 'ngmy_nav.dart';
@@ -330,6 +331,7 @@ class AppConfig {
   bool ngmyChatClosed;
   List<Map<String, dynamic>> ngmyPopups;
   List<Map<String, dynamic>> ngmyVideoPopups;
+  List<Map<String, dynamic>> mediaVirtualProfiles;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -372,11 +374,13 @@ class AppConfig {
     this.ngmyChatClosed = false,
     List<Map<String, dynamic>>? ngmyPopups,
     List<Map<String, dynamic>>? ngmyVideoPopups,
+    List<Map<String, dynamic>>? mediaVirtualProfiles,
   })  : gameTimeLimits = gameTimeLimits ?? ngmyDefaultGameTimeLimits(),
         diceSettings = diceSettings ?? NgmyDiceSettings().toJson(),
         gameInvites = gameInvites ?? [],
         ngmyPopups = ngmyPopups ?? NgmyPopupDefaults.allDefaultPopups(),
-        ngmyVideoPopups = ngmyVideoPopups ?? NgmyPopupDefaults.buildVideoPopups();
+        ngmyVideoPopups = ngmyVideoPopups ?? NgmyPopupDefaults.buildVideoPopups(),
+        mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(mediaVirtualProfiles);
   Map<String, dynamic> toJson() => {
     'officialCashApp': officialCashApp,
     'officialBitcoin': officialBitcoin,
@@ -418,6 +422,7 @@ class AppConfig {
     'ngmyChatClosed': ngmyChatClosed,
     'ngmyPopups': ngmyPopups,
     'ngmyVideoPopups': ngmyVideoPopups,
+    'mediaVirtualProfiles': mediaVirtualProfiles,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
@@ -464,6 +469,7 @@ class AppConfig {
     ngmyVideoPopups: NgmyPopupDefaults.ensureVideoPopups(
       (json['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
     ),
+    mediaVirtualProfiles: NgmyVirtualMediaProfiles.ensure(json['mediaVirtualProfiles']),
   );
 }
 
@@ -527,6 +533,7 @@ class MediaPost {
   List<String> likedBy;
   List<String> savedBy;
   List<Map<String, dynamic>> comments;
+  List<String> taggedUsers;
   double? mediaAspectRatio;
 
   MediaPost({
@@ -538,9 +545,10 @@ class MediaPost {
     required this.timestamp,
     this.contentType = 'video',
     this.likes = 0,
-    this.likedBy = const [],
-    this.savedBy = const [],
-    this.comments = const [],
+    this.likedBy = const <String>[],
+    this.savedBy = const <String>[],
+    this.comments = const <Map<String, dynamic>>[],
+    this.taggedUsers = const <String>[],
     this.mediaAspectRatio,
   });
 
@@ -558,15 +566,15 @@ class MediaPost {
     'likedBy': likedBy,
     'savedBy': savedBy,
     'comments': comments,
+    'taggedUsers': taggedUsers,
     if (mediaAspectRatio != null) 'mediaAspectRatio': mediaAspectRatio,
   };
 
   factory MediaPost.fromJson(Map<String, dynamic> json) {
     final likedBy = List<String>.from(json['likedBy'] ?? json['liked_by'] ?? const []);
     final savedBy = List<String>.from(json['savedBy'] ?? json['saved_by'] ?? const []);
-    final comments = List<Map<String, dynamic>>.from(
-      (json['comments'] ?? json['media_comments'] ?? const []).map((e) => Map<String, dynamic>.from(e)),
-    );
+    final comments = _jsonMapList(json['comments'] ?? json['media_comments']);
+    final taggedUsers = _jsonStringList(json['taggedUsers'] ?? json['tagged_users']);
     return MediaPost(
       id: json['id'] ?? '',
       userEmail: json['userEmail'] ?? json['user_email'] ?? '',
@@ -578,6 +586,7 @@ class MediaPost {
       likedBy: likedBy,
       savedBy: savedBy,
       comments: comments,
+      taggedUsers: taggedUsers,
       likes: likedBy.isNotEmpty ? likedBy.length : (json['likes'] ?? 0),
       mediaAspectRatio: (json['mediaAspectRatio'] as num?)?.toDouble(),
     );
@@ -770,6 +779,7 @@ MediaPost _combineMediaPosts(MediaPost remote, MediaPost local) {
     likedBy: likedBy,
     savedBy: savedBy,
     comments: comments,
+    taggedUsers: _mergeStringLists(remote.taggedUsers, local.taggedUsers),
     mediaAspectRatio: remote.mediaAspectRatio ?? local.mediaAspectRatio,
   );
 }
@@ -1263,8 +1273,8 @@ String ngmyUserDisplayAccountId(UserData u) {
   return 'GV${u.email.hashCode.abs().toString().padLeft(8, '0').substring(0, 8)}';
 }
 
-ImageProvider? ngmyAdminUserAvatar(UserData u) {
-  final path = u.profilePicturePath;
+ImageProvider? ngmyAdminUserAvatar(dynamic u) {
+  final path = (u as dynamic).profilePicturePath;
   if (path == null || path.trim().isEmpty) return null;
   final src = path.trim();
   if (src.startsWith('data:image')) {
@@ -1998,6 +2008,24 @@ Future<({String? ref, String? error})> _uploadNgmyMediaBytes({
   }
 }
 
+Future<String> _adminUploadVirtualProfilePic(String src) async {
+  try {
+    late Uint8List bytes;
+    if (src.startsWith('data:')) {
+      bytes = base64Decode(src.split(',').last);
+    } else if (!kIsWeb) {
+      bytes = await File(src).readAsBytes();
+    } else {
+      return src;
+    }
+    final path = 'virtual_profiles/${DateTime.now().microsecondsSinceEpoch}.jpg';
+    final upload = await _uploadNgmyMediaBytes(bytes: bytes, storagePath: path, contentType: 'image/jpeg');
+    return upload.ref ?? src;
+  } catch (_) {
+    return src;
+  }
+}
+
 Widget _ngmyLogoImage(String? logoUrl, {double? width, double? height, BoxFit fit = BoxFit.cover}) {
   final primary = (logoUrl ?? '').trim().isNotEmpty ? logoUrl!.trim() : kNgmyDefaultLogoUrl;
   return Image.network(
@@ -2394,8 +2422,13 @@ class UserData {
   String savedBitcoinAddress;
   String crownBadge;
   double freeFixCredit;
+  String mediaBio;
+  List<String> mediaFollowers;
+  List<String> mediaFollowing;
+  List<Map<String, dynamic>> mediaHighlights;
+  List<Map<String, dynamic>> mediaStories;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0});
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories}) : mediaFollowers = mediaFollowers ?? <String>[], mediaFollowing = mediaFollowing ?? <String>[], mediaHighlights = mediaHighlights ?? <Map<String, dynamic>>[], mediaStories = mediaStories ?? <Map<String, dynamic>>[];
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
     if (activeInvestment!.daysLeft <= 0) return 0.0;
@@ -2415,7 +2448,7 @@ class UserData {
     return earnings > totalDaily ? totalDaily : earnings;
   }
   double get todayDailyGoal => activeInvestment == null ? 0.0 : (activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100)));
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -2480,8 +2513,27 @@ class UserData {
       savedBitcoinAddress: (json['savedBitcoinAddress'] ?? '').toString(),
       crownBadge: (json['crownBadge'] ?? '').toString(),
       freeFixCredit: (json['freeFixCredit'] ?? 0.0).toDouble(),
+      mediaBio: (json['mediaBio'] ?? '').toString(),
+      mediaFollowers: _jsonStringList(json['mediaFollowers']),
+      mediaFollowing: _jsonStringList(json['mediaFollowing']),
+      mediaHighlights: _jsonMapList(json['mediaHighlights']),
+      mediaStories: _jsonMapList(json['mediaStories']),
     );
   }
+}
+
+List<String> _jsonStringList(dynamic raw) {
+  if (raw == null) return <String>[];
+  if (raw is List) return raw.map((e) => e.toString()).toList();
+  return <String>[];
+}
+
+List<Map<String, dynamic>> _jsonMapList(dynamic raw) {
+  if (raw == null) return <Map<String, dynamic>>[];
+  if (raw is List) {
+    return raw.map((e) => e is Map ? Map<String, dynamic>.from(e) : <String, dynamic>{}).toList();
+  }
+  return <Map<String, dynamic>>[];
 }
 
 // --- MAIN APP ---
@@ -3664,6 +3716,9 @@ class _NGMYAppState extends State<NGMYApp> {
         final usersData = await supabase.from('users').select();
         if (usersData != null) {
           _allUsers = (usersData as List).map((e) => UserData.fromJson(e)).toList();
+          for (final u in _allUsers) {
+            NgmyMediaProfile.normalizeUserMediaFields(u);
+          }
         }
 
         final transData = await supabase.from('transactions').select();
@@ -3690,6 +3745,9 @@ class _NGMYAppState extends State<NGMYApp> {
         if (configData != null) {
           final cfgMap = Map<String, dynamic>.from(configData);
           _config = AppConfig.fromJson(cfgMap);
+          (_config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(
+            cfgMap['mediaVirtualProfiles'] ?? (_config as dynamic).mediaVirtualProfiles,
+          );
           _applyRemoteLegalToConfig(_config, cfgMap);
           _mergeStoreListingsIntoConfig(localStoreListings);
           _mergeStoreInquiriesIntoConfig(localStoreInquiries);
@@ -3766,6 +3824,15 @@ class _NGMYAppState extends State<NGMYApp> {
       final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
       for (var u in _allUsers) if (admins.contains(u.email.toLowerCase().trim())) u.isAdmin = true;
 
+      for (final u in _allUsers) {
+        NgmyMediaProfile.normalizeUserMediaFields(u);
+      }
+      if (_currentUser != null) {
+        NgmyMediaProfile.normalizeUserMediaFields(_currentUser);
+      }
+      (_config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure((_config as dynamic).mediaVirtualProfiles);
+      NgmyMediaProfile.pruneExpiredStoriesAllUsers(_allUsers);
+
       _purgeExpiredSoldStoreListings();
       for (final o in _config.storeOrders) {
         final id = (o['id'] ?? '').toString();
@@ -3839,6 +3906,12 @@ class _NGMYAppState extends State<NGMYApp> {
         }
       }
       _allUsers = mergedByEmail.values.toList();
+
+      for (final u in _allUsers) {
+        NgmyMediaProfile.normalizeUserMediaFields(u);
+      }
+      if (_currentUser != null) NgmyMediaProfile.normalizeUserMediaFields(_currentUser);
+      NgmyMediaProfile.pruneExpiredStoriesAllUsers(_allUsers);
 
       if (_currentUser != null) {
         final email = _currentUser!.email.toLowerCase().trim();
@@ -5130,7 +5203,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         });
         widget.onDataChanged();
         await _showLateClockInDialog(penalty, now);
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
         if (cost <= 0) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -5360,6 +5433,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
 class HomeScreen extends StatefulWidget {
   final UserData user; final VoidCallback onClockIn; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans; final AppConfig config;
+  final List<MediaPost> allMedia;
   final List<Announcement> allAnnouncements;
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
@@ -5368,7 +5442,7 @@ class HomeScreen extends StatefulWidget {
   final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
   final Future<bool> Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos)? onSavePopups;
   final Future<String> Function(String localRef)? onUploadPopupVideo;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo});
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -5419,7 +5493,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               FloatingTitle(
                 title: 'GROWTH INCOME',
-                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo), routeName: 'AdminDashboard') : null,
+                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo), routeName: 'AdminDashboard') : null,
                 leading: InkWell(
                   onTap: () => NgmyNavigator.push(context, LoanServiceScreen(user: widget.user, config: widget.config), routeName: 'LoanServiceScreen'),
                   child: Container(
@@ -8079,6 +8153,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
 class AdminDashboard extends StatefulWidget {
   final UserData user; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans; final AppConfig config;
+  final List<MediaPost> allMedia;
   final List<Announcement> allAnnouncements;
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
@@ -8088,7 +8163,7 @@ class AdminDashboard extends StatefulWidget {
   final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
   final Future<bool> Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos)? onSavePopups;
   final Future<String> Function(String localRef)? onUploadPopupVideo;
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo});
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 class _AdminDashboardState extends State<AdminDashboard> {
@@ -8096,14 +8171,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   String? _selectedUserEmail;
 
   void _adminBack() {
-    if (_selectedUserEmail != null) {
-      setState(() => _selectedUserEmail = null);
-      return;
-    }
-    if (_idx > 0) {
-      setState(() => _idx--);
-      return;
-    }
     NgmyNavigator.pop(context);
   }
 
@@ -8790,7 +8857,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
           const SizedBox(height: 30),
-          const Center(child: Text('MEDIA MODERATION CONTENT', style: TextStyle(color: Colors.grey))),
+          NgmyMediaAdminPanel(
+            allMedia: widget.allMedia,
+            allUsers: widget.allUsers,
+            adminUser: widget.user,
+            onDataChanged: widget.onDataChanged,
+            persistPost: (p) async => _upsertMediaRowSafe(Map<String, dynamic>.from(p.toJson())),
+            isPostExpired: (m) => DateTime.now().difference(m.timestamp).inDays >= 7,
+            isDark: isDark,
+            virtualProfilesRaw: (widget.config as dynamic).mediaVirtualProfiles,
+            onVirtualProfilesChanged: (list) {
+              setState(() => (widget.config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(list));
+              widget.onDataChanged();
+            },
+            resolveMediaUrl: _resolveSupabaseStorageUrlResilient,
+            uploadMediaRef: _adminUploadVirtualProfilePic,
+          ),
         ],
       ),
     );
@@ -23947,7 +24029,22 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     );
   }
 
-  Future<void> _pickAndPost({required bool isVideo}) async {
+  List<String> _resolveTaggedEmails(String raw) {
+    final out = <String>[];
+    for (final part in raw.split(RegExp(r'[,\s]+'))) {
+      final token = part.trim().replaceAll('@', '');
+      if (token.isEmpty) continue;
+      for (final u in widget.allUsers) {
+        if (u.username.toLowerCase() == token.toLowerCase() || u.email.toLowerCase() == token.toLowerCase()) {
+          out.add(u.email);
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
+  Future<void> _pickAndPost({required bool isVideo, String tagRaw = ''}) async {
     if (_isPosting) return;
     final limit = widget.config.maxMediaPostsPerWeek;
     if (_weeklyPostsForCurrentUser() >= limit) {
@@ -24046,6 +24143,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
         caption: _captionController.text.trim(),
         timestamp: DateTime.now(),
         mediaAspectRatio: aspectRatio,
+        taggedUsers: _resolveTaggedEmails(tagRaw),
       );
 
       final saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
@@ -24076,17 +24174,18 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     }
   }
 
-  Future<void> _beginPostFlow({required bool isVideo}) async {
+  Future<void> _beginPostFlow({required bool isVideo, String tagRaw = ''}) async {
     if (_isPosting) return;
     await Future<void>.delayed(const Duration(milliseconds: 120));
     if (!mounted) return;
-    await _pickAndPost(isVideo: isVideo);
+    await _pickAndPost(isVideo: isVideo, tagRaw: tagRaw);
   }
 
   void _showPostDialog() {
     if (_isPosting) return;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final captionCtrl = TextEditingController(text: _captionController.text);
+    final tagCtrl = TextEditingController();
     showDialog<void>(
       context: context,
       barrierColor: Colors.black.withOpacity(0.5),
@@ -24154,6 +24253,17 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: tagCtrl,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                    decoration: InputDecoration(
+                      hintText: 'Tag users (@username, comma separated)',
+                      filled: true,
+                      fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                    ),
+                  ),
                   const SizedBox(height: 18),
                   Text(
                     'Choose media type',
@@ -24176,8 +24286,9 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                                 ? null
                                 : () {
                                     _captionController.text = captionCtrl.text.trim();
+                                    final tags = tagCtrl.text.trim();
                                     Navigator.pop(dialogCtx);
-                                    unawaited(_beginPostFlow(isVideo: false));
+                                    unawaited(_beginPostFlow(isVideo: false, tagRaw: tags));
                                   },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 18),
@@ -24207,8 +24318,9 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                                 ? null
                                 : () {
                                     _captionController.text = captionCtrl.text.trim();
+                                    final tags = tagCtrl.text.trim();
                                     Navigator.pop(dialogCtx);
-                                    unawaited(_beginPostFlow(isVideo: true));
+                                    unawaited(_beginPostFlow(isVideo: true, tagRaw: tags));
                                   },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 18),
@@ -24231,7 +24343,10 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
           ),
         );
       },
-    ).whenComplete(captionCtrl.dispose);
+    ).whenComplete(() {
+      captionCtrl.dispose();
+      tagCtrl.dispose();
+    });
   }
 
   @override
@@ -24240,6 +24355,52 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     _noticeEntry?.remove();
     _captionController.dispose();
     super.dispose();
+  }
+
+  Future<String> _uploadProfileMediaRef(String ref) async {
+    final src = ref.trim();
+    if (src.isEmpty || src.startsWith('supabase://') || src.startsWith('http')) return src;
+    try {
+      late Uint8List bytes;
+      if (src.startsWith('data:')) {
+        bytes = base64Decode(src.split(',').last);
+      } else if (!kIsWeb) {
+        bytes = await File(src).readAsBytes();
+      } else {
+        return src;
+      }
+      final path = 'profiles/${DateTime.now().microsecondsSinceEpoch}_${widget.user.email.hashCode}.jpg';
+      final upload = await _uploadNgmyMediaBytes(bytes: bytes, storagePath: path, contentType: 'image/jpeg');
+      return upload.ref ?? src;
+    } catch (_) {
+      return src;
+    }
+  }
+
+  void _openMediaProfile(String email) {
+    final target = NgmyMediaProfile.userByEmail(widget.allUsers, email) ??
+        UserData(email: email, username: email.split('@').first);
+    NgmyMediaProfile.normalizeUserMediaFields(target);
+    NgmyMediaProfile.normalizeUserMediaFields(widget.user);
+    if (NgmyMediaProfile.pruneExpiredStories(target)) widget.onDataChanged();
+    NgmyNavigator.push(
+      context,
+      NgmyMediaProfileScreen(
+        targetUser: target,
+        currentUser: widget.user,
+        allUsers: widget.allUsers,
+        allMedia: widget.allMedia,
+        avatarForUser: (u) => ngmyAdminUserAvatar(u),
+        resolveMediaUrl: _resolveSupabaseStorageUrlResilient,
+        persistPost: (p) async {
+          await _upsertMediaRowSafe(Map<String, dynamic>.from(p.toJson()));
+        },
+        onDataChanged: widget.onDataChanged,
+        isPostExpired: (m) => _isExpired(m as MediaPost),
+        uploadMediaRef: _uploadProfileMediaRef,
+      ),
+      routeName: 'MediaProfile',
+    );
   }
 
   @override
@@ -24288,6 +24449,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                       allUsers: widget.allUsers,
                       onChanged: widget.onDataChanged,
                       onDelete: () => _deletePost(mediaFeed[index]),
+                      onOpenProfile: _openMediaProfile,
                     ),
                   ),
           ),
@@ -24329,6 +24491,21 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                                   fontSize: 22,
                                   letterSpacing: 1.4,
                                   color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Material(
+                              color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB),
+                              shape: const CircleBorder(),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: () => _openMediaProfile(widget.user.email),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Icon(Icons.person_rounded, color: isDark ? Colors.white : Colors.black87, size: 20),
                                 ),
                               ),
                             ),
@@ -24514,6 +24691,7 @@ class VideoPostWidget extends StatefulWidget {
   final List<UserData> allUsers;
   final VoidCallback onChanged;
   final VoidCallback onDelete;
+  final void Function(String userEmail)? onOpenProfile;
   const VideoPostWidget({
     super.key,
     required this.post,
@@ -24521,6 +24699,7 @@ class VideoPostWidget extends StatefulWidget {
     required this.allUsers,
     required this.onChanged,
     required this.onDelete,
+    this.onOpenProfile,
   });
 
   @override
@@ -24872,7 +25051,37 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
     );
   }
 
-  Widget _commentAvatar(String email, {double radius = 18}) {
+  Widget _commentAvatar(String email, {double radius = 18, String? profilePictureUrl, bool isVirtual = false}) {
+    if (isVirtual || email.startsWith('vp_')) {
+      final path = (profilePictureUrl ?? '').trim();
+      ImageProvider? img;
+      if (path.startsWith('data:image')) {
+        try {
+          img = MemoryImage(base64Decode(path.split(',').last));
+        } catch (_) {}
+      } else if (path.startsWith('http')) {
+        img = NetworkImage(path);
+      } else if (path.startsWith('supabase://')) {
+        return FutureBuilder<String>(
+          future: _resolveSupabaseStorageUrlResilient(path),
+          builder: (_, s) {
+            final resolved = s.data ?? '';
+            if (resolved.startsWith('http')) {
+              return CircleAvatar(radius: radius, backgroundImage: NetworkImage(resolved));
+            }
+            return CircleAvatar(radius: radius, child: Icon(Icons.person, size: radius));
+          },
+        );
+      } else if (!kIsWeb && path.isNotEmpty) {
+        img = FileImage(File(path));
+      }
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: img,
+        backgroundColor: const Color(0xFF7C3AED).withOpacity(0.25),
+        child: img == null ? Icon(Icons.person, size: radius, color: Colors.white70) : null,
+      );
+    }
     final u = widget.allUsers.firstWhere(
       (x) => x.email.toLowerCase().trim() == email.toLowerCase().trim(),
       orElse: () => UserData(email: email),
@@ -24908,6 +25117,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
     final username = (cm['username'] ?? 'User').toString();
     final text = (cm['text'] ?? '').toString();
     final id = (cm['id'] ?? '').toString();
+    final isVirtual = cm['isVirtual'] == true || email.startsWith('vp_');
+    final profilePictureUrl = (cm['profilePictureUrl'] ?? '').toString();
     final replies = List<Map<String, dynamic>>.from(
       (cm['replies'] ?? []).map((e) => Map<String, dynamic>.from(e as Map)),
     );
@@ -24919,7 +25130,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _commentAvatar(email, radius: depth > 0 ? 14 : 18),
+              _commentAvatar(email, radius: depth > 0 ? 14 : 18, profilePictureUrl: profilePictureUrl, isVirtual: isVirtual),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -25127,18 +25338,27 @@ class _VideoPostWidgetState extends State<VideoPostWidget> {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundImage: _authorImage,
-                  child: _authorImage == null ? const Icon(Icons.person, size: 20) : null,
+                GestureDetector(
+                  onTap: () => widget.onOpenProfile?.call(widget.post.userEmail),
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundImage: _authorImage,
+                    child: _authorImage == null ? const Icon(Icons.person, size: 20) : null,
+                  ),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(widget.post.username, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    Text(widget.post.userEmail, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                  ],
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => widget.onOpenProfile?.call(widget.post.userEmail),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.post.username, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        if (widget.post.caption.trim().isNotEmpty)
+                          Text(widget.post.caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                      ],
+                    ),
+                  ),
                 ),
                 const Spacer(),
                 Container(
