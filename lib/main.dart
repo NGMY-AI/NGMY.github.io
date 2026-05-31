@@ -60,6 +60,8 @@ import 'ngmy_web_viewport.dart';
 import 'ngmy_web_status_bar.dart';
 import 'ngmy_login_logo.dart';
 import 'ngmy_media_delivery.dart';
+import 'ngmy_push_notifications.dart';
+import 'ngmy_announcement_reads.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -3640,6 +3642,61 @@ class _NGMYAppState extends State<NGMYApp> {
     }
   }
 
+  Future<void> _promptPushNotificationsForUser(BuildContext context, String email) async {
+    if (kIsWeb) {
+      await ngmyPushMaybePrompt(context, email);
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'ngmy_push_prompted_${email.toLowerCase().trim()}';
+    if (prefs.getBool(key) == true) return;
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.notifications_active_rounded, color: Color(0xFF00B25A)),
+            SizedBox(width: 10),
+            Expanded(child: Text('Enable notifications?')),
+          ],
+        ),
+        content: const Text(
+          'Allow NGMY to alert you for transactions, earnings, and news announcements.',
+          style: TextStyle(height: 1.35),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await prefs.setBool(key, true);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF00B25A)),
+            onPressed: () async {
+              await prefs.setBool(key, true);
+              try {
+                await _localNotifications
+                    .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+                    ?.requestPermissions(alert: true, badge: true, sound: true);
+                await _localNotifications
+                    .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+                    ?.requestNotificationsPermission();
+                _notificationsReady = true;
+              } catch (_) {}
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Allow notifications'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _persistAnnouncementsLocally() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -4262,10 +4319,13 @@ class _NGMYAppState extends State<NGMYApp> {
   Future<void> _pushInAppNotification({
     required String title,
     required String body,
+    String? tag,
   }) async {
     if (_currentUser == null) return;
 
-    if (_notificationsReady && !kIsWeb) {
+    if (kIsWeb) {
+      await ngmyPushShow(title: title, body: body, tag: tag ?? title);
+    } else if (_notificationsReady) {
       try {
         const androidDetails = AndroidNotificationDetails(
           'ngmy_transactions',
@@ -4523,10 +4583,11 @@ class _NGMYAppState extends State<NGMYApp> {
         unawaited(_persistAnnouncementsLocally());
         if (isNew && !_seenRealtimeAnnouncementIds.contains(ann.id)) {
           _seenRealtimeAnnouncementIds.add(ann.id);
-          _pushInAppNotification(
+          unawaited(_pushInAppNotification(
             title: 'New announcement',
-            body: '${ann.title}: ${ann.message}',
-          );
+            body: ann.title.trim().isNotEmpty ? ann.title : ann.message,
+            tag: 'announcement_${ann.id}',
+          ));
         }
       }
     } catch (e) {
@@ -4772,14 +4833,20 @@ class _NGMYAppState extends State<NGMYApp> {
         setState(() => _allTransactions.removeWhere((t) => t.id == id));
       } else {
         final tx = AppTransaction.fromJson(payload.newRecord);
+        AppTransaction? previous;
         setState(() {
           final idx = _allTransactions.indexWhere((t) => t.id == tx.id);
           if (idx == -1) {
             _allTransactions.add(tx);
           } else {
+            previous = _allTransactions[idx];
             _allTransactions[idx] = tx;
           }
         });
+        final statusChanged = previous != null && previous!.status != tx.status;
+        if (previous == null || statusChanged) {
+          unawaited(_notifyTransactionEvent(tx, statusChanged: statusChanged));
+        }
       }
     } catch (e) {
       debugPrint('Transactions realtime apply error: $e');
@@ -5594,6 +5661,7 @@ class _NGMYAppState extends State<NGMYApp> {
                 onSyncAdminMediaPost: _syncAdminMediaPost,
                 onSyncAdminUserMedia: _syncAdminUserMediaProfile,
                 onEnqueueMediaDelivery: _enqueueMediaDelivery,
+                onPromptNotifications: (ctx) => _promptPushNotificationsForUser(ctx, _currentUser!.email),
             ),
       ),
     );
@@ -6307,8 +6375,9 @@ class MainScreen extends StatefulWidget {
   final Future<bool> Function(MediaPost post)? onSyncAdminMediaPost;
   final Future<bool> Function(UserData user)? onSyncAdminUserMedia;
   final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueMediaDelivery;
+  final Future<void> Function(BuildContext context)? onPromptNotifications;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
@@ -6409,6 +6478,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (oldSig != newSig) _runScheduledPopups();
   }
 
+  Future<void> _promptPushNotificationsIfNeeded() async {
+    if (!mounted) return;
+    if (widget.onPromptNotifications != null) {
+      await widget.onPromptNotifications!(context);
+    }
+  }
+
   @override void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
@@ -6416,6 +6492,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _ngmyApplyMidnightClockReset(widget.user);
     _refreshOnlineStatus();
     _runScheduledPopups();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _promptPushNotificationsIfNeeded());
     _onlineCheck = Timer.periodic(const Duration(seconds: 8), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
@@ -6812,6 +6889,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late Animation<double> _smokeRot;
   Timer? _liveTicker;
   int _liveStart = 0;
+  int _unreadNewsCount = 0;
+
+  Future<void> _refreshUnreadNewsBadge() async {
+    final count = await NgmyAnnouncementReads.unreadCount(
+      widget.user.email,
+      widget.allAnnouncements.map((a) => a.id),
+    );
+    if (mounted) setState(() => _unreadNewsCount = count);
+  }
+
+  Future<void> _openNewsHub() async {
+    await NgmyNavigator.push(
+      context,
+      AnnouncementScreen(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        announcements: widget.allAnnouncements,
+        config: widget.config,
+        onPostToNews: widget.onAddAnnouncement,
+        onNewsRead: _refreshUnreadNewsBadge,
+      ),
+    );
+    await _refreshUnreadNewsBadge();
+  }
 
   Future<void> _showOfficialNotice(String title, String message) async {
     if (!mounted) return;
@@ -6835,6 +6936,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       if (!mounted) return;
       setState(() => _liveStart++);
     });
+    _refreshUnreadNewsBadge();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.allAnnouncements != widget.allAnnouncements) {
+      _refreshUnreadNewsBadge();
+    }
   }
 
   @override void dispose() {
@@ -6870,27 +6980,42 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     child: Icon(Icons.attach_money_rounded, color: isLight ? Colors.white : Colors.greenAccent, size: 20),
                   ),
                 ),
-                trailing: IconButton(
-                  tooltip: 'NGMY Helper — chat & news',
-                  icon: Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00B25A).withOpacity(isLight ? 0.14 : 0.22),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF00B25A).withOpacity(0.45)),
+                trailing: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      tooltip: 'NGMY Helper — chat & news',
+                      icon: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00B25A).withOpacity(isLight ? 0.14 : 0.22),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFF00B25A).withOpacity(0.45)),
+                        ),
+                        child: const Icon(Icons.forum_rounded, color: Color(0xFF00B25A), size: 20),
+                      ),
+                      onPressed: _openNewsHub,
                     ),
-                    child: const Icon(Icons.forum_rounded, color: Color(0xFF00B25A), size: 20),
-                  ),
-                  onPressed: () => NgmyNavigator.push(
-                    context,
-                    AnnouncementScreen(
-                      user: widget.user,
-                      allUsers: widget.allUsers,
-                      announcements: widget.allAnnouncements,
-                      config: widget.config,
-                      onPostToNews: widget.onAddAnnouncement,
-                    ),
-                  ),
+                    if (_unreadNewsCount > 0)
+                      Positioned(
+                        right: 4,
+                        top: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            _unreadNewsCount > 9 ? '9+' : '$_unreadNewsCount',
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(height: 20),
@@ -28648,6 +28773,7 @@ class AnnouncementScreen extends StatefulWidget {
   final List<Announcement> announcements;
   final AppConfig config;
   final Function(Announcement) onPostToNews;
+  final VoidCallback? onNewsRead;
   const AnnouncementScreen({
     super.key,
     required this.user,
@@ -28655,6 +28781,7 @@ class AnnouncementScreen extends StatefulWidget {
     required this.announcements,
     required this.config,
     required this.onPostToNews,
+    this.onNewsRead,
   });
 
   @override
@@ -28675,6 +28802,15 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   bool _memoryLoaded = false;
   bool _chatClosedForUsers = false;
   Timer? _chatGateTimer;
+  int _unreadNewsInternal = 0;
+
+  Future<void> _refreshUnreadNewsInternal() async {
+    final count = await NgmyAnnouncementReads.unreadCount(
+      widget.user.email,
+      widget.announcements.map((a) => a.id),
+    );
+    if (mounted) setState(() => _unreadNewsInternal = count);
+  }
 
   final ScrollController _scrollController = ScrollController();
 
@@ -28700,7 +28836,26 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _chatClosedForUsers = widget.config.ngmyChatClosed;
     _loadChatMemory();
     _startChatGateWatcher();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshGeminiKeyFromCloud());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshGeminiKeyFromCloud();
+      _refreshUnreadNewsInternal();
+    });
+  }
+
+  Future<void> _markNewsAsRead() async {
+    if (widget.announcements.isEmpty) return;
+    await NgmyAnnouncementReads.markAllRead(
+      widget.user.email,
+      widget.announcements.map((a) => a.id),
+    );
+    widget.onNewsRead?.call();
+  }
+
+  void _selectNewsTab() {
+    if (_activeTab == 1) return;
+    setState(() => _activeTab = 1);
+    unawaited(_markNewsAsRead());
+    _scrollNewsToBottom();
   }
 
   void _startChatGateWatcher() {
@@ -28782,6 +28937,9 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   @override
   void didUpdateWidget(covariant AnnouncementScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.announcements != widget.announcements) {
+      _refreshUnreadNewsInternal();
+    }
     if (_activeTab != 1) return;
     final oldSig = oldWidget.announcements.map((a) => a.id).join('|');
     final newSig = widget.announcements.map((a) => a.id).join('|');
@@ -29117,7 +29275,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                       1,
                       Icons.newspaper_rounded,
                       'News',
-                      badge: widget.announcements.where((a) => !NgmyNewsRetention.isExpired(a.timestamp)).length,
+                      badge: _unreadNewsInternal,
                     ),
                   ],
                 ),
@@ -29245,14 +29403,13 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     return Expanded(
       child: GestureDetector(
         onTap: () {
+          if (idx == 1) {
+            _selectNewsTab();
+            return;
+          }
           setState(() => _activeTab = idx);
           if (idx == 0) {
             _scrollToBottom(jump: true);
-          } else if (idx == 1) {
-            _scrollNewsToBottom(jump: true);
-            Future<void>.delayed(const Duration(milliseconds: 120), () {
-              if (mounted && _activeTab == 1) _scrollNewsToBottom(jump: true);
-            });
           }
         },
         child: AnimatedContainer(
@@ -29273,8 +29430,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                 const SizedBox(width: 5),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: const Color(0xFF00B25A), borderRadius: BorderRadius.circular(8)),
-                  child: Text('$badge', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
+                  decoration: BoxDecoration(color: const Color(0xFFEF4444), borderRadius: BorderRadius.circular(8)),
+                  child: Text(badge > 9 ? '9+' : '$badge', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
                 ),
               ],
             ],

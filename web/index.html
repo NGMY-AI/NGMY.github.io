@@ -242,7 +242,7 @@
 
         var prev = localStorage.getItem(KEY);
 
-        if (prev && prev !== CURRENT && "serviceWorker" in navigator) {
+        if (prev && prev !== CURRENT && navigator.onLine && "serviceWorker" in navigator) {
 
           navigator.serviceWorker.getRegistrations().then(function (regs) {
 
@@ -313,17 +313,66 @@
     })();
   </script>
 
-  <script src="flutter_bootstrap.js?v=__NGMY_DEPLOY_ID__" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/')"></script>
-
   <script>
     (function () {
-      if (!('serviceWorker' in navigator)) return;
       var deployId = '__NGMY_DEPLOY_ID__';
-      window.addEventListener('load', function () {
-        navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: '/NGMY.github.io/' })
-          .then(function () { console.log('[ngmy] offline PWA worker registered'); })
-          .catch(function (e) { console.warn('[ngmy] service worker register failed', e); });
-      });
+      var bootstrapSrc = 'flutter_bootstrap.js?v=' + deployId;
+      var loadAttempts = 0;
+
+      function showBootstrapError() {
+        window.__ngmyShowLoadError && window.__ngmyShowLoadError(
+          navigator.onLine
+            ? 'Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/'
+            : 'You are offline. Open NGMY once while online so it can save for offline use, then try again.'
+        );
+      }
+
+      function loadFlutterBootstrap() {
+        loadAttempts += 1;
+        var s = document.createElement('script');
+        s.src = bootstrapSrc;
+        s.async = false;
+        s.onerror = function () {
+          if (loadAttempts < 3) {
+            setTimeout(loadFlutterBootstrap, loadAttempts === 1 ? 400 : 1200);
+            return;
+          }
+          showBootstrapError();
+        };
+        document.body.appendChild(s);
+      }
+
+      function startApp() {
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', loadFlutterBootstrap);
+        } else {
+          loadFlutterBootstrap();
+        }
+      }
+
+      if (!('serviceWorker' in navigator)) {
+        startApp();
+        return;
+      }
+
+      navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: '/NGMY.github.io/' })
+        .then(function (reg) {
+          function go() { startApp(); }
+          if (reg.active) { go(); return; }
+          var worker = reg.installing || reg.waiting;
+          if (worker) {
+            worker.addEventListener('statechange', function () {
+              if (worker.state === 'activated') go();
+            });
+            setTimeout(go, 1500);
+          } else {
+            go();
+          }
+        })
+        .catch(function (e) {
+          console.warn('[ngmy] service worker register failed', e);
+          startApp();
+        });
     })();
   </script>
 

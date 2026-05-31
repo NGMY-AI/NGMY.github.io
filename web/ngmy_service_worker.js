@@ -1,4 +1,4 @@
-/* NGMY PWA — caches the app shell so the site opens offline (replaces Flutter's unregister-only worker). */
+/* NGMY PWA — cache-first shell so the app opens offline after one online visit. */
 'use strict';
 
 const CACHE_PREFIX = 'ngmy-pwa-';
@@ -56,30 +56,50 @@ async function offlineDocument() {
   return undefined;
 }
 
+function isInScope(url) {
+  return url.pathname.startsWith(SCOPE_PATH) || url.pathname === '/' || url.pathname.endsWith('index.html');
+}
+
+function isAppShellAsset(url) {
+  if (url.pathname.endsWith('/') || url.pathname.endsWith('index.html')) return true;
+  return /\.(js|wasm|json|png|jpg|jpeg|gif|webp|ico|woff2?|ttf|otf|css|html|bin|symbols)$/i.test(url.pathname);
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-
-  if (!url.pathname.startsWith(SCOPE_PATH) && url.pathname !== '/' && !url.pathname.endsWith('index.html')) {
-    return;
-  }
+  if (!isInScope(url)) return;
 
   event.respondWith(
     (async () => {
+      const cache = await caches.open(CACHE_NAME);
       const cached = await caches.match(event.request);
+
+      if (isAppShellAsset(url) && cached) {
+        event.waitUntil(
+          fetch(event.request)
+            .then((res) => {
+              if (res && res.status === 200) return cache.put(event.request, res.clone());
+            })
+            .catch(() => {}),
+        );
+        return cached;
+      }
 
       if (event.request.mode === 'navigate') {
         try {
           const net = await fetch(event.request);
           if (net && net.status === 200) {
-            const cache = await caches.open(CACHE_NAME);
             cache.put(event.request, net.clone());
           }
           return net;
         } catch (_) {
-          return cached || (await offlineDocument()) || new Response('NGMY is offline. Open this app once online to cache it.', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+          return cached || (await offlineDocument()) || new Response(
+            '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NGMY Offline</title></head><body style="font-family:system-ui;background:#121212;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px"><div><h2>NGMY is offline</h2><p>Open the app once while online so it can cache for offline use.</p><button onclick="location.reload()" style="margin-top:16px;padding:12px 24px;border:none;border-radius:8px;background:#00B25A;color:#fff;font-weight:700">Retry</button></div></body></html>',
+            { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+          );
         }
       }
 
@@ -87,9 +107,7 @@ self.addEventListener('fetch', (event) => {
         event.waitUntil(
           fetch(event.request)
             .then((res) => {
-              if (res && res.status === 200) {
-                return caches.open(CACHE_NAME).then((c) => c.put(event.request, res));
-              }
+              if (res && res.status === 200) return cache.put(event.request, res.clone());
             })
             .catch(() => {}),
         );
@@ -99,12 +117,29 @@ self.addEventListener('fetch', (event) => {
       try {
         const res = await fetch(event.request);
         if (res && res.status === 200) {
-          const cache = await caches.open(CACHE_NAME);
           cache.put(event.request, res.clone());
         }
         return res;
       } catch (_) {
         return cached;
+      }
+    })(),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of all) {
+        if ('focus' in client) {
+          client.focus();
+          return;
+        }
+      }
+      if (self.clients.openWindow) {
+        await self.clients.openWindow(scopeUrl(SCOPE_PATH));
       }
     })(),
   );
