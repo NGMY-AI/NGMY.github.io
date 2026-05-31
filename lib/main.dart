@@ -6206,8 +6206,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                       borderRadius: BorderRadius.circular(26),
                       child: Image.network(
                         widget.config.logoUrl,
-                        width: 36,
-                        height: 36,
+                        width: NgmyBottomNavMetrics.centerLogoSize,
+                        height: NgmyBottomNavMetrics.centerLogoSize,
                         fit: BoxFit.cover,
                         errorBuilder: (c, e, s) => const Text(
                           'NGMY',
