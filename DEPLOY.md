@@ -48,10 +48,20 @@ You should see “Loading NGMY…” then the login screen — not a black error
 
 ## GitHub Pages settings
 
-Repo that serves **ngmy-ai.github.io/NGMY.github.io/** must use:
+Repo: **https://github.com/NGMY-AI/NGMY.github.io**
 
-- **Branch:** `main` (or your deploy branch)
-- **Folder:** `/docs`
+### If the site shows 404 (after making the repo private)
+
+Making the repo **private** turns off GitHub Pages. Making it **public** again does **not** turn Pages back on automatically.
+
+Do this once:
+
+1. Open **https://github.com/NGMY-AI/NGMY.github.io/settings/pages**
+2. Under **Build and deployment** → **Source**, choose **GitHub Actions** (recommended; uses `.github/workflows/deploy-pages.yml`).
+   - Or choose **Deploy from a branch** → branch **main** → folder **/docs** → Save.
+3. Wait 2–5 minutes, then open **https://ngmy-ai.github.io/NGMY.github.io/version.json** — you should see a `build_number`, not 404.
+
+After every `git push` to `main`, Pages should rebuild automatically.
 
 ---
 

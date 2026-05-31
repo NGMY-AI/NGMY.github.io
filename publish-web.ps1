@@ -125,9 +125,9 @@ Write-Host "  3. Open $LiveUrl in a NEW private/incognito tab first" -Foreground
 Write-Host "  4. If still old: clear website data for this URL in browser settings" -ForegroundColor White
 Write-Host "  5. Add to Home Screen again from the NEW URL only" -ForegroundColor White
 Write-Host ""
-Write-Host "GITHUB PAGES (required once):" -ForegroundColor Magenta
-Write-Host "  github.com/kbpabloqr-lgtm/kbpabloqr-lgtm.github.io - Settings - Pages" -ForegroundColor White
-Write-Host "  Source: Deploy from branch main, folder /docs, then Save" -ForegroundColor White
+Write-Host "GITHUB PAGES (required after 404 / private repo):" -ForegroundColor Magenta
+Write-Host "  https://github.com/NGMY-AI/NGMY.github.io/settings/pages" -ForegroundColor White
+Write-Host "  Source: GitHub Actions (or branch main + folder /docs), then Save" -ForegroundColor White
 Write-Host ""
 Write-Host "[7/7] Checking live site (only works AFTER push + Pages enabled) ..." -ForegroundColor Cyan
 try {
