@@ -84,10 +84,35 @@ class NgmyAiMemoryStore {
     final slice = memory.length <= maxMessages ? memory : memory.sublist(memory.length - maxMessages);
     final buf = StringBuffer('Recent conversation memory (local, last ${slice.length} messages):\n');
     for (final m in slice) {
-      final who = m['role'] == 'user' ? 'User' : 'NGMY AI';
+      final who = m['role'] == 'user' ? 'User' : 'Assistant';
       buf.writeln('$who: ${m['text']}');
     }
     return buf.toString();
+  }
+
+  /// Strip branding prefixes models sometimes add at the start of a reply.
+  static String sanitizeHelperReply(String text) {
+    var t = text.trim();
+    if (t.isEmpty) return text.trim();
+    final patterns = <RegExp>[
+      RegExp(r'^ngmy\s*ai\s*[:\-]?\s*', caseSensitive: false),
+      RegExp(r'^as\s+ngmy\s*ai\s*[,.\-]?\s*', caseSensitive: false),
+      RegExp(r"^i'?m\s+ngmy\s*ai\s*[,.\-]?\s*", caseSensitive: false),
+      RegExp(r"^hello!?\s+i'?m\s+ngmy\s*ai\s*[,.\-]?\s*", caseSensitive: false),
+      RegExp(r'^ngmy\s*helper\s*[:\-]?\s*', caseSensitive: false),
+    ];
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (final p in patterns) {
+        final next = t.replaceFirst(p, '').trim();
+        if (next != t) {
+          t = next;
+          changed = true;
+        }
+      }
+    }
+    return t.isEmpty ? text.trim() : t;
   }
 }
 

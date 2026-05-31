@@ -22,6 +22,7 @@ import 'package:video_player/video_player.dart';
 import 'ngmy_popups.dart';
 import 'ngmy_media_profile.dart';
 import 'ngmy_ai_memory.dart';
+import 'ngmy_news_retention.dart';
 import 'ngmy_weekend_clock_overlay.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_back_scope.dart';
@@ -2358,11 +2359,14 @@ Future<String?> _geminiGenerateReply(
           'You are their loyal personal assistant, strategic advisor, and trusted close friend — not a generic support bot. '
           'Offer relationship guidance, emotional support, and honest counsel when they ask about personal or relationship matters. '
           'Be warm, respectful, discreet, and proactive. Speak with deference but also genuine friendship. '
-          'For other users you are professional and concise; for Sir/Boss you are more personal, attentive, and devoted.\n'
-      : 'You are NGMY AI, the official helper for NGMY (Next Generation - Make Yours). '
+          'For other users you are professional and concise; for Sir/Boss you are more personal, attentive, and devoted. '
+          'Answer directly — never open with "NGMY AI", "I\'m NGMY AI", or similar branding.\n'
+      : 'You are the helpful assistant for the NGMY platform (Next Generation - Make Yours). '
           '$founderFacts'
           'NGMY offers investment plans, daily clock-in earnings, loans, NGMY Store, job marketplace, and civic registry. '
-          'Be helpful, professional, and friendly. Keep answers concise.\n';
+          'Be helpful, professional, and friendly. Keep answers concise. '
+          'Answer the user\'s question directly. Never introduce yourself as "NGMY AI" and never start replies with '
+          '"NGMY AI:", "As NGMY AI", "I\'m NGMY AI", or similar — just answer naturally.\n';
   final memoryBlock = memory.isNotEmpty
       ? '\n${NgmyAiMemoryStore.transcriptForPrompt(memory)}\n'
       : '';
@@ -2394,7 +2398,9 @@ Future<String?> _geminiGenerateReply(
           final parts = candidates[0]['content']?['parts'];
           if (parts is List && parts.isNotEmpty) {
             final text = parts[0]['text']?.toString();
-            if (text != null && text.trim().isNotEmpty) return text.trim();
+            if (text != null && text.trim().isNotEmpty) {
+              return NgmyAiMemoryStore.sanitizeHelperReply(text.trim());
+            }
           }
         }
       } else {
@@ -3807,6 +3813,7 @@ class _NGMYAppState extends State<NGMYApp> {
         final annData = await supabase.from('announcements').select();
         if (annData != null) {
           _allAnnouncements = (annData as List).map((e) => Announcement.fromJson(e)).toList();
+          await _pruneExpiredAnnouncements(updateUi: false);
         }
 
         final localStoreListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
@@ -3905,6 +3912,7 @@ class _NGMYAppState extends State<NGMYApp> {
       NgmyMediaProfile.pruneExpiredStoriesAllUsers(_allUsers);
 
       _purgeExpiredSoldStoreListings();
+      await _pruneExpiredAnnouncements(updateUi: false);
       for (final o in _config.storeOrders) {
         final id = (o['id'] ?? '').toString();
         if (id.isNotEmpty) _seenRealtimeStoreOrderIds.add(id);
@@ -4014,11 +4022,14 @@ class _NGMYAppState extends State<NGMYApp> {
         await _pruneStaleMediaAgainstCloud();
       }
 
-      if (online && _allAnnouncements.isNotEmpty) {
-        await _safeUpsertRows(
-          'announcements',
-          _allAnnouncements.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
-        );
+      if (online) {
+        await _pruneExpiredAnnouncements(updateUi: false);
+        if (_allAnnouncements.isNotEmpty) {
+          await _safeUpsertRows(
+            'announcements',
+            _allAnnouncements.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
+          );
+        }
       }
 
       if (online) {
@@ -4077,6 +4088,38 @@ class _NGMYAppState extends State<NGMYApp> {
     } catch (e) {
       debugPrint('Announcement delete error: $e');
     }
+  }
+
+  Future<void> _deleteAnnouncementStorageMedia(Announcement ann) async {
+    for (final raw in [ann.imageUrl, ann.videoUrl]) {
+      final url = raw?.trim() ?? '';
+      if (url.isEmpty) continue;
+      final ref = _parseSupabaseStorageRef(url);
+      if (ref == null) continue;
+      try {
+        await supabase.storage.from(ref.bucket).remove([ref.path]);
+      } catch (e) {
+        debugPrint('[news] storage delete ${ref.path}: $e');
+      }
+    }
+  }
+
+  Future<void> _pruneExpiredAnnouncements({bool updateUi = true}) async {
+    final expired = _allAnnouncements.where((a) => NgmyNewsRetention.isExpired(a.timestamp)).toList();
+    if (expired.isEmpty) return;
+    for (final ann in expired) {
+      await _deleteAnnouncementStorageMedia(ann);
+      await _deleteAnnouncementById(ann.id);
+    }
+    void apply() {
+      _allAnnouncements.removeWhere((a) => NgmyNewsRetention.isExpired(a.timestamp));
+    }
+    if (updateUi && mounted) {
+      setState(apply);
+    } else {
+      apply();
+    }
+    debugPrint('[news] pruned ${expired.length} announcement(s) older than ${NgmyNewsRetention.weekdayRetention} weekdays');
   }
 
   Future<void> _clearAllAnnouncementsRemote() async {
@@ -20536,6 +20579,66 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     );
   }
 
+  BoxDecoration _storeDetailFrameDecoration(bool isDark) {
+    return BoxDecoration(
+      color: isDark ? const Color(0xFF1A2035) : const Color(0xFFF8FAFC),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0)),
+    );
+  }
+
+  Widget _storeDetailFrame({
+    required bool isDark,
+    required String label,
+    required Widget child,
+    EdgeInsets padding = const EdgeInsets.all(12),
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: padding,
+      decoration: _storeDetailFrameDecoration(isDark),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _storeDetailLabel(label, isDark),
+          const SizedBox(height: 6),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _storeDetailFrameTile({
+    required bool isDark,
+    required String label,
+    required String value,
+    Color? valueColor,
+    int maxLines = 2,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: _storeDetailFrameDecoration(isDark),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _storeDetailLabel(label, isDark),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+              color: valueColor ?? (isDark ? Colors.white : Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openListingMediaFullscreen(
     BuildContext context, {
     required List<String> images,
@@ -20609,7 +20712,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           body: Column(
             children: [
               Expanded(
-                flex: 17,
+                flex: 24,
                 child: _StoreListingMediaGallery(
                   imageRefs: images,
                   videoRef: videoRef,
@@ -20627,9 +20730,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                 ),
               ),
               Expanded(
-                flex: 10,
+                flex: 7,
                 child: Transform.translate(
-                  offset: const Offset(0, -18),
+                  offset: const Offset(0, 8),
                   child: Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
@@ -20663,66 +20766,98 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _storeDetailLabel('Price', isDark),
-                    const SizedBox(height: 4),
-                    _storeDetailValue(
-                      '\$${formatCurrency(price)}${delivery > 0 ? '  + \$${formatCurrency(delivery)} delivery' : ''}',
-                      isDark,
-                      fontSize: 22,
-                      weight: FontWeight.w900,
-                      color: const Color(0xFF2563EB),
-                    ),
-                    const SizedBox(height: 12),
-                    _storeDetailLabel('Title', isDark),
-                    const SizedBox(height: 4),
-                    _storeDetailValue(title, isDark, fontSize: 17, weight: FontWeight.w900),
-                    const SizedBox(height: 12),
-                    _storeDetailLabel('Seller', isDark),
-                    const SizedBox(height: 6),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _sellerAvatar((listing['sellerEmail'] ?? '').toString(), radius: 14),
-                        const SizedBox(width: 8),
-                        Expanded(child: _storeDetailValue(sellerName, isDark)),
+                        Expanded(
+                          flex: 2,
+                          child: _storeDetailFrame(
+                            isDark: isDark,
+                            label: 'Price',
+                            child: _storeDetailValue(
+                              '\$${formatCurrency(price)}${delivery > 0 ? '\n+\$${formatCurrency(delivery)} ship' : ''}',
+                              isDark,
+                              fontSize: 20,
+                              weight: FontWeight.w900,
+                              color: const Color(0xFF2563EB),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 3,
+                          child: _storeDetailFrame(
+                            isDark: isDark,
+                            label: 'Title',
+                            child: _storeDetailValue(title, isDark, fontSize: 16, weight: FontWeight.w900),
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    _storeDetailLabel('Description', isDark),
-                    const SizedBox(height: 4),
-                    _storeDetailValue(
-                      description.isNotEmpty ? description : 'No description provided.',
-                      isDark,
-                      weight: FontWeight.w500,
+                    const SizedBox(height: 10),
+                    _storeDetailFrame(
+                      isDark: isDark,
+                      label: 'Seller',
+                      child: Row(
+                        children: [
+                          _sellerAvatar((listing['sellerEmail'] ?? '').toString(), radius: 14),
+                          const SizedBox(width: 8),
+                          Expanded(child: _storeDetailValue(sellerName, isDark)),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    if (category.isNotEmpty) ...[
-                      _storeDetailLabel('Category', isDark),
-                      const SizedBox(height: 4),
-                      _storeDetailValue(category, isDark),
-                      const SizedBox(height: 10),
-                    ],
-                    if (condition.isNotEmpty) ...[
-                      _storeDetailLabel('Condition', isDark),
-                      const SizedBox(height: 4),
-                      _storeDetailValue(condition, isDark),
-                      const SizedBox(height: 10),
-                    ],
-                    _storeDetailLabel('Availability', isDark),
-                    const SizedBox(height: 4),
-                    _storeDetailValue(
-                      '${units > 1 ? '$units items' : '1 item'}${negotiable ? ' · Negotiable' : ''}',
-                      isDark,
+                    const SizedBox(height: 10),
+                    _storeDetailFrame(
+                      isDark: isDark,
+                      label: 'Description',
+                      child: _storeDetailValue(
+                        description.isNotEmpty ? description : 'No description provided.',
+                        isDark,
+                        weight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (category.isNotEmpty)
+                            Expanded(
+                              child: _storeDetailFrameTile(isDark: isDark, label: 'Category', value: category),
+                            ),
+                          if (category.isNotEmpty) const SizedBox(width: 8),
+                          if (condition.isNotEmpty)
+                            Expanded(
+                              child: _storeDetailFrameTile(isDark: isDark, label: 'Condition', value: condition),
+                            ),
+                          if (condition.isNotEmpty) const SizedBox(width: 8),
+                          Expanded(
+                            child: _storeDetailFrameTile(
+                              isDark: isDark,
+                              label: 'Availability',
+                              value: '${units > 1 ? '$units items' : '1 item'}${negotiable ? '\nNegotiable' : ''}',
+                              maxLines: 3,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     if (location.isNotEmpty) ...[
                       const SizedBox(height: 10),
-                      _storeDetailLabel('Location', isDark),
-                      const SizedBox(height: 4),
-                      _storeDetailValue(location, isDark),
+                      _storeDetailFrame(
+                        isDark: isDark,
+                        label: 'Location',
+                        child: _storeDetailValue(location, isDark),
+                      ),
                     ],
-                    const SizedBox(height: 12),
-                    _storeDetailLabel('Payment methods', isDark),
-                    const SizedBox(height: 8),
-                    ..._listingAcceptedPayments(listing).map((p) {
+                    const SizedBox(height: 10),
+                    _storeDetailFrame(
+                      isDark: isDark,
+                      label: 'Payment methods',
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _listingAcceptedPayments(listing).map((p) {
                       if (p == 'cashapp') {
                         final tag = _listingSellerCashTag(listing);
                         if (tag.isEmpty) return const SizedBox.shrink();
@@ -20751,11 +20886,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                           ),
                         );
                       }
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6, bottom: 6),
-                        child: Chip(label: Text(_paymentLabel(p), style: const TextStyle(fontSize: 10))),
-                      );
-                    }),
+                      return Chip(label: Text(_paymentLabel(p), style: const TextStyle(fontSize: 10)));
+                    }).toList(),
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     if (isOwner && status == 'sold') ...[
                       SizedBox(
@@ -25998,7 +26132,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           'role': 'ai',
           'text': _isBoss
               ? 'Good to see you, Sir. I am your NGMY personal assistant — ready to help with the platform, strategy, or anything personal including relationships. How may I serve you today, Boss?'
-              : 'Hello! I\'m NGMY AI. Ask me about investments, clock-in, withdrawals, the store, or anything about the platform.',
+              : 'Hello! Ask me about investments, clock-in, withdrawals, the store, or anything about the platform.',
           'at': DateTime.now().toUtc().toIso8601String(),
         });
       }
@@ -26072,7 +26206,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         if (apiKey.isNotEmpty && mounted) setState(() => widget.config.geminiApiKey = apiKey);
       }
       if (apiKey.isEmpty) {
-        const err = 'NGMY AI is not connected yet. Ask an admin to save the Gemini API key in Admin → Management Hub → Save Global Settings.';
+        const err = 'The helper is not connected yet. Ask an admin to save the Gemini API key in Admin → Management Hub → Save Global Settings.';
         setState(() {
           _messages.add({'role': 'ai', 'text': err, 'at': DateTime.now().toUtc().toIso8601String()});
           _isTyping = false;
@@ -26233,7 +26367,9 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   List<Announcement> get _sortedNews {
-    final list = List<Announcement>.from(widget.announcements);
+    final list = widget.announcements
+        .where((a) => !NgmyNewsRetention.isExpired(a.timestamp))
+        .toList();
     list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return list;
   }
@@ -26321,7 +26457,12 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                 child: Row(
                   children: [
                     _tabBtn(0, Icons.chat_rounded, 'Chat'),
-                    _tabBtn(1, Icons.newspaper_rounded, 'News', badge: widget.announcements.length),
+                    _tabBtn(
+                      1,
+                      Icons.newspaper_rounded,
+                      'News',
+                      badge: widget.announcements.where((a) => !NgmyNewsRetention.isExpired(a.timestamp)).length,
+                    ),
                   ],
                 ),
               ),
