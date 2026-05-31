@@ -10,8 +10,10 @@ class NgmyBottomNavMetrics {
   static const sideIconSize = 30.0;
   static const centerButtonSize = 52.0;
   static const iconPad = 9.0;
-  static const outerRadius = 22.0;
-  static const centerJoin = 8.0;
+  static const outerRadius = 24.0;
+  /// How far into the side wings the NGMY curve begins (starts before the button).
+  static const curveReach = 16.0;
+  static const innerFillet = 10.0;
 
   static double get frameHeight => iconPad * 2 + centerButtonSize;
 
@@ -93,7 +95,6 @@ class _NgmyUnifiedNavPainter extends CustomPainter {
   final Color fillColor;
   final Color borderColor;
 
-  /// Perfect circular arc between two points at [y0], bulging to [peakY] (smaller = higher).
   static void _arcBulgeUp(
     Path path,
     double x0,
@@ -123,34 +124,21 @@ class _NgmyUnifiedNavPainter extends CustomPainter {
     );
   }
 
-  /// Perfect circular arc between two points at [y0], bulging down to [valleyY].
-  static void _arcBulgeDown(
+  /// Symmetric fillet from wing bottom up to the flat NGMY bottom line.
+  static void _filletDownToBottom(
     Path path,
-    double x0,
-    double x1,
-    double y0,
-    double valleyY,
-    double cx,
-  ) {
-    final half = (x1 - x0) / 2;
-    final sagitta = valleyY - y0;
-    if (sagitta <= 0.5 || half <= 0.5) {
-      path.lineTo(x1, y0);
-      return;
+    double x,
+    double wingBottom,
+    double bottom,
+    double fillet, {
+    required bool fromLeft,
+  }) {
+    final f = fillet.clamp(2.0, bottom - wingBottom);
+    if (fromLeft) {
+      path.cubicTo(x + f * 0.55, wingBottom, x + f * 0.55, bottom, x + f, bottom);
+    } else {
+      path.cubicTo(x - f * 0.55, bottom, x - f * 0.55, wingBottom, x, wingBottom);
     }
-    final radius = (half * half + sagitta * sagitta) / (2 * sagitta);
-    final centerY = y0 - radius + sagitta;
-    final start = math.atan2(y0 - centerY, x0 - cx);
-    final end = math.atan2(y0 - centerY, x1 - cx);
-    var sweep = end - start;
-    if (sweep > math.pi) sweep -= 2 * math.pi;
-    if (sweep < -math.pi) sweep += 2 * math.pi;
-    path.arcTo(
-      Rect.fromCircle(center: Offset(cx, centerY), radius: radius),
-      start,
-      sweep,
-      false,
-    );
   }
 
   static Path buildPath(double w, double h) {
@@ -162,62 +150,64 @@ class _NgmyUnifiedNavPainter extends CustomPainter {
     final rightStart = w * (4 / 7);
     final cx = w / 2;
     final r = NgmyBottomNavMetrics.outerRadius;
-    final join = NgmyBottomNavMetrics.centerJoin;
+    final reach = NgmyBottomNavMetrics.curveReach;
+    final fillet = NgmyBottomNavMetrics.innerFillet.clamp(2.0, bottom - wingBottom);
 
-    final leftJoin = leftEnd + join;
-    final rightJoin = rightStart - join;
+    // Curve starts further out on the wings — away from the NGMY button.
+    final leftJoin = (leftEnd - reach).clamp(r + 4, cx - 8);
+    final rightJoin = (rightStart + reach).clamp(cx + 8, w - r - 4);
 
     final path = Path();
 
-    // ── Bottom-left outer corner ──
+    // ── Left end: rounded bottom cap ──
     path.moveTo(r, wingBottom);
-
-    // Straight bottom edge — left wing.
     path.lineTo(leftJoin, wingBottom);
+    _filletDownToBottom(path, leftJoin, wingBottom, bottom, fillet, fromLeft: true);
 
-    // Symmetric circular curve under NGMY.
-    _arcBulgeDown(path, leftJoin, rightJoin, wingBottom, bottom, cx);
+    // Flat NGMY bottom (unchanged depth).
+    path.lineTo(rightJoin - fillet, bottom);
 
-    // Straight bottom edge — right wing.
+    // Symmetric fillet back up to right wing.
+    _filletDownToBottom(path, rightJoin, wingBottom, bottom, fillet, fromLeft: false);
+
+    // ── Right end: rounded bottom cap ──
     path.lineTo(w - r, wingBottom);
-
-    // Bottom-right outer corner.
     path.arcToPoint(
       Offset(w, wingBottom - r),
       radius: Radius.circular(r),
       clockwise: true,
     );
 
-    // Straight right outer edge.
+    // Straight outer edge.
     path.lineTo(w, wingTop + r);
 
-    // Top-right outer corner.
+    // ── Right end: rounded top cap ──
     path.arcToPoint(
       Offset(w - r, wingTop),
       radius: Radius.circular(r),
       clockwise: true,
     );
 
-    // Straight top edge — right wing.
+    // Straight top — right wing.
     path.lineTo(rightJoin, wingTop);
 
-    // Symmetric circular curve over NGMY.
+    // Wide symmetric top curve over NGMY.
     _arcBulgeUp(path, leftJoin, rightJoin, wingTop, centerTop, cx);
 
-    // Straight top edge — left wing.
+    // Straight top — left wing.
     path.lineTo(r, wingTop);
 
-    // Top-left outer corner.
+    // ── Left end: rounded top cap ──
     path.arcToPoint(
       Offset(0, wingTop + r),
       radius: Radius.circular(r),
       clockwise: true,
     );
 
-    // Straight left outer edge.
+    // Straight outer edge.
     path.lineTo(0, wingBottom - r);
 
-    // Bottom-left outer corner.
+    // ── Left end: rounded bottom cap ──
     path.arcToPoint(
       Offset(r, wingBottom),
       radius: Radius.circular(r),

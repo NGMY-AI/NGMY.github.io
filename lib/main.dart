@@ -27725,6 +27725,14 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant AnnouncementScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_activeTab == 1 && widget.announcements.length != oldWidget.announcements.length) {
+      _scrollNewsToBottom();
+    }
+  }
+
+  @override
   void dispose() {
     _chatGateTimer?.cancel();
     _chatController.dispose();
@@ -27942,11 +27950,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _pendingNewsVideoUrl = null;
     if (mounted) {
       setState(() => _isPostingNews = false);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_newsScrollController.hasClients) {
-          _newsScrollController.animateTo(0, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
-        }
-      });
+      _scrollNewsToBottom();
     }
   }
 
@@ -27954,8 +27958,20 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     final list = widget.announcements
         .where((a) => !NgmyNewsRetention.isExpired(a.timestamp))
         .toList();
-    list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     return list;
+  }
+
+  void _scrollNewsToBottom({bool jump = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_newsScrollController.hasClients) return;
+      final target = _newsScrollController.position.maxScrollExtent;
+      if (jump) {
+        _newsScrollController.jumpTo(target);
+      } else {
+        _newsScrollController.animateTo(target, duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
+      }
+    });
   }
 
   @override
@@ -28174,7 +28190,14 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       child: GestureDetector(
         onTap: () {
           setState(() => _activeTab = idx);
-          if (idx == 0) _scrollToBottom(jump: true);
+          if (idx == 0) {
+            _scrollToBottom(jump: true);
+          } else if (idx == 1) {
+            _scrollNewsToBottom(jump: true);
+            Future<void>.delayed(const Duration(milliseconds: 120), () {
+              if (mounted && _activeTab == 1) _scrollNewsToBottom(jump: true);
+            });
+          }
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
