@@ -6,13 +6,12 @@ class NgmyBottomNavMetrics {
 
   static const barHeight = 68.0;
   static const sideIconSize = 28.0;
-  static const centerButtonSize = 60.0;
-  static const centerLift = 14.0;
+  static const centerButtonSize = 52.0;
 
   static double get frameHeight => barHeight;
 }
 
-/// Simple rounded pill bar — NGMY button floats above the center.
+/// Simple rounded pill bar — all icons share one horizontal center line.
 class NgmySculptedBottomNavFrame extends StatelessWidget {
   const NgmySculptedBottomNavFrame({
     super.key,
