@@ -54,6 +54,7 @@ import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_loans.dart';
+import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_web_viewport.dart';
 import 'ngmy_web_status_bar.dart';
@@ -522,6 +523,183 @@ Map<String, String> _civicRegistryPinsFromJson(dynamic raw) {
     return raw.map((k, v) => MapEntry(k.toString().trim(), v.toString().trim()));
   }
   return {};
+}
+
+Map<String, int> _mergeGameTimeLimitsPreferCustom(Map<String, int> local, Map<String, int> remote) {
+  final defaults = ngmyDefaultGameTimeLimits();
+  final out = <String, int>{};
+  for (final id in defaults.keys) {
+    final def = defaults[id]!;
+    final l = local[id] ?? def;
+    final r = remote[id] ?? def;
+    final localCustom = l != def;
+    final remoteCustom = r != def;
+    if (remoteCustom && localCustom) {
+      out[id] = r;
+    } else if (remoteCustom) {
+      out[id] = r;
+    } else if (localCustom) {
+      out[id] = l;
+    } else {
+      out[id] = def;
+    }
+  }
+  return out;
+}
+
+int _pickCustomInt(int local, int remote, int def) {
+  final localCustom = local != def;
+  final remoteCustom = remote != def;
+  if (remoteCustom && localCustom) return remote;
+  if (remoteCustom) return remote;
+  if (localCustom) return local;
+  return def;
+}
+
+Map<String, dynamic> _mergeDiceSettingsPreferCustom(Map<String, dynamic> localJson, Map<String, dynamic> remoteJson) {
+  final local = NgmyDiceSettings.fromJson(localJson);
+  final remote = NgmyDiceSettings.fromJson(remoteJson);
+  final defaults = NgmyDiceSettings();
+  final weights = <String, int>{};
+  for (final key in ngmyDefaultDiceWeights().keys) {
+    final def = defaults.weights[key] ?? 1;
+    weights[key] = _pickCustomInt(local.weights[key] ?? def, remote.weights[key] ?? def, def);
+  }
+  final merged = NgmyDiceSettings(
+    weights: weights,
+    winPercent: _pickCustomInt(local.winPercent, remote.winPercent, defaults.winPercent),
+    maxWinStreak: _pickCustomInt(local.maxWinStreak, remote.maxWinStreak, defaults.maxWinStreak),
+    maxLoseStreak: _pickCustomInt(local.maxLoseStreak, remote.maxLoseStreak, defaults.maxLoseStreak),
+    plus3DailyLimit: _pickCustomInt(local.plus3DailyLimit, remote.plus3DailyLimit, defaults.plus3DailyLimit),
+    plus3UsedToday: local.plus3Date.compareTo(remote.plus3Date) >= 0 ? local.plus3UsedToday : remote.plus3UsedToday,
+    plus3Date: local.plus3Date.compareTo(remote.plus3Date) >= 0 ? local.plus3Date : remote.plus3Date,
+    userGrants: local.userGrants.isNotEmpty ? local.userGrants : remote.userGrants,
+    playerState: local.playerState.isNotEmpty ? local.playerState : remote.playerState,
+  );
+  return merged.toJson();
+}
+
+List<Map<String, dynamic>> _mergeCivicRegistrarApplications(
+  List<Map<String, dynamic>> local,
+  List<Map<String, dynamic>> remote,
+) {
+  final byId = <String, Map<String, dynamic>>{};
+  for (final a in local) {
+    final id = (a['id'] ?? '').toString();
+    if (id.isNotEmpty) byId[id] = Map<String, dynamic>.from(a);
+  }
+  for (final a in remote) {
+    final id = (a['id'] ?? '').toString();
+    if (id.isEmpty) continue;
+    final r = Map<String, dynamic>.from(a);
+    final existing = byId[id];
+    if (existing == null) {
+      byId[id] = r;
+      continue;
+    }
+    final rs = (r['status'] ?? 'pending').toString();
+    final es = (existing['status'] ?? 'pending').toString();
+    if (es == 'pending' && rs != 'pending') {
+      byId[id] = r;
+    } else if (rs == 'pending' && es != 'pending') {
+      continue;
+    } else {
+      final rc = (r['createdAt'] ?? '').toString();
+      final ec = (existing['createdAt'] ?? '').toString();
+      byId[id] = rc.compareTo(ec) >= 0 ? r : existing;
+    }
+  }
+  return byId.values.toList()
+    ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+}
+
+/// Keeps local civic/game admin settings when Supabase row is missing jsonb columns.
+void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppConfig keep) {
+  if (record.containsKey('gameTimeLimits') && record['gameTimeLimits'] is Map) {
+    final remote = ngmyParseGameTimeLimits(record['gameTimeLimits']);
+    next.gameTimeLimits = _mergeGameTimeLimitsPreferCustom(keep.gameTimeLimits, remote);
+  } else {
+    next.gameTimeLimits = Map<String, int>.from(keep.gameTimeLimits);
+  }
+
+  if (record.containsKey('diceSettings') && record['diceSettings'] is Map) {
+    final remote = Map<String, dynamic>.from(record['diceSettings'] as Map);
+    if (remote.isNotEmpty) {
+      next.diceSettings = _mergeDiceSettingsPreferCustom(keep.diceSettings, remote);
+    } else {
+      next.diceSettings = Map<String, dynamic>.from(keep.diceSettings);
+    }
+  } else {
+    next.diceSettings = Map<String, dynamic>.from(keep.diceSettings);
+  }
+
+  if (record.containsKey('gameInvites') && record['gameInvites'] is List) {
+    final remote = (record['gameInvites'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    if (remote.isNotEmpty) {
+      next.gameInvites = remote;
+    } else if (keep.gameInvites.isNotEmpty) {
+      next.gameInvites = keep.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+  } else if (keep.gameInvites.isNotEmpty) {
+    next.gameInvites = keep.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  if (record.containsKey('civicRegistryPin')) {
+    final remotePin = (record['civicRegistryPin'] ?? '').toString().trim();
+    if (remotePin.isNotEmpty) {
+      next.civicRegistryPin = remotePin;
+    } else if (keep.civicRegistryPin.trim().isNotEmpty) {
+      next.civicRegistryPin = keep.civicRegistryPin;
+    }
+  } else if (keep.civicRegistryPin.trim().isNotEmpty) {
+    next.civicRegistryPin = keep.civicRegistryPin;
+  }
+
+  if (record.containsKey('civicRegistryPinsByState') && record['civicRegistryPinsByState'] is Map) {
+    final remotePins = _civicRegistryPinsFromJson(record['civicRegistryPinsByState']);
+    if (remotePins.isNotEmpty) {
+      next.civicRegistryPinsByState = remotePins;
+    } else if (keep.civicRegistryPinsByState.isNotEmpty) {
+      next.civicRegistryPinsByState = Map<String, String>.from(keep.civicRegistryPinsByState);
+    }
+  } else if (keep.civicRegistryPinsByState.isNotEmpty) {
+    next.civicRegistryPinsByState = Map<String, String>.from(keep.civicRegistryPinsByState);
+  }
+
+  if (record.containsKey('civicRegistrarApplications') && record['civicRegistrarApplications'] is List) {
+    final remoteApps = (record['civicRegistrarApplications'] as List)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    if (remoteApps.isNotEmpty) {
+      next.civicRegistrarApplications = _mergeCivicRegistrarApplications(keep.civicRegistrarApplications, remoteApps);
+    } else if (keep.civicRegistrarApplications.isNotEmpty) {
+      next.civicRegistrarApplications =
+          keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+  } else if (keep.civicRegistrarApplications.isNotEmpty) {
+    next.civicRegistrarApplications =
+        keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+}
+
+Future<void> _persistCriticalConfigFields(AppConfig config) async {
+  if (!await ngmyCanReachCloud()) return;
+  final client = Supabase.instance.client;
+  final payloads = <Map<String, dynamic>>[
+    {'id': 1, 'gameTimeLimits': config.gameTimeLimits},
+    {'id': 1, 'diceSettings': config.diceSettings},
+    {'id': 1, 'gameInvites': config.gameInvites},
+    {'id': 1, 'civicRegistryPin': config.civicRegistryPin},
+    {'id': 1, 'civicRegistryPinsByState': config.civicRegistryPinsByState},
+    {'id': 1, 'civicRegistrarApplications': config.civicRegistrarApplications},
+  ];
+  for (final row in payloads) {
+    try {
+      await client.from('config').upsert(row);
+    } catch (e) {
+      debugPrint('[config] persist ${row.keys.where((k) => k != 'id').join(', ')}: $e');
+    }
+  }
 }
 
 void showNgmyCivicRegistryPinSheet(
@@ -2660,6 +2838,9 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   row['gameTimeLimits'] = config.gameTimeLimits;
   row['diceSettings'] = config.diceSettings;
   row['gameInvites'] = config.gameInvites;
+  row['civicRegistryPin'] = config.civicRegistryPin;
+  row['civicRegistryPinsByState'] = config.civicRegistryPinsByState;
+  row['civicRegistrarApplications'] = config.civicRegistrarApplications;
   if (isAdmin) {
     row['termsAndConditions'] = config.termsAndConditions;
     row['privacyPolicy'] = config.privacyPolicy;
@@ -3216,34 +3397,15 @@ class _NGMYAppState extends State<NGMYApp> {
         final keepHelpBiz = List<Map<String, dynamic>>.from(_config.helpBusinesses.map((e) => Map<String, dynamic>.from(e)));
         final keepOrders = List<Map<String, dynamic>>.from(_config.storeOrders.map((e) => Map<String, dynamic>.from(e)));
         final keepPlans = List<Map<String, dynamic>>.from(_config.investmentPlans.map((e) => Map<String, dynamic>.from(e)));
-        final keepGameLimits = Map<String, int>.from(_config.gameTimeLimits);
-        final keepDice = Map<String, dynamic>.from(_config.diceSettings);
-        final keepInvites = List<Map<String, dynamic>>.from(_config.gameInvites.map((e) => Map<String, dynamic>.from(e)));
         final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepLoans = List<Map<String, dynamic>>.from(_config.loanApplications.map((e) => Map<String, dynamic>.from(e)));
         final keepChatClosed = _config.ngmyChatClosed;
         final cfgMap = Map<String, dynamic>.from(cfg);
+        final keepConfig = _config;
         final next = AppConfig.fromJson(cfgMap);
+        _applyRemoteConfigMerge(next, cfgMap, keepConfig);
         _applyNgmyChatClosedFromRemote(next, cfgMap, localClosed: keepChatClosed);
-        final remoteLimits = cfgMap['gameTimeLimits'];
-        if (remoteLimits is Map && remoteLimits.isNotEmpty) {
-          next.gameTimeLimits = ngmyParseGameTimeLimits(remoteLimits);
-        } else if (keepGameLimits.isNotEmpty) {
-          next.gameTimeLimits = keepGameLimits;
-        }
-        final remoteDice = cfgMap['diceSettings'];
-        if (remoteDice is Map && remoteDice.isNotEmpty) {
-          next.diceSettings = NgmyDiceSettings.fromJson(remoteDice).toJson();
-        } else if (keepDice.isNotEmpty) {
-          next.diceSettings = keepDice;
-        }
-        final remoteInvites = cfgMap['gameInvites'];
-        if (remoteInvites is List && remoteInvites.isNotEmpty) {
-          next.gameInvites = remoteInvites.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        } else if (keepInvites.isNotEmpty) {
-          next.gameInvites = keepInvites;
-        }
         _applyRemoteLegalToConfig(next, cfgMap);
         final remoteGemini = _geminiKeyFromMap(cfgMap);
         if (remoteGemini.isNotEmpty) {
@@ -3294,6 +3456,7 @@ class _NGMYAppState extends State<NGMYApp> {
         if (_appConfigSig(_config) == _appConfigSig(next) && plansSigBefore == plansSigAfter) return;
         setState(() => _config = next);
         SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('app_config', jsonEncode(_config.toJson()));
           prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
         }).catchError((_) {});
       } catch (_) {
@@ -3934,7 +4097,9 @@ class _NGMYAppState extends State<NGMYApp> {
         final keepGeminiKey = _config.geminiApiKey.trim();
         final remoteGemini = _geminiKeyFromMap(Map<String, dynamic>.from(payload.newRecord));
         final record = Map<String, dynamic>.from(payload.newRecord);
+        final keepConfig = _config;
         final next = AppConfig.fromJson(record);
+        _applyRemoteConfigMerge(next, record, keepConfig);
         _applyRemoteLegalToConfig(next, record);
         _applyNgmyChatClosedFromRemote(next, record, localClosed: _config.ngmyChatClosed);
         if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
@@ -4293,10 +4458,13 @@ class _NGMYAppState extends State<NGMYApp> {
         final localStoreListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
         final localStoreInquiries = List<Map<String, dynamic>>.from(_config.storeInquiries.map((e) => Map<String, dynamic>.from(e)));
         final localGeminiKey = _config.geminiApiKey.trim();
+        final localConfigSnapshot = AppConfig.fromJson(_config.toJson());
         final configData = await supabase.from('config').select().maybeSingle();
         if (configData != null) {
           final cfgMap = Map<String, dynamic>.from(configData);
-          _config = AppConfig.fromJson(cfgMap);
+          final next = AppConfig.fromJson(cfgMap);
+          _applyRemoteConfigMerge(next, cfgMap, localConfigSnapshot);
+          _config = next;
           (_config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(
             cfgMap['mediaVirtualProfiles'] ?? (_config as dynamic).mediaVirtualProfiles,
           );
@@ -4553,6 +4721,7 @@ class _NGMYAppState extends State<NGMYApp> {
           await _persistNgmyPopupsToCloud(_config.ngmyPopups, _config.ngmyVideoPopups);
         }
         await _safeUpsertRows('config', [configRow]);
+        await _persistCriticalConfigFields(_config);
       }, timeout: const Duration(seconds: 28));
       } else {
         _config.storeOrders = ordersSnapshot;
@@ -5964,23 +6133,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Widget _buildBottomNavBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(15, 0, 15, 25),
+      padding: const EdgeInsets.fromLTRB(15, 0, 15, 20),
       child: SafeArea(
         top: false,
-        child: Container(
-          height: 75,
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
+        child: NgmySculptedBottomNavFrame(
           child: Row(
             children: [
               _nav(0, Icons.home_rounded),
@@ -11559,7 +11715,7 @@ class LoanServiceScreen extends StatelessWidget {
 
 /// Scroll padding so list content can pass behind the floating bottom nav (like Media).
 double _ngmyBottomNavScrollPadding(BuildContext context) {
-  return 110 + MediaQuery.paddingOf(context).bottom;
+  return 125 + MediaQuery.paddingOf(context).bottom;
 }
 
 class InvestScreen extends StatelessWidget {
