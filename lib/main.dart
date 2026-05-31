@@ -1256,6 +1256,38 @@ bool _maintainStoreOrders(List<Map<String, dynamic>> orders) {
   return changed;
 }
 
+String ngmyUserDisplayAccountId(UserData u) {
+  final reg = (u.registryId ?? '').trim();
+  if (reg.isNotEmpty) return reg;
+  return 'GV${u.email.hashCode.abs().toString().padLeft(8, '0').substring(0, 8)}';
+}
+
+ImageProvider? ngmyAdminUserAvatar(UserData u) {
+  final path = u.profilePicturePath;
+  if (path == null || path.trim().isEmpty) return null;
+  final src = path.trim();
+  if (src.startsWith('data:image')) {
+    try {
+      return MemoryImage(base64Decode(src.split(',').last));
+    } catch (_) {
+      return null;
+    }
+  }
+  if (src.startsWith('http')) return NetworkImage(src);
+  if (!kIsWeb) return FileImage(File(src));
+  return null;
+}
+
+List<Map<String, dynamic>> _mergeNgmyPopupsFromRemote(
+  List<Map<String, dynamic>> local,
+  List<Map<String, dynamic>>? remote,
+  List<Map<String, dynamic>> Function(List<Map<String, dynamic>>?) ensure,
+) {
+  if (remote != null && remote.isNotEmpty) return ensure(remote);
+  if (local.isNotEmpty) return local;
+  return ensure(null);
+}
+
 List<Map<String, dynamic>> _mergeStoreOrdersLists(
   List<Map<String, dynamic>> local,
   List<Map<String, dynamic>> remote,
@@ -2221,8 +2253,10 @@ class UserData {
   String savedCashAppTag;
   String savedZelleInfo;
   String savedBitcoinAddress;
+  String crownBadge;
+  double freeFixCredit;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = ''});
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0});
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
     if (activeInvestment!.daysLeft <= 0) return 0.0;
@@ -2242,7 +2276,7 @@ class UserData {
     return earnings > totalDaily ? totalDaily : earnings;
   }
   double get todayDailyGoal => activeInvestment == null ? 0.0 : (activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100)));
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -2305,6 +2339,8 @@ class UserData {
       savedCashAppTag: (json['savedCashAppTag'] ?? '').toString(),
       savedZelleInfo: (json['savedZelleInfo'] ?? '').toString(),
       savedBitcoinAddress: (json['savedBitcoinAddress'] ?? '').toString(),
+      crownBadge: (json['crownBadge'] ?? '').toString(),
+      freeFixCredit: (json['freeFixCredit'] ?? 0.0).toDouble(),
     );
   }
 }
@@ -2506,6 +2542,8 @@ class _NGMYAppState extends State<NGMYApp> {
         final keepGameLimits = Map<String, int>.from(_config.gameTimeLimits);
         final keepDice = Map<String, dynamic>.from(_config.diceSettings);
         final keepInvites = List<Map<String, dynamic>>.from(_config.gameInvites.map((e) => Map<String, dynamic>.from(e)));
+        final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
+        final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
         final cfgMap = Map<String, dynamic>.from(cfg);
         final next = AppConfig.fromJson(cfgMap);
         final remoteLimits = cfgMap['gameTimeLimits'];
@@ -2543,6 +2581,10 @@ class _NGMYAppState extends State<NGMYApp> {
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
+        final remotePopups = (cfgMap['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        final remoteVideoPopups = (cfgMap['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        next.ngmyPopups = _mergeNgmyPopupsFromRemote(keepPopups, remotePopups, NgmyPopupDefaults.ensurePopups);
+        next.ngmyVideoPopups = _mergeNgmyPopupsFromRemote(keepVideoPopups, remoteVideoPopups, NgmyPopupDefaults.ensureVideoPopups);
         final plansSigBefore = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
         final legal = await _fetchAuthoritativeLegalContent();
         final remotePlans = await _fetchAuthoritativeInvestmentPlans();
@@ -3177,6 +3219,12 @@ class _NGMYAppState extends State<NGMYApp> {
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
+        final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
+        final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
+        final remotePopups = (record['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        final remoteVideoPopups = (record['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        next.ngmyPopups = _mergeNgmyPopupsFromRemote(keepPopups, remotePopups, NgmyPopupDefaults.ensurePopups);
+        next.ngmyVideoPopups = _mergeNgmyPopupsFromRemote(keepVideoPopups, remoteVideoPopups, NgmyPopupDefaults.ensureVideoPopups);
         if (remoteGemini.isNotEmpty) {
           next.geminiApiKey = remoteGemini;
         } else if (next.geminiApiKey.trim().isEmpty && keepGeminiKey.isNotEmpty) {
@@ -3672,6 +3720,10 @@ class _NGMYAppState extends State<NGMYApp> {
         configRow['helpHelperApplications'] = _config.helpHelperApplications;
         configRow['helpRequests'] = _config.helpRequests;
         configRow['helpBusinesses'] = _config.helpBusinesses;
+        if (_currentUser?.isAdmin == true) {
+          configRow['ngmyPopups'] = _config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)).toList();
+          configRow['ngmyVideoPopups'] = _config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)).toList();
+        }
         await _safeUpsertRows('config', [configRow]);
       } else {
         _config.storeOrders = ordersSnapshot;
@@ -7843,8 +7895,13 @@ class AdminDashboard extends StatefulWidget {
 }
 class _AdminDashboardState extends State<AdminDashboard> {
   int _idx = 0; final _search = TextEditingController(); bool _isSearching = false; String _query = '';
+  String? _selectedUserEmail;
 
   void _adminBack() {
+    if (_selectedUserEmail != null) {
+      setState(() => _selectedUserEmail = null);
+      return;
+    }
     if (_idx > 0) {
       setState(() => _idx--);
       return;
@@ -8366,27 +8423,45 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _menuFrame(String title, IconData icon, Color color, VoidCallback onTap, bool isDark) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(20),
-    child: Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5), width: 2),
-        boxShadow: [BoxShadow(color: color.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-            child: Icon(icon, color: color, size: 24),
+  Widget _menuFrame(String title, IconData icon, Color color, VoidCallback onTap, bool isDark) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color.withOpacity(isDark ? 0.55 : 0.75),
+              color.withOpacity(isDark ? 0.35 : 0.55),
+              color.withOpacity(isDark ? 0.25 : 0.4),
+            ],
           ),
-          const SizedBox(height: 10),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-        ],
+          boxShadow: [
+            BoxShadow(color: color.withOpacity(0.35), blurRadius: 14, offset: const Offset(0, 6)),
+            BoxShadow(color: Colors.black.withOpacity(isDark ? 0.35 : 0.12), blurRadius: 6, offset: const Offset(0, 3)),
+          ],
+          border: Border.all(color: Colors.white.withOpacity(0.28), width: 1.2),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.18),
+                shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3))],
+              ),
+              child: Icon(icon, color: Colors.white, size: 24),
+            ),
+            const SizedBox(height: 10),
+            Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white)),
+          ],
+        ),
       ),
     ),
   );
@@ -9159,20 +9234,363 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ]),
   );
 
+  bool _userMatchesQuery(UserData u, String q) {
+    if (q.isEmpty) return true;
+    final accountId = ngmyUserDisplayAccountId(u).toLowerCase();
+    return u.email.toLowerCase().contains(q) ||
+        u.username.toLowerCase().contains(q) ||
+        (u.fullName ?? '').toLowerCase().contains(q) ||
+        accountId.contains(q) ||
+        (u.registryId ?? '').toLowerCase().contains(q);
+  }
+
+  Widget _adminUserAvatar(UserData u, {double radius = 22, Color? fallback}) {
+    final img = ngmyAdminUserAvatar(u);
+    final bg = fallback ?? (u.status == 'active' ? Colors.green : Colors.red);
+    if (img != null) {
+      return CircleAvatar(radius: radius, backgroundColor: bg.withOpacity(0.2), backgroundImage: img);
+    }
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: bg,
+      child: Text(u.username.isNotEmpty ? u.username[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _adminActionBtn(String label, IconData icon, Color color, VoidCallback onTap) => SizedBox(
+    width: double.infinity,
+    child: ElevatedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16, color: Colors.white),
+      label: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 4,
+        shadowColor: color.withOpacity(0.45),
+      ),
+    ),
+  );
+
+  Widget _adminUserDetail(UserData u, bool isDark) {
+    final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
+    final border = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
+    final statusColor = u.status == 'active'
+        ? Colors.green
+        : u.status == 'suspended'
+            ? Colors.orange
+            : u.status == 'verified'
+                ? Colors.blue
+                : Colors.red;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(15, 10, 15, 30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextButton.icon(
+            onPressed: () => setState(() => _selectedUserEmail = null),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
+            label: const Text('Back to Users List', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(color: panelBg, borderRadius: BorderRadius.circular(18), border: Border.all(color: border)),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _adminUserAvatar(u, radius: 34),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('@${u.username}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
+                          const SizedBox(height: 4),
+                          Text(u.email, style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54)),
+                          const SizedBox(height: 2),
+                          Text(ngmyUserDisplayAccountId(u), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : Colors.black45)),
+                          if (u.phone.trim().isNotEmpty) Text(u.phone, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black45)),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: statusColor.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+                      child: Text(u.status.toUpperCase(), style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 10)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: isDark ? Colors.black26 : const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(12)),
+                        child: Column(
+                          children: [
+                            Text('Balance', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white54 : Colors.black45)),
+                            const SizedBox(height: 4),
+                            Text('\$${formatCurrency(u.accountBalance)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF00B25A))),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: isDark ? Colors.black26 : const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12)),
+                        child: Column(
+                          children: [
+                            Text('Invested', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white54 : Colors.black45)),
+                            const SizedBox(height: 4),
+                            Text('\$${formatCurrency(u.totalInvestmentAmount)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : Colors.black87)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text('Account Actions', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+          const SizedBox(height: 10),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 3,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1.05,
+            children: [
+              _adminActionBtn('Active', Icons.person_outline, const Color(0xFF22C55E), () { u.status = 'active'; widget.onDataChanged(); setState(() {}); }),
+              _adminActionBtn('Suspend', Icons.block, const Color(0xFFF59E0B), () { u.status = 'suspended'; widget.onDataChanged(); setState(() {}); }),
+              _adminActionBtn('Verify', Icons.verified_user, const Color(0xFF3B82F6), () { u.status = 'verified'; u.isApprovedWorker = true; widget.onDataChanged(); setState(() {}); }),
+              _adminActionBtn('Disable', Icons.person_off, const Color(0xFFEF4444), () { u.status = 'disabled'; widget.onDataChanged(); setState(() {}); }),
+              _adminActionBtn('Add', Icons.add, const Color(0xFF14B8A6), () => _prompt(context, 'Add Money (\$)', (val) {
+                final amt = double.tryParse(val) ?? 0;
+                if (amt <= 0) return;
+                widget.onAddTransaction(AppTransaction(id: DateTime.now().toString(), userEmail: u.email, amount: amt, type: TransactionType.adminAdd, method: PaymentMethod.system, sourceDetails: 'Admin credit', status: TransactionStatus.approved, timestamp: DateTime.now()));
+                widget.onDataChanged();
+                setState(() {});
+              })),
+              _adminActionBtn('Remove', Icons.remove, const Color(0xFFEA580C), () => _prompt(context, 'Remove Money (\$)', (val) {
+                final amt = double.tryParse(val) ?? 0;
+                if (amt <= 0) return;
+                widget.onAddTransaction(AppTransaction(id: DateTime.now().toString(), userEmail: u.email, amount: amt, type: TransactionType.adminRemove, method: PaymentMethod.system, sourceDetails: 'Admin debit', status: TransactionStatus.approved, timestamp: DateTime.now()));
+                u.accountBalance = (u.accountBalance - amt).clamp(0.0, double.infinity);
+                widget.onDataChanged();
+                setState(() {});
+              })),
+              _adminActionBtn('Reset', Icons.refresh, const Color(0xFF8B5CF6), () {
+                u.isClockedIn = false;
+                u.clockInStartTime = null;
+                u.lastClockInDate = null;
+                u.lastClockInEarningsDate = null;
+                u.clockInPenaltyPercent = 0.0;
+                u.forceLogout = false;
+                widget.onDataChanged();
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${u.username} clock-in and session reset.')));
+              }),
+              _adminActionBtn('Delete', Icons.delete_outline, const Color(0xFF374151), () async {
+                final ok = await showDialog<bool>(context: context, builder: (c) => AlertDialog(
+                  title: const Text('Delete User?'),
+                  content: Text('Permanently remove ${u.username} (${u.email})?'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('CANCEL')),
+                    TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('DELETE', style: TextStyle(color: Colors.red))),
+                  ],
+                ));
+                if (ok == true) {
+                  widget.allUsers.remove(u);
+                  _selectedUserEmail = null;
+                  widget.onDataChanged();
+                  setState(() {});
+                }
+              }),
+              _adminActionBtn('Referrals', Icons.link, const Color(0xFF06B6D4), () {
+                final code = 'REFD${u.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
+                final refs = widget.allUsers.where((x) => x.referredByCode.trim().toUpperCase() == code.toUpperCase()).toList();
+                showDialog(context: context, builder: (c) => AlertDialog(
+                  title: Text('Referrals — ${u.username}'),
+                  content: SizedBox(
+                    width: 320,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Code: $code', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text('Total referrals: ${u.referralCount}', style: const TextStyle(fontSize: 12)),
+                        const SizedBox(height: 10),
+                        if (refs.isEmpty) const Text('No referred users yet.')
+                        else ...refs.map((r) => Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('• ${r.username} (${r.email})', style: const TextStyle(fontSize: 12)))),
+                      ],
+                    ),
+                  ),
+                  actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('CLOSE'))],
+                ));
+              }),
+              _adminActionBtn('Reimburse', Icons.sync, const Color(0xFF14B8A6), () => _prompt(context, 'Reimburse Amount (\$)', (val) {
+                final amt = double.tryParse(val) ?? 0;
+                if (amt <= 0) return;
+                widget.onAddTransaction(AppTransaction(id: DateTime.now().toString(), userEmail: u.email, amount: amt, type: TransactionType.reimbursement, method: PaymentMethod.system, sourceDetails: 'Admin reimbursement', status: TransactionStatus.approved, timestamp: DateTime.now()));
+                u.accountBalance += amt;
+                widget.onDataChanged();
+                setState(() {});
+              })),
+              _adminActionBtn('Force Logout', Icons.logout, const Color(0xFFDC2626), () { u.forceLogout = true; widget.onDataChanged(); setState(() {}); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${u.username} will be logged out on next refresh.'))); }),
+              _adminActionBtn('Edit User', Icons.edit, const Color(0xFF6366F1), () => _showEditUserDialog(u, isDark)),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Text('👑 Assign Crown Badge', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: _adminActionBtn('King', Icons.emoji_events, const Color(0xFFF59E0B), () { u.crownBadge = 'king'; widget.onDataChanged(); setState(() {}); })),
+              const SizedBox(width: 8),
+              Expanded(child: _adminActionBtn('Queen', Icons.workspace_premium, const Color(0xFFEC4899), () { u.crownBadge = 'queen'; widget.onDataChanged(); setState(() {}); })),
+              const SizedBox(width: 8),
+              Expanded(child: _adminActionBtn('Remove', Icons.close, const Color(0xFF374151), () { u.crownBadge = ''; widget.onDataChanged(); setState(() {}); })),
+            ],
+          ),
+          if (u.crownBadge.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Current badge: ${u.crownBadge.toUpperCase()}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
+          ],
+          const SizedBox(height: 22),
+          Text('🔧 Free Fix Badge', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+          const SizedBox(height: 6),
+          Text('Grant this user free work credit from your team.', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54)),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: panelBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: border)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Credit Amount (\$)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black54)),
+                const SizedBox(height: 6),
+                Text('How much work value is covered for free', style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black45)),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _prompt(context, 'Free Fix Credit (\$)', (val) {
+                      final amt = double.tryParse(val) ?? 0;
+                      if (amt <= 0) return;
+                      u.freeFixCredit += amt;
+                      widget.onDataChanged();
+                      setState(() {});
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Granted \$${formatCurrency(amt)} free fix credit to ${u.username}.')));
+                    }),
+                    icon: const Icon(Icons.build, size: 18),
+                    label: const Text('Grant Free Fix', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF14B8A6), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                  ),
+                ),
+                if (u.freeFixCredit > 0) ...[
+                  const SizedBox(height: 8),
+                  Text('Total free fix credit: \$${formatCurrency(u.freeFixCredit)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF14B8A6))),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditUserDialog(UserData u, bool isDark) {
+    final nameC = TextEditingController(text: u.username);
+    final emailC = TextEditingController(text: u.email);
+    final phoneC = TextEditingController(text: u.phone);
+    final fullC = TextEditingController(text: u.fullName ?? '');
+    showDialog(context: context, builder: (c) => AlertDialog(
+      title: const Text('Edit User'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Username')),
+            TextField(controller: emailC, decoration: const InputDecoration(labelText: 'Email')),
+            TextField(controller: phoneC, decoration: const InputDecoration(labelText: 'Phone')),
+            TextField(controller: fullC, decoration: const InputDecoration(labelText: 'Full Name')),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(c), child: const Text('CANCEL')),
+        ElevatedButton(
+          onPressed: () {
+            u.username = nameC.text.trim().isEmpty ? u.username : nameC.text.trim();
+            u.email = emailC.text.trim().isEmpty ? u.email : emailC.text.trim();
+            u.phone = phoneC.text.trim();
+            u.fullName = fullC.text.trim().isEmpty ? u.fullName : fullC.text.trim();
+            widget.onDataChanged();
+            Navigator.pop(c);
+            setState(() {});
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
+    ));
+  }
+
   Widget _adminUsers(bool isDark) {
-    final filtered = widget.allUsers.where((u) => u.email.toLowerCase().contains(_query)).toList();
+    final q = _query.trim().toLowerCase();
+    final filtered = widget.allUsers.where((u) => _userMatchesQuery(u, q)).toList()
+      ..sort((a, b) => a.username.compareTo(b.username));
+    if (_selectedUserEmail != null) {
+      UserData? selected;
+      for (final x in widget.allUsers) {
+        if (x.email.toLowerCase() == _selectedUserEmail!.toLowerCase()) {
+          selected = x;
+          break;
+        }
+      }
+      if (selected != null) return _adminUserDetail(selected, isDark);
+      _selectedUserEmail = null;
+    }
     final workerApps = List<Map<String, dynamic>>.from(
       widget.config.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)),
     );
     final pendingApps = workerApps.where((a) => (a['status'] ?? 'pending') == 'pending').toList();
+    final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
     return Column(children: [
-      Padding(padding: const EdgeInsets.all(15), child: TextField(controller: _search, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(hintText: 'Search users...', hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey), prefixIcon: Icon(Icons.search, color: isDark ? Colors.white38 : Colors.grey), filled: true, fillColor: isDark ? const Color(0xFF1C1F2E) : Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)), onChanged: (v) => setState(() => _query = v.toLowerCase()))),
+      Padding(
+        padding: const EdgeInsets.all(15),
+        child: TextField(
+          controller: _search,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black),
+          decoration: InputDecoration(
+            hintText: 'Search by name, email, or account ID...',
+            hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
+            prefixIcon: Icon(Icons.search, color: isDark ? Colors.white38 : Colors.grey),
+            filled: true,
+            fillColor: panelBg,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+          ),
+          onChanged: (v) => setState(() => _query = v.toLowerCase()),
+        ),
+      ),
       if (pendingApps.isNotEmpty)
         Container(
           margin: const EdgeInsets.fromLTRB(15, 0, 15, 10),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+            color: panelBg,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -9235,53 +9653,36 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ],
           ),
         ),
-      Expanded(child: ListView(padding: const EdgeInsets.symmetric(horizontal: 15), children: filtered.map((u) => Card(elevation: 0, color: isDark ? const Color(0xFF1C1F2E) : Colors.white, margin: const EdgeInsets.only(bottom: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), child: ExpansionTile(
-        iconColor: isDark ? Colors.white : Colors.black,
-        collapsedIconColor: isDark ? Colors.white60 : Colors.black54,
-        leading: CircleAvatar(backgroundColor: u.status == 'active' ? Colors.green : Colors.red, child: Text(u.username.isNotEmpty ? u.username[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white))),
-        title: Text(u.username, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white : Colors.black)),
-        subtitle: Text(u.email, style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.black54)),
-        children: [
-          Padding(padding: const EdgeInsets.all(15), child: Wrap(spacing: 8, runSpacing: 8, children: [
-            _sBtn('Active', Icons.check, Colors.green, () { u.status = 'active'; widget.onDataChanged(); setState((){}); }),
-            _sBtn('Suspend', Icons.pause, Colors.orange, () { u.status = 'suspended'; widget.onDataChanged(); setState((){}); }),
-            _sBtn('Add \$', Icons.add, Colors.blue, () => _prompt(context, 'Add Money', (val) {
-              final amt = double.tryParse(val) ?? 0;
-              if (amt <= 0) return;
-              widget.onAddTransaction(AppTransaction(
-                id: DateTime.now().toString(),
-                userEmail: u.email,
-                amount: amt,
-                type: TransactionType.adminAdd,
-                method: PaymentMethod.system,
-                sourceDetails: 'Admin credit',
-                status: TransactionStatus.approved,
-                timestamp: DateTime.now(),
-              ));
-              widget.onDataChanged();
-              setState(() {});
-            })),
-            _sBtn('Logout', Icons.logout, Colors.redAccent, () { u.forceLogout = true; widget.onDataChanged(); setState((){}); }),
-            _sBtn(u.isApprovedWorker ? 'Worker ✓' : 'Approve Worker', Icons.verified_user, Colors.purple, () {
-              u.isApprovedWorker = true;
-              u.status = 'verified';
-              widget.onDataChanged();
-              setState(() {});
-            }),
-            _sBtn(u.canSellOnStore ? 'Store Sell ✓' : 'Allow Store Sell', Icons.storefront_rounded, Colors.deepPurple, () {
-              u.canSellOnStore = !u.canSellOnStore;
-              widget.onDataChanged();
-              setState(() {});
-            }),
-            _sBtn(u.isApprovedHelper ? 'Helper ✓' : 'Approve Helper', Icons.support_agent_rounded, Colors.teal, () {
-              u.isApprovedHelper = !u.isApprovedHelper;
-              widget.onDataChanged();
-              setState(() {});
-            }),
-            _sBtn('Delete', Icons.delete, isDark ? Colors.white12 : Colors.black, () { widget.allUsers.remove(u); widget.onDataChanged(); setState((){}); }),
-          ]))
-        ],
-      ))).toList())),
+      Expanded(
+        child: ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          itemCount: filtered.length,
+          itemBuilder: (_, i) {
+            final u = filtered[i];
+            final statusColor = u.status == 'active' ? Colors.green : u.status == 'suspended' ? Colors.orange : Colors.red;
+            return Card(
+              elevation: 0,
+              color: panelBg,
+              margin: const EdgeInsets.only(bottom: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              child: ListTile(
+                onTap: () => setState(() => _selectedUserEmail = u.email),
+                leading: _adminUserAvatar(u, fallback: statusColor),
+                title: Text(u.username, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white : Colors.black)),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(u.email, style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.black54)),
+                    Text(ngmyUserDisplayAccountId(u), style: TextStyle(fontSize: 10, color: isDark ? Colors.white30 : Colors.black38)),
+                  ],
+                ),
+                isThreeLine: true,
+                trailing: Icon(Icons.chevron_right, color: isDark ? Colors.white38 : Colors.black38),
+              ),
+            );
+          },
+        ),
+      ),
     ]);
   }
 

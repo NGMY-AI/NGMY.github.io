@@ -193,14 +193,31 @@ class NgmyPopupDefaults {
         'durationMs': 7000,
       };
 
-  static List<Map<String, dynamic>> ensurePopups(List<Map<String, dynamic>>? raw) {
-    if (raw == null || raw.isEmpty) return allDefaultPopups();
-    return raw.map((e) => Map<String, dynamic>.from(e)).toList();
-  }
+  static List<Map<String, dynamic>> ensurePopups(List<Map<String, dynamic>>? raw) =>
+      mergeWithDefaults(raw, allDefaultPopups());
 
-  static List<Map<String, dynamic>> ensureVideoPopups(List<Map<String, dynamic>>? raw) {
-    if (raw == null || raw.isEmpty) return buildVideoPopups();
-    return raw.map((e) => Map<String, dynamic>.from(e)).toList();
+  static List<Map<String, dynamic>> ensureVideoPopups(List<Map<String, dynamic>>? raw) =>
+      mergeWithDefaults(raw, buildVideoPopups());
+
+  /// Merge saved admin settings with defaults so toggles/fields are never wiped on sync.
+  static List<Map<String, dynamic>> mergeWithDefaults(
+    List<Map<String, dynamic>>? raw,
+    List<Map<String, dynamic>> defaults,
+  ) {
+    final byId = <String, Map<String, dynamic>>{
+      for (final d in defaults) (d['id'] ?? '').toString(): Map<String, dynamic>.from(d),
+    };
+    if (raw != null) {
+      for (final item in raw) {
+        final id = (item['id'] ?? '').toString();
+        if (id.isEmpty) continue;
+        final base = byId[id] ?? <String, dynamic>{'id': id};
+        byId[id] = {...base, ...Map<String, dynamic>.from(item)};
+      }
+    }
+    final ids = defaults.map((e) => (e['id'] ?? '').toString()).where((e) => e.isNotEmpty);
+    final extra = byId.keys.where((k) => !ids.contains(k));
+    return [...ids.map((id) => byId[id]!).whereType<Map<String, dynamic>>(), ...extra.map((id) => byId[id]!).whereType<Map<String, dynamic>>()];
   }
 
   static Map<String, dynamic>? themeById(String id) {
@@ -422,79 +439,96 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
     );
   }
 
-  Widget _core(double size, double spinY, double glow) {
+  Widget _faceContent(double size, double glow) {
     final title = (widget.config['title'] ?? 'NGMY').toString();
     final subtitle = (widget.config['subtitle'] ?? '').toString();
     final link = (widget.config['linkUrl'] ?? '').toString().trim();
     final linkLabel = (widget.config['linkLabel'] ?? 'Open Link').toString();
 
+    return Container(
+      width: size * 0.64,
+      height: size * 0.64,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(_colors[0], _colors[1], glow)!,
+            Color.lerp(_colors[1], _colors[2], 1 - glow)!,
+            _colors[2],
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(color: _colors[1].withValues(alpha: 0.55 + glow * 0.35), blurRadius: 36, spreadRadius: 4),
+        ],
+        border: Border.all(color: Colors.white.withValues(alpha: 0.24), width: 1.5),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(_icon, color: Colors.white.withValues(alpha: 0.95), size: size * 0.14),
+          SizedBox(height: size * 0.03),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white, fontSize: size * 0.09, fontWeight: FontWeight.w900),
+            ),
+          ),
+          if (subtitle.isNotEmpty) ...[
+            SizedBox(height: size * 0.015),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: size * 0.048, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+          if (link.isNotEmpty) ...[
+            SizedBox(height: size * 0.02),
+            Text(
+              linkLabel,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _faceBox(double size, double glow, double rotY, {bool mirror = false}) {
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()..rotateY(rotY),
+      child: Transform(
+        alignment: Alignment.center,
+        transform: mirror ? (Matrix4.identity()..rotateY(math.pi)) : Matrix4.identity(),
+        child: _faceContent(size, glow),
+      ),
+    );
+  }
+
+  Widget _core(double size, double spinY, double glow) {
     return Transform(
       alignment: Alignment.center,
       transform: Matrix4.identity()
         ..setEntry(3, 2, 0.002)
-        ..rotateX(0.18 + math.sin(spinY) * 0.08)
+        ..rotateX(0.12 + math.sin(spinY) * 0.06)
         ..rotateY(spinY),
-      child: Container(
-        width: size * 0.64,
-        height: size * 0.64,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color.lerp(_colors[0], _colors[1], glow)!,
-              Color.lerp(_colors[1], _colors[2], 1 - glow)!,
-              _colors[2],
-            ],
-          ),
-          boxShadow: [
-            BoxShadow(color: _colors[1].withValues(alpha: 0.55 + glow * 0.35), blurRadius: 36, spreadRadius: 4),
-          ],
-          border: Border.all(color: Colors.white.withValues(alpha: 0.24), width: 1.5),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(_icon, color: Colors.white.withValues(alpha: 0.95), size: size * 0.14),
-            SizedBox(height: size * 0.03),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white, fontSize: size * 0.09, fontWeight: FontWeight.w900),
-              ),
-            ),
-            if (subtitle.isNotEmpty) ...[
-              SizedBox(height: size * 0.015),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: Text(
-                  subtitle,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: size * 0.048, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-            if (link.isNotEmpty) ...[
-              SizedBox(height: size * 0.02),
-              TextButton(
-                onPressed: _openLink,
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: Colors.black.withValues(alpha: 0.25),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                ),
-                child: Text(linkLabel, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
-              ),
-            ],
-          ],
-        ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          _faceBox(size, glow, 0),
+          _faceBox(size, glow, math.pi, mirror: true),
+        ],
       ),
     );
   }
@@ -793,11 +827,11 @@ class _NgmyPopupsAdminSheetState extends State<_NgmyPopupsAdminSheet> {
                   Text('3D Pop Ups (${NgmyPopupDefaults.standardCount} standard + ${NgmyPopupDefaults.marketingCount} marketing)',
                       style: TextStyle(fontWeight: FontWeight.w800, color: widget.isDark ? Colors.white70 : Colors.black87)),
                   const SizedBox(height: 8),
-                  ..._popups.map((p) => _popupTile(p, isVideo: false)),
+                  _popupGrid(_popups, isVideo: false),
                   const SizedBox(height: 18),
                   Text('Video Ad Pop Ups (luxury frames)', style: TextStyle(fontWeight: FontWeight.w800, color: widget.isDark ? Colors.white70 : Colors.black87)),
                   const SizedBox(height: 8),
-                  ..._videos.map((p) => _popupTile(p, isVideo: true)),
+                  _popupGrid(_videos, isVideo: true),
                 ],
               ),
             ),
@@ -822,151 +856,247 @@ class _NgmyPopupsAdminSheetState extends State<_NgmyPopupsAdminSheet> {
     );
   }
 
-  Widget _popupTile(Map<String, dynamic> p, {required bool isVideo}) {
-    final id = (p['id'] ?? '').toString();
-    final title = (p['title'] ?? id).toString();
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ExpansionTile(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-        subtitle: Text('${p['type'] ?? (isVideo ? 'video' : 'standard')} · ${p['trigger'] ?? 'once_per_day'}', style: const TextStyle(fontSize: 11)),
-        trailing: Switch(
-          value: p['enabled'] == true,
-          onChanged: (v) => setState(() => p['enabled'] = v),
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-            child: Column(
-              children: [
-                TextField(
-                  decoration: _dec('Title'),
-                  controller: TextEditingController(text: title),
-                  onChanged: (v) => p['title'] = v,
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  decoration: _dec('Subtitle'),
-                  controller: TextEditingController(text: (p['subtitle'] ?? '').toString()),
-                  onChanged: (v) => p['subtitle'] = v,
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  decoration: _dec('Link URL'),
-                  controller: TextEditingController(text: (p['linkUrl'] ?? '').toString()),
-                  onChanged: (v) => p['linkUrl'] = v,
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  decoration: _dec('Link label'),
-                  controller: TextEditingController(text: (p['linkLabel'] ?? 'Open Link').toString()),
-                  onChanged: (v) => p['linkLabel'] = v,
-                ),
-                if (isVideo) ...[
-                  const SizedBox(height: 8),
-                  TextField(
-                    decoration: _dec('Video URL'),
-                    controller: TextEditingController(text: (p['videoUrl'] ?? '').toString()),
-                    onChanged: (v) => p['videoUrl'] = v,
+  Widget _popupGrid(List<Map<String, dynamic>> items, {required bool isVideo}) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 0.92,
+      ),
+      itemCount: items.length,
+      itemBuilder: (_, i) => _popupGridCard(items[i], isVideo: isVideo),
+    );
+  }
+
+  Widget _popupGridCard(Map<String, dynamic> p, {required bool isVideo}) {
+    final title = (p['title'] ?? p['id'] ?? 'Pop Up').toString();
+    final enabled = p['enabled'] == true;
+    final theme = NgmyPopupDefaults.themeById((p['themeId'] ?? 'ngmy').toString());
+    final colors = theme?['colors'] as List?;
+    final c0 = colors != null && colors.isNotEmpty ? Color((colors[0] as num).toInt()) : const Color(0xFF6366F1);
+    final c1 = colors != null && colors.length > 1 ? Color((colors[1] as num).toInt()) : const Color(0xFF818CF8);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _openPopupEditor(p, isVideo: isVideo),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [c0.withValues(alpha: 0.85), c1.withValues(alpha: 0.75)],
+            ),
+            boxShadow: [BoxShadow(color: c1.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 5))],
+            border: Border.all(color: enabled ? Colors.white.withValues(alpha: 0.45) : Colors.white24),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
                   ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: (p['frameStyle'] ?? 'gold_luxury').toString(),
-                    decoration: _dec('Frame style'),
-                    items: NgmyPopupDefaults.videoFrameStyles
-                        .map((f) => DropdownMenuItem(value: f['id'] as String, child: Text(f['name'] as String)))
-                        .toList(),
-                    onChanged: (v) => setState(() => p['frameStyle'] = v),
-                  ),
-                ] else ...[
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: (p['themeId'] ?? 'ngmy').toString(),
-                    decoration: _dec('3D theme'),
-                    items: [...NgmyPopupDefaults.standardThemes, ...NgmyPopupDefaults.marketingThemes]
-                        .map((t) => DropdownMenuItem(value: t['id'] as String, child: Text(t['name'] as String)))
-                        .toList(),
-                    onChanged: (v) => setState(() => p['themeId'] = v),
-                  ),
+                  Switch(value: enabled, onChanged: (v) => setState(() => p['enabled'] = v), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
                 ],
+              ),
+              const Spacer(),
+              Text(isVideo ? 'Video ad' : (p['type'] ?? 'standard').toString(), style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 9)),
+              Text(enabled ? 'ON · tap to edit' : 'OFF', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 9, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openPopupEditor(Map<String, dynamic> p, {required bool isVideo}) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _NgmyPopupEditorSheet(
+        popup: p,
+        isVideo: isVideo,
+        isDark: widget.isDark,
+        onPreview: () => isVideo ? _previewVideo(p) : _preview3d(p),
+      ),
+    ).then((_) => setState(() {}));
+  }
+
+}
+
+class _NgmyPopupEditorSheet extends StatefulWidget {
+  final Map<String, dynamic> popup;
+  final bool isVideo;
+  final bool isDark;
+  final VoidCallback onPreview;
+
+  const _NgmyPopupEditorSheet({
+    required this.popup,
+    required this.isVideo,
+    required this.isDark,
+    required this.onPreview,
+  });
+
+  @override
+  State<_NgmyPopupEditorSheet> createState() => _NgmyPopupEditorSheetState();
+}
+
+class _NgmyPopupEditorSheetState extends State<_NgmyPopupEditorSheet> {
+  late final TextEditingController _titleC;
+  late final TextEditingController _subtitleC;
+  late final TextEditingController _linkC;
+  late final TextEditingController _linkLabelC;
+  late final TextEditingController _videoC;
+  late final TextEditingController _hourC;
+  late final TextEditingController _minuteC;
+  late final TextEditingController _intervalC;
+  late final TextEditingController _maxC;
+  late final TextEditingController _durationC;
+
+  Map<String, dynamic> get p => widget.popup;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleC = TextEditingController(text: (p['title'] ?? '').toString());
+    _subtitleC = TextEditingController(text: (p['subtitle'] ?? '').toString());
+    _linkC = TextEditingController(text: (p['linkUrl'] ?? '').toString());
+    _linkLabelC = TextEditingController(text: (p['linkLabel'] ?? 'Open Link').toString());
+    _videoC = TextEditingController(text: (p['videoUrl'] ?? '').toString());
+    _hourC = TextEditingController(text: '${p['firstShowHour'] ?? 7}');
+    _minuteC = TextEditingController(text: '${p['firstShowMinute'] ?? 0}');
+    _intervalC = TextEditingController(text: '${p['intervalHours'] ?? 3}');
+    _maxC = TextEditingController(text: '${p['maxPerDay'] ?? 1}');
+    _durationC = TextEditingController(text: '${p['durationMs'] ?? 7000}');
+  }
+
+  @override
+  void dispose() {
+    _titleC.dispose();
+    _subtitleC.dispose();
+    _linkC.dispose();
+    _linkLabelC.dispose();
+    _videoC.dispose();
+    _hourC.dispose();
+    _minuteC.dispose();
+    _intervalC.dispose();
+    _maxC.dispose();
+    _durationC.dispose();
+    super.dispose();
+  }
+
+  InputDecoration _dec(String label) => InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: widget.isDark ? const Color(0xFF1C1F2E) : Colors.white,
+      );
+
+  void _apply() {
+    p['title'] = _titleC.text.trim();
+    p['subtitle'] = _subtitleC.text.trim();
+    p['linkUrl'] = _linkC.text.trim();
+    p['linkLabel'] = _linkLabelC.text.trim();
+    p['videoUrl'] = _videoC.text.trim();
+    p['firstShowHour'] = int.tryParse(_hourC.text.trim()) ?? 7;
+    p['firstShowMinute'] = int.tryParse(_minuteC.text.trim()) ?? 0;
+    p['intervalHours'] = int.tryParse(_intervalC.text.trim()) ?? 3;
+    p['maxPerDay'] = int.tryParse(_maxC.text.trim()) ?? 1;
+    p['durationMs'] = int.tryParse(_durationC.text.trim()) ?? 7000;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final panel = widget.isDark ? const Color(0xFF0F111A) : Colors.white;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+        margin: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(22)),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text((p['title'] ?? 'Edit Pop Up').toString(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              TextField(controller: _titleC, decoration: _dec('Title')),
+              const SizedBox(height: 8),
+              TextField(controller: _subtitleC, decoration: _dec('Subtitle')),
+              const SizedBox(height: 8),
+              TextField(controller: _linkC, decoration: _dec('Link URL')),
+              const SizedBox(height: 8),
+              TextField(controller: _linkLabelC, decoration: _dec('Link label')),
+              if (widget.isVideo) ...[
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        decoration: _dec('First show hour (0-23)'),
-                        keyboardType: TextInputType.number,
-                        controller: TextEditingController(text: '${p['firstShowHour'] ?? 7}'),
-                        onChanged: (v) => p['firstShowHour'] = int.tryParse(v) ?? 7,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        decoration: _dec('Minute'),
-                        keyboardType: TextInputType.number,
-                        controller: TextEditingController(text: '${p['firstShowMinute'] ?? 0}'),
-                        onChanged: (v) => p['firstShowMinute'] = int.tryParse(v) ?? 0,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        decoration: _dec('Hours between shows'),
-                        keyboardType: TextInputType.number,
-                        controller: TextEditingController(text: '${p['intervalHours'] ?? 3}'),
-                        onChanged: (v) => p['intervalHours'] = int.tryParse(v) ?? 3,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        decoration: _dec('Max per day'),
-                        keyboardType: TextInputType.number,
-                        controller: TextEditingController(text: '${p['maxPerDay'] ?? 1}'),
-                        onChanged: (v) => p['maxPerDay'] = int.tryParse(v) ?? 1,
-                      ),
-                    ),
-                  ],
-                ),
+                TextField(controller: _videoC, decoration: _dec('Video URL')),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: (p['trigger'] ?? 'once_per_day').toString(),
-                  decoration: _dec('When to show'),
-                  items: const [
-                    DropdownMenuItem(value: 'every_app_open', child: Text('Every app open (up to max/day)')),
-                    DropdownMenuItem(value: 'once_per_day', child: Text('Once per day')),
-                    DropdownMenuItem(value: 'scheduled', child: Text('After scheduled time only')),
-                  ],
-                  onChanged: (v) => setState(() => p['trigger'] = v),
+                  value: (p['frameStyle'] ?? 'gold_luxury').toString(),
+                  decoration: _dec('Frame style'),
+                  items: NgmyPopupDefaults.videoFrameStyles
+                      .map((f) => DropdownMenuItem(value: f['id'] as String, child: Text(f['name'] as String)))
+                      .toList(),
+                  onChanged: (v) => setState(() => p['frameStyle'] = v),
                 ),
-                if (!isVideo) ...[
-                  const SizedBox(height: 8),
-                  TextField(
-                    decoration: _dec('Duration (ms)'),
-                    keyboardType: TextInputType.number,
-                    controller: TextEditingController(text: '${p['durationMs'] ?? 7000}'),
-                    onChanged: (v) => p['durationMs'] = int.tryParse(v) ?? 7000,
-                  ),
-                ],
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () => isVideo ? _previewVideo(p) : _preview3d(p),
-                      icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
-                      label: const Text('Preview'),
-                    ),
-                  ],
+              ] else ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: (p['themeId'] ?? 'ngmy').toString(),
+                  decoration: _dec('3D theme'),
+                  items: [...NgmyPopupDefaults.standardThemes, ...NgmyPopupDefaults.marketingThemes]
+                      .map((t) => DropdownMenuItem(value: t['id'] as String, child: Text(t['name'] as String)))
+                      .toList(),
+                  onChanged: (v) => setState(() => p['themeId'] = v),
                 ),
               ],
-            ),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: TextField(controller: _hourC, keyboardType: TextInputType.number, decoration: _dec('Start hour'))),
+                const SizedBox(width: 8),
+                Expanded(child: TextField(controller: _minuteC, keyboardType: TextInputType.number, decoration: _dec('Start minute'))),
+              ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: TextField(controller: _intervalC, keyboardType: TextInputType.number, decoration: _dec('Hours apart'))),
+                const SizedBox(width: 8),
+                Expanded(child: TextField(controller: _maxC, keyboardType: TextInputType.number, decoration: _dec('Max / day'))),
+              ]),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: (p['trigger'] ?? 'once_per_day').toString(),
+                decoration: _dec('When to show'),
+                items: const [
+                  DropdownMenuItem(value: 'every_app_open', child: Text('Every app open')),
+                  DropdownMenuItem(value: 'once_per_day', child: Text('Once per day')),
+                  DropdownMenuItem(value: 'scheduled', child: Text('After scheduled time')),
+                ],
+                onChanged: (v) => setState(() => p['trigger'] = v),
+              ),
+              if (!widget.isVideo) ...[
+                const SizedBox(height: 8),
+                TextField(controller: _durationC, keyboardType: TextInputType.number, decoration: _dec('Duration ms')),
+              ],
+              const SizedBox(height: 14),
+              Row(children: [
+                Expanded(child: OutlinedButton(onPressed: widget.onPreview, child: const Text('Preview'))),
+                const SizedBox(width: 10),
+                Expanded(child: FilledButton(onPressed: () { _apply(); Navigator.pop(context); }, child: const Text('Apply'))),
+              ]),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
