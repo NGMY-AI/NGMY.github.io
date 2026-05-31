@@ -202,3 +202,19 @@ Future<String?> ngmyFetchCurrentLocationLabel() async {
   final reading = await ngmyFetchCurrentGpsReading();
   return reading?.label;
 }
+
+/// Straight-line distance in miles (device GPS vs job site, store, etc.).
+double ngmyDistanceMiles(double lat1, double lng1, double lat2, double lng2) {
+  final meters = Geolocator.distanceBetween(lat1, lng1, lat2, lng2);
+  return meters / 1609.344;
+}
+
+bool ngmyIsWithinMiles({
+  required double fromLat,
+  required double fromLng,
+  required double toLat,
+  required double toLng,
+  double maxMiles = 3,
+}) {
+  return ngmyDistanceMiles(fromLat, fromLng, toLat, toLng) <= maxMiles;
+}

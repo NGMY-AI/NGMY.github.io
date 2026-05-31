@@ -1,6 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'ngmy_network_resilience.dart';
 
 const String _projectsKeyPrefix = 'ngmy_worksheets_projects_v2_';
 const String _familyTreesKeyPrefix = 'ngmy_worksheets_family_trees_v1_';
@@ -370,31 +375,42 @@ Future<void> deleteWorksheetProject(String userEmail, String projectId) async {
 
 Future<List<FamilyTree>> loadFamilyTrees(String userEmail) async {
   final prefs = await SharedPreferences.getInstance();
+  List<FamilyTree> local = [];
   final raw = prefs.getString(_familyTreesKey(userEmail));
-  if (raw == null || raw.isEmpty) return [];
-  try {
-    final list = jsonDecode(raw);
-    if (list is! List) return [];
-    return list
-        .whereType<Map>()
-        .map((e) => FamilyTree.fromJson(Map<String, dynamic>.from(e)))
-        .where((t) => t.id.isNotEmpty && t.name.isNotEmpty)
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-  } catch (_) {
-    return [];
+  if (raw != null && raw.isNotEmpty) {
+    try {
+      final list = jsonDecode(raw);
+      if (list is List) {
+        local = list
+            .whereType<Map>()
+            .map((e) => FamilyTree.fromJson(Map<String, dynamic>.from(e)))
+            .where((t) => t.id.isNotEmpty && t.name.isNotEmpty)
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      }
+    } catch (_) {}
   }
+
+  final remote = await _fetchFamilyTreesFromCloud(userEmail);
+  if (remote == null) return local;
+
+  final merged = _mergeFamilyTreeLists(local, remote);
+  final mergedJson = jsonEncode(merged.map((t) => t.toJson()).toList());
+  if (mergedJson != (raw ?? '')) {
+    await _persistFamilyTreesLocally(userEmail, merged);
+  }
+  if (local.isNotEmpty && remote.isEmpty) {
+    unawaited(_upsertFamilyTreesCloud(userEmail, merged));
+  }
+  return merged;
 }
 
 Future<void> saveFamilyTrees(
   String userEmail,
   List<FamilyTree> trees,
 ) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(
-    _familyTreesKey(userEmail),
-    jsonEncode(trees.map((t) => t.toJson()).toList()),
-  );
+  await _persistFamilyTreesLocally(userEmail, trees);
+  await _upsertFamilyTreesCloud(userEmail, trees);
 }
 
 Future<void> upsertFamilyTree(String userEmail, FamilyTree tree) async {
@@ -405,13 +421,15 @@ Future<void> upsertFamilyTree(String userEmail, FamilyTree tree) async {
   } else {
     list[idx] = tree;
   }
-  await saveFamilyTrees(userEmail, list);
+  await _persistFamilyTreesLocally(userEmail, list);
+  await _upsertFamilyTreeCloud(userEmail, tree);
 }
 
 Future<void> deleteFamilyTree(String userEmail, String treeId) async {
   final list = await loadFamilyTrees(userEmail);
   list.removeWhere((t) => t.id == treeId);
-  await saveFamilyTrees(userEmail, list);
+  await _persistFamilyTreesLocally(userEmail, list);
+  await _deleteFamilyTreeCloud(treeId);
 }
 
 List<FamilyMember> visibleMembers(FamilyTree tree) =>
@@ -439,4 +457,141 @@ int descendantCount(FamilyTree tree, String memberId) {
     count += descendantCount(tree, child.id);
   }
   return count;
+}
+
+String _normalizedEmail(String userEmail) => userEmail.toLowerCase().trim();
+
+Map<String, dynamic> _familyTreeRow(FamilyTree tree, String userEmail) {
+  final now = DateTime.now().toUtc().toIso8601String();
+  return {
+    'id': tree.id,
+    'userEmail': _normalizedEmail(userEmail),
+    'name': tree.name,
+    'code': tree.code,
+    'isPrivate': tree.isPrivate,
+    'collaboratorEmails': tree.collaboratorEmails,
+    'members': tree.members.map((e) => e.toJson()).toList(),
+    'createdAt': tree.createdAt.toUtc().toIso8601String(),
+    'updatedAt': now,
+  };
+}
+
+FamilyTree _familyTreeFromRow(Map<String, dynamic> row) {
+  final payload = Map<String, dynamic>.from(row);
+  if (payload['members'] is! List && row['data'] is Map) {
+    return FamilyTree.fromJson(Map<String, dynamic>.from(row['data'] as Map));
+  }
+  return FamilyTree.fromJson({
+    'id': row['id'],
+    'name': row['name'],
+    'code': row['code'],
+    'isPrivate': row['isPrivate'],
+    'collaboratorEmails': row['collaboratorEmails'],
+    'members': row['members'],
+    'createdAt': row['createdAt'],
+  });
+}
+
+bool _familyTreesTableMissing(Object error) {
+  return error.toString().contains("Could not find the table 'public.family_trees'");
+}
+
+Future<List<FamilyTree>?> _fetchFamilyTreesFromCloud(String userEmail) async {
+  if (!await ngmyCanReachCloud()) return null;
+  final email = _normalizedEmail(userEmail);
+  if (email.isEmpty) return null;
+  try {
+    final rows = await Supabase.instance.client
+        .from('family_trees')
+        .select()
+        .eq('userEmail', email)
+        .timeout(kNgmyCloudLoadTimeout);
+    if (rows == null) return null;
+    return (rows as List)
+        .map((e) => _familyTreeFromRow(Map<String, dynamic>.from(e as Map)))
+        .where((t) => t.id.isNotEmpty && t.name.isNotEmpty)
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  } catch (e) {
+    if (_familyTreesTableMissing(e)) {
+      debugPrint('[family_trees] table missing — run supabase/family_trees_table.sql');
+    } else {
+      debugPrint('[family_trees] fetch error: $e');
+    }
+    return null;
+  }
+}
+
+List<FamilyTree> _mergeFamilyTreeLists(List<FamilyTree> local, List<FamilyTree> remote) {
+  if (remote.isEmpty) return local;
+  if (local.isEmpty) return remote;
+  final byId = <String, FamilyTree>{};
+  for (final t in local) {
+    if (t.id.isNotEmpty) byId[t.id] = t;
+  }
+  for (final r in remote) {
+    if (r.id.isEmpty) continue;
+    final existing = byId[r.id];
+    if (existing == null) {
+      byId[r.id] = r;
+      continue;
+    }
+    if (r.members.length > existing.members.length) {
+      byId[r.id] = r;
+    } else if (r.members.length == existing.members.length && r.createdAt.isAfter(existing.createdAt)) {
+      byId[r.id] = r;
+    }
+  }
+  return byId.values.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+}
+
+Future<void> _persistFamilyTreesLocally(String userEmail, List<FamilyTree> trees) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString(
+    _familyTreesKey(userEmail),
+    jsonEncode(trees.map((t) => t.toJson()).toList()),
+  );
+}
+
+Future<bool> _upsertFamilyTreeCloud(String userEmail, FamilyTree tree) async {
+  if (!await ngmyCanReachCloud()) return false;
+  try {
+    await Supabase.instance.client
+        .from('family_trees')
+        .upsert(_familyTreeRow(tree, userEmail))
+        .timeout(kNgmyCloudWriteTimeout);
+    return true;
+  } catch (e) {
+    if (_familyTreesTableMissing(e)) {
+      debugPrint('[family_trees] table missing — run supabase/family_trees_table.sql');
+    } else {
+      debugPrint('[family_trees] upsert error: $e');
+    }
+    return false;
+  }
+}
+
+Future<bool> _upsertFamilyTreesCloud(String userEmail, List<FamilyTree> trees) async {
+  if (trees.isEmpty || !await ngmyCanReachCloud()) return false;
+  try {
+    final rows = trees.map((t) => _familyTreeRow(t, userEmail)).toList();
+    await Supabase.instance.client.from('family_trees').upsert(rows).timeout(kNgmyCloudWriteTimeout);
+    return true;
+  } catch (e) {
+    if (_familyTreesTableMissing(e)) {
+      debugPrint('[family_trees] table missing — run supabase/family_trees_table.sql');
+    } else {
+      debugPrint('[family_trees] bulk upsert error: $e');
+    }
+    return false;
+  }
+}
+
+Future<void> _deleteFamilyTreeCloud(String treeId) async {
+  if (treeId.isEmpty || !await ngmyCanReachCloud()) return;
+  try {
+    await Supabase.instance.client.from('family_trees').delete().eq('id', treeId);
+  } catch (e) {
+    debugPrint('[family_trees] delete error: $e');
+  }
 }

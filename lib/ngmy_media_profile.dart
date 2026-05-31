@@ -801,7 +801,8 @@ class NgmyMediaAdminPanel extends StatefulWidget {
   final List<dynamic> allUsers;
   final dynamic adminUser;
   final VoidCallback onDataChanged;
-  final Future<void> Function(dynamic post) persistPost;
+  final Future<bool> Function(dynamic post) persistPost;
+  final Future<bool> Function(dynamic user)? persistUser;
   final bool Function(dynamic post) isPostExpired;
   final bool isDark;
   final dynamic virtualProfilesRaw;
@@ -816,6 +817,7 @@ class NgmyMediaAdminPanel extends StatefulWidget {
     required this.adminUser,
     required this.onDataChanged,
     required this.persistPost,
+    this.persistUser,
     required this.isPostExpired,
     required this.isDark,
     required this.virtualProfilesRaw,
@@ -971,8 +973,18 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                             final n = int.tryParse(amtCtrl.text.trim()) ?? 0;
                             if (n <= 0) return;
                             NgmyMediaProfile.adminAddFollowers(u, n);
+                            final userOk = await widget.persistUser?.call(u) ?? true;
                             widget.onDataChanged();
                             setSheet(() {});
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(userOk
+                                      ? 'Added $n followers to ${u.username}.'
+                                      : 'Followers added locally but cloud sync failed. Run supabase/users_media_profile_columns.sql.'),
+                                ),
+                              );
+                            }
                           },
                           child: Column(
                             children: [
@@ -1440,7 +1452,7 @@ class _AdminPostCard extends StatefulWidget {
   final dynamic post;
   final bool isDark;
   final VoidCallback onDataChanged;
-  final Future<void> Function(dynamic post) persistPost;
+  final Future<bool> Function(dynamic post) persistPost;
   final List<Map<String, dynamic>> virtualProfiles;
   final Map<String, dynamic> Function() pickVirtualProfile;
   final Future<String> Function(String rawUrl) resolveMediaUrl;
@@ -1502,8 +1514,14 @@ class _AdminPostCardState extends State<_AdminPostCard> {
     }
     (widget.post as dynamic).likedBy = liked;
     widget.post.likes = liked.length;
-    await widget.persistPost(widget.post);
+    final ok = await widget.persistPost(widget.post);
+    if (!ok) {
+      _snack('Could not save likes to the database. Check Supabase media table.');
+      return;
+    }
+    if (mounted) setState(() {});
     widget.onDataChanged();
+    _snack('Added $count like(s).');
   }
 
   Future<void> _addBulkComments(int count) async {
@@ -1527,7 +1545,12 @@ class _AdminPostCardState extends State<_AdminPostCard> {
       return;
     }
     (widget.post as dynamic).comments = comments;
-    await widget.persistPost(widget.post);
+    final ok = await widget.persistPost(widget.post);
+    if (!ok) {
+      _snack('Could not save comments. Run supabase/media_tables.sql in Supabase.');
+      return;
+    }
+    if (mounted) setState(() {});
     widget.onDataChanged();
     _snack('Added $added comment(s) from demo profiles.');
   }
@@ -1558,7 +1581,12 @@ class _AdminPostCardState extends State<_AdminPostCard> {
     final comments = NgmyMediaProfile.asMapList((widget.post as dynamic).comments);
     comments.add(_commentFromProfile(profile, text));
     (widget.post as dynamic).comments = comments;
-    await widget.persistPost(widget.post);
+    final ok = await widget.persistPost(widget.post);
+    if (!ok) {
+      _snack('Could not save comment. Run supabase/media_tables.sql in Supabase.');
+      return;
+    }
+    if (mounted) setState(() {});
     widget.onDataChanged();
     _commentTextCtrl.clear();
     _snack('Comment posted as @${profile['username']}.');

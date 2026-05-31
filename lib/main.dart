@@ -610,7 +610,42 @@ List<Map<String, dynamic>> _mergeCivicRegistrarApplications(
     }
   }
   return byId.values.toList()
+      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+}
+
+List<Map<String, dynamic>> _mergeJobPostsLists(
+  List<Map<String, dynamic>> local,
+  List<Map<String, dynamic>> remote,
+) {
+  if (remote.isEmpty) return local.map((e) => Map<String, dynamic>.from(e)).toList();
+  if (local.isEmpty) return remote.map((e) => Map<String, dynamic>.from(e)).toList();
+  final byId = <String, Map<String, dynamic>>{};
+  for (final a in local) {
+    final id = (a['id'] ?? '').toString();
+    if (id.isNotEmpty) byId[id] = Map<String, dynamic>.from(a);
+  }
+  for (final a in remote) {
+    final id = (a['id'] ?? '').toString();
+    if (id.isEmpty) continue;
+    final r = Map<String, dynamic>.from(a);
+    final existing = byId[id];
+    if (existing == null) {
+      byId[id] = r;
+      continue;
+    }
+    final rc = (r['createdAt'] ?? r['completedAt'] ?? '').toString();
+    final ec = (existing['createdAt'] ?? existing['completedAt'] ?? '').toString();
+    byId[id] = rc.compareTo(ec) >= 0 ? r : existing;
+  }
+  return byId.values.toList()
     ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+}
+
+List<Map<String, dynamic>> _mergeJobWorkerApplicationsLists(
+  List<Map<String, dynamic>> local,
+  List<Map<String, dynamic>> remote,
+) {
+  return _mergeCivicRegistrarApplications(local, remote);
 }
 
 /// Keeps local civic/game admin settings when Supabase row is missing jsonb columns.
@@ -680,25 +715,97 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     next.civicRegistrarApplications =
         keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
   }
+
+  if (record.containsKey('jobPosts') && record['jobPosts'] is List) {
+    final remoteJobs = (record['jobPosts'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    if (remoteJobs.isNotEmpty) {
+      next.jobPosts = _mergeJobPostsLists(keep.jobPosts, remoteJobs);
+    } else if (keep.jobPosts.isNotEmpty) {
+      next.jobPosts = keep.jobPosts.map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+  } else if (keep.jobPosts.isNotEmpty) {
+    next.jobPosts = keep.jobPosts.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  if (record.containsKey('jobWorkerApplications') && record['jobWorkerApplications'] is List) {
+    final remoteApps = (record['jobWorkerApplications'] as List)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    if (remoteApps.isNotEmpty) {
+      next.jobWorkerApplications = _mergeJobWorkerApplicationsLists(keep.jobWorkerApplications, remoteApps);
+    } else if (keep.jobWorkerApplications.isNotEmpty) {
+      next.jobWorkerApplications =
+          keep.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+  } else if (keep.jobWorkerApplications.isNotEmpty) {
+    next.jobWorkerApplications =
+        keep.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
 }
 
 Future<void> _persistCriticalConfigFields(AppConfig config) async {
   if (!await ngmyCanReachCloud()) return;
   final client = Supabase.instance.client;
-  final payloads = <Map<String, dynamic>>[
+  final combined = <String, dynamic>{
+    'id': 1,
+    'gameTimeLimits': config.gameTimeLimits,
+    'diceSettings': config.diceSettings,
+    'gameInvites': config.gameInvites,
+    'civicRegistryPin': config.civicRegistryPin,
+    'civicRegistryPinsByState': config.civicRegistryPinsByState,
+    'civicRegistrarApplications': config.civicRegistrarApplications,
+    'jobPosts': config.jobPosts,
+    'jobWorkerApplications': config.jobWorkerApplications,
+  };
+  try {
+    await client.from('config').upsert(combined);
+    return;
+  } catch (e) {
+    debugPrint('[config] combined critical upsert: $e');
+  }
+  for (final row in [
     {'id': 1, 'gameTimeLimits': config.gameTimeLimits},
     {'id': 1, 'diceSettings': config.diceSettings},
     {'id': 1, 'gameInvites': config.gameInvites},
     {'id': 1, 'civicRegistryPin': config.civicRegistryPin},
     {'id': 1, 'civicRegistryPinsByState': config.civicRegistryPinsByState},
     {'id': 1, 'civicRegistrarApplications': config.civicRegistrarApplications},
-  ];
-  for (final row in payloads) {
+    {'id': 1, 'jobPosts': config.jobPosts},
+    {'id': 1, 'jobWorkerApplications': config.jobWorkerApplications},
+  ]) {
     try {
       await client.from('config').upsert(row);
     } catch (e) {
       debugPrint('[config] persist ${row.keys.where((k) => k != 'id').join(', ')}: $e');
     }
+  }
+}
+
+Future<void> ngmyFlushCriticalConfigLocalAndCloud(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_config', jsonEncode(config.toJson()));
+  } catch (e) {
+    debugPrint('[config] local flush: $e');
+  }
+  await _persistCriticalConfigFields(config);
+}
+
+Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
+  if (!await ngmyCanReachCloud()) return;
+  try {
+    await Supabase.instance.client.from('transactions').upsert(Map<String, dynamic>.from(t.toJson()));
+  } catch (e) {
+    debugPrint('[txn] fast upsert: $e');
+  }
+}
+
+Future<void> _pushUserToCloudFast(UserData u) async {
+  if (!await ngmyCanReachCloud()) return;
+  try {
+    await Supabase.instance.client.from('users').upsert(Map<String, dynamic>.from(u.toJson()));
+  } catch (e) {
+    debugPrint('[user] fast upsert: $e');
   }
 }
 
@@ -2841,6 +2948,8 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   row['civicRegistryPin'] = config.civicRegistryPin;
   row['civicRegistryPinsByState'] = config.civicRegistryPinsByState;
   row['civicRegistrarApplications'] = config.civicRegistrarApplications;
+  row['jobPosts'] = config.jobPosts;
+  row['jobWorkerApplications'] = config.jobWorkerApplications;
   if (isAdmin) {
     row['termsAndConditions'] = config.termsAndConditions;
     row['privacyPolicy'] = config.privacyPolicy;
@@ -3353,6 +3462,30 @@ class _NGMYAppState extends State<NGMYApp> {
 
   String _appConfigSig(AppConfig c) => jsonEncode(c.toJson());
 
+  void _onDataChanged() {
+    unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config));
+    unawaited(_saveData());
+  }
+
+  void _applyIncomingApprovedTransaction(AppTransaction t, {required bool isNew}) {
+    if (!isNew || t.status != TransactionStatus.approved) return;
+    final userKey = t.userEmail.toLowerCase().trim();
+    if (userKey.isEmpty) return;
+    final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
+    if (userIdx == -1) return;
+    ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], t);
+    if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
+      _currentUser = _allUsers[userIdx];
+    }
+  }
+
+  Future<void> _persistAnnouncementsLocally() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('all_announcements', jsonEncode(_allAnnouncements.map((e) => e.toJson()).toList()));
+    } catch (_) {}
+  }
+
   List<Map<String, dynamic>> _mergeLoanApplicationsLists(
     List<Map<String, dynamic>> local,
     List<Map<String, dynamic>> remote,
@@ -3402,7 +3535,7 @@ class _NGMYAppState extends State<NGMYApp> {
         final keepLoans = List<Map<String, dynamic>>.from(_config.loanApplications.map((e) => Map<String, dynamic>.from(e)));
         final keepChatClosed = _config.ngmyChatClosed;
         final cfgMap = Map<String, dynamic>.from(cfg);
-        final keepConfig = _config;
+        final keepConfig = AppConfig.fromJson(_config.toJson());
         final next = AppConfig.fromJson(cfgMap);
         _applyRemoteConfigMerge(next, cfgMap, keepConfig);
         _applyNgmyChatClosedFromRemote(next, cfgMap, localClosed: keepChatClosed);
@@ -4030,7 +4163,6 @@ class _NGMYAppState extends State<NGMYApp> {
   }
 
   void _onAnnouncementsChange(PostgresChangePayload payload) {
-    if (_isSyncing) return;
     try {
       if (payload.eventType == PostgresChangeEvent.delete) {
         final id = (payload.oldRecord['id'] ?? '').toString();
@@ -4048,6 +4180,7 @@ class _NGMYAppState extends State<NGMYApp> {
             _allAnnouncements[idx] = ann;
           }
         });
+        unawaited(_persistAnnouncementsLocally());
         if (isNew && !_seenRealtimeAnnouncementIds.contains(ann.id)) {
           _seenRealtimeAnnouncementIds.add(ann.id);
           _pushInAppNotification(
@@ -4084,7 +4217,6 @@ class _NGMYAppState extends State<NGMYApp> {
   }
 
   void _onConfigChange(PostgresChangePayload payload) {
-    if (_isSyncing) return;
     try {
       if (payload.eventType != PostgresChangeEvent.delete) {
         final keepListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
@@ -4097,7 +4229,7 @@ class _NGMYAppState extends State<NGMYApp> {
         final keepGeminiKey = _config.geminiApiKey.trim();
         final remoteGemini = _geminiKeyFromMap(Map<String, dynamic>.from(payload.newRecord));
         final record = Map<String, dynamic>.from(payload.newRecord);
-        final keepConfig = _config;
+        final keepConfig = AppConfig.fromJson(_config.toJson());
         final next = AppConfig.fromJson(record);
         _applyRemoteConfigMerge(next, record, keepConfig);
         _applyRemoteLegalToConfig(next, record);
@@ -4116,6 +4248,19 @@ class _NGMYAppState extends State<NGMYApp> {
         } else {
           next.loanApplications = _mergeLoanApplicationsLists(keepLoans, next.loanApplications);
         }
+        final keepJobPosts = List<Map<String, dynamic>>.from(_config.jobPosts.map((e) => Map<String, dynamic>.from(e)));
+        final keepJobWorkerApps =
+            List<Map<String, dynamic>>.from(_config.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)));
+        if (next.jobPosts.isEmpty && keepJobPosts.isNotEmpty) {
+          next.jobPosts = keepJobPosts;
+        } else {
+          next.jobPosts = _mergeJobPostsLists(keepJobPosts, next.jobPosts);
+        }
+        if (next.jobWorkerApplications.isEmpty && keepJobWorkerApps.isNotEmpty) {
+          next.jobWorkerApplications = keepJobWorkerApps;
+        } else {
+          next.jobWorkerApplications = _mergeJobWorkerApplicationsLists(keepJobWorkerApps, next.jobWorkerApplications);
+        }
         final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
         final remotePopups = (record['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -4127,31 +4272,43 @@ class _NGMYAppState extends State<NGMYApp> {
         } else if (next.geminiApiKey.trim().isEmpty && keepGeminiKey.isNotEmpty) {
           next.geminiApiKey = keepGeminiKey;
         }
+        if (_appConfigSig(_config) != _appConfigSig(next)) {
+          _notifySellerOfNewStoreOrders(_config, next);
+          setState(() => _config = next);
+          SharedPreferences.getInstance().then((prefs) {
+            prefs.setString('app_config', jsonEncode(_config.toJson()));
+          }).catchError((_) {});
+        }
         unawaited(() async {
           final legal = await _fetchAuthoritativeLegalContent();
           final remotePlans = await _fetchAuthoritativeInvestmentPlans();
           final terms = (legal['terms'] ?? '').trim();
           final privacy = (legal['privacy'] ?? '').trim();
-          if (terms.isNotEmpty) next.termsAndConditions = terms;
-          if (privacy.isNotEmpty) next.privacyPolicy = privacy;
-          if (remotePlans.isNotEmpty) {
-            next.investmentPlans = remotePlans;
-          } else if (next.investmentPlans.isEmpty && keepPlans.isNotEmpty) {
-            next.investmentPlans = keepPlans;
-          }
-          final plansSigBefore = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
-          if (next.investmentPlans.isNotEmpty) {
-            _globalPlans = _investmentPlansFromMaps(next.investmentPlans);
-          }
           if (!mounted) return;
-          final plansSigAfter = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
-          if (_appConfigSig(_config) == _appConfigSig(next) && plansSigBefore == plansSigAfter) return;
-          _notifySellerOfNewStoreOrders(_config, next);
-          setState(() => _config = next);
-          SharedPreferences.getInstance().then((prefs) {
-            prefs.setString('app_config', jsonEncode(_config.toJson()));
-            prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
-          }).catchError((_) {});
+          var changed = false;
+          if (terms.isNotEmpty && _config.termsAndConditions != terms) {
+            _config.termsAndConditions = terms;
+            changed = true;
+          }
+          if (privacy.isNotEmpty && _config.privacyPolicy != privacy) {
+            _config.privacyPolicy = privacy;
+            changed = true;
+          }
+          if (remotePlans.isNotEmpty) {
+            _config.investmentPlans = remotePlans;
+            _globalPlans = _investmentPlansFromMaps(remotePlans);
+            changed = true;
+          } else if (_config.investmentPlans.isEmpty && keepPlans.isNotEmpty) {
+            _config.investmentPlans = keepPlans;
+            changed = true;
+          }
+          if (changed && mounted) {
+            setState(() {});
+            SharedPreferences.getInstance().then((prefs) {
+              prefs.setString('app_config', jsonEncode(_config.toJson()));
+              prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
+            }).catchError((_) {});
+          }
         }());
       }
     } catch (e) {
@@ -4229,7 +4386,6 @@ class _NGMYAppState extends State<NGMYApp> {
   }
 
   void _onUsersChange(PostgresChangePayload payload) {
-    if (_isSyncing) return;
     try {
       if (payload.eventType == PostgresChangeEvent.delete) {
         final email = (payload.oldRecord['email'] ?? '').toString().toLowerCase().trim();
@@ -4262,7 +4418,6 @@ class _NGMYAppState extends State<NGMYApp> {
   }
 
   void _onTransactionsChange(PostgresChangePayload payload) {
-    if (_isSyncing) return;
     try {
       if (payload.eventType == PostgresChangeEvent.delete) {
         final id = (payload.oldRecord['id'] ?? '').toString();
@@ -4292,6 +4447,25 @@ class _NGMYAppState extends State<NGMYApp> {
     }
     if (local.activeInvestment != null && remote.activeInvestment == null) {
       remote.activeInvestment = local.activeInvestment;
+    }
+    if (local.mediaFollowers.length > remote.mediaFollowers.length) {
+      remote.mediaFollowers = List<String>.from(local.mediaFollowers);
+    }
+    if (local.mediaFollowing.length > remote.mediaFollowing.length) {
+      remote.mediaFollowing = List<String>.from(local.mediaFollowing);
+    }
+    if ((local.mediaBio ?? '').trim().isNotEmpty && (remote.mediaBio ?? '').trim().isEmpty) {
+      remote.mediaBio = local.mediaBio;
+    }
+    if (local.mediaHighlights.isNotEmpty && remote.mediaHighlights.isEmpty) {
+      remote.mediaHighlights = List<Map<String, dynamic>>.from(
+        local.mediaHighlights.map((e) => Map<String, dynamic>.from(e)),
+      );
+    }
+    if (local.mediaStories.isNotEmpty && remote.mediaStories.isEmpty) {
+      remote.mediaStories = List<Map<String, dynamic>>.from(
+        local.mediaStories.map((e) => Map<String, dynamic>.from(e)),
+      );
     }
   }
 
@@ -4663,6 +4837,7 @@ class _NGMYAppState extends State<NGMYApp> {
       await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
       await prefs.setString('all_announcements', jsonEncode(_allAnnouncements.map((e) => e.toJson()).toList()));
       await _persistLocalSnapshot();
+      unawaited(_persistCriticalConfigFields(_config));
 
       if (online) {
       await ngmyIgnoreTimeout(() async {
@@ -4729,7 +4904,7 @@ class _NGMYAppState extends State<NGMYApp> {
 
     } catch (e) { debugPrint("Save error: $e"); }
     finally {
-      Future.delayed(const Duration(milliseconds: 800), () => _isSyncing = false);
+      Future.delayed(const Duration(milliseconds: 200), () => _isSyncing = false);
     }
   }
 
@@ -4950,14 +5125,16 @@ class _NGMYAppState extends State<NGMYApp> {
                   } catch (_) {}
                   setState(() => _currentUser = null);
                 },
-                onDataChanged: () => _saveData(),
+                onDataChanged: _onDataChanged,
                 onAddTransaction: (t) {
+                  UserData? syncedUser;
                   setState(() {
                     _allTransactions.add(t);
                     final userKey = t.userEmail.toLowerCase().trim();
                     final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
                     if (userIdx != -1) {
                       ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], t);
+                      syncedUser = _allUsers[userIdx];
                       if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
                         _currentUser = _allUsers[userIdx];
                       }
@@ -4972,10 +5149,14 @@ class _NGMYAppState extends State<NGMYApp> {
                       }
                     }
                   });
-                  _saveData();
+                  unawaited(_pushTransactionToCloudFast(t));
+                  if (syncedUser != null) unawaited(_pushUserToCloudFast(syncedUser!));
+                  unawaited(_saveData());
                   _notifyTransactionEvent(t);
                 },
-                onProcessTransaction: (t, approve) { setState(() {
+                onProcessTransaction: (t, approve) {
+                  UserData? syncedUser;
+                  setState(() {
                   t.status = approve ? TransactionStatus.approved : TransactionStatus.rejected;
                   final targetIndex = _allUsers.indexWhere((u) => u.email == t.userEmail);
                   if (targetIndex == -1) return;
@@ -5025,8 +5206,14 @@ class _NGMYAppState extends State<NGMYApp> {
                       targetUser.accountBalance += t.amount;
                     }
                   }
+                  syncedUser = targetUser;
                   if (_currentUser != null && _currentUser!.email == t.userEmail) _currentUser = targetUser;
-                }); _saveData(); _notifyTransactionEvent(t, statusChanged: true); },
+                });
+                  unawaited(_pushTransactionToCloudFast(t));
+                  if (syncedUser != null) unawaited(_pushUserToCloudFast(syncedUser!));
+                  unawaited(_saveData());
+                  _notifyTransactionEvent(t, statusChanged: true);
+                },
                 onAddPlan: (p) {
                   setState(() {
                     _globalPlans.add(p);
@@ -5059,9 +5246,10 @@ class _NGMYAppState extends State<NGMYApp> {
                 onSavePopups: _savePopupsSettingsToCloud,
                 onUploadPopupVideo: _uploadPopupVideoRef,
                 onAddAnnouncement: (ann) {
-                  setState(() => _allAnnouncements.insert(0, ann));
-                  _upsertAnnouncement(ann);
-                  _saveData();
+                  setState(() => _allAnnouncements.add(ann));
+                  unawaited(_upsertAnnouncement(ann));
+                  unawaited(_persistAnnouncementsLocally());
+                  unawaited(_saveData());
                 },
               onDeleteAnnouncement: (id) {
                 setState(() => _allAnnouncements.removeWhere((a) => a.id == id));
@@ -9748,7 +9936,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
             allUsers: widget.allUsers,
             adminUser: widget.user,
             onDataChanged: widget.onDataChanged,
-            persistPost: (p) async => _upsertMediaRowSafe(Map<String, dynamic>.from(p.toJson())),
+            persistPost: (p) async {
+              final ok = await _upsertMediaRowSafe(Map<String, dynamic>.from(p.toJson()));
+              if (ok) {
+                try {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('all_media', jsonEncode(widget.allMedia.map((e) => e.toJson()).toList()));
+                } catch (_) {}
+              }
+              return ok;
+            },
+            persistUser: (u) async {
+              if (u is! UserData) return false;
+              await _pushUserToCloudFast(u);
+              return true;
+            },
             isPostExpired: (m) => DateTime.now().difference(m.timestamp).inDays >= 7,
             isDark: isDark,
             virtualProfilesRaw: (widget.config as dynamic).mediaVirtualProfiles,
@@ -24602,163 +24804,452 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     String workType = isEdit ? (editJob['workType'] ?? 'On-site').toString() : 'On-site';
     String urgency = isEdit ? (editJob['urgency'] ?? 'Normal').toString() : 'Normal';
     String imageRef = isEdit ? (editJob['imageRef'] ?? '').toString() : '';
+    double? workLat = isEdit ? (editJob['workLat'] as num?)?.toDouble() : null;
+    double? workLng = isEdit ? (editJob['workLng'] as num?)?.toDouble() : null;
+    var gpsLoading = false;
+
+    void submitJob(BuildContext ctx) {
+      if (titleC.text.trim().isEmpty || contactC.text.trim().isEmpty || addressC.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Title, contact, and address are required.')),
+        );
+        return;
+      }
+      if (workType != 'Remote' && (workLat == null || workLng == null)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tap Share location to pin where the work will be done.')),
+        );
+        return;
+      }
+      final budget = double.tryParse(budgetC.text.trim()) ?? 0;
+      if (isEdit) {
+        final id = (editJob!['id'] ?? '').toString();
+        final idx = _jobs.indexWhere((j) => (j['id'] ?? '').toString() == id);
+        if (idx < 0) {
+          Navigator.pop(ctx);
+          return;
+        }
+        final existing = Map<String, dynamic>.from(_jobs[idx]);
+        existing['title'] = titleC.text.trim();
+        existing['description'] = descC.text.trim();
+        existing['category'] = category;
+        existing['workType'] = workType;
+        existing['urgency'] = urgency;
+        existing['contact'] = contactC.text.trim();
+        existing['preferredTime'] = whenC.text.trim();
+        existing['address'] = addressC.text.trim();
+        existing['budget'] = budget;
+        existing['imageRef'] = imageRef;
+        existing['agreedPrice'] = budget;
+        existing['workLat'] = workLat;
+        existing['workLng'] = workLng;
+        existing['workLocationSharedAt'] = DateTime.now().toIso8601String();
+        _jobs[idx] = existing;
+      } else {
+        _jobs.add({
+          'id': DateTime.now().microsecondsSinceEpoch.toString(),
+          'ownerEmail': widget.user.email,
+          'ownerName': widget.user.username,
+          'title': titleC.text.trim(),
+          'description': descC.text.trim(),
+          'category': category,
+          'workType': workType,
+          'urgency': urgency,
+          'contact': contactC.text.trim(),
+          'preferredTime': whenC.text.trim(),
+          'address': addressC.text.trim(),
+          'budget': budget,
+          'imageRef': imageRef,
+          'workLat': workLat,
+          'workLng': workLng,
+          'workLocationSharedAt': DateTime.now().toIso8601String(),
+          'status': 'open',
+          'offers': <Map<String, dynamic>>[],
+          'claimedByEmail': '',
+          'claimedByName': '',
+          'agreedPrice': budget,
+          'createdAt': DateTime.now().toIso8601String(),
+          'completedAt': '',
+        });
+      }
+      _saveJobs();
+      Navigator.pop(ctx);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isEdit ? 'Job updated and saved.' : 'Job posted and saved to the marketplace.')),
+      );
+    }
 
     await showDialog(
       context: context,
+      barrierColor: Colors.black54,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialog) => AlertDialog(
-          title: Text(isEdit ? 'Edit Job' : 'Post New Job'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Job title')),
-                TextField(controller: descC, maxLines: 3, decoration: const InputDecoration(labelText: 'Job details')),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: category,
-                        decoration: const InputDecoration(labelText: 'Category'),
-                        items: const [
-                          DropdownMenuItem(value: 'General Service', child: Text('General Service')),
-                          DropdownMenuItem(value: 'Electrical', child: Text('Electrical')),
-                          DropdownMenuItem(value: 'Plumbing', child: Text('Plumbing')),
-                          DropdownMenuItem(value: 'Cleaning', child: Text('Cleaning')),
-                          DropdownMenuItem(value: 'Carpentry', child: Text('Carpentry')),
-                          DropdownMenuItem(value: 'Delivery', child: Text('Delivery')),
-                        ],
-                        onChanged: (v) => setDialog(() => category = v ?? 'General Service'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: workType,
-                        decoration: const InputDecoration(labelText: 'Work Type'),
-                        items: const [
-                          DropdownMenuItem(value: 'On-site', child: Text('On-site')),
-                          DropdownMenuItem(value: 'Remote', child: Text('Remote')),
-                          DropdownMenuItem(value: 'Hybrid', child: Text('Hybrid')),
-                        ],
-                        onChanged: (v) => setDialog(() => workType = v ?? 'On-site'),
-                      ),
-                    ),
-                  ],
+        builder: (ctx, setDialog) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          const accent = Color(0xFFFF5722);
+          const accentDark = Color(0xFFE64A19);
+          final panelBg = isDark ? const Color(0xFF101827) : Colors.white;
+          final fill = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+          final border = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+          final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+
+          InputDecoration dec(String label, {String? hint, IconData? icon, int maxLines = 1}) => InputDecoration(
+                labelText: label,
+                hintText: hint,
+                prefixIcon: icon != null ? Icon(icon, size: 20, color: accent) : null,
+                filled: true,
+                fillColor: fill,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: border)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: border)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: accent, width: 1.5),
                 ),
-                const SizedBox(height: 8),
-                TextField(controller: contactC, decoration: const InputDecoration(labelText: 'Phone or Email')),
-                TextField(controller: whenC, decoration: const InputDecoration(labelText: 'When do you need it done?')),
-                TextField(controller: addressC, decoration: const InputDecoration(labelText: 'Workplace address')),
-                TextField(controller: budgetC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Budget (\$)')),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: urgency,
-                  decoration: const InputDecoration(labelText: 'Urgency'),
-                  items: const [
-                    DropdownMenuItem(value: 'Low', child: Text('Low')),
-                    DropdownMenuItem(value: 'Normal', child: Text('Normal')),
-                    DropdownMenuItem(value: 'Urgent', child: Text('Urgent')),
-                  ],
-                  onChanged: (v) => setDialog(() => urgency = v ?? 'Normal'),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final img = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 78, maxWidth: 1200);
-                          if (img == null) return;
-                          if (kIsWeb) {
-                            final bytes = await img.readAsBytes();
-                            imageRef = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-                          } else {
-                            imageRef = img.path;
-                          }
-                          setDialog(() {});
-                        },
-                        icon: const Icon(Icons.photo),
-                        label: const Text('Add Picture'),
-                      ),
-                    ),
-                  ],
-                ),
-                if (imageRef.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 110,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      image: DecorationImage(image: _jobImage(imageRef)!, fit: BoxFit.cover),
-                    ),
+                labelStyle: TextStyle(color: muted, fontWeight: FontWeight.w600, fontSize: 13),
+              );
+
+          Widget sectionLabel(String text) => Padding(
+                padding: const EdgeInsets.only(bottom: 8, top: 4),
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                    color: muted,
                   ),
-                ],
-              ],
+                ),
+              );
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520, maxHeight: 720),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Material(
+                  color: panelBg,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(20, 20, 16, 18),
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [accent, accentDark],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.18),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                isEdit ? Icons.edit_note_rounded : Icons.post_add_rounded,
+                                color: Colors.white,
+                                size: 26,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isEdit ? 'Edit Job' : 'Post New Job',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    isEdit
+                                        ? 'Update your listing details'
+                                        : 'Share what you need — workers can find it instantly',
+                                    style: TextStyle(color: Colors.white.withOpacity(0.88), fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              icon: const Icon(Icons.close_rounded, color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              sectionLabel('JOB DETAILS'),
+                              TextField(
+                                controller: titleC,
+                                decoration: dec('Job title *', hint: 'e.g. Fix kitchen sink', icon: Icons.work_outline_rounded),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: descC,
+                                maxLines: 3,
+                                decoration: dec(
+                                  'Description',
+                                  hint: 'Describe the work, tools needed, etc.',
+                                  icon: Icons.notes_rounded,
+                                  maxLines: 3,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              sectionLabel('CATEGORY & TYPE'),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      initialValue: category,
+                                      decoration: dec('Category'),
+                                      items: const [
+                                        DropdownMenuItem(value: 'General Service', child: Text('General')),
+                                        DropdownMenuItem(value: 'Electrical', child: Text('Electrical')),
+                                        DropdownMenuItem(value: 'Plumbing', child: Text('Plumbing')),
+                                        DropdownMenuItem(value: 'Cleaning', child: Text('Cleaning')),
+                                        DropdownMenuItem(value: 'Carpentry', child: Text('Carpentry')),
+                                        DropdownMenuItem(value: 'Delivery', child: Text('Delivery')),
+                                      ],
+                                      onChanged: (v) => setDialog(() => category = v ?? 'General Service'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      initialValue: workType,
+                                      decoration: dec('Work type'),
+                                      items: const [
+                                        DropdownMenuItem(value: 'On-site', child: Text('On-site')),
+                                        DropdownMenuItem(value: 'Remote', child: Text('Remote')),
+                                        DropdownMenuItem(value: 'Hybrid', child: Text('Hybrid')),
+                                      ],
+                                      onChanged: (v) => setDialog(() => workType = v ?? 'On-site'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                initialValue: urgency,
+                                decoration: dec('Urgency', icon: Icons.schedule_rounded),
+                                items: const [
+                                  DropdownMenuItem(value: 'Low', child: Text('Low priority')),
+                                  DropdownMenuItem(value: 'Normal', child: Text('Normal')),
+                                  DropdownMenuItem(value: 'Urgent', child: Text('Urgent')),
+                                ],
+                                onChanged: (v) => setDialog(() => urgency = v ?? 'Normal'),
+                              ),
+                              const SizedBox(height: 16),
+                              sectionLabel('CONTACT & LOCATION'),
+                              TextField(
+                                controller: contactC,
+                                decoration: dec('Phone or email *', icon: Icons.phone_outlined),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: whenC,
+                                decoration: dec('When needed?', hint: 'e.g. This weekend', icon: Icons.event_rounded),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: addressC,
+                                      decoration: dec('Work address *', icon: Icons.location_on_outlined),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton.filled(
+                                    tooltip: 'Share live GPS for work site',
+                                    onPressed: gpsLoading
+                                        ? null
+                                        : () async {
+                                            setDialog(() => gpsLoading = true);
+                                            final result = await ngmyFetchCurrentGpsDetailed();
+                                            if (!ctx.mounted) return;
+                                            setDialog(() => gpsLoading = false);
+                                            final reading = result.reading;
+                                            if (reading == null) {
+                                              final msg = result.failure != null
+                                                  ? ngmyGpsFailureMessage(result.failure!)
+                                                  : 'Could not get GPS. Allow location when prompted.';
+                                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                                              return;
+                                            }
+                                            addressC.text = reading.label;
+                                            workLat = reading.lat;
+                                            workLng = reading.lng;
+                                            setDialog(() {});
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('Work location pinned from GPS.')),
+                                            );
+                                          },
+                                    icon: gpsLoading
+                                        ? const SizedBox(
+                                            width: 22,
+                                            height: 22,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                          )
+                                        : const Icon(Icons.my_location_rounded),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: accent,
+                                      foregroundColor: Colors.white,
+                                      minimumSize: const Size(52, 52),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (workLat != null && workLng != null) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Icon(Icons.gps_fixed_rounded, size: 14, color: accent),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Work site GPS pinned • ${ngmyFormatCoords(workLat!, workLng!)}',
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: muted),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: budgetC,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: dec('Budget (\$)', hint: '0.00', icon: Icons.attach_money_rounded),
+                              ),
+                              const SizedBox(height: 16),
+                              sectionLabel('PHOTO (OPTIONAL)'),
+                              InkWell(
+                                onTap: () async {
+                                  final img = await _picker.pickImage(
+                                    source: ImageSource.gallery,
+                                    imageQuality: 78,
+                                    maxWidth: 1200,
+                                  );
+                                  if (img == null) return;
+                                  if (kIsWeb) {
+                                    final bytes = await img.readAsBytes();
+                                    imageRef = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                                  } else {
+                                    imageRef = img.path;
+                                  }
+                                  setDialog(() {});
+                                },
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  width: double.infinity,
+                                  height: imageRef.isEmpty ? 110 : 140,
+                                  decoration: BoxDecoration(
+                                    color: fill,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: imageRef.isEmpty ? border : accent.withOpacity(0.5),
+                                      width: imageRef.isEmpty ? 1.5 : 2,
+                                    ),
+                                  ),
+                                  child: imageRef.isEmpty
+                                      ? Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.add_photo_alternate_outlined, color: accent.withOpacity(0.85), size: 32),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              'Tap to add a photo',
+                                              style: TextStyle(color: muted, fontWeight: FontWeight.w600, fontSize: 13),
+                                            ),
+                                          ],
+                                        )
+                                      : ClipRRect(
+                                          borderRadius: BorderRadius.circular(14),
+                                          child: Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              Image(image: _jobImage(imageRef)!, fit: BoxFit.cover),
+                                              Positioned(
+                                                top: 8,
+                                                right: 8,
+                                                child: Material(
+                                                  color: Colors.black54,
+                                                  borderRadius: BorderRadius.circular(20),
+                                                  child: IconButton(
+                                                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                                                    onPressed: () => setDialog(() => imageRef = ''),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+                        decoration: BoxDecoration(
+                          border: Border(top: BorderSide(color: border)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(0, 48),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  side: BorderSide(color: border),
+                                ),
+                                child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: FilledButton(
+                                onPressed: () => submitJob(ctx),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: accent,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size(0, 48),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                ),
+                                child: Text(
+                                  isEdit ? 'Save Changes' : 'Post Job',
+                                  style: const TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () {
-                if (titleC.text.trim().isEmpty || contactC.text.trim().isEmpty || addressC.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Title, contact, and address are required.')));
-                  return;
-                }
-                final budget = double.tryParse(budgetC.text.trim()) ?? 0;
-                if (isEdit) {
-                  final id = (editJob['id'] ?? '').toString();
-                  final idx = _jobs.indexWhere((j) => (j['id'] ?? '').toString() == id);
-                  if (idx < 0) {
-                    Navigator.pop(ctx);
-                    return;
-                  }
-                  final existing = Map<String, dynamic>.from(_jobs[idx]);
-                  existing['title'] = titleC.text.trim();
-                  existing['description'] = descC.text.trim();
-                  existing['category'] = category;
-                  existing['workType'] = workType;
-                  existing['urgency'] = urgency;
-                  existing['contact'] = contactC.text.trim();
-                  existing['preferredTime'] = whenC.text.trim();
-                  existing['address'] = addressC.text.trim();
-                  existing['budget'] = budget;
-                  existing['imageRef'] = imageRef;
-                  existing['agreedPrice'] = budget;
-                  _jobs[idx] = existing;
-                } else {
-                  _jobs.add({
-                    'id': DateTime.now().microsecondsSinceEpoch.toString(),
-                    'ownerEmail': widget.user.email,
-                    'ownerName': widget.user.username,
-                    'title': titleC.text.trim(),
-                    'description': descC.text.trim(),
-                    'category': category,
-                    'workType': workType,
-                    'urgency': urgency,
-                    'contact': contactC.text.trim(),
-                    'preferredTime': whenC.text.trim(),
-                    'address': addressC.text.trim(),
-                    'budget': budget,
-                    'imageRef': imageRef,
-                    'status': 'open',
-                    'offers': <Map<String, dynamic>>[],
-                    'claimedByEmail': '',
-                    'claimedByName': '',
-                    'agreedPrice': budget,
-                    'createdAt': DateTime.now().toIso8601String(),
-                    'completedAt': '',
-                  });
-                }
-                _saveJobs();
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isEdit ? 'Job updated.' : 'Job posted.')));
-              },
-              child: Text(isEdit ? 'Save Changes' : 'Post Job'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -25022,9 +25513,158 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
   }
 
   void _markDone(Map<String, dynamic> job) {
-    job['status'] = 'done';
-    job['completedAt'] = DateTime.now().toIso8601String();
-    _saveJobs();
+    unawaited(_markDoneWithLocation(job));
+  }
+
+  Future<void> _markDoneWithLocation(Map<String, dynamic> job) async {
+    final workType = (job['workType'] ?? 'On-site').toString();
+    if (workType == 'Remote') {
+      job['status'] = 'done';
+      job['completedAt'] = DateTime.now().toIso8601String();
+      job['completedByEmail'] = widget.user.email;
+      _saveJobs();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Remote job marked complete.')));
+      return;
+    }
+
+    final workLat = (job['workLat'] as num?)?.toDouble();
+    final workLng = (job['workLng'] as num?)?.toDouble();
+    if (workLat == null || workLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This job has no GPS work site. The poster must share location when posting.')),
+      );
+      return;
+    }
+
+    NgmyGpsReading? reading;
+    var gpsLoading = false;
+    const maxMiles = 3.0;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF101827) : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final miles = reading == null
+              ? null
+              : ngmyDistanceMiles(reading!.lat, reading!.lng, workLat, workLng);
+          final withinRange = miles != null && miles <= maxMiles;
+          return Padding(
+            padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(ctx).viewInsets.bottom + 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Confirm Work Complete',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : Colors.black87),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Share your live location. You must be within $maxMiles miles of the work site to complete this job.',
+                  style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Work site', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : Colors.black54)),
+                      const SizedBox(height: 4),
+                      Text((job['address'] ?? '').toString(), style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
+                      const SizedBox(height: 4),
+                      Text(ngmyFormatCoords(workLat, workLng), style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        reading == null
+                            ? 'Tap the GPS button to share your location'
+                            : withinRange
+                                ? 'You are ${miles!.toStringAsFixed(2)} mi away — within range'
+                                : 'You are ${miles!.toStringAsFixed(2)} mi away — must be within $maxMiles mi',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: reading == null
+                              ? (isDark ? Colors.white60 : Colors.black54)
+                              : withinRange
+                                  ? Colors.green
+                                  : Colors.red,
+                        ),
+                      ),
+                    ),
+                    IconButton.filled(
+                      tooltip: 'Share live GPS now',
+                      onPressed: gpsLoading
+                          ? null
+                          : () async {
+                              setSheet(() => gpsLoading = true);
+                              final result = await ngmyFetchCurrentGpsDetailed();
+                              if (!ctx.mounted) return;
+                              setSheet(() => gpsLoading = false);
+                              if (result.reading == null) {
+                                final msg = result.failure != null
+                                    ? ngmyGpsFailureMessage(result.failure!)
+                                    : 'Could not get GPS. Allow location when prompted.';
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                                return;
+                              }
+                              setSheet(() => reading = result.reading);
+                            },
+                      icon: gpsLoading
+                          ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.my_location_rounded),
+                      style: IconButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white, minimumSize: const Size(52, 52)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: withinRange && reading != null
+                      ? () {
+                          job['status'] = 'done';
+                          job['completedAt'] = DateTime.now().toIso8601String();
+                          job['completedByEmail'] = widget.user.email;
+                          job['completionLat'] = reading!.lat;
+                          job['completionLng'] = reading!.lng;
+                          job['completionLocationLabel'] = reading!.label;
+                          job['completionDistanceMiles'] = miles;
+                          _saveJobs();
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Job completed (${miles!.toStringAsFixed(2)} mi from site).')),
+                          );
+                        }
+                      : null,
+                  icon: const Icon(Icons.task_alt_rounded),
+                  label: const Text('Complete Job'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF22C55E),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Widget _workerApplicationCard(Map<String, dynamic> app, {required bool isDark, required bool adminView}) {
@@ -25203,6 +25843,11 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
             Text('Contact: ${(job['contact'] ?? '').toString()}'),
             Text('When: ${(job['preferredTime'] ?? '').toString()}'),
             Text('Address: ${(job['address'] ?? '').toString()}'),
+            if ((job['workLat'] as num?) != null && (job['workLng'] as num?) != null)
+              Text(
+                'Work site GPS: ${ngmyFormatCoords((job['workLat'] as num).toDouble(), (job['workLng'] as num).toDouble())}',
+                style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+              ),
             Text('Posted by: ${(job['ownerName'] ?? '').toString()}'),
             if ((job['claimedByName'] ?? '').toString().isNotEmpty) Text('Claimed by: ${(job['claimedByName'] ?? '').toString()}'),
             const SizedBox(height: 8),
@@ -25232,7 +25877,7 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
                   ElevatedButton.icon(
                     onPressed: () => _markDone(job),
                     icon: const Icon(Icons.task_alt, size: 14),
-                    label: const Text('Mark Done'),
+                    label: const Text('Complete Job'),
                   ),
               ],
             ),
@@ -27727,9 +28372,10 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   @override
   void didUpdateWidget(covariant AnnouncementScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_activeTab == 1 && widget.announcements.length != oldWidget.announcements.length) {
-      _scrollNewsToBottom();
-    }
+    if (_activeTab != 1) return;
+    final oldSig = oldWidget.announcements.map((a) => a.id).join('|');
+    final newSig = widget.announcements.map((a) => a.id).join('|');
+    if (oldSig != newSig) _scrollNewsToBottom();
   }
 
   @override
