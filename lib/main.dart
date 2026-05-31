@@ -1405,7 +1405,10 @@ ImageProvider? ngmyAdminUserAvatar(dynamic u) {
       return null;
     }
   }
-  if (src.startsWith('http')) return NetworkImage(src);
+  if (src.startsWith('blob:') || src.startsWith('http')) {
+    if (kIsWeb) return NetworkImage(src);
+    return null;
+  }
   if (!kIsWeb) return FileImage(File(src));
   return null;
 }
@@ -5620,18 +5623,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               statusBarColor: Color(0xFF121212),
               statusBarIconBrightness: Brightness.light,
               statusBarBrightness: Brightness.dark,
-              systemNavigationBarColor: Color(0xFF121212),
+              systemNavigationBarColor: Colors.transparent,
               systemNavigationBarIconBrightness: Brightness.light,
             )
           : const SystemUiOverlayStyle(
               statusBarColor: Colors.white,
               statusBarIconBrightness: Brightness.dark,
               statusBarBrightness: Brightness.light,
-              systemNavigationBarColor: Colors.white,
+              systemNavigationBarColor: Colors.transparent,
               systemNavigationBarIconBrightness: Brightness.dark,
             ),
       child: Scaffold(
         extendBody: true,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Stack(
           children: [
             IndexedStack(
@@ -5670,12 +5674,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               ),
           ],
         ),
-        bottomNavigationBar: _buildBottomNavBar(),
+        bottomNavigationBar: Material(
+          type: MaterialType.transparency,
+          elevation: 0,
+          color: Colors.transparent,
+          child: _buildBottomNavBar(),
+        ),
       ),
     );
   }
 
   Widget _buildBottomNavBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final barFill = isDark ? Colors.black.withValues(alpha: 0.38) : Colors.white.withValues(alpha: 0.52);
     return Padding(
       padding: const EdgeInsets.fromLTRB(15, 0, 15, 25),
       child: SafeArea(
@@ -5683,16 +5694,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         child: Container(
           height: 75,
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.78),
+            color: barFill,
             borderRadius: BorderRadius.circular(35),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha: 0.12),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
             ],
-            border: Border.all(color: Colors.white.withOpacity(0.10)),
+            border: Border.all(color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.45)),
           ),
           child: Row(
             children: [
@@ -5827,9 +5838,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override Widget build(BuildContext context) {
     bool isLight = Theme.of(context).brightness == Brightness.light;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: SafeArea(
+        bottom: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 150),
+          padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
           child: Column(
             children: [
               FloatingTitle(
@@ -8542,7 +8555,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         leading: IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : Colors.black, size: 18), onPressed: _adminBack),
         title: Text(_menuName(), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(78),
+          preferredSize: const Size.fromHeight(72),
           child: _topNav(isDark),
         ),
       ),
@@ -8555,8 +8568,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final frameBg = isDark ? const Color(0xFF121726) : const Color(0xFFF8FAFC);
     final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
     return Container(
-      height: 78,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      height: 72,
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF161922) : Colors.white,
         border: Border(top: BorderSide(color: isDark ? Colors.white10 : Colors.black12, width: 0.5)),
@@ -8599,22 +8612,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ? [BoxShadow(color: const Color(0xFF00B25A).withOpacity(isDark ? 0.22 : 0.12), blurRadius: 8, offset: const Offset(0, 3))]
                   : null,
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, color: selected ? const Color(0xFF00B25A) : (isDark ? Colors.white54 : Colors.grey), size: 22),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: selected ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white54 : Colors.grey),
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                    fontSize: 10,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: selected ? const Color(0xFF00B25A) : (isDark ? Colors.white54 : Colors.grey), size: 20),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: selected ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white54 : Colors.grey),
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                      fontSize: 9,
+                      height: 1.1,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -10457,7 +10474,13 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   @override Widget build(BuildContext context) {
-    return Scaffold(body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 150), child: Column(children: [
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
+          child: Column(children: [
       const FloatingTitle(title: 'MY WALLET'), const SizedBox(height: 20),
       Container(width: double.infinity, height: 180, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF2E3192), Color(0xFF1BFFFF)]), borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))]), child: Stack(alignment: Alignment.center, children: [
         Positioned(
@@ -10483,7 +10506,10 @@ class _WalletScreenState extends State<WalletScreen> {
       ]),
       const SizedBox(height: 30),
       _walletBody(),
-    ]))));
+    ]),
+        ),
+      ),
+    );
   }
 
   Widget _wNav(int i, IconData ic, String l) {
@@ -11180,8 +11206,9 @@ class LoanServiceScreen extends StatelessWidget {
   }
 }
 
+/// Scroll padding so list content can pass behind the floating bottom nav (like Media).
 double _ngmyBottomNavScrollPadding(BuildContext context) {
-  return 25 + 75 + MediaQuery.of(context).padding.bottom + 36;
+  return 110 + MediaQuery.paddingOf(context).bottom;
 }
 
 class InvestScreen extends StatelessWidget {
@@ -11189,12 +11216,21 @@ class InvestScreen extends StatelessWidget {
   const InvestScreen({super.key, required this.user, required this.plans, required this.onInvest});
   @override Widget build(BuildContext context) {
     final bottomPad = _ngmyBottomNavScrollPadding(context);
-    return Scaffold(body: SafeArea(child: SingleChildScrollView(padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPad), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPad),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const FloatingTitle(title: 'INVESTMENT PLANS'), const SizedBox(height: 20),
       if (user.activeInvestment != null) ...[const Text('ACTIVE ASSET', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)), const SizedBox(height: 15), _activeCard(context, user.activeInvestment!, user), const SizedBox(height: 30)],
       const Text('AVAILABLE PLANS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)), const SizedBox(height: 15),
       ...plans.map((p) => _planRow(context, p)),
-    ]))));
+          ]),
+        ),
+      ),
+    );
   }
   Widget _cardChip({bool platinum = false, bool leader = false}) => Container(
     width: leader ? 56 : 40,
@@ -11769,9 +11805,11 @@ class _StatsScreenState extends State<StatsScreen> {
     final flowCountdown = '0:${flowSecondsLeft.toString().padLeft(2, '0')}';
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: SafeArea(
+        bottom: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 150),
+          padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
           child: Column(
             children: [
               const FloatingTitle(title: 'PLATFORM STATS'),
@@ -12584,7 +12622,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final cashEarned = widget.user.totalProfit;
     final cashInvested = widget.user.totalInvestmentAmount;
     final pointsCash = widget.user.points / 100.0;
-    return Scaffold(body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 150), child: Column(children: [
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
+          child: Column(children: [
       const FloatingTitle(title: 'MY PROFILE'), const SizedBox(height: 30),
       GestureDetector(
         onTap: () async {
@@ -12897,7 +12941,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       const SizedBox(height: 15),
       _box(context, 'Appearance', [Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_tOp(context, ThemeMode.light, Icons.light_mode, 'Light'), _tOp(context, ThemeMode.dark, Icons.dark_mode, 'Dark'), _tOp(context, ThemeMode.system, Icons.brightness_auto, 'Auto')])]), const SizedBox(height: 30),
       ElevatedButton(onPressed: widget.onLogout, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), elevation: 5), child: const Text('LOGOUT ACCOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
-    ]))));
+    ]),
+        ),
+      ),
+    );
   }
 
   void _editMe(BuildContext ctx) {
@@ -13437,9 +13484,11 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       : [const Color(0xFFF06292), const Color(0xFF9C27B0)];
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: SafeArea(
+        bottom: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.fromLTRB(20, 20, 20, _ngmyBottomNavScrollPadding(context)),
           child: Column(
             children: [
               const FloatingTitle(title: 'NGMY HUB'),
@@ -14807,8 +14856,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     });
   }
 
+  bool _canBypassCivicGate() => widget.user.isAuthorizedRegistrar;
+
   Future<void> _checkRegistryUnlock() async {
-    if (_isRegistrar()) {
+    if (_canBypassCivicGate()) {
       if (mounted) setState(() {
         _registryUnlocked = true;
         _unlockChecked = true;
@@ -15071,7 +15122,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   onTap: () async {
                     final newState = _usStates[i];
                     Navigator.pop(c);
-                    if (!_isRegistrar()) {
+                    if (!_canBypassCivicGate()) {
                       final ok = await civicRegistryIsUnlocked(widget.user.email, newState);
                       if (!ok) {
                         setState(() {
@@ -16601,14 +16652,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-    if (!_registryUnlocked && !_isRegistrar()) {
+    if (!_registryUnlocked && !_canBypassCivicGate()) {
       return CivicRegistryGateScreen(
         usStates: _usStates,
         pinsByState: widget.config.civicRegistryPinsByState,
         userEmail: widget.user.email,
         initialState: _selectedState,
         isAdmin: widget.user.isAdmin,
-        onAdminSavePin: widget.user.isAdmin ? _adminSaveCivicPin : null,
+        onAdminSavePin: (widget.user.isAdmin || widget.user.isAuthorizedRegistrar) ? _adminSaveCivicPin : null,
         onBack: () => NgmyNavigator.pop(context),
         onUnlocked: _onRegistryUnlocked,
       );

@@ -168,7 +168,11 @@ class NgmyVirtualMediaProfiles {
         return null;
       }
     }
-    if (url.startsWith('http') || url.startsWith('supabase://')) return null;
+    if (url.startsWith('blob:') || url.startsWith('http')) {
+      if (kIsWeb) return NetworkImage(url);
+      return null;
+    }
+    if (url.startsWith('supabase://')) return null;
     if (!kIsWeb) return FileImage(File(url));
     return null;
   }
