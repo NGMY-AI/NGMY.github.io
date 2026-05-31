@@ -1,13 +1,15 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-/// Bottom nav shell — short recessed wings (3 icons each) + subtle center lift for NGMY.
+/// Three-part bottom nav frame matching the hand-drawn layout:
+/// compact left pill (3 icons) | tall center arch (NGMY) | compact right pill (3 icons).
 class NgmySculptedBottomNavFrame extends StatelessWidget {
   const NgmySculptedBottomNavFrame({
     super.key,
     required this.child,
-    this.height = 72,
+    this.height = 86,
   });
 
   final Widget child;
@@ -16,8 +18,8 @@ class NgmySculptedBottomNavFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fillColor = Theme.of(context).cardColor.withValues(alpha: isDark ? 0.52 : 0.58);
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06);
+    final fillColor = Theme.of(context).cardColor.withValues(alpha: isDark ? 0.55 : 0.62);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.14) : Colors.black.withValues(alpha: 0.07);
 
     return SizedBox(
       height: height,
@@ -27,11 +29,11 @@ class NgmySculptedBottomNavFrame extends StatelessWidget {
         children: [
           Positioned.fill(
             child: ClipPath(
-              clipper: _NgmySculptedNavBarClipper(),
+              clipper: _NgmyTripleNavClipper(),
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                 child: CustomPaint(
-                  painter: _NgmySculptedNavBarPainter(
+                  painter: _NgmyTripleNavPainter(
                     fillColor: fillColor,
                     borderColor: borderColor,
                   ),
@@ -43,7 +45,7 @@ class NgmySculptedBottomNavFrame extends StatelessWidget {
             left: 0,
             right: 0,
             bottom: 0,
-            height: 64,
+            height: 58,
             child: child,
           ),
         ],
@@ -52,16 +54,16 @@ class NgmySculptedBottomNavFrame extends StatelessWidget {
   }
 }
 
-class _NgmySculptedNavBarClipper extends CustomClipper<Path> {
+class _NgmyTripleNavClipper extends CustomClipper<Path> {
   @override
-  Path getClip(Size size) => _NgmySculptedNavBarPainter.buildPath(size.width, size.height);
+  Path getClip(Size size) => _NgmyTripleNavPainter.unionPath(size.width, size.height);
 
   @override
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
-class _NgmySculptedNavBarPainter extends CustomPainter {
-  _NgmySculptedNavBarPainter({
+class _NgmyTripleNavPainter extends CustomPainter {
+  _NgmyTripleNavPainter({
     required this.fillColor,
     required this.borderColor,
   });
@@ -69,76 +71,104 @@ class _NgmySculptedNavBarPainter extends CustomPainter {
   final Color fillColor;
   final Color borderColor;
 
-  static Path buildPath(double w, double h) {
-    const corner = 22.0;
-    const bottomLift = 4.0;
-    const steps = 40;
-    final bottom = h - bottomLift;
+  static const _gap = 5.0;
+  static const _wingH = 48.0;
+  static const _bottomInset = 2.0;
+  static const _capW = 74.0;
+  static const _capFlatH = 44.0;
 
-    final path = Path()..moveTo(corner, _topY(corner, w));
+  static Path unionPath(double w, double h) {
+    final p = Path()
+      ..addPath(leftWingPath(w, h), Offset.zero)
+      ..addPath(centerArchPath(w, h), Offset.zero)
+      ..addPath(rightWingPath(w, h), Offset.zero);
+    return p;
+  }
 
-    for (var i = 1; i <= steps; i++) {
-      final x = corner + (w - corner * 2) * (i / steps);
-      path.lineTo(x, _topY(x, w));
-    }
+  static double _wingWidth(double w) => w * (3 / 7) - _gap;
 
-    path
-      ..lineTo(w - corner, _topY(w - corner, w))
-      ..quadraticBezierTo(w, _topY(w - corner, w), w, _topY(w - corner, w) + corner)
-      ..lineTo(w, bottom - corner)
-      ..quadraticBezierTo(w, bottom, w - corner, bottom)
-      ..lineTo(corner, bottom)
-      ..quadraticBezierTo(0, bottom, 0, bottom - corner)
-      ..lineTo(0, _topY(corner, w) + corner)
-      ..quadraticBezierTo(0, _topY(corner, w), corner, _topY(corner, w))
+  static Path leftWingPath(double w, double h) {
+    final width = _wingWidth(w);
+    final top = h - _bottomInset - _wingH;
+    return Path()
+      ..addRRect(
+        RRect.fromRectAndCorners(
+          Rect.fromLTWH(0, top, width, _wingH),
+          topLeft: const Radius.circular(24),
+          topRight: const Radius.circular(14),
+          bottomLeft: const Radius.circular(24),
+          bottomRight: const Radius.circular(14),
+        ),
+      );
+  }
+
+  static Path rightWingPath(double w, double h) {
+    final width = _wingWidth(w);
+    final left = w - width;
+    final top = h - _bottomInset - _wingH;
+    return Path()
+      ..addRRect(
+        RRect.fromRectAndCorners(
+          Rect.fromLTWH(left, top, width, _wingH),
+          topLeft: const Radius.circular(14),
+          topRight: const Radius.circular(24),
+          bottomLeft: const Radius.circular(14),
+          bottomRight: const Radius.circular(24),
+        ),
+      );
+  }
+
+  /// Center cap: flat base + semicircle dome hugging the NGMY button.
+  static Path centerArchPath(double w, double h) {
+    final cx = w / 2;
+    final halfW = _capW / 2;
+    final left = cx - halfW;
+    final right = cx + halfW;
+    final bottom = h - _bottomInset;
+    final flatTop = bottom - _capFlatH;
+    final arcCenter = Offset(cx, flatTop);
+    const corner = 16.0;
+
+    return Path()
+      ..moveTo(left + corner, bottom)
+      ..lineTo(right - corner, bottom)
+      ..quadraticBezierTo(right, bottom, right, bottom - corner)
+      ..lineTo(right, flatTop)
+      ..arcTo(
+        Rect.fromCircle(center: arcCenter, radius: halfW),
+        0,
+        -math.pi,
+        false,
+      )
+      ..lineTo(left, bottom - corner)
+      ..quadraticBezierTo(left, bottom, left + corner, bottom)
       ..close();
-
-    return path;
-  }
-
-  /// Wings sit lower/shorter; center lifts only slightly above them.
-  static double _topY(double x, double w) {
-    final seg = w / 7;
-    const wingTop = 34.0;
-    const centerTop = 26.0;
-    const blend = 7.0;
-
-    if (x <= seg * 3) return wingTop;
-    if (x >= seg * 4) return wingTop;
-
-    if (x < seg * 3 + blend) {
-      final t = (x - seg * 3) / blend;
-      return wingTop + (centerTop - wingTop) * _easeInOut(t);
-    }
-    if (x > seg * 4 - blend) {
-      final t = (seg * 4 - x) / blend;
-      return wingTop + (centerTop - wingTop) * _easeInOut(t);
-    }
-    return centerTop;
-  }
-
-  static double _easeInOut(double t) {
-    if (t <= 0) return 0;
-    if (t >= 1) return 1;
-    return t * t * (3 - 2 * t);
   }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = buildPath(size.width, size.height);
+    final w = size.width;
+    final h = size.height;
+    final paths = [
+      leftWingPath(w, h),
+      centerArchPath(w, h),
+      rightWingPath(w, h),
+    ];
 
-    canvas.drawShadow(path, Colors.black.withValues(alpha: 0.08), 6, false);
-    canvas.drawPath(path, Paint()..color = fillColor);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = borderColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
+    final fill = Paint()..color = fillColor;
+    final stroke = Paint()
+      ..color = borderColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1;
+
+    for (final path in paths) {
+      canvas.drawShadow(path, Colors.black.withValues(alpha: 0.07), 5, false);
+      canvas.drawPath(path, fill);
+      canvas.drawPath(path, stroke);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant _NgmySculptedNavBarPainter oldDelegate) =>
+  bool shouldRepaint(covariant _NgmyTripleNavPainter oldDelegate) =>
       oldDelegate.fillColor != fillColor || oldDelegate.borderColor != borderColor;
 }

@@ -6133,7 +6133,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Widget _buildBottomNavBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(15, 0, 15, 14),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       child: SafeArea(
         top: false,
         child: NgmySculptedBottomNavFrame(
@@ -6163,12 +6163,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             },
             customBorder: const CircleBorder(),
             child: SizedBox(
-              height: 64,
+              height: 58,
               child: Center(
                 child: Icon(
                   icon,
                   color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey,
-                  size: 28,
+                  size: 26,
                 ),
               ),
             ),
@@ -6183,10 +6183,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             onTap: () => setState(() => _idx = i),
             customBorder: const CircleBorder(),
             child: SizedBox(
-              height: 64,
+              height: 58,
               child: Center(
                 child: Transform.translate(
-                  offset: const Offset(0, -4),
+                  offset: const Offset(0, -16),
                   transformHitTests: true,
                   child: Container(
                     width: 60,
@@ -11715,7 +11715,7 @@ class LoanServiceScreen extends StatelessWidget {
 
 /// Scroll padding so list content can pass behind the floating bottom nav (like Media).
 double _ngmyBottomNavScrollPadding(BuildContext context) {
-  return 108 + MediaQuery.paddingOf(context).bottom;
+  return 112 + MediaQuery.paddingOf(context).bottom;
 }
 
 class InvestScreen extends StatelessWidget {
