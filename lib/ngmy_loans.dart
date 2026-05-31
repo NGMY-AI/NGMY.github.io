@@ -1,0 +1,937 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'ngmy_offline.dart';
+
+/// Bridge to app config without importing main.dart (avoids circular imports).
+class NgmyLoanConfigBridge {
+  NgmyLoanConfigBridge({
+    required this.loanApplications,
+    required this.loanPhone,
+    required this.loanHowItWorks,
+    required this.officialCashApp,
+    required this.loanCompanyZelle,
+  });
+
+  List<Map<String, dynamic>> loanApplications;
+  String loanPhone;
+  String loanHowItWorks;
+  String officialCashApp;
+  String loanCompanyZelle;
+}
+
+String ngmyLoanFormatCurrency(double v) {
+  if (v == v.roundToDouble()) return v.toStringAsFixed(0);
+  return v.toStringAsFixed(2);
+}
+
+/// Loan applications, admin review, and payment tracking.
+class NgmyLoanServicesScreen extends StatefulWidget {
+  const NgmyLoanServicesScreen({
+    super.key,
+    required this.userEmail,
+    required this.username,
+    required this.config,
+    required this.onDataChanged,
+  });
+
+  final String userEmail;
+  final String username;
+  final NgmyLoanConfigBridge config;
+  final VoidCallback onDataChanged;
+
+  @override
+  State<NgmyLoanServicesScreen> createState() => _NgmyLoanServicesScreenState();
+}
+
+class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final myLoans = NgmyLoanStore.appsForUser(widget.config.loanApplications, widget.userEmail);
+    final active = myLoans.where((a) => (a['status'] ?? '') == 'approved').toList();
+    final pending = myLoans.where((a) => (a['status'] ?? '') == 'pending').toList();
+    final rejected = myLoans.where((a) => (a['status'] ?? '') == 'rejected').toList();
+
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF5F7FB),
+      appBar: AppBar(
+        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded), onPressed: () => Navigator.pop(context)),
+        title: const Text('Loan Services', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          widget.onDataChanged();
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _headerCard(),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _openApplication(context),
+                  icon: const Icon(Icons.description_outlined),
+                  label: const Text('Apply for a Loan', style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00B25A),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 56),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
+                ),
+              ),
+              if (active.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                const Text('Active loans — live tracking', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 10),
+                ...active.map((a) => _loanTile(context, a, isDark)),
+              ],
+              if (pending.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                const Text('Pending review', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ...pending.map((a) => _loanTile(context, a, isDark)),
+              ],
+              if (rejected.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                const Text('Rejected — you may apply again', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.redAccent)),
+                ...rejected.map((a) => _loanTile(context, a, isDark)),
+              ],
+              const SizedBox(height: 24),
+              _howItWorks(isDark),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => showNgmyLoanCalculator(context),
+                icon: const Icon(Icons.calculate_outlined),
+                label: const Text('Loan calculator (36% interest)'),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _headerCard() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)]),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.attach_money_rounded, color: Colors.white, size: 28),
+                SizedBox(width: 12),
+                Text('Loan Services', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Call ${widget.config.loanPhone} or apply with collateral. Max 3 active loans.',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13, height: 1.4),
+            ),
+          ],
+        ),
+      );
+
+  Widget _howItWorks(bool isDark) => Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFE8F0FF),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(widget.config.loanHowItWorks, style: TextStyle(fontSize: 13, height: 1.7, color: isDark ? Colors.white70 : Colors.black87)),
+      );
+
+  Widget _loanTile(BuildContext context, Map<String, dynamic> app, bool isDark) {
+    final status = (app['status'] ?? 'pending').toString();
+    final amount = (app['amount'] as num?)?.toDouble() ?? 0;
+    Color c = Colors.orange;
+    if (status == 'approved') c = Colors.green;
+    if (status == 'rejected') c = Colors.red;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        onTap: status == 'approved'
+            ? () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => NgmyLoanTrackingScreen(
+                      loanId: (app['id'] ?? '').toString(),
+                      config: widget.config,
+                      onDataChanged: widget.onDataChanged,
+                      isAdmin: false,
+                    ),
+                  ),
+                )
+            : (status == 'rejected'
+                ? () {
+                    final reason = (app['rejectionReason'] ?? '').toString();
+                    showDialog<void>(
+                      context: context,
+                      builder: (c) => AlertDialog(
+                        title: const Text('Application rejected'),
+                        content: Text(reason.isEmpty ? 'No reason provided. You may apply again.' : reason),
+                        actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK'))],
+                      ),
+                    );
+                  }
+                : null),
+        title: Text('\$${ngmyLoanFormatCurrency(amount)} · ${status.toUpperCase()}', style: TextStyle(fontWeight: FontWeight.w800, color: c)),
+        subtitle: Text(
+          status == 'rejected' && (app['rejectionReason'] ?? '').toString().isNotEmpty
+              ? 'Rejected: ${app['rejectionReason']}'
+              : (app['scheduleSummary'] ?? app['createdAt'] ?? '').toString(),
+          maxLines: 3,
+        ),
+        trailing: status == 'approved' ? const Icon(Icons.track_changes_rounded, color: Color(0xFF00B25A)) : null,
+      ),
+    );
+  }
+
+  Future<void> _openApplication(BuildContext context) async {
+    final activeCount = NgmyLoanStore.appsForUser(widget.config.loanApplications, widget.userEmail)
+        .where((a) => (a['status'] ?? '') == 'approved' || (a['status'] ?? '') == 'pending')
+        .length;
+    if (activeCount >= 3) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maximum 3 active or pending loans. Finish or wait for review on current applications.')));
+      return;
+    }
+    final ok = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(builder: (_) => NgmyLoanApplicationScreen(userEmail: widget.userEmail, username: widget.username, config: widget.config, onDataChanged: widget.onDataChanged)),
+    );
+    if (ok == true && mounted) setState(() {});
+  }
+}
+
+class NgmyLoanApplicationScreen extends StatefulWidget {
+  const NgmyLoanApplicationScreen({super.key, required this.userEmail, required this.username, required this.config, required this.onDataChanged});
+  final String userEmail;
+  final String username;
+  final NgmyLoanConfigBridge config;
+  final VoidCallback onDataChanged;
+
+  @override
+  State<NgmyLoanApplicationScreen> createState() => _NgmyLoanApplicationScreenState();
+}
+
+class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
+  final _amountC = TextEditingController();
+  final _ssnC = TextEditingController();
+  final _govIdC = TextEditingController();
+  final _payoutDestC = TextEditingController();
+  final _receiveDetailC = TextEditingController();
+  final _customCollateralC = TextEditingController();
+  final _picker = ImagePicker();
+
+  String _receiveMethod = 'cashapp';
+  String _collateralMode = 'required'; // required | custom
+  int _termMonths = 12;
+  bool _submitting = false;
+
+  String? _idFront;
+  String? _idBack;
+  String? _selfie;
+  String? _titleFront;
+  String? _titleBack;
+
+  double get _amount => double.tryParse(_amountC.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+
+  @override
+  void dispose() {
+    _amountC.dispose();
+    _ssnC.dispose();
+    _govIdC.dispose();
+    _payoutDestC.dispose();
+    _receiveDetailC.dispose();
+    _customCollateralC.dispose();
+    super.dispose();
+  }
+
+  Future<String?> _pickPhoto(String label) async {
+    final src = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (c) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(leading: const Icon(Icons.camera_alt), title: Text('$label — Camera'), onTap: () => Navigator.pop(c, ImageSource.camera)),
+            ListTile(leading: const Icon(Icons.photo_library), title: Text('$label — Gallery'), onTap: () => Navigator.pop(c, ImageSource.gallery)),
+          ],
+        ),
+      ),
+    );
+    if (src == null) return null;
+    final file = await _picker.pickImage(source: src, imageQuality: 82, maxWidth: 1600);
+    if (file == null) return null;
+    return NgmyLoanStore.storeImageRef(file);
+  }
+
+  List<String> _validate() {
+    final missing = <String>[];
+    if (_amount <= 0) missing.add('Loan amount');
+    if (_ssnC.text.replaceAll(RegExp(r'\D'), '').length != 9) missing.add('Social Security Number (9 digits)');
+    if (_govIdC.text.trim().isEmpty) missing.add('Government ID number');
+    if (_idFront == null) missing.add('ID photo — front');
+    if (_idBack == null) missing.add('ID photo — back');
+    if (_selfie == null) missing.add('Selfie photo');
+    if (_payoutDestC.text.trim().isEmpty) missing.add('Where you want to receive the money');
+    if (_receiveDetailC.text.trim().isEmpty) missing.add('Your payment handle (Cash App / Zelle / other)');
+    if (_collateralMode == 'custom') {
+      if (_customCollateralC.text.trim().isEmpty) missing.add('Description of custom collateral');
+    } else {
+      if (_titleFront == null) missing.add('Collateral title/photo — front');
+      if (_titleBack == null) missing.add('Collateral title/photo — back');
+    }
+    if (_amount > 2000 && _termMonths < 1) missing.add('Repayment term (choose months for loans over \$2,000)');
+    return missing;
+  }
+
+  Future<void> _submit() async {
+    final missing = _validate();
+    if (missing.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please complete:\n• ${missing.join('\n• ')}'), duration: const Duration(seconds: 5)),
+      );
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      final collateralType = _collateralMode == 'custom' ? 'custom' : NgmyLoanLogic.requiredCollateralType(_amount);
+      final term = NgmyLoanLogic.termForAmount(_amount, userMonths: _amount > 2000 ? _termMonths : null);
+      final interest = _amount * NgmyLoanLogic.interestRate;
+      final total = _amount + interest;
+      final weekly = total / term.weeks;
+
+      final payments = List.generate(term.weeks, (i) {
+        final due = DateTime.now().add(Duration(days: 7 * (i + 1)));
+        return {
+          'id': '${i + 1}',
+          'dueDate': due.toUtc().toIso8601String(),
+          'amount': double.parse(weekly.toStringAsFixed(2)),
+          'status': 'pending',
+          'paidAmount': 0.0,
+          'paidAt': '',
+        };
+      });
+
+      widget.config.loanApplications.insert(0, {
+        'id': DateTime.now().microsecondsSinceEpoch.toString(),
+        'userEmail': widget.userEmail,
+        'username': widget.username,
+        'status': 'pending',
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+        'amount': _amount,
+        'interestRate': NgmyLoanLogic.interestRate,
+        'totalRepayment': double.parse(total.toStringAsFixed(2)),
+        'scheduleSummary': term.summary,
+        'termWeeks': term.weeks,
+        'termMonths': _amount > 2000 ? _termMonths : term.monthsLabel,
+        'collateralType': collateralType,
+        'collateralCustomNote': _customCollateralC.text.trim(),
+        'ssn': _ssnC.text.trim(),
+        'governmentId': _govIdC.text.trim(),
+        'idFrontRef': _idFront,
+        'idBackRef': _idBack,
+        'selfieRef': _selfie,
+        'titleFrontRef': _titleFront ?? '',
+        'titleBackRef': _titleBack ?? '',
+        'receiveMethod': _receiveMethod,
+        'receiveDetails': _receiveDetailC.text.trim(),
+        'payoutDestination': _payoutDestC.text.trim(),
+        'companyCashApp': widget.config.officialCashApp,
+        'companyZelle': widget.config.loanCompanyZelle,
+        'rejectionReason': '',
+        'payments': payments,
+      });
+      widget.onDataChanged();
+      if (!mounted) return;
+      Navigator.pop(context, true);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan application submitted. Admin will review soon.')));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final reqCol = NgmyLoanLogic.requiredCollateralType(_amount);
+    final colLabel = NgmyLoanLogic.collateralLabel(reqCol);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Loan Application'), backgroundColor: Colors.transparent),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Amount & terms', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black)),
+            const SizedBox(height: 8),
+            TextField(controller: _amountC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Loan amount (\$)', border: OutlineInputBorder()), onChanged: (_) => setState(() {})),
+            if (_amount > 0) ...[
+              const SizedBox(height: 8),
+              Text(NgmyLoanLogic.termForAmount(_amount, userMonths: _amount > 2000 ? _termMonths : null).summary, style: TextStyle(color: Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.w600)),
+              if (_amount > 2000) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  value: _termMonths,
+                  decoration: const InputDecoration(labelText: 'Repayment period (over \$2,000)', border: OutlineInputBorder()),
+                  items: const [3, 6, 9, 12].map((m) => DropdownMenuItem(value: m, child: Text('$m months'))).toList(),
+                  onChanged: (v) => setState(() => _termMonths = v ?? 12),
+                ),
+              ],
+            ],
+            const Divider(height: 32),
+            const Text('Identity', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            TextField(controller: _ssnC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Social Security Number', border: OutlineInputBorder()), inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9-]'))]),
+            TextField(controller: _govIdC, decoration: const InputDecoration(labelText: 'Government ID number', border: OutlineInputBorder())),
+            _photoRow('ID — front', _idFront, () async { final r = await _pickPhoto('ID front'); if (r != null) setState(() => _idFront = r); }),
+            _photoRow('ID — back', _idBack, () async { final r = await _pickPhoto('ID back'); if (r != null) setState(() => _idBack = r); }),
+            _photoRow('Selfie', _selfie, () async { final r = await _pickPhoto('Selfie'); if (r != null) setState(() => _selfie = r); }),
+            const Divider(height: 32),
+            const Text('Receive loan & payout', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            TextField(controller: _payoutDestC, decoration: const InputDecoration(labelText: 'Where should we send the money?', hintText: 'Cash App, bank, address…', border: OutlineInputBorder())),
+            DropdownButtonFormField<String>(
+              value: _receiveMethod,
+              decoration: const InputDecoration(labelText: 'How you receive payments', border: OutlineInputBorder()),
+              items: const [
+                DropdownMenuItem(value: 'cashapp', child: Text('Cash App')),
+                DropdownMenuItem(value: 'zelle', child: Text('Zelle')),
+                DropdownMenuItem(value: 'other', child: Text('Other')),
+              ],
+              onChanged: (v) => setState(() => _receiveMethod = v ?? 'cashapp'),
+            ),
+            TextField(controller: _receiveDetailC, decoration: const InputDecoration(labelText: 'Your \$Cashtag, Zelle email/phone, or other', border: OutlineInputBorder())),
+            const Divider(height: 32),
+            const Text('Collateral', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            if (_amount > 0)
+              Text('Required for \$${ngmyLoanFormatCurrency(_amount)}: $colLabel (or submit custom collateral for review)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'required', label: Text('Standard')),
+                ButtonSegment(value: 'custom', label: Text('Custom / other')),
+              ],
+              selected: {_collateralMode},
+              onSelectionChanged: (s) => setState(() => _collateralMode = s.first),
+            ),
+            if (_collateralMode == 'custom')
+              TextField(controller: _customCollateralC, maxLines: 2, decoration: const InputDecoration(labelText: 'Describe your collateral — we will review value', border: OutlineInputBorder()))
+            else ...[
+              _photoRow('$colLabel — front', _titleFront, () async { final r = await _pickPhoto('Title front'); if (r != null) setState(() => _titleFront = r); }),
+              _photoRow('$colLabel — back', _titleBack, () async { final r = await _pickPhoto('Title back'); if (r != null) setState(() => _titleBack = r); }),
+            ],
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: _submitting ? null : _submit,
+              style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 52), backgroundColor: const Color(0xFF00B25A)),
+              child: _submitting ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Submit application', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _photoRow(String label, String? ref, VoidCallback onPick) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(label),
+      subtitle: ref != null ? const Text('Added ✓', style: TextStyle(color: Colors.green)) : const Text('Required'),
+      trailing: TextButton.icon(onPressed: onPick, icon: const Icon(Icons.add_a_photo), label: const Text('Add')),
+    );
+  }
+}
+
+class NgmyLoanTrackingScreen extends StatefulWidget {
+  const NgmyLoanTrackingScreen({super.key, required this.loanId, required this.config, required this.onDataChanged, required this.isAdmin});
+
+  final String loanId;
+  final NgmyLoanConfigBridge config;
+  final VoidCallback onDataChanged;
+  final bool isAdmin;
+
+  @override
+  State<NgmyLoanTrackingScreen> createState() => _NgmyLoanTrackingScreenState();
+}
+
+class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> {
+  Map<String, dynamic>? get _loan {
+    final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == widget.loanId);
+    if (i < 0) return null;
+    return widget.config.loanApplications[i];
+  }
+
+  void _mutateLoan(void Function(Map<String, dynamic> loan) fn) {
+    final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == widget.loanId);
+    if (i < 0) return;
+    fn(widget.config.loanApplications[i]);
+    widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+    widget.onDataChanged();
+    setState(() {});
+  }
+
+  Future<void> _recordPayment(Map<String, dynamic> payment) async {
+    final dueAmt = (payment['amount'] as num?)?.toDouble() ?? 0;
+    final amountC = TextEditingController(text: ngmyLoanFormatCurrency(dueAmt));
+    final noteC = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Record payment received'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amountC,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Amount received (\$)', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: noteC,
+              decoration: const InputDecoration(labelText: 'Note (optional)', border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final received = double.tryParse(amountC.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? dueAmt;
+    final payId = (payment['id'] ?? '').toString();
+    _mutateLoan((loan) {
+      final payments = (loan['payments'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+      final idx = payments.indexWhere((p) => (p['id'] ?? '').toString() == payId);
+      if (idx < 0) return;
+      payments[idx]['status'] = 'paid';
+      payments[idx]['paidAmount'] = received;
+      payments[idx]['paidAt'] = DateTime.now().toUtc().toIso8601String();
+      if (noteC.text.trim().isNotEmpty) payments[idx]['adminNote'] = noteC.text.trim();
+      loan['payments'] = payments;
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment recorded.')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loan = _loan;
+    if (loan == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Loan tracking')),
+        body: const Center(child: Text('Loan not found.')),
+      );
+    }
+    final payments = (loan['payments'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+    final cash = (loan['companyCashApp'] ?? widget.config.officialCashApp).toString();
+    final zelle = (loan['companyZelle'] ?? widget.config.loanCompanyZelle).toString();
+    final paidCount = payments.where((p) => (p['status'] ?? '') == 'paid').length;
+
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.isAdmin ? 'Admin loan tracking' : 'My loan payments')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text('\$${ngmyLoanFormatCurrency((loan['amount'] as num?)?.toDouble() ?? 0)} loan', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+          Text((loan['scheduleSummary'] ?? '').toString(), style: const TextStyle(color: Colors.grey)),
+          Text('Total due: \$${ngmyLoanFormatCurrency((loan['totalRepayment'] as num?)?.toDouble() ?? 0)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+          Text('$paidCount of ${payments.length} weekly payments received', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 16),
+          const Text('Pay the company', style: TextStyle(fontWeight: FontWeight.bold)),
+          if (cash.isNotEmpty)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.attach_money, color: Colors.green),
+                title: Text('Cash App: \$$cash'),
+                subtitle: const Text('Tap to open Cash App'),
+                trailing: FilledButton(
+                  onPressed: () => NgmyLoanLogic.openCashApp(cash),
+                  child: const Text('Pay'),
+                ),
+              ),
+            ),
+          if (zelle.isNotEmpty)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.account_balance, color: Colors.blue),
+                title: Text('Zelle: $zelle'),
+                subtitle: const Text('Send payment to this Zelle'),
+              ),
+            ),
+          const Divider(),
+          Text(widget.isAdmin ? 'Weekly schedule — record when received' : 'Your weekly payment schedule', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ...payments.map((p) => _paymentTile(context, p)),
+        ],
+      ),
+    );
+  }
+
+  Widget _paymentTile(BuildContext context, Map<String, dynamic> p) {
+    final due = DateTime.tryParse((p['dueDate'] ?? '').toString())?.toLocal();
+    final paid = (p['status'] ?? '') == 'paid';
+    final paidAmt = (p['paidAmount'] as num?)?.toDouble();
+    final dueAmt = (p['amount'] as num?)?.toDouble() ?? 0;
+    return Card(
+      child: ListTile(
+        title: Text('\$${ngmyLoanFormatCurrency(dueAmt)}', style: TextStyle(fontWeight: FontWeight.w800, color: paid ? Colors.green : Colors.orange)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(due != null ? 'Due ${due.month}/${due.day}/${due.year}' : 'Scheduled'),
+            if (paid && paidAmt != null) Text('Received: \$${ngmyLoanFormatCurrency(paidAmt)}', style: const TextStyle(color: Colors.green, fontSize: 12)),
+            if ((p['adminNote'] ?? '').toString().isNotEmpty) Text((p['adminNote'] ?? '').toString(), style: const TextStyle(fontSize: 11)),
+          ],
+        ),
+        trailing: paid
+            ? const Icon(Icons.check_circle, color: Colors.green)
+            : (widget.isAdmin
+                ? TextButton(onPressed: () => _recordPayment(p), child: const Text('Record'))
+                : const Icon(Icons.schedule)),
+      ),
+    );
+  }
+}
+
+void showNgmyLoanCalculator(BuildContext context) {
+  final amt = TextEditingController();
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (c) => StatefulBuilder(
+      builder: (context, setST) {
+        final loan = double.tryParse(amt.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+        final interest = loan * NgmyLoanLogic.interestRate;
+        final total = loan + interest;
+        final term = loan > 0 ? NgmyLoanLogic.termForAmount(loan) : null;
+        final weekly = term != null && term.weeks > 0 ? total / term.weeks : 0.0;
+
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.62,
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          padding: const EdgeInsets.all(25),
+          child: Column(
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(99))),
+              const SizedBox(height: 20),
+              const Text('Loan Calculator', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              TextField(
+                controller: amt,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Loan amount (\$)', border: OutlineInputBorder()),
+                onChanged: (_) => setST(() {}),
+              ),
+              const SizedBox(height: 20),
+              if (term != null) Text(term.summary, style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              _calcRow('Interest (36%)', '\$${ngmyLoanFormatCurrency(interest)}', Colors.orange),
+              _calcRow('Total repayment', '\$${ngmyLoanFormatCurrency(total)}', Colors.blue),
+              if (weekly > 0) _calcRow('Each weekly payment', '\$${ngmyLoanFormatCurrency(weekly)}', Colors.green),
+              const Spacer(),
+              ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+Widget _calcRow(String l, String v, Color c) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(l),
+          Text(v, style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 17)),
+        ],
+      ),
+    );
+
+void showNgmyLoanAdminSheet(
+  BuildContext context, {
+  required NgmyLoanConfigBridge config,
+  required VoidCallback onDataChanged,
+  required bool isDark,
+  VoidCallback? onEditSettings,
+}) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => DraggableScrollableSheet(
+      initialChildSize: 0.92,
+      minChildSize: 0.5,
+      maxChildSize: 0.96,
+      builder: (_, scroll) => _NgmyLoanAdminPanel(
+        config: config,
+        onDataChanged: onDataChanged,
+        isDark: isDark,
+        scrollController: scroll,
+        onEditSettings: onEditSettings,
+      ),
+    ),
+  );
+}
+
+class _NgmyLoanAdminPanel extends StatefulWidget {
+  const _NgmyLoanAdminPanel({
+    required this.config,
+    required this.onDataChanged,
+    required this.isDark,
+    required this.scrollController,
+    this.onEditSettings,
+  });
+  final NgmyLoanConfigBridge config;
+  final VoidCallback onDataChanged;
+  final bool isDark;
+  final ScrollController scrollController;
+  final VoidCallback? onEditSettings;
+
+  @override
+  State<_NgmyLoanAdminPanel> createState() => _NgmyLoanAdminPanelState();
+}
+
+class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
+  @override
+  Widget build(BuildContext context) {
+    final apps = List<Map<String, dynamic>>.from(widget.config.loanApplications.map((e) => Map<String, dynamic>.from(e)))
+      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+
+    return Container(
+      decoration: BoxDecoration(
+        color: widget.isDark ? const Color(0xFF0F111A) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: ListView(
+        controller: widget.scrollController,
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+        children: [
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(99)))),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Expanded(child: Text('Loan Center', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+              if (widget.onEditSettings != null)
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    widget.onEditSettings!();
+                  },
+                  icon: const Icon(Icons.settings, size: 18),
+                  label: const Text('Settings'),
+                ),
+            ],
+          ),
+          Text('${apps.where((a) => (a['status'] ?? '') == 'pending').length} pending · ${apps.length} total', style: TextStyle(color: Colors.grey.shade600)),
+          const SizedBox(height: 16),
+          if (apps.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Text('No loan applications yet.', textAlign: TextAlign.center)),
+          ...apps.map((a) => _adminCard(context, a)),
+        ],
+      ),
+    );
+  }
+
+  Widget _adminCard(BuildContext context, Map<String, dynamic> app) {
+    final status = (app['status'] ?? 'pending').toString();
+    final id = (app['id'] ?? '').toString();
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${app['username']} · \$${ngmyLoanFormatCurrency((app['amount'] as num?)?.toDouble() ?? 0)}', style: const TextStyle(fontWeight: FontWeight.w900)),
+            Text('Status: $status · ${app['collateralType']}', style: const TextStyle(fontSize: 12)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 6, children: [
+              if ((app['idFrontRef'] ?? '').toString().isNotEmpty) _thumb(app['idFrontRef']),
+              if ((app['idBackRef'] ?? '').toString().isNotEmpty) _thumb(app['idBackRef']),
+              if ((app['selfieRef'] ?? '').toString().isNotEmpty) _thumb(app['selfieRef']),
+              if ((app['titleFrontRef'] ?? '').toString().isNotEmpty) _thumb(app['titleFrontRef']),
+              if ((app['titleBackRef'] ?? '').toString().isNotEmpty) _thumb(app['titleBackRef']),
+            ]),
+            Text('SSN: ${app['ssn']} · Gov ID: ${app['governmentId']}', style: const TextStyle(fontSize: 11)),
+            Text('Payout to: ${app['payoutDestination']}', style: const TextStyle(fontSize: 11)),
+            if (status == 'rejected' && (app['rejectionReason'] ?? '').toString().isNotEmpty)
+              Text('Rejected: ${app['rejectionReason']}', style: const TextStyle(color: Colors.red, fontSize: 12)),
+            const SizedBox(height: 8),
+            if (status == 'pending') Row(
+              children: [
+                Expanded(child: OutlinedButton(onPressed: () => _reject(context, id), child: const Text('Reject'))),
+                const SizedBox(width: 8),
+                Expanded(child: FilledButton(onPressed: () => _approve(id), child: const Text('Approve'))),
+              ],
+            ),
+            if (status == 'approved')
+              TextButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => NgmyLoanTrackingScreen(
+                      loanId: id,
+                      config: widget.config,
+                      onDataChanged: widget.onDataChanged,
+                      isAdmin: true,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.payments),
+                label: const Text('Track & record payments'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _thumb(dynamic ref) => SizedBox(width: 48, height: 48, child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NgmyLoanStore.imageWidget(ref)));
+
+  void _approve(String id) {
+    final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == id);
+    if (i < 0) return;
+    widget.config.loanApplications[i]['status'] = 'approved';
+    widget.config.loanApplications[i]['approvedAt'] = DateTime.now().toUtc().toIso8601String();
+    widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+    widget.onDataChanged();
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan approved — user can track payments live.')));
+  }
+
+  Future<void> _reject(BuildContext context, String id) async {
+    final reasonC = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Reject application'),
+        content: TextField(controller: reasonC, maxLines: 3, decoration: const InputDecoration(labelText: 'Why rejected? (user will see this)')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Reject')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == id);
+    if (i < 0) return;
+    widget.config.loanApplications[i]['status'] = 'rejected';
+    widget.config.loanApplications[i]['rejectionReason'] = reasonC.text.trim();
+    widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+    widget.onDataChanged();
+    setState(() {});
+  }
+}
+
+class NgmyLoanLogic {
+  static const interestRate = 0.36;
+
+  static String requiredCollateralType(double amount) {
+    if (amount <= 200) return 'phone';
+    if (amount >= 2000) return 'house';
+    return 'car';
+  }
+
+  static String collateralLabel(String type) => switch (type) {
+        'phone' => 'Phone (2 photos)',
+        'car' => 'Vehicle title (front & back)',
+        'house' => 'Property title (front & back)',
+        _ => 'Collateral',
+      };
+
+  static ({int weeks, String summary, String monthsLabel}) termForAmount(double amount, {int? userMonths}) {
+    if (amount <= 300) {
+      return (weeks: 4, summary: '4 weekly payments over 1 month', monthsLabel: '1 month');
+    }
+    if (amount <= 500) {
+      return (weeks: 6, summary: '6 weekly payments over 6 weeks (1½ months)', monthsLabel: '6 weeks');
+    }
+    if (amount <= 2000) {
+      return (weeks: 12, summary: '12 weekly payments over 3 months', monthsLabel: '3 months');
+    }
+    final months = (userMonths ?? 12).clamp(3, 12);
+    final weeks = months * 4;
+    return (weeks: weeks, summary: '$weeks weekly payments over $months months', monthsLabel: '$months months');
+  }
+
+  static Future<void> openCashApp(String tag) async {
+    final handle = tag.trim().replaceFirst(r'$', '');
+    if (handle.isEmpty) return;
+    final uri = Uri.parse('https://cash.app/\$$handle');
+    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+class NgmyLoanStore {
+  static List<Map<String, dynamic>> appsForUser(List<Map<String, dynamic>> all, String email) {
+    final key = email.toLowerCase().trim();
+    return all.where((a) => (a['userEmail'] ?? '').toString().toLowerCase().trim() == key).map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  static Future<String> storeImageRef(XFile file) async {
+    final bytes = await file.readAsBytes();
+    if (kIsWeb) {
+      return 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    }
+    final path = file.path;
+    if (await ngmyDeviceIsOnline()) {
+      final uploaded = await _upload(bytes, 'loans/${DateTime.now().microsecondsSinceEpoch}.jpg');
+      if (uploaded != null) return uploaded;
+    }
+    return path;
+  }
+
+  static Future<String?> _upload(Uint8List bytes, String path) async {
+    try {
+      final storage = Supabase.instance.client.storage.from('media');
+      await storage.uploadBinary(path, bytes, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'));
+      return 'supabase://media/$path';
+    } catch (e) {
+      debugPrint('[loan] upload: $e');
+      return null;
+    }
+  }
+
+  static Widget imageWidget(dynamic ref) {
+    final src = (ref ?? '').toString();
+    if (src.isEmpty) return const Icon(Icons.image_not_supported, size: 32);
+    if (src.startsWith('data:image')) {
+      try {
+        return Image.memory(base64Decode(src.split(',').last), fit: BoxFit.cover);
+      } catch (_) {}
+    }
+    if (src.startsWith('http')) return Image.network(src, fit: BoxFit.cover);
+    if (!kIsWeb && src.startsWith('/')) return Image.file(File(src), fit: BoxFit.cover);
+    return const Icon(Icons.insert_photo, size: 32);
+  }
+}

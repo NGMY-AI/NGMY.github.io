@@ -47,6 +47,7 @@ import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
+import 'ngmy_loans.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -318,6 +319,8 @@ class AppConfig {
   List<String> dismissedContributionReceiptKeys;
   List<Map<String, dynamic>> jobPosts;
   List<Map<String, dynamic>> jobWorkerApplications;
+  List<Map<String, dynamic>> loanApplications;
+  String loanCompanyZelle;
   List<Map<String, dynamic>> storeListings;
   List<Map<String, dynamic>> storeInquiries;
   List<Map<String, dynamic>> storeOrders;
@@ -361,6 +364,8 @@ class AppConfig {
     this.dismissedContributionReceiptKeys = const [],
     this.jobPosts = const [],
     this.jobWorkerApplications = const [],
+    List<Map<String, dynamic>>? loanApplications,
+    this.loanCompanyZelle = '',
     this.storeListings = const [],
     this.storeInquiries = const [],
     this.storeOrders = const [],
@@ -378,7 +383,8 @@ class AppConfig {
     List<Map<String, dynamic>>? ngmyPopups,
     List<Map<String, dynamic>>? ngmyVideoPopups,
     List<Map<String, dynamic>>? mediaVirtualProfiles,
-  })  : gameTimeLimits = gameTimeLimits ?? ngmyDefaultGameTimeLimits(),
+  })  : loanApplications = loanApplications ?? [],
+        gameTimeLimits = gameTimeLimits ?? ngmyDefaultGameTimeLimits(),
         diceSettings = diceSettings ?? NgmyDiceSettings().toJson(),
         gameInvites = gameInvites ?? [],
         ngmyPopups = ngmyPopups ?? NgmyPopupDefaults.allDefaultPopups(),
@@ -409,6 +415,8 @@ class AppConfig {
     'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys,
     'jobPosts': jobPosts,
     'jobWorkerApplications': jobWorkerApplications,
+    'loanApplications': loanApplications,
+    'loanCompanyZelle': loanCompanyZelle,
     'storeListings': storeListings,
     'storeInquiries': storeInquiries,
     'storeOrders': storeOrders,
@@ -452,6 +460,8 @@ class AppConfig {
     dismissedContributionReceiptKeys: List<String>.from(json['dismissedContributionReceiptKeys'] ?? const []),
     jobPosts: List<Map<String, dynamic>>.from((json['jobPosts'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     jobWorkerApplications: List<Map<String, dynamic>>.from((json['jobWorkerApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
+    loanApplications: List<Map<String, dynamic>>.from((json['loanApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
+    loanCompanyZelle: (json['loanCompanyZelle'] ?? '').toString(),
     storeListings: List<Map<String, dynamic>>.from((json['storeListings'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     storeInquiries: List<Map<String, dynamic>>.from((json['storeInquiries'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     storeOrders: List<Map<String, dynamic>>.from((json['storeOrders'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
@@ -475,6 +485,14 @@ class AppConfig {
     mediaVirtualProfiles: NgmyVirtualMediaProfiles.ensure(json['mediaVirtualProfiles']),
   );
 }
+
+NgmyLoanConfigBridge ngmyLoanConfigBridge(AppConfig config) => NgmyLoanConfigBridge(
+      loanApplications: config.loanApplications,
+      loanPhone: config.loanPhone,
+      loanHowItWorks: config.loanHowItWorks,
+      officialCashApp: config.officialCashApp,
+      loanCompanyZelle: config.loanCompanyZelle.trim().isNotEmpty ? config.loanCompanyZelle : config.helpZelle,
+    );
 
 List<InvestmentPlan> _investmentPlansFromMaps(List<Map<String, dynamic>> maps) {
   final plans = maps.map((e) => InvestmentPlan.fromJson(e)).toList();
@@ -2792,6 +2810,34 @@ class _NGMYAppState extends State<NGMYApp> {
 
   String _appConfigSig(AppConfig c) => jsonEncode(c.toJson());
 
+  List<Map<String, dynamic>> _mergeLoanApplicationsLists(
+    List<Map<String, dynamic>> local,
+    List<Map<String, dynamic>> remote,
+  ) {
+    if (remote.isEmpty) return local;
+    if (local.isEmpty) return remote;
+    final byId = <String, Map<String, dynamic>>{};
+    for (final a in local) {
+      final id = (a['id'] ?? '').toString();
+      if (id.isNotEmpty) byId[id] = Map<String, dynamic>.from(a);
+    }
+    for (final a in remote) {
+      final id = (a['id'] ?? '').toString();
+      if (id.isEmpty) continue;
+      final r = Map<String, dynamic>.from(a);
+      final existing = byId[id];
+      if (existing == null) {
+        byId[id] = r;
+      } else {
+        final lu = (existing['updatedAt'] ?? '').toString();
+        final ru = (r['updatedAt'] ?? '').toString();
+        byId[id] = ru.compareTo(lu) >= 0 ? r : existing;
+      }
+    }
+    return byId.values.toList()
+      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+  }
+
   void _startConfigRefreshLoop() {
     _configRefreshTimer?.cancel();
     _configRefreshTimer = Timer.periodic(const Duration(seconds: 45), (_) async {
@@ -2813,6 +2859,7 @@ class _NGMYAppState extends State<NGMYApp> {
         final keepInvites = List<Map<String, dynamic>>.from(_config.gameInvites.map((e) => Map<String, dynamic>.from(e)));
         final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
+        final keepLoans = List<Map<String, dynamic>>.from(_config.loanApplications.map((e) => Map<String, dynamic>.from(e)));
         final cfgMap = Map<String, dynamic>.from(cfg);
         final next = AppConfig.fromJson(cfgMap);
         final remoteLimits = cfgMap['gameTimeLimits'];
@@ -2850,6 +2897,11 @@ class _NGMYAppState extends State<NGMYApp> {
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
+        if (next.loanApplications.isEmpty && keepLoans.isNotEmpty) {
+          next.loanApplications = keepLoans;
+        } else {
+          next.loanApplications = _mergeLoanApplicationsLists(keepLoans, next.loanApplications);
+        }
         final remotePopups = (cfgMap['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         final remoteVideoPopups = (cfgMap['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         next.ngmyPopups = _mergeNgmyPopupsFromRemote(keepPopups, remotePopups, NgmyPopupDefaults.ensurePopups);
@@ -3528,6 +3580,12 @@ class _NGMYAppState extends State<NGMYApp> {
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
+        final keepLoans = List<Map<String, dynamic>>.from(_config.loanApplications.map((e) => Map<String, dynamic>.from(e)));
+        if (next.loanApplications.isEmpty && keepLoans.isNotEmpty) {
+          next.loanApplications = keepLoans;
+        } else {
+          next.loanApplications = _mergeLoanApplicationsLists(keepLoans, next.loanApplications);
+        }
         final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
         final remotePopups = (record['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -5607,7 +5665,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 title: 'GROWTH INCOME',
                 onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo), routeName: 'AdminDashboard') : null,
                 leading: InkWell(
-                  onTap: () => NgmyNavigator.push(context, LoanServiceScreen(user: widget.user, config: widget.config), routeName: 'LoanServiceScreen'),
+                  onTap: () => NgmyNavigator.push(
+                    context,
+                    LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
+                    routeName: 'LoanServiceScreen',
+                  ),
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(color: isLight ? const Color(0xFF00B25A) : Colors.transparent, shape: BoxShape.circle),
@@ -8849,12 +8911,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
   );
 
   void _showLoanAdmin(bool isDark) {
+    showNgmyLoanAdminSheet(
+      context,
+      config: ngmyLoanConfigBridge(widget.config),
+      onDataChanged: widget.onDataChanged,
+      isDark: isDark,
+      onEditSettings: () => _showLoanSettingsEditor(isDark),
+    );
+  }
+
+  void _showLoanSettingsEditor(bool isDark) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (c) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
+        height: MediaQuery.of(context).size.height * 0.75,
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF0F111A) : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
@@ -8864,10 +8936,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10))),
             const SizedBox(height: 20),
-            const Text('Loan Management Center', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 30),
-            _addressEditor(isDark), // This now contains the loan phone and how-it-works editor
-            const Spacer(),
+            const Text('Loan settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            Expanded(child: SingleChildScrollView(child: _addressEditor(isDark))),
             ElevatedButton(onPressed: () => Navigator.pop(c), child: const Text('CLOSE')),
           ],
         ),
@@ -8890,6 +8961,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final bAddr = TextEditingController(text: widget.config.officialBitcoin);
     final lPhone = TextEditingController(text: widget.config.loanPhone);
     final lHow = TextEditingController(text: widget.config.loanHowItWorks);
+    final lZelle = TextEditingController(text: widget.config.loanCompanyZelle);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: isDark ? const Color(0xFF1C1F2E) : Colors.white, borderRadius: BorderRadius.circular(20)),
@@ -8897,6 +8969,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
         TextField(controller: cTag, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Admin Cash App Tag', isDark: isDark)),
         const SizedBox(height: 15),
         TextField(controller: bAddr, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Admin Bitcoin Address', isDark: isDark)),
+        const SizedBox(height: 15),
+        TextField(controller: lZelle, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Loan payments — Zelle (email/phone)', isDark: isDark)),
         const SizedBox(height: 15),
         TextField(controller: lPhone, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Loan Support Phone', isDark: isDark)),
         const SizedBox(height: 15),
@@ -8906,6 +8980,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           setState(() {
             widget.config.officialCashApp = cTag.text.trim();
             widget.config.officialBitcoin = bAddr.text.trim();
+            widget.config.loanCompanyZelle = lZelle.text.trim();
             widget.config.loanPhone = lPhone.text.trim();
             widget.config.loanHowItWorks = lHow.text.trim();
           });
@@ -10913,245 +10988,18 @@ class _SubmitPaymentPageState extends State<SubmitPaymentPage> {
 class LoanServiceScreen extends StatelessWidget {
   final UserData user;
   final AppConfig config;
-  const LoanServiceScreen({super.key, required this.user, required this.config});
+  final VoidCallback onDataChanged;
+  const LoanServiceScreen({super.key, required this.user, required this.config, required this.onDataChanged});
 
   @override
   Widget build(BuildContext context) {
-    bool isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF5F7FB),
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => NgmyNavigator.pop(context),
-        ),
-        title: const Text('Loan Services', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header Card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(25),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF00B25A), Color(0xFF00894B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [BoxShadow(color: const Color(0xFF00B25A).withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                        child: const Icon(Icons.attach_money_rounded, color: Colors.white, size: 28),
-                      ),
-                      const SizedBox(width: 15),
-                      const Text('Loan Services', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  Text(
-                    'Need fast cash? Call ${config.loanPhone} or apply for a loan with collateral-backed security below',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            const Text('Apply for New Loan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 15),
-            ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan application form opening...')));
-              },
-              icon: const Icon(Icons.attach_money_rounded),
-              label: const Text('Apply for a Loan', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00B25A),
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 60),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            // How It Works Box
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFE8F0FF),
-                borderRadius: BorderRadius.circular(25),
-                border: Border.all(color: Colors.blue.withOpacity(0.1)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.description_outlined, color: Colors.blue, size: 22),
-                          SizedBox(width: 10),
-                          Text('How It Works', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        ],
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => _showCalculator(context),
-                        icon: const Icon(Icons.calculate_outlined, size: 18),
-                        label: const Text('Calculator', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepPurple,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 15),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    config.loanHowItWorks,
-                    style: TextStyle(fontSize: 13, height: 1.8, color: isDark ? Colors.white70 : Colors.black87),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Warning Box
-                  Container(
-                    padding: const EdgeInsets.all(15),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.red.withOpacity(0.1)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
-                            SizedBox(width: 8),
-                            Text('Late Payment Fees', style: TextStyle(color: Colors.brown, fontWeight: FontWeight.bold, fontSize: 12)),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        _warnItem('A one-time late fee of up to 10% may apply if payment is not received within 10 days'),
-                        _warnItem('Additional fees apply if unpaid after 15 days'),
-                        const Divider(height: 20),
-                        const Row(
-                          children: [
-                            Icon(Icons.gavel_rounded, color: Colors.redAccent, size: 16),
-                            SizedBox(width: 8),
-                            Text('Default & Collateral Policy', style: TextStyle(color: Colors.brown, fontWeight: FontWeight.bold, fontSize: 12)),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        _warnItem('Loan considered in default after 15 days late'),
-                        _warnItem('Lender has the right to recover pledged collateral'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  const Row(
-                    children: [
-                      Icon(Icons.warning_rounded, color: Colors.orange, size: 14),
-                      SizedBox(width: 8),
-                      Expanded(child: Text('Maximum 3 active loans per user. Collateral may be seized.', style: TextStyle(color: Colors.brown, fontSize: 10, fontWeight: FontWeight.bold))),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 50),
-          ],
-        ),
-      ),
+    return NgmyLoanServicesScreen(
+      userEmail: user.email,
+      username: user.username,
+      config: ngmyLoanConfigBridge(config),
+      onDataChanged: onDataChanged,
     );
   }
-
-  Widget _warnItem(String t) => Padding(
-    padding: const EdgeInsets.only(bottom: 4),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('• ', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-        Expanded(child: Text(t, style: const TextStyle(color: Colors.redAccent, fontSize: 10, height: 1.4))),
-      ],
-    ),
-  );
-
-  void _showCalculator(BuildContext context) {
-    final amt = TextEditingController();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (c) => StatefulBuilder(
-        builder: (context, setST) {
-          double? loan = double.tryParse(amt.text);
-          double interest = (loan ?? 0) * 0.36;
-          double total = (loan ?? 0) + interest;
-          double monthly = total / 2;
-
-          return Container(
-            height: MediaQuery.of(context).size.height * 0.6,
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-            ),
-            padding: const EdgeInsets.all(25),
-            child: Column(
-              children: [
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10))),
-                const SizedBox(height: 20),
-                const Text('Loan Calculator', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 25),
-                TextField(
-                  controller: amt,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Loan Amount (\$)', border: OutlineInputBorder()),
-                  onChanged: (v) => setST(() {}),
-                ),
-                const SizedBox(height: 30),
-                _calcRow('Interest (36%)', '\$${formatCurrency(interest)}', Colors.orange),
-                const Divider(height: 30),
-                _calcRow('Total Repayment', '\$${formatCurrency(total)}', Colors.blue),
-                const SizedBox(height: 10),
-                _calcRow('Monthly (2 Months)', '\$${formatCurrency(monthly)}', Colors.green),
-                const Spacer(),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-                  child: const Text('CLOSE'),
-                ),
-              ],
-            ),
-          );
-        }
-      ),
-    );
-  }
-
-  Widget _calcRow(String l, String v, Color c) => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Text(l, style: const TextStyle(fontWeight: FontWeight.w500)),
-      Text(v, style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 18)),
-    ],
-  );
 }
 
 double _ngmyBottomNavScrollPadding(BuildContext context) {
