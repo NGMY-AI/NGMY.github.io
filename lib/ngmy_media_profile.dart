@@ -130,6 +130,7 @@ class NgmyVirtualMediaProfiles {
           'displayName': 'Virtual User ${i + 1}',
           'username': 'virtual_${i + 1}',
           'profilePictureUrl': '',
+          'defaultComment': '',
         });
   }
 
@@ -150,6 +151,7 @@ class NgmyVirtualMediaProfiles {
           'displayName': (saved['displayName'] ?? base[i]['displayName']).toString(),
           'username': (saved['username'] ?? base[i]['username']).toString(),
           'profilePictureUrl': (saved['profilePictureUrl'] ?? '').toString(),
+          'defaultComment': (saved['defaultComment'] ?? '').toString(),
         };
       }
       return Map<String, dynamic>.from(base[i]);
@@ -823,14 +825,80 @@ class NgmyMediaAdminPanel extends StatefulWidget {
 }
 
 class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
-  final _profileSearch = TextEditingController();
+  final _postSearch = TextEditingController();
   final _picker = ImagePicker();
   final _rng = Random();
+  bool _postSearchOpen = false;
 
   @override
   void dispose() {
-    _profileSearch.dispose();
+    _postSearch.dispose();
     super.dispose();
+  }
+
+  List<dynamic> _filteredPosts(List<dynamic> posts) {
+    final q = _postSearch.text.trim().toLowerCase();
+    if (q.isEmpty) return posts;
+    return posts.where((post) {
+      final username = post.username.toString().toLowerCase();
+      final email = post.userEmail.toString().toLowerCase();
+      final postId = post.id.toString().toLowerCase();
+      return username.contains(q) || email.contains(q) || postId.contains(q);
+    }).toList();
+  }
+
+  void _openPostModerationSheet(dynamic post) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: widget.isDark ? const Color(0xFF111731) : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.92,
+        minChildSize: 0.55,
+        maxChildSize: 0.96,
+        builder: (_, scrollCtrl) => SingleChildScrollView(
+          controller: scrollCtrl,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(color: widget.isDark ? Colors.white24 : Colors.black12, borderRadius: BorderRadius.circular(4)),
+                ),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Post Settings', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: widget.isDark ? Colors.white : Colors.black87)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    color: widget.isDark ? Colors.white70 : Colors.black54,
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              _AdminPostCard(
+                post: post,
+                isDark: widget.isDark,
+                onDataChanged: widget.onDataChanged,
+                persistPost: widget.persistPost,
+                virtualProfiles: _profiles,
+                pickVirtualProfile: _pickVirtualProfile,
+                resolveMediaUrl: widget.resolveMediaUrl,
+                onVirtualProfilesChanged: widget.onVirtualProfilesChanged,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   List<Map<String, dynamic>> get _profiles {
@@ -1013,6 +1081,7 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
     final p = Map<String, dynamic>.from(profiles[index]);
     final nameCtrl = TextEditingController(text: (p['displayName'] ?? '').toString());
     final userCtrl = TextEditingController(text: (p['username'] ?? '').toString());
+    final commentCtrl = TextEditingController(text: (p['defaultComment'] ?? '').toString());
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
@@ -1026,7 +1095,15 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
               TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Display name')),
               const SizedBox(height: 8),
               TextField(controller: userCtrl, decoration: const InputDecoration(labelText: 'Username')),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+              TextField(
+                controller: commentCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Default comment',
+                  hintText: 'What this demo account says in comments',
+                ),
+              ),
               OutlinedButton.icon(
                 onPressed: () async {
                   final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
@@ -1050,21 +1127,34 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () { p['displayName'] = nameCtrl.text.trim(); p['username'] = userCtrl.text.trim(); Navigator.pop(c, true); }, child: const Text('Save')),
+          FilledButton(
+            onPressed: () {
+              p['displayName'] = nameCtrl.text.trim();
+              p['username'] = userCtrl.text.trim();
+              p['defaultComment'] = commentCtrl.text.trim();
+              Navigator.pop(c, true);
+            },
+            child: const Text('Save'),
+          ),
         ],
       ),
     );
     if (ok == true) {
       p['displayName'] = nameCtrl.text.trim();
       p['username'] = userCtrl.text.trim();
+      p['defaultComment'] = commentCtrl.text.trim();
       _updateProfile(index, p);
       widget.onDataChanged();
     }
+    nameCtrl.dispose();
+    userCtrl.dispose();
+    commentCtrl.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final posts = widget.allMedia.where((m) => !widget.isPostExpired(m)).toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final allPosts = widget.allMedia.where((m) => !widget.isPostExpired(m)).toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final posts = _filteredPosts(allPosts);
     final profiles = _profiles;
     final accent = const Color(0xFF7C3AED);
     final sub = widget.isDark ? Colors.white54 : Colors.black54;
@@ -1102,12 +1192,45 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Media Moderation', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: widget.isDark ? Colors.white : Colors.black87)),
-                        Text('Boost likes & comments on live posts', style: TextStyle(fontSize: 12, color: sub)),
+                        Text('${allPosts.length} posts • tap a post to manage', style: TextStyle(fontSize: 12, color: sub)),
                       ],
+                    ),
+                  ),
+                  Material(
+                    color: widget.isDark ? const Color(0xFF1C1F2E) : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
+                      onTap: () => setState(() => _postSearchOpen = !_postSearchOpen),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          _postSearchOpen ? Icons.close_rounded : Icons.search_rounded,
+                          size: 20,
+                          color: accent,
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
+              if (_postSearchOpen) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _postSearch,
+                  onChanged: (_) => setState(() {}),
+                  style: TextStyle(color: widget.isDark ? Colors.white : Colors.black87, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Search by username, email, or post ID...',
+                    hintStyle: TextStyle(fontSize: 12, color: sub),
+                    prefixIcon: Icon(Icons.search, size: 20, color: sub),
+                    filled: true,
+                    fillColor: widget.isDark ? const Color(0xFF1C1F2E) : Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -1135,23 +1258,106 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
             ],
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
         if (posts.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 28),
-            child: Center(child: Text('No active media posts.', style: TextStyle(color: sub))),
+            child: Center(
+              child: Text(
+                _postSearch.text.trim().isEmpty ? 'No active media posts.' : 'No posts match your search.',
+                style: TextStyle(color: sub),
+              ),
+            ),
           )
         else
-          ...posts.take(40).map((post) => _AdminPostCard(
-                post: post,
-                isDark: widget.isDark,
-                onDataChanged: widget.onDataChanged,
-                persistPost: widget.persistPost,
-                virtualProfiles: profiles,
-                pickVirtualProfile: _pickVirtualProfile,
-                resolveMediaUrl: widget.resolveMediaUrl,
-              )),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 0.72,
+            ),
+            itemCount: posts.length,
+            itemBuilder: (_, i) => _AdminPostGridTile(
+              post: posts[i],
+              isDark: widget.isDark,
+              resolveMediaUrl: widget.resolveMediaUrl,
+              onTap: () => _openPostModerationSheet(posts[i]),
+            ),
+          ),
       ],
+    );
+  }
+}
+
+class _AdminPostGridTile extends StatelessWidget {
+  final dynamic post;
+  final bool isDark;
+  final Future<String> Function(String rawUrl) resolveMediaUrl;
+  final VoidCallback onTap;
+
+  const _AdminPostGridTile({
+    required this.post,
+    required this.isDark,
+    required this.resolveMediaUrl,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final likes = NgmyMediaProfile.asStringList((post as dynamic).likedBy).length;
+    final comments = NgmyMediaProfile.asMapList((post as dynamic).comments).length;
+    final border = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
+
+    return Material(
+      color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+      borderRadius: BorderRadius.circular(10),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: border),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _PostPreviewThumb(post: post, resolveMediaUrl: resolveMediaUrl),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 5, 6, 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.username.toString(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(Icons.favorite_rounded, size: 10, color: const Color(0xFFEF4444).withOpacity(0.9)),
+                        const SizedBox(width: 2),
+                        Text('$likes', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black54)),
+                        const SizedBox(width: 6),
+                        Icon(Icons.chat_bubble_rounded, size: 10, color: const Color(0xFF3B82F6).withOpacity(0.9)),
+                        const SizedBox(width: 2),
+                        Text('$comments', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black54)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1234,6 +1440,7 @@ class _AdminPostCard extends StatefulWidget {
   final List<Map<String, dynamic>> virtualProfiles;
   final Map<String, dynamic> Function() pickVirtualProfile;
   final Future<String> Function(String rawUrl) resolveMediaUrl;
+  final void Function(List<Map<String, dynamic>> profiles)? onVirtualProfilesChanged;
 
   const _AdminPostCard({
     required this.post,
@@ -1243,6 +1450,7 @@ class _AdminPostCard extends StatefulWidget {
     required this.virtualProfiles,
     required this.pickVirtualProfile,
     required this.resolveMediaUrl,
+    this.onVirtualProfilesChanged,
   });
 
   @override
@@ -1297,16 +1505,27 @@ class _AdminPostCardState extends State<_AdminPostCard> {
   Future<void> _addBulkComments(int count) async {
     if (count <= 0 || widget.virtualProfiles.isEmpty) return;
     if (!await _ensureProfileSelected()) return;
+    final fallback = _commentTextCtrl.text.trim();
     final comments = NgmyMediaProfile.asMapList((widget.post as dynamic).comments);
     final start = _selectedProfileIdx!.clamp(0, widget.virtualProfiles.length - 1);
+    var added = 0;
     for (var i = 0; i < count; i++) {
       final profile = widget.virtualProfiles[(start + i) % widget.virtualProfiles.length];
-      comments.add(_commentFromProfile(profile, '🔥'));
+      final text = (profile['defaultComment'] ?? '').toString().trim().isNotEmpty
+          ? (profile['defaultComment'] ?? '').toString().trim()
+          : fallback;
+      if (text.isEmpty) continue;
+      comments.add(_commentFromProfile(profile, text));
+      added++;
+    }
+    if (added == 0) {
+      _snack('Set a comment for the demo profile or type one below.');
+      return;
     }
     (widget.post as dynamic).comments = comments;
     await widget.persistPost(widget.post);
     widget.onDataChanged();
-    _snack('Added $count comment(s) from demo profiles.');
+    _snack('Added $added comment(s) from demo profiles.');
   }
 
   Map<String, dynamic> _commentFromProfile(Map<String, dynamic> profile, String text) => {
@@ -1326,10 +1545,12 @@ class _AdminPostCardState extends State<_AdminPostCard> {
     if (!await _ensureProfileSelected()) return;
     final text = _commentTextCtrl.text.trim();
     if (text.isEmpty) {
-      _snack('Write a comment first.');
+      _snack('Write the comment this demo account will say.');
       return;
     }
-    final profile = _selectedProfile!;
+    final profile = Map<String, dynamic>.from(_selectedProfile!);
+    profile['defaultComment'] = text;
+    _saveProfileDefaultComment(_selectedProfileIdx!, profile);
     final comments = NgmyMediaProfile.asMapList((widget.post as dynamic).comments);
     comments.add(_commentFromProfile(profile, text));
     (widget.post as dynamic).comments = comments;
@@ -1337,6 +1558,22 @@ class _AdminPostCardState extends State<_AdminPostCard> {
     widget.onDataChanged();
     _commentTextCtrl.clear();
     _snack('Comment posted as @${profile['username']}.');
+  }
+
+  void _saveProfileDefaultComment(int index, Map<String, dynamic> profile) {
+    if (widget.onVirtualProfilesChanged == null) return;
+    final next = widget.virtualProfiles.map((e) => Map<String, dynamic>.from(e)).toList();
+    if (index < 0 || index >= next.length) return;
+    next[index] = profile;
+    widget.onVirtualProfilesChanged!(NgmyVirtualMediaProfiles.ensure(next));
+  }
+
+  void _onProfileSelected(int i) {
+    setState(() {
+      _selectedProfileIdx = i;
+      final p = widget.virtualProfiles[i];
+      _commentTextCtrl.text = (p['defaultComment'] ?? '').toString();
+    });
   }
 
   Widget _profilePickerStrip() {
@@ -1382,7 +1619,7 @@ class _AdminPostCardState extends State<_AdminPostCard> {
               final p = widget.virtualProfiles[i];
               final selected = _selectedProfileIdx == i;
               return GestureDetector(
-                onTap: () => setState(() => _selectedProfileIdx = i),
+                onTap: () => _onProfileSelected(i),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   width: 64,
@@ -1489,18 +1726,10 @@ class _AdminPostCardState extends State<_AdminPostCard> {
     final border = widget.isDark ? Colors.white12 : const Color(0xFFE2E8F0);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: panel,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(widget.isDark ? 0.2 : 0.06),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1589,7 +1818,7 @@ class _AdminPostCardState extends State<_AdminPostCard> {
                     maxLines: 2,
                     style: TextStyle(color: widget.isDark ? Colors.white : Colors.black87),
                     decoration: InputDecoration(
-                      hintText: 'Write comment text...',
+                      hintText: 'Comment this demo account will say...',
                       filled: true,
                       fillColor: widget.isDark ? const Color(0xFF1C1F2E) : Colors.white,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
