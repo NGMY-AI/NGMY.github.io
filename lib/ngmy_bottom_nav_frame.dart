@@ -1,21 +1,20 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-/// Shared layout numbers — frame and icons use the same values so everything aligns.
+/// Shared layout — frame and icons use the same numbers for alignment.
 class NgmyBottomNavMetrics {
   NgmyBottomNavMetrics._();
 
-  static const sideIconSize = 26.0;
-  static const centerButtonSize = 44.0;
-  static const iconPad = 8.0;
-  static const wingCorner = 20.0;
-  static const bottomJoin = 10.0;
+  static const sideIconSize = 30.0;
+  static const centerButtonSize = 52.0;
+  static const iconPad = 9.0;
+  static const outerRadius = 22.0;
+  static const centerJoin = 8.0;
 
-  /// Total painted frame height (center dome + flat bottom).
   static double get frameHeight => iconPad * 2 + centerButtonSize;
 
-  /// Vertical center for every icon — same horizontal ruler through all menus.
   static double iconCenterY(double frameH) =>
       frameH - iconPad - centerButtonSize / 2;
 
@@ -29,14 +28,12 @@ class NgmyBottomNavMetrics {
     return cy - centerButtonSize / 2 - iconPad;
   }
 
-  /// Side wings stop here at the bottom — same inset as top padding around small icons.
   static double wingBottomY(double frameH) {
     final cy = iconCenterY(frameH);
     return cy + sideIconSize / 2 + iconPad;
   }
 }
 
-/// One continuous bottom nav frame — side wings inset at bottom, clean center arch on top.
 class NgmySculptedBottomNavFrame extends StatelessWidget {
   const NgmySculptedBottomNavFrame({
     super.key,
@@ -96,6 +93,66 @@ class _NgmyUnifiedNavPainter extends CustomPainter {
   final Color fillColor;
   final Color borderColor;
 
+  /// Perfect circular arc between two points at [y0], bulging to [peakY] (smaller = higher).
+  static void _arcBulgeUp(
+    Path path,
+    double x0,
+    double x1,
+    double y0,
+    double peakY,
+    double cx,
+  ) {
+    final half = (x1 - x0) / 2;
+    final sagitta = y0 - peakY;
+    if (sagitta <= 0.5 || half <= 0.5) {
+      path.lineTo(x0, y0);
+      return;
+    }
+    final radius = (half * half + sagitta * sagitta) / (2 * sagitta);
+    final centerY = peakY + radius;
+    final start = math.atan2(y0 - centerY, x1 - cx);
+    final end = math.atan2(y0 - centerY, x0 - cx);
+    var sweep = end - start;
+    if (sweep > math.pi) sweep -= 2 * math.pi;
+    if (sweep < -math.pi) sweep += 2 * math.pi;
+    path.arcTo(
+      Rect.fromCircle(center: Offset(cx, centerY), radius: radius),
+      start,
+      sweep,
+      false,
+    );
+  }
+
+  /// Perfect circular arc between two points at [y0], bulging down to [valleyY].
+  static void _arcBulgeDown(
+    Path path,
+    double x0,
+    double x1,
+    double y0,
+    double valleyY,
+    double cx,
+  ) {
+    final half = (x1 - x0) / 2;
+    final sagitta = valleyY - y0;
+    if (sagitta <= 0.5 || half <= 0.5) {
+      path.lineTo(x1, y0);
+      return;
+    }
+    final radius = (half * half + sagitta * sagitta) / (2 * sagitta);
+    final centerY = y0 - radius + sagitta;
+    final start = math.atan2(y0 - centerY, x0 - cx);
+    final end = math.atan2(y0 - centerY, x1 - cx);
+    var sweep = end - start;
+    if (sweep > math.pi) sweep -= 2 * math.pi;
+    if (sweep < -math.pi) sweep += 2 * math.pi;
+    path.arcTo(
+      Rect.fromCircle(center: Offset(cx, centerY), radius: radius),
+      start,
+      sweep,
+      false,
+    );
+  }
+
   static Path buildPath(double w, double h) {
     final wingTop = NgmyBottomNavMetrics.wingTopY(h);
     final centerTop = NgmyBottomNavMetrics.centerTopY(h);
@@ -104,62 +161,70 @@ class _NgmyUnifiedNavPainter extends CustomPainter {
     final leftEnd = w * (3 / 7);
     final rightStart = w * (4 / 7);
     final cx = w / 2;
-    final r = NgmyBottomNavMetrics.wingCorner;
-    final join = NgmyBottomNavMetrics.bottomJoin;
-    final sideInset = NgmyBottomNavMetrics.iconPad * 0.65;
+    final r = NgmyBottomNavMetrics.outerRadius;
+    final join = NgmyBottomNavMetrics.centerJoin;
+
+    final leftJoin = leftEnd + join;
+    final rightJoin = rightStart - join;
 
     final path = Path();
 
-    // ── Left wing bottom (inset up to match top padding) ──
+    // ── Bottom-left outer corner ──
     path.moveTo(r, wingBottom);
-    path.lineTo(leftEnd - sideInset, wingBottom);
 
-    // Inner join: curve down into full NGMY bottom (unchanged).
-    path.cubicTo(
-      leftEnd - 2,
-      wingBottom,
-      leftEnd + 2,
-      bottom - 2,
-      leftEnd + join,
-      bottom,
-    );
+    // Straight bottom edge — left wing.
+    path.lineTo(leftJoin, wingBottom);
 
-    // ── NGMY flat bottom (do not change) ──
-    path.lineTo(rightStart - join, bottom);
+    // Symmetric circular curve under NGMY.
+    _arcBulgeDown(path, leftJoin, rightJoin, wingBottom, bottom, cx);
 
-    // Inner join on right wing.
-    path.cubicTo(
-      rightStart - 2,
-      bottom - 2,
-      rightStart + 2,
-      wingBottom,
-      rightStart + sideInset,
-      wingBottom,
-    );
-
-    // ── Right wing bottom ──
+    // Straight bottom edge — right wing.
     path.lineTo(w - r, wingBottom);
-    path.quadraticBezierTo(w, wingBottom, w, wingBottom - r);
 
-    // Right outer edge.
+    // Bottom-right outer corner.
+    path.arcToPoint(
+      Offset(w, wingBottom - r),
+      radius: Radius.circular(r),
+      clockwise: true,
+    );
+
+    // Straight right outer edge.
     path.lineTo(w, wingTop + r);
-    path.quadraticBezierTo(w, wingTop, w - r, wingTop);
 
-    // Right wing top (pushed in slightly on inner edge).
-    path.lineTo(rightStart + sideInset, wingTop);
+    // Top-right outer corner.
+    path.arcToPoint(
+      Offset(w - r, wingTop),
+      radius: Radius.circular(r),
+      clockwise: true,
+    );
 
-    // ── Clean top curve over NGMY (one arc, end to end) ──
-    path.quadraticBezierTo(cx, centerTop, leftEnd + sideInset, wingTop);
+    // Straight top edge — right wing.
+    path.lineTo(rightJoin, wingTop);
 
-    // Left wing top.
+    // Symmetric circular curve over NGMY.
+    _arcBulgeUp(path, leftJoin, rightJoin, wingTop, centerTop, cx);
+
+    // Straight top edge — left wing.
     path.lineTo(r, wingTop);
-    path.quadraticBezierTo(0, wingTop, 0, wingTop + r);
 
-    // Left outer edge.
+    // Top-left outer corner.
+    path.arcToPoint(
+      Offset(0, wingTop + r),
+      radius: Radius.circular(r),
+      clockwise: true,
+    );
+
+    // Straight left outer edge.
     path.lineTo(0, wingBottom - r);
-    path.quadraticBezierTo(0, wingBottom, r, wingBottom);
-    path.close();
 
+    // Bottom-left outer corner.
+    path.arcToPoint(
+      Offset(r, wingBottom),
+      radius: Radius.circular(r),
+      clockwise: true,
+    );
+
+    path.close();
     return path;
   }
 

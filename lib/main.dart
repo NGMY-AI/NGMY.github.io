@@ -6206,12 +6206,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                       borderRadius: BorderRadius.circular(30),
                       child: Image.network(
                         widget.config.logoUrl,
-                        width: 30,
-                        height: 30,
+                        width: 36,
+                        height: 36,
                         fit: BoxFit.cover,
                         errorBuilder: (c, e, s) => const Text(
                           'NGMY',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
                         ),
                       ),
                     ),
@@ -11712,7 +11712,7 @@ class LoanServiceScreen extends StatelessWidget {
 
 /// Scroll padding so list content can pass behind the floating bottom nav (like Media).
 double _ngmyBottomNavScrollPadding(BuildContext context) {
-  return 98 + MediaQuery.paddingOf(context).bottom;
+  return 106 + MediaQuery.paddingOf(context).bottom;
 }
 
 class InvestScreen extends StatelessWidget {
