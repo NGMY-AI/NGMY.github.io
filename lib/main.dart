@@ -60,6 +60,7 @@ import 'ngmy_web_viewport.dart';
 import 'ngmy_web_status_bar.dart';
 import 'ngmy_login_logo.dart';
 import 'ngmy_media_delivery.dart';
+import 'ngmy_push_notification_prompt.dart';
 import 'ngmy_push_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 
@@ -95,8 +96,8 @@ String _hashPassword(String password) {
   return sha256.convert(bytes).toString();
 }
 
-/// Copy text only after a deliberate 4-second long-press (prevents scroll selection).
-class CopyOnHoldText extends StatefulWidget {
+/// Selectable text — tap and drag to copy (works on web and mobile).
+class CopyOnHoldText extends StatelessWidget {
   final String data;
   final TextStyle? style;
   final TextAlign? textAlign;
@@ -113,60 +114,17 @@ class CopyOnHoldText extends StatefulWidget {
   });
 
   @override
-  State<CopyOnHoldText> createState() => _CopyOnHoldTextState();
-}
-
-class _CopyOnHoldTextState extends State<CopyOnHoldText> {
-  Timer? _holdTimer;
-  bool _readyToCopy = false;
-
-  void _cancelHold() {
-    _holdTimer?.cancel();
-    _holdTimer = null;
-    if (_readyToCopy && mounted) setState(() => _readyToCopy = false);
-  }
-
-  void _startHold() {
-    _cancelHold();
-    setState(() => _readyToCopy = false);
-    _holdTimer = Timer(const Duration(seconds: 4), () {
-      if (!mounted) return;
-      setState(() => _readyToCopy = true);
-      Clipboard.setData(ClipboardData(text: widget.data));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Copied to clipboard'),
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    });
-  }
-
-  @override
-  void dispose() {
-    _cancelHold();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final baseStyle = widget.style ?? DefaultTextStyle.of(context).style;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onLongPressStart: (_) => _startHold(),
-      onLongPressEnd: (_) => _cancelHold(),
-      onLongPressCancel: _cancelHold,
-      child: Text(
-        widget.data,
-        style: baseStyle.copyWith(
-          decoration: _readyToCopy ? TextDecoration.underline : null,
-          decorationColor: Colors.greenAccent,
-        ),
-        textAlign: widget.textAlign,
-        maxLines: widget.maxLines,
-        overflow: widget.overflow,
-      ),
+    return SelectableText(
+      data,
+      style: style,
+      textAlign: textAlign,
+      maxLines: maxLines,
+      contextMenuBuilder: (context, editableTextState) {
+        return AdaptiveTextSelectionToolbar.editableText(
+          editableTextState: editableTextState,
+        );
+      },
     );
   }
 }
@@ -851,6 +809,7 @@ Future<bool> _pushUserMediaProfileFast(UserData u) async {
 void _mergeUserMediaProfileFields(UserData local, UserData remote) {
   remote.mediaFollowers = <String>{...remote.mediaFollowers, ...local.mediaFollowers}.toList();
   remote.mediaFollowing = <String>{...remote.mediaFollowing, ...local.mediaFollowing}.toList();
+  remote.readAnnouncementIds = NgmyAnnouncementReads.mergeReadSets(local.readAnnouncementIds, remote.readAnnouncementIds).toList();
   if ((local.mediaBio ?? '').trim().isNotEmpty && (remote.mediaBio ?? '').trim().isEmpty) {
     remote.mediaBio = local.mediaBio;
   }
@@ -1347,6 +1306,7 @@ const _userMediaProfileCloudKeys = {
   'mediaBio',
   'mediaHighlights',
   'mediaStories',
+  'readAnnouncementIds',
 };
 
 void _stripUserMediaProfileFieldsFromBulkRow(Map<String, dynamic> row) {
@@ -1417,6 +1377,23 @@ Future<bool> _upsertMediaSocialFields(MediaPost post) async {
     'likes': likedBy.length,
   };
   return _upsertMediaRowSafe(row);
+}
+
+Future<bool> _upsertUserReadAnnouncements(UserData u) async {
+  if (!await ngmyCanReachCloud()) return false;
+  final email = u.email.toLowerCase().trim();
+  if (email.isEmpty) return false;
+  try {
+    await Supabase.instance.client.from('users').upsert({
+      'email': u.email,
+      'username': u.username,
+      'readAnnouncementIds': u.readAnnouncementIds,
+    }).timeout(kNgmyCloudWriteTimeout);
+    return true;
+  } catch (e) {
+    debugPrint('[user read announcements] upsert: $e');
+    return false;
+  }
 }
 
 Future<bool> _upsertUserMediaSocialFields(UserData u) async {
@@ -3316,8 +3293,9 @@ class UserData {
   List<String> mediaFollowing;
   List<Map<String, dynamic>> mediaHighlights;
   List<Map<String, dynamic>> mediaStories;
+  List<String> readAnnouncementIds;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories}) : mediaFollowers = mediaFollowers ?? <String>[], mediaFollowing = mediaFollowing ?? <String>[], mediaHighlights = mediaHighlights ?? <Map<String, dynamic>>[], mediaStories = mediaStories ?? <Map<String, dynamic>>[];
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds}) : mediaFollowers = mediaFollowers ?? <String>[], mediaFollowing = mediaFollowing ?? <String>[], mediaHighlights = mediaHighlights ?? <Map<String, dynamic>>[], mediaStories = mediaStories ?? <Map<String, dynamic>>[], readAnnouncementIds = readAnnouncementIds ?? <String>[];
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
     if (activeInvestment!.daysLeft <= 0) return 0.0;
@@ -3337,7 +3315,7 @@ class UserData {
     return earnings > totalDaily ? totalDaily : earnings;
   }
   double get todayDailyGoal => activeInvestment == null ? 0.0 : (activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100)));
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -3407,6 +3385,7 @@ class UserData {
       mediaFollowing: _jsonStringList(json['mediaFollowing']),
       mediaHighlights: _jsonMapList(json['mediaHighlights']),
       mediaStories: _jsonMapList(json['mediaStories']),
+      readAnnouncementIds: _jsonStringList(json['readAnnouncementIds']),
     );
   }
 }
@@ -3642,59 +3621,61 @@ class _NGMYAppState extends State<NGMYApp> {
     }
   }
 
+  Future<bool> _pushNotificationsEnabled() async {
+    if (kIsWeb) return ngmyPushHasPermission();
+    final ios = _localNotifications.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+    if (ios != null) {
+      final settings = await ios.checkPermissions();
+      return settings?.isEnabled ?? false;
+    }
+    final android = _localNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (android != null) {
+      return await android.areNotificationsEnabled() ?? false;
+    }
+    return _notificationsReady;
+  }
+
   Future<void> _promptPushNotificationsForUser(BuildContext context, String email) async {
+    if (email.trim().isEmpty) return;
+    if (await _pushNotificationsEnabled()) return;
+    if (!context.mounted) return;
+
+    final enable = await NgmyPushNotificationPrompt.show(context);
+    if (enable != true || !context.mounted) return;
+
     if (kIsWeb) {
-      await ngmyPushMaybePrompt(context, email);
+      await ngmyPushRequestPermission();
       return;
     }
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'ngmy_push_prompted_${email.toLowerCase().trim()}';
-    if (prefs.getBool(key) == true) return;
-    if (!context.mounted) return;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.notifications_active_rounded, color: Color(0xFF00B25A)),
-            SizedBox(width: 10),
-            Expanded(child: Text('Enable notifications?')),
-          ],
-        ),
-        content: const Text(
-          'Allow NGMY to alert you for transactions, earnings, and news announcements.',
-          style: TextStyle(height: 1.35),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await prefs.setBool(key, true);
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Not now'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF00B25A)),
-            onPressed: () async {
-              await prefs.setBool(key, true);
-              try {
-                await _localNotifications
-                    .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
-                    ?.requestPermissions(alert: true, badge: true, sound: true);
-                await _localNotifications
-                    .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-                    ?.requestNotificationsPermission();
-                _notificationsReady = true;
-              } catch (_) {}
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Allow notifications'),
-          ),
-        ],
-      ),
-    );
+    try {
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(alert: true, badge: true, sound: true);
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+      _notificationsReady = true;
+    } catch (_) {}
+  }
+
+  Future<void> _markAnnouncementsReadForUser(Iterable<String> announcementIds) async {
+    final ids = announcementIds.where((e) => e.isNotEmpty).toList();
+    if (ids.isEmpty || _currentUser == null) return;
+    final key = _currentUser!.email.toLowerCase().trim();
+    final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+    final user = idx >= 0 ? _allUsers[idx] : _currentUser!;
+    user.readAnnouncementIds = NgmyAnnouncementReads.mergeReadSets(user.readAnnouncementIds, ids).toList();
+    if (_currentUser!.email.toLowerCase().trim() == key) {
+      _currentUser!.readAnnouncementIds = user.readAnnouncementIds;
+    }
+    await NgmyAnnouncementReads.saveLocal(key, user.readAnnouncementIds.toSet());
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+      await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+    } catch (_) {}
+    await _upsertUserReadAnnouncements(user);
+    if (mounted) setState(() {});
   }
 
   Future<void> _persistAnnouncementsLocally() async {
@@ -4813,6 +4794,7 @@ class _NGMYAppState extends State<NGMYApp> {
             }
           }
         });
+        unawaited(NgmyAnnouncementReads.saveLocal(email, updatedUser.readAnnouncementIds.toSet()));
         SharedPreferences.getInstance().then((prefs) {
           prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
           if (_currentUser != null) {
@@ -5130,6 +5112,16 @@ class _NGMYAppState extends State<NGMYApp> {
       }
       if (_currentUser != null) {
         NgmyMediaProfile.normalizeUserMediaFields(_currentUser);
+        final localReads = await NgmyAnnouncementReads.loadLocal(_currentUser!.email);
+        if (localReads.isNotEmpty) {
+          _currentUser!.readAnnouncementIds =
+              NgmyAnnouncementReads.mergeReadSets(_currentUser!.readAnnouncementIds, localReads).toList();
+          final key = _currentUser!.email.toLowerCase().trim();
+          final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+          if (idx >= 0) {
+            _allUsers[idx].readAnnouncementIds = _currentUser!.readAnnouncementIds;
+          }
+        }
       }
       (_config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure((_config as dynamic).mediaVirtualProfiles);
       NgmyMediaProfile.pruneExpiredStoriesAllUsers(_allUsers);
@@ -5358,7 +5350,13 @@ class _NGMYAppState extends State<NGMYApp> {
   }
 
   @override Widget build(BuildContext context) {
-    if (_isLoading) return const MaterialApp(debugShowCheckedModeBanner: false, home: Scaffold(body: Center(child: CircularProgressIndicator())));
+    if (_isLoading) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        builder: (context, child) => SelectionArea(child: child ?? const SizedBox.shrink()),
+        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
+    }
 
     final isDarkMode = _effectiveThemeMode == ThemeMode.dark;
     final style = isDarkMode
@@ -5407,6 +5405,11 @@ class _NGMYAppState extends State<NGMYApp> {
             backgroundColor: Colors.white,
             elevation: 0,
           ),
+          textSelectionTheme: TextSelectionThemeData(
+            cursorColor: const Color(0xFF00B25A),
+            selectionColor: const Color(0xFF00B25A).withValues(alpha: 0.28),
+            selectionHandleColor: const Color(0xFF00B25A),
+          ),
         ),
         darkTheme: ThemeData(
           useMaterial3: true,
@@ -5432,10 +5435,15 @@ class _NGMYAppState extends State<NGMYApp> {
             backgroundColor: Color(0xFF121212),
             elevation: 0,
           ),
+          textSelectionTheme: TextSelectionThemeData(
+            cursorColor: const Color(0xFFBB86FC),
+            selectionColor: const Color(0xFFBB86FC).withValues(alpha: 0.35),
+            selectionHandleColor: const Color(0xFFBB86FC),
+          ),
         ),
         themeMode: _effectiveThemeMode,
         builder: (context, child) {
-          final content = child ?? const SizedBox.shrink();
+          final content = SelectionArea(child: child ?? const SizedBox.shrink());
           if (kIsWeb && Theme.of(context).brightness == Brightness.light) {
             ngmyApplyWebStatusBarStyle(lightMode: true);
             return ColoredBox(color: Colors.white, child: content);
@@ -5662,6 +5670,7 @@ class _NGMYAppState extends State<NGMYApp> {
                 onSyncAdminUserMedia: _syncAdminUserMediaProfile,
                 onEnqueueMediaDelivery: _enqueueMediaDelivery,
                 onPromptNotifications: (ctx) => _promptPushNotificationsForUser(ctx, _currentUser!.email),
+                onMarkAnnouncementsRead: (ids) => _markAnnouncementsReadForUser(ids),
             ),
       ),
     );
@@ -6376,8 +6385,9 @@ class MainScreen extends StatefulWidget {
   final Future<bool> Function(UserData user)? onSyncAdminUserMedia;
   final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueMediaDelivery;
   final Future<void> Function(BuildContext context)? onPromptNotifications;
+  final Future<void> Function(List<String> ids)? onMarkAnnouncementsRead;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
@@ -6401,7 +6411,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _runScheduledPopups();
+    if (state == AppLifecycleState.resumed) {
+      _runScheduledPopups();
+      _promptPushNotificationsIfNeeded();
+    }
   }
 
   Future<void> _refreshOnlineStatus() async {
@@ -6608,7 +6621,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         });
         widget.onDataChanged();
         await _showLateClockInDialog(penalty, now);
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
         if (cost <= 0) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -6879,7 +6892,8 @@ class HomeScreen extends StatefulWidget {
   final Future<bool> Function(MediaPost post)? onSyncAdminMediaPost;
   final Future<bool> Function(UserData user)? onSyncAdminUserMedia;
   final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueMediaDelivery;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery});
+  final Future<void> Function(List<String> ids)? onMarkAnnouncementsRead;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -6892,8 +6906,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int _unreadNewsCount = 0;
 
   Future<void> _refreshUnreadNewsBadge() async {
-    final count = await NgmyAnnouncementReads.unreadCount(
+    final count = await NgmyAnnouncementReads.unreadCountForEmail(
       widget.user.email,
+      widget.user.readAnnouncementIds,
       widget.allAnnouncements.map((a) => a.id),
     );
     if (mounted) setState(() => _unreadNewsCount = count);
@@ -6909,6 +6924,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         config: widget.config,
         onPostToNews: widget.onAddAnnouncement,
         onNewsRead: _refreshUnreadNewsBadge,
+        onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead,
       ),
     );
     await _refreshUnreadNewsBadge();
@@ -6942,7 +6958,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.allAnnouncements != widget.allAnnouncements) {
+    if (oldWidget.allAnnouncements != widget.allAnnouncements ||
+        !listEquals(oldWidget.user.readAnnouncementIds, widget.user.readAnnouncementIds)) {
       _refreshUnreadNewsBadge();
     }
   }
@@ -14709,104 +14726,8 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
             children: [
               const FloatingTitle(title: 'NGMY HUB'),
               const SizedBox(height: 20),
-              // Main Top Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 18),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: topColors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(isDark ? 0.22 : 0.38),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: topColors[1].withOpacity(0.35),
-                      blurRadius: 18,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 8),
-                    ),
-                    BoxShadow(
-                      color: const Color(0xFF38BDF8).withOpacity(isDark ? 0.18 : 0.25),
-                      blurRadius: 22,
-                      spreadRadius: -2,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _animatedStar(20, spin: false),
-                        const SizedBox(width: 10),
-                        _animatedStar(34, spin: true, reactive: true),
-                        const SizedBox(width: 10),
-                        _animatedStar(20, spin: false),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    RichText(
-                      text: TextSpan(
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
-                        children: [
-                          WidgetSpan(
-                            alignment: PlaceholderAlignment.middle,
-                            child: GestureDetector(
-                              onTap: _openDocumentScanner,
-                              child: const Text(
-                                'N',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
-                              ),
-                            ),
-                          ),
-                          WidgetSpan(
-                            alignment: PlaceholderAlignment.middle,
-                            child: GestureDetector(
-                              onTap: _openGServicesPriceCalculator,
-                              child: const Text(
-                                'G',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
-                              ),
-                            ),
-                          ),
-                          WidgetSpan(
-                            alignment: PlaceholderAlignment.middle,
-                            child: GestureDetector(
-                              onTap: _openMFunGames,
-                              child: const Text(
-                                'M',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
-                              ),
-                            ),
-                          ),
-                          WidgetSpan(
-                            alignment: PlaceholderAlignment.middle,
-                            child: GestureDetector(
-                              onTap: _openYQrGenerator,
-                              child: const Text(
-                                'Y',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
-                              ),
-                            ),
-                          ),
-                          const TextSpan(text: ' Services'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Next Generation - Make Yours',
-                      style: TextStyle(color: Colors.white.withOpacity(0.95), fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.2),
-                    ),
-                  ],
-                ),
-              ),
+              // Main Top Card — 3D animated NGMY Services frame
+              _ngmyServicesHeroCard(isDark: isDark, topColors: topColors),
               const SizedBox(height: 25),
               // 2x2 Grid of cards
               GridView.count(
@@ -15883,6 +15804,169 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       ),
     );
     });
+  }
+
+  Widget _ngmyServicesHeroCard({required bool isDark, required List<Color> topColors}) {
+    return AnimatedBuilder(
+      animation: _animCtrl,
+      builder: (context, child) {
+        final t = _animCtrl.value;
+        final pulse = 0.55 + 0.45 * (math.sin(t * 2 * math.pi) + 1) / 2;
+        final tiltX = 0.035 * math.sin(t * 2 * math.pi);
+        final tiltY = 0.05 * math.cos(t * 2 * math.pi);
+        final borderShift = t * 2 * math.pi;
+
+        return Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: topColors[1].withOpacity(0.28 + pulse * 0.22),
+                blurRadius: 22 + pulse * 10,
+                spreadRadius: 1 + pulse * 2,
+                offset: const Offset(0, 10),
+              ),
+              BoxShadow(
+                color: const Color(0xFF38BDF8).withOpacity(isDark ? 0.16 + pulse * 0.18 : 0.22 + pulse * 0.2),
+                blurRadius: 28,
+                spreadRadius: -2,
+              ),
+              BoxShadow(
+                color: const Color(0xFF7C3AED).withOpacity(0.12 + pulse * 0.14),
+                blurRadius: 36,
+                spreadRadius: -6,
+              ),
+            ],
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: SweepGradient(
+                startAngle: borderShift,
+                endAngle: borderShift + math.pi * 2,
+                colors: [
+                  Colors.white.withOpacity(0.95),
+                  const Color(0xFF67E8F9).withOpacity(0.85),
+                  const Color(0xFFA78BFA).withOpacity(0.85),
+                  Colors.white.withOpacity(0.35),
+                  const Color(0xFF22D3EE).withOpacity(0.75),
+                  Colors.white.withOpacity(0.95),
+                ],
+              ),
+            ),
+            padding: const EdgeInsets.all(2.6),
+            child: Transform(
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.0012)
+                ..rotateX(tiltX)
+                ..rotateY(tiltY),
+              alignment: Alignment.center,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color.lerp(topColors[0], const Color(0xFF38BDF8), pulse * 0.12)!,
+                      Color.lerp(topColors[1], const Color(0xFF7C3AED), pulse * 0.1)!,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(21),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(isDark ? 0.24 + pulse * 0.12 : 0.38 + pulse * 0.14),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.08 + pulse * 0.1),
+                      blurRadius: 18,
+                      spreadRadius: -4,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _animatedStar(20, spin: false),
+                        const SizedBox(width: 10),
+                        _animatedStar(34, spin: true, reactive: true),
+                        const SizedBox(width: 10),
+                        _animatedStar(20, spin: false),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
+                        children: [
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: GestureDetector(
+                              onTap: _openDocumentScanner,
+                              child: const Text(
+                                'N',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
+                              ),
+                            ),
+                          ),
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: GestureDetector(
+                              onTap: _openGServicesPriceCalculator,
+                              child: const Text(
+                                'G',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
+                              ),
+                            ),
+                          ),
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: GestureDetector(
+                              onTap: _openMFunGames,
+                              child: const Text(
+                                'M',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
+                              ),
+                            ),
+                          ),
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: GestureDetector(
+                              onTap: _openYQrGenerator,
+                              child: const Text(
+                                'Y',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28),
+                              ),
+                            ),
+                          ),
+                          const TextSpan(text: ' Services'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Next Generation - Make Yours',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.95),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _animatedStar(double size, {bool spin = true, bool reactive = false}) {
@@ -28774,6 +28858,7 @@ class AnnouncementScreen extends StatefulWidget {
   final AppConfig config;
   final Function(Announcement) onPostToNews;
   final VoidCallback? onNewsRead;
+  final Future<void> Function(List<String> ids)? onMarkAnnouncementsRead;
   const AnnouncementScreen({
     super.key,
     required this.user,
@@ -28782,6 +28867,7 @@ class AnnouncementScreen extends StatefulWidget {
     required this.config,
     required this.onPostToNews,
     this.onNewsRead,
+    this.onMarkAnnouncementsRead,
   });
 
   @override
@@ -28805,8 +28891,9 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   int _unreadNewsInternal = 0;
 
   Future<void> _refreshUnreadNewsInternal() async {
-    final count = await NgmyAnnouncementReads.unreadCount(
+    final count = await NgmyAnnouncementReads.unreadCountForEmail(
       widget.user.email,
+      widget.user.readAnnouncementIds,
       widget.announcements.map((a) => a.id),
     );
     if (mounted) setState(() => _unreadNewsInternal = count);
@@ -28844,11 +28931,12 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   Future<void> _markNewsAsRead() async {
     if (widget.announcements.isEmpty) return;
-    await NgmyAnnouncementReads.markAllRead(
-      widget.user.email,
-      widget.announcements.map((a) => a.id),
-    );
+    final ids = widget.announcements.map((a) => a.id).where((id) => id.isNotEmpty).toList();
+    if (widget.onMarkAnnouncementsRead != null) {
+      await widget.onMarkAnnouncementsRead!(ids);
+    }
     widget.onNewsRead?.call();
+    await _refreshUnreadNewsInternal();
   }
 
   void _selectNewsTab() {

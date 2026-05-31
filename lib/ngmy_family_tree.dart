@@ -433,18 +433,28 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                         style: TextStyle(color: p.secondaryText),
                       ),
                     )
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.only(bottom: 24),
-                        child: FamilyTreeCanvas(
-                          tree: _tree,
-                          showHidden: _showHidden,
-                          onMemberTap: _editMember,
-                          isDark: p.isDark,
-                        ),
-                      ),
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: SingleChildScrollView(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minWidth: constraints.maxWidth,
+                                minHeight: math.max(320, constraints.maxHeight),
+                              ),
+                              child: Center(
+                                child: FamilyTreeCanvas(
+                                  tree: _tree,
+                                  showHidden: _showHidden,
+                                  onMemberTap: _editMember,
+                                  isDark: p.isDark,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
             ),
             if (hiddenCount > 0)
@@ -553,47 +563,50 @@ class FamilyTreeCanvas extends StatelessWidget {
     final layout = _FamilyTreeLayout.compute(tree, showHidden: showHidden);
     if (layout.nodes.isEmpty) return const SizedBox.shrink();
 
-    return SizedBox(
-      width: layout.width + 40,
-      height: layout.height + 80,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: 8,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                tree.name,
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: WorksheetPalette.teal.withValues(alpha: isDark ? 0.95 : 1),
-                  letterSpacing: 0.5,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: SizedBox(
+        width: layout.width,
+        height: layout.height,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  tree.name,
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: WorksheetPalette.teal.withValues(alpha: isDark ? 0.95 : 1),
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ),
-          ),
-          CustomPaint(
-            size: Size(layout.width + 40, layout.height + 80),
-            painter: _FamilyTreeLinesPainter(layout: layout),
-          ),
-          ...layout.nodes.entries.map((entry) {
-            final member = entry.value.member;
-            final pos = entry.value.position;
-            return Positioned(
-              left: pos.dx + 20 - _FamilyTreeLayout.nodeRadius,
-              top: pos.dy + 48,
-              child: _MemberNode(
-                member: member,
-                childCount: descendantCount(tree, member.id),
-                onTap: () => onMemberTap(member),
-              ),
-            );
-          }),
-        ],
+            CustomPaint(
+              size: Size(layout.width, layout.height),
+              painter: _FamilyTreeLinesPainter(layout: layout),
+            ),
+            ...layout.nodes.entries.map((entry) {
+              final member = entry.value.member;
+              final pos = entry.value.position;
+              return Positioned(
+                left: pos.dx - _FamilyTreeLayout.nodeWidth / 2,
+                top: pos.dy,
+                child: _MemberNode(
+                  member: member,
+                  childCount: descendantCount(tree, member.id),
+                  onTap: () => onMemberTap(member),
+                ),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }
@@ -607,10 +620,15 @@ class _LayoutNode {
 }
 
 class _FamilyTreeLayout {
-  static const nodeRadius = 28.0;
-  static const horizontalGap = 18.0;
-  static const verticalGap = 100.0;
-  static const minNodeWidth = 72.0;
+  static const nodeWidth = 84.0;
+  static const avatarSize = 56.0;
+  static const nameBlockHeight = 28.0;
+  static const nodeHeight = avatarSize + 6 + nameBlockHeight;
+  static const rowGap = 44.0;
+  static const verticalStep = nodeHeight + rowGap;
+  static const horizontalGap = 22.0;
+  static const titleBlockHeight = 44.0;
+  static const canvasPad = 24.0;
 
   final Map<String, _LayoutNode> nodes;
   final List<_TreeEdge> edges;
@@ -624,8 +642,18 @@ class _FamilyTreeLayout {
     required this.height,
   });
 
+  static Offset _nodeBottom(Offset topCenter) => Offset(topCenter.dx, topCenter.dy + nodeHeight);
+
+  static Offset _avatarCenter(Offset topCenter) =>
+      Offset(topCenter.dx, topCenter.dy + avatarSize / 2);
+
+  static Offset _nodeTop(Offset topCenter) => topCenter;
+
   static _FamilyTreeLayout compute(FamilyTree tree, {required bool showHidden}) {
     final visible = showHidden ? tree.members : visibleMembers(tree);
+    if (visible.isEmpty) {
+      return const _FamilyTreeLayout(nodes: {}, edges: [], width: 0, height: 0);
+    }
     final visibleIds = visible.map((m) => m.id).toSet();
     final root = visible.firstWhere(
       (m) => m.parentId == null || m.parentId!.isEmpty || !visibleIds.contains(m.parentId),
@@ -639,14 +667,12 @@ class _FamilyTreeLayout {
     double measure(String id) {
       if (subtreeWidths.containsKey(id)) return subtreeWidths[id]!;
       final member = visible.firstWhere((m) => m.id == id);
-      final kids = visible
-          .where((m) => m.parentId == id)
-          .toList()
+      final kids = visible.where((m) => m.parentId == id).toList()
         ..sort((a, b) => a.birthOrder.compareTo(b.birthOrder));
 
-      var width = minNodeWidth;
+      var width = nodeWidth;
       if (member.spouseId != null && visibleIds.contains(member.spouseId)) {
-        width = minNodeWidth * 2 + horizontalGap;
+        width = nodeWidth * 2 + horizontalGap;
       }
 
       if (kids.isEmpty) {
@@ -667,13 +693,11 @@ class _FamilyTreeLayout {
       if (nodes.containsKey(id)) return;
 
       final member = visible.firstWhere((m) => m.id == id);
-      final kids = visible
-          .where((m) => m.parentId == id)
-          .toList()
+      final kids = visible.where((m) => m.parentId == id).toList()
         ..sort((a, b) => a.birthOrder.compareTo(b.birthOrder));
 
-      final subtreeW = subtreeWidths[id] ?? minNodeWidth;
-      var x = left + subtreeW / 2;
+      final subtreeW = subtreeWidths[id] ?? nodeWidth;
+      final rowTop = titleBlockHeight + depth * verticalStep;
 
       FamilyMember? spouse;
       if (member.spouseId != null && visibleIds.contains(member.spouseId)) {
@@ -681,65 +705,95 @@ class _FamilyTreeLayout {
       }
 
       if (kids.isEmpty) {
+        final centerX = left + subtreeW / 2;
         if (spouse != null && !nodes.containsKey(spouse.id)) {
-          final offset = minNodeWidth / 2 + horizontalGap / 2;
-          nodes[member.id] = _LayoutNode(member: member, position: Offset(x - offset, depth * verticalGap));
-          nodes[spouse.id] = _LayoutNode(member: spouse, position: Offset(x + offset, depth * verticalGap));
-          edges.add(_TreeEdge(nodes[member.id]!.position, nodes[spouse.id]!.position, isSpouse: true));
+          final half = nodeWidth / 2 + horizontalGap / 2;
+          final memberTop = Offset(centerX - half, rowTop);
+          final spouseTop = Offset(centerX + half, rowTop);
+          nodes[member.id] = _LayoutNode(member: member, position: memberTop);
+          nodes[spouse.id] = _LayoutNode(member: spouse, position: spouseTop);
+          edges.add(_TreeEdge(
+            _avatarCenter(memberTop),
+            _avatarCenter(spouseTop),
+            isSpouse: true,
+          ));
         } else {
-          nodes[id] = _LayoutNode(member: member, position: Offset(x, depth * verticalGap));
+          nodes[id] = _LayoutNode(member: member, position: Offset(centerX, rowTop));
         }
         return;
       }
 
       var cursor = left;
-      final childCenters = <double>[];
       for (final child in kids) {
-        final w = subtreeWidths[child.id] ?? minNodeWidth;
+        final w = subtreeWidths[child.id] ?? nodeWidth;
         place(child.id, cursor, depth + 1);
-        childCenters.add(nodes[child.id]!.position.dx);
         cursor += w + horizontalGap;
       }
 
-      final parentCenter = (childCenters.first + childCenters.last) / 2;
+      final childTops = kids.map((c) => nodes[c.id]!.position).toList();
+      final parentCenterX = (childTops.first.dx + childTops.last.dx) / 2;
 
+      Offset parentTop;
+      Offset parentConnectorBottom;
       if (spouse != null && !nodes.containsKey(spouse.id)) {
-        final offset = minNodeWidth / 2 + horizontalGap / 2;
-        nodes[member.id] = _LayoutNode(member: member, position: Offset(parentCenter - offset, depth * verticalGap));
-        nodes[spouse.id] = _LayoutNode(member: spouse, position: Offset(parentCenter + offset, depth * verticalGap));
-        edges.add(_TreeEdge(nodes[member.id]!.position, nodes[spouse.id]!.position, isSpouse: true));
-        for (final child in kids) {
-          edges.add(_TreeEdge(
-            Offset(parentCenter, depth * verticalGap + nodeRadius),
-            Offset(nodes[child.id]!.position.dx, (depth + 1) * verticalGap - nodeRadius),
-          ));
-        }
+        final half = nodeWidth / 2 + horizontalGap / 2;
+        parentTop = Offset(parentCenterX - half, rowTop);
+        final spouseTop = Offset(parentCenterX + half, rowTop);
+        nodes[member.id] = _LayoutNode(member: member, position: parentTop);
+        nodes[spouse.id] = _LayoutNode(member: spouse, position: spouseTop);
+        edges.add(_TreeEdge(_avatarCenter(parentTop), _avatarCenter(spouseTop), isSpouse: true));
+        parentConnectorBottom = Offset(parentCenterX, rowTop + nodeHeight);
       } else {
-        nodes[id] = _LayoutNode(member: member, position: Offset(parentCenter, depth * verticalGap));
-        for (final child in kids) {
-          edges.add(_TreeEdge(
-            Offset(parentCenter, depth * verticalGap + nodeRadius),
-            Offset(nodes[child.id]!.position.dx, (depth + 1) * verticalGap - nodeRadius),
-          ));
-        }
+        parentTop = Offset(parentCenterX, rowTop);
+        nodes[id] = _LayoutNode(member: member, position: parentTop);
+        parentConnectorBottom = _nodeBottom(parentTop);
       }
+
+      edges.add(_TreeEdge(
+        parentConnectorBottom,
+        Offset.zero,
+        childTops: childTops.map(_nodeTop).toList(),
+      ));
     }
 
     measure(root.id);
     place(root.id, 0, 0);
 
+    var minX = double.infinity;
     var maxX = 0.0;
-    var maxY = 0.0;
+    var maxY = titleBlockHeight;
     for (final node in nodes.values) {
-      maxX = math.max(maxX, node.position.dx + minNodeWidth);
-      maxY = math.max(maxY, node.position.dy + verticalGap);
+      minX = math.min(minX, node.position.dx - nodeWidth / 2);
+      maxX = math.max(maxX, node.position.dx + nodeWidth / 2);
+      maxY = math.max(maxY, node.position.dy + nodeHeight + verticalStep);
+    }
+
+    final shiftX = canvasPad - minX;
+    if (shiftX != 0) {
+      for (final id in nodes.keys.toList()) {
+        final n = nodes[id]!;
+        nodes[id] = _LayoutNode(
+          member: n.member,
+          position: Offset(n.position.dx + shiftX, n.position.dy),
+        );
+      }
+      for (var i = 0; i < edges.length; i++) {
+        final e = edges[i];
+        edges[i] = _TreeEdge(
+          Offset(e.from.dx + shiftX, e.from.dy),
+          Offset(e.to.dx + shiftX, e.to.dy),
+          isSpouse: e.isSpouse,
+          childTops: e.childTops?.map((p) => Offset(p.dx + shiftX, p.dy)).toList(),
+        );
+      }
+      maxX += shiftX;
     }
 
     return _FamilyTreeLayout(
       nodes: nodes,
       edges: edges,
-      width: maxX,
-      height: maxY,
+      width: maxX + canvasPad,
+      height: maxY + canvasPad,
     );
   }
 }
@@ -748,8 +802,9 @@ class _TreeEdge {
   final Offset from;
   final Offset to;
   final bool isSpouse;
+  final List<Offset>? childTops;
 
-  const _TreeEdge(this.from, this.to, {this.isSpouse = false});
+  const _TreeEdge(this.from, this.to, {this.isSpouse = false, this.childTops});
 }
 
 class _FamilyTreeLinesPainter extends CustomPainter {
@@ -757,27 +812,48 @@ class _FamilyTreeLinesPainter extends CustomPainter {
 
   _FamilyTreeLinesPainter({required this.layout});
 
+  void _drawParentChildGroup(Canvas canvas, Paint paint, Offset parentBottom, List<Offset> childTops) {
+    if (childTops.isEmpty) return;
+    childTops.sort((a, b) => a.dx.compareTo(b.dx));
+
+    if (childTops.length == 1) {
+      canvas.drawLine(parentBottom, childTops.first, paint);
+      return;
+    }
+
+    final midY = parentBottom.dy + (childTops.first.dy - parentBottom.dy) / 2;
+    final path = Path()
+      ..moveTo(parentBottom.dx, parentBottom.dy)
+      ..lineTo(parentBottom.dx, midY)
+      ..lineTo(childTops.first.dx, midY)
+      ..lineTo(childTops.last.dx, midY);
+
+    canvas.drawPath(path, paint);
+
+    for (final childTop in childTops) {
+      canvas.drawLine(Offset(childTop.dx, midY), childTop, paint);
+    }
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = WorksheetPalette.teal
       ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
 
     for (final edge in layout.edges) {
-      final from = Offset(edge.from.dx + 20, edge.from.dy + 48);
-      final to = Offset(edge.to.dx + 20, edge.to.dy + 48);
       if (edge.isSpouse) {
-        canvas.drawLine(from, to, paint);
+        canvas.drawLine(edge.from, edge.to, paint);
         continue;
       }
-      final midY = (from.dy + to.dy) / 2;
-      final path = Path()
-        ..moveTo(from.dx, from.dy)
-        ..lineTo(from.dx, midY)
-        ..lineTo(to.dx, midY)
-        ..lineTo(to.dx, to.dy);
-      canvas.drawPath(path, paint);
+      if (edge.childTops != null && edge.childTops!.isNotEmpty) {
+        _drawParentChildGroup(canvas, paint, edge.from, edge.childTops!);
+      } else if (edge.to != Offset.zero) {
+        canvas.drawLine(edge.from, edge.to, paint);
+      }
     }
   }
 
@@ -813,15 +889,16 @@ class _MemberNode extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
-        width: 84,
+        width: _FamilyTreeLayout.nodeWidth,
+        height: _FamilyTreeLayout.nodeHeight,
         child: Column(
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: _FamilyTreeLayout.avatarSize,
+                  height: _FamilyTreeLayout.avatarSize,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(color: _ringColor, width: 3),
@@ -832,8 +909,8 @@ class _MemberNode extends StatelessWidget {
                         ? Image(
                             image: ngmyImageFromRef(member.photoPath)!,
                             fit: BoxFit.cover,
-                            width: 56,
-                            height: 56,
+                            width: _FamilyTreeLayout.avatarSize,
+                            height: _FamilyTreeLayout.avatarSize,
                           )
                         : Icon(Icons.person, color: _ringColor, size: 30),
                   ),

@@ -345,6 +345,31 @@ class Ngmy3DFloatingPopup {
     overlay.insert(entry);
     return done.future.timeout(Duration(milliseconds: ms + 1200), onTimeout: () {});
   }
+
+  /// Interactive 3D popup with action buttons — returns true (primary) or false (secondary).
+  static Future<bool?> showInteractive(
+    BuildContext context, {
+    required Map<String, dynamic> config,
+    required String primaryLabel,
+    String secondaryLabel = 'Not now',
+  }) {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    late OverlayEntry entry;
+    final done = Completer<bool?>();
+    entry = OverlayEntry(
+      builder: (ctx) => _Ngmy3DFloatingInteractiveBody(
+        config: config,
+        primaryLabel: primaryLabel,
+        secondaryLabel: secondaryLabel,
+        onDone: (result) {
+          if (entry.mounted) entry.remove();
+          if (!done.isCompleted) done.complete(result);
+        },
+      ),
+    );
+    overlay.insert(entry);
+    return done.future;
+  }
 }
 
 class _Ngmy3DFloatingPopupBody extends StatefulWidget {
@@ -590,6 +615,270 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
                 ),
               ],
             ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _Ngmy3DFloatingInteractiveBody extends StatefulWidget {
+  final Map<String, dynamic> config;
+  final String primaryLabel;
+  final String secondaryLabel;
+  final ValueChanged<bool?> onDone;
+
+  const _Ngmy3DFloatingInteractiveBody({
+    required this.config,
+    required this.primaryLabel,
+    required this.secondaryLabel,
+    required this.onDone,
+  });
+
+  @override
+  State<_Ngmy3DFloatingInteractiveBody> createState() => _Ngmy3DFloatingInteractiveBodyState();
+}
+
+class _Ngmy3DFloatingInteractiveBodyState extends State<_Ngmy3DFloatingInteractiveBody> with TickerProviderStateMixin {
+  late final AnimationController _enter;
+  late final AnimationController _spin;
+  late final AnimationController _orbit;
+  late final AnimationController _float;
+  late final AnimationController _pulse;
+  bool _leaving = false;
+
+  List<String> get _orbitWords {
+    final raw = widget.config['orbitWords'];
+    if (raw is List && raw.isNotEmpty) return raw.map((e) => e.toString()).toList();
+    return const ['NGMY', 'ALERT', 'NEWS', 'EARN'];
+  }
+
+  Map<String, dynamic> get _theme {
+    return NgmyPopupDefaults.themeById((widget.config['themeId'] ?? 'ngmy').toString()) ??
+        NgmyPopupDefaults.standardThemes.last;
+  }
+
+  List<Color> get _colors {
+    final raw = _theme['colors'] as List?;
+    if (raw == null) return [const Color(0xFF065F46), const Color(0xFF00B25A), const Color(0xFF064E3B)];
+    return raw.map((c) => Color((c as num).toInt())).toList();
+  }
+
+  IconData get _icon {
+    final name = (_theme['iconName'] ?? 'hub').toString();
+    return NgmyPopupDefaults._icons[name] ?? Icons.notifications_active_rounded;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
+    _spin = AnimationController(vsync: this, duration: const Duration(milliseconds: 9000))..repeat();
+    _orbit = AnimationController(vsync: this, duration: const Duration(milliseconds: 10800))..repeat();
+    _float = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat(reverse: true);
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
+    _enter.forward();
+  }
+
+  Future<void> _finish(bool? result) async {
+    if (!mounted || _leaving) return;
+    _leaving = true;
+    await _enter.reverse();
+    if (mounted) widget.onDone(result);
+  }
+
+  @override
+  void dispose() {
+    _enter.dispose();
+    _spin.dispose();
+    _orbit.dispose();
+    _float.dispose();
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  Widget _orbitLabel(double size, int i, double t) {
+    final angle = (i / _orbitWords.length) * math.pi * 2 + t * math.pi * 2;
+    final radius = size * 0.54;
+    return Transform.translate(
+      offset: Offset(math.cos(angle) * radius, math.sin(angle) * radius),
+      child: Transform.rotate(
+        angle: angle + math.pi / 2,
+        child: Text(
+          _orbitWords[i % _orbitWords.length],
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.6 + (_pulse.value * 0.35)),
+            fontSize: 10 + (_pulse.value * 2),
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.1,
+            shadows: [Shadow(color: _colors.first.withValues(alpha: 0.9), blurRadius: 12)],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _faceContent(double size, double glow) {
+    final title = (widget.config['title'] ?? 'NGMY').toString();
+    final subtitle = (widget.config['subtitle'] ?? '').toString();
+    final subtitleMaxLines = (widget.config['subtitleMaxLines'] as num?)?.toInt() ?? 2;
+
+    return Container(
+      width: size * 0.64,
+      height: size * 0.64,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(_colors[0], _colors[1], glow)!,
+            Color.lerp(_colors[1], _colors[2], 1 - glow)!,
+            _colors[2],
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(color: _colors[1].withValues(alpha: 0.55 + glow * 0.35), blurRadius: 36, spreadRadius: 4),
+        ],
+        border: Border.all(color: Colors.white.withValues(alpha: 0.24), width: 1.5),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(_icon, color: Colors.white.withValues(alpha: 0.95), size: size * 0.14),
+          SizedBox(height: size * 0.03),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white, fontSize: size * 0.09, fontWeight: FontWeight.w900),
+            ),
+          ),
+          if (subtitle.isNotEmpty) ...[
+            SizedBox(height: size * 0.015),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                maxLines: subtitleMaxLines,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: size * 0.048, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _core(double size, double spinY, double glow) {
+    final showFront = math.cos(spinY) >= 0;
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()
+        ..setEntry(3, 2, 0.002)
+        ..rotateX(0.12 + math.sin(spinY) * 0.06)
+        ..rotateY(spinY),
+      child: showFront
+          ? _faceContent(size, glow)
+          : Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()..rotateY(math.pi),
+              child: _faceContent(size, glow),
+            ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_enter, _spin, _orbit, _float, _pulse]),
+      builder: (context, _) {
+        final enter = Curves.easeOutBack.transform(_enter.value);
+        final fade = _enter.value;
+        final spinY = _spin.value * math.pi * 2;
+        final size = 200.0 * ((widget.config['sizeScale'] as num?)?.toDouble() ?? 1.0);
+        final floatY = math.sin(_float.value * math.pi) * 8;
+        final bottomPad = MediaQuery.paddingOf(context).bottom;
+
+        return Material(
+          type: MaterialType.transparency,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Opacity(
+                opacity: fade * 0.42,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: const Alignment(0, -0.1),
+                      radius: 1.2,
+                      colors: [_colors[0].withValues(alpha: 0.88), const Color(0xCC000000), const Color(0xF0000000)],
+                    ),
+                  ),
+                ),
+              ),
+              Center(
+                child: Transform.translate(
+                  offset: Offset(0, floatY + (1 - enter) * 36 - 40),
+                  child: Transform.scale(
+                    scale: 0.7 + enter * 0.3,
+                    child: Opacity(
+                      opacity: fade,
+                      child: SizedBox(
+                        width: size,
+                        height: size,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            ...List.generate(_orbitWords.length, (i) => _orbitLabel(size, i, _orbit.value)),
+                            _core(size, spinY, _pulse.value),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 24,
+                right: 24,
+                bottom: bottomPad + 28,
+                child: Opacity(
+                  opacity: fade,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF00B25A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          onPressed: () => _finish(true),
+                          child: Text(widget.primaryLabel, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextButton(
+                        onPressed: () => _finish(false),
+                        child: Text(
+                          widget.secondaryLabel,
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },

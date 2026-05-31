@@ -2,17 +2,21 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Tracks which news/announcement posts each user has opened (for badge counts).
+/// Tracks which news/announcement posts each user has read (badge counts).
 class NgmyAnnouncementReads {
-  static String _key(String email) =>
+  static String _localKey(String email) =>
       'ngmy_read_announcements_${email.toLowerCase().trim()}';
 
-  static Future<Set<String>> load(String email) async {
+  static Set<String> mergeReadSets(Iterable<String> a, Iterable<String> b) {
+    return {...a, ...b}.where((e) => e.isNotEmpty).toSet();
+  }
+
+  static Future<Set<String>> loadLocal(String email) async {
     final key = email.toLowerCase().trim();
     if (key.isEmpty) return {};
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_key(key));
+      final raw = prefs.getString(_localKey(key));
       if (raw == null || raw.trim().isEmpty) return {};
       final decoded = jsonDecode(raw);
       if (decoded is! List) return {};
@@ -22,28 +26,31 @@ class NgmyAnnouncementReads {
     }
   }
 
-  static Future<void> save(String email, Set<String> ids) async {
+  static Future<void> saveLocal(String email, Set<String> ids) async {
     final key = email.toLowerCase().trim();
     if (key.isEmpty) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_key(key), jsonEncode(ids.toList()));
+      await prefs.setString(_localKey(key), jsonEncode(ids.toList()));
     } catch (_) {}
   }
 
-  static Future<void> markAllRead(String email, Iterable<String> announcementIds) async {
-    final read = await load(email);
-    read.addAll(announcementIds.where((id) => id.isNotEmpty));
-    await save(email, read);
-  }
-
-  static Future<int> unreadCount(String email, Iterable<String> announcementIds) async {
-    final read = await load(email);
+  static int unreadCount(Set<String> readIds, Iterable<String> announcementIds) {
     var n = 0;
     for (final id in announcementIds) {
       if (id.isEmpty) continue;
-      if (!read.contains(id)) n++;
+      if (!readIds.contains(id)) n++;
     }
     return n;
+  }
+
+  /// Merges cloud read IDs with this device's local cache (cross-device sync).
+  static Future<int> unreadCountForEmail(
+    String email,
+    Iterable<String> cloudReadIds,
+    Iterable<String> announcementIds,
+  ) async {
+    final local = await loadLocal(email);
+    return unreadCount(mergeReadSets(cloudReadIds, local), announcementIds);
   }
 }
