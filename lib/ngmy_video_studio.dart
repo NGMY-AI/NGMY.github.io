@@ -55,6 +55,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   bool _templatesExpanded = false;
   bool _exporting = false;
   double _exportProgress = 0;
+  String _exportStatus = '';
   String? _activeSlotId;
   bool _picking = false;
 
@@ -298,17 +299,30 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       );
       return;
     }
+    final cfg = _exportConfig();
+    final instant = cfg.canDirectDownload;
     setState(() {
       _exporting = true;
-      _exportProgress = 0;
+      _exportProgress = instant ? 0.5 : 0;
+      _exportStatus = instant ? 'Saving your video…' : 'Preparing export…';
     });
     try {
-      final msg = await exportNgmyVideoStudioComposed(
-        config: _exportConfig(),
-        onProgress: (p) {
-          if (mounted) setState(() => _exportProgress = p);
-        },
-      );
+      final msg = cfg.canDirectDownload
+          ? await exportNgmyVideoStudioDirect(videoSourceUrl: cfg.videoSourcesBySlot.values.first)
+          : await exportNgmyVideoStudioComposed(
+              config: cfg,
+              onProgress: (p) {
+                if (!mounted) return;
+                setState(() {
+                  _exportProgress = p;
+                  _exportStatus = p < 0.15
+                      ? 'Loading videos…'
+                      : p < 0.98
+                          ? 'Building video (${(p * 100).round()}%)…'
+                          : 'Saving file…';
+                });
+              },
+            );
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
       if (mounted) {
@@ -317,7 +331,13 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         );
       }
     } finally {
-      if (mounted) setState(() => _exporting = false);
+      if (mounted) {
+        setState(() {
+          _exporting = false;
+          _exportStatus = '';
+          _exportProgress = 0;
+        });
+      }
     }
   }
 
@@ -337,18 +357,13 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           ],
         ),
         actions: [
-          if (_exporting)
+          if (_exporting && _exportStatus.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.only(right: 6),
               child: Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    value: _exportProgress > 0 ? _exportProgress : null,
-                    color: Colors.white,
-                  ),
+                child: Text(
+                  _exportStatus,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
                 ),
               ),
             ),

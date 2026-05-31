@@ -7,3 +7,9 @@ Future<String> exportNgmyVideoStudioComposed({
 }) {
   return impl.exportNgmyVideoStudioComposed(config: config, onProgress: onProgress);
 }
+
+Future<String> exportNgmyVideoStudioDirect({
+  required String videoSourceUrl,
+}) {
+  return impl.exportNgmyVideoStudioDirect(videoSourceUrl: videoSourceUrl);
+}

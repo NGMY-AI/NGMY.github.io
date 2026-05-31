@@ -41,6 +41,7 @@ import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_store_location.dart';
 import 'ngmy_offline.dart';
+import 'ngmy_document_scanner.dart';
 import 'ngmy_oauth.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
@@ -13957,6 +13958,21 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   void _openYQrGenerator() => showNgmyQrGeneratorDialog(context);
 
   void _openGServicesTool() {
+    showNgmyDocumentScanner(
+      context,
+      geminiApiKey: widget.config.geminiApiKey,
+      refreshApiKey: () async {
+        final remote = await _fetchRemoteGeminiApiKey();
+        if (remote.isNotEmpty && mounted) {
+          setState(() => widget.config.geminiApiKey = remote);
+        }
+        return widget.config.geminiApiKey.trim();
+      },
+      onOpenPriceCalculator: _openGServicesPriceCalculator,
+    );
+  }
+
+  void _openGServicesPriceCalculator() {
     showDialog(
       context: context,
       barrierColor: Colors.black87,

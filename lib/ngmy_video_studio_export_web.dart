@@ -8,6 +8,71 @@ import 'package:flutter/material.dart';
 import 'ngmy_news_banner_painter.dart';
 import 'ngmy_video_studio_models.dart';
 
+const _metaTimeout = Duration(seconds: 18);
+const _exportPlaybackRate = 2.0;
+const _maxRecordSeconds = 90.0;
+
+Future<String> exportNgmyVideoStudioDirect({
+  required String videoSourceUrl,
+}) async {
+  final src = videoSourceUrl.trim();
+  if (src.isEmpty) {
+    return 'No video to download.';
+  }
+
+  var ext = 'mp4';
+  final lower = src.toLowerCase();
+  if (lower.contains('.webm')) ext = 'webm';
+  else if (lower.contains('.mov')) ext = 'mov';
+
+  final filename = 'ngmy_studio_${DateTime.now().millisecondsSinceEpoch}.$ext';
+
+  if (src.startsWith('blob:') || src.startsWith('http')) {
+    html.AnchorElement(href: src)
+      ..download = filename
+      ..click();
+    return 'Download started — your video file is saving now.';
+  }
+
+  // data: or other — fetch to blob then download
+  try {
+    final resp = await html.HttpRequest.request(src, responseType: 'blob');
+    final blob = resp.response as html.Blob?;
+    if (blob == null || blob.size == 0) {
+      return 'Could not read video for download.';
+    }
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.AnchorElement(href: url)
+      ..download = filename
+      ..click();
+    html.Url.revokeObjectUrl(url);
+    return 'Download started — your video file is saving now.';
+  } catch (e) {
+    return 'Download failed: $e';
+  }
+}
+
+Future<bool> _waitVideoMeta(html.VideoElement v) async {
+  if (v.readyState >= html.MediaElement.HAVE_METADATA) return true;
+  try {
+    await v.onLoadedMetadata.first.timeout(_metaTimeout);
+    return v.readyState >= html.MediaElement.HAVE_METADATA;
+  } catch (_) {
+    return false;
+  }
+}
+
+void _configureVideoElement(html.VideoElement v, String src) {
+  v.src = src;
+  v.preload = 'auto';
+  v.muted = false;
+  v.setAttribute('playsinline', 'true');
+  if (src.startsWith('http') && !src.startsWith('blob:')) {
+    v.crossOrigin = 'anonymous';
+  }
+  v.style.display = 'none';
+}
+
 Future<String> exportNgmyVideoStudioComposed({
   required NgmyVideoStudioExportConfig config,
   void Function(double progress)? onProgress,
@@ -17,15 +82,17 @@ Future<String> exportNgmyVideoStudioComposed({
     return 'Upload at least one video into a screen frame before downloading.';
   }
 
+  if (config.canDirectDownload) {
+    return exportNgmyVideoStudioDirect(videoSourceUrl: sources.values.first);
+  }
+
+  onProgress?.call(0.03);
+
   final videos = <String, html.VideoElement>{};
   for (final e in sources.entries) {
     if (e.value.trim().isEmpty) continue;
-    final v = html.VideoElement()
-      ..src = e.value
-      ..crossOrigin = 'anonymous'
-      ..preload = 'auto'
-      ..muted = false;
-    v.style.display = 'none';
+    final v = html.VideoElement();
+    _configureVideoElement(v, e.value);
     html.document.body?.append(v);
     videos[e.key] = v;
   }
@@ -37,7 +104,9 @@ Future<String> exportNgmyVideoStudioComposed({
     img.style.display = 'none';
     html.document.body?.append(img);
     logos[e.key] = img;
-    await img.onLoad.first;
+    try {
+      await img.onLoad.first.timeout(const Duration(seconds: 12));
+    } catch (_) {}
   }
 
   html.ImageElement? backdrop;
@@ -50,7 +119,7 @@ Future<String> exportNgmyVideoStudioComposed({
     for (final p in paths) {
       try {
         final img = html.ImageElement()..src = p;
-        await img.onLoad.first;
+        await img.onLoad.first.timeout(const Duration(seconds: 12));
         backdrop = img;
         break;
       } catch (_) {}
@@ -58,12 +127,20 @@ Future<String> exportNgmyVideoStudioComposed({
   }
 
   try {
-    await Future.wait(videos.values.map((v) => v.onLoadedMetadata.first));
+    onProgress?.call(0.08);
+
+    final metaOk = await Future.wait(videos.values.map(_waitVideoMeta));
+    if (metaOk.contains(false)) {
+      return 'Video could not load for export. Re-upload the clip and try Download again.';
+    }
 
     var durationSec = 3.0;
     for (final v in videos.values) {
       if (v.duration.isFinite && v.duration > durationSec) durationSec = v.duration.toDouble();
     }
+    durationSec = durationSec.clamp(1.0, _maxRecordSeconds);
+
+    onProgress?.call(0.12);
 
     final w = config.outputWidth;
     final h = config.outputHeight;
@@ -101,6 +178,7 @@ Future<String> exportNgmyVideoStudioComposed({
     recorder.addEventListener('stop', (_) => done.complete());
 
     for (final v in videos.values) {
+      v.playbackRate = _exportPlaybackRate;
       v.currentTime = 0;
     }
     await Future.wait(videos.values.map((v) => v.play()));
@@ -108,6 +186,7 @@ Future<String> exportNgmyVideoStudioComposed({
     recorder.start(250);
     var stopped = false;
     final startMs = DateTime.now().millisecondsSinceEpoch;
+    final recordTargetSec = durationSec / _exportPlaybackRate;
 
     void drawFrame(num _) {
       if (stopped) return;
@@ -167,12 +246,13 @@ Future<String> exportNgmyVideoStudioComposed({
       }
 
       final t = videos.values.first.currentTime;
-      onProgress?.call((t / durationSec).clamp(0.0, 1.0));
+      onProgress?.call((t / durationSec).clamp(0.12, 0.98));
 
-      if (t >= durationSec - 0.04 || videos.values.first.ended) {
+      if (t >= durationSec - 0.05 || videos.values.first.ended) {
         stopped = true;
         for (final v in videos.values) {
           v.pause();
+          v.playbackRate = 1.0;
         }
         if (recorder.state != 'inactive') recorder.stop();
         return;
@@ -184,14 +264,20 @@ Future<String> exportNgmyVideoStudioComposed({
 
     await Future.any([
       done.future,
-      Future.delayed(Duration(milliseconds: ((durationSec + 12) * 1000).round())),
+      Future.delayed(Duration(milliseconds: ((recordTargetSec + 8) * 1000).round())),
     ]);
 
     if (!done.isCompleted) {
       try {
         recorder.stop();
       } catch (_) {}
-      await done.future.timeout(const Duration(seconds: 3), onTimeout: () {});
+      await done.future.timeout(const Duration(seconds: 4), onTimeout: () {});
+    }
+
+    onProgress?.call(1.0);
+
+    if (chunks.isEmpty) {
+      return 'Export produced no video data. Try a shorter clip or a different browser (Chrome/Edge).';
     }
 
     final blob = html.Blob(chunks, mimeType);
