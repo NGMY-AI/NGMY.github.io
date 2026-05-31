@@ -5912,7 +5912,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               systemNavigationBarIconBrightness: Brightness.dark,
             ),
       child: Scaffold(
-        extendBody: !isDark,
+        extendBody: true,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Stack(
           children: [
@@ -5963,27 +5963,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildBottomNavBar() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.fromLTRB(15, 0, 15, 25),
       child: SafeArea(
         top: false,
-        child: Container(
+        child: SizedBox(
           height: 75,
-          decoration: isDark
-              ? BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.38),
-                  borderRadius: BorderRadius.circular(35),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.12),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-                )
-              : null,
           child: Row(
             children: [
               _nav(0, Icons.home_rounded),
@@ -6229,71 +6214,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
               const SizedBox(height: 20),
               _live(context),
-              if (widget.user.isAdmin) ...[
-                const SizedBox(height: 28),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Management',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
-                      color: isLight ? Colors.black87 : Colors.white,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Material(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () => showNgmyCivicRegistryPinSheet(
-                      context,
-                      config: widget.config,
-                      onDataChanged: widget.onDataChanged,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF6200EE).withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(Icons.account_balance_rounded, color: Color(0xFF6200EE), size: 26),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Civic Registry',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16,
-                                    color: isLight ? Colors.black87 : Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Set the PIN all members use to unlock the registry',
-                                  style: TextStyle(fontSize: 12, color: isLight ? Colors.black54 : Colors.white60),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.chevron_right_rounded, color: isLight ? Colors.black38 : Colors.white38),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         ),
