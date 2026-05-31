@@ -6368,6 +6368,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Stack(
           children: [
+            if (!isDark)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: MediaQuery.of(context).padding.top,
+                child: const ColoredBox(color: Colors.white),
+              ),
             IndexedStack(
               index: _idx,
               sizing: StackFit.expand,
@@ -6564,10 +6572,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override Widget build(BuildContext context) {
     bool isLight = Theme.of(context).brightness == Brightness.light;
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
+      backgroundColor: isLight ? Colors.white : Colors.transparent,
+      body: ColoredBox(
+        color: isLight ? Colors.white : Colors.transparent,
+        child: SafeArea(
+          bottom: false,
+          child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
           child: Column(
             children: [
@@ -6667,6 +6677,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ],
           ),
         ),
+      ),
       ),
     );
   }

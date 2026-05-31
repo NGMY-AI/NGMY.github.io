@@ -4,24 +4,35 @@ import 'dart:html' as html;
 
 /// Light mode only — sets iOS PWA status bar + page chrome to white.
 void ngmyApplyWebStatusBarStyle({required bool lightMode}) {
-  if (!lightMode) return;
+  final root = html.document.documentElement;
+
+  if (!lightMode) {
+    root?.classes.remove('ngmy-app-light');
+    html.document.getElementById('ngmy-light-theme-color')?.remove();
+    return;
+  }
+
+  root?.classes.add('ngmy-app-light');
 
   final statusMeta = html.document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
   statusMeta?.setAttribute('content', 'default');
 
-  final root = html.document.documentElement;
-  if (root != null) {
-    root.style.backgroundColor = '#ffffff';
-  }
-  html.document.body?.style.setProperty('background-color', '#ffffff');
+  root?.style.setProperty('background-color', '#ffffff', 'important');
+  html.document.body?.style.setProperty('background-color', '#ffffff', 'important');
 
-  for (final name in ['theme-color']) {
-    for (final meta in html.document.querySelectorAll('meta[name="$name"]')) {
-      final media = meta.getAttribute('media') ?? '';
-      if (media.contains('prefers-color-scheme: dark')) continue;
-      meta.setAttribute('content', '#ffffff');
-    }
+  // Last theme-color meta wins on iOS — overrides dark prefers-color-scheme chrome in light mode.
+  final existing = html.document.getElementById('ngmy-light-theme-color');
+  if (existing != null) {
+    existing.setAttribute('content', '#ffffff');
+    return;
   }
+  final head = html.document.head;
+  if (head == null) return;
+  final meta = html.MetaElement()
+    ..id = 'ngmy-light-theme-color'
+    ..name = 'theme-color'
+    ..content = '#ffffff';
+  head.append(meta);
 }
 
 void ngmyInstallWebViewportSync() {
