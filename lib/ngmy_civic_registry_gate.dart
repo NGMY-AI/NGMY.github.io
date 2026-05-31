@@ -7,6 +7,17 @@ String civicRegistryPinForState(Map<String, String> pinsByState, String state) {
   return (pinsByState[state.trim()] ?? '').trim();
 }
 
+/// One PIN for all users (admin sets in Management). Falls back to per-state map if empty.
+String civicRegistryEffectivePin({
+  required String globalPin,
+  required Map<String, String> pinsByState,
+  required String state,
+}) {
+  final g = globalPin.trim();
+  if (g.isNotEmpty) return g;
+  return civicRegistryPinForState(pinsByState, state);
+}
+
 Future<bool> civicRegistryIsUnlocked(String userEmail, String state) async {
   final prefs = await SharedPreferences.getInstance();
   final raw = prefs.getString('civic_registry_unlock');
@@ -47,19 +58,17 @@ class CivicRegistryGateScreen extends StatefulWidget {
   final String initialState;
   final void Function(String state) onUnlocked;
   final VoidCallback? onBack;
-  final bool isAdmin;
-  final void Function(String state, String pin)? onAdminSavePin;
+  final String globalPin;
 
   const CivicRegistryGateScreen({
     super.key,
     required this.usStates,
     required this.pinsByState,
+    required this.globalPin,
     required this.userEmail,
     required this.initialState,
     required this.onUnlocked,
     this.onBack,
-    this.isAdmin = false,
-    this.onAdminSavePin,
   });
 
   @override
@@ -97,9 +106,13 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
       setState(() => _error = 'Enter the PIN from your state registrar.');
       return;
     }
-    final expected = civicRegistryPinForState(widget.pinsByState, _state);
+    final expected = civicRegistryEffectivePin(
+      globalPin: widget.globalPin,
+      pinsByState: widget.pinsByState,
+      state: _state,
+    );
     if (expected.isEmpty) {
-      setState(() => _error = 'No PIN set for $_state yet. Contact your state registrar.');
+      setState(() => _error = 'Registry PIN not set yet. Contact your state registrar.');
       return;
     }
     if (pin != expected) {
@@ -116,47 +129,6 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
     });
   }
 
-  Future<void> _adminSetPin() async {
-    if (widget.onAdminSavePin == null) return;
-    final pinCtrl = TextEditingController(text: civicRegistryPinForState(widget.pinsByState, _state));
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('State registry PIN'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Set PIN for $_state. Share this PIN only with authorized users.'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: pinCtrl,
-              keyboardType: TextInputType.number,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'PIN code',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save PIN')),
-        ],
-      ),
-    );
-    if (ok == true && pinCtrl.text.trim().isNotEmpty) {
-      widget.onAdminSavePin!(_state, pinCtrl.text.trim());
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PIN updated for $_state')),
-        );
-      }
-    }
-    pinCtrl.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -170,17 +142,11 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
                 onPressed: widget.onBack,
               )
             : null,
-        actions: [
-          if (widget.isAdmin)
-            TextButton(
-              onPressed: _adminSetPin,
-              child: const Text('Set PIN', style: TextStyle(fontWeight: FontWeight.w800)),
-            ),
-        ],
       ),
-      body: Center(
+      body: Align(
+        alignment: const Alignment(0, -0.14),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(22, 0, 22, 24),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 420),
             padding: const EdgeInsets.fromLTRB(22, 28, 22, 22),

@@ -78,6 +78,22 @@
 
     }
 
+    flutter-view, flt-glass-pane {
+
+      background-color: transparent !important;
+
+    }
+
+    @media (prefers-color-scheme: light) {
+
+      html, body, flutter-view, flt-glass-pane {
+
+        background-color: #ffffff !important;
+
+      }
+
+    }
+
     @media (prefers-color-scheme: dark) {
 
       html, body { background-color: #121212; }
@@ -134,7 +150,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260531141104";
+      var CURRENT = "20260531142443";
 
       function showError(msg) {
 
@@ -186,30 +202,38 @@
 
   <script>
     (function () {
-      function nudgeFlutterLayout() {
-        try {
-          window.dispatchEvent(new Event('resize'));
-        } catch (e) {}
+      function forceViewportReset() {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        if (document.body) document.body.scrollTop = 0;
+        try { window.dispatchEvent(new Event('resize')); } catch (e) {}
       }
 
       function scheduleViewportSync() {
-        nudgeFlutterLayout();
-        setTimeout(nudgeFlutterLayout, 50);
-        setTimeout(nudgeFlutterLayout, 150);
-        setTimeout(nudgeFlutterLayout, 400);
-        setTimeout(nudgeFlutterLayout, 1000);
+        forceViewportReset();
+        setTimeout(forceViewportReset, 50);
+        setTimeout(forceViewportReset, 150);
+        setTimeout(forceViewportReset, 400);
+        setTimeout(forceViewportReset, 1000);
+        setTimeout(forceViewportReset, 2000);
       }
 
       window.addEventListener('load', scheduleViewportSync);
       window.addEventListener('pageshow', function (event) {
-        if (event.persisted) scheduleViewportSync();
+        scheduleViewportSync();
       });
+
+      document.addEventListener('touchstart', function () {
+        if (window.scrollY !== 0 || (window.visualViewport && window.visualViewport.offsetTop !== 0)) {
+          forceViewportReset();
+        }
+      }, { passive: true });
 
       if (window.visualViewport) {
         var timer;
         function onViewportChange() {
           clearTimeout(timer);
-          timer = setTimeout(nudgeFlutterLayout, 16);
+          timer = setTimeout(forceViewportReset, 16);
         }
         window.visualViewport.addEventListener('resize', onViewportChange);
         window.visualViewport.addEventListener('scroll', onViewportChange);
@@ -217,12 +241,12 @@
     })();
   </script>
 
-  <script src="flutter_bootstrap.js?v=20260531141104" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/')"></script>
+  <script src="flutter_bootstrap.js?v=20260531142443" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/')"></script>
 
   <script>
     (function () {
       if (!('serviceWorker' in navigator)) return;
-      var deployId = '20260531141104';
+      var deployId = '20260531142443';
       window.addEventListener('load', function () {
         navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: '/NGMY.github.io/' })
           .then(function () { console.log('[ngmy] offline PWA worker registered'); })

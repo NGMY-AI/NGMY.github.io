@@ -548,46 +548,48 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
         final size = 200.0 * ((widget.config['sizeScale'] as num?)?.toDouble() ?? 1.0);
         final floatY = math.sin(_float.value * math.pi) * 8;
 
-        return Material(
-          type: MaterialType.transparency,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Opacity(
-                opacity: fade * 0.38,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: const Alignment(0, -0.1),
-                      radius: 1.2,
-                      colors: [_colors[0].withValues(alpha: 0.85), const Color(0xCC000000), const Color(0xF0000000)],
+        return IgnorePointer(
+          child: Material(
+            type: MaterialType.transparency,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Opacity(
+                  opacity: fade * 0.38,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: const Alignment(0, -0.1),
+                        radius: 1.2,
+                        colors: [_colors[0].withValues(alpha: 0.85), const Color(0xCC000000), const Color(0xF0000000)],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Center(
-                child: Transform.translate(
-                  offset: Offset(0, floatY + (1 - enter) * 36),
-                  child: Transform.scale(
-                    scale: 0.7 + enter * 0.3,
-                    child: Opacity(
-                      opacity: fade,
-                      child: SizedBox(
-                        width: size,
-                        height: size,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            ...List.generate(_orbitWords.length, (i) => _orbitLabel(size, i, _orbit.value)),
-                            _core(size, spinY, _pulse.value),
-                          ],
+                Center(
+                  child: Transform.translate(
+                    offset: Offset(0, floatY + (1 - enter) * 36),
+                    child: Transform.scale(
+                      scale: 0.7 + enter * 0.3,
+                      child: Opacity(
+                        opacity: fade,
+                        child: SizedBox(
+                          width: size,
+                          height: size,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              ...List.generate(_orbitWords.length, (i) => _orbitLabel(size, i, _orbit.value)),
+                              _core(size, spinY, _pulse.value),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

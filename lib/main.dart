@@ -56,6 +56,7 @@ import 'ngmy_video_studio.dart';
 import 'ngmy_loans.dart';
 import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_web_viewport.dart';
+import 'ngmy_web_status_bar.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -3092,6 +3093,9 @@ class _NGMYAppState extends State<NGMYApp> {
             systemNavigationBarIconBrightness: Brightness.dark,
           );
     SystemChrome.setSystemUIOverlayStyle(style);
+    if (kIsWeb && !isDarkMode) {
+      ngmyApplyWebStatusBarStyle(lightMode: true);
+    }
   }
 
   Future<void> _setThemeMode(ThemeMode mode) async {
@@ -4689,6 +4693,14 @@ class _NGMYAppState extends State<NGMYApp> {
           ),
         ),
         themeMode: _effectiveThemeMode,
+        builder: (context, child) {
+          final content = child ?? const SizedBox.shrink();
+          if (kIsWeb && Theme.of(context).brightness == Brightness.light) {
+            ngmyApplyWebStatusBarStyle(lightMode: true);
+            return ColoredBox(color: Colors.white, child: content);
+          }
+          return content;
+        },
         home: _currentUser == null
             ? AuthScreen(
                 allUsers: _allUsers,
@@ -5900,7 +5912,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               systemNavigationBarIconBrightness: Brightness.dark,
             ),
       child: Scaffold(
-        extendBody: false,
+        extendBody: !isDark,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Stack(
           children: [
@@ -5952,25 +5964,26 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Widget _buildBottomNavBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final barFill = isDark ? Colors.black.withValues(alpha: 0.38) : Colors.white.withValues(alpha: 0.52);
     return Padding(
       padding: const EdgeInsets.fromLTRB(15, 0, 15, 25),
       child: SafeArea(
         top: false,
         child: Container(
           height: 75,
-          decoration: BoxDecoration(
-            color: barFill,
-            borderRadius: BorderRadius.circular(35),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.12),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
-              ),
-            ],
-            border: Border.all(color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.45)),
-          ),
+          decoration: isDark
+              ? BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.38),
+                  borderRadius: BorderRadius.circular(35),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+                )
+              : null,
           child: Row(
             children: [
               _nav(0, Icons.home_rounded),
