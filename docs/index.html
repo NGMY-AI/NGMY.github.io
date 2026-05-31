@@ -34,9 +34,11 @@
 
   <meta name="description" content="Next Generation - Make Yours">
 
+  <meta name="mobile-web-app-capable" content="yes">
+
   <meta name="apple-mobile-web-app-capable" content="yes">
 
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <meta name="apple-mobile-web-app-title" content="NGMY">
 
@@ -126,7 +128,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260531112717";
+      var CURRENT = "20260531113917";
 
       function showError(msg) {
 
@@ -176,7 +178,19 @@
 
   </script>
 
-  <script src="flutter_bootstrap.js?v=20260531112717" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/')"></script>
+  <script src="flutter_bootstrap.js?v=20260531113917" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/')"></script>
+
+  <script>
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+      var deployId = '20260531113917';
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: '/NGMY.github.io/' })
+          .then(function () { console.log('[ngmy] offline PWA worker registered'); })
+          .catch(function (e) { console.warn('[ngmy] service worker register failed', e); });
+      });
+    })();
+  </script>
 
 </body>
 

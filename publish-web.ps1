@@ -86,16 +86,44 @@ if (Test-Path $manifestPath) {
     $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path $manifestPath -Encoding UTF8
 }
 
-# Fix Flutter bootstrap: keep service worker for PWA offline (app shell cached on device).
+# Flutter 3.x ships a service worker that only unregisters itself - disable it; use ngmy_service_worker.js instead.
 $bootPath = Join-Path $PSScriptRoot "docs\flutter_bootstrap.js"
 if (Test-Path $bootPath) {
     $boot = Get-Content $bootPath -Raw
     $boot = $boot -replace ',\{\}', ''
+    $boot = $boot -replace '(?s)\s*serviceWorkerSettings:\s*\{[^}]*\}\s*,?', ''
     Set-Content -Path $bootPath -Value $boot -Encoding UTF8 -NoNewline
-    Write-Host "  Patched flutter_bootstrap.js (PWA service worker enabled)" -ForegroundColor DarkGray
+    Write-Host "  Patched flutter_bootstrap.js (disabled Flutter unregister-only worker)" -ForegroundColor DarkGray
 }
-if (Test-Path (Join-Path $PSScriptRoot "docs\flutter_service_worker.js")) {
-    Write-Host "  flutter_service_worker.js present (offline PWA)" -ForegroundColor DarkGray
+$flutterSw = Join-Path $PSScriptRoot "docs\flutter_service_worker.js"
+if (Test-Path $flutterSw) {
+    Remove-Item $flutterSw -Force
+    Write-Host "  Removed flutter_service_worker.js (unregister-only stub)" -ForegroundColor DarkGray
+}
+
+# Generate offline PWA worker with full precache list for GitHub Pages subpath.
+$swTemplate = Join-Path $PSScriptRoot "web\ngmy_service_worker.js"
+$swOut = Join-Path $PSScriptRoot "docs\ngmy_service_worker.js"
+$docsPath = Join-Path $PSScriptRoot "docs"
+$base = $BaseHref.TrimEnd('/')
+if (Test-Path $swTemplate) {
+    $urlSet = [System.Collections.Generic.HashSet[string]]::new()
+    [void]$urlSet.Add("$base/")
+    [void]$urlSet.Add("$base/index.html")
+    Get-ChildItem $docsPath -Recurse -File | ForEach-Object {
+        if ($_.Name -eq 'ngmy_service_worker.js') { return }
+        $rel = $_.FullName.Substring($docsPath.Length).Replace('\', '/')
+        if (-not $rel.StartsWith('/')) { $rel = "/$rel" }
+        [void]$urlSet.Add("$base$rel")
+    }
+    $jsonUrls = (($urlSet | Sort-Object) | ForEach-Object { "'$_'" }) -join ","
+    $sw = Get-Content $swTemplate -Raw
+    $sw = $sw.Replace('__NGMY_DEPLOY_ID__', $DeployId)
+    $sw = $sw.Replace('__NGMY_PRECACHE_URLS__', "[$jsonUrls]")
+    Set-Content -Path $swOut -Value $sw -Encoding UTF8
+    Write-Host "  Wrote ngmy_service_worker.js ($($urlSet.Count) precache URLs)" -ForegroundColor DarkGray
+} else {
+    Write-Warning "Missing web/ngmy_service_worker.js - offline cache not generated."
 }
 
 $mainJs = Join-Path $PSScriptRoot "docs\main.dart.js"

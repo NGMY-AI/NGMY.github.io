@@ -40,6 +40,7 @@ import 'ngmy_invoice_storage.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_store_location.dart';
+import 'ngmy_local_cache.dart';
 import 'ngmy_offline.dart';
 import 'ngmy_document_scanner.dart';
 import 'ngmy_oauth.dart';
@@ -3781,6 +3782,29 @@ class _NGMYAppState extends State<NGMYApp> {
     }
   }
 
+  void _preserveLocalSessionState(UserData local, UserData remote) {
+    if (local.isClockedIn && local.clockInStartTime != null) {
+      remote.isClockedIn = true;
+      remote.clockInStartTime = local.clockInStartTime;
+      remote.clockInPenaltyPercent = local.clockInPenaltyPercent;
+    }
+    if (local.activeInvestment != null && remote.activeInvestment == null) {
+      remote.activeInvestment = local.activeInvestment;
+    }
+  }
+
+  Future<void> _persistLocalSnapshot() async {
+    await NgmyLocalCache.persistSnapshot(
+      users: _allUsers.map((e) => e.toJson()).toList(),
+      transactions: _allTransactions.map((e) => e.toJson()).toList(),
+      media: _allMedia.map((e) => e.toJson()).toList(),
+      announcements: _allAnnouncements.map((e) => e.toJson()).toList(),
+      config: _config.toJson(),
+      investmentPlans: _globalPlans.map((e) => e.toJson()).toList(),
+      currentUser: _currentUser?.toJson(),
+    );
+  }
+
   Future<void> _loadData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -3868,17 +3892,39 @@ class _NGMYAppState extends State<NGMYApp> {
           }
         } catch (_) {}
       }
+
+      final annLocalEarly = safeGet('all_announcements');
+      if (annLocalEarly != null) {
+        try {
+          _allAnnouncements = (jsonDecode(annLocalEarly) as List).map((e) => Announcement.fromJson(e)).toList();
+          await _pruneExpiredAnnouncements(updateUi: false);
+        } catch (_) {
+          prefs.remove('all_announcements');
+        }
+      }
+
       if (mounted) setState(() => _isLoading = false);
 
       // 2. Fetch from Supabase when online (offline uses local cache above).
       if (!await ngmyDeviceIsOnline()) {
         debugPrint('[ngmy] offline — using cached local data');
+        await _persistLocalSnapshot();
+        if (mounted) setState(() {});
         return;
       }
+      final localUsersBeforeFetch = <String, UserData>{
+        for (final u in _allUsers) u.email.toLowerCase().trim(): u,
+      };
+      final localCurrent = _currentUser;
       try {
         final usersData = await supabase.from('users').select();
         if (usersData != null) {
           _allUsers = (usersData as List).map((e) => UserData.fromJson(e)).toList();
+          for (final u in _allUsers) {
+            final key = u.email.toLowerCase().trim();
+            final local = localUsersBeforeFetch[key];
+            if (local != null) _preserveLocalSessionState(local, u);
+          }
           for (final u in _allUsers) {
             NgmyMediaProfile.normalizeUserMediaFields(u);
           }
@@ -3900,6 +3946,7 @@ class _NGMYAppState extends State<NGMYApp> {
         if (annData != null) {
           _allAnnouncements = (annData as List).map((e) => Announcement.fromJson(e)).toList();
           await _pruneExpiredAnnouncements(updateUi: false);
+          if (mounted) setState(() {});
         }
 
         final localStoreListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
@@ -3981,7 +4028,17 @@ class _NGMYAppState extends State<NGMYApp> {
       if (_currentUser != null) {
         final key = _currentUser!.email.toLowerCase().trim();
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
-        if (idx != -1) _currentUser = _allUsers[idx];
+        if (idx != -1) {
+          _preserveLocalSessionState(_currentUser!, _allUsers[idx]);
+          _currentUser = _allUsers[idx];
+        }
+      } else if (localCurrent != null) {
+        final key = localCurrent.email.toLowerCase().trim();
+        final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+        if (idx != -1) {
+          _preserveLocalSessionState(localCurrent, _allUsers[idx]);
+          _currentUser = _allUsers[idx];
+        }
       }
 
       // Ensure admins are updated
@@ -4003,8 +4060,9 @@ class _NGMYAppState extends State<NGMYApp> {
         final id = (o['id'] ?? '').toString();
         if (id.isNotEmpty) _seenRealtimeStoreOrderIds.add(id);
       }
+      await _persistLocalSnapshot();
     } catch (e) { debugPrint("General load error: $e"); }
-    if (mounted) setState(() => _isLoading = false);
+    if (mounted) setState(() {});
   }
 
   bool _isMissingTableError(Object error, String table) {
@@ -26069,20 +26127,27 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   Future<void> _loadChatMemory() async {
     final stored = await NgmyAiMemoryStore.load(widget.user.email);
     if (!mounted) return;
+    final next = <Map<String, dynamic>>[];
+    if (stored.isNotEmpty) {
+      next.addAll(stored);
+      next.sort((a, b) {
+        final ta = DateTime.tryParse((a['at'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final tb = DateTime.tryParse((b['at'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return ta.compareTo(tb);
+      });
+    } else {
+      next.add({
+        'role': 'ai',
+        'text': _isBoss
+            ? 'Good to see you, Sir. I am your NGMY personal assistant — ready to help with the platform, strategy, or anything personal including relationships. How may I serve you today, Boss?'
+            : 'Hello! Ask me about investments, clock-in, withdrawals, the store, or anything about the platform.',
+        'at': DateTime.now().toUtc().toIso8601String(),
+      });
+    }
     setState(() {
-      _messages.clear();
-      if (stored.isNotEmpty) {
-        _messages.addAll(stored);
-        _sortMessagesChronological();
-      } else {
-        _messages.add({
-          'role': 'ai',
-          'text': _isBoss
-              ? 'Good to see you, Sir. I am your NGMY personal assistant — ready to help with the platform, strategy, or anything personal including relationships. How may I serve you today, Boss?'
-              : 'Hello! Ask me about investments, clock-in, withdrawals, the store, or anything about the platform.',
-          'at': DateTime.now().toUtc().toIso8601String(),
-        });
-      }
+      _messages
+        ..clear()
+        ..addAll(next);
       _memoryLoaded = true;
     });
     _scrollToBottom(jump: true);
