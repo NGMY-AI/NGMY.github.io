@@ -6138,6 +6138,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         top: false,
         child: NgmySculptedBottomNavFrame(
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               _nav(0, Icons.home_rounded),
               _nav(1, Icons.trending_up_rounded),
@@ -6163,12 +6164,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             },
             customBorder: const CircleBorder(),
             child: SizedBox(
-              height: 58,
+              height: NgmyBottomNavMetrics.frameHeight,
               child: Center(
                 child: Icon(
                   icon,
                   color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey,
-                  size: 26,
+                  size: NgmyBottomNavMetrics.sideIconSize,
                 ),
               ),
             ),
@@ -6183,38 +6184,34 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             onTap: () => setState(() => _idx = i),
             customBorder: const CircleBorder(),
             child: SizedBox(
-              height: 58,
+              height: NgmyBottomNavMetrics.frameHeight,
               child: Center(
-                child: Transform.translate(
-                  offset: const Offset(0, -16),
-                  transformHitTests: true,
-                  child: Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF6200EE).withOpacity(0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                      border: Border.all(color: _idx == i ? Colors.white : Colors.transparent, width: 2),
-                    ),
-                    child: Center(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(30),
-                        child: Image.network(
-                          widget.config.logoUrl,
-                          width: 40,
-                          height: 40,
-                          fit: BoxFit.cover,
-                          errorBuilder: (c, e, s) => const Text(
-                            'NGMY',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
-                          ),
+                child: Container(
+                  width: NgmyBottomNavMetrics.centerButtonSize,
+                  height: NgmyBottomNavMetrics.centerButtonSize,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6200EE).withOpacity(0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                    border: Border.all(color: _idx == i ? Colors.white : Colors.transparent, width: 2),
+                  ),
+                  child: Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(30),
+                      child: Image.network(
+                        widget.config.logoUrl,
+                        width: 30,
+                        height: 30,
+                        fit: BoxFit.cover,
+                        errorBuilder: (c, e, s) => const Text(
+                          'NGMY',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
                         ),
                       ),
                     ),
@@ -11715,7 +11712,7 @@ class LoanServiceScreen extends StatelessWidget {
 
 /// Scroll padding so list content can pass behind the floating bottom nav (like Media).
 double _ngmyBottomNavScrollPadding(BuildContext context) {
-  return 112 + MediaQuery.paddingOf(context).bottom;
+  return 98 + MediaQuery.paddingOf(context).bottom;
 }
 
 class InvestScreen extends StatelessWidget {
