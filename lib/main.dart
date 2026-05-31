@@ -17690,25 +17690,117 @@ class _StoreListingVideoPlayerState extends State<_StoreListingVideoPlayer> {
       return const Center(child: CircularProgressIndicator(color: Colors.white));
     }
     final c = _controller!;
+    final w = c.value.size.width > 0 ? c.value.size.width : 16.0;
+    final h = c.value.size.height > 0 ? c.value.size.height : 9.0;
     return GestureDetector(
       onTap: _togglePlay,
       child: Stack(
-        alignment: Alignment.center,
         fit: StackFit.expand,
         children: [
-          Center(
-            child: AspectRatio(
-              aspectRatio: c.value.aspectRatio == 0 ? 16 / 9 : c.value.aspectRatio,
-              child: VideoPlayer(c),
-            ),
+          FittedBox(
+            fit: BoxFit.cover,
+            clipBehavior: Clip.hardEdge,
+            child: SizedBox(width: w, height: h, child: VideoPlayer(c)),
           ),
           if (!_playing)
             Container(
               color: Colors.black38,
+              alignment: Alignment.center,
               child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 72),
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Product detail media carousel — video first, swipeable, page dots.
+class _StoreListingMediaGallery extends StatefulWidget {
+  final List<String> imageRefs;
+  final String videoRef;
+  final Widget Function(String imageRef, {BoxFit fit}) photoBuilder;
+  final Widget Function(String videoRef) videoBuilder;
+
+  const _StoreListingMediaGallery({
+    required this.imageRefs,
+    required this.videoRef,
+    required this.photoBuilder,
+    required this.videoBuilder,
+  });
+
+  @override
+  State<_StoreListingMediaGallery> createState() => _StoreListingMediaGalleryState();
+}
+
+class _StoreListingMediaGalleryState extends State<_StoreListingMediaGallery> {
+  late final PageController _pageCtrl;
+  int _page = 0;
+
+  int get _count => (widget.videoRef.isNotEmpty ? 1 : 0) + widget.imageRefs.length;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageCtrl = PageController();
+    _pageCtrl.addListener(_onPage);
+  }
+
+  void _onPage() {
+    final p = _pageCtrl.page?.round() ?? 0;
+    if (p != _page && mounted) setState(() => _page = p);
+  }
+
+  @override
+  void dispose() {
+    _pageCtrl.removeListener(_onPage);
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_count == 0) {
+      return const Center(child: Icon(Icons.image_not_supported, color: Colors.white54, size: 48));
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        PageView.builder(
+          controller: _pageCtrl,
+          itemCount: _count,
+          itemBuilder: (_, i) {
+            if (widget.videoRef.isNotEmpty && i == 0) {
+              return widget.videoBuilder(widget.videoRef);
+            }
+            final imgIndex = widget.videoRef.isNotEmpty ? i - 1 : i;
+            final ref = widget.imageRefs[imgIndex];
+            return widget.photoBuilder(ref, fit: BoxFit.cover);
+          },
+        ),
+        if (_count > 1)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 12,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_count, (i) {
+                final active = i == _page;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: active ? 8 : 6,
+                  height: active ? 8 : 6,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: active ? Colors.white : Colors.white.withValues(alpha: 0.45),
+                    boxShadow: active ? [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 4)] : null,
+                  ),
+                );
+              }),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -20246,16 +20338,24 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                   const SizedBox(height: 4),
                   Text((listing['title'] ?? '').toString().toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
                   const SizedBox(height: 4),
-                  RichText(
-                    text: TextSpan(
-                      style: DefaultTextStyle.of(context).style,
-                      children: [
-                        TextSpan(text: '\$${formatCurrency(price)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF2563EB))),
-                        if (delivery > 0)
-                          TextSpan(text: ' +\$${formatCurrency(delivery)} delivery', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _storePurple.withOpacity(0.9))),
-                      ],
+                  Text(
+                    '\$${formatCurrency(price)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                      color: Color(0xFF2563EB),
+                      decoration: TextDecoration.none,
+                      height: 1.1,
                     ),
                   ),
+                  if (delivery > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '+\$${formatCurrency(delivery)} delivery',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _storePurple.withValues(alpha: 0.9), decoration: TextDecoration.none),
+                      ),
+                    ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -20289,11 +20389,18 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final images = _listingImageRefs(listing);
     final videoRef = _listingVideoRef(listing);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pageCount = images.length + (videoRef.isNotEmpty ? 1 : 0);
-    final pageCtrl = PageController();
     final me = widget.user.email.toLowerCase().trim();
     final isOwner = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
     final status = (listing['status'] ?? 'active').toString();
+    final price = (listing['price'] as num?)?.toDouble() ?? 0;
+    final delivery = (listing['deliveryFee'] as num?)?.toDouble() ?? 0;
+    final description = (listing['description'] ?? '').toString().trim();
+    final condition = (listing['condition'] ?? '').toString().trim();
+    final category = (listing['category'] ?? '').toString().trim();
+    final location = (listing['location'] ?? '').toString().trim();
+    final units = (listing['units'] as num?)?.toInt() ?? 1;
+    final negotiable = listing['negotiable'] != false;
+    final sellerName = (listing['sellerName'] ?? 'User').toString();
 
     NgmyNavigator.pushRoute(
       context,
@@ -20312,29 +20419,60 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           body: Column(
             children: [
               Expanded(
-                child: pageCount == 0
-                    ? const Center(child: Icon(Icons.image_not_supported, color: Colors.white54, size: 48))
-                    : PageView.builder(
-                        controller: pageCtrl,
-                        itemCount: pageCount == 0 ? 1 : pageCount,
-                        itemBuilder: (_, i) {
-                          if (videoRef.isNotEmpty && i == images.length) {
-                            return _StoreListingVideoPlayer(videoRef: videoRef);
-                          }
-                          final ref = images[i];
-                          return InteractiveViewer(child: Center(child: _listingPhoto(ref, fit: BoxFit.contain)));
-                        },
-                      ),
+                child: _StoreListingMediaGallery(
+                  imageRefs: images,
+                  videoRef: videoRef,
+                  photoBuilder: (ref, {fit = BoxFit.cover}) => SizedBox.expand(child: _listingPhoto(ref, fit: fit, width: double.infinity, height: double.infinity)),
+                  videoBuilder: (ref) => _StoreListingVideoPlayer(videoRef: ref),
+                ),
               ),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 color: isDark ? const Color(0xFF121726) : Colors.white,
-                child: Column(
+                child: SingleChildScrollView(
+                  child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('\$${formatCurrency((listing['price'] as num?)?.toDouble() ?? 0)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Color(0xFF2563EB))),
-                    Text((listing['description'] ?? '').toString(), style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+                    Text(
+                      '\$${formatCurrency(price)}',
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Color(0xFF2563EB), decoration: TextDecoration.none, height: 1.1),
+                    ),
+                    if (delivery > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          '+\$${formatCurrency(delivery)} delivery',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _storePurple.withValues(alpha: 0.95), decoration: TextDecoration.none),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Text((listing['title'] ?? '').toString(), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _sellerAvatar((listing['sellerEmail'] ?? '').toString(), radius: 14),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(sellerName, style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54))),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    if (description.isNotEmpty)
+                      Text(description, style: TextStyle(fontSize: 14, height: 1.45, color: isDark ? Colors.white70 : Colors.black87))
+                    else
+                      Text('No description provided.', style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: isDark ? Colors.white38 : Colors.black45)),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        if (category.isNotEmpty) _storeChip(category),
+                        if (condition.isNotEmpty) _storeChip(condition),
+                        if (negotiable) _storeChip('Negotiable'),
+                        if (units > 1) _storeChip('$units available'),
+                        if (location.isNotEmpty) _storeChip(location),
+                      ],
+                    ),
                     const SizedBox(height: 10),
                     ..._listingAcceptedPayments(listing).map((p) {
                       if (p == 'cashapp') {
@@ -20426,6 +20564,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         ],
                       ),
                   ],
+                ),
                 ),
               ),
             ],
@@ -21345,7 +21484,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text('\$${formatCurrency(price)}', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A))),
+                Text(
+                  '\$${formatCurrency(price)}',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A), decoration: TextDecoration.none, height: 1.1),
+                ),
                 const SizedBox(height: 6),
                 Text((listing['description'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12)),
                 const SizedBox(height: 8),

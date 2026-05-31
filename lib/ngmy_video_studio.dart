@@ -12,7 +12,7 @@ import 'ngmy_video_studio_logo.dart';
 import 'ngmy_video_studio_models.dart';
 import 'ngmy_video_studio_painter.dart';
 import 'ngmy_video_studio_picker.dart';
-import 'ngmy_studio_video_view.dart';
+import 'ngmy_studio_slot_video.dart';
 import 'ngmy_news_banner_painter.dart';
 
 void showNgmyVideoStudio(BuildContext context) {
@@ -140,7 +140,6 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       _picking = true;
       _preparingSlotId = slotId;
     });
-    VideoPlayerController? newController;
     try {
       final picked = await pickNgmyStudioVideo();
       if (picked == null) {
@@ -152,7 +151,6 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         return;
       }
 
-      // Let the file dialog close and the UI repaint before heavy decode work.
       await Future<void>.delayed(Duration.zero);
       if (!mounted) return;
 
@@ -160,40 +158,32 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       await media.dispose();
 
       if (kIsWeb) {
-        final bytes = picked.bytes;
-        if (bytes == null || bytes.isEmpty) {
-          throw StateError('Could not read video data. Try another file or browser.');
+        final path = picked.path;
+        if (path != null && path.isNotEmpty && (path.startsWith('blob:') || path.startsWith('http'))) {
+          media.source = path;
+          media.blobUrl = path.startsWith('blob:') ? path : null;
+        } else {
+          final bytes = picked.bytes;
+          if (bytes == null || bytes.isEmpty) {
+            throw StateError('Could not read video data. Try another file or browser.');
+          }
+          final blobUrl = blob_util.createNgmyBlobUrl(bytes, picked.mime);
+          if (blobUrl.isEmpty) {
+            throw StateError('Could not prepare video preview on this device.');
+          }
+          media.blobUrl = blobUrl;
+          media.source = blobUrl;
         }
-        final blobUrl = blob_util.createNgmyBlobUrl(bytes, picked.mime);
-        if (blobUrl.isEmpty) {
-          throw StateError('Could not prepare video preview on this device.');
-        }
-        media.blobUrl = blobUrl;
-        media.source = blobUrl;
-        newController = VideoPlayerController.networkUrl(
-          Uri.parse(blobUrl),
-          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-        );
       } else {
         final path = picked.path;
         if (path == null || path.isEmpty) {
           throw StateError('Invalid video file path.');
         }
         media.source = path;
-        newController = VideoPlayerController.file(File(path));
       }
 
-      media.controller = newController;
+      media.controller = null;
       _slotMedia[slotId] = media;
-      if (mounted) setState(() {});
-
-      await newController.initialize().timeout(
-        const Duration(seconds: 60),
-        onTimeout: () => throw TimeoutException('Video preview timed out — try a smaller MP4.'),
-      );
-      if (!mounted) return;
-      await newController.setLooping(true);
-      unawaited(newController.play());
       setState(() => _activeSlotId = slotId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -204,17 +194,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           ),
         );
       }
-    } on TimeoutException catch (e) {
-      await newController?.dispose();
-      _slotMedia[slotId]?.controller = null;
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red.shade700),
-        );
-      }
     } catch (e) {
-      await newController?.dispose();
-      _slotMedia[slotId]?.controller = null;
+      await _slotMedia[slotId]?.dispose();
+      _slotMedia.remove(slotId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red.shade700),
@@ -763,10 +745,10 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     }
 
     final media = _slotMedia[slot.id];
-    final ctrl = media?.controller;
+    final src = media?.source;
     Widget child;
-    if (ctrl != null) {
-      child = NgmyStudioVideoView(controller: ctrl);
+    if (src != null && src.isNotEmpty) {
+      child = NgmyStudioSlotVideo(key: ValueKey(src), source: src);
     } else {
       child = Container(
         color: Colors.black87,

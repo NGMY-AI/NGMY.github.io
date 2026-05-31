@@ -13,6 +13,7 @@ bool get ngmyStudioUseDesktopFilePicker =>
         defaultTargetPlatform == TargetPlatform.macOS);
 
 const int kNgmyStudioMaxVideoBytes = 280 * 1024 * 1024;
+const int kNgmyStudioMaxWebVideoBytes = 80 * 1024 * 1024;
 const int kNgmyStudioMaxLogoBytes = 16 * 1024 * 1024;
 
 class NgmyStudioLogoPick {
@@ -25,10 +26,15 @@ class NgmyStudioLogoPick {
       (bytes != null && bytes!.isNotEmpty) || (filePath != null && filePath!.isNotEmpty);
 }
 
-/// Picks a video without loading the whole file into RAM (desktop).
+/// Picks a video — prefers blob/path on web (no full-file RAM load).
 Future<({Uint8List? bytes, String? path, String mime})?> pickNgmyStudioVideo() async {
   if (ngmyStudioUseDesktopFilePicker) {
-    return _pickVideoWithFilePicker(loadBytes: false);
+    return _pickVideoWithFilePicker(loadBytes: false, maxBytes: kNgmyStudioMaxVideoBytes);
+  }
+
+  if (kIsWeb) {
+    final blobPath = await _pickVideoWithFilePicker(loadBytes: false, maxBytes: kNgmyStudioMaxWebVideoBytes);
+    if (blobPath != null) return blobPath;
   }
 
   final picker = ImagePicker();
@@ -37,77 +43,80 @@ Future<({Uint8List? bytes, String? path, String mime})?> pickNgmyStudioVideo() a
     if (xFile != null) {
       if (kIsWeb) {
         final bytes = await xFile.readAsBytes();
+        if (bytes.length > kNgmyStudioMaxWebVideoBytes) {
+          throw StateError('Video is too large for web preview (max ${kNgmyStudioMaxWebVideoBytes ~/ (1024 * 1024)} MB). Try a shorter clip.');
+        }
         if (bytes.isNotEmpty) {
           return (bytes: bytes, path: null, mime: _videoMime(xFile.mimeType, xFile.path));
         }
       } else {
         final path = xFile.path;
         if (path.isNotEmpty) {
-          await _assertFileSize(path, kNgmyStudioMaxVideoBytes, 'Video');
+          await _assertFileSize(path, kNgmyStudioMaxVideoBytes);
           return (bytes: null, path: path, mime: _videoMime(xFile.mimeType, path));
         }
       }
     }
   } catch (e) {
     debugPrint('[studio] ImagePicker video: $e');
+    rethrow;
   }
 
   if (kIsWeb) {
-    return _pickVideoWithFilePicker(loadBytes: true);
+    return _pickVideoWithFilePicker(loadBytes: true, maxBytes: kNgmyStudioMaxWebVideoBytes);
   }
 
   return null;
 }
 
-Future<({Uint8List? bytes, String? path, String mime})?> _pickVideoWithFilePicker({required bool loadBytes}) async {
-  try {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.video,
-      allowMultiple: false,
-      withData: loadBytes,
-    );
-    if (result == null || result.files.isEmpty) return null;
-    final f = result.files.single;
-    final mime = _videoMime(null, f.name);
+Future<({Uint8List? bytes, String? path, String mime})?> _pickVideoWithFilePicker({
+  required bool loadBytes,
+  required int maxBytes,
+}) async {
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.video,
+    allowMultiple: false,
+    withData: loadBytes,
+  );
+  if (result == null || result.files.isEmpty) return null;
+  final f = result.files.single;
+  final mime = _videoMime(null, f.name);
 
-    if (loadBytes) {
-      final bytes = f.bytes;
-      if (bytes != null && bytes.isNotEmpty) {
-        if (bytes.length > kNgmyStudioMaxVideoBytes) {
-          throw StateError('Video is too large (max ${kNgmyStudioMaxVideoBytes ~/ (1024 * 1024)} MB).');
-        }
-        return (bytes: bytes, path: null, mime: mime);
-      }
-      return null;
-    }
-
-    final path = f.path;
-    if (path == null || path.isEmpty) return null;
-    await _assertFileSize(path, kNgmyStudioMaxVideoBytes, 'Video');
-    return (bytes: null, path: path, mime: mime);
-  } catch (e) {
-    debugPrint('[studio] FilePicker video: $e');
-    rethrow;
+  if (f.size != null && f.size! > maxBytes) {
+    throw StateError('Video is too large (max ${maxBytes ~/ (1024 * 1024)} MB).');
   }
+
+  if (loadBytes) {
+    final bytes = f.bytes;
+    if (bytes != null && bytes.isNotEmpty) {
+      if (bytes.length > maxBytes) {
+        throw StateError('Video is too large (max ${maxBytes ~/ (1024 * 1024)} MB).');
+      }
+      return (bytes: bytes, path: null, mime: mime);
+    }
+    return null;
+  }
+
+  final path = f.path;
+  if (path == null || path.isEmpty) return null;
+  if (!kIsWeb) {
+    await _assertFileSize(path, maxBytes);
+  }
+  return (bytes: null, path: path, mime: mime);
 }
 
 Future<NgmyStudioLogoPick?> pickNgmyStudioLogo() async {
   if (ngmyStudioUseDesktopFilePicker) {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
-        withData: false,
-      );
-      if (result == null || result.files.isEmpty) return null;
-      final path = result.files.single.path;
-      if (path == null || path.isEmpty) return null;
-      await _assertFileSize(path, kNgmyStudioMaxLogoBytes, 'Image');
-      return NgmyStudioLogoPick(filePath: path);
-    } catch (e) {
-      debugPrint('[studio] FilePicker logo: $e');
-      rethrow;
-    }
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+      withData: false,
+    );
+    if (result == null || result.files.isEmpty) return null;
+    final path = result.files.single.path;
+    if (path == null || path.isEmpty) return null;
+    await _assertFileSize(path, kNgmyStudioMaxLogoBytes);
+    return NgmyStudioLogoPick(filePath: path);
   }
 
   final picker = ImagePicker();
@@ -123,7 +132,7 @@ Future<NgmyStudioLogoPick?> pickNgmyStudioLogo() async {
       } else {
         final path = xFile.path;
         if (path.isNotEmpty) {
-          await _assertFileSize(path, kNgmyStudioMaxLogoBytes, 'Image');
+          await _assertFileSize(path, kNgmyStudioMaxLogoBytes);
           return NgmyStudioLogoPick(filePath: path);
         }
       }
@@ -133,33 +142,29 @@ Future<NgmyStudioLogoPick?> pickNgmyStudioLogo() async {
   }
 
   if (kIsWeb) {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
-        withData: true,
-      );
-      if (result != null && result.files.isNotEmpty) {
-        final bytes = result.files.single.bytes;
-        if (bytes != null && bytes.isNotEmpty) {
-          if (bytes.length > kNgmyStudioMaxLogoBytes) {
-            throw StateError('Image is too large (max ${kNgmyStudioMaxLogoBytes ~/ (1024 * 1024)} MB).');
-          }
-          return NgmyStudioLogoPick(bytes: bytes);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+      withData: true,
+    );
+    if (result != null && result.files.isNotEmpty) {
+      final bytes = result.files.single.bytes;
+      if (bytes != null && bytes.isNotEmpty) {
+        if (bytes.length > kNgmyStudioMaxLogoBytes) {
+          throw StateError('Image is too large (max ${kNgmyStudioMaxLogoBytes ~/ (1024 * 1024)} MB).');
         }
+        return NgmyStudioLogoPick(bytes: bytes);
       }
-    } catch (e) {
-      debugPrint('[studio] FilePicker logo: $e');
     }
   }
 
   return null;
 }
 
-Future<void> _assertFileSize(String path, int maxBytes, String label) async {
+Future<void> _assertFileSize(String path, int maxBytes) async {
   final len = await File(path).length();
   if (len > maxBytes) {
-    throw StateError('$label is too large (max ${maxBytes ~/ (1024 * 1024)} MB).');
+    throw StateError('File is too large (max ${maxBytes ~/ (1024 * 1024)} MB).');
   }
 }
 
