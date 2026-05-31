@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -38,12 +37,15 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
   Future<void> _load() async {
     final src = widget.source?.trim() ?? '';
     final gen = ++_generation;
-    await _controller?.dispose();
+    final old = _controller;
     _controller = null;
+    if (old != null) {
+      try {
+        await old.dispose();
+      } catch (_) {}
+    }
     if (!mounted) return;
-    setState(() {
-      _error = null;
-    });
+    setState(() => _error = null);
 
     if (src.isEmpty) return;
 
@@ -51,7 +53,7 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
     try {
       c = slot_io.createStudioVideoController(src);
       if (c == null) {
-        throw StateError('Unsupported video source.');
+        throw StateError('This device cannot preview that video format.');
       }
 
       await c.initialize().timeout(
@@ -65,70 +67,89 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
       await c.setLooping(true);
       unawaited(c.play());
       _controller = c;
-      setState(() {});
+      if (mounted) setState(() {});
     } catch (e) {
-      await c?.dispose();
+      if (c != null) {
+        try {
+          await c.dispose();
+        } catch (_) {}
+      }
       if (gen != _generation || !mounted) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = e is TimeoutException ? e.message! : e.toString());
     }
   }
 
   @override
   void dispose() {
     _generation++;
-    unawaited(_controller?.dispose());
+    final c = _controller;
+    _controller = null;
+    if (c != null) {
+      unawaited(c.dispose().catchError((_) {}));
+    }
     super.dispose();
+  }
+
+  Widget _loading() {
+    return Container(
+      color: Colors.black87,
+      alignment: Alignment.center,
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70)),
+          SizedBox(height: 8),
+          Text('Loading video…', style: TextStyle(color: Colors.white54, fontSize: 10)),
+        ],
+      ),
+    );
+  }
+
+  Widget _errorBox() {
+    return Container(
+      color: Colors.black87,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, color: Colors.redAccent, size: 28),
+          const SizedBox(height: 6),
+          Text(
+            _error ?? 'Video failed',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 10),
+          ),
+          TextButton(
+            onPressed: () => unawaited(_load()),
+            child: const Text('Retry', style: TextStyle(fontSize: 11)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_error != null) {
-      return Container(
-        color: Colors.black87,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.redAccent, size: 28),
-            const SizedBox(height: 6),
-            Text(
-              'Video failed to load',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 10),
-            ),
-            TextButton(
-              onPressed: () => unawaited(_load()),
-              child: const Text('Retry', style: TextStyle(fontSize: 11)),
-            ),
-          ],
-        ),
-      );
-    }
-
+    if (_error != null) return _errorBox();
     final c = _controller;
-    if (c == null || !c.value.isInitialized) {
-      return Container(
-        color: Colors.black87,
-        alignment: Alignment.center,
-        child: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70)),
-            SizedBox(height: 8),
-            Text('Loading video…', style: TextStyle(color: Colors.white54, fontSize: 10)),
-          ],
-        ),
-      );
-    }
+    if (c == null) return _loading();
 
-    final size = c.value.size;
-    final w = size.width > 0 ? size.width : 16.0;
-    final h = size.height > 0 ? size.height : 9.0;
-    return FittedBox(
-      fit: BoxFit.cover,
-      clipBehavior: Clip.hardEdge,
-      child: SizedBox(width: w, height: h, child: VideoPlayer(c)),
+    return ValueListenableBuilder<VideoPlayerValue>(
+      valueListenable: c,
+      builder: (context, value, _) {
+        if (!value.isInitialized) return _loading();
+        if (value.hasError) {
+          return _errorBox();
+        }
+        final w = value.size.width > 0 ? value.size.width : 16.0;
+        final h = value.size.height > 0 ? value.size.height : 9.0;
+        return FittedBox(
+          fit: BoxFit.cover,
+          clipBehavior: Clip.hardEdge,
+          child: SizedBox(width: w, height: h, child: VideoPlayer(c)),
+        );
+      },
     );
   }
 }

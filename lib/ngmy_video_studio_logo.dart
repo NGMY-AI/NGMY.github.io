@@ -18,17 +18,43 @@ class NgmyStudioLogoAnim extends StatefulWidget {
 }
 
 class _NgmyStudioLogoAnimState extends State<NgmyStudioLogoAnim> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
+  AnimationController? _ctrl;
+
+  bool get _hasImage {
+    if (widget.imageBytes != null && widget.imageBytes!.isNotEmpty) return true;
+    if (widget.filePath != null && widget.filePath!.isNotEmpty) return true;
+    if (widget.networkUrl != null && widget.networkUrl!.startsWith('http')) return true;
+    return false;
+  }
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..repeat(reverse: true);
+    _startAnimIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant NgmyStudioLogoAnim oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageBytes != widget.imageBytes ||
+        oldWidget.filePath != widget.filePath ||
+        oldWidget.networkUrl != widget.networkUrl) {
+      _startAnimIfNeeded();
+    }
+  }
+
+  void _startAnimIfNeeded() {
+    if (!_hasImage) {
+      _ctrl?.dispose();
+      _ctrl = null;
+      return;
+    }
+    _ctrl ??= AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _ctrl?.dispose();
     super.dispose();
   }
 
@@ -61,9 +87,9 @@ class _NgmyStudioLogoAnimState extends State<NgmyStudioLogoAnim> with SingleTick
               ],
             )
           : AnimatedBuilder(
-              animation: _ctrl,
+              animation: _ctrl!,
               builder: (_, child) {
-                final t = _ctrl.value;
+                final t = _ctrl!.value;
                 final scale = 0.88 + t * 0.14;
                 final dy = (t - 0.5) * 8;
                 final glow = 0.35 + t * 0.45;

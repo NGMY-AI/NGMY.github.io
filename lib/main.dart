@@ -17714,18 +17714,22 @@ class _StoreListingVideoPlayerState extends State<_StoreListingVideoPlayer> {
   }
 }
 
-/// Product detail media carousel — video first, swipeable, page dots.
+/// Product detail media — full height preview (no top/bottom crop), tap for fullscreen swipe.
 class _StoreListingMediaGallery extends StatefulWidget {
   final List<String> imageRefs;
   final String videoRef;
   final Widget Function(String imageRef, {BoxFit fit}) photoBuilder;
   final Widget Function(String videoRef) videoBuilder;
+  final VoidCallback? onTapExpand;
+  final ValueChanged<int>? onPageChanged;
 
   const _StoreListingMediaGallery({
     required this.imageRefs,
     required this.videoRef,
     required this.photoBuilder,
     required this.videoBuilder,
+    this.onTapExpand,
+    this.onPageChanged,
   });
 
   @override
@@ -17733,7 +17737,7 @@ class _StoreListingMediaGallery extends StatefulWidget {
 }
 
 class _StoreListingMediaGalleryState extends State<_StoreListingMediaGallery> {
-  late final PageController _pageCtrl;
+  final PageController _pageCtrl = PageController();
   int _page = 0;
 
   int get _count => (widget.videoRef.isNotEmpty ? 1 : 0) + widget.imageRefs.length;
@@ -17741,13 +17745,15 @@ class _StoreListingMediaGalleryState extends State<_StoreListingMediaGallery> {
   @override
   void initState() {
     super.initState();
-    _pageCtrl = PageController();
     _pageCtrl.addListener(_onPage);
   }
 
   void _onPage() {
     final p = _pageCtrl.page?.round() ?? 0;
-    if (p != _page && mounted) setState(() => _page = p);
+    if (p != _page) {
+      if (mounted) setState(() => _page = p);
+      widget.onPageChanged?.call(p);
+    }
   }
 
   @override
@@ -17762,47 +17768,149 @@ class _StoreListingMediaGalleryState extends State<_StoreListingMediaGallery> {
     if (_count == 0) {
       return const Center(child: Icon(Icons.image_not_supported, color: Colors.white54, size: 48));
     }
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        PageView.builder(
-          controller: _pageCtrl,
-          itemCount: _count,
-          itemBuilder: (_, i) {
-            if (widget.videoRef.isNotEmpty && i == 0) {
-              return widget.videoBuilder(widget.videoRef);
-            }
-            final imgIndex = widget.videoRef.isNotEmpty ? i - 1 : i;
-            final ref = widget.imageRefs[imgIndex];
-            return widget.photoBuilder(ref, fit: BoxFit.cover);
-          },
-        ),
-        if (_count > 1)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 12,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(_count, (i) {
-                final active = i == _page;
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: active ? 8 : 6,
-                  height: active ? 8 : 6,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: active ? Colors.white : Colors.white.withValues(alpha: 0.45),
-                    boxShadow: active ? [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 4)] : null,
-                  ),
-                );
-              }),
+    return GestureDetector(
+      onTap: widget.onTapExpand,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ColoredBox(
+            color: Colors.black,
+            child: PageView.builder(
+              controller: _pageCtrl,
+              itemCount: _count,
+              itemBuilder: (_, i) {
+                if (widget.videoRef.isNotEmpty && i == 0) {
+                  return Center(child: widget.videoBuilder(widget.videoRef));
+                }
+                final imgIndex = widget.videoRef.isNotEmpty ? i - 1 : i;
+                final ref = widget.imageRefs[imgIndex];
+                return Center(child: widget.photoBuilder(ref, fit: BoxFit.contain));
+              },
             ),
           ),
-      ],
+          if (widget.onTapExpand != null)
+            Positioned(
+              top: 10,
+              right: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.fullscreen_rounded, color: Colors.white, size: 16),
+                    SizedBox(width: 4),
+                    Text('Tap to enlarge', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+          if (_count > 1) _storeMediaDots(_count, _page),
+        ],
+      ),
     );
   }
+}
+
+class _StoreListingFullscreenGallery extends StatefulWidget {
+  final List<String> imageRefs;
+  final String videoRef;
+  final int initialPage;
+  final Widget Function(String imageRef, {BoxFit fit}) photoBuilder;
+  final Widget Function(String videoRef) videoBuilder;
+
+  const _StoreListingFullscreenGallery({
+    required this.imageRefs,
+    required this.videoRef,
+    required this.initialPage,
+    required this.photoBuilder,
+    required this.videoBuilder,
+  });
+
+  @override
+  State<_StoreListingFullscreenGallery> createState() => _StoreListingFullscreenGalleryState();
+}
+
+class _StoreListingFullscreenGalleryState extends State<_StoreListingFullscreenGallery> {
+  late final PageController _pageCtrl;
+  late int _page;
+
+  int get _count => (widget.videoRef.isNotEmpty ? 1 : 0) + widget.imageRefs.length;
+
+  @override
+  void initState() {
+    super.initState();
+    _page = widget.initialPage.clamp(0, _count > 0 ? _count - 1 : 0);
+    _pageCtrl = PageController(initialPage: _page);
+    _pageCtrl.addListener(() {
+      final p = _pageCtrl.page?.round() ?? 0;
+      if (p != _page && mounted) setState(() => _page = p);
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          PageView.builder(
+            controller: _pageCtrl,
+            itemCount: _count,
+            itemBuilder: (_, i) {
+              if (widget.videoRef.isNotEmpty && i == 0) {
+                return widget.videoBuilder(widget.videoRef);
+              }
+              final imgIndex = widget.videoRef.isNotEmpty ? i - 1 : i;
+              final ref = widget.imageRefs[imgIndex];
+              return InteractiveViewer(
+                minScale: 0.85,
+                maxScale: 4,
+                child: Center(child: widget.photoBuilder(ref, fit: BoxFit.contain)),
+              );
+            },
+          ),
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ),
+          if (_count > 1)
+            Positioned(left: 0, right: 0, bottom: 28, child: _storeMediaDots(_count, _page)),
+        ],
+      ),
+    );
+  }
+}
+
+Widget _storeMediaDots(int count, int active) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: List.generate(count, (i) {
+      final on = i == active;
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        width: on ? 8 : 6,
+        height: on ? 8 : 6,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: on ? Colors.white : Colors.white.withValues(alpha: 0.45),
+        ),
+      );
+    }),
+  );
 }
 
 class NgmyStoreScreen extends StatefulWidget {
@@ -20385,6 +20493,47 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     );
   }
 
+  Widget _storeDetailLabel(String label, bool isDark) {
+    return Text(
+      label.toUpperCase(),
+      style: TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.6,
+        color: isDark ? Colors.white54 : Colors.black45,
+      ),
+    );
+  }
+
+  Widget _storeDetailValue(String value, bool isDark, {double fontSize = 14, FontWeight weight = FontWeight.w600, Color? color}) {
+    return Text(
+      value,
+      style: TextStyle(fontSize: fontSize, fontWeight: weight, height: 1.35, color: color ?? (isDark ? Colors.white : Colors.black87)),
+    );
+  }
+
+  void _openListingMediaFullscreen(
+    BuildContext context, {
+    required List<String> images,
+    required String videoRef,
+    required int initialPage,
+    required Widget Function(String imageRef, {BoxFit fit}) photoBuilder,
+    required Widget Function(String videoRef) videoBuilder,
+  }) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => _StoreListingFullscreenGallery(
+          imageRefs: images,
+          videoRef: videoRef,
+          initialPage: initialPage,
+          photoBuilder: photoBuilder,
+          videoBuilder: videoBuilder,
+        ),
+      ),
+    );
+  }
+
   void _openListingDetail(Map<String, dynamic> listing) {
     final images = _listingImageRefs(listing);
     final videoRef = _listingVideoRef(listing);
@@ -20401,11 +20550,28 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final units = (listing['units'] as num?)?.toInt() ?? 1;
     final negotiable = listing['negotiable'] != false;
     final sellerName = (listing['sellerName'] ?? 'User').toString();
+    final title = (listing['title'] ?? 'Item').toString();
+
+    Widget photo(String ref, {BoxFit fit = BoxFit.contain}) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return _listingPhoto(
+            ref,
+            fit: fit,
+            width: constraints.maxWidth,
+            height: constraints.maxHeight,
+          );
+        },
+      );
+    }
 
     NgmyNavigator.pushRoute(
       context,
       NgmyNavigator.route(
-        (ctx) => Scaffold(
+        (ctx) {
+          var mediaPage = 0;
+          return StatefulBuilder(
+            builder: (ctx, setDetail) => Scaffold(
           backgroundColor: Colors.black,
           appBar: AppBar(
             backgroundColor: Colors.black,
@@ -20414,19 +20580,31 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
               icon: const Icon(Icons.arrow_back_ios_new_rounded),
               onPressed: () => NgmyNavigator.pop(ctx),
             ),
-            title: Text((listing['title'] ?? 'Item').toString(), style: const TextStyle(fontSize: 16)),
+            title: Text(title, style: const TextStyle(fontSize: 16)),
           ),
           body: Column(
             children: [
               Expanded(
+                flex: 11,
                 child: _StoreListingMediaGallery(
                   imageRefs: images,
                   videoRef: videoRef,
-                  photoBuilder: (ref, {fit = BoxFit.cover}) => SizedBox.expand(child: _listingPhoto(ref, fit: fit, width: double.infinity, height: double.infinity)),
+                  photoBuilder: photo,
                   videoBuilder: (ref) => _StoreListingVideoPlayer(videoRef: ref),
+                  onPageChanged: (p) => mediaPage = p,
+                  onTapExpand: () => _openListingMediaFullscreen(
+                    ctx,
+                    images: images,
+                    videoRef: videoRef,
+                    initialPage: mediaPage,
+                    photoBuilder: photo,
+                    videoBuilder: (ref) => _StoreListingVideoPlayer(videoRef: ref),
+                  ),
                 ),
               ),
-              Container(
+              Expanded(
+                flex: 10,
+                child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 color: isDark ? const Color(0xFF121726) : Colors.white,
@@ -20434,46 +20612,65 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                   child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '\$${formatCurrency(price)}',
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Color(0xFF2563EB), decoration: TextDecoration.none, height: 1.1),
+                    _storeDetailLabel('Price', isDark),
+                    const SizedBox(height: 4),
+                    _storeDetailValue(
+                      '\$${formatCurrency(price)}${delivery > 0 ? '  + \$${formatCurrency(delivery)} delivery' : ''}',
+                      isDark,
+                      fontSize: 22,
+                      weight: FontWeight.w900,
+                      color: const Color(0xFF2563EB),
                     ),
-                    if (delivery > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          '+\$${formatCurrency(delivery)} delivery',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _storePurple.withValues(alpha: 0.95), decoration: TextDecoration.none),
-                        ),
-                      ),
-                    const SizedBox(height: 8),
-                    Text((listing['title'] ?? '').toString(), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
+                    const SizedBox(height: 12),
+                    _storeDetailLabel('Title', isDark),
+                    const SizedBox(height: 4),
+                    _storeDetailValue(title, isDark, fontSize: 17, weight: FontWeight.w900),
+                    const SizedBox(height: 12),
+                    _storeDetailLabel('Seller', isDark),
                     const SizedBox(height: 6),
                     Row(
                       children: [
                         _sellerAvatar((listing['sellerEmail'] ?? '').toString(), radius: 14),
                         const SizedBox(width: 8),
-                        Expanded(child: Text(sellerName, style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54))),
+                        Expanded(child: _storeDetailValue(sellerName, isDark)),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    if (description.isNotEmpty)
-                      Text(description, style: TextStyle(fontSize: 14, height: 1.45, color: isDark ? Colors.white70 : Colors.black87))
-                    else
-                      Text('No description provided.', style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: isDark ? Colors.white38 : Colors.black45)),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        if (category.isNotEmpty) _storeChip(category),
-                        if (condition.isNotEmpty) _storeChip(condition),
-                        if (negotiable) _storeChip('Negotiable'),
-                        if (units > 1) _storeChip('$units available'),
-                        if (location.isNotEmpty) _storeChip(location),
-                      ],
+                    const SizedBox(height: 12),
+                    _storeDetailLabel('Description', isDark),
+                    const SizedBox(height: 4),
+                    _storeDetailValue(
+                      description.isNotEmpty ? description : 'No description provided.',
+                      isDark,
+                      weight: FontWeight.w500,
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
+                    if (category.isNotEmpty) ...[
+                      _storeDetailLabel('Category', isDark),
+                      const SizedBox(height: 4),
+                      _storeDetailValue(category, isDark),
+                      const SizedBox(height: 10),
+                    ],
+                    if (condition.isNotEmpty) ...[
+                      _storeDetailLabel('Condition', isDark),
+                      const SizedBox(height: 4),
+                      _storeDetailValue(condition, isDark),
+                      const SizedBox(height: 10),
+                    ],
+                    _storeDetailLabel('Availability', isDark),
+                    const SizedBox(height: 4),
+                    _storeDetailValue(
+                      '${units > 1 ? '$units items' : '1 item'}${negotiable ? ' · Negotiable' : ''}',
+                      isDark,
+                    ),
+                    if (location.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _storeDetailLabel('Location', isDark),
+                      const SizedBox(height: 4),
+                      _storeDetailValue(location, isDark),
+                    ],
+                    const SizedBox(height: 12),
+                    _storeDetailLabel('Payment methods', isDark),
+                    const SizedBox(height: 8),
                     ..._listingAcceptedPayments(listing).map((p) {
                       if (p == 'cashapp') {
                         final tag = _listingSellerCashTag(listing);
@@ -20567,9 +20764,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                 ),
                 ),
               ),
+              ),
             ],
           ),
         ),
+          );
+        },
         settings: const RouteSettings(name: 'StoreListingDetailPage'),
       ),
     );

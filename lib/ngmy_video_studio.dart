@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
-import 'ngmy_video_studio_blob.dart' if (dart.library.io) 'ngmy_video_studio_blob_stub.dart' as blob_util;
+import 'ngmy_video_studio_blob_stub.dart' if (dart.library.html) 'ngmy_video_studio_blob.dart' as blob_util;
 import 'ngmy_video_studio_export.dart';
 import 'ngmy_video_studio_logo.dart';
 import 'ngmy_video_studio_models.dart';
@@ -154,33 +154,40 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       await Future<void>.delayed(Duration.zero);
       if (!mounted) return;
 
-      final media = _slotMedia[slotId] ?? _SlotMedia();
-      await media.dispose();
+      if (!_slotMedia.containsKey(slotId)) {
+        _slotMedia[slotId] = _SlotMedia();
+      }
+      final media = _slotMedia[slotId]!;
+      try {
+        await media.dispose();
+      } catch (e) {
+        debugPrint('[studio] media dispose: $e');
+      }
 
+      String? source;
       if (kIsWeb) {
         final path = picked.path;
-        if (path != null && path.isNotEmpty && (path.startsWith('blob:') || path.startsWith('http'))) {
-          media.source = path;
-          media.blobUrl = path.startsWith('blob:') ? path : null;
+        if (path != null && path.isNotEmpty) {
+          source = path;
         } else {
           final bytes = picked.bytes;
           if (bytes == null || bytes.isEmpty) {
-            throw StateError('Could not read video data. Try another file or browser.');
+            throw StateError('Could not read video. Try a smaller MP4 file.');
           }
-          final blobUrl = blob_util.createNgmyBlobUrl(bytes, picked.mime);
-          if (blobUrl.isEmpty) {
-            throw StateError('Could not prepare video preview on this device.');
+          source = blob_util.createNgmyBlobUrl(bytes, picked.mime);
+          if (source.isEmpty) {
+            throw StateError('Could not prepare video on this browser.');
           }
-          media.blobUrl = blobUrl;
-          media.source = blobUrl;
         }
+        media.blobUrl = source.startsWith('blob:') ? source : null;
       } else {
-        final path = picked.path;
-        if (path == null || path.isEmpty) {
+        source = picked.path;
+        if (source == null || source.isEmpty) {
           throw StateError('Invalid video file path.');
         }
-        media.source = path;
       }
+
+      media.source = source;
 
       media.controller = null;
       _slotMedia[slotId] = media;
