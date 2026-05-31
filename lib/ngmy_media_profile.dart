@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_media_delivery.dart';
+
 /// Instagram-style media profile, stories, highlights, follow system.
 class NgmyMediaProfile {
   static dynamic userByEmail(List<dynamic> allUsers, String email) {
@@ -20,6 +22,12 @@ class NgmyMediaProfile {
 
   static List<Map<String, dynamic>> asMapList(dynamic raw) {
     if (raw == null) return <Map<String, dynamic>>[];
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) raw = decoded;
+      } catch (_) {}
+    }
     if (raw is! List) return <Map<String, dynamic>>[];
     final out = <Map<String, dynamic>>[];
     for (final e in raw) {
@@ -34,6 +42,12 @@ class NgmyMediaProfile {
 
   static List<String> asStringList(dynamic raw) {
     if (raw == null) return <String>[];
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) raw = decoded;
+      } catch (_) {}
+    }
     if (raw is! List) return <String>[];
     return raw.map((e) => e.toString()).toList();
   }
@@ -87,14 +101,28 @@ class NgmyMediaProfile {
     }
   }
 
-  static void adminAddFollowers(dynamic target, int count) {
+  static List<String> adminBuildFollowerIds(dynamic target, int count) {
     final u = target as dynamic;
     final followers = List<String>.from(asStringList(u.mediaFollowers));
+    final out = <String>[];
     for (var i = 0; i < count; i++) {
-      final fake = 'ngmy_follower_${target.email.hashCode}_${followers.length + i}';
-      if (!followers.contains(fake)) followers.add(fake);
+      final fake = 'ngmy_follower_${target.email.hashCode}_${followers.length + out.length}';
+      if (!followers.contains(fake) && !out.contains(fake)) out.add(fake);
+    }
+    return out;
+  }
+
+  static void adminApplyFollowerIds(dynamic target, List<String> ids) {
+    final u = target as dynamic;
+    final followers = List<String>.from(asStringList(u.mediaFollowers));
+    for (final id in ids) {
+      if (!followers.contains(id)) followers.add(id);
     }
     u.mediaFollowers = followers;
+  }
+
+  static void adminAddFollowers(dynamic target, int count) {
+    adminApplyFollowerIds(target, adminBuildFollowerIds(target, count));
   }
 
   static void normalizeUserMediaFields(dynamic user) {
@@ -836,6 +864,7 @@ class NgmyMediaAdminPanel extends StatefulWidget {
   final VoidCallback onDataChanged;
   final Future<bool> Function(dynamic post) persistPost;
   final Future<bool> Function(dynamic user)? persistUser;
+  final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueDelivery;
   final bool Function(dynamic post) isPostExpired;
   final bool isDark;
   final dynamic virtualProfilesRaw;
@@ -851,6 +880,7 @@ class NgmyMediaAdminPanel extends StatefulWidget {
     required this.onDataChanged,
     required this.persistPost,
     this.persistUser,
+    this.onEnqueueDelivery,
     required this.isPostExpired,
     required this.isDark,
     required this.virtualProfilesRaw,
@@ -928,6 +958,7 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                 isDark: widget.isDark,
                 onDataChanged: widget.onDataChanged,
                 persistPost: widget.persistPost,
+                onEnqueueDelivery: widget.onEnqueueDelivery,
                 virtualProfiles: _profiles,
                 pickVirtualProfile: _pickVirtualProfile,
                 resolveMediaUrl: widget.resolveMediaUrl,
@@ -1005,18 +1036,48 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                             if (ok != true) return;
                             final n = int.tryParse(amtCtrl.text.trim()) ?? 0;
                             if (n <= 0) return;
-                            NgmyMediaProfile.adminAddFollowers(u, n);
-                            final userOk = await widget.persistUser?.call(u) ?? false;
+                            final spread = await NgmyMediaDelivery.pickSchedule(context, count: n, label: 'followers');
+                            if (spread == null) return;
+                            if (spread.inMilliseconds <= 0) {
+                              NgmyMediaProfile.adminAddFollowers(u, n);
+                              final userOk = await widget.persistUser?.call(u) ?? false;
+                              setSheet(() {});
+                              if (context.mounted) {
+                                final shown = NgmyMediaProfile.formatInstagramCount(
+                                  NgmyMediaProfile.asStringList((u as dynamic).mediaFollowers).length,
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(userOk
+                                        ? 'Added $n followers to ${u.username}. Total: $shown. Saved for all users.'
+                                        : 'Could not save followers. Run supabase/users_media_profile_columns.sql in Supabase.'),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+                            if (widget.onEnqueueDelivery == null) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Scheduling is not available on this screen.')),
+                                );
+                              }
+                              return;
+                            }
+                            final ids = NgmyMediaProfile.adminBuildFollowerIds(u, n);
+                            final items = NgmyMediaDelivery.queueFollowers(
+                              userEmail: u.email.toString(),
+                              followerIds: ids,
+                              spread: spread,
+                            );
+                            await widget.onEnqueueDelivery!(items);
                             setSheet(() {});
                             if (context.mounted) {
-                              final shown = NgmyMediaProfile.formatInstagramCount(
-                                NgmyMediaProfile.asStringList((u as dynamic).mediaFollowers).length,
-                              );
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(userOk
-                                      ? 'Added $n followers to ${u.username}. Total: $shown. Saved for all users.'
-                                      : 'Could not save followers. Run supabase/users_media_profile_columns.sql in Supabase.'),
+                                  content: Text(
+                                    'Scheduled $n followers for ${u.username}. ${NgmyMediaDelivery.describeSpread(spread, n)}',
+                                  ),
                                 ),
                               );
                             }
@@ -1491,6 +1552,7 @@ class _AdminPostCard extends StatefulWidget {
   final bool isDark;
   final VoidCallback onDataChanged;
   final Future<bool> Function(dynamic post) persistPost;
+  final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueDelivery;
   final List<Map<String, dynamic>> virtualProfiles;
   final Map<String, dynamic> Function() pickVirtualProfile;
   final Future<String> Function(String rawUrl) resolveMediaUrl;
@@ -1501,6 +1563,7 @@ class _AdminPostCard extends StatefulWidget {
     required this.isDark,
     required this.onDataChanged,
     required this.persistPost,
+    this.onEnqueueDelivery,
     required this.virtualProfiles,
     required this.pickVirtualProfile,
     required this.resolveMediaUrl,
@@ -1542,53 +1605,111 @@ class _AdminPostCardState extends State<_AdminPostCard> {
     return false;
   }
 
-  Future<void> _addLikes(int count) async {
-    if (count <= 0) return;
+  String get _postId => (widget.post as dynamic).id.toString();
+
+  List<String> _buildLikeIds(int count) {
     final liked = NgmyMediaProfile.asStringList((widget.post as dynamic).likedBy);
+    final out = <String>[];
     for (var i = 0; i < count; i++) {
       final profile = widget.virtualProfiles.isNotEmpty ? widget.virtualProfiles[i % widget.virtualProfiles.length] : widget.pickVirtualProfile();
       final id = (profile['id'] ?? 'vp_$i').toString();
-      if (!liked.contains(id)) liked.add(id);
+      if (!liked.contains(id) && !out.contains(id)) out.add(id);
     }
-    (widget.post as dynamic).likedBy = liked;
-    widget.post.likes = liked.length;
-    final ok = await widget.persistPost(widget.post);
-    if (!ok) {
-      _snack('Could not save likes to the database. Check Supabase media table.');
-      return;
-    }
-    if (mounted) setState(() {});
-    _snack('Added $count like(s).');
+    return out;
   }
 
-  Future<void> _addBulkComments(int count) async {
-    if (count <= 0 || widget.virtualProfiles.isEmpty) return;
-    if (!await _ensureProfileSelected()) return;
+  List<Map<String, dynamic>> _buildCommentBatch(int count) {
+    if (count <= 0 || widget.virtualProfiles.isEmpty || _selectedProfileIdx == null) return [];
     final fallback = _commentTextCtrl.text.trim();
-    final comments = NgmyMediaProfile.asMapList((widget.post as dynamic).comments);
     final start = _selectedProfileIdx!.clamp(0, widget.virtualProfiles.length - 1);
-    var added = 0;
+    final out = <Map<String, dynamic>>[];
     for (var i = 0; i < count; i++) {
       final profile = widget.virtualProfiles[(start + i) % widget.virtualProfiles.length];
       final text = (profile['defaultComment'] ?? '').toString().trim().isNotEmpty
           ? (profile['defaultComment'] ?? '').toString().trim()
           : fallback;
       if (text.isEmpty) continue;
-      comments.add(_commentFromProfile(profile, text, suffix: '_$i'));
-      added++;
+      out.add(_commentFromProfile(profile, text, suffix: '_$i'));
     }
-    if (added == 0) {
+    return out;
+  }
+
+  Future<void> _applyLikesToPost(List<String> likeIds) async {
+    if (likeIds.isEmpty) return;
+    final liked = NgmyMediaProfile.asStringList((widget.post as dynamic).likedBy);
+    for (final id in likeIds) {
+      if (!liked.contains(id)) liked.add(id);
+    }
+    (widget.post as dynamic).likedBy = liked;
+    widget.post.likes = liked.length;
+  }
+
+  Future<void> _applyCommentsToPost(List<Map<String, dynamic>> batch) async {
+    if (batch.isEmpty) return;
+    final comments = NgmyMediaProfile.asMapList((widget.post as dynamic).comments);
+    comments.addAll(batch);
+    (widget.post as dynamic).comments = comments;
+  }
+
+  Future<void> _addLikes(int count) async {
+    if (count <= 0) return;
+    final likeIds = _buildLikeIds(count);
+    if (likeIds.isEmpty) {
+      _snack('No new likes to add.');
+      return;
+    }
+    final spread = await NgmyMediaDelivery.pickSchedule(context, count: likeIds.length, label: 'likes');
+    if (spread == null) return;
+    if (spread.inMilliseconds <= 0) {
+      await _applyLikesToPost(likeIds);
+      final ok = await widget.persistPost(widget.post);
+      if (!ok) {
+        _snack('Could not save likes to the database. Check Supabase media table.');
+        return;
+      }
+      if (mounted) setState(() {});
+      _snack('Added ${likeIds.length} like(s). Visible to all users.');
+      return;
+    }
+    if (widget.onEnqueueDelivery == null) {
+      _snack('Scheduling unavailable.');
+      return;
+    }
+    await widget.onEnqueueDelivery!(
+      NgmyMediaDelivery.queueLikes(postId: _postId, likerIds: likeIds, spread: spread),
+    );
+    _snack('Scheduled ${likeIds.length} likes. ${NgmyMediaDelivery.describeSpread(spread, likeIds.length)}');
+  }
+
+  Future<void> _addBulkComments(int count) async {
+    if (count <= 0 || widget.virtualProfiles.isEmpty) return;
+    if (!await _ensureProfileSelected()) return;
+    final batch = _buildCommentBatch(count);
+    if (batch.isEmpty) {
       _snack('Set a comment for the demo profile or type one below.');
       return;
     }
-    (widget.post as dynamic).comments = comments;
-    final ok = await widget.persistPost(widget.post);
-    if (!ok) {
-      _snack('Could not save comments. Run supabase/media_tables.sql in Supabase.');
+    final spread = await NgmyMediaDelivery.pickSchedule(context, count: batch.length, label: 'comments');
+    if (spread == null) return;
+    if (spread.inMilliseconds <= 0) {
+      await _applyCommentsToPost(batch);
+      final ok = await widget.persistPost(widget.post);
+      if (!ok) {
+        _snack('Could not save comments. Run supabase/media_tables.sql in Supabase.');
+        return;
+      }
+      if (mounted) setState(() {});
+      _snack('Added ${batch.length} comment(s). Visible to all users.');
       return;
     }
-    if (mounted) setState(() {});
-    _snack('Added $added comment(s) from demo profiles.');
+    if (widget.onEnqueueDelivery == null) {
+      _snack('Scheduling unavailable.');
+      return;
+    }
+    await widget.onEnqueueDelivery!(
+      NgmyMediaDelivery.queueComments(postId: _postId, comments: batch, spread: spread),
+    );
+    _snack('Scheduled ${batch.length} comments. ${NgmyMediaDelivery.describeSpread(spread, batch.length)}');
   }
 
   Map<String, dynamic> _commentFromProfile(Map<String, dynamic> profile, String text, {String suffix = ''}) => {
@@ -1614,17 +1735,30 @@ class _AdminPostCardState extends State<_AdminPostCard> {
     final profile = Map<String, dynamic>.from(_selectedProfile!);
     profile['defaultComment'] = text;
     _saveProfileDefaultComment(_selectedProfileIdx!, profile);
-    final comments = NgmyMediaProfile.asMapList((widget.post as dynamic).comments);
-    comments.add(_commentFromProfile(profile, text, suffix: '_c${comments.length}'));
-    (widget.post as dynamic).comments = comments;
-    final ok = await widget.persistPost(widget.post);
-    if (!ok) {
-      _snack('Could not save comment. Run supabase/media_tables.sql in Supabase.');
+    final batch = [_commentFromProfile(profile, text, suffix: '_c${DateTime.now().microsecondsSinceEpoch}')];
+    final spread = await NgmyMediaDelivery.pickSchedule(context, count: 1, label: 'comment');
+    if (spread == null) return;
+    if (spread.inMilliseconds <= 0) {
+      await _applyCommentsToPost(batch);
+      final ok = await widget.persistPost(widget.post);
+      if (!ok) {
+        _snack('Could not save comment. Run supabase/media_tables.sql in Supabase.');
+        return;
+      }
+      if (mounted) setState(() {});
+      _commentTextCtrl.clear();
+      _snack('Comment posted as @${profile['username']}. Visible to all users.');
       return;
     }
-    if (mounted) setState(() {});
+    if (widget.onEnqueueDelivery == null) {
+      _snack('Scheduling unavailable.');
+      return;
+    }
+    await widget.onEnqueueDelivery!(
+      NgmyMediaDelivery.queueComments(postId: _postId, comments: batch, spread: spread),
+    );
     _commentTextCtrl.clear();
-    _snack('Comment posted as @${profile['username']}.');
+    _snack('Comment scheduled as @${profile['username']}.');
   }
 
   void _saveProfileDefaultComment(int index, Map<String, dynamic> profile) {

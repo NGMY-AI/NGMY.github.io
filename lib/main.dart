@@ -59,6 +59,7 @@ import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_web_viewport.dart';
 import 'ngmy_web_status_bar.dart';
 import 'ngmy_login_logo.dart';
+import 'ngmy_media_delivery.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -353,6 +354,7 @@ class AppConfig {
   List<Map<String, dynamic>> ngmyPopups;
   List<Map<String, dynamic>> ngmyVideoPopups;
   List<Map<String, dynamic>> mediaVirtualProfiles;
+  List<Map<String, dynamic>> mediaDeliveryQueue;
   /// State name -> PIN for Civic Registry gate (legacy per-state; prefer [civicRegistryPin]).
   Map<String, String> civicRegistryPinsByState;
   /// One PIN for all Civic Registry users (set in Growth Income / Admin Management).
@@ -403,6 +405,7 @@ class AppConfig {
     List<Map<String, dynamic>>? ngmyPopups,
     List<Map<String, dynamic>>? ngmyVideoPopups,
     List<Map<String, dynamic>>? mediaVirtualProfiles,
+    List<Map<String, dynamic>>? mediaDeliveryQueue,
     Map<String, String>? civicRegistryPinsByState,
     this.civicRegistryPin = '',
     List<Map<String, dynamic>>? civicRegistrarApplications,
@@ -414,7 +417,8 @@ class AppConfig {
         gameInvites = gameInvites ?? [],
         ngmyPopups = ngmyPopups ?? NgmyPopupDefaults.allDefaultPopups(),
         ngmyVideoPopups = ngmyVideoPopups ?? NgmyPopupDefaults.buildVideoPopups(),
-        mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(mediaVirtualProfiles);
+        mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(mediaVirtualProfiles),
+        mediaDeliveryQueue = mediaDeliveryQueue ?? const [];
   Map<String, dynamic> toJson() => {
     'officialCashApp': officialCashApp,
     'officialBitcoin': officialBitcoin,
@@ -459,6 +463,7 @@ class AppConfig {
     'ngmyPopups': ngmyPopups,
     'ngmyVideoPopups': ngmyVideoPopups,
     'mediaVirtualProfiles': mediaVirtualProfiles,
+    'mediaDeliveryQueue': mediaDeliveryQueue,
     'civicRegistryPinsByState': civicRegistryPinsByState,
     'civicRegistryPin': civicRegistryPin,
     'civicRegistrarApplications': civicRegistrarApplications,
@@ -511,6 +516,9 @@ class AppConfig {
       (json['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
     ),
     mediaVirtualProfiles: NgmyVirtualMediaProfiles.ensure(json['mediaVirtualProfiles']),
+    mediaDeliveryQueue: List<Map<String, dynamic>>.from(
+      (json['mediaDeliveryQueue'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
+    ),
     civicRegistryPinsByState: _civicRegistryPinsFromJson(json['civicRegistryPinsByState']),
     civicRegistryPin: (json['civicRegistryPin'] ?? '').toString(),
     civicRegistrarApplications: List<Map<String, dynamic>>.from(
@@ -742,6 +750,13 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     next.jobWorkerApplications =
         keep.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)).toList();
   }
+
+  if (record.containsKey('mediaDeliveryQueue') && record['mediaDeliveryQueue'] is List) {
+    final remoteQ = (record['mediaDeliveryQueue'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    next.mediaDeliveryQueue = NgmyMediaDelivery.mergeQueues(keep.mediaDeliveryQueue, remoteQ);
+  } else if (keep.mediaDeliveryQueue.isNotEmpty) {
+    next.mediaDeliveryQueue = keep.mediaDeliveryQueue.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
 }
 
 Future<void> _persistCriticalConfigFields(AppConfig config) async {
@@ -757,6 +772,7 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     'civicRegistrarApplications': config.civicRegistrarApplications,
     'jobPosts': config.jobPosts,
     'jobWorkerApplications': config.jobWorkerApplications,
+    'mediaDeliveryQueue': config.mediaDeliveryQueue,
   };
   try {
     await client.from('config').upsert(combined);
@@ -773,6 +789,7 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     {'id': 1, 'civicRegistrarApplications': config.civicRegistrarApplications},
     {'id': 1, 'jobPosts': config.jobPosts},
     {'id': 1, 'jobWorkerApplications': config.jobWorkerApplications},
+    {'id': 1, 'mediaDeliveryQueue': config.mediaDeliveryQueue},
   ]) {
     try {
       await client.from('config').upsert(row);
@@ -804,7 +821,7 @@ Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
 Future<void> _pushUserToCloudFast(UserData u) async {
   if (!await ngmyCanReachCloud()) return;
   try {
-    await Supabase.instance.client.from('users').upsert(Map<String, dynamic>.from(u.toJson()));
+    await Supabase.instance.client.from('users').upsert(_userRowForBulkSync(u));
   } catch (e) {
     debugPrint('[user] fast upsert: $e');
   }
@@ -1229,8 +1246,8 @@ class MediaPost {
   }
 
   factory MediaPost.fromJson(Map<String, dynamic> json) {
-    final likedBy = List<String>.from(json['likedBy'] ?? json['liked_by'] ?? const []);
-    final savedBy = List<String>.from(json['savedBy'] ?? json['saved_by'] ?? const []);
+    final likedBy = _jsonStringList(json['likedBy'] ?? json['liked_by']);
+    final savedBy = _jsonStringList(json['savedBy'] ?? json['saved_by']);
     final comments = _jsonMapList(json['comments'] ?? json['media_comments']);
     final taggedUsers = _jsonStringList(json['taggedUsers'] ?? json['tagged_users']);
     final mon = NgmyMediaMonetization.fromJson(json);
@@ -1322,9 +1339,66 @@ bool _isMissingTablePostgrestError(Object error, String table) {
   return error.toString().contains("Could not find the table 'public.$table'");
 }
 
+const _userMediaProfileCloudKeys = {
+  'mediaFollowers',
+  'mediaFollowing',
+  'mediaBio',
+  'mediaHighlights',
+  'mediaStories',
+};
+
+void _stripUserMediaProfileFieldsFromBulkRow(Map<String, dynamic> row) {
+  for (final key in _userMediaProfileCloudKeys) {
+    row.remove(key);
+  }
+}
+
+Map<String, dynamic> _userRowForBulkSync(UserData u) {
+  final row = Map<String, dynamic>.from(u.toJson());
+  _stripUserMediaProfileFieldsFromBulkRow(row);
+  return row;
+}
+
 Future<bool> _upsertMediaSocialFields(MediaPost post) async {
   if (!await ngmyCanReachCloud()) return false;
   if (post.id.isEmpty) return false;
+  final comments = post.comments.map((e) => Map<String, dynamic>.from(e)).toList();
+  final likedBy = List<String>.from(post.likedBy);
+  final savedBy = List<String>.from(post.savedBy);
+  final patch = <String, dynamic>{
+    'comments': comments,
+    'likedBy': likedBy,
+    'savedBy': savedBy,
+    'likes': likedBy.length,
+  };
+  final client = Supabase.instance.client;
+  try {
+    final updated = await client
+        .from('media')
+        .update(patch)
+        .eq('id', post.id)
+        .select('id, comments, likedBy, likes')
+        .maybeSingle()
+        .timeout(kNgmyCloudWriteTimeout);
+    if (updated != null) return true;
+  } catch (e) {
+    debugPrint('[media] patch update: $e');
+  }
+  try {
+    await client.from('media').upsert({
+      'id': post.id,
+      ...patch,
+    }).timeout(kNgmyCloudWriteTimeout);
+    final verify = await client.from('media').select('comments').eq('id', post.id).maybeSingle().timeout(kNgmyCloudWriteTimeout);
+    if (verify != null) {
+      final remoteCount = _jsonMapList(verify['comments']).length;
+      if (remoteCount >= comments.length) return true;
+      debugPrint('[media] social verify: expected ${comments.length} comments, cloud has $remoteCount');
+    }
+    return true;
+  } catch (e) {
+    debugPrint('[media] social upsert: $e');
+  }
   final row = <String, dynamic>{
     'id': post.id,
     'userEmail': post.userEmail,
@@ -1335,10 +1409,10 @@ Future<bool> _upsertMediaSocialFields(MediaPost post) async {
     'type': post.contentType,
     'caption': post.caption,
     'timestamp': post.timestamp.toUtc().toIso8601String(),
-    'comments': post.comments.map((e) => Map<String, dynamic>.from(e)).toList(),
-    'likedBy': List<String>.from(post.likedBy),
-    'savedBy': List<String>.from(post.savedBy),
-    'likes': post.likedBy.length,
+    'comments': comments,
+    'likedBy': likedBy,
+    'savedBy': savedBy,
+    'likes': likedBy.length,
   };
   return _upsertMediaRowSafe(row);
 }
@@ -3337,14 +3411,29 @@ class UserData {
 
 List<String> _jsonStringList(dynamic raw) {
   if (raw == null) return <String>[];
+  if (raw is String && raw.trim().isNotEmpty) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) raw = decoded;
+    } catch (_) {}
+  }
   if (raw is List) return raw.map((e) => e.toString()).toList();
   return <String>[];
 }
 
 List<Map<String, dynamic>> _jsonMapList(dynamic raw) {
   if (raw == null) return <Map<String, dynamic>>[];
+  if (raw is String && raw.trim().isNotEmpty) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) raw = decoded;
+    } catch (_) {}
+  }
   if (raw is List) {
-    return raw.map((e) => e is Map ? Map<String, dynamic>.from(e) : <String, dynamic>{}).toList();
+    return raw
+        .map((e) => e is Map ? Map<String, dynamic>.from(e) : <String, dynamic>{})
+        .where((m) => m.isNotEmpty)
+        .toList();
   }
   return <Map<String, dynamic>>[];
 }
@@ -3386,6 +3475,7 @@ class _NGMYAppState extends State<NGMYApp> {
   bool _isSyncing = false;
   Timer? _autoThemeTimer;
   Timer? _configRefreshTimer;
+  Timer? _mediaDeliveryTimer;
   final Set<String> _disabledSupabaseTables = {};
   final Set<String> _seenRealtimeAnnouncementIds = {};
   final Set<String> _seenRealtimeStoreOrderIds = {};
@@ -3404,12 +3494,14 @@ class _NGMYAppState extends State<NGMYApp> {
       _subscribeToRealtime();
       _subscribeToAuthState();
       _startConfigRefreshLoop();
+      _startMediaDeliveryLoop();
     });
   }
 
   @override void dispose() {
     try { _autoThemeTimer?.cancel(); } catch (_) {}
     try { _configRefreshTimer?.cancel(); } catch (_) {}
+    try { _mediaDeliveryTimer?.cancel(); } catch (_) {}
     try { _inAppNoticeEntry?.remove(); } catch (_) {}
     try { _usersChannel?.unsubscribe(); } catch (_) {}
     try { _transactionsChannel?.unsubscribe(); } catch (_) {}
@@ -3858,6 +3950,93 @@ class _NGMYAppState extends State<NGMYApp> {
   Future<void> _refreshMediaAndProfilesFromCloud() async {
     await _reloadMediaFromSupabase();
     await _reloadUsersMediaProfilesFromSupabase();
+  }
+
+  Future<void> _enqueueMediaDelivery(List<Map<String, dynamic>> items) async {
+    if (items.isEmpty) return;
+    _config.mediaDeliveryQueue = NgmyMediaDelivery.mergeQueues(_config.mediaDeliveryQueue, items);
+    await ngmyFlushCriticalConfigLocalAndCloud(_config);
+    unawaited(_processMediaDeliveryQueue());
+    if (mounted) setState(() {});
+  }
+
+  Future<bool> _applyMediaDeliveryItem(Map<String, dynamic> item) async {
+    final kind = (item['kind'] ?? '').toString();
+    switch (kind) {
+      case NgmyMediaDelivery.kindComment:
+        final postId = (item['postId'] ?? '').toString();
+        final payload = item['payload'];
+        if (postId.isEmpty || payload is! Map) return false;
+        final idx = _allMedia.indexWhere((m) => m.id == postId);
+        if (idx < 0) return false;
+        final post = _allMedia[idx];
+        final comments = post.comments.map((e) => Map<String, dynamic>.from(e)).toList();
+        final comment = Map<String, dynamic>.from(payload);
+        final cid = (comment['id'] ?? '').toString();
+        if (cid.isNotEmpty && comments.any((c) => (c['id'] ?? '').toString() == cid)) return true;
+        comments.add(comment);
+        post.comments = comments;
+        return _syncAdminMediaPost(post);
+      case NgmyMediaDelivery.kindLike:
+        final postId = (item['postId'] ?? '').toString();
+        final likerId = (item['payload'] ?? '').toString();
+        if (postId.isEmpty || likerId.isEmpty) return false;
+        final idx = _allMedia.indexWhere((m) => m.id == postId);
+        if (idx < 0) return false;
+        final post = _allMedia[idx];
+        if (post.likedBy.contains(likerId)) return true;
+        post.likedBy = [...post.likedBy, likerId];
+        post.likes = post.likedBy.length;
+        return _syncAdminMediaPost(post);
+      case NgmyMediaDelivery.kindFollower:
+        final email = (item['userEmail'] ?? '').toString().toLowerCase().trim();
+        final followerId = (item['payload'] ?? '').toString();
+        if (email.isEmpty || followerId.isEmpty) return false;
+        final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+        if (idx < 0) return false;
+        final user = _allUsers[idx];
+        if (user.mediaFollowers.contains(followerId)) return true;
+        user.mediaFollowers = [...user.mediaFollowers, followerId];
+        return _syncAdminUserMediaProfile(user);
+      default:
+        return false;
+    }
+  }
+
+  Future<void> _processMediaDeliveryQueue() async {
+    if (_config.mediaDeliveryQueue.isEmpty) return;
+    final now = DateTime.now().toUtc();
+    final pending = <Map<String, dynamic>>[];
+    var changed = false;
+    for (final raw in _config.mediaDeliveryQueue) {
+      final item = Map<String, dynamic>.from(raw);
+      if (item['delivered'] == true) continue;
+      final deliverAt = DateTime.tryParse((item['deliverAt'] ?? '').toString())?.toUtc();
+      if (deliverAt == null || deliverAt.isAfter(now)) {
+        pending.add(item);
+        continue;
+      }
+      final ok = await _applyMediaDeliveryItem(item);
+      if (ok) {
+        changed = true;
+        _markAdminMediaProtectWindow();
+        continue;
+      }
+      pending.add(item);
+    }
+    if (pending.length != _config.mediaDeliveryQueue.length || changed) {
+      _config.mediaDeliveryQueue = pending;
+      await ngmyFlushCriticalConfigLocalAndCloud(_config);
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _startMediaDeliveryLoop() {
+    _mediaDeliveryTimer?.cancel();
+    _mediaDeliveryTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      unawaited(_processMediaDeliveryQueue());
+    });
+    unawaited(_processMediaDeliveryQueue());
   }
 
   Future<void> _reloadMediaFromSupabase() async {
@@ -4439,6 +4618,7 @@ class _NGMYAppState extends State<NGMYApp> {
           SharedPreferences.getInstance().then((prefs) {
             prefs.setString('app_config', jsonEncode(_config.toJson()));
           }).catchError((_) {});
+          unawaited(_processMediaDeliveryQueue());
         }
         unawaited(() async {
           final legal = await _fetchAuthoritativeLegalContent();
@@ -4998,11 +5178,12 @@ class _NGMYAppState extends State<NGMYApp> {
         );
       }
 
-      // Sync all users to Supabase (deduped list)
+      // Sync users without media profile fields — those use dedicated upserts so stale
+      // phones cannot wipe admin-granted followers or profile data.
       if (_allUsers.isNotEmpty) {
         await _safeUpsertRows(
           'users',
-          _allUsers.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
+          _allUsers.map(_userRowForBulkSync).toList(),
         );
       }
 
@@ -5412,6 +5593,7 @@ class _NGMYAppState extends State<NGMYApp> {
               },
                 onSyncAdminMediaPost: _syncAdminMediaPost,
                 onSyncAdminUserMedia: _syncAdminUserMediaProfile,
+                onEnqueueMediaDelivery: _enqueueMediaDelivery,
             ),
       ),
     );
@@ -6124,8 +6306,9 @@ class MainScreen extends StatefulWidget {
   final VoidCallback onClearAllAnnouncements;
   final Future<bool> Function(MediaPost post)? onSyncAdminMediaPost;
   final Future<bool> Function(UserData user)? onSyncAdminUserMedia;
+  final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueMediaDelivery;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
@@ -6348,7 +6531,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         });
         widget.onDataChanged();
         await _showLateClockInDialog(penalty, now);
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
         if (cost <= 0) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -6618,7 +6801,8 @@ class HomeScreen extends StatefulWidget {
   final Future<String> Function(String localRef)? onUploadPopupVideo;
   final Future<bool> Function(MediaPost post)? onSyncAdminMediaPost;
   final Future<bool> Function(UserData user)? onSyncAdminUserMedia;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia});
+  final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueMediaDelivery;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -6673,7 +6857,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               FloatingTitle(
                 title: 'GROWTH INCOME',
-                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia), routeName: 'AdminDashboard') : null,
+                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery), routeName: 'AdminDashboard') : null,
                 leading: InkWell(
                   onTap: () => NgmyNavigator.push(
                     context,
@@ -9350,7 +9534,8 @@ class AdminDashboard extends StatefulWidget {
   final Future<String> Function(String localRef)? onUploadPopupVideo;
   final Future<bool> Function(MediaPost post)? onSyncAdminMediaPost;
   final Future<bool> Function(UserData user)? onSyncAdminUserMedia;
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia});
+  final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueMediaDelivery;
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 class _AdminDashboardState extends State<AdminDashboard> {
@@ -10141,8 +10326,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               if (widget.onSyncAdminMediaPost != null) {
                 return widget.onSyncAdminMediaPost!(post);
               }
-              final ok = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
-              return ok;
+              return _upsertMediaSocialFields(post);
             },
             persistUser: (u) async {
               if (u is! UserData) return false;
@@ -10151,6 +10335,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               }
               return _pushUserMediaProfileFast(u);
             },
+            onEnqueueDelivery: widget.onEnqueueMediaDelivery,
             isPostExpired: (m) => DateTime.now().difference(m.timestamp).inDays >= 7,
             isDark: isDark,
             virtualProfilesRaw: (widget.config as dynamic).mediaVirtualProfiles,
