@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -20,20 +19,25 @@ void showNgmyDocumentScanner(
       fullscreenDialog: true,
       transitionDuration: const Duration(milliseconds: 420),
       reverseTransitionDuration: const Duration(milliseconds: 320),
-      pageBuilder: (_, __, ___) => _NgmyDocumentScannerPage(
+      pageBuilder: (context, animation, secondaryAnimation) => _NgmyDocumentScannerPage(
         geminiApiKey: geminiApiKey,
         refreshApiKey: refreshApiKey,
       ),
-      transitionsBuilder: (_, anim, __, child) {
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
         final slide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
-            .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic));
-        return FadeTransition(
-          opacity: anim,
-          child: SlideTransition(position: slide, child: child),
-        );
+            .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+        return FadeTransition(opacity: animation, child: SlideTransition(position: slide, child: child));
       },
     ),
   );
+}
+
+class _ScannedPage {
+  _ScannedPage({required this.bytes, this.path});
+
+  final Uint8List bytes;
+  final String? path;
+  final String mime = 'image/jpeg';
 }
 
 class _NgmyDocumentScannerPage extends StatefulWidget {
@@ -55,47 +59,60 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   static const _violet = Color(0xFF8B5CF6);
   static const _pink = Color(0xFFF472B6);
 
+  static const double _emptyFrameHeight = 128;
+  static const double _filledMaxHeight = 280;
+
   final _picker = ImagePicker();
   final _questionC = TextEditingController();
 
   late final AnimationController _ambient;
   late final AnimationController _framePulse;
+  late final AnimationController _inner3d;
 
-  Uint8List? _bytes;
-  String? _mime;
-  String? _previewPath;
+  final List<_ScannedPage> _pages = [];
   bool _analyzing = false;
   String? _result;
   String? _error;
+
+  bool get _hasPages => _pages.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
     _ambient = AnimationController(vsync: this, duration: const Duration(seconds: 14))..repeat();
     _framePulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
+    _inner3d = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
   }
 
   @override
   void dispose() {
     _ambient.dispose();
     _framePulse.dispose();
+    _inner3d.dispose();
     _questionC.dispose();
     super.dispose();
   }
 
-  Future<void> _pick(ImageSource source) async {
+  int get _slotsLeft => 2 - _pages.length;
+
+  Future<void> _addImages(List<XFile> files) async {
+    if (files.isEmpty) return;
+    final take = files.length > _slotsLeft ? files.sublist(0, _slotsLeft) : files;
     try {
-      final file = await _picker.pickImage(source: source, imageQuality: 82, maxWidth: 2000);
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
+      for (final file in take) {
+        final bytes = await file.readAsBytes();
+        _pages.add(_ScannedPage(bytes: bytes, path: kIsWeb ? null : file.path));
+      }
       if (!mounted) return;
       setState(() {
-        _bytes = bytes;
-        _mime = 'image/jpeg';
         _result = null;
         _error = null;
-        _previewPath = kIsWeb ? null : file.path;
       });
+      if (files.length > _slotsLeft && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Only 2 documents at a time — extra files were skipped.')),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -105,10 +122,48 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     }
   }
 
-  Future<void> _analyze() async {
-    if (_bytes == null) {
+  Future<void> _pickCamera() async {
+    if (_slotsLeft <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Take or choose a photo of your document first.')),
+        const SnackBar(content: Text('You already have 2 documents. Remove one to add another.')),
+      );
+      return;
+    }
+    final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 82, maxWidth: 2000);
+    if (file != null) await _addImages([file]);
+  }
+
+  Future<void> _pickGallery() async {
+    if (_slotsLeft <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You already have 2 documents. Remove one to add another.')),
+      );
+      return;
+    }
+    try {
+      final files = await _picker.pickMultiImage(
+        imageQuality: 82,
+        maxWidth: 2000,
+        limit: _slotsLeft,
+      );
+      await _addImages(files);
+    } catch (_) {
+      final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 2000);
+      if (file != null) await _addImages([file]);
+    }
+  }
+
+  void _removePage(int index) {
+    setState(() {
+      _pages.removeAt(index);
+      _result = null;
+    });
+  }
+
+  Future<void> _analyze() async {
+    if (_pages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add one or two document photos first.')),
       );
       return;
     }
@@ -130,11 +185,11 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
         return;
       }
 
-      final reply = await geminiAnalyzeImage(
+      final images = _pages.map((p) => (bytes: p.bytes, mimeType: p.mime)).toList();
+      final reply = await geminiAnalyzeImages(
         apiKey: apiKey,
-        imageBytes: _bytes!,
-        mimeType: _mime ?? 'image/jpeg',
-        prompt: ngmyDocumentScanPrompt(userQuestion: _questionC.text),
+        images: images,
+        prompt: ngmyDocumentScanPrompt(userQuestion: _questionC.text, pageCount: _pages.length),
       );
 
       if (!mounted) return;
@@ -165,9 +220,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Color.lerp(_cyan, _pink, (i % 4) / 3.0)!.withValues(alpha: 0.5 + pulse * 0.45),
-          boxShadow: [
-            BoxShadow(color: _violet.withValues(alpha: 0.65), blurRadius: 8 + pulse * 6),
-          ],
+          boxShadow: [BoxShadow(color: _violet.withValues(alpha: 0.65), blurRadius: 8 + pulse * 6)],
         ),
       ),
     );
@@ -232,7 +285,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     );
   }
 
-  Widget _scanFrame({required Widget child}) {
+  Widget _scanFrame({required Widget child, required bool compact}) {
     return AnimatedBuilder(
       animation: _framePulse,
       builder: (context, _) {
@@ -241,9 +294,10 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
           alignment: Alignment.center,
           transform: Matrix4.identity()
             ..setEntry(3, 2, 0.0016)
-            ..rotateX(0.04)
-            ..rotateY(-0.03),
+            ..rotateX(compact ? 0.03 : 0.04)
+            ..rotateY(compact ? -0.02 : -0.03),
           child: Container(
+            width: double.infinity,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(22),
               boxShadow: [
@@ -255,7 +309,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
               painter: _ScanCornerPainter(progress: _framePulse.value),
               child: Container(
                 margin: const EdgeInsets.all(3),
-                padding: const EdgeInsets.all(10),
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: compact ? 8 : 10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
                   gradient: LinearGradient(
@@ -277,45 +331,276 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     );
   }
 
-  Widget _previewContent() {
-    if (_bytes == null) {
-      return SizedBox(
-        height: 210,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.document_scanner_rounded, size: 52, color: Colors.white.withValues(alpha: 0.4)),
-            const SizedBox(height: 12),
-            Text(
-              'Place your document in the frame',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.65),
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
+  Widget _frameInterior3D() {
+    return AnimatedBuilder(
+      animation: _inner3d,
+      builder: (context, _) {
+        final t = _inner3d.value * math.pi * 2;
+        final scanY = (math.sin(t * 1.2) + 1) / 2;
+
+        Widget miniPage(double phase, Color accent) {
+          final bob = math.sin(t + phase) * 5;
+          final tiltX = 0.55 + math.sin(t * 0.9 + phase) * 0.18;
+          final tiltY = -0.35 + math.cos(t * 0.7 + phase) * 0.22;
+          return Transform.translate(
+            offset: Offset(0, bob),
+            child: Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.004)
+                ..rotateX(tiltX)
+                ..rotateY(tiltY)
+                ..rotateZ(math.sin(t + phase) * 0.06),
+              child: Container(
+                width: 52,
+                height: 66,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [accent.withValues(alpha: 0.95), accent.withValues(alpha: 0.55)],
+                  ),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.65), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(color: accent.withValues(alpha: 0.55), blurRadius: 16, offset: const Offset(0, 8)),
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 6)),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.article_rounded, color: Colors.white.withValues(alpha: 0.9), size: 22),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 30,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Container(
+                      width: 24,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Receipts · letters · forms · homework',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+          );
+        }
+
+        return SizedBox(
+          height: _emptyFrameHeight - 24,
+          width: double.infinity,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: CustomPaint(painter: _HoloGridPainter(t: t)),
+              ),
+              for (var i = 0; i < 8; i++)
+                Positioned(
+                  left: 20 + (i % 4) * 28.0 + math.sin(t + i) * 4,
+                  top: 18 + (i ~/ 4) * 36.0 + math.cos(t * 0.8 + i) * 3,
+                  child: Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color.lerp(_cyan, _pink, (i % 3) / 2.0)!.withValues(alpha: 0.45),
+                      boxShadow: [BoxShadow(color: _violet.withValues(alpha: 0.6), blurRadius: 6)],
+                    ),
+                  ),
+                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  miniPage(0, _cyan),
+                  const SizedBox(width: 22),
+                  miniPage(1.4, _violet),
+                ],
+              ),
+              Positioned(
+                left: 24,
+                right: 24,
+                top: 8 + scanY * (_emptyFrameHeight - 48),
+                child: Container(
+                  height: 3,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        _mint.withValues(alpha: 0.9),
+                        _cyan.withValues(alpha: 0.95),
+                        _mint.withValues(alpha: 0.9),
+                        Colors.transparent,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: _mint.withValues(alpha: 0.65), blurRadius: 12, spreadRadius: 1),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _emptyPlaceholder() {
+    return SizedBox(
+      width: double.infinity,
+      height: _emptyFrameHeight,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _frameInterior3D(),
+          const SizedBox(height: 6),
+          Text(
+            'Place your document in the frame',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.72),
+              fontWeight: FontWeight.w800,
+              fontSize: 13.5,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Up to 2 pages · camera or gallery',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.42), fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filledPreview() {
+    if (_pages.length == 1) {
+      Widget img;
+      final p = _pages.first;
+      if (p.path != null && !kIsWeb) {
+        img = Image.file(File(p.path!), fit: BoxFit.contain);
+      } else {
+        img = Image.memory(p.bytes, fit: BoxFit.contain);
+      }
+      return Stack(
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: _filledMaxHeight),
+            child: ClipRRect(borderRadius: BorderRadius.circular(12), child: img),
+          ),
+          Positioned(
+            top: 6,
+            right: 6,
+            child: _removeChip(0),
+          ),
+        ],
       );
     }
 
-    Widget img;
-    if (_previewPath != null && !kIsWeb) {
-      img = Image.file(File(_previewPath!), fit: BoxFit.contain);
-    } else {
-      img = Image.memory(_bytes!, fit: BoxFit.contain);
-    }
-
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 280),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: img,
+      constraints: const BoxConstraints(maxHeight: _filledMaxHeight),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < _pages.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: _pages[i].path != null && !kIsWeb
+                        ? Image.file(File(_pages[i].path!), fit: BoxFit.cover)
+                        : Image.memory(_pages[i].bytes, fit: BoxFit.cover),
+                  ),
+                  Positioned(top: 4, right: 4, child: _removeChip(i)),
+                  Positioned(
+                    bottom: 4,
+                    left: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Page ${i + 1}',
+                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _removeChip(int index) {
+    return Material(
+      color: Colors.black54,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => _removePage(index),
+        child: const Padding(
+          padding: EdgeInsets.all(4),
+          child: Icon(Icons.close_rounded, color: Colors.white, size: 16),
+        ),
+      ),
+    );
+  }
+
+  Widget _modernChatPrefix() {
+    return Container(
+      width: 44,
+      height: 44,
+      margin: const EdgeInsets.only(left: 2, right: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF38BDF8), Color(0xFF6366F1), Color(0xFFEC4899)],
+        ),
+        boxShadow: [
+          BoxShadow(color: _cyan.withValues(alpha: 0.5), blurRadius: 14, offset: const Offset(0, 5)),
+          BoxShadow(color: _violet.withValues(alpha: 0.35), blurRadius: 8),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Icon(Icons.forum_rounded, color: Colors.white.withValues(alpha: 0.95), size: 24),
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: _mint,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -325,6 +610,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     required IconData icon,
     required List<Color> colors,
     required VoidCallback? onTap,
+    String? sublabel,
   }) {
     return Material(
       color: Colors.transparent,
@@ -341,12 +627,22 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, color: Colors.white, size: 22),
-                const SizedBox(width: 8),
-                Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, color: Colors.white, size: 22),
+                    const SizedBox(width: 8),
+                    Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                  ],
+                ),
+                if (sublabel != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(sublabel, style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 10)),
+                  ),
               ],
             ),
           ),
@@ -369,9 +665,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
             Colors.white.withValues(alpha: 0.05),
           ],
         ),
-        border: Border.all(
-          color: (borderColors?.first ?? Colors.white).withValues(alpha: 0.28),
-        ),
+        border: Border.all(color: (borderColors?.first ?? Colors.white).withValues(alpha: 0.28)),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 8)),
         ],
@@ -387,6 +681,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       builder: (context, _) {
         final t = _ambient.value;
         final bgShift = math.sin(t * math.pi * 2) * 0.08;
+        final slotHint = _slotsLeft == 2 ? '2 pages' : '1 more';
 
         return Scaffold(
           body: Stack(
@@ -455,44 +750,40 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             _heroOrb(t),
                             const SizedBox(height: 4),
                             ShaderMask(
-                              shaderCallback: (bounds) => const LinearGradient(
-                                colors: [_cyan, _mint, _violet],
-                              ).createShader(bounds),
+                              shaderCallback: (bounds) => const LinearGradient(colors: [_cyan, _mint, _violet]).createShader(bounds),
                               child: const Text(
                                 'Snap · Scan · Understand',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                  letterSpacing: 0.5,
-                                ),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5),
                               ),
                             ),
                             const SizedBox(height: 6),
                             Text(
                               'Family-friendly AI reads your papers and highlights what matters.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.72),
-                                fontSize: 13,
-                                height: 1.35,
-                              ),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 13, height: 1.35),
                             ),
                             const SizedBox(height: 18),
-                            _scanFrame(child: _previewContent()),
+                            _scanFrame(
+                              compact: !_hasPages,
+                              child: _hasPages ? _filledPreview() : _emptyPlaceholder(),
+                            ),
                             const SizedBox(height: 14),
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Expanded(
                                   child: _actionButton(
                                     label: 'Camera',
                                     icon: Icons.photo_camera_rounded,
                                     colors: const [Color(0xFF059669), Color(0xFF10B981)],
-                                    onTap: _analyzing ? null : () => _pick(ImageSource.camera),
+                                    onTap: _analyzing ? null : _pickCamera,
+                                    sublabel: _slotsLeft > 0 ? slotHint : 'Full',
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -501,7 +792,8 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                     label: 'Gallery',
                                     icon: Icons.photo_library_rounded,
                                     colors: const [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                                    onTap: _analyzing ? null : () => _pick(ImageSource.gallery),
+                                    onTap: _analyzing ? null : _pickGallery,
+                                    sublabel: _slotsLeft > 0 ? 'Up to 2' : 'Full',
                                   ),
                                 ),
                               ],
@@ -513,10 +805,10 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                 maxLines: 2,
                                 style: const TextStyle(color: Colors.white, fontSize: 14),
                                 decoration: InputDecoration(
-                                  hintText: 'Ask anything about this document (optional)',
+                                  hintText: 'Ask anything about your document(s)…',
                                   hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.38)),
                                   border: InputBorder.none,
-                                  prefixIcon: Icon(Icons.chat_bubble_outline_rounded, color: _cyan.withValues(alpha: 0.85)),
+                                  prefixIcon: _modernChatPrefix(),
                                 ),
                               ),
                             ),
@@ -527,7 +819,6 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                 onTap: _analyzing ? null : _analyze,
                                 borderRadius: BorderRadius.circular(18),
                                 child: Ink(
-                                  width: double.infinity,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(18),
                                     gradient: LinearGradient(
@@ -536,11 +827,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                           : const [Color(0xFFF59E0B), Color(0xFFEC4899), Color(0xFF8B5CF6)],
                                     ),
                                     boxShadow: [
-                                      BoxShadow(
-                                        color: _pink.withValues(alpha: 0.45),
-                                        blurRadius: 20,
-                                        offset: const Offset(0, 8),
-                                      ),
+                                      BoxShadow(color: _pink.withValues(alpha: 0.45), blurRadius: 20, offset: const Offset(0, 8)),
                                     ],
                                   ),
                                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -557,12 +844,10 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                         const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 24),
                                       const SizedBox(width: 10),
                                       Text(
-                                        _analyzing ? 'Reading your document…' : 'Scan & summarize',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 16,
-                                        ),
+                                        _analyzing
+                                            ? 'Reading your document${_pages.length > 1 ? 's' : ''}…'
+                                            : 'Scan & summarize',
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
                                       ),
                                     ],
                                   ),
@@ -578,9 +863,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                   children: [
                                     const Icon(Icons.info_outline_rounded, color: Colors.redAccent, size: 20),
                                     const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 13, height: 1.4)),
-                                    ),
+                                    Expanded(child: Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 13, height: 1.4))),
                                   ],
                                 ),
                               ),
@@ -592,27 +875,20 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: _mint.withValues(alpha: 0.2),
-                                            borderRadius: BorderRadius.circular(20),
-                                            border: Border.all(color: _mint.withValues(alpha: 0.5)),
-                                          ),
-                                          child: const Text(
-                                            'AI Summary',
-                                            style: TextStyle(color: _mint, fontWeight: FontWeight.w800, fontSize: 11),
-                                          ),
-                                        ),
-                                      ],
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: _mint.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: _mint.withValues(alpha: 0.5)),
+                                      ),
+                                      child: Text(
+                                        _pages.length > 1 ? 'AI Summary · ${_pages.length} pages' : 'AI Summary',
+                                        style: const TextStyle(color: _mint, fontWeight: FontWeight.w800, fontSize: 11),
+                                      ),
                                     ),
                                     const SizedBox(height: 12),
-                                    SelectableText(
-                                      _result!,
-                                      style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
-                                    ),
+                                    SelectableText(_result!, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5)),
                                   ],
                                 ),
                               ),
@@ -632,7 +908,6 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   }
 }
 
-/// Animated corner brackets around the scan area.
 class _ScanCornerPainter extends CustomPainter {
   _ScanCornerPainter({required this.progress});
 
@@ -666,4 +941,29 @@ class _ScanCornerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ScanCornerPainter old) => old.progress != progress;
+}
+
+class _HoloGridPainter extends CustomPainter {
+  _HoloGridPainter({required this.t});
+
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF22D3EE).withValues(alpha: 0.08)
+      ..strokeWidth = 1;
+
+    const step = 22.0;
+    final offset = (t * 40) % step;
+    for (var x = -step; x < size.width + step; x += step) {
+      canvas.drawLine(Offset(x + offset, 0), Offset(x + offset, size.height), paint);
+    }
+    for (var y = -step; y < size.height + step; y += step) {
+      canvas.drawLine(Offset(0, y + offset * 0.6), Offset(size.width, y + offset * 0.6), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HoloGridPainter old) => old.t != t;
 }

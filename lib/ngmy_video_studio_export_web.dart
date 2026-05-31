@@ -126,6 +126,8 @@ Future<String> exportNgmyVideoStudioComposed({
     }
   }
 
+  html.CanvasElement? exportCanvas;
+
   try {
     onProgress?.call(0.08);
 
@@ -148,16 +150,47 @@ Future<String> exportNgmyVideoStudioComposed({
     if (config.newsBannerStyle != null) {
       bannerOverlay = await _renderNewsBannerOverlay(config, w, h);
     }
-    final canvas = html.CanvasElement(width: w, height: h);
+    exportCanvas = html.CanvasElement(width: w, height: h);
+    final canvas = exportCanvas!;
     final ctx = canvas.context2D;
 
     final composed = html.MediaStream();
-    for (final t in canvas.captureStream(30).getVideoTracks()) {
-      composed.addTrack(t);
+    var usedCanvasStream = false;
+    try {
+      canvas
+        ..style.position = 'fixed'
+        ..style.left = '0'
+        ..style.top = '0'
+        ..style.opacity = '0.01'
+        ..style.pointerEvents = 'none'
+        ..style.zIndex = '-1';
+      html.document.body?.append(canvas);
+      final canvasStream = canvas.captureStream(30);
+      for (final t in canvasStream.getVideoTracks()) {
+        composed.addTrack(t);
+      }
+      usedCanvasStream = composed.getVideoTracks().isNotEmpty;
+    } catch (e) {
+      debugPrint('[studio export] canvas.captureStream unavailable: $e');
     }
-    for (final t in videos.values.first.captureStream().getAudioTracks()) {
-      composed.addTrack(t);
+
+    if (!usedCanvasStream) {
+      try {
+        final vStream = videos.values.first.captureStream();
+        for (final t in vStream.getVideoTracks()) {
+          composed.addTrack(t);
+        }
+      } catch (e) {
+        exportCanvas?.remove();
+        return 'Download failed on this browser. Try Chrome on a computer, or use one video only for instant download.';
+      }
     }
+
+    try {
+      for (final t in videos.values.first.captureStream().getAudioTracks()) {
+        composed.addTrack(t);
+      }
+    } catch (_) {}
 
     String? mimeType;
     for (final m in ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']) {
@@ -288,8 +321,14 @@ Future<String> exportNgmyVideoStudioComposed({
       ..download = filename
       ..click();
     html.Url.revokeObjectUrl(url);
+    if (!usedCanvasStream) {
+      return 'Downloaded $filename (video track — full studio merge needs Chrome/Edge on desktop).';
+    }
     return 'Downloaded $filename';
   } finally {
+    try {
+      exportCanvas?.remove();
+    } catch (_) {}
     for (final v in videos.values) {
       v.remove();
     }
