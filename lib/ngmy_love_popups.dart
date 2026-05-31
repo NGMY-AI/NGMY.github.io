@@ -2,7 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// Full-screen 3D-style love match result (~4 seconds).
+const _lovePink = Color(0xFFEC4899);
+const _loveDeep = Color(0xFF9F1239);
+
+/// Full-screen love match result (~7 seconds) with percentage.
 Future<void> showNgmyLoveMatchPopup(
   BuildContext context, {
   required int score,
@@ -14,23 +17,21 @@ Future<void> showNgmyLoveMatchPopup(
     builder: (ctx) => _LoveMatchPopupOverlay(
       score: score,
       message: message,
-      onDone: () {
-        entry.remove();
-      },
+      onDone: () => entry.remove(),
     ),
   );
   overlay.insert(entry);
-  await Future<void>.delayed(const Duration(seconds: 4));
+  await Future<void>.delayed(const Duration(seconds: 7));
   entry.remove();
 }
 
-/// Smaller romantic idea popup for Next / Keep / Date.
+/// Compact romantic idea toast — frame fits the text.
 Future<void> showNgmyLoveIdeaPopup(
   BuildContext context, {
   required String title,
   required String emoji,
   required String idea,
-  Color accent = const Color(0xFFEC4899),
+  Color accent = _lovePink,
 }) async {
   final overlay = Overlay.of(context, rootOverlay: true);
   late OverlayEntry entry;
@@ -44,7 +45,7 @@ Future<void> showNgmyLoveIdeaPopup(
     ),
   );
   overlay.insert(entry);
-  await Future<void>.delayed(const Duration(milliseconds: 3200));
+  await Future<void>.delayed(const Duration(milliseconds: 4500));
   entry.remove();
 }
 
@@ -70,7 +71,7 @@ class _LoveMatchPopupOverlayState extends State<_LoveMatchPopupOverlay> with Sin
   void initState() {
     super.initState();
     _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..forward();
-    Future<void>.delayed(const Duration(seconds: 4), () {
+    Future<void>.delayed(const Duration(seconds: 7), () {
       if (mounted) widget.onDone();
     });
   }
@@ -107,11 +108,11 @@ class _LoveMatchPopupOverlayState extends State<_LoveMatchPopupOverlay> with Sin
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFFFB7185), Color(0xFFEC4899), Color(0xFF9F1239)],
+                      colors: [Color(0xFFFB7185), _lovePink, _loveDeep],
                     ),
                     border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 2),
                     boxShadow: [
-                      BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.65), blurRadius: 40, spreadRadius: 4),
+                      BoxShadow(color: _lovePink.withValues(alpha: 0.65), blurRadius: 40, spreadRadius: 4),
                       BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 24, offset: const Offset(0, 14)),
                     ],
                   ),
@@ -178,8 +179,8 @@ class _LoveIdeaPopupOverlayState extends State<_LoveIdeaPopupOverlay> with Singl
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 550))..forward();
-    Future<void>.delayed(const Duration(milliseconds: 3200), () {
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 480))..forward();
+    Future<void>.delayed(const Duration(milliseconds: 4500), () {
       if (mounted) widget.onDone();
     });
   }
@@ -192,6 +193,8 @@ class _LoveIdeaPopupOverlayState extends State<_LoveIdeaPopupOverlay> with Singl
 
   @override
   Widget build(BuildContext context) {
+    final maxW = MediaQuery.sizeOf(context).width * 0.88;
+
     return IgnorePointer(
       child: Material(
         color: Colors.transparent,
@@ -200,41 +203,58 @@ class _LoveIdeaPopupOverlayState extends State<_LoveIdeaPopupOverlay> with Singl
           builder: (context, _) {
             final slide = Curves.easeOutBack.transform(_ctrl.value);
             return Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 72),
-                child: Transform.translate(
-                  offset: Offset(0, (1 - slide) * -40),
-                  child: Opacity(
-                    opacity: _ctrl.value,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 22),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A1020).withValues(alpha: 0.94),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: widget.accent.withValues(alpha: 0.65), width: 1.5),
-                        boxShadow: [
-                          BoxShadow(color: widget.accent.withValues(alpha: 0.4), blurRadius: 20),
+              alignment: Alignment.center,
+              child: Transform.scale(
+                scale: 0.85 + slide * 0.15,
+                child: Opacity(
+                  opacity: _ctrl.value,
+                  child: Container(
+                    constraints: BoxConstraints(maxWidth: maxW),
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFF2A1528).withValues(alpha: 0.97),
+                          const Color(0xFF1A1020).withValues(alpha: 0.97),
                         ],
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(widget.emoji, style: const TextStyle(fontSize: 28)),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(widget.title, style: TextStyle(color: widget.accent, fontWeight: FontWeight.w900, fontSize: 13)),
-                                const SizedBox(height: 4),
-                                Text(widget.idea, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35)),
-                              ],
-                            ),
+                      border: Border.all(color: widget.accent.withValues(alpha: 0.75), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(color: widget.accent.withValues(alpha: 0.35), blurRadius: 16, spreadRadius: 0),
+                      ],
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.emoji, style: const TextStyle(fontSize: 22)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                widget.title,
+                                style: TextStyle(color: widget.accent, fontWeight: FontWeight.w800, fontSize: 12),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                widget.idea,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

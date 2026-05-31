@@ -510,6 +510,49 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
     );
   }
 
+  Widget _loveMatchResultCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_redLove, _pinkDeep, Color(0xFF9F1239)],
+        ),
+        border: Border.all(color: Colors.white.withOpacity(0.35)),
+        boxShadow: [BoxShadow(color: _redLove.withOpacity(0.35), blurRadius: 14, offset: const Offset(0, 6))],
+      ),
+      child: Column(
+        children: [
+          const Text('💘', style: TextStyle(fontSize: 28)),
+          const SizedBox(height: 6),
+          Text(
+            '$_matchScore%',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 44,
+              height: 1,
+              shadows: [Shadow(color: Colors.black26, blurRadius: 6)],
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text('Love Match', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: 0.8)),
+          if (_matchMessage != null && _matchMessage!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              _matchMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withOpacity(0.92), fontSize: 13, height: 1.35, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _loveMatchCalculator() {
     return Stack(
       clipBehavior: Clip.none,
@@ -530,14 +573,14 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
               const SizedBox(height: 8),
               const Text('Love Match Calculator', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
               const SizedBox(height: 6),
-              Text('Enter your names — we will show your match in a 3D love popup', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12)),
+              Text('Enter both names — your match shows here and in a love popup', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12)),
               const SizedBox(height: 20),
               _nameField(controller: _yourNameC, hint: 'Your name', icon: Icons.person_outline_rounded),
               const SizedBox(height: 12),
               _nameField(controller: _theirNameC, hint: 'Their name', icon: Icons.favorite_border_rounded),
               if (_matchScore != null) ...[
-                const SizedBox(height: 14),
-                Text('Last result: $_matchScore%', style: TextStyle(color: _pinkGlow.withOpacity(0.85), fontWeight: FontWeight.w800, fontSize: 13)),
+                const SizedBox(height: 18),
+                _loveMatchResultCard(),
               ],
               const SizedBox(height: 18),
               _loveActionButton(label: 'Calculate Love Match', onTap: _calculateLoveMatch),
