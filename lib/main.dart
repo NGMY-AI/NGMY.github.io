@@ -55,6 +55,7 @@ import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_loans.dart';
 import 'ngmy_civic_registry_gate.dart';
+import 'ngmy_web_viewport.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -74,7 +75,11 @@ void main() async {
   } catch (e) {
     debugPrint('Supabase init failed (app still starts): $e');
   }
-  runApp(kIsWeb ? const ExcludeSemantics(child: NGMYApp()) : const NGMYApp());
+  runApp(
+    kIsWeb
+        ? const ExcludeSemantics(child: NgmyWebViewportGuard(child: NGMYApp()))
+        : const NGMYApp(),
+  );
 }
 
 // --- DATA MODELS ---
@@ -345,8 +350,11 @@ class AppConfig {
   List<Map<String, dynamic>> ngmyPopups;
   List<Map<String, dynamic>> ngmyVideoPopups;
   List<Map<String, dynamic>> mediaVirtualProfiles;
-  /// State name -> PIN for Civic Registry gate (admin sets per state).
+  /// State name -> PIN for Civic Registry gate (legacy per-state; prefer [civicRegistryPin]).
   Map<String, String> civicRegistryPinsByState;
+  /// One PIN for all Civic Registry users (set in Growth Income / Admin Management).
+  String civicRegistryPin;
+  List<Map<String, dynamic>> civicRegistrarApplications;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -393,8 +401,11 @@ class AppConfig {
     List<Map<String, dynamic>>? ngmyVideoPopups,
     List<Map<String, dynamic>>? mediaVirtualProfiles,
     Map<String, String>? civicRegistryPinsByState,
+    this.civicRegistryPin = '',
+    List<Map<String, dynamic>>? civicRegistrarApplications,
   })  : loanApplications = loanApplications ?? [],
         civicRegistryPinsByState = civicRegistryPinsByState ?? const {},
+        civicRegistrarApplications = civicRegistrarApplications ?? const [],
         gameTimeLimits = gameTimeLimits ?? ngmyDefaultGameTimeLimits(),
         diceSettings = diceSettings ?? NgmyDiceSettings().toJson(),
         gameInvites = gameInvites ?? [],
@@ -446,6 +457,8 @@ class AppConfig {
     'ngmyVideoPopups': ngmyVideoPopups,
     'mediaVirtualProfiles': mediaVirtualProfiles,
     'civicRegistryPinsByState': civicRegistryPinsByState,
+    'civicRegistryPin': civicRegistryPin,
+    'civicRegistrarApplications': civicRegistrarApplications,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
@@ -496,6 +509,10 @@ class AppConfig {
     ),
     mediaVirtualProfiles: NgmyVirtualMediaProfiles.ensure(json['mediaVirtualProfiles']),
     civicRegistryPinsByState: _civicRegistryPinsFromJson(json['civicRegistryPinsByState']),
+    civicRegistryPin: (json['civicRegistryPin'] ?? '').toString(),
+    civicRegistrarApplications: List<Map<String, dynamic>>.from(
+      (json['civicRegistrarApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
+    ),
   );
 }
 
@@ -504,6 +521,252 @@ Map<String, String> _civicRegistryPinsFromJson(dynamic raw) {
     return raw.map((k, v) => MapEntry(k.toString().trim(), v.toString().trim()));
   }
   return {};
+}
+
+void showNgmyCivicRegistryPinSheet(
+  BuildContext context, {
+  required AppConfig config,
+  required VoidCallback onDataChanged,
+}) {
+  final pinCtrl = TextEditingController(text: config.civicRegistryPin);
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      final isDark = Theme.of(ctx).brightness == Brightness.dark;
+      return Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 22),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F111A) : Colors.white,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.account_balance_rounded, color: Color(0xFF6200EE)),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text('Civic Registry PIN', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                    ),
+                    IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'One PIN for every member in every state. Share it only with people who should access the registry.',
+                  style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: pinCtrl,
+                  keyboardType: TextInputType.number,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Registry PIN',
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () {
+                    final pin = pinCtrl.text.trim();
+                    if (pin.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Enter a PIN before saving.')),
+                      );
+                      return;
+                    }
+                    config.civicRegistryPin = pin;
+                    onDataChanged();
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Civic Registry PIN saved for all users.')),
+                    );
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF6200EE),
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Save PIN', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  ).whenComplete(pinCtrl.dispose);
+}
+
+void showNgmyCivicRegistrarApplicationsSheet(
+  BuildContext context, {
+  required AppConfig config,
+  required List<UserData> allUsers,
+  required UserData reviewer,
+  required VoidCallback onDataChanged,
+  VoidCallback? onParentSetState,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setST) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final apps = List<Map<String, dynamic>>.from(
+          config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)),
+        )..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+        final pendingApps = apps.where((a) => (a['status'] ?? 'pending').toString() == 'pending').toList();
+
+        String fmt(String raw) {
+          if (raw.trim().isEmpty) return 'N/A';
+          try {
+            final d = DateTime.parse(raw).toLocal();
+            return '${d.month}/${d.day}/${d.year} ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+          } catch (_) {
+            return raw;
+          }
+        }
+
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+            margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F111A) : Colors.white,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+            ),
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+            child: Column(
+              children: [
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10))),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(Icons.verified_user_rounded, color: Color(0xFF6200EE)),
+                    const SizedBox(width: 8),
+                    const Expanded(child: Text('Authorized Registrar Requests', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18))),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(color: Colors.orange.withOpacity(0.12), borderRadius: BorderRadius.circular(9)),
+                      child: Text('${pendingApps.length} pending', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: apps.isEmpty
+                      ? Center(child: Text('No registrar applications yet.', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)))
+                      : ListView.builder(
+                          itemCount: apps.length,
+                          itemBuilder: (context, i) {
+                            final app = apps[i];
+                            final status = (app['status'] ?? 'pending').toString();
+                            final statusColor = status == 'approved'
+                                ? Colors.green
+                                : status == 'rejected'
+                                    ? Colors.red
+                                    : Colors.orange;
+                            final email = (app['userEmail'] ?? '').toString().toLowerCase().trim();
+                            final userIndex = allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: statusColor.withOpacity(0.28)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          (app['fullName'] ?? app['username'] ?? 'Applicant').toString(),
+                                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(color: statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+                                        child: Text(status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Text('Email: ${app['userEmail'] ?? ''}'),
+                                  if ((app['state'] ?? '').toString().trim().isNotEmpty) Text('State: ${app['state']}'),
+                                  if ((app['reason'] ?? '').toString().trim().isNotEmpty) Text('Reason: ${app['reason']}'),
+                                  Text('Submitted: ${fmt((app['createdAt'] ?? '').toString())}', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 11)),
+                                  if (status == 'pending') ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: OutlinedButton(
+                                            onPressed: () {
+                                              app['status'] = 'rejected';
+                                              app['reviewedAt'] = DateTime.now().toIso8601String();
+                                              app['reviewedBy'] = reviewer.email;
+                                              config.civicRegistrarApplications = apps;
+                                              onDataChanged();
+                                              onParentSetState?.call();
+                                              setST(() {});
+                                            },
+                                            child: const Text('Reject'),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: () {
+                                              app['status'] = 'approved';
+                                              app['reviewedAt'] = DateTime.now().toIso8601String();
+                                              app['reviewedBy'] = reviewer.email;
+                                              config.civicRegistrarApplications = apps;
+                                              if (userIndex != -1) {
+                                                allUsers[userIndex].isAuthorizedRegistrar = true;
+                                              }
+                                              onDataChanged();
+                                              onParentSetState?.call();
+                                              setST(() {});
+                                            },
+                                            child: const Text('Approve'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
 }
 
 NgmyLoanConfigBridge ngmyLoanConfigBridge(AppConfig config) => NgmyLoanConfigBridge(
@@ -3973,7 +4236,10 @@ class _NGMYAppState extends State<NGMYApp> {
         }
       }
 
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        _applySystemUiForMode(_effectiveThemeMode);
+        setState(() => _isLoading = false);
+      }
 
       // 2. Fetch from Supabase when reachable (slow/offline uses local cache above).
       if (!await ngmyCanReachCloud()) {
@@ -5634,7 +5900,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               systemNavigationBarIconBrightness: Brightness.dark,
             ),
       child: Scaffold(
-        extendBody: true,
+        extendBody: false,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Stack(
           children: [
@@ -5722,56 +5988,68 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Widget _nav(int i, IconData icon) => Expanded(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            setState(() => _idx = i);
-            if (i == 4) unawaited(widget.onRefreshMediaFromCloud?.call());
-          },
-          child: Center(
-            child: Icon(
-              icon,
-              color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey,
-              size: 28,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              setState(() => _idx = i);
+              if (i == 4) unawaited(widget.onRefreshMediaFromCloud?.call());
+            },
+            customBorder: const CircleBorder(),
+            child: SizedBox(
+              height: 75,
+              child: Center(
+                child: Icon(
+                  icon,
+                  color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey,
+                  size: 28,
+                ),
+              ),
             ),
           ),
         ),
       );
 
   Widget _navC(int i) => Expanded(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => setState(() => _idx = i),
-          child: Center(
-            child: Transform.translate(
-              offset: const Offset(0, -10),
-              transformHitTests: true,
-              child: Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6200EE).withOpacity(0.4),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() => _idx = i),
+            customBorder: const CircleBorder(),
+            child: SizedBox(
+              height: 75,
+              child: Center(
+                child: Transform.translate(
+                  offset: const Offset(0, -10),
+                  transformHitTests: true,
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6200EE).withOpacity(0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                      border: Border.all(color: _idx == i ? Colors.white : Colors.transparent, width: 2),
                     ),
-                  ],
-                  border: Border.all(color: _idx == i ? Colors.white : Colors.transparent, width: 2),
-                ),
-                child: Center(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(30),
-                    child: Image.network(
-                      widget.config.logoUrl,
-                      width: 40,
-                      height: 40,
-                      fit: BoxFit.cover,
-                      errorBuilder: (c, e, s) => const Text(
-                        'NGMY',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                    child: Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(30),
+                        child: Image.network(
+                          widget.config.logoUrl,
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.cover,
+                          errorBuilder: (c, e, s) => const Text(
+                            'NGMY',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -5938,6 +6216,71 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
               const SizedBox(height: 20),
               _live(context),
+              if (widget.user.isAdmin) ...[
+                const SizedBox(height: 28),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Management',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      color: isLight ? Colors.black87 : Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Material(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(20),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => showNgmyCivicRegistryPinSheet(
+                      context,
+                      config: widget.config,
+                      onDataChanged: widget.onDataChanged,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6200EE).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(Icons.account_balance_rounded, color: Color(0xFF6200EE), size: 26),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Civic Registry',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                    color: isLight ? Colors.black87 : Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Set the PIN all members use to unlock the registry',
+                                  style: TextStyle(fontSize: 12, color: isLight ? Colors.black54 : Colors.white60),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: isLight ? Colors.black38 : Colors.white38),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -8779,6 +9122,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             _menuFrame('Loan Center', Icons.handshake_outlined, Colors.teal, () => _showLoanAdmin(isDark), isDark),
             _menuFrame('Announcements', Icons.campaign_outlined, Colors.orange, () => _showAnnouncementAdmin(isDark), isDark),
+            _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => _showCivicRegistryAdmin(isDark), isDark),
             _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => _showJobApplicationsAdmin(isDark), isDark),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => _showPopupsAdmin(isDark), isDark),
             _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => _showGamesAdmin(isDark), isDark),
@@ -8846,6 +9190,68 @@ class _AdminDashboardState extends State<AdminDashboard> {
         widget.config.gameTimeLimits = limits;
         widget.config.diceSettings = diceJson;
         widget.onDataChanged();
+      },
+    );
+  }
+
+  void _showCivicRegistryAdmin(bool isDark) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.55),
+          margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F111A) : Colors.white,
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Civic Registry', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+              const SizedBox(height: 8),
+              Text(
+                'Set the shared PIN or review Authorized Registrar applications.',
+                style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+              ),
+              const SizedBox(height: 18),
+              ListTile(
+                leading: const Icon(Icons.pin_rounded, color: Color(0xFF6200EE)),
+                title: const Text('Registry PIN', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('One PIN for all members'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  showNgmyCivicRegistryPinSheet(context, config: widget.config, onDataChanged: widget.onDataChanged);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.verified_user_rounded, color: Color(0xFF6200EE)),
+                title: const Text('Registrar Applications', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text(
+                  '${widget.config.civicRegistrarApplications.where((a) => (a['status'] ?? 'pending') == 'pending').length} pending',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  showNgmyCivicRegistrarApplicationsSheet(
+                    context,
+                    config: widget.config,
+                    allUsers: widget.allUsers,
+                    reviewer: widget.user,
+                    onDataChanged: widget.onDataChanged,
+                    onParentSetState: () => setState(() {}),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
       },
     );
   }
@@ -14884,10 +15290,96 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     widget.onDataChanged();
   }
 
-  void _adminSaveCivicPin(String state, String pin) {
-    widget.config.civicRegistryPinsByState = Map<String, String>.from(widget.config.civicRegistryPinsByState)
-      ..[state.trim()] = pin.trim();
-    widget.onDataChanged();
+  bool _canManageCivicRegistry() => widget.user.isAuthorizedRegistrar;
+
+  int get _maxCivicTabIndex => _canManageCivicRegistry() ? 3 : 1;
+
+  bool _hasPendingRegistrarApplication() {
+    return widget.config.civicRegistrarApplications.any(
+      (a) =>
+          (a['userEmail'] ?? '').toString().toLowerCase().trim() == widget.user.email.toLowerCase().trim() &&
+          (a['status'] ?? 'pending').toString() == 'pending',
+    );
+  }
+
+  Future<void> _showRegistrarApplicationDialog() async {
+    if (widget.user.isAuthorizedRegistrar) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are already an Authorized Registrar.')));
+      return;
+    }
+    if (_hasPendingRegistrarApplication()) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your registrar application is pending review.')));
+      return;
+    }
+    final reasonC = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Apply — Authorized Registrar'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Authorized Registrars can enroll members, manage help mode, and maintain the registry for their state.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonC,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: 'Why should you be approved?',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Submit')),
+        ],
+      ),
+    );
+    if (ok == true && reasonC.text.trim().isNotEmpty) {
+      widget.config.civicRegistrarApplications = [
+        ...widget.config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)),
+        {
+          'id': DateTime.now().microsecondsSinceEpoch.toString(),
+          'userEmail': widget.user.email,
+          'username': widget.user.username,
+          'fullName': widget.user.fullName ?? widget.user.username,
+          'state': widget.user.state,
+          'reason': reasonC.text.trim(),
+          'status': 'pending',
+          'createdAt': DateTime.now().toIso8601String(),
+        },
+      ];
+      widget.onDataChanged();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Application sent. An admin will review it in the dashboard.')),
+        );
+        setState(() {});
+      }
+    } else if (ok == true) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please explain why you are applying.')));
+    }
+    reasonC.dispose();
+  }
+
+  List<UserData> _registryMembersMatchingSearch() {
+    bool matchesFilters(UserData u) {
+      final stateMatch = u.state.trim().toLowerCase() == _selectedState.trim().toLowerCase();
+      final textMatch = _searchQuery.isEmpty ||
+          u.username.toLowerCase().contains(_searchQuery) ||
+          u.fullName?.toLowerCase().contains(_searchQuery) == true ||
+          u.registryId?.toLowerCase().contains(_searchQuery) == true ||
+          u.city?.toLowerCase().contains(_searchQuery) == true;
+      return u.isEnrolledInRegistry && stateMatch && textMatch;
+    }
+
+    return widget.allUsers.where(matchesFilters).toList();
   }
 
   void _syncReceiptFlagsToConfig() {
@@ -15149,8 +15641,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  bool _isRegistrar() => widget.user.isAdmin || widget.user.isAuthorizedRegistrar;
-
   bool _memberMatchesHelpScope(UserData u) {
     if (!widget.config.helpModeActive) return false;
     final scopeType = widget.config.helpScopeType;
@@ -15195,7 +15685,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   bool _canCurrentUserSeeHelpMode() {
     if (!widget.config.helpModeActive) return false;
-    if (_isRegistrar()) return true;
+    if (_canManageCivicRegistry()) return true;
     return _memberMatchesHelpScope(widget.user);
   }
 
@@ -15211,7 +15701,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   bool _audienceMatchForViewer(String scopeType, String scopeValue) {
-    if (_isRegistrar()) return true;
+    if (_canManageCivicRegistry()) return true;
     if (scopeType == 'city') return (widget.user.city ?? '') == scopeValue;
     if (scopeType == 'room') return (widget.user.room ?? '') == scopeValue;
     return true;
@@ -15224,7 +15714,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final scopeType = (meta['scopeType'] ?? 'all').toString();
       final scopeValue = (meta['scopeValue'] ?? '').toString();
       final targetState = (meta['state'] ?? '').toString();
-      if (targetState.isNotEmpty && targetState != widget.user.state && !_isRegistrar()) return false;
+      if (targetState.isNotEmpty && targetState != widget.user.state && !_canManageCivicRegistry()) return false;
       return _audienceMatchForViewer(scopeType, scopeValue);
     }).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -16656,10 +17146,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return CivicRegistryGateScreen(
         usStates: _usStates,
         pinsByState: widget.config.civicRegistryPinsByState,
+        globalPin: widget.config.civicRegistryPin,
         userEmail: widget.user.email,
         initialState: _selectedState,
-        isAdmin: widget.user.isAdmin,
-        onAdminSavePin: (widget.user.isAdmin || widget.user.isAuthorizedRegistrar) ? _adminSaveCivicPin : null,
         onBack: () => NgmyNavigator.pop(context),
         onUnlocked: _onRegistryUnlocked,
       );
@@ -16667,7 +17156,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
     return NgmyTabBackScope(
       activeTab: _activeTab,
-      onTabBack: () => setState(() => _activeTab = (_activeTab - 1).clamp(0, 3)),
+      onTabBack: () => setState(() => _activeTab = (_activeTab - 1).clamp(0, _maxCivicTabIndex)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF5F7FB),
       appBar: AppBar(
@@ -16680,40 +17169,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          if (widget.user.isAdmin)
-            IconButton(
-              onPressed: () {
-                final pinCtrl = TextEditingController(
-                  text: civicRegistryPinForState(widget.config.civicRegistryPinsByState, _selectedState),
-                );
-                showDialog<void>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: Text('PIN for $_selectedState'),
-                    content: TextField(
-                      controller: pinCtrl,
-                      obscureText: true,
-                      decoration: const InputDecoration(labelText: 'Registry PIN', border: OutlineInputBorder()),
-                    ),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-                      FilledButton(
-                        onPressed: () {
-                          _adminSaveCivicPin(_selectedState, pinCtrl.text);
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('PIN saved for $_selectedState')),
-                          );
-                        },
-                        child: const Text('Save'),
-                      ),
-                    ],
-                  ),
-                ).whenComplete(pinCtrl.dispose);
-              },
-              icon: const Icon(Icons.pin_rounded),
-              tooltip: 'Set state PIN',
-            ),
           IconButton(onPressed: _showStatePicker, icon: const Icon(Icons.map_rounded), tooltip: 'Change State'),
         ],
       ),
@@ -16853,7 +17308,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   const SizedBox(width: 15),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Authorized Registrar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), Text('$_selectedState • ${widget.allUsers.where((u)=>u.isEnrolledInRegistry && u.state.trim().toLowerCase() == _selectedState.trim().toLowerCase()).length} registered', style: TextStyle(color: Colors.grey.shade600, fontSize: 11))])),
 
-                  if (_isRegistrar())
+                  if (_canManageCivicRegistry())
                     SelectionContainer.disabled(
                       child: GestureDetector(
                         onTap: _showHelpModeDialog,
@@ -16872,7 +17327,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           ),
                         ),
                       ),
-                    ),
+                    )
+                  else if (!widget.user.isAuthorizedRegistrar && !_hasPendingRegistrarApplication())
+                    TextButton(
+                      onPressed: _showRegistrarApplicationDialog,
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF6200EE),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                    )
+                  else if (_hasPendingRegistrarApplication())
+                    const Text('Pending', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 11)),
                   const SizedBox(width: 4),
                 ],
               ),
@@ -16880,28 +17346,42 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             const SizedBox(height: 25),
 
             // Tabs Grid
-            Row(
-              children: [
-                Expanded(child: _tabItem(0, 'Search', Icons.search_rounded)),
-                const SizedBox(width: 15),
-                Expanded(child: _tabItem(1, 'Enroll', Icons.add_rounded)),
-              ],
-            ),
-            const SizedBox(height: 15),
-            Row(
-              children: [
-                Expanded(child: _tabItem(2, 'Members', Icons.people_outline_rounded)),
-                const SizedBox(width: 15),
-                Expanded(child: _tabItem(3, 'Rankings', Icons.bookmark_border_rounded)),
-              ],
-            ),
+            if (_canManageCivicRegistry()) ...[
+              Row(
+                children: [
+                  Expanded(child: _tabItem(0, 'Search', Icons.search_rounded)),
+                  const SizedBox(width: 15),
+                  Expanded(child: _tabItem(1, 'Enroll', Icons.add_rounded)),
+                ],
+              ),
+              const SizedBox(height: 15),
+              Row(
+                children: [
+                  Expanded(child: _tabItem(2, 'Members', Icons.people_outline_rounded)),
+                  const SizedBox(width: 15),
+                  Expanded(child: _tabItem(3, 'Rankings', Icons.bookmark_border_rounded)),
+                ],
+              ),
+            ] else
+              Row(
+                children: [
+                  Expanded(child: _tabItem(0, 'Search', Icons.search_rounded)),
+                  const SizedBox(width: 15),
+                  Expanded(child: _tabItem(1, 'Rankings', Icons.bookmark_border_rounded)),
+                ],
+              ),
             const SizedBox(height: 30),
 
             // Search/Action Box
-            if (_activeTab == 0) _searchSection(isDark),
-            if (_activeTab == 1) _enrollSection(isDark),
-            if (_activeTab == 2) _membersSection(isDark),
-            if (_activeTab == 3) _rankingsSection(isDark),
+            if (_canManageCivicRegistry()) ...[
+              if (_activeTab == 0) _searchSection(isDark),
+              if (_activeTab == 1) _enrollSection(isDark),
+              if (_activeTab == 2) _membersSection(isDark),
+              if (_activeTab == 3) _rankingsSection(isDark),
+            ] else ...[
+              if (_activeTab == 0) _searchSection(isDark),
+              if (_activeTab == 1) _rankingsSection(isDark),
+            ],
 
               const SizedBox(height: 50),
             ],
@@ -16958,10 +17438,27 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           ),
           const SizedBox(height: 25),
           ElevatedButton(
-            onPressed: () { setState(() { _searchQuery = _searchController.text.toLowerCase(); _activeTab = 2; }); },
+            onPressed: () {
+              setState(() {
+                _searchQuery = _searchController.text.toLowerCase();
+                if (_canManageCivicRegistry()) _activeTab = 2;
+              });
+            },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), elevation: 0),
             child: const Text('Search Registry', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
+          if (!_canManageCivicRegistry() && _searchQuery.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${_registryMembersMatchingSearch().length} result(s)',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ..._registryMembersMatchingSearch().map((m) => _memberCard(m, isDark, manageActions: false)),
+          ],
         ],
       ),
     );
@@ -17214,20 +17711,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           ),
         ]),
 
-        const SizedBox(height: 15),
-        ElevatedButton.icon(onPressed: _showManageCitiesRooms, icon: const Icon(Icons.settings, size: 16), label: const Text('Manage Cities & Rooms', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)))),
+        if (_canManageCivicRegistry()) ...[
+          const SizedBox(height: 15),
+          ElevatedButton.icon(onPressed: _showManageCitiesRooms, icon: const Icon(Icons.settings, size: 16), label: const Text('Manage Cities & Rooms', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)))),
+        ],
 
         const SizedBox(height: 20),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Showing ${members.length} member(s)', style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)), Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Row(children: const [Icon(Icons.brush, size: 12, color: Colors.red), SizedBox(width: 5), Text('Clear Missed', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)), Icon(Icons.keyboard_arrow_down, size: 12, color: Colors.red)]))]),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Showing ${members.length} member(s)', style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)), if (_canManageCivicRegistry()) Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Row(children: const [Icon(Icons.brush, size: 12, color: Colors.red), SizedBox(width: 5), Text('Clear Missed', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)), Icon(Icons.keyboard_arrow_down, size: 12, color: Colors.red)]))]),
 
         const SizedBox(height: 15),
         if (members.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No members match your filters.', style: TextStyle(color: Colors.grey))))
-        else ...members.map((m) => _memberCard(m, isDark)),
+        else ...members.map((m) => _memberCard(m, isDark, manageActions: _canManageCivicRegistry())),
       ],
     );
   }
 
-  Widget _memberCard(UserData u, bool isDark) {
+  Widget _memberCard(UserData u, bool isDark, {bool manageActions = true}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(20),
@@ -17262,28 +17761,33 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           _memberInfo(Icons.email_outlined, u.email, Colors.blueAccent),
 
           const SizedBox(height: 20),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            _mBtn(Icons.visibility_outlined, 'View', Colors.indigo, () => _showMemberProfile(u)),
-            _mBtn(Icons.monetization_on_outlined, 'Money', Colors.green, () => _showContributionDialog(u)),
-            _mBtn(Icons.warning_amber_rounded, 'Claim', Colors.orange, () => _showClaimDialog(u)),
-            _mBtn(Icons.undo_rounded, 'Clean', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
-            _mBtn(Icons.delete_outline_rounded, '', Colors.red, () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Delete Member?'),
-                  content: Text('Remove ${u.fullName ?? u.username} from registry? This only happens when you confirm.'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                    ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-                  ],
-                ),
-              );
-              if (confirm != true) return;
-              setState(() => u.isEnrolledInRegistry = false);
-              widget.onDataChanged();
-            }),
-          ]),
+          Row(
+            mainAxisAlignment: manageActions ? MainAxisAlignment.spaceBetween : MainAxisAlignment.center,
+            children: [
+              _mBtn(Icons.visibility_outlined, 'View', Colors.indigo, () => _showMemberProfile(u)),
+              if (manageActions) ...[
+                _mBtn(Icons.monetization_on_outlined, 'Money', Colors.green, () => _showContributionDialog(u)),
+                _mBtn(Icons.warning_amber_rounded, 'Claim', Colors.orange, () => _showClaimDialog(u)),
+                _mBtn(Icons.undo_rounded, 'Clean', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
+                _mBtn(Icons.delete_outline_rounded, '', Colors.red, () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Delete Member?'),
+                      content: Text('Remove ${u.fullName ?? u.username} from registry? This only happens when you confirm.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                        ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+                      ],
+                    ),
+                  );
+                  if (confirm != true) return;
+                  setState(() => u.isEnrolledInRegistry = false);
+                  widget.onDataChanged();
+                }),
+              ],
+            ],
+          ),
         ],
       ),
     );

@@ -38,7 +38,7 @@
 
   <meta name="apple-mobile-web-app-capable" content="yes">
 
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
   <meta name="apple-mobile-web-app-title" content="NGMY">
 
@@ -69,6 +69,12 @@
       background-color: #ffffff;
 
       overscroll-behavior-x: none;
+
+    }
+
+    @media (prefers-color-scheme: light) {
+
+      html, body { background-color: #ffffff; }
 
     }
 
@@ -128,7 +134,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260531133844";
+      var CURRENT = "20260531141104";
 
       function showError(msg) {
 
@@ -178,12 +184,45 @@
 
   </script>
 
-  <script src="flutter_bootstrap.js?v=20260531133844" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/')"></script>
+  <script>
+    (function () {
+      function nudgeFlutterLayout() {
+        try {
+          window.dispatchEvent(new Event('resize'));
+        } catch (e) {}
+      }
+
+      function scheduleViewportSync() {
+        nudgeFlutterLayout();
+        setTimeout(nudgeFlutterLayout, 50);
+        setTimeout(nudgeFlutterLayout, 150);
+        setTimeout(nudgeFlutterLayout, 400);
+        setTimeout(nudgeFlutterLayout, 1000);
+      }
+
+      window.addEventListener('load', scheduleViewportSync);
+      window.addEventListener('pageshow', function (event) {
+        if (event.persisted) scheduleViewportSync();
+      });
+
+      if (window.visualViewport) {
+        var timer;
+        function onViewportChange() {
+          clearTimeout(timer);
+          timer = setTimeout(nudgeFlutterLayout, 16);
+        }
+        window.visualViewport.addEventListener('resize', onViewportChange);
+        window.visualViewport.addEventListener('scroll', onViewportChange);
+      }
+    })();
+  </script>
+
+  <script src="flutter_bootstrap.js?v=20260531141104" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/')"></script>
 
   <script>
     (function () {
       if (!('serviceWorker' in navigator)) return;
-      var deployId = '20260531133844';
+      var deployId = '20260531141104';
       window.addEventListener('load', function () {
         navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: '/NGMY.github.io/' })
           .then(function () { console.log('[ngmy] offline PWA worker registered'); })
