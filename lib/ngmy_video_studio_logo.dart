@@ -3,12 +3,15 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_studio_path_image.dart' if (dart.library.html) 'ngmy_studio_path_image_stub.dart' as path_image;
+
 /// News-style pop-up animation for logo / graphic on the side monitor.
 class NgmyStudioLogoAnim extends StatefulWidget {
   final Uint8List? imageBytes;
+  final String? filePath;
   final String? networkUrl;
 
-  const NgmyStudioLogoAnim({super.key, this.imageBytes, this.networkUrl});
+  const NgmyStudioLogoAnim({super.key, this.imageBytes, this.filePath, this.networkUrl});
 
   @override
   State<NgmyStudioLogoAnim> createState() => _NgmyStudioLogoAnimState();
@@ -33,8 +36,11 @@ class _NgmyStudioLogoAnimState extends State<NgmyStudioLogoAnim> with SingleTick
   Widget build(BuildContext context) {
     Widget? img;
     if (widget.imageBytes != null && widget.imageBytes!.isNotEmpty) {
-      img = Image.memory(widget.imageBytes!, fit: BoxFit.contain);
-    } else if (widget.networkUrl != null && widget.networkUrl!.startsWith('http')) {
+      img = Image.memory(widget.imageBytes!, fit: BoxFit.contain, gaplessPlayback: true);
+    } else {
+      img = path_image.ngmyStudioImageFromPath(widget.filePath);
+    }
+    if (img == null && widget.networkUrl != null && widget.networkUrl!.startsWith('http')) {
       img = Image.network(widget.networkUrl!, fit: BoxFit.contain);
     }
 

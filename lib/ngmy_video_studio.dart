@@ -63,6 +63,8 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   final Map<String, NgmySlotKind> _slotKinds = {};
   final Map<String, _SlotMedia> _slotMedia = {};
   final Map<String, Uint8List> _logoBytes = {};
+  final Map<String, String> _logoPaths = {};
+  String? _preparingSlotId;
 
   final _headlineC = TextEditingController();
   final _titleC = TextEditingController();
@@ -124,6 +126,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       }
       _slotMedia.clear();
       _logoBytes.clear();
+      _logoPaths.clear();
       for (final s in def.slots) {
         _slotMedia[s.id] = _SlotMedia();
       }
@@ -133,7 +136,10 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
 
   Future<void> _pickVideoForSlot(String slotId) async {
     if (_picking) return;
-    setState(() => _picking = true);
+    setState(() {
+      _picking = true;
+      _preparingSlotId = slotId;
+    });
     VideoPlayerController? newController;
     try {
       final picked = await pickNgmyStudioVideo();
@@ -145,6 +151,10 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         }
         return;
       }
+
+      // Let the file dialog close and the UI repaint before heavy decode work.
+      await Future<void>.delayed(Duration.zero);
+      if (!mounted) return;
 
       final media = _slotMedia[slotId] ?? _SlotMedia();
       await media.dispose();
@@ -174,37 +184,71 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       }
 
       media.controller = newController;
-      await newController.initialize();
+      _slotMedia[slotId] = media;
+      if (mounted) setState(() {});
+
+      await newController.initialize().timeout(
+        const Duration(seconds: 60),
+        onTimeout: () => throw TimeoutException('Video preview timed out — try a smaller MP4.'),
+      );
       if (!mounted) return;
       await newController.setLooping(true);
-      await newController.play();
-      _slotMedia[slotId] = media;
+      unawaited(newController.play());
       setState(() => _activeSlotId = slotId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Video added to "${_def.slots.where((s) => s.id == slotId).map((s) => s.label).firstOrNull ?? slotId}".')),
+          SnackBar(
+            content: Text(
+              'Video added to "${_def.slots.where((s) => s.id == slotId).map((s) => s.label).firstOrNull ?? slotId}".',
+            ),
+          ),
+        );
+      }
+    } on TimeoutException catch (e) {
+      await newController?.dispose();
+      _slotMedia[slotId]?.controller = null;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red.shade700),
         );
       }
     } catch (e) {
       await newController?.dispose();
+      _slotMedia[slotId]?.controller = null;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red.shade700),
         );
       }
     } finally {
-      if (mounted) setState(() => _picking = false);
+      if (mounted) {
+        setState(() {
+          _picking = false;
+          _preparingSlotId = null;
+        });
+      }
     }
   }
 
   Future<void> _pickLogoForSlot(String slotId) async {
     if (_picking) return;
-    setState(() => _picking = true);
+    setState(() {
+      _picking = true;
+      _preparingSlotId = slotId;
+    });
     try {
-      final bytes = await pickNgmyStudioLogoBytes();
-      if (bytes == null || bytes.isEmpty) return;
+      final picked = await pickNgmyStudioLogo();
+      if (picked == null || !picked.hasContent) return;
+      await Future<void>.delayed(Duration.zero);
+      if (!mounted) return;
       setState(() {
-        _logoBytes[slotId] = bytes;
+        if (picked.filePath != null) {
+          _logoPaths[slotId] = picked.filePath!;
+          _logoBytes.remove(slotId);
+        } else if (picked.bytes != null) {
+          _logoBytes[slotId] = picked.bytes!;
+          _logoPaths.remove(slotId);
+        }
         _activeSlotId = slotId;
       });
       if (mounted) {
@@ -217,7 +261,12 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Logo upload failed: $e')));
       }
     } finally {
-      if (mounted) setState(() => _picking = false);
+      if (mounted) {
+        setState(() {
+          _picking = false;
+          _preparingSlotId = null;
+        });
+      }
     }
   }
 
@@ -705,7 +754,10 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         rect: px,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(4),
-          child: NgmyStudioLogoAnim(imageBytes: _logoBytes[slot.id]),
+          child: NgmyStudioLogoAnim(
+            imageBytes: _logoBytes[slot.id],
+            filePath: _logoPaths[slot.id],
+          ),
         ),
       );
     }
@@ -786,11 +838,18 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('${_format.label} frames', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-            if (_picking) const LinearProgressIndicator(minHeight: 2, color: _accent),
+            if (_picking)
+              LinearProgressIndicator(
+                minHeight: 2,
+                color: _accent,
+                semanticsLabel: _preparingSlotId == null ? 'Working…' : 'Preparing preview…',
+              ),
             const SizedBox(height: 8),
             ..._def.slots.map((s) {
               final isLogo = s.kind == NgmySlotKind.logoAnim;
-              final has = isLogo ? _logoBytes.containsKey(s.id) : (_slotMedia[s.id]?.source != null);
+              final has = isLogo
+                  ? (_logoBytes.containsKey(s.id) || _logoPaths.containsKey(s.id))
+                  : (_slotMedia[s.id]?.source != null);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: OutlinedButton.icon(
