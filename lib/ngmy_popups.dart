@@ -453,6 +453,7 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
   Widget _faceContent(double size, double glow) {
     final title = (widget.config['title'] ?? 'NGMY').toString();
     final subtitle = (widget.config['subtitle'] ?? '').toString();
+    final subtitleMaxLines = (widget.config['subtitleMaxLines'] as num?)?.toInt() ?? 2;
     final link = (widget.config['linkUrl'] ?? '').toString().trim();
     final linkLabel = (widget.config['linkLabel'] ?? 'Open Link').toString();
 
@@ -497,7 +498,7 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
               child: Text(
                 subtitle,
                 textAlign: TextAlign.center,
-                maxLines: 2,
+                maxLines: subtitleMaxLines,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: size * 0.048, fontWeight: FontWeight.w600),
               ),
@@ -544,7 +545,7 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
         final enter = Curves.easeOutBack.transform(_enter.value);
         final fade = _enter.value;
         final spinY = _spin.value * math.pi * 2;
-        const size = 200.0;
+        final size = 200.0 * ((widget.config['sizeScale'] as num?)?.toDouble() ?? 1.0);
         final floatY = math.sin(_float.value * math.pi) * 8;
 
         return Material(

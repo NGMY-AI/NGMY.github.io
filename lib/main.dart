@@ -42,6 +42,8 @@ import 'ngmy_invoice_signature.dart';
 import 'ngmy_store_location.dart';
 import 'ngmy_local_cache.dart';
 import 'ngmy_offline.dart';
+import 'ngmy_store_gift_celebration.dart';
+import 'ngmy_store_listing_extras.dart';
 import 'ngmy_document_scanner.dart';
 import 'ngmy_oauth.dart';
 import 'ngmy_worksheets.dart';
@@ -1179,6 +1181,7 @@ Map<String, dynamic> _normalizeStoreListing(Map<String, dynamic> listing) {
   if (payments is! List || payments.isEmpty) {
     copy['acceptedPayments'] = ['ngmy'];
   }
+  NgmyStoreListingExtras.normalize(copy);
   return copy;
 }
 
@@ -19048,7 +19051,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   List<Map<String, dynamic>> _activeShopListings() {
     final me = widget.user.email.toLowerCase().trim();
     return _listings
-        .where((l) => (l['status'] ?? 'active').toString() == 'active' && (l['sellerEmail'] ?? '').toString().toLowerCase().trim() != me && _matchesSearch(l))
+        .where((l) =>
+            (l['status'] ?? 'active').toString() == 'active' &&
+            (l['sellerEmail'] ?? '').toString().toLowerCase().trim() != me &&
+            _matchesSearch(l) &&
+            NgmyStoreListingExtras.isVisibleToBuyersToday(l))
         .toList()
       ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
   }
@@ -20638,6 +20645,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final negotiable = listing['negotiable'] != false;
     final sellerName = (listing['sellerName'] ?? 'User').toString();
     final title = (listing['title'] ?? 'Item').toString();
+    final marketSchedule = NgmyStoreListingExtras.scheduleLabel(listing);
+    final giftTitle = NgmyStoreListingExtras.bonusGiftTitle(listing);
+    final buyerCanBuyToday = isOwner || NgmyStoreListingExtras.isVisibleToBuyersToday(listing);
 
     Widget photo(String ref, {BoxFit fit = BoxFit.cover}) {
       return LayoutBuilder(
@@ -20794,7 +20804,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                           Expanded(
                             child: _storeDetailFrameTile(
                               isDark: isDark,
-                              label: 'Availability',
+                              label: 'Stock',
                               value: '${units > 1 ? '$units items' : '1 item'}${negotiable ? '\nNegotiable' : ''}',
                               maxLines: 3,
                             ),
@@ -20802,6 +20812,42 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         ],
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    _storeDetailFrame(
+                      isDark: isDark,
+                      label: 'Market days',
+                      child: _storeDetailValue(marketSchedule, isDark, weight: FontWeight.w700),
+                    ),
+                    if (giftTitle.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _storeDetailFrame(
+                        isDark: isDark,
+                        label: 'Bonus gift',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.card_giftcard_rounded, color: Color(0xFFF59E0B), size: 22),
+                            const SizedBox(width: 8),
+                            Expanded(child: _storeDetailValue('Buy today and win: $giftTitle', isDark, weight: FontWeight.w800)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (!isOwner && !buyerCanBuyToday) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.orange.withValues(alpha: 0.45)),
+                        ),
+                        child: Text(
+                          NgmyStoreListingExtras.nextAvailableMessage(listing) ?? 'Not on the market today.',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFEA580C)),
+                        ),
+                      ),
+                    ],
                     if (location.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       _storeDetailFrame(
@@ -20892,7 +20938,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                             ),
                           ),
                           const SizedBox(width: 8),
-                          if (status == 'active' && !isOwner)
+                          if (status == 'active' && !isOwner && buyerCanBuyToday)
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () {
@@ -20900,7 +20946,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                   _buyListing(listing);
                                 },
                                 style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white),
-                                child: const Text('Buy'),
+                                child: Text(giftTitle.isNotEmpty ? 'Buy + Win Gift' : 'Buy'),
                               ),
                             ),
                         ],
@@ -20956,6 +21002,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     String videoRef = '';
     final cashAppTagC = TextEditingController(text: widget.user.savedCashAppTag);
     final zelleInfoC = TextEditingController(text: widget.user.savedZelleInfo);
+    final bonusGiftC = TextEditingController();
+    final Set<int> marketDays = {};
+    bool restrictMarketDays = false;
+    bool bonusGiftEnabled = false;
 
     await showDialog(
       context: context,
@@ -21113,6 +21163,75 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                               );
                             }).toList(),
                           ),
+                          const SizedBox(height: 16),
+                          _storeSectionTitle('Market days', Icons.calendar_month_rounded, isDark),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Choose which days buyers can see and buy this item. Turn on to pick days; leave off to show every day.',
+                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
+                          ),
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Only on selected days', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                            value: restrictMarketDays,
+                            activeColor: _storeAccent,
+                            onChanged: (v) => setDlg(() {
+                              restrictMarketDays = v;
+                              if (!v) marketDays.clear();
+                            }),
+                          ),
+                          if (restrictMarketDays) ...[
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: NgmyStoreListingExtras.weekdays.map((w) {
+                                final selected = marketDays.contains(w.$1);
+                                return _storeFramedChip(
+                                  label: w.$2,
+                                  icon: Icons.event_rounded,
+                                  selected: selected,
+                                  isDark: isDark,
+                                  onTap: () => setDlg(() {
+                                    if (selected) {
+                                      marketDays.remove(w.$1);
+                                    } else {
+                                      marketDays.add(w.$1);
+                                    }
+                                  }),
+                                );
+                              }).toList(),
+                            ),
+                            if (marketDays.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text('Pick at least one day.', style: TextStyle(fontSize: 11, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
+                              ),
+                          ],
+                          const SizedBox(height: 12),
+                          _storeSectionTitle('Bonus gift (optional)', Icons.card_giftcard_rounded, isDark),
+                          const SizedBox(height: 6),
+                          Text(
+                            'If someone buys on a market day, they can win an extra gift you name (phone, charger, etc.).',
+                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
+                          ),
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Include bonus gift', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                            value: bonusGiftEnabled,
+                            activeColor: _storePurple,
+                            onChanged: (v) => setDlg(() => bonusGiftEnabled = v),
+                          ),
+                          if (bonusGiftEnabled) ...[
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: bonusGiftC,
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                              decoration: _storeFieldDec('What the buyer wins (e.g. iPhone, Samsung, charger)', Icons.emoji_events_rounded, isDark),
+                            ),
+                          ],
                           const SizedBox(height: 16),
                           _storeSectionTitle('Media (3 photos + 1 video)', Icons.perm_media_outlined, isDark),
                           const SizedBox(height: 10),
@@ -21294,6 +21413,14 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter your Zelle phone number or email.')));
                                 return;
                               }
+                              if (restrictMarketDays && marketDays.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select at least one market day, or turn off “Only on selected days”.')));
+                                return;
+                              }
+                              if (bonusGiftEnabled && bonusGiftC.text.trim().isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Describe the bonus gift, or turn off bonus gift.')));
+                                return;
+                              }
                               _persistSellerPaymentPrefs(
                                 saveCashApp: payCashApp,
                                 cashTag: cashTag,
@@ -21335,6 +21462,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                 'updatedAt': now,
                                 'soldAt': '',
                               };
+                              final marketDayList = marketDays.toList()..sort();
+                              NgmyStoreListingExtras.applyToListing(
+                                listing,
+                                days: restrictMarketDays ? marketDayList : const [],
+                                giftTitle: bonusGiftEnabled ? bonusGiftC.text.trim() : '',
+                              );
                               final normalized = _normalizeStoreListing(listing);
                               final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == normalized['id']);
                               if (idx >= 0) {
@@ -21390,6 +21523,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     );
     cashAppTagC.dispose();
     zelleInfoC.dispose();
+    bonusGiftC.dispose();
   }
 
   void _completeStorePurchase({
@@ -21415,6 +21549,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == listingId);
     if (idx < 0 || (_listings[idx]['status'] ?? '') != 'active') {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This item is no longer available.')));
+      return;
+    }
+    if (!NgmyStoreListingExtras.isVisibleToBuyersToday(_listings[idx])) {
+      final msg = NgmyStoreListingExtras.nextAvailableMessage(_listings[idx]);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg ?? 'This item is not on the market today.')));
       return;
     }
     final remaining = ((_listings[idx]['unitsRemaining'] as num?)?.toInt() ?? 1);
@@ -21448,6 +21587,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       'fulfillmentStatus': 'pending',
       'shipByDeadline': DateTime.now().toUtc().add(kStoreShipByWindow).toIso8601String(),
       'locationHistory': <Map<String, dynamic>>[],
+      'bonusGiftTitle': NgmyStoreListingExtras.bonusGiftTitle(listing),
     });
 
     setState(() {
@@ -21500,13 +21640,29 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         _tabCtrl.animateTo(1);
       }
     }
+    final giftTitle = NgmyStoreListingExtras.bonusGiftTitle(listing);
+    if (giftTitle.isNotEmpty) {
+      unawaited(showNgmyStoreGiftCelebration(context, productTitle: title, giftTitle: giftTitle));
+    }
     if (selectedPay == 'ngmy') {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_canSell ? 'Purchase complete! Track in Receipts → My Purchases.' : 'Purchase complete! Track shipment in Purchases.')),
+        SnackBar(
+          content: Text(
+            giftTitle.isNotEmpty
+                ? 'Purchase complete! You won: $giftTitle. Track in Purchases.'
+                : (_canSell ? 'Purchase complete! Track in Receipts → My Purchases.' : 'Purchase complete! Track shipment in Purchases.'),
+          ),
+        ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Order placed. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}. Track in Purchases.')),
+        SnackBar(
+          content: Text(
+            giftTitle.isNotEmpty
+                ? 'Order placed — bonus gift: $giftTitle. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}.'
+                : 'Order placed. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}. Track in Purchases.',
+          ),
+        ),
       );
       _showExternalPaymentSheet(selectedPay, listing, total);
     }
@@ -21520,6 +21676,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final sellerEmail = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
     if (sellerEmail == widget.user.email.toLowerCase().trim()) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You cannot buy your own listing.')));
+      return;
+    }
+    if (!NgmyStoreListingExtras.isVisibleToBuyersToday(listing)) {
+      final msg = NgmyStoreListingExtras.nextAvailableMessage(listing);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg ?? 'This item is not on the market today.')));
       return;
     }
     final payments = _listingAcceptedPayments(listing);
@@ -21847,6 +22008,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                     _storeChip((listing['category'] ?? 'Other').toString()),
                     _storeChip((listing['condition'] ?? '').toString()),
                     if ((listing['location'] ?? '').toString().isNotEmpty) _storeChip((listing['location'] ?? '').toString()),
+                    if (NgmyStoreListingExtras.hasRestrictedDays(listing)) _storeChip(NgmyStoreListingExtras.scheduleLabel(listing)),
+                    if (NgmyStoreListingExtras.hasBonusGift(listing)) _storeChip('Gift: ${NgmyStoreListingExtras.bonusGiftTitle(listing)}'),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -21854,7 +22017,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                 if (status == 'sold' && (listing['buyerName'] ?? '').toString().isNotEmpty)
                   Text('Buyer: ${listing['buyerName']}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
                 const SizedBox(height: 10),
-                if (showBuy && status == 'active') ...[
+                if (showBuy && status == 'active' && NgmyStoreListingExtras.isVisibleToBuyersToday(listing)) ...[
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -21869,12 +22032,17 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () => _buyListing(listing),
-                      icon: const Icon(Icons.shopping_cart_checkout_rounded),
-                      label: const Text('Buy Now'),
+                      icon: Icon(NgmyStoreListingExtras.hasBonusGift(listing) ? Icons.card_giftcard_rounded : Icons.shopping_cart_checkout_rounded),
+                      label: Text(NgmyStoreListingExtras.hasBonusGift(listing) ? 'Buy Now + Win Gift' : 'Buy Now'),
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
                     ),
                   ),
                 ],
+                if (showBuy && status == 'active' && !NgmyStoreListingExtras.isVisibleToBuyersToday(listing))
+                  Text(
+                    NgmyStoreListingExtras.nextAvailableMessage(listing) ?? 'Not on the market today.',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.orange.shade800),
+                  ),
                 if (showManage && status == 'sold')
                   SizedBox(
                     width: double.infinity,
@@ -21891,8 +22059,16 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                   ),
                 if (showManage && status == 'active')
                   Text(
-                    'Live in Shop for all buyers',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A)),
+                    NgmyStoreListingExtras.isVisibleToBuyersToday(listing)
+                        ? 'Live in Shop today · ${NgmyStoreListingExtras.scheduleLabel(listing)}'
+                        : 'Hidden from Shop today · ${NgmyStoreListingExtras.scheduleLabel(listing)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: NgmyStoreListingExtras.isVisibleToBuyersToday(listing)
+                          ? (isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A))
+                          : Colors.orange.shade800,
+                    ),
                   ),
               ],
             ),
