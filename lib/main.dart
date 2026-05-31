@@ -2026,6 +2026,37 @@ Future<String> _adminUploadVirtualProfilePic(String src) async {
   }
 }
 
+Widget _ngmyLoginLogo(String? logoUrl) {
+  final url = (logoUrl ?? '').trim().isNotEmpty ? logoUrl!.trim() : kNgmyDefaultLogoUrl;
+  const dots = SizedBox(
+    width: 110,
+    height: 110,
+    child: Icon(Icons.blur_on_rounded, size: 80, color: Color(0xFF6200EE)),
+  );
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(30),
+    child: Image.network(
+      url,
+      width: 110,
+      height: 110,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      errorBuilder: (_, __, ___) {
+        if (url != kNgmyDefaultLogoUrl) {
+          return Image.network(
+            kNgmyDefaultLogoUrl,
+            width: 110,
+            height: 110,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => dots,
+          );
+        }
+        return dots;
+      },
+    ),
+  );
+}
+
 Widget _ngmyLogoImage(String? logoUrl, {double? width, double? height, BoxFit fit = BoxFit.cover}) {
   final primary = (logoUrl ?? '').trim().isNotEmpty ? logoUrl!.trim() : kNgmyDefaultLogoUrl;
   return Image.network(
@@ -4618,10 +4649,7 @@ class _AuthScreenState extends State<AuthScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: style,
       child: SelectionContainer.disabled(child: Scaffold(body: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(35), child: Column(children: [
-      ClipRRect(
-        borderRadius: BorderRadius.circular(30),
-        child: _ngmyLogoImage(widget.config.logoUrl, width: 110, height: 110),
-      ),
+      _ngmyLoginLogo(widget.config.logoUrl),
       const SizedBox(height: 25), Text(_isLogin ? 'Login to NGMY' : 'Create Account', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
       const SizedBox(height: 45),
       if (!_isLogin) ...[
