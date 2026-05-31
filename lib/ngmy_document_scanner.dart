@@ -73,6 +73,8 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   bool _analyzing = false;
   String? _result;
   String? _error;
+  /// `en` = English, `sw` = Swahili (Kiswahili).
+  String _responseLanguage = 'en';
 
   bool get _hasPages => _pages.isNotEmpty;
 
@@ -189,7 +191,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       final reply = await geminiAnalyzeImages(
         apiKey: apiKey,
         images: images,
-        prompt: ngmyDocumentScanPrompt(userQuestion: _questionC.text, pageCount: _pages.length),
+        prompt: ngmyDocumentScanPrompt(userQuestion: _questionC.text, pageCount: _pages.length, languageCode: _responseLanguage),
       );
 
       if (!mounted) return;
@@ -458,30 +460,49 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     );
   }
 
-  Widget _emptyPlaceholder() {
+  Widget _emptyFrameContent() {
     return SizedBox(
       width: double.infinity,
-      height: _emptyFrameHeight,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _frameInterior3D(),
-          const SizedBox(height: 6),
-          Text(
-            'Place your document in the frame',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.72),
-              fontWeight: FontWeight.w800,
-              fontSize: 13.5,
+      height: _emptyFrameHeight - 12,
+      child: _frameInterior3D(),
+    );
+  }
+
+  Widget _languageFlags() {
+    Widget flagBtn({required String code, required String emoji, required String label}) {
+      final on = _responseLanguage == code;
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _analyzing ? null : () => setState(() => _responseLanguage = code),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: on ? _mint : Colors.white.withValues(alpha: 0.25), width: on ? 2 : 1),
+              color: on ? Colors.white.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.05),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 20)),
+                const SizedBox(width: 4),
+                Text(label, style: TextStyle(color: Colors.white.withValues(alpha: on ? 0.95 : 0.55), fontSize: 10, fontWeight: FontWeight.w700)),
+              ],
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            'Up to 2 pages · camera or gallery',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.42), fontSize: 11),
-          ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        flagBtn(code: 'en', emoji: '🇺🇸', label: 'EN'),
+        const SizedBox(width: 8),
+        flagBtn(code: 'sw', emoji: '🇹🇿', label: 'SW'),
+      ],
     );
   }
 
@@ -567,40 +588,12 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   }
 
   Widget _modernChatPrefix() {
-    return Container(
-      width: 44,
-      height: 44,
-      margin: const EdgeInsets.only(left: 2, right: 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(15),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF38BDF8), Color(0xFF6366F1), Color(0xFFEC4899)],
-        ),
-        boxShadow: [
-          BoxShadow(color: _cyan.withValues(alpha: 0.5), blurRadius: 14, offset: const Offset(0, 5)),
-          BoxShadow(color: _violet.withValues(alpha: 0.35), blurRadius: 8),
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Icon(Icons.forum_rounded, color: Colors.white.withValues(alpha: 0.95), size: 24),
-          Positioned(
-            right: 8,
-            top: 8,
-            child: Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: _mint,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.2),
-              ),
-            ),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, right: 4),
+      child: Icon(
+        Icons.chat_bubble_outline_rounded,
+        size: 26,
+        color: Colors.white.withValues(alpha: 0.72),
       ),
     );
   }
@@ -742,7 +735,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                               ),
                             ),
                           ),
-                          const SizedBox(width: 48),
+                          _languageFlags(),
                         ],
                       ),
                     ),
@@ -771,8 +764,26 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                             const SizedBox(height: 18),
                             _scanFrame(
                               compact: !_hasPages,
-                              child: _hasPages ? _filledPreview() : _emptyPlaceholder(),
+                              child: _hasPages ? _filledPreview() : _emptyFrameContent(),
                             ),
+                            if (!_hasPages) ...[
+                              const SizedBox(height: 14),
+                              Text(
+                                'Place your document in the frame',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.78),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Up to 2 pages · camera or gallery',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.48), fontSize: 11.5),
+                              ),
+                            ],
                             const SizedBox(height: 14),
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,

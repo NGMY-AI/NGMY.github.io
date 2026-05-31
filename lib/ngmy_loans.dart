@@ -33,6 +33,11 @@ String ngmyLoanFormatCurrency(double v) {
   return v.toStringAsFixed(2);
 }
 
+const Color _loanGreen = Color(0xFF00B25A);
+const Color _loanGreenDark = Color(0xFF00894B);
+const Color _loanPageBg = Color(0xFFF3F4F6);
+const Color _loanFieldFill = Color(0xFFF9FAFB);
+
 /// Loan applications, admin review, and payment tracking.
 class NgmyLoanServicesScreen extends StatefulWidget {
   const NgmyLoanServicesScreen({
@@ -62,12 +67,23 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> {
     final rejected = myLoans.where((a) => (a['status'] ?? '') == 'rejected').toList();
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF5F7FB),
+      backgroundColor: _loanPageBg,
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded), onPressed: () => Navigator.pop(context)),
-        title: const Text('Loan Services', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
+        surfaceTintColor: Colors.white,
+        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF111827)), onPressed: () => Navigator.pop(context)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(color: _loanGreen, borderRadius: BorderRadius.circular(9)),
+              child: const Icon(Icons.trending_up_rounded, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 10),
+            const Text('Loan Services', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF111827))),
+          ],
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -82,17 +98,29 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> {
             children: [
               _headerCard(),
               const SizedBox(height: 20),
-              SizedBox(
+              Container(
                 width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _openApplication(context),
-                  icon: const Icon(Icons.description_outlined),
-                  label: const Text('Apply for a Loan', style: TextStyle(fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00B25A),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 56),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => _openApplication(context),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.description_outlined, color: _loanGreen, size: 22),
+                          SizedBox(width: 10),
+                          Text('Apply for a Loan', style: TextStyle(fontWeight: FontWeight.w800, color: _loanGreen, fontSize: 16)),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -238,16 +266,23 @@ class NgmyLoanApplicationScreen extends StatefulWidget {
 
 class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
   final _amountC = TextEditingController();
-  final _ssnC = TextEditingController();
+  final _fullNameC = TextEditingController();
+  final _phoneC = TextEditingController();
+  final _emailC = TextEditingController();
+  final _addressC = TextEditingController();
   final _govIdC = TextEditingController();
+  final _idExpC = TextEditingController();
+  final _ssnC = TextEditingController();
   final _payoutDestC = TextEditingController();
   final _receiveDetailC = TextEditingController();
   final _customCollateralC = TextEditingController();
   final _picker = ImagePicker();
 
   String _receiveMethod = 'cashapp';
-  String _collateralMode = 'required'; // required | custom
+  String _collateralMode = 'required';
+  String _idType = 'drivers_license';
   int _termMonths = 12;
+  DateTime? _dateOfBirth;
   bool _submitting = false;
 
   String? _idFront;
@@ -259,14 +294,94 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
   double get _amount => double.tryParse(_amountC.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
 
   @override
+  void initState() {
+    super.initState();
+    _emailC.text = widget.userEmail;
+    if (widget.username.trim().isNotEmpty) _fullNameC.text = widget.username;
+  }
+
+  @override
   void dispose() {
     _amountC.dispose();
-    _ssnC.dispose();
+    _fullNameC.dispose();
+    _phoneC.dispose();
+    _emailC.dispose();
+    _addressC.dispose();
     _govIdC.dispose();
+    _idExpC.dispose();
+    _ssnC.dispose();
     _payoutDestC.dispose();
     _receiveDetailC.dispose();
     _customCollateralC.dispose();
     super.dispose();
+  }
+
+  InputDecoration _fieldDeco(String label, {String? hint, bool required = true}) => InputDecoration(
+        labelText: required ? '$label *' : label,
+        hintText: hint,
+        filled: true,
+        fillColor: _loanFieldFill,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _loanGreen, width: 1.5)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      );
+
+  Widget _sectionTitle(String title) => Padding(
+        padding: const EdgeInsets.only(bottom: 12, top: 4),
+        child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF111827))),
+      );
+
+  Widget _uploadBox({required String label, required String hint, required bool done, required VoidCallback onTap}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$label *', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF374151))),
+        const SizedBox(height: 6),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 14),
+              decoration: BoxDecoration(
+                color: done ? _loanGreen.withValues(alpha: 0.06) : _loanFieldFill,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: done ? _loanGreen : Colors.grey.shade400, width: done ? 1.5 : 1, strokeAlign: BorderSide.strokeAlignInside),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(done ? Icons.check_circle_rounded : Icons.file_upload_outlined, color: done ? _loanGreen : Colors.grey.shade600, size: 22),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      done ? 'Uploaded ✓ — tap to replace' : hint,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: done ? _loanGreen : Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+      ],
+    );
+  }
+
+  Future<void> _pickDob() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateOfBirth ?? DateTime(now.year - 25),
+      firstDate: DateTime(now.year - 100),
+      lastDate: DateTime(now.year - 18),
+    );
+    if (picked != null) setState(() => _dateOfBirth = picked);
   }
 
   Future<String?> _pickPhoto(String label) async {
@@ -289,9 +404,15 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
 
   List<String> _validate() {
     final missing = <String>[];
-    if (_amount <= 0) missing.add('Loan amount');
+    if (_amount <= 0) missing.add('Requested loan amount');
+    if (_fullNameC.text.trim().isEmpty) missing.add('Full legal name');
+    if (_dateOfBirth == null) missing.add('Date of birth');
+    if (_phoneC.text.trim().isEmpty) missing.add('Phone number');
+    if (_emailC.text.trim().isEmpty) missing.add('Email address');
+    if (_addressC.text.trim().isEmpty) missing.add('Home address');
     if (_ssnC.text.replaceAll(RegExp(r'\D'), '').length != 9) missing.add('Social Security Number (9 digits)');
     if (_govIdC.text.trim().isEmpty) missing.add('Government ID number');
+    if (_idExpC.text.trim().isEmpty) missing.add('ID expiration date');
     if (_idFront == null) missing.add('ID photo — front');
     if (_idBack == null) missing.add('ID photo — back');
     if (_selfie == null) missing.add('Selfie photo');
@@ -350,6 +471,13 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
         'termMonths': _amount > 2000 ? _termMonths : term.monthsLabel,
         'collateralType': collateralType,
         'collateralCustomNote': _customCollateralC.text.trim(),
+        'fullLegalName': _fullNameC.text.trim(),
+        'dateOfBirth': _dateOfBirth?.toUtc().toIso8601String() ?? '',
+        'phone': _phoneC.text.trim(),
+        'email': _emailC.text.trim(),
+        'homeAddress': _addressC.text.trim(),
+        'idType': _idType,
+        'idExpiration': _idExpC.text.trim(),
         'ssn': _ssnC.text.trim(),
         'governmentId': _govIdC.text.trim(),
         'idFrontRef': _idFront,
@@ -376,90 +504,197 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final reqCol = NgmyLoanLogic.requiredCollateralType(_amount);
     final colLabel = NgmyLoanLogic.collateralLabel(reqCol);
+    final term = _amount > 0 ? NgmyLoanLogic.termForAmount(_amount, userMonths: _amount > 2000 ? _termMonths : null) : null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Loan Application'), backgroundColor: Colors.transparent),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: _loanPageBg,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.white,
+        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF111827)), onPressed: () => Navigator.pop(context)),
+        title: Row(
           children: [
-            Text('Amount & terms', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black)),
-            const SizedBox(height: 8),
-            TextField(controller: _amountC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Loan amount (\$)', border: OutlineInputBorder()), onChanged: (_) => setState(() {})),
-            if (_amount > 0) ...[
-              const SizedBox(height: 8),
-              Text(NgmyLoanLogic.termForAmount(_amount, userMonths: _amount > 2000 ? _termMonths : null).summary, style: TextStyle(color: Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.w600)),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: _loanGreen, borderRadius: BorderRadius.circular(10)),
+              child: const Icon(Icons.trending_up_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Text('Loan Application', style: TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w800, fontSize: 18)),
+          ],
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 4))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _sectionTitle('Loan Details'),
+              TextField(
+                controller: _amountC,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: _fieldDeco('Requested Loan Amount (\$)', hint: 'Enter amount'),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              if (term != null)
+                Text(term.summary, style: TextStyle(color: _loanGreenDark, fontSize: 12, fontWeight: FontWeight.w600)),
               if (_amount > 2000) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
                   value: _termMonths,
-                  decoration: const InputDecoration(labelText: 'Repayment period (over \$2,000)', border: OutlineInputBorder()),
+                  decoration: _fieldDeco('Repayment Period (Months)', required: true),
                   items: const [3, 6, 9, 12].map((m) => DropdownMenuItem(value: m, child: Text('$m months'))).toList(),
                   onChanged: (v) => setState(() => _termMonths = v ?? 12),
                 ),
               ],
-            ],
-            const Divider(height: 32),
-            const Text('Identity', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            TextField(controller: _ssnC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Social Security Number', border: OutlineInputBorder()), inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9-]'))]),
-            TextField(controller: _govIdC, decoration: const InputDecoration(labelText: 'Government ID number', border: OutlineInputBorder())),
-            _photoRow('ID — front', _idFront, () async { final r = await _pickPhoto('ID front'); if (r != null) setState(() => _idFront = r); }),
-            _photoRow('ID — back', _idBack, () async { final r = await _pickPhoto('ID back'); if (r != null) setState(() => _idBack = r); }),
-            _photoRow('Selfie', _selfie, () async { final r = await _pickPhoto('Selfie'); if (r != null) setState(() => _selfie = r); }),
-            const Divider(height: 32),
-            const Text('Receive loan & payout', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            TextField(controller: _payoutDestC, decoration: const InputDecoration(labelText: 'Where should we send the money?', hintText: 'Cash App, bank, address…', border: OutlineInputBorder())),
-            DropdownButtonFormField<String>(
-              value: _receiveMethod,
-              decoration: const InputDecoration(labelText: 'How you receive payments', border: OutlineInputBorder()),
-              items: const [
-                DropdownMenuItem(value: 'cashapp', child: Text('Cash App')),
-                DropdownMenuItem(value: 'zelle', child: Text('Zelle')),
-                DropdownMenuItem(value: 'other', child: Text('Other')),
+              if (_amount > 2000)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text('Loans over \$2,000 can be repaid in up to 12 months (1 year).', style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
+                ),
+              const SizedBox(height: 20),
+              _sectionTitle('Personal Information'),
+              TextField(controller: _fullNameC, decoration: _fieldDeco('Full Legal Name', hint: 'First Middle Last')),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: _pickDob,
+                borderRadius: BorderRadius.circular(12),
+                child: InputDecorator(
+                  decoration: _fieldDeco('Date of Birth'),
+                  child: Text(
+                    _dateOfBirth == null ? 'Select date' : '${_dateOfBirth!.month}/${_dateOfBirth!.day}/${_dateOfBirth!.year}',
+                    style: TextStyle(color: _dateOfBirth == null ? Colors.grey : const Color(0xFF111827)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(controller: _phoneC, keyboardType: TextInputType.phone, decoration: _fieldDeco('Phone Number', hint: '+1 (555) 123-4567')),
+              const SizedBox(height: 12),
+              TextField(controller: _emailC, keyboardType: TextInputType.emailAddress, decoration: _fieldDeco('Email Address')),
+              const SizedBox(height: 12),
+              TextField(controller: _addressC, maxLines: 2, decoration: _fieldDeco('Home Address', hint: 'Street, City, State, ZIP')),
+              const SizedBox(height: 20),
+              _sectionTitle('Government-Issued ID'),
+              DropdownButtonFormField<String>(
+                value: _idType,
+                decoration: _fieldDeco('ID Type'),
+                items: const [
+                  DropdownMenuItem(value: 'drivers_license', child: Text("Driver's License")),
+                  DropdownMenuItem(value: 'passport', child: Text('Passport')),
+                  DropdownMenuItem(value: 'state_id', child: Text('State ID')),
+                  DropdownMenuItem(value: 'other', child: Text('Other')),
+                ],
+                onChanged: (v) => setState(() => _idType = v ?? 'drivers_license'),
+              ),
+              const SizedBox(height: 12),
+              TextField(controller: _govIdC, decoration: _fieldDeco('ID Number', hint: 'Enter ID number')),
+              const SizedBox(height: 12),
+              TextField(controller: _idExpC, decoration: _fieldDeco('ID Expiration Date', hint: 'MM/DD/YYYY')),
+              _uploadBox(label: 'Photo of ID', hint: 'Click to upload front of ID', done: _idFront != null, onTap: () async { final r = await _pickPhoto('ID front'); if (r != null) setState(() => _idFront = r); }),
+              _uploadBox(label: 'Photo of ID (back)', hint: 'Click to upload back of ID', done: _idBack != null, onTap: () async { final r = await _pickPhoto('ID back'); if (r != null) setState(() => _idBack = r); }),
+              const SizedBox(height: 8),
+              _sectionTitle('Identity Verification'),
+              const Text('Upload a clear selfie for identity verification.', style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+              const SizedBox(height: 8),
+              _uploadBox(label: 'Selfie Photo', hint: 'Click to upload selfie', done: _selfie != null, onTap: () async { final r = await _pickPhoto('Selfie'); if (r != null) setState(() => _selfie = r); }),
+              TextField(
+                controller: _ssnC,
+                keyboardType: TextInputType.number,
+                decoration: _fieldDeco('Social Security Number / National ID', hint: 'XXX-XX-XXXX'),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9-]'))],
+              ),
+              const Text('Your information is encrypted and secure.', style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+              const SizedBox(height: 20),
+              _sectionTitle('Payment Method'),
+              DropdownButtonFormField<String>(
+                value: _receiveMethod,
+                decoration: _fieldDeco('Preferred Payment Method'),
+                items: const [
+                  DropdownMenuItem(value: 'cashapp', child: Text('Cash App')),
+                  DropdownMenuItem(value: 'zelle', child: Text('Zelle')),
+                  DropdownMenuItem(value: 'other', child: Text('Other')),
+                ],
+                onChanged: (v) => setState(() => _receiveMethod = v ?? 'cashapp'),
+              ),
+              const SizedBox(height: 12),
+              TextField(controller: _payoutDestC, decoration: _fieldDeco('Where to receive the loan', hint: 'Cash App, bank, address…')),
+              const SizedBox(height: 12),
+              TextField(controller: _receiveDetailC, decoration: _fieldDeco('Payment handle / details', hint: '\$Cashtag, Zelle email, or phone')),
+              const SizedBox(height: 20),
+              _sectionTitle('Collateral'),
+              if (_amount > 0)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    'For \$${ngmyLoanFormatCurrency(_amount)}: $colLabel — or choose custom for admin review.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                ),
+              DropdownButtonFormField<String>(
+                value: _collateralMode == 'custom' ? 'custom' : reqCol,
+                decoration: _fieldDeco('Collateral Type', required: false),
+                items: [
+                  const DropdownMenuItem(value: 'phone', child: Text('Phone')),
+                  const DropdownMenuItem(value: 'car', child: Text('Vehicle')),
+                  const DropdownMenuItem(value: 'house', child: Text('Property / House')),
+                  const DropdownMenuItem(value: 'custom', child: Text('Other — we will review')),
+                ],
+                onChanged: (v) => setState(() => _collateralMode = v == 'custom' ? 'custom' : 'required'),
+              ),
+              const SizedBox(height: 12),
+              if (_collateralMode == 'custom') ...[
+                TextField(
+                  controller: _customCollateralC,
+                  maxLines: 4,
+                  decoration: _fieldDeco('Collateral Description', hint: 'Make, model, year, value, condition…', required: false),
+                ),
+                const Text('The more detailed your description, the faster we can process your application.', style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+              ] else ...[
+                _uploadBox(label: colLabel, hint: 'Click to upload front of title', done: _titleFront != null, onTap: () async { final r = await _pickPhoto('Title front'); if (r != null) setState(() => _titleFront = r); }),
+                _uploadBox(label: '$colLabel (back)', hint: 'Click to upload back of title', done: _titleBack != null, onTap: () async { final r = await _pickPhoto('Title back'); if (r != null) setState(() => _titleBack = r); }),
               ],
-              onChanged: (v) => setState(() => _receiveMethod = v ?? 'cashapp'),
-            ),
-            TextField(controller: _receiveDetailC, decoration: const InputDecoration(labelText: 'Your \$Cashtag, Zelle email/phone, or other', border: OutlineInputBorder())),
-            const Divider(height: 32),
-            const Text('Collateral', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            if (_amount > 0)
-              Text('Required for \$${ngmyLoanFormatCurrency(_amount)}: $colLabel (or submit custom collateral for review)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'required', label: Text('Standard')),
-                ButtonSegment(value: 'custom', label: Text('Custom / other')),
-              ],
-              selected: {_collateralMode},
-              onSelectionChanged: (s) => setState(() => _collateralMode = s.first),
-            ),
-            if (_collateralMode == 'custom')
-              TextField(controller: _customCollateralC, maxLines: 2, decoration: const InputDecoration(labelText: 'Describe your collateral — we will review value', border: OutlineInputBorder()))
-            else ...[
-              _photoRow('$colLabel — front', _titleFront, () async { final r = await _pickPhoto('Title front'); if (r != null) setState(() => _titleFront = r); }),
-              _photoRow('$colLabel — back', _titleBack, () async { final r = await _pickPhoto('Title back'); if (r != null) setState(() => _titleBack = r); }),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton(
+                      onPressed: _submitting ? null : _submit,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 52),
+                        backgroundColor: _loanGreen,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: _submitting
+                          ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Submit Application', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _submitting ? null : () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
             ],
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _submitting ? null : _submit,
-              style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 52), backgroundColor: const Color(0xFF00B25A)),
-              child: _submitting ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Submit application', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
+          ),
         ),
       ),
-    );
-  }
-
-  Widget _photoRow(String label, String? ref, VoidCallback onPick) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(label),
-      subtitle: ref != null ? const Text('Added ✓', style: TextStyle(color: Colors.green)) : const Text('Required'),
-      trailing: TextButton.icon(onPressed: onPick, icon: const Icon(Icons.add_a_photo), label: const Text('Add')),
     );
   }
 }
@@ -772,7 +1007,10 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${app['username']} · \$${ngmyLoanFormatCurrency((app['amount'] as num?)?.toDouble() ?? 0)}', style: const TextStyle(fontWeight: FontWeight.w900)),
+            Text(
+              '${(app['fullLegalName'] ?? app['username'] ?? '').toString()} · \$${ngmyLoanFormatCurrency((app['amount'] as num?)?.toDouble() ?? 0)}',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
             Text('Status: $status · ${app['collateralType']}', style: const TextStyle(fontSize: 12)),
             const SizedBox(height: 8),
             Wrap(spacing: 6, children: [

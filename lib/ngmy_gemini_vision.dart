@@ -144,7 +144,7 @@ Future<String?> geminiAnalyzeImages({
   return null;
 }
 
-String ngmyDocumentScanPrompt({String userQuestion = '', int pageCount = 1}) {
+String ngmyDocumentScanPrompt({String userQuestion = '', int pageCount = 1, String languageCode = 'en'}) {
   final q = userQuestion.trim();
   final ask = q.isEmpty
       ? 'Summarize this document and list the most important details.'
@@ -152,7 +152,11 @@ String ngmyDocumentScanPrompt({String userQuestion = '', int pageCount = 1}) {
   final pagesNote = pageCount > 1
       ? 'The user uploaded $pageCount document pages (images). Read and combine BOTH pages — do not ignore the second page.\n'
       : 'The user photographed or uploaded a document image.\n';
+  final langLine = languageCode == 'sw'
+      ? 'Write your entire response in Swahili (Kiswahili). Use simple, clear language.'
+      : 'Write your entire response in English.';
   return 'You are a document analysis assistant. $pagesNote'
+      '$langLine\n'
       'Provide:\n'
       '1. A clear summary (2–5 sentences)\n'
       '2. **Key details** as bullet points (names, dates, amounts, deadlines, addresses, signatures, action items)\n'
