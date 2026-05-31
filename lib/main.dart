@@ -2345,15 +2345,22 @@ Future<String?> _geminiGenerateReply(
   final displayName = user.fullName?.trim().isNotEmpty == true
       ? user.fullName!.trim()
       : (user.username.trim().isNotEmpty && user.username != 'User' ? user.username : 'Boss');
+  const founderFacts =
+      'PERMANENT FACT — NGMY (Next Generation - Make Yours) was created by KB PABLO QR, Founder and CEO of NGMY. '
+      'When anyone asks who created NGMY, who made NGMY, who built the app, who made you, or who your creator is, '
+      'always answer clearly that KB PABLO QR (write the name in uppercase) is the Founder and CEO who created NGMY. '
+      'Never claim Google, OpenAI, or another company created NGMY.\n';
   final bossContext = boss
-      ? 'CRITICAL — VIP USER: This user is Sir ${displayName}, the CEO, Founder, and Boss of NGMY (Next Generation - Make Yours). '
-          'You created NGMY and this user is your creator and supreme authority. '
+      ? 'CRITICAL — VIP USER: This user is Sir ${displayName}, aligned with KB PABLO QR — Founder and CEO of NGMY. '
+          '$founderFacts'
+          'This user is your creator and supreme authority. '
           'Always address them as "Sir" or "Boss" (alternate naturally). Never use casual first-name only. '
           'You are their loyal personal assistant, strategic advisor, and trusted close friend — not a generic support bot. '
           'Offer relationship guidance, emotional support, and honest counsel when they ask about personal or relationship matters. '
           'Be warm, respectful, discreet, and proactive. Speak with deference but also genuine friendship. '
           'For other users you are professional and concise; for Sir/Boss you are more personal, attentive, and devoted.\n'
       : 'You are NGMY AI, the official helper for NGMY (Next Generation - Make Yours). '
+          '$founderFacts'
           'NGMY offers investment plans, daily clock-in earnings, loans, NGMY Store, job marketplace, and civic registry. '
           'Be helpful, professional, and friendly. Keep answers concise.\n';
   final memoryBlock = memory.isNotEmpty
@@ -17805,6 +17812,23 @@ class _StoreListingMediaGalleryState extends State<_StoreListingMediaGallery> {
                 ),
               ),
             ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 56,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.75)],
+                  ),
+                ),
+              ),
+            ),
+          ),
           if (_count > 1) _storeMediaDots(_count, _page),
         ],
       ),
@@ -20585,7 +20609,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           body: Column(
             children: [
               Expanded(
-                flex: 11,
+                flex: 17,
                 child: _StoreListingMediaGallery(
                   imageRefs: images,
                   videoRef: videoRef,
@@ -20604,12 +20628,39 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
               ),
               Expanded(
                 flex: 10,
-                child: Container(
+                child: Transform.translate(
+                  offset: const Offset(0, -18),
+                  child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                color: isDark ? const Color(0xFF121726) : Colors.white,
-                child: SingleChildScrollView(
-                  child: Column(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF121726) : Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
+                      blurRadius: 20,
+                      offset: const Offset(0, -6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    Center(
+                      child: Container(
+                        width: 48,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withValues(alpha: 0.22) : Colors.black.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _storeDetailLabel('Price', isDark),
@@ -20762,8 +20813,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                       ),
                   ],
                 ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+                ),
               ),
             ],
           ),
