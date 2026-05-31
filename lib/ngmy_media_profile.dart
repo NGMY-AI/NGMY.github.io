@@ -1553,7 +1553,7 @@ class _AdminPostCardState extends State<_AdminPostCard> {
   }
 
   Map<String, dynamic> _commentFromProfile(Map<String, dynamic> profile, String text, {String suffix = ''}) => {
-        'id': '${DateTime.now().microsecondsSinceEpoch}$suffix',
+        'id': '${DateTime.now().microsecondsSinceEpoch}${suffix}_${Random().nextInt(999999)}',
         'userEmail': (profile['id'] ?? 'virtual').toString(),
         'username': (profile['username'] ?? 'user').toString(),
         'displayName': (profile['displayName'] ?? '').toString(),

@@ -3377,6 +3377,7 @@ class _NGMYAppState extends State<NGMYApp> {
   final Set<String> _disabledSupabaseTables = {};
   final Set<String> _seenRealtimeAnnouncementIds = {};
   final Set<String> _seenRealtimeStoreOrderIds = {};
+  DateTime? _adminMediaProtectUntil;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   OverlayEntry? _inAppNoticeEntry;
   bool _notificationsReady = false;
@@ -3758,14 +3759,19 @@ class _NGMYAppState extends State<NGMYApp> {
     } catch (_) {}
   }
 
+  void _markAdminMediaProtectWindow() {
+    _adminMediaProtectUntil = DateTime.now().add(const Duration(seconds: 8));
+  }
+
   Future<bool> _syncAdminMediaPost(MediaPost post) async {
     final idx = _allMedia.indexWhere((m) => m.id == post.id);
     if (idx >= 0) {
       _allMedia[idx] = post;
     }
+    await _persistAllMediaLocally();
     final ok = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
     if (ok) {
-      await _persistAllMediaLocally();
+      _markAdminMediaProtectWindow();
       if (mounted) setState(() {});
     }
     return ok;
@@ -3780,15 +3786,20 @@ class _NGMYAppState extends State<NGMYApp> {
     if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == key) {
       _currentUser = user;
     }
-    final ok = await _pushUserMediaProfileFast(user);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+      if (_currentUser != null) {
+        await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+      }
+    } catch (_) {}
+    var ok = await _pushUserMediaProfileFast(user);
+    if (!ok) {
+      await _pushUserToCloudFast(user);
+      ok = await ngmyCanReachCloud();
+    }
     if (ok) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
-        if (_currentUser != null) {
-          await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
-        }
-      } catch (_) {}
+      _markAdminMediaProtectWindow();
       if (mounted) setState(() {});
     }
     return ok;
@@ -3803,6 +3814,9 @@ class _NGMYAppState extends State<NGMYApp> {
   }
 
   Future<void> _pruneStaleMediaAgainstCloud() async {
+    if (_adminMediaProtectUntil != null && DateTime.now().isBefore(_adminMediaProtectUntil!)) {
+      return;
+    }
     final remote = await _fetchMediaPostsFromSupabase();
     if (remote == null || !mounted) return;
     final next = _mergeMediaWithRemote(_allMedia, remote, tombstones: _tombstonedMediaIds);
