@@ -54,6 +54,7 @@ import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_loans.dart';
+import 'ngmy_civic_registry_gate.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -344,6 +345,8 @@ class AppConfig {
   List<Map<String, dynamic>> ngmyPopups;
   List<Map<String, dynamic>> ngmyVideoPopups;
   List<Map<String, dynamic>> mediaVirtualProfiles;
+  /// State name -> PIN for Civic Registry gate (admin sets per state).
+  Map<String, String> civicRegistryPinsByState;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -389,7 +392,9 @@ class AppConfig {
     List<Map<String, dynamic>>? ngmyPopups,
     List<Map<String, dynamic>>? ngmyVideoPopups,
     List<Map<String, dynamic>>? mediaVirtualProfiles,
+    Map<String, String>? civicRegistryPinsByState,
   })  : loanApplications = loanApplications ?? [],
+        civicRegistryPinsByState = civicRegistryPinsByState ?? const {},
         gameTimeLimits = gameTimeLimits ?? ngmyDefaultGameTimeLimits(),
         diceSettings = diceSettings ?? NgmyDiceSettings().toJson(),
         gameInvites = gameInvites ?? [],
@@ -440,6 +445,7 @@ class AppConfig {
     'ngmyPopups': ngmyPopups,
     'ngmyVideoPopups': ngmyVideoPopups,
     'mediaVirtualProfiles': mediaVirtualProfiles,
+    'civicRegistryPinsByState': civicRegistryPinsByState,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
@@ -489,7 +495,15 @@ class AppConfig {
       (json['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
     ),
     mediaVirtualProfiles: NgmyVirtualMediaProfiles.ensure(json['mediaVirtualProfiles']),
+    civicRegistryPinsByState: _civicRegistryPinsFromJson(json['civicRegistryPinsByState']),
   );
+}
+
+Map<String, String> _civicRegistryPinsFromJson(dynamic raw) {
+  if (raw is Map) {
+    return raw.map((k, v) => MapEntry(k.toString().trim(), v.toString().trim()));
+  }
+  return {};
 }
 
 NgmyLoanConfigBridge ngmyLoanConfigBridge(AppConfig config) => NgmyLoanConfigBridge(
@@ -5616,145 +5630,138 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               systemNavigationBarColor: Colors.white,
               systemNavigationBarIconBrightness: Brightness.dark,
             ),
-      child: SelectionContainer.disabled(
-        child: Scaffold(
-          body: Stack(
-            children: [
-              IndexedStack(
-                index: _idx,
-                sizing: StackFit.expand,
-                children: pages,
-              ),
-              if (_offline)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: SafeArea(
-                    bottom: false,
-                    child: Container(
-                      margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7C3AED).withOpacity(0.92),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Offline or slow connection — using data saved on this device.',
-                              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+      child: Scaffold(
+        extendBody: true,
+        body: Stack(
+          children: [
+            IndexedStack(
+              index: _idx,
+              sizing: StackFit.expand,
+              children: pages,
+            ),
+            if (_offline)
               Positioned(
-                left: 12,
-                right: 12,
-                bottom: 12,
+                top: 0,
+                left: 0,
+                right: 0,
                 child: SafeArea(
-                  top: false,
-                  minimum: const EdgeInsets.only(bottom: 4),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: Container(
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(36),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
+                  bottom: false,
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF7C3AED).withOpacity(0.92),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Offline or slow connection — using data saved on this device.',
+                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                           ),
-                        ],
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _nav(0, Icons.home_rounded),
-                          _nav(1, Icons.trending_up_rounded),
-                          _nav(2, Icons.account_balance_wallet_rounded),
-                          _navC(3),
-                          _nav(4, Icons.play_circle_fill_rounded),
-                          _nav(5, Icons.bar_chart_rounded),
-                          _nav(6, Icons.person_rounded),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomNavBar(),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(15, 0, 15, 25),
+      child: SafeArea(
+        top: false,
+        child: Container(
+          height: 75,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface.withOpacity(0.78),
+            borderRadius: BorderRadius.circular(35),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
+            border: Border.all(color: Colors.white.withOpacity(0.10)),
+          ),
+          child: Row(
+            children: [
+              _nav(0, Icons.home_rounded),
+              _nav(1, Icons.trending_up_rounded),
+              _nav(2, Icons.account_balance_wallet_rounded),
+              _navC(3),
+              _nav(4, Icons.play_circle_fill_rounded),
+              _nav(5, Icons.bar_chart_rounded),
+              _nav(6, Icons.person_rounded),
             ],
           ),
         ),
       ),
     );
   }
-  Widget _nav(int i, IconData icon) {
-    final selected = _idx == i;
-    final color = selected ? Theme.of(context).colorScheme.primary : Colors.grey;
-    return Expanded(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+
+  Widget _nav(int i, IconData icon) => Expanded(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () {
             setState(() => _idx = i);
             if (i == 4) unawaited(widget.onRefreshMediaFromCloud?.call());
           },
-          customBorder: const StadiumBorder(),
-          splashColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
           child: Center(
-            child: Icon(icon, color: color, size: 30),
+            child: Icon(
+              icon,
+              color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey,
+              size: 28,
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
 
-  Widget _navC(int i) {
-    final selected = _idx == i;
-    return Expanded(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+  Widget _navC(int i) => Expanded(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => setState(() => _idx = i),
-          customBorder: const CircleBorder(),
           child: Center(
-            child: Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF6200EE).withValues(alpha: 0.4),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-                border: Border.all(color: selected ? Colors.white : Colors.transparent, width: 2),
-              ),
-              child: Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(27),
-                  child: Image.network(
-                    widget.config.logoUrl,
-                    width: 38,
-                    height: 38,
-                    fit: BoxFit.cover,
-                    errorBuilder: (c, e, s) => const Text(
-                      'NGMY',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+            child: Transform.translate(
+              offset: const Offset(0, -10),
+              transformHitTests: true,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6200EE).withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                  border: Border.all(color: _idx == i ? Colors.white : Colors.transparent, width: 2),
+                ),
+                child: Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
+                    child: Image.network(
+                      widget.config.logoUrl,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      errorBuilder: (c, e, s) => const Text(
+                        'NGMY',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                      ),
                     ),
                   ),
                 ),
@@ -5762,9 +5769,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             ),
           ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class HomeScreen extends StatefulWidget {
@@ -14757,6 +14762,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   int _activeTab = 0; // 0: Search, 1: Enroll, 2: Members, 3: Rankings
   String _searchQuery = '';
   late String _selectedState;
+  bool _registryUnlocked = false;
+  bool _unlockChecked = false;
   String _selectedCity = 'All Cities';
   String _selectedRoom = 'All Rooms';
   final TextEditingController _searchController = TextEditingController();
@@ -14796,7 +14803,40 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ..addAll(widget.config.dismissedContributionReceiptKeys);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _runHelpModeLifecycleMaintenance();
+      _checkRegistryUnlock();
     });
+  }
+
+  Future<void> _checkRegistryUnlock() async {
+    if (_isRegistrar()) {
+      if (mounted) setState(() {
+        _registryUnlocked = true;
+        _unlockChecked = true;
+      });
+      return;
+    }
+    final ok = await civicRegistryIsUnlocked(widget.user.email, _selectedState);
+    if (mounted) {
+      setState(() {
+        _registryUnlocked = ok;
+        _unlockChecked = true;
+      });
+    }
+  }
+
+  void _onRegistryUnlocked(String state) {
+    setState(() {
+      _selectedState = state;
+      widget.user.state = state;
+      _registryUnlocked = true;
+    });
+    widget.onDataChanged();
+  }
+
+  void _adminSaveCivicPin(String state, String pin) {
+    widget.config.civicRegistryPinsByState = Map<String, String>.from(widget.config.civicRegistryPinsByState)
+      ..[state.trim()] = pin.trim();
+    widget.onDataChanged();
   }
 
   void _syncReceiptFlagsToConfig() {
@@ -15028,13 +15068,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 itemCount: _usStates.length,
                 itemBuilder: (ctx, i) => ListTile(
                   title: Text(_usStates[i], style: const TextStyle(fontWeight: FontWeight.w600)),
-                  onTap: () {
+                  onTap: () async {
+                    final newState = _usStates[i];
+                    Navigator.pop(c);
+                    if (!_isRegistrar()) {
+                      final ok = await civicRegistryIsUnlocked(widget.user.email, newState);
+                      if (!ok) {
+                        setState(() {
+                          _selectedState = newState;
+                          _selectedCity = 'All Cities';
+                          _selectedRoom = 'All Rooms';
+                          _registryUnlocked = false;
+                        });
+                        return;
+                      }
+                    }
                     setState(() {
-                      _selectedState = _usStates[i];
+                      _selectedState = newState;
                       _selectedCity = 'All Cities';
                       _selectedRoom = 'All Rooms';
                     });
-                    Navigator.pop(c);
                   },
                 ),
               ),
@@ -16543,6 +16596,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final receiptGroups = _groupContributionReceipts(_visibleContributionTx(), unreadOnly: true);
     final receiptCount = receiptGroups.length;
 
+    if (!_unlockChecked) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (!_registryUnlocked && !_isRegistrar()) {
+      return CivicRegistryGateScreen(
+        usStates: _usStates,
+        pinsByState: widget.config.civicRegistryPinsByState,
+        userEmail: widget.user.email,
+        initialState: _selectedState,
+        isAdmin: widget.user.isAdmin,
+        onAdminSavePin: widget.user.isAdmin ? _adminSaveCivicPin : null,
+        onBack: () => NgmyNavigator.pop(context),
+        onUnlocked: _onRegistryUnlocked,
+      );
+    }
+
     return NgmyTabBackScope(
       activeTab: _activeTab,
       onTabBack: () => setState(() => _activeTab = (_activeTab - 1).clamp(0, 3)),
@@ -16558,6 +16629,40 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          if (widget.user.isAdmin)
+            IconButton(
+              onPressed: () {
+                final pinCtrl = TextEditingController(
+                  text: civicRegistryPinForState(widget.config.civicRegistryPinsByState, _selectedState),
+                );
+                showDialog<void>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text('PIN for $_selectedState'),
+                    content: TextField(
+                      controller: pinCtrl,
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: 'Registry PIN', border: OutlineInputBorder()),
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                      FilledButton(
+                        onPressed: () {
+                          _adminSaveCivicPin(_selectedState, pinCtrl.text);
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('PIN saved for $_selectedState')),
+                          );
+                        },
+                        child: const Text('Save'),
+                      ),
+                    ],
+                  ),
+                ).whenComplete(pinCtrl.dispose);
+              },
+              icon: const Icon(Icons.pin_rounded),
+              tooltip: 'Set state PIN',
+            ),
           IconButton(onPressed: _showStatePicker, icon: const Icon(Icons.map_rounded), tooltip: 'Change State'),
         ],
       ),
@@ -26158,13 +26263,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
                 ),
               ),
               if (isVideo && _previewEnded && !_unlockedFullVideo) _previewPaywallOverlay(),
-              if (isVideo && _isInitialized && _controller != null && (!_previewEnded || _unlockedFullVideo))
-                Positioned(
-                  bottom: 10,
-                  left: 0,
-                  right: 0,
-                  child: Center(child: _inlineVideoSeekControls()),
-                ),
               if (isVideo && _isInitialized && _controller != null && !_controller!.value.isPlaying && !_previewEnded)
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -26745,18 +26843,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
                 await _handleLinkAction();
                 return;
               }
-              if (isVideo) {
-                if (_previewEnded && !_unlockedFullVideo) return;
-                if (_isInitialized && _controller != null) {
-                  if (_controller!.value.isPlaying) {
-                    await _controller!.pause();
-                  } else {
-                    await _controller!.play();
-                  }
-                  if (mounted) setState(() {});
-                  return;
-                }
-              }
+              if (isVideo && _previewEnded && !_unlockedFullVideo) return;
               await _openFullscreenMedia();
             },
             onDoubleTap: _quickLike,
