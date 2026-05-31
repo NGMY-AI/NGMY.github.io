@@ -38,6 +38,21 @@ class NgmyMediaProfile {
     return raw.map((e) => e.toString()).toList();
   }
 
+  /// Instagram-style counts: 9999, 10K, 10.5K, 1M, etc.
+  static String formatInstagramCount(int count) {
+    if (count < 10000) return count.toString();
+    if (count < 1000000) {
+      if (count % 1000 == 0) return '${count ~/ 1000}K';
+      final value = (count / 1000.0 * 10).round() / 10;
+      final text = value.toStringAsFixed(1);
+      return '${text.endsWith('.0') ? text.substring(0, text.length - 2) : text}K';
+    }
+    if (count % 1000000 == 0) return '${count ~/ 1000000}M';
+    final value = (count / 1000000.0 * 10).round() / 10;
+    final text = value.toStringAsFixed(1);
+    return '${text.endsWith('.0') ? text.substring(0, text.length - 2) : text}M';
+  }
+
   static List<Map<String, dynamic>> activeStories(dynamic user) {
     final now = DateTime.now();
     return asMapList((user as dynamic).mediaStories).where((s) {
@@ -185,7 +200,8 @@ class NgmyMediaProfileScreen extends StatefulWidget {
   final List<dynamic> allMedia;
   final ImageProvider? Function(dynamic user) avatarForUser;
   final Future<String> Function(String url) resolveMediaUrl;
-  final Future<void> Function(dynamic post) persistPost;
+  final Future<bool> Function(dynamic post) persistPost;
+  final Future<bool> Function(dynamic user)? persistUser;
   final VoidCallback onDataChanged;
   final bool Function(dynamic post) isPostExpired;
   final Future<String> Function(String localRef)? uploadMediaRef;
@@ -199,6 +215,7 @@ class NgmyMediaProfileScreen extends StatefulWidget {
     required this.avatarForUser,
     required this.resolveMediaUrl,
     required this.persistPost,
+    this.persistUser,
     required this.onDataChanged,
     required this.isPostExpired,
     this.uploadMediaRef,
@@ -214,8 +231,10 @@ class _NgmyMediaProfileScreenState extends State<NgmyMediaProfileScreen> {
   final _picker = ImagePicker();
   bool _editingBio = false;
 
-  dynamic get _target => widget.targetUser;
-  dynamic get _me => widget.currentUser;
+  dynamic get _target =>
+      NgmyMediaProfile.userByEmail(widget.allUsers, widget.targetUser.email.toString()) ?? widget.targetUser;
+  dynamic get _me =>
+      NgmyMediaProfile.userByEmail(widget.allUsers, widget.currentUser.email.toString()) ?? widget.currentUser;
   bool get _isOwn => _target.email.toLowerCase().trim() == _me.email.toLowerCase().trim();
   bool get _following => NgmyMediaProfile.isFollowing(_me, _target);
 
@@ -255,6 +274,14 @@ class _NgmyMediaProfileScreenState extends State<NgmyMediaProfileScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant NgmyMediaProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.allUsers != widget.allUsers || oldWidget.allMedia != widget.allMedia) {
+      setState(() {});
+    }
+  }
+
+  @override
   void dispose() {
     _bioCtrl.dispose();
     super.dispose();
@@ -263,13 +290,19 @@ class _NgmyMediaProfileScreenState extends State<NgmyMediaProfileScreen> {
   Future<void> _saveBio() async {
     (_target as dynamic).mediaBio = _bioCtrl.text.trim();
     setState(() => _editingBio = false);
-    widget.onDataChanged();
+    final ok = await widget.persistUser?.call(_target) ?? false;
+    if (!ok) widget.onDataChanged();
   }
 
   Future<void> _toggleFollow() async {
     NgmyMediaProfile.toggleFollow(_me, _target);
-    widget.onDataChanged();
-    setState(() {});
+    if (widget.persistUser != null) {
+      await widget.persistUser!.call(_target);
+      await widget.persistUser!.call(_me);
+    } else {
+      widget.onDataChanged();
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _openStoryViewer() async {
@@ -561,9 +594,9 @@ class _NgmyMediaProfileScreenState extends State<NgmyMediaProfileScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _statCol('$posts', 'posts'),
-                        _statCol('$_followerCount', 'followers'),
-                        _statCol('$_followingCount', 'following'),
+                        _statCol(NgmyMediaProfile.formatInstagramCount(posts), 'posts'),
+                        _statCol(NgmyMediaProfile.formatInstagramCount(_followerCount), 'followers'),
+                        _statCol(NgmyMediaProfile.formatInstagramCount(_followingCount), 'following'),
                       ],
                     ),
                   ),
@@ -976,10 +1009,13 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                             final userOk = await widget.persistUser?.call(u) ?? false;
                             setSheet(() {});
                             if (context.mounted) {
+                              final shown = NgmyMediaProfile.formatInstagramCount(
+                                NgmyMediaProfile.asStringList((u as dynamic).mediaFollowers).length,
+                              );
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(userOk
-                                      ? 'Added $n followers to ${u.username}. Saved for all users.'
+                                      ? 'Added $n followers to ${u.username}. Total: $shown. Saved for all users.'
                                       : 'Could not save followers. Run supabase/users_media_profile_columns.sql in Supabase.'),
                                 ),
                               );
@@ -990,7 +1026,10 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                               CircleAvatar(radius: 26, child: Text(u.username.toString().substring(0, 1).toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w800))),
                               const SizedBox(height: 4),
                               Text(u.username.toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: widget.isDark ? Colors.white : Colors.black87)),
-                              Text('$count', style: TextStyle(fontSize: 9, color: widget.isDark ? Colors.white54 : Colors.black54)),
+                              Text(
+                                NgmyMediaProfile.formatInstagramCount(count),
+                                style: TextStyle(fontSize: 9, color: widget.isDark ? Colors.white54 : Colors.black54),
+                              ),
                             ],
                           ),
                         );

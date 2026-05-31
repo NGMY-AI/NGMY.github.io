@@ -1321,6 +1321,48 @@ bool _isMissingTablePostgrestError(Object error, String table) {
   return error.toString().contains("Could not find the table 'public.$table'");
 }
 
+Future<bool> _upsertMediaSocialFields(MediaPost post) async {
+  if (!await ngmyCanReachCloud()) return false;
+  if (post.id.isEmpty) return false;
+  final row = <String, dynamic>{
+    'id': post.id,
+    'userEmail': post.userEmail,
+    'username': post.username,
+    'videoUrl': post.videoUrl,
+    'url': post.videoUrl,
+    'contentType': post.contentType,
+    'type': post.contentType,
+    'caption': post.caption,
+    'timestamp': post.timestamp.toUtc().toIso8601String(),
+    'comments': post.comments.map((e) => Map<String, dynamic>.from(e)).toList(),
+    'likedBy': List<String>.from(post.likedBy),
+    'savedBy': List<String>.from(post.savedBy),
+    'likes': post.likedBy.length,
+  };
+  return _upsertMediaRowSafe(row);
+}
+
+Future<bool> _upsertUserMediaSocialFields(UserData u) async {
+  if (!await ngmyCanReachCloud()) return false;
+  final email = u.email.toLowerCase().trim();
+  if (email.isEmpty) return false;
+  try {
+    await Supabase.instance.client.from('users').upsert({
+      'email': u.email,
+      'username': u.username,
+      'mediaFollowers': u.mediaFollowers,
+      'mediaFollowing': u.mediaFollowing,
+      'mediaBio': u.mediaBio ?? '',
+      'mediaHighlights': u.mediaHighlights.map((e) => Map<String, dynamic>.from(e)).toList(),
+      'mediaStories': u.mediaStories.map((e) => Map<String, dynamic>.from(e)).toList(),
+    }).timeout(kNgmyCloudWriteTimeout);
+    return true;
+  } catch (e) {
+    debugPrint('[user media social] upsert: $e');
+    return false;
+  }
+}
+
 Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
   final working = Map<String, dynamic>.from(row);
   const protected = {
@@ -3769,7 +3811,7 @@ class _NGMYAppState extends State<NGMYApp> {
       _allMedia[idx] = post;
     }
     await _persistAllMediaLocally();
-    final ok = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+    final ok = await _upsertMediaSocialFields(post);
     if (ok) {
       _markAdminMediaProtectWindow();
       if (mounted) setState(() {});
@@ -3793,16 +3835,59 @@ class _NGMYAppState extends State<NGMYApp> {
         await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
       }
     } catch (_) {}
-    var ok = await _pushUserMediaProfileFast(user);
+    var ok = await _upsertUserMediaSocialFields(user);
     if (!ok) {
-      await _pushUserToCloudFast(user);
-      ok = await ngmyCanReachCloud();
+      ok = await _pushUserMediaProfileFast(user);
+    }
+    if (!ok) {
+      try {
+        await _safeUpsertRows('users', [Map<String, dynamic>.from(user.toJson())]);
+        ok = true;
+      } catch (e) {
+        debugPrint('[user media sync] fallback upsert failed: $e');
+        ok = false;
+      }
     }
     if (ok) {
       _markAdminMediaProtectWindow();
       if (mounted) setState(() {});
     }
     return ok;
+  }
+
+  Future<bool> _syncMediaPostForAllUsers(MediaPost post) => _syncAdminMediaPost(post);
+
+  Future<void> _reloadUsersMediaProfilesFromSupabase() async {
+    if (!await ngmyCanReachCloud()) return;
+    try {
+      final usersData = await supabase.from('users').select();
+      if (usersData == null || !mounted) return;
+      final remoteUsers = (usersData as List).map((e) => UserData.fromJson(e)).toList();
+      setState(() {
+        for (final remote in remoteUsers) {
+          final key = remote.email.toLowerCase().trim();
+          if (key.isEmpty) continue;
+          final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+          if (idx == -1) {
+            _allUsers.add(remote);
+            continue;
+          }
+          _mergeUserMediaProfileFields(_allUsers[idx], remote);
+          _allUsers[idx] = remote;
+        }
+      });
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+      } catch (_) {}
+    } catch (e) {
+      debugPrint('[users media] reload error: $e');
+    }
+  }
+
+  Future<void> _refreshMediaAndProfilesFromCloud() async {
+    await _reloadMediaFromSupabase();
+    await _reloadUsersMediaProfilesFromSupabase();
   }
 
   Future<void> _reloadMediaFromSupabase() async {
@@ -4519,6 +4604,9 @@ class _NGMYAppState extends State<NGMYApp> {
         });
         SharedPreferences.getInstance().then((prefs) {
           prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+          if (_currentUser != null) {
+            prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+          }
         }).catchError((_) {});
       }
     } catch (e) {
@@ -5330,7 +5418,7 @@ class _NGMYAppState extends State<NGMYApp> {
                     await _reloadMediaFromSupabase();
                   }());
                 },
-                onRefreshMediaFromCloud: _reloadMediaFromSupabase,
+                onRefreshMediaFromCloud: _refreshMediaAndProfilesFromCloud,
                 onDeleteMedia: _deleteMediaPostGlobally,
                 onPruneMedia: _pruneDeletedMediaPost,
                 onSaveLegalContent: _saveLegalContentToSupabase,
@@ -6343,6 +6431,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onRefreshFromCloud: widget.onRefreshMediaFromCloud,
         onDeleteMedia: widget.onDeleteMedia,
         onPruneMedia: widget.onPruneMedia,
+        onSyncMediaPost: widget.onSyncAdminMediaPost,
+        onSyncUserMedia: widget.onSyncAdminUserMedia,
       ),
       StatsScreen(user: widget.user, transactions: sorted),
       ProfileScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged, onAddTransaction: widget.onAddTransaction),
@@ -26189,6 +26279,8 @@ class MediaHubScreen extends StatefulWidget {
   final Future<void> Function()? onRefreshFromCloud;
   final Future<void> Function(MediaPost)? onDeleteMedia;
   final Future<void> Function(MediaPost)? onPruneMedia;
+  final Future<bool> Function(MediaPost post)? onSyncMediaPost;
+  final Future<bool> Function(UserData user)? onSyncUserMedia;
 
   const MediaHubScreen({
     super.key,
@@ -26202,6 +26294,8 @@ class MediaHubScreen extends StatefulWidget {
     this.onRefreshFromCloud,
     this.onDeleteMedia,
     this.onPruneMedia,
+    this.onSyncMediaPost,
+    this.onSyncUserMedia,
   });
 
   @override
@@ -26226,8 +26320,17 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   }
 
   String _feedSignature() {
-    final feed = widget.allMedia.where((m) => !_isExpired(m)).map((m) => m.id).join('|');
-    return feed;
+    final buf = StringBuffer();
+    for (final m in widget.allMedia.where((m) => !_isExpired(m))) {
+      buf
+        ..write(m.id)
+        ..write(':')
+        ..write(_mediaCommentCount(m.comments))
+        ..write(':')
+        ..write(m.likedBy.length)
+        ..write('|');
+    }
+    return buf.toString();
   }
 
   Future<void> _silentRefreshFeed() async {
@@ -26963,11 +27066,16 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
         avatarForUser: (u) => ngmyAdminUserAvatar(u),
         resolveMediaUrl: _resolveSupabaseStorageUrlResilient,
         persistPost: (p) async {
-          await _upsertMediaRowSafe(Map<String, dynamic>.from(p.toJson()));
+          final post = p is MediaPost ? p : MediaPost.fromJson(Map<String, dynamic>.from((p as dynamic).toJson()));
+          if (widget.onSyncMediaPost != null) {
+            return widget.onSyncMediaPost!(post);
+          }
+          return _upsertMediaSocialFields(post);
         },
         onDataChanged: widget.onDataChanged,
         isPostExpired: (m) => _isExpired(m as MediaPost),
         uploadMediaRef: _uploadProfileMediaRef,
+        persistUser: widget.onSyncUserMedia == null ? null : (u) => widget.onSyncUserMedia!(u is UserData ? u : UserData.fromJson(Map<String, dynamic>.from((u as dynamic).toJson()))),
       ),
       routeName: 'MediaProfile',
     );
@@ -27018,6 +27126,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                       currentUser: widget.user,
                       allUsers: widget.allUsers,
                       onChanged: widget.onDataChanged,
+                      onSyncPost: widget.onSyncMediaPost,
                       onDelete: () => _deletePost(mediaFeed[index]),
                       onOpenProfile: _openMediaProfile,
                       onPayoutWatchReward: _payoutWatchReward,
@@ -27301,6 +27410,7 @@ class VideoPostWidget extends StatefulWidget {
   final VoidCallback onDelete;
   final void Function(String userEmail)? onOpenProfile;
   final Future<bool> Function(MediaPost post)? onPayoutWatchReward;
+  final Future<bool> Function(MediaPost post)? onSyncPost;
   const VideoPostWidget({
     super.key,
     required this.post,
@@ -27310,6 +27420,7 @@ class VideoPostWidget extends StatefulWidget {
     required this.onDelete,
     this.onOpenProfile,
     this.onPayoutWatchReward,
+    this.onSyncPost,
   });
 
   @override
@@ -27803,7 +27914,11 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
   String get _displayUsername => _mediaPostDisplayName(widget.post, widget.allUsers);
 
   Future<void> _persistPostChange() async {
-    await _upsertMediaRowSafe(Map<String, dynamic>.from(widget.post.toJson()));
+    if (widget.onSyncPost != null) {
+      await widget.onSyncPost!(widget.post);
+    } else {
+      await _upsertMediaSocialFields(widget.post);
+    }
     widget.onChanged();
   }
 
