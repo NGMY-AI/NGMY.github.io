@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_news_banner_painter.dart';
+import 'ngmy_news_banner_templates.dart';
+
 enum NgmyVideoFormat { youtube, tiktok }
 
 enum NgmyVideoSlotShape { rect, circle }
@@ -24,6 +27,36 @@ enum NgmyVideoTemplateId {
   ttNewsLowerThird,
   ttThanksTriple,
   ttNewsTag,
+  ytBanner0,
+  ytBanner1,
+  ytBanner2,
+  ytBanner3,
+  ytBanner4,
+  ytBanner5,
+  ytBanner6,
+  ytBanner7,
+  ytBanner8,
+  ytBanner9,
+  ytBanner10,
+  ytBanner11,
+  ytBanner12,
+  ytBanner13,
+  ytBanner14,
+  ttBanner0,
+  ttBanner1,
+  ttBanner2,
+  ttBanner3,
+  ttBanner4,
+  ttBanner5,
+  ttBanner6,
+  ttBanner7,
+  ttBanner8,
+  ttBanner9,
+  ttBanner10,
+  ttBanner11,
+  ttBanner12,
+  ttBanner13,
+  ttBanner14,
 }
 
 extension NgmyVideoFormatExt on NgmyVideoFormat {
@@ -72,6 +105,8 @@ class NgmyVideoTemplateDef {
   final String defaultSubtitle;
   final String defaultLive;
   final bool showTextOverlay;
+  final NgmyNewsBannerStyle? newsBannerStyle;
+  final bool newsTopAccent;
 
   const NgmyVideoTemplateDef({
     required this.id,
@@ -86,12 +121,16 @@ class NgmyVideoTemplateDef {
     this.defaultSubtitle = 'BREAKING',
     this.defaultLive = 'LIVE',
     this.showTextOverlay = false,
+    this.newsBannerStyle,
+    this.newsTopAccent = false,
   });
 
   bool get usesPhotoBackdrop => assetPath != null && assetPath!.isNotEmpty;
+
+  bool get isNewsBanner => newsBannerStyle != null;
 }
 
-const List<NgmyVideoTemplateDef> kNgmyVideoTemplates = [
+final List<NgmyVideoTemplateDef> kNgmyVideoTemplates = [
   // —— YouTube (16:9) photo studios — keep screenshot colors; only screens are video/logo ——
   NgmyVideoTemplateDef(
     id: NgmyVideoTemplateId.ytStudioCurved,
@@ -362,6 +401,7 @@ const List<NgmyVideoTemplateDef> kNgmyVideoTemplates = [
     defaultLive: 'LIVE',
     showTextOverlay: true,
   ),
+  ...buildNgmyNewsBannerTemplates(),
 ];
 
 List<NgmyVideoTemplateDef> ngmyTemplatesForFormat(NgmyVideoFormat format) =>
@@ -397,6 +437,8 @@ class NgmyVideoStudioExportConfig {
   final double headlineFontScale;
   final double titleFontScale;
   final bool showTextOverlay;
+  final NgmyNewsBannerStyle? newsBannerStyle;
+  final bool newsTopAccent;
 
   const NgmyVideoStudioExportConfig({
     required this.templateId,
@@ -414,6 +456,8 @@ class NgmyVideoStudioExportConfig {
     this.headlineFontScale = 1.0,
     this.titleFontScale = 1.0,
     this.showTextOverlay = false,
+    this.newsBannerStyle,
+    this.newsTopAccent = false,
   });
 
   int get outputWidth => format.exportWidth;

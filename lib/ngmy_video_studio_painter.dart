@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_news_banner_painter.dart';
 import 'ngmy_video_studio_models.dart';
 
 enum NgmyTemplatePaintLayer { background, foreground, frameBorders }
@@ -37,7 +38,26 @@ class NgmyVideoTemplatePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (ngmyTemplateDef(templateId).usesPhotoBackdrop) return;
+    final def = ngmyTemplateDef(templateId);
+    if (def.usesPhotoBackdrop) return;
+
+    final banner = def.newsBannerStyle;
+    if (banner != null) {
+      if (layer == NgmyTemplatePaintLayer.background) {
+        canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF0A0A0A));
+      } else if (layer == NgmyTemplatePaintLayer.foreground) {
+        NgmyNewsBannerPainter(
+          style: banner,
+          headline: headline,
+          title: title,
+          subtitle: subtitle,
+          liveLabel: liveLabel,
+          topAccent: def.newsTopAccent,
+        ).paint(canvas, size);
+      }
+      if (layer == NgmyTemplatePaintLayer.frameBorders) _drawBorders(canvas, size);
+      return;
+    }
 
     switch (templateId) {
       case NgmyVideoTemplateId.ytBreakingNews:

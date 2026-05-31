@@ -12,6 +12,8 @@ import 'ngmy_video_studio_logo.dart';
 import 'ngmy_video_studio_models.dart';
 import 'ngmy_video_studio_painter.dart';
 import 'ngmy_video_studio_picker.dart';
+import 'ngmy_studio_video_view.dart';
+import 'ngmy_news_banner_painter.dart';
 
 void showNgmyVideoStudio(BuildContext context) {
   Navigator.of(context).push(
@@ -132,6 +134,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   Future<void> _pickVideoForSlot(String slotId) async {
     if (_picking) return;
     setState(() => _picking = true);
+    VideoPlayerController? newController;
     try {
       final picked = await pickNgmyStudioVideo();
       if (picked == null) {
@@ -147,27 +150,43 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       await media.dispose();
 
       if (kIsWeb) {
-        final bytes = picked.bytes!;
-        media.blobUrl = blob_util.createNgmyBlobUrl(bytes, picked.mime);
-        media.source = media.blobUrl;
-        media.controller = VideoPlayerController.networkUrl(Uri.parse(media.blobUrl!));
+        final bytes = picked.bytes;
+        if (bytes == null || bytes.isEmpty) {
+          throw StateError('Could not read video data. Try another file or browser.');
+        }
+        final blobUrl = blob_util.createNgmyBlobUrl(bytes, picked.mime);
+        if (blobUrl.isEmpty) {
+          throw StateError('Could not prepare video preview on this device.');
+        }
+        media.blobUrl = blobUrl;
+        media.source = blobUrl;
+        newController = VideoPlayerController.networkUrl(
+          Uri.parse(blobUrl),
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        );
       } else {
-        media.source = picked.path;
-        media.controller = VideoPlayerController.file(File(picked.path!));
+        final path = picked.path;
+        if (path == null || path.isEmpty) {
+          throw StateError('Invalid video file path.');
+        }
+        media.source = path;
+        newController = VideoPlayerController.file(File(path));
       }
 
-      await media.controller!.initialize();
+      media.controller = newController;
+      await newController.initialize();
       if (!mounted) return;
-      media.controller!.setLooping(true);
-      await media.controller!.play();
+      await newController.setLooping(true);
+      await newController.play();
       _slotMedia[slotId] = media;
       setState(() => _activeSlotId = slotId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Video added to frame "$slotId".')),
+          SnackBar(content: Text('Video added to "${_def.slots.where((s) => s.id == slotId).map((s) => s.label).firstOrNull ?? slotId}".')),
         );
       }
     } catch (e) {
+      await newController?.dispose();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red.shade700),
@@ -230,6 +249,8 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       headlineFontScale: _headlineScale,
       titleFontScale: _titleScale,
       showTextOverlay: _def.showTextOverlay,
+      newsBannerStyle: _def.newsBannerStyle,
+      newsTopAccent: _def.newsTopAccent,
     );
   }
 
@@ -593,6 +614,30 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           );
         }
 
+        if (_def.isNewsBanner) {
+          for (final slot in _def.slots) {
+            children.add(_slotLayer(slot, size));
+          }
+          children.add(
+            Positioned.fill(
+              child: CustomPaint(
+                painter: NgmyNewsBannerPainter(
+                  style: _def.newsBannerStyle!,
+                  headline: _headlineC.text,
+                  title: _titleC.text,
+                  subtitle: _subtitleC.text,
+                  liveLabel: _liveC.text,
+                  topAccent: _def.newsTopAccent,
+                ),
+              ),
+            ),
+          );
+          for (final slot in _def.slots) {
+            children.add(_slotTap(slot, size));
+          }
+          return Stack(fit: StackFit.expand, children: children);
+        }
+
         for (final slot in _def.slots) {
           children.add(_slotLayer(slot, size));
         }
@@ -668,12 +713,8 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     final media = _slotMedia[slot.id];
     final ctrl = media?.controller;
     Widget child;
-    if (ctrl != null && ctrl.value.isInitialized) {
-      child = FittedBox(
-        fit: BoxFit.cover,
-        clipBehavior: Clip.hardEdge,
-        child: SizedBox(width: ctrl.value.size.width, height: ctrl.value.size.height, child: VideoPlayer(ctrl)),
-      );
+    if (ctrl != null) {
+      child = NgmyStudioVideoView(controller: ctrl);
     } else {
       child = Container(
         color: Colors.black87,
@@ -807,7 +848,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           },
         ),
       ],
-      if (_def.showTextOverlay) ...[
+      if (_def.showTextOverlay || _def.isNewsBanner) ...[
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(12),
@@ -815,7 +856,10 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Text overlays', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+              Text(
+                _def.isNewsBanner ? 'Banner text' : 'Text overlays',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+              ),
               const SizedBox(height: 8),
               _field('Headline', _headlineC, maxLines: 2),
               _field('Title', _titleC),

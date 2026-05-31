@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'dart:html' as html;
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
+import 'package:flutter/material.dart';
+
+import 'ngmy_news_banner_painter.dart';
 import 'ngmy_video_studio_models.dart';
 
 Future<String> exportNgmyVideoStudioComposed({
@@ -63,6 +67,10 @@ Future<String> exportNgmyVideoStudioComposed({
 
     final w = config.outputWidth;
     final h = config.outputHeight;
+    html.ImageElement? bannerOverlay;
+    if (config.newsBannerStyle != null) {
+      bannerOverlay = await _renderNewsBannerOverlay(config, w, h);
+    }
     final canvas = html.CanvasElement(width: w, height: h);
     final ctx = canvas.context2D;
 
@@ -152,7 +160,9 @@ Future<String> exportNgmyVideoStudioComposed({
         ctx.restore();
       }
 
-      if (config.showTextOverlay) {
+      if (bannerOverlay != null) {
+        ctx.drawImageScaled(bannerOverlay, 0, 0, w, h);
+      } else if (config.showTextOverlay) {
         _drawTextOverlay(ctx, w.toDouble(), h.toDouble(), config);
       }
 
@@ -201,6 +211,27 @@ Future<String> exportNgmyVideoStudioComposed({
       i.remove();
     }
   }
+}
+
+Future<html.ImageElement> _renderNewsBannerOverlay(NgmyVideoStudioExportConfig config, int w, int h) async {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  NgmyNewsBannerPainter(
+    style: config.newsBannerStyle!,
+    headline: config.headline,
+    title: config.title,
+    subtitle: config.subtitle,
+    liveLabel: config.liveLabel,
+    topAccent: config.newsTopAccent,
+  ).paint(canvas, Size(w.toDouble(), h.toDouble()));
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(w, h);
+  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+  final blob = html.Blob([bytes!.buffer.asUint8List()], 'image/png');
+  final url = html.Url.createObjectUrlFromBlob(blob);
+  final img = html.ImageElement()..src = url;
+  await img.onLoad.first;
+  return img;
 }
 
 void _drawProgramBg(html.CanvasRenderingContext2D ctx, double w, double h, NgmyVideoStudioExportConfig c) {
