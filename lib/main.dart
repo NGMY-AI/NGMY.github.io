@@ -1123,6 +1123,35 @@ Map<String, dynamic> _normalizeStoreOrder(Map<String, dynamic> order) {
   return copy;
 }
 
+/// When seller ETA passes, mark shipped/in-transit orders delivered automatically.
+bool _autoMarkStoreOrdersDelivered(List<Map<String, dynamic>> orders) {
+  var changed = false;
+  final now = DateTime.now();
+  for (final o in orders) {
+    if (o['refunded'] == true) continue;
+    final status = (o['fulfillmentStatus'] ?? 'pending').toString();
+    if (status == 'delivered' || status == 'refunded' || status == 'pending') continue;
+    final eta = DateTime.tryParse((o['estimatedArrival'] ?? '').toString());
+    if (eta == null) continue;
+    if (now.isBefore(eta)) continue;
+    o['fulfillmentStatus'] = 'delivered';
+    final deliveredAt = now.toUtc().toIso8601String();
+    o['deliveredAt'] = deliveredAt;
+    o['updatedAt'] = deliveredAt;
+    final hist = List<Map<String, dynamic>>.from(
+      (o['locationHistory'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? [],
+    );
+    hist.insert(0, {
+      'location': (o['buyerAddress'] ?? 'Buyer').toString(),
+      'note': 'Delivered automatically at scheduled arrival time',
+      'at': now.toLocal().toString(),
+    });
+    o['locationHistory'] = hist;
+    changed = true;
+  }
+  return changed;
+}
+
 List<Map<String, dynamic>> _mergeStoreOrdersLists(
   List<Map<String, dynamic>> local,
   List<Map<String, dynamic>> remote,
@@ -2384,6 +2413,9 @@ class _NGMYAppState extends State<NGMYApp> {
         if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) next.storeInquiries = keepInquiries;
         if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
         else next.storeOrders = _mergeStoreOrdersLists(keepOrders, next.storeOrders);
+        if (_autoMarkStoreOrdersDelivered(next.storeOrders)) {
+          unawaited(_pushStoreOrdersToSupabase(next.storeOrders));
+        }
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
@@ -3430,7 +3462,8 @@ class _NGMYAppState extends State<NGMYApp> {
 
   Future<void> _saveData() async {
     _isSyncing = true;
-    final ordersSnapshot = List<Map<String, dynamic>>.from(
+    _autoMarkStoreOrdersDelivered(_config.storeOrders);
+    var ordersSnapshot = List<Map<String, dynamic>>.from(
       _config.storeOrders.map((e) => Map<String, dynamic>.from(e)),
     );
     final online = await ngmyDeviceIsOnline();
@@ -3493,6 +3526,9 @@ class _NGMYAppState extends State<NGMYApp> {
 
       if (online) {
         await _reloadStoreFromSupabase();
+        if (_autoMarkStoreOrdersDelivered(_config.storeOrders)) {
+          await _pushStoreOrdersToSupabase(_config.storeOrders);
+        }
         await _syncStoreToSupabase();
         if (_currentUser?.isAdmin == true) {
           _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
@@ -3504,8 +3540,10 @@ class _NGMYAppState extends State<NGMYApp> {
         );
         configRow['storeListings'] = _config.storeListings;
         configRow['storeInquiries'] = _config.storeInquiries;
-        configRow['storeOrders'] = ordersSnapshot;
-        _config.storeOrders = ordersSnapshot;
+        configRow['storeOrders'] = _config.storeOrders;
+        _config.storeOrders = List<Map<String, dynamic>>.from(
+          _config.storeOrders.map((e) => Map<String, dynamic>.from(e)),
+        );
         configRow['helpHelperApplications'] = _config.helpHelperApplications;
         configRow['helpRequests'] = _config.helpRequests;
         configRow['helpBusinesses'] = _config.helpBusinesses;
@@ -16670,6 +16708,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         changed = true;
       }
     }
+    if (_autoMarkStoreOrdersDelivered(_orders)) changed = true;
     return changed;
   }
 
