@@ -414,7 +414,21 @@ Future<void> saveFamilyTrees(
 }
 
 Future<void> upsertFamilyTree(String userEmail, FamilyTree tree) async {
-  final list = await loadFamilyTrees(userEmail);
+  List<FamilyTree> list = [];
+  final prefs = await SharedPreferences.getInstance();
+  final raw = prefs.getString(_familyTreesKey(userEmail));
+  if (raw != null && raw.isNotEmpty) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        list = decoded
+            .whereType<Map>()
+            .map((e) => FamilyTree.fromJson(Map<String, dynamic>.from(e)))
+            .where((t) => t.id.isNotEmpty && t.name.isNotEmpty)
+            .toList();
+      }
+    } catch (_) {}
+  }
   final idx = list.indexWhere((t) => t.id == tree.id);
   if (idx == -1) {
     list.insert(0, tree);
@@ -422,7 +436,10 @@ Future<void> upsertFamilyTree(String userEmail, FamilyTree tree) async {
     list[idx] = tree;
   }
   await _persistFamilyTreesLocally(userEmail, list);
-  await _upsertFamilyTreeCloud(userEmail, tree);
+  final cloudOk = await _upsertFamilyTreeCloud(userEmail, tree);
+  if (!cloudOk) {
+    debugPrint('[family_trees] saved locally; cloud sync will retry on next load.');
+  }
 }
 
 Future<void> deleteFamilyTree(String userEmail, String treeId) async {
@@ -538,9 +555,10 @@ List<FamilyTree> _mergeFamilyTreeLists(List<FamilyTree> local, List<FamilyTree> 
     }
     if (r.members.length > existing.members.length) {
       byId[r.id] = r;
-    } else if (r.members.length == existing.members.length && r.createdAt.isAfter(existing.createdAt)) {
-      byId[r.id] = r;
+    } else if (existing.members.length > r.members.length) {
+      continue;
     }
+    // Equal member count: keep local copy (user's device edits win).
   }
   return byId.values.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 }
