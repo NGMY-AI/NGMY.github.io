@@ -387,15 +387,19 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
 
   Widget _templatePicker() {
     final templates = _formatTemplates;
-    return Container(
-      decoration: BoxDecoration(
-        color: _panel,
+    return Material(
+      color: _panel,
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
+        side: const BorderSide(color: Colors.white12),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
+          backgroundColor: Colors.transparent,
+          collapsedBackgroundColor: Colors.transparent,
           initiallyExpanded: _templatesExpanded,
           onExpansionChanged: (v) => setState(() => _templatesExpanded = v),
           iconColor: Colors.white70,
@@ -463,24 +467,40 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                                 borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
                                 child: t.usesPhotoBackdrop
                                     ? Image.asset(t.assetPath!, fit: BoxFit.cover)
-                                    : Container(
-                                        color: Colors.black,
-                                        child: CustomPaint(
-                                          painter: NgmyVideoTemplatePainter(
-                                            templateId: t.id,
-                                            format: t.forFormat,
-                                            slotRects: {for (final s in t.slots) s.id: s.defaultRect(t.forFormat)},
-                                            slotShapes: {for (final s in t.slots) s.id: s.shape},
-                                            headline: t.defaultHeadline,
-                                            title: t.defaultTitle,
-                                            subtitle: t.defaultSubtitle,
-                                            liveLabel: t.defaultLive,
-                                            headlineFontScale: 0.7,
-                                            titleFontScale: 0.65,
-                                            layer: NgmyTemplatePaintLayer.foreground,
+                                    : Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          CustomPaint(
+                                            painter: NgmyVideoTemplatePainter(
+                                              templateId: t.id,
+                                              format: t.forFormat,
+                                              slotRects: {for (final s in t.slots) s.id: s.defaultRect(t.forFormat)},
+                                              slotShapes: {for (final s in t.slots) s.id: s.shape},
+                                              headline: t.defaultHeadline,
+                                              title: t.defaultTitle,
+                                              subtitle: t.defaultSubtitle,
+                                              liveLabel: t.defaultLive,
+                                              headlineFontScale: 0.7,
+                                              titleFontScale: 0.65,
+                                              layer: NgmyTemplatePaintLayer.background,
+                                            ),
                                           ),
-                                          child: const SizedBox.expand(),
-                                        ),
+                                          CustomPaint(
+                                            painter: NgmyVideoTemplatePainter(
+                                              templateId: t.id,
+                                              format: t.forFormat,
+                                              slotRects: {for (final s in t.slots) s.id: s.defaultRect(t.forFormat)},
+                                              slotShapes: {for (final s in t.slots) s.id: s.shape},
+                                              headline: t.defaultHeadline,
+                                              title: t.defaultTitle,
+                                              subtitle: t.defaultSubtitle,
+                                              liveLabel: t.defaultLive,
+                                              headlineFontScale: 0.7,
+                                              titleFontScale: 0.65,
+                                              layer: NgmyTemplatePaintLayer.foreground,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                               ),
                             ),
@@ -577,7 +597,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           children.add(_slotLayer(slot, size));
         }
 
-        if (_def.showTextOverlay) {
+        if (!_def.usesPhotoBackdrop) {
           children.add(
             CustomPaint(
               painter: NgmyVideoTemplatePainter(
