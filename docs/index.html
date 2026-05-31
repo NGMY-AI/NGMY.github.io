@@ -38,9 +38,43 @@
 
   <meta name="apple-mobile-web-app-capable" content="yes">
 
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
 
   <meta name="apple-mobile-web-app-title" content="NGMY">
+
+  <script>
+    (function () {
+      function ngmyThemeIsLight() {
+        try {
+          var keys = ['flutter.theme_mode', 'theme_mode'];
+          for (var i = 0; i < keys.length; i++) {
+            var raw = localStorage.getItem(keys[i]);
+            if (!raw) continue;
+            var v = raw.replace(/^"|"$/g, '');
+            if (v === 'dark') return false;
+            if (v === 'light') return true;
+          }
+        } catch (e) {}
+        var h = new Date().getHours();
+        return h >= 9 && h < 20;
+      }
+      function ngmyApplyLightChromeEarly() {
+        var root = document.documentElement;
+        root.classList.add('ngmy-app-light');
+        root.style.setProperty('background-color', '#ffffff', 'important');
+        root.style.setProperty('color-scheme', 'light');
+        if (document.body) {
+          document.body.style.setProperty('background-color', '#ffffff', 'important');
+        }
+        var statusMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+        if (statusMeta) statusMeta.setAttribute('content', 'black');
+        document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
+          m.setAttribute('content', '#ffffff');
+        });
+      }
+      if (ngmyThemeIsLight()) ngmyApplyLightChromeEarly();
+    })();
+  </script>
 
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
@@ -105,6 +139,37 @@
 
       background-color: #ffffff !important;
 
+      color-scheme: light;
+
+    }
+
+    html.ngmy-app-light flutter-view,
+    html.ngmy-app-light flt-glass-pane {
+
+      background-color: #ffffff !important;
+
+    }
+
+    html.ngmy-app-light::before {
+
+      content: '';
+
+      position: fixed;
+
+      top: 0;
+
+      left: 0;
+
+      right: 0;
+
+      height: env(safe-area-inset-top, 0px);
+
+      background: #ffffff;
+
+      z-index: 2147483646;
+
+      pointer-events: none;
+
     }
 
     #ngmy-error {
@@ -157,7 +222,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260531182111";
+      var CURRENT = "20260531183326";
 
       function showError(msg) {
 
@@ -248,12 +313,12 @@
     })();
   </script>
 
-  <script src="flutter_bootstrap.js?v=20260531182111" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/')"></script>
+  <script src="flutter_bootstrap.js?v=20260531183326" onerror="window.__ngmyShowLoadError && window.__ngmyShowLoadError('Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/')"></script>
 
   <script>
     (function () {
       if (!('serviceWorker' in navigator)) return;
-      var deployId = '20260531182111';
+      var deployId = '20260531183326';
       window.addEventListener('load', function () {
         navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: '/NGMY.github.io/' })
           .then(function () { console.log('[ngmy] offline PWA worker registered'); })

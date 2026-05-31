@@ -8,19 +8,30 @@ void ngmyApplyWebStatusBarStyle({required bool lightMode}) {
 
   if (!lightMode) {
     root?.classes.remove('ngmy-app-light');
+    root?.style.removeProperty('color-scheme');
     html.document.getElementById('ngmy-light-theme-color')?.remove();
     return;
   }
 
   root?.classes.add('ngmy-app-light');
-
-  final statusMeta = html.document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-  statusMeta?.setAttribute('content', 'default');
-
   root?.style.setProperty('background-color', '#ffffff', 'important');
+  root?.style.setProperty('color-scheme', 'light');
+
   html.document.body?.style.setProperty('background-color', '#ffffff', 'important');
 
-  // Last theme-color meta wins on iOS — overrides dark prefers-color-scheme chrome in light mode.
+  // iOS standalone: "black" = dark icons on solid white status bar (not a black bar).
+  final statusMeta = html.document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  statusMeta?.setAttribute('content', 'black');
+
+  // Force every theme-color to white while app is in light mode (beats system dark preference).
+  for (final meta in html.document.querySelectorAll('meta[name="theme-color"]')) {
+    meta.setAttribute('content', '#ffffff');
+  }
+
+  for (final view in html.document.querySelectorAll('flutter-view, flt-glass-pane')) {
+    view.style.setProperty('background-color', '#ffffff', 'important');
+  }
+
   final existing = html.document.getElementById('ngmy-light-theme-color');
   if (existing != null) {
     existing.setAttribute('content', '#ffffff');

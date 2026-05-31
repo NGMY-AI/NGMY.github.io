@@ -58,6 +58,7 @@ import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_web_viewport.dart';
 import 'ngmy_web_status_bar.dart';
+import 'ngmy_login_logo.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -2795,37 +2796,6 @@ Future<String> _adminUploadVirtualProfilePic(String src) async {
   } catch (_) {
     return src;
   }
-}
-
-Widget _ngmyLoginLogo(String? logoUrl) {
-  final url = (logoUrl ?? '').trim().isNotEmpty ? logoUrl!.trim() : kNgmyDefaultLogoUrl;
-  const dots = SizedBox(
-    width: 110,
-    height: 110,
-    child: Icon(Icons.blur_on_rounded, size: 80, color: Color(0xFF6200EE)),
-  );
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(30),
-    child: Image.network(
-      url,
-      width: 110,
-      height: 110,
-      fit: BoxFit.cover,
-      gaplessPlayback: true,
-      errorBuilder: (_, __, ___) {
-        if (url != kNgmyDefaultLogoUrl) {
-          return Image.network(
-            kNgmyDefaultLogoUrl,
-            width: 110,
-            height: 110,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => dots,
-          );
-        }
-        return dots;
-      },
-    ),
-  );
 }
 
 Widget _ngmyLogoImage(String? logoUrl, {double? width, double? height, BoxFit fit = BoxFit.cover}) {
@@ -5763,8 +5733,28 @@ class _AuthScreenState extends State<AuthScreen> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: style,
-      child: SelectionContainer.disabled(child: Scaffold(body: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(35), child: Column(children: [
-      _ngmyLoginLogo(widget.config.logoUrl),
+      child: ColoredBox(
+        color: isDark ? Colors.transparent : Colors.white,
+        child: Scaffold(
+          backgroundColor: isDark ? null : Colors.white,
+          body: Stack(
+            children: [
+              if (!isDark)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: MediaQuery.of(context).padding.top,
+                  child: const ColoredBox(color: Colors.white),
+                ),
+              SafeArea(
+                child: SelectionContainer.disabled(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(35),
+                      child: Column(
+                        children: [
+      NgmyLoginLogoHero(logoUrl: widget.config.logoUrl),
       const SizedBox(height: 25), Text(_isLogin ? 'Login to NGMY' : 'Create Account', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
       const SizedBox(height: 45),
       if (!_isLogin) ...[
@@ -5847,7 +5837,17 @@ class _AuthScreenState extends State<AuthScreen> {
         },
         child: const Text('Trouble logging in? Reset App Data', style: TextStyle(color: Colors.grey, fontSize: 10))
       ),
-    ]))))));
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
