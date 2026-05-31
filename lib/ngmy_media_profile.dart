@@ -973,15 +973,14 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                             final n = int.tryParse(amtCtrl.text.trim()) ?? 0;
                             if (n <= 0) return;
                             NgmyMediaProfile.adminAddFollowers(u, n);
-                            final userOk = await widget.persistUser?.call(u) ?? true;
-                            widget.onDataChanged();
+                            final userOk = await widget.persistUser?.call(u) ?? false;
                             setSheet(() {});
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(userOk
-                                      ? 'Added $n followers to ${u.username}.'
-                                      : 'Followers added locally but cloud sync failed. Run supabase/users_media_profile_columns.sql.'),
+                                      ? 'Added $n followers to ${u.username}. Saved for all users.'
+                                      : 'Could not save followers. Run supabase/users_media_profile_columns.sql in Supabase.'),
                                 ),
                               );
                             }
@@ -1520,7 +1519,6 @@ class _AdminPostCardState extends State<_AdminPostCard> {
       return;
     }
     if (mounted) setState(() {});
-    widget.onDataChanged();
     _snack('Added $count like(s).');
   }
 
@@ -1537,7 +1535,7 @@ class _AdminPostCardState extends State<_AdminPostCard> {
           ? (profile['defaultComment'] ?? '').toString().trim()
           : fallback;
       if (text.isEmpty) continue;
-      comments.add(_commentFromProfile(profile, text));
+      comments.add(_commentFromProfile(profile, text, suffix: '_$i'));
       added++;
     }
     if (added == 0) {
@@ -1551,12 +1549,11 @@ class _AdminPostCardState extends State<_AdminPostCard> {
       return;
     }
     if (mounted) setState(() {});
-    widget.onDataChanged();
     _snack('Added $added comment(s) from demo profiles.');
   }
 
-  Map<String, dynamic> _commentFromProfile(Map<String, dynamic> profile, String text) => {
-        'id': DateTime.now().microsecondsSinceEpoch.toString(),
+  Map<String, dynamic> _commentFromProfile(Map<String, dynamic> profile, String text, {String suffix = ''}) => {
+        'id': '${DateTime.now().microsecondsSinceEpoch}$suffix',
         'userEmail': (profile['id'] ?? 'virtual').toString(),
         'username': (profile['username'] ?? 'user').toString(),
         'displayName': (profile['displayName'] ?? '').toString(),
@@ -1579,7 +1576,7 @@ class _AdminPostCardState extends State<_AdminPostCard> {
     profile['defaultComment'] = text;
     _saveProfileDefaultComment(_selectedProfileIdx!, profile);
     final comments = NgmyMediaProfile.asMapList((widget.post as dynamic).comments);
-    comments.add(_commentFromProfile(profile, text));
+    comments.add(_commentFromProfile(profile, text, suffix: '_c${comments.length}'));
     (widget.post as dynamic).comments = comments;
     final ok = await widget.persistPost(widget.post);
     if (!ok) {
@@ -1587,7 +1584,6 @@ class _AdminPostCardState extends State<_AdminPostCard> {
       return;
     }
     if (mounted) setState(() {});
-    widget.onDataChanged();
     _commentTextCtrl.clear();
     _snack('Comment posted as @${profile['username']}.');
   }

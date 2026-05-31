@@ -809,6 +809,39 @@ Future<void> _pushUserToCloudFast(UserData u) async {
   }
 }
 
+Future<bool> _pushUserMediaProfileFast(UserData u) async {
+  if (!await ngmyCanReachCloud()) return false;
+  try {
+    await Supabase.instance.client.from('users').upsert({
+      'email': u.email,
+      'username': u.username,
+      'mediaFollowers': u.mediaFollowers,
+      'mediaFollowing': u.mediaFollowing,
+      'mediaBio': u.mediaBio ?? '',
+      'mediaHighlights': u.mediaHighlights.map((e) => Map<String, dynamic>.from(e)).toList(),
+      'mediaStories': u.mediaStories.map((e) => Map<String, dynamic>.from(e)).toList(),
+    }).timeout(kNgmyCloudWriteTimeout);
+    return true;
+  } catch (e) {
+    debugPrint('[user media] fast upsert: $e');
+    return false;
+  }
+}
+
+void _mergeUserMediaProfileFields(UserData local, UserData remote) {
+  remote.mediaFollowers = <String>{...remote.mediaFollowers, ...local.mediaFollowers}.toList();
+  remote.mediaFollowing = <String>{...remote.mediaFollowing, ...local.mediaFollowing}.toList();
+  if ((local.mediaBio ?? '').trim().isNotEmpty && (remote.mediaBio ?? '').trim().isEmpty) {
+    remote.mediaBio = local.mediaBio;
+  }
+  if (local.mediaHighlights.isNotEmpty && remote.mediaHighlights.isEmpty) {
+    remote.mediaHighlights = local.mediaHighlights.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+  if (local.mediaStories.isNotEmpty && remote.mediaStories.isEmpty) {
+    remote.mediaStories = local.mediaStories.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+}
+
 void showNgmyCivicRegistryPinSheet(
   BuildContext context, {
   required AppConfig config,
@@ -1290,6 +1323,21 @@ bool _isMissingTablePostgrestError(Object error, String table) {
 
 Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
   final working = Map<String, dynamic>.from(row);
+  const protected = {
+    'id',
+    'userEmail',
+    'username',
+    'videoUrl',
+    'url',
+    'comments',
+    'likedBy',
+    'savedBy',
+    'likes',
+    'timestamp',
+    'caption',
+    'contentType',
+    'type',
+  };
   final mediaType = (working['contentType'] ?? working['content_type'] ?? working['type'] ?? 'video').toString();
   working['type'] = mediaType;
   working['contentType'] = mediaType;
@@ -1300,9 +1348,13 @@ Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
     debugPrint('[media] skipped upsert: inline media too large for database.');
     return false;
   }
+  final likedBy = working['likedBy'];
+  if (likedBy is List) {
+    working['likes'] = likedBy.length;
+  }
   for (int i = 0; i < 12; i++) {
     try {
-      await Supabase.instance.client.from('media').upsert([working]);
+      await Supabase.instance.client.from('media').upsert([working]).timeout(kNgmyCloudWriteTimeout);
       return true;
     } catch (e) {
       if (_isMissingTablePostgrestError(e, 'media')) {
@@ -1311,6 +1363,10 @@ Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
       }
       final missing = _missingColumnFromPostgrestError(e);
       if (missing != null && missing.isNotEmpty) {
+        if (protected.contains(missing)) {
+          debugPrint('[media] required column missing in Supabase: $missing — run supabase/media_tables.sql');
+          return false;
+        }
         working.remove(missing);
         continue;
       }
@@ -3702,6 +3758,42 @@ class _NGMYAppState extends State<NGMYApp> {
     } catch (_) {}
   }
 
+  Future<bool> _syncAdminMediaPost(MediaPost post) async {
+    final idx = _allMedia.indexWhere((m) => m.id == post.id);
+    if (idx >= 0) {
+      _allMedia[idx] = post;
+    }
+    final ok = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+    if (ok) {
+      await _persistAllMediaLocally();
+      if (mounted) setState(() {});
+    }
+    return ok;
+  }
+
+  Future<bool> _syncAdminUserMediaProfile(UserData user) async {
+    final key = user.email.toLowerCase().trim();
+    final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+    if (idx >= 0) {
+      _allUsers[idx] = user;
+    }
+    if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == key) {
+      _currentUser = user;
+    }
+    final ok = await _pushUserMediaProfileFast(user);
+    if (ok) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+        if (_currentUser != null) {
+          await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+        }
+      } catch (_) {}
+      if (mounted) setState(() {});
+    }
+    return ok;
+  }
+
   Future<void> _reloadMediaFromSupabase() async {
     final remote = await _fetchMediaPostsFromSupabase();
     if (remote == null || !mounted) return;
@@ -4367,7 +4459,6 @@ class _NGMYAppState extends State<NGMYApp> {
         _persistAllMediaLocally();
         return;
       }
-      if (_isSyncing) return;
       final incoming = MediaPost.fromJson(payload.newRecord);
       if (!mounted) return;
       setState(() {
@@ -4401,6 +4492,7 @@ class _NGMYAppState extends State<NGMYApp> {
           if (idx == -1) {
             _allUsers.add(updatedUser);
           } else {
+            _mergeUserMediaProfileFields(_allUsers[idx], updatedUser);
             _allUsers[idx] = updatedUser;
           }
           if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == email) {
@@ -4411,6 +4503,9 @@ class _NGMYAppState extends State<NGMYApp> {
             }
           }
         });
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+        }).catchError((_) {});
       }
     } catch (e) {
       debugPrint('Users realtime apply error: $e');
@@ -4448,25 +4543,7 @@ class _NGMYAppState extends State<NGMYApp> {
     if (local.activeInvestment != null && remote.activeInvestment == null) {
       remote.activeInvestment = local.activeInvestment;
     }
-    if (local.mediaFollowers.length > remote.mediaFollowers.length) {
-      remote.mediaFollowers = List<String>.from(local.mediaFollowers);
-    }
-    if (local.mediaFollowing.length > remote.mediaFollowing.length) {
-      remote.mediaFollowing = List<String>.from(local.mediaFollowing);
-    }
-    if ((local.mediaBio ?? '').trim().isNotEmpty && (remote.mediaBio ?? '').trim().isEmpty) {
-      remote.mediaBio = local.mediaBio;
-    }
-    if (local.mediaHighlights.isNotEmpty && remote.mediaHighlights.isEmpty) {
-      remote.mediaHighlights = List<Map<String, dynamic>>.from(
-        local.mediaHighlights.map((e) => Map<String, dynamic>.from(e)),
-      );
-    }
-    if (local.mediaStories.isNotEmpty && remote.mediaStories.isEmpty) {
-      remote.mediaStories = List<Map<String, dynamic>>.from(
-        local.mediaStories.map((e) => Map<String, dynamic>.from(e)),
-      );
-    }
+    _mergeUserMediaProfileFields(local, remote);
   }
 
   Future<void> _persistLocalSnapshot() async {
@@ -5256,11 +5333,13 @@ class _NGMYAppState extends State<NGMYApp> {
                 _deleteAnnouncementById(id);
                 _saveData();
               },
-              onClearAllAnnouncements: () {
+                onClearAllAnnouncements: () {
                 setState(() => _allAnnouncements.clear());
                 _clearAllAnnouncementsRemote();
                 _saveData();
               },
+                onSyncAdminMediaPost: _syncAdminMediaPost,
+                onSyncAdminUserMedia: _syncAdminUserMediaProfile,
             ),
       ),
     );
@@ -5941,8 +6020,10 @@ class MainScreen extends StatefulWidget {
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
   final VoidCallback onClearAllAnnouncements;
+  final Future<bool> Function(MediaPost post)? onSyncAdminMediaPost;
+  final Future<bool> Function(UserData user)? onSyncAdminUserMedia;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
@@ -6165,7 +6246,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         });
         widget.onDataChanged();
         await _showLateClockInDialog(penalty, now);
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
         if (cost <= 0) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -6423,7 +6504,9 @@ class HomeScreen extends StatefulWidget {
   final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
   final Future<bool> Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos)? onSavePopups;
   final Future<String> Function(String localRef)? onUploadPopupVideo;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo});
+  final Future<bool> Function(MediaPost post)? onSyncAdminMediaPost;
+  final Future<bool> Function(UserData user)? onSyncAdminUserMedia;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -6476,7 +6559,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               FloatingTitle(
                 title: 'GROWTH INCOME',
-                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo), routeName: 'AdminDashboard') : null,
+                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia), routeName: 'AdminDashboard') : null,
                 leading: InkWell(
                   onTap: () => NgmyNavigator.push(
                     context,
@@ -9150,7 +9233,9 @@ class AdminDashboard extends StatefulWidget {
   final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
   final Future<bool> Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos)? onSavePopups;
   final Future<String> Function(String localRef)? onUploadPopupVideo;
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo});
+  final Future<bool> Function(MediaPost post)? onSyncAdminMediaPost;
+  final Future<bool> Function(UserData user)? onSyncAdminUserMedia;
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 class _AdminDashboardState extends State<AdminDashboard> {
@@ -9937,19 +10022,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
             adminUser: widget.user,
             onDataChanged: widget.onDataChanged,
             persistPost: (p) async {
-              final ok = await _upsertMediaRowSafe(Map<String, dynamic>.from(p.toJson()));
-              if (ok) {
-                try {
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setString('all_media', jsonEncode(widget.allMedia.map((e) => e.toJson()).toList()));
-                } catch (_) {}
+              final post = p is MediaPost ? p : MediaPost.fromJson(Map<String, dynamic>.from((p as dynamic).toJson()));
+              if (widget.onSyncAdminMediaPost != null) {
+                return widget.onSyncAdminMediaPost!(post);
               }
+              final ok = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
               return ok;
             },
             persistUser: (u) async {
               if (u is! UserData) return false;
-              await _pushUserToCloudFast(u);
-              return true;
+              if (widget.onSyncAdminUserMedia != null) {
+                return widget.onSyncAdminUserMedia!(u);
+              }
+              return _pushUserMediaProfileFast(u);
             },
             isPostExpired: (m) => DateTime.now().difference(m.timestamp).inDays >= 7,
             isDark: isDark,
