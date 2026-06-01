@@ -5308,6 +5308,46 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _safeDeleteTransactionsByIds(List<String> ids) async {
+    if (ids.isEmpty) return;
+    try {
+      // Supabase limits payload size; delete in chunks.
+      const chunkSize = 50;
+      for (var i = 0; i < ids.length; i += chunkSize) {
+        final chunk = ids.sublist(i, math.min(i + chunkSize, ids.length));
+        await supabase.from('transactions').delete().inFilter('id', chunk).timeout(kNgmyCloudWriteTimeout);
+      }
+    } catch (e) {
+      debugPrint('[transactions] delete old approved receipts error: $e');
+    }
+  }
+
+  /// Approved deposit/investment requests should only live in Supabase for 24 hours.
+  /// After that, archive them locally (admin device) and delete from Supabase.
+  Future<void> _archiveAndPurgeOldApprovedWalletRequests({required bool online}) async {
+    if (_currentUser?.isAdmin != true) return;
+    if (_allTransactions.isEmpty) return;
+
+    final cutoff = DateTime.now().subtract(const Duration(days: 1));
+    final oldApproved = _allTransactions.where((t) {
+      if (t.status != TransactionStatus.approved) return false;
+      if (t.type != TransactionType.deposit) return false;
+      return t.timestamp.isBefore(cutoff);
+    }).toList();
+
+    if (oldApproved.isEmpty) return;
+
+    // Archive locally first.
+    await NgmyAdminWalletApprovedArchive.addAll(oldApproved);
+
+    // Best-effort delete from cloud (then remove locally so it won't re-sync).
+    final ids = oldApproved.map((e) => e.id).where((e) => e.trim().isNotEmpty).toList();
+    if (online) {
+      await _safeDeleteTransactionsByIds(ids);
+    }
+    _allTransactions.removeWhere((t) => ids.contains(t.id));
+  }
+
   Future<void> _saveData() async {
     _isSyncing = true;
     _maintainStoreOrders(_config.storeOrders);
@@ -5340,6 +5380,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       if (_currentUser != null) NgmyMediaProfile.normalizeUserMediaFields(_currentUser);
       NgmyMediaProfile.pruneExpiredStoriesAllUsers(_allUsers);
+
+      await _archiveAndPurgeOldApprovedWalletRequests(online: online);
 
       if (_currentUser != null) {
         final email = _currentUser!.email.toLowerCase().trim();
@@ -10042,9 +10084,66 @@ class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
+
+/// Local-only archive for approved admin wallet receipts that have been deleted from Supabase.
+class NgmyAdminWalletApprovedArchive {
+  static const String _kKey = 'ngmy_admin_wallet_approved_archive_v1';
+
+  static Future<List<AppTransaction>> load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kKey);
+      if (raw == null || raw.trim().isEmpty) return [];
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      final out = <AppTransaction>[];
+      for (final e in decoded) {
+        if (e is Map<String, dynamic>) out.add(AppTransaction.fromJson(e));
+        if (e is Map) out.add(AppTransaction.fromJson(Map<String, dynamic>.from(e)));
+      }
+      out.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      return out;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> addAll(Iterable<AppTransaction> txns) async {
+    try {
+      final existing = await load();
+      final byId = <String, AppTransaction>{
+        for (final t in existing) t.id: t,
+      };
+      for (final t in txns) {
+        if (t.id.trim().isEmpty) continue;
+        byId[t.id] = t;
+      }
+      final merged = byId.values.toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kKey, jsonEncode(merged.map((e) => e.toJson()).toList()));
+    } catch (_) {}
+  }
+}
+
 class _AdminDashboardState extends State<AdminDashboard> {
   int _idx = 0; final _search = TextEditingController(); bool _isSearching = false; String _query = '';
   String? _selectedUserEmail;
+
+  List<AppTransaction> _walletApprovedArchive = const [];
+  DateTime? _lastWalletArchiveLoad;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadWalletApprovedArchive());
+  }
+
+  Future<void> _loadWalletApprovedArchive() async {
+    _lastWalletArchiveLoad = DateTime.now();
+    final loaded = await NgmyAdminWalletApprovedArchive.load();
+    if (!mounted) return;
+    setState(() => _walletApprovedArchive = loaded);
+  }
 
   void _adminBack() {
     NgmyNavigator.pop(context);
@@ -11217,13 +11316,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _adminWallet(bool isDark) {
+    final now = DateTime.now();
+    if (_lastWalletArchiveLoad == null || now.difference(_lastWalletArchiveLoad!).inSeconds > 10) {
+      unawaited(_loadWalletApprovedArchive());
+    }
     final cTag = TextEditingController(text: widget.config.officialCashApp);
     final bAddr = TextEditingController(text: widget.config.officialBitcoin);
 
     final pendingDeposits = widget.allTransactions.where((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending).toList();
-    final approvedDeposits = widget.allTransactions.where((t) => (t.type == TransactionType.deposit || t.type == TransactionType.adminAdd) && t.status != TransactionStatus.pending).toList();
+    // Approved receipts should not flood the admin view.
+    // Show only the latest 3; the rest are available in a dropdown (local archive + overflow).
+    final approvedDeposits = widget.allTransactions
+        .where((t) => (t.type == TransactionType.deposit || t.type == TransactionType.adminAdd) && t.status == TransactionStatus.approved)
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final visibleApprovedDeposits = approvedDeposits.take(3).toList();
+    final overflowApprovedDeposits = approvedDeposits.length > 3 ? approvedDeposits.sublist(3) : <AppTransaction>[];
     final pendingWithdrawals = widget.allTransactions.where((t) => t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending).toList();
-    final approvedWithdrawals = widget.allTransactions.where((t) => t.type == TransactionType.withdrawal && t.status != TransactionStatus.pending).toList();
+    final approvedWithdrawals = widget.allTransactions.where((t) => t.type == TransactionType.withdrawal && t.status == TransactionStatus.approved).toList();
 
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -11264,13 +11374,71 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
         _sectionHeader(Icons.attach_money_rounded, 'Deposit & Investment Requests', pendingDeposits.length, isDark),
         ...pendingDeposits.map((t) => _depositCard(t, isDark)),
-        ...approvedDeposits.map((t) => _depositCard(t, isDark)),
+        ...visibleApprovedDeposits.map((t) => _depositCard(t, isDark)),
+        if (overflowApprovedDeposits.isNotEmpty || _walletApprovedArchive.isNotEmpty)
+          _approvedReceiptsDropdown(
+            isDark: isDark,
+            title: 'Approved receipts (dropdown)',
+            overflow: overflowApprovedDeposits,
+            archived: _walletApprovedArchive.where((t) => t.type == TransactionType.deposit || t.type == TransactionType.adminAdd).toList(),
+          ),
 
         const SizedBox(height: 30),
         _sectionHeader(Icons.outbox_rounded, 'Withdrawal Requests', pendingWithdrawals.length, isDark, iconColor: Colors.blue),
         ...pendingWithdrawals.map((t) => _withdrawalCard(t, isDark)),
         ...approvedWithdrawals.map((t) => _withdrawalCard(t, isDark)),
       ],
+    );
+  }
+
+  Widget _approvedReceiptsDropdown({
+    required bool isDark,
+    required String title,
+    required List<AppTransaction> overflow,
+    required List<AppTransaction> archived,
+  }) {
+    final items = <AppTransaction>[
+      ...overflow,
+      ...archived.where((t) => overflow.every((o) => o.id != t.id)),
+    ]..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: false,
+          title: Text(
+            '$title • ${items.length}',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : const Color(0xFF111827),
+            ),
+          ),
+          subtitle: Text(
+            'Older approved receipts are stored locally; Supabase keeps only 24h.',
+            style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 12),
+          ),
+          children: [
+            if (items.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Text('No archived receipts yet.', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Column(
+                  children: items.map((t) => _depositCard(t, isDark, allowLocalRemove: false)).toList(),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -11290,7 +11458,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _depositCard(AppTransaction t, bool isDark) {
+  Widget _depositCard(AppTransaction t, bool isDark, {bool allowLocalRemove = true}) {
     final user = widget.allUsers.firstWhere((u) => u.email == t.userEmail, orElse: () => UserData(email: t.userEmail));
     final isInvestmentRequest = isInvestmentRequestDetails(t.sourceDetails);
     final investmentMeta = parseInvestmentRequestDetails(t.sourceDetails);
@@ -11347,7 +11515,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
           _screenshotBox(t, isDark),
           const SizedBox(height: 10),
           Row(children: [
-            IconButton(icon: Icon(Icons.delete_outline, color: isDark ? Colors.white60 : const Color(0xFF1A1C1E)), onPressed: () { setState(() { widget.allTransactions.remove(t); }); widget.onDataChanged(); }),
+            if (allowLocalRemove)
+              IconButton(
+                icon: Icon(Icons.delete_outline, color: isDark ? Colors.white60 : const Color(0xFF1A1C1E)),
+                onPressed: () {
+                  setState(() { widget.allTransactions.remove(t); });
+                  widget.onDataChanged();
+                },
+              )
+            else
+              const SizedBox(width: 40),
             const Spacer(),
             if (isPending) ...[
               TextButton(onPressed: () { widget.onProcess(t, false); setState(() {}); }, child: const Text('REJECT', style: TextStyle(color: Colors.red))),
