@@ -3538,6 +3538,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _refreshCurrentUserFromCloud() async {
     if (_currentUser == null || !await ngmyCanReachCloud()) return;
+    if (NgmyGameSession.suppressExternalNotifications) return;
     try {
       final email = _currentUser!.email.trim();
       if (email.isEmpty) return;
@@ -4971,6 +4972,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (local.activeInvestment != null && remote.activeInvestment == null) {
       remote.activeInvestment = local.activeInvestment;
+    }
+    // NGMY points are earned locally during games — never let stale cloud rows drop them.
+    if (local.points > remote.points) {
+      remote.points = local.points;
     }
     _mergeUserMediaProfileFields(local, remote);
   }
@@ -8266,7 +8271,6 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
   void initState() {
     super.initState();
     _invitePoll = Timer.periodic(const Duration(seconds: 4), (_) {
-      widget.onDataChanged();
       if (mounted) setState(() {});
     });
   }
@@ -8578,6 +8582,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
 
   /// One step back to the main app (home tab shell), not through the whole stack.
   void _exitGameCenter() {
+    widget.onDataChanged();
     final result = _sessionGamesPlayed > 0
         ? <String, dynamic>{
             'gamesPlayed': _sessionGamesPlayed,
@@ -8638,6 +8643,7 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> {
         if (widget.user.accountBalance < bet) return false;
         setState(() => widget.user.accountBalance -= bet);
         widget.user.points += 20;
+        unawaited(_pushUserToCloudFast(widget.user));
         widget.onAddTransaction(
           AppTransaction(
             id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -8733,6 +8739,7 @@ class _GameBetScreenState extends State<GameBetScreen> {
     setState(() => widget.user.accountBalance -= wager);
     widget.user.points += 20;
     widget.onGameStarted();
+    unawaited(_pushUserToCloudFast(widget.user));
     widget.onAddTransaction(
       AppTransaction(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -8767,7 +8774,7 @@ class _GameBetScreenState extends State<GameBetScreen> {
   Widget build(BuildContext context) {
     final valuePerPair = (_bet * 1.46) / 8;
     final profit = _bet * 0.46;
-    return Scaffold(
+    return ngmyGameScreenShell(
       backgroundColor: const Color(0xFF2B1454),
       appBar: AppBar(
         backgroundColor: const Color(0xFF2B1454),
@@ -8786,7 +8793,7 @@ class _GameBetScreenState extends State<GameBetScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
         child: Container(
           width: double.infinity,
@@ -9582,9 +9589,9 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   @override
   Widget build(BuildContext context) {
     final timerText = '${_secondsLeft ~/ 60}:${(_secondsLeft % 60).toString().padLeft(2, '0')}';
-    return Scaffold(
+    return ngmyGameScreenShell(
       backgroundColor: const Color(0xFF1C1236),
-      body: SafeArea(
+      child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
           child: Column(
@@ -14106,6 +14113,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String get _accountId => 'NGMY/USR/${widget.user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
   String get _referralCode => 'REFD${widget.user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
 
+  Future<void> _confirmLogout() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('Are you sure you want to log out of your account?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, log out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) widget.onLogout();
+  }
+
   ImageProvider? _profileImageProvider() {
     final path = widget.user.profilePicturePath;
     if (path == null || path.trim().isEmpty) return null;
@@ -14610,7 +14635,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _legalInformationSection(context),
       const SizedBox(height: 15),
       _box(context, 'Appearance', [Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_tOp(context, ThemeMode.light, Icons.light_mode, 'Light'), _tOp(context, ThemeMode.dark, Icons.dark_mode, 'Dark'), _tOp(context, ThemeMode.system, Icons.brightness_auto, 'Auto')])]), const SizedBox(height: 30),
-      ElevatedButton(onPressed: widget.onLogout, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), elevation: 5), child: const Text('LOGOUT ACCOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
+      ElevatedButton(onPressed: _confirmLogout, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), elevation: 5), child: const Text('LOGOUT ACCOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
     ]),
         ),
       ),

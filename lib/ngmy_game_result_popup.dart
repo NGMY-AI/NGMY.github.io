@@ -15,24 +15,26 @@ Future<void> showNgmyGameResultPopup(
 }) {
   return showGeneralDialog<void>(
     context: context,
-    useRootNavigator: true,
+    useRootNavigator: false,
     barrierDismissible: false,
     barrierLabel: win ? 'Win' : 'Lose',
     barrierColor: Colors.black54,
     transitionDuration: const Duration(milliseconds: 300),
-    pageBuilder: (ctx, _, __) => _GameResultDialog(
-      win: win,
-      title: title,
-      subtitle: subtitle,
-      outcomeLabel: outcomeLabel,
-      onGoBack: () {
-        Navigator.pop(ctx);
-        ngmyCloseDialogThen(onGoBack);
-      },
-      onPlayAgain: () {
-        Navigator.pop(ctx);
-        ngmyCloseDialogThen(onPlayAgain);
-      },
+    pageBuilder: (ctx, _, __) => SizedBox.expand(
+      child: _GameResultDialog(
+        win: win,
+        title: title,
+        subtitle: subtitle,
+        outcomeLabel: outcomeLabel,
+        onGoBack: () {
+          Navigator.pop(ctx);
+          ngmyCloseDialogThen(onGoBack);
+        },
+        onPlayAgain: () {
+          Navigator.pop(ctx);
+          ngmyCloseDialogThen(onPlayAgain);
+        },
+      ),
     ),
   );
 }

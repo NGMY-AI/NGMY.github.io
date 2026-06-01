@@ -393,9 +393,9 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
     final wager = _effectiveBet();
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final diceSize = math.min(MediaQuery.sizeOf(context).width * 0.44, 200.0);
-    return Scaffold(
+    return ngmyGameScreenShell(
       backgroundColor: const Color(0xFF2B1454),
-      body: SafeArea(
+      child: SafeArea(
         child: Column(
           children: [
             Padding(

@@ -138,4 +138,30 @@ void _popUntilGameCenter(NavigatorState? nav, int popsDone) {
 
 }
 
+/// Full-viewport shell for game routes — avoids half-black gaps on mobile PWA.
+Widget ngmyGameScreenShell({
+  required Color backgroundColor,
+  required Widget child,
+  PreferredSizeWidget? appBar,
+}) {
+  return ColoredBox(
+    color: backgroundColor,
+    child: LayoutBuilder(
+      builder: (context, _) {
+        final size = MediaQuery.sizeOf(context);
+        return SizedBox(
+          height: size.height,
+          width: size.width,
+          child: Scaffold(
+            backgroundColor: backgroundColor,
+            resizeToAvoidBottomInset: false,
+            appBar: appBar,
+            body: child,
+          ),
+        );
+      },
+    ),
+  );
+}
+
 
