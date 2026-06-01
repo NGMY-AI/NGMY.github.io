@@ -8655,6 +8655,7 @@ class _NgmyDiceGameHost extends StatefulWidget {
 
 class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> {
   late NgmyDiceSettings _dice;
+  bool _countedThisSession = false;
 
   @override
   void initState() {
@@ -8680,12 +8681,15 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> {
         widget.onDataChanged();
         setState(() {});
       },
-      onSessionStarted: widget.onGameStarted,
       onChargeBet: (bet, note) {
         if (widget.user.accountBalance < bet) return false;
         setState(() => widget.user.accountBalance -= bet);
         widget.user.points += 20;
         unawaited(_pushUserToCloudFast(widget.user));
+        if (!_countedThisSession) {
+          _countedThisSession = true;
+          widget.onGameStarted();
+        }
         widget.onAddTransaction(
           AppTransaction(
             id: DateTime.now().microsecondsSinceEpoch.toString(),
