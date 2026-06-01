@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import 'ngmy_platform_graphics.dart';
+
 Widget _ngmyPopupTitleText(String title, double size, {int maxLines = 1}) {
   return FittedBox(
     fit: BoxFit.scaleDown,
@@ -440,9 +442,14 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
     super.initState();
     _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
     _spin = AnimationController(vsync: this, duration: Duration(milliseconds: widget.durationMs));
-    _orbit = AnimationController(vsync: this, duration: Duration(milliseconds: (widget.durationMs * 1.2).round()))..repeat();
-    _float = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat(reverse: true);
-    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
+    _orbit = AnimationController(vsync: this, duration: Duration(milliseconds: (widget.durationMs * 1.2).round()));
+    _float = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600));
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
+    if (!ngmyPreferLightGraphics) {
+      _orbit.repeat();
+      _float.repeat(reverse: true);
+      _pulse.repeat(reverse: true);
+    }
     _enter.forward();
     _spin.forward();
     Future.delayed(Duration(milliseconds: widget.durationMs), _exit);
@@ -689,10 +696,16 @@ class _Ngmy3DFloatingInteractiveBodyState extends State<_Ngmy3DFloatingInteracti
   void initState() {
     super.initState();
     _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
-    _spin = AnimationController(vsync: this, duration: const Duration(milliseconds: 9000))..repeat();
-    _orbit = AnimationController(vsync: this, duration: const Duration(milliseconds: 10800))..repeat();
-    _float = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat(reverse: true);
-    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
+    _spin = AnimationController(vsync: this, duration: const Duration(milliseconds: 9000));
+    _orbit = AnimationController(vsync: this, duration: const Duration(milliseconds: 10800));
+    _float = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600));
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
+    if (!ngmyPreferLightGraphics) {
+      _spin.repeat();
+      _orbit.repeat();
+      _float.repeat(reverse: true);
+      _pulse.repeat(reverse: true);
+    }
     _enter.forward();
   }
 
@@ -942,7 +955,8 @@ class _NgmyVideoPopupBodyState extends State<_NgmyVideoPopupBody> with SingleTic
   @override
   void initState() {
     super.initState();
-    _frameSpin = AnimationController(vsync: this, duration: const Duration(milliseconds: 8000))..repeat();
+    _frameSpin = AnimationController(vsync: this, duration: const Duration(milliseconds: 8000));
+    if (!ngmyPreferLightGraphics) _frameSpin.repeat();
     _initVideo();
     Future.delayed(Duration(milliseconds: widget.durationMs), () {
       if (mounted && !_leaving) Navigator.of(context).pop();

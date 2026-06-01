@@ -63,6 +63,7 @@ import 'ngmy_media_delivery.dart';
 import 'ngmy_push_notification_prompt.dart';
 import 'ngmy_push_notifications.dart';
 import 'ngmy_announcement_reads.dart';
+import 'ngmy_platform_graphics.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -786,10 +787,10 @@ Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
   }
 }
 
-Future<void> _pushUserToCloudFast(UserData u) async {
+Future<void> _pushUserToCloudFast(UserData u, {bool includeFreeTrial = false}) async {
   if (!await ngmyCanReachCloud()) return;
   try {
-    await Supabase.instance.client.from('users').upsert(_userRowForBulkSync(u));
+    await Supabase.instance.client.from('users').upsert(_userRowForBulkSync(u, includeFreeTrial: includeFreeTrial));
   } catch (e) {
     debugPrint('[user] fast upsert: $e');
   }
@@ -1323,10 +1324,27 @@ void _stripUserMediaProfileFieldsFromBulkRow(Map<String, dynamic> row) {
   }
 }
 
-Map<String, dynamic> _userRowForBulkSync(UserData u) {
+Map<String, dynamic> _userRowForBulkSync(UserData u, {bool includeFreeTrial = false}) {
   final row = Map<String, dynamic>.from(u.toJson());
   _stripUserMediaProfileFieldsFromBulkRow(row);
+  if (!includeFreeTrial) {
+    row.remove('freeTrialActive');
+    row.remove('freeTrialDailyAmount');
+  }
   return row;
+}
+
+Future<void> _pushUserFreeTrialToCloud(UserData u) async {
+  if (!await ngmyCanReachCloud()) return;
+  try {
+    await Supabase.instance.client.from('users').upsert({
+      'email': u.email,
+      'freeTrialActive': u.freeTrialActive,
+      'freeTrialDailyAmount': u.freeTrialDailyAmount,
+    }).timeout(kNgmyCloudWriteTimeout);
+  } catch (e) {
+    debugPrint('[user] trial upsert: $e');
+  }
 }
 
 Future<bool> _upsertMediaSocialFields(MediaPost post) async {
@@ -2040,6 +2058,8 @@ double _ngmyClockInLatePenaltyPercent(DateTime now) {
   if (minutesLate >= 10) return 15;
   return 0;
 }
+
+const int _ngmyFreeTrialFillSeconds = 60;
 
 bool _storeOrderIsDelivered(Map<String, dynamic> o) =>
     (o['fulfillmentStatus'] ?? '').toString() == 'delivered';
@@ -3296,6 +3316,8 @@ class UserData {
   String savedBitcoinAddress;
   String crownBadge;
   double freeFixCredit;
+  bool freeTrialActive;
+  double freeTrialDailyAmount;
   String mediaBio;
   List<String> mediaFollowers;
   List<String> mediaFollowing;
@@ -3303,7 +3325,8 @@ class UserData {
   List<Map<String, dynamic>> mediaStories;
   List<String> readAnnouncementIds;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds}) : mediaFollowers = mediaFollowers ?? <String>[], mediaFollowing = mediaFollowing ?? <String>[], mediaHighlights = mediaHighlights ?? <Map<String, dynamic>>[], mediaStories = mediaStories ?? <Map<String, dynamic>>[], readAnnouncementIds = readAnnouncementIds ?? <String>[];
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.freeTrialActive = false, this.freeTrialDailyAmount = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds}) : mediaFollowers = mediaFollowers ?? <String>[], mediaFollowing = mediaFollowing ?? <String>[], mediaHighlights = mediaHighlights ?? <Map<String, dynamic>>[], mediaStories = mediaStories ?? <Map<String, dynamic>>[], readAnnouncementIds = readAnnouncementIds ?? <String>[];
+  bool get isOnFreeTrial => freeTrialActive && freeTrialDailyAmount > 0;
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
     if (activeInvestment!.daysLeft <= 0) return 0.0;
@@ -3316,14 +3339,24 @@ class UserData {
     return false;
   }
   double get currentTodayEarnings {
-    if (!isClockedIn || clockInStartTime == null || activeInvestment == null) return 0.0;
+    if (!isClockedIn || clockInStartTime == null) return 0.0;
     final elapsed = DateTime.now().difference(clockInStartTime!);
+    if (isOnFreeTrial) {
+      final goal = freeTrialDailyAmount;
+      final earnings = (goal / _ngmyFreeTrialFillSeconds) * elapsed.inSeconds;
+      return earnings > goal ? goal : earnings;
+    }
+    if (activeInvestment == null) return 0.0;
     final totalDaily = activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
     double earnings = (totalDaily / 24.0) * (elapsed.inSeconds / 3600.0);
     return earnings > totalDaily ? totalDaily : earnings;
   }
-  double get todayDailyGoal => activeInvestment == null ? 0.0 : (activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100)));
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds};
+  double get todayDailyGoal {
+    if (isOnFreeTrial) return freeTrialDailyAmount;
+    if (activeInvestment == null) return 0.0;
+    return activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
+  }
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -3388,6 +3421,8 @@ class UserData {
       savedBitcoinAddress: (json['savedBitcoinAddress'] ?? '').toString(),
       crownBadge: (json['crownBadge'] ?? '').toString(),
       freeFixCredit: (json['freeFixCredit'] ?? 0.0).toDouble(),
+      freeTrialActive: json['freeTrialActive'] == true,
+      freeTrialDailyAmount: (json['freeTrialDailyAmount'] ?? 0.0).toDouble(),
       mediaBio: (json['mediaBio'] ?? '').toString(),
       mediaFollowers: _jsonStringList(json['mediaFollowers']),
       mediaFollowing: _jsonStringList(json['mediaFollowing']),
@@ -3434,7 +3469,7 @@ class NGMYApp extends StatefulWidget {
   @override State<NGMYApp> createState() => _NGMYAppState();
 }
 
-class _NGMYAppState extends State<NGMYApp> {
+class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   ThemeMode _themeMode = ThemeMode.light;
   UserData? _currentUser;
   bool _isLoading = true;
@@ -3476,6 +3511,7 @@ class _NGMYAppState extends State<NGMYApp> {
 
   @override void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     NgmyNavigator.install();
     _initLocalNotifications();
     _loadData().then((_) {
@@ -3487,7 +3523,42 @@ class _NGMYAppState extends State<NGMYApp> {
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshCurrentUserFromCloud());
+    }
+  }
+
+  Future<void> _refreshCurrentUserFromCloud() async {
+    if (_currentUser == null || !await ngmyCanReachCloud()) return;
+    try {
+      final email = _currentUser!.email.trim();
+      if (email.isEmpty) return;
+      final row = await supabase.from('users').select().eq('email', email).maybeSingle().timeout(kNgmyCloudLoadTimeout);
+      if (row == null || !mounted) return;
+      final remote = UserData.fromJson(Map<String, dynamic>.from(row));
+      final key = email.toLowerCase().trim();
+      setState(() {
+        final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+        if (idx >= 0) {
+          _preserveLocalSessionState(_allUsers[idx], remote);
+          _mergeUserMediaProfileFields(_allUsers[idx], remote);
+          _allUsers[idx] = remote;
+        }
+        _preserveLocalSessionState(_currentUser!, remote);
+        _currentUser = remote;
+      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+      await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+    } catch (e) {
+      debugPrint('[user] refresh from cloud: $e');
+    }
+  }
+
   @override void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     try { _autoThemeTimer?.cancel(); } catch (_) {}
     try { _configRefreshTimer?.cancel(); } catch (_) {}
     try { _mediaDeliveryTimer?.cancel(); } catch (_) {}
@@ -4010,8 +4081,14 @@ class _NGMYAppState extends State<NGMYApp> {
             _allUsers.add(remote);
             continue;
           }
-          _mergeUserMediaProfileFields(_allUsers[idx], remote);
+          final local = _allUsers[idx];
+          _preserveLocalSessionState(local, remote);
+          _mergeUserMediaProfileFields(local, remote);
           _allUsers[idx] = remote;
+          if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == key) {
+            _preserveLocalSessionState(_currentUser!, remote);
+            _currentUser = remote;
+          }
         }
       });
       try {
@@ -4821,13 +4898,16 @@ class _NGMYAppState extends State<NGMYApp> {
           if (idx == -1) {
             _allUsers.add(updatedUser);
           } else {
-            _mergeUserMediaProfileFields(_allUsers[idx], updatedUser);
+            final local = _allUsers[idx];
+            _preserveLocalSessionState(local, updatedUser);
+            _mergeUserMediaProfileFields(local, updatedUser);
             _allUsers[idx] = updatedUser;
           }
           if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == email) {
             if (updatedUser.forceLogout) {
               _currentUser = null;
             } else {
+              _preserveLocalSessionState(_currentUser!, updatedUser);
               _currentUser = updatedUser;
             }
           }
@@ -5278,9 +5358,10 @@ class _NGMYAppState extends State<NGMYApp> {
       // Sync users without media profile fields — those use dedicated upserts so stale
       // phones cannot wipe admin-granted followers or profile data.
       if (_allUsers.isNotEmpty) {
+        final canWriteTrial = _currentUser?.isAdmin == true;
         await _safeUpsertRows(
           'users',
-          _allUsers.map(_userRowForBulkSync).toList(),
+          _allUsers.map((u) => _userRowForBulkSync(u, includeFreeTrial: canWriteTrial)).toList(),
         );
       }
 
@@ -6568,8 +6649,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           setState(() {
             widget.user.accountBalance += earned;
             widget.user.totalProfit += earned;
-            widget.user.activeInvestment!.totalEarned += earned;
-            widget.user.activeInvestment!.daysClockedIn++;
+            if (widget.user.activeInvestment != null) {
+              widget.user.activeInvestment!.totalEarned += earned;
+              widget.user.activeInvestment!.daysClockedIn++;
+            }
             widget.user.isClockedIn = false;
             widget.user.clockInStartTime = null;
             widget.user.clockInPenaltyPercent = 0;
@@ -6613,7 +6696,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       HomeScreen(user: widget.user, onClockIn: () async {
         final now = DateTime.now();
         _ngmyApplyMidnightClockReset(widget.user);
-        if (widget.user.activeInvestment == null) {
+        final onTrial = widget.user.isOnFreeTrial;
+        if (!onTrial && widget.user.activeInvestment == null) {
           _showOfficialNotice(
             title: 'Plan Required',
             message: 'You need an active investment plan to start clock-in earnings.',
@@ -6621,7 +6705,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           );
           return;
         }
-        if (_ngmyIsWeekend(now)) {
+        if (!onTrial && _ngmyIsWeekend(now)) {
           await NgmyWeekendClockOverlay.show(context);
           return;
         }
@@ -6641,7 +6725,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           );
           return;
         }
-        if (now.hour >= 12) {
+        if (!onTrial && now.hour >= 12) {
           _showOfficialNotice(
             title: 'Clock-In Window Closed',
             message: 'You must clock in before 12:00 PM (noon). The window opens again at midnight.',
@@ -6649,7 +6733,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           );
           return;
         }
-        final penalty = _ngmyClockInLatePenaltyPercent(now);
+        final penalty = onTrial ? 0.0 : _ngmyClockInLatePenaltyPercent(now);
         setState(() {
           widget.user.isClockedIn = true;
           widget.user.clockInStartTime = now;
@@ -6657,7 +6741,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           _clockPayoutLocked = false;
         });
         widget.onDataChanged();
-        await _showLateClockInDialog(penalty, now);
+        if (!onTrial) await _showLateClockInDialog(penalty, now);
       }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
         if (cost <= 0) {
@@ -6983,7 +7067,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override void initState() {
     super.initState();
-    _smokeCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
+    _smokeCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 10));
+    if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
     _smokeRot = Tween<double>(begin: 0, end: 2 * math.pi).animate(_smokeCtrl);
     _liveTicker = Timer.periodic(const Duration(seconds: 6), (_) {
       if (!mounted) return;
@@ -7072,6 +7157,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ],
                 ),
               ),
+              if (widget.user.isOnFreeTrial) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [const Color(0xFF22C55E).withOpacity(isLight ? 0.14 : 0.22), const Color(0xFF059669).withOpacity(isLight ? 0.08 : 0.16)]),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.45)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.card_giftcard_rounded, color: Color(0xFF15803D), size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'FREE TRIAL ACTIVE — \$${formatCurrency(widget.user.freeTrialDailyAmount)}/day · clock in anytime · 1 min payout · no withdraw fee',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isLight ? const Color(0xFF14532D) : const Color(0xFFBBF7D0), height: 1.3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -7345,17 +7454,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final now = DateTime.now();
     bool active = widget.user.isClockedIn;
     bool alreadyDone = widget.user.alreadyClockedInToday && !active;
-    final weekend = _ngmyIsWeekend(now);
-    final missedWindow = now.hour >= 12;
+    final onTrial = widget.user.isOnFreeTrial;
+    final weekend = !onTrial && _ngmyIsWeekend(now);
+    final missedWindow = !onTrial && now.hour >= 12;
     final blocked = !active && !alreadyDone && (weekend || missedWindow);
     final clockMuted = alreadyDone || blocked;
     final lateInfo = _clockLateInfo();
-    final showLate = !active && !alreadyDone && widget.user.activeInvestment != null && lateInfo != null;
+    final showLate = !onTrial && !active && !alreadyDone && widget.user.activeInvestment != null && lateInfo != null;
 
     return GestureDetector(
-      onTap: (active || alreadyDone || blocked || widget.user.activeInvestment == null)
+      onTap: (active || alreadyDone || blocked || (!onTrial && widget.user.activeInvestment == null))
         ? () {
-            if (widget.user.activeInvestment == null) {
+            if (!onTrial && widget.user.activeInvestment == null) {
               _showOfficialNotice(
                 'Plan Required',
                 'You need an active investment plan to start clock-in earnings.',
@@ -7660,6 +7770,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   ({String message, double penalty, bool blocked})? _clockLateInfo() {
+    if (widget.user.isOnFreeTrial) return null;
     final now = DateTime.now();
     if (widget.user.alreadyClockedInToday && !widget.user.isClockedIn) return null;
     if (_ngmyIsWeekend(now)) {
@@ -7865,7 +7976,8 @@ class _GameRewardPopupState extends State<_GameRewardPopup> with SingleTickerPro
   @override
   void initState() {
     super.initState();
-    _rainCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat();
+    _rainCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600));
+    if (!ngmyPreferLightGraphics) _rainCtrl.repeat();
   }
 
   @override
@@ -9976,6 +10088,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => _showJobApplicationsAdmin(isDark), isDark),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => _showPopupsAdmin(isDark), isDark),
             _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => _showGamesAdmin(isDark), isDark),
+            _menuFrame('Free Trial', Icons.card_giftcard_rounded, const Color(0xFF22C55E), () => setState(() => _idx = 1), isDark),
           ],
         ),
         const SizedBox(height: 28),
@@ -11117,6 +11230,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _withdrawalCard(AppTransaction t, bool isDark) {
     final user = widget.allUsers.firstWhere((u) => u.email == t.userEmail, orElse: () => UserData(email: t.userEmail));
+    final trialWithdraw = user.isOnFreeTrial || (t.sourceDetails ?? '').contains('Free trial: no fee');
+    final feeRate = trialWithdraw ? 0.0 : 0.15;
     bool isPending = t.status == TransactionStatus.pending;
     return Container(
       margin: const EdgeInsets.only(bottom: 20), padding: const EdgeInsets.all(15),
@@ -11139,8 +11254,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
         const SizedBox(height: 15),
         Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.03) : const Color(0xFFFFF9E7), borderRadius: BorderRadius.circular(15), border: Border.all(color: isDark ? Colors.white10 : Colors.orange.withOpacity(0.1))), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           _subDetail('Requested', '\$${formatCurrency(t.amount)}', isDark),
-          _subDetail('Fee (15%)', '-\$${formatCurrency(t.amount * 0.15)}', isDark, valueColor: Colors.red),
-          _subDetail('Send to User', '\$${formatCurrency(t.amount * 0.85)}', isDark, valueColor: Colors.green),
+          _subDetail(trialWithdraw ? 'Fee (0%)' : 'Fee (15%)', trialWithdraw ? '\$0.00' : '-\$${formatCurrency(t.amount * feeRate)}', isDark, valueColor: Colors.red),
+          _subDetail('Send to User', '\$${formatCurrency(t.amount * (1 - feeRate))}', isDark, valueColor: Colors.green),
         ])),
         const SizedBox(height: 15),
         Text('Method: ${t.method.name}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.black)),
@@ -11456,6 +11571,71 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ],
             ),
           ),
+          const SizedBox(height: 22),
+          Text('🎁 Free Trial', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+          const SizedBox(height: 6),
+          Text('Grant clock-in any day, 1-minute payout, and fee-free withdrawals.', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54)),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: panelBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: u.isOnFreeTrial ? const Color(0xFF22C55E).withOpacity(0.5) : border)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (u.isOnFreeTrial) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(color: const Color(0xFF22C55E).withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                    child: Text(
+                      'ACTIVE — \$${formatCurrency(u.freeTrialDailyAmount)}/day · 1 min clock-in · no withdraw fee',
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFF15803D)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Text('Daily trial amount (\$)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black54)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _prompt(context, 'Free Trial Daily Amount (\$)', (val) {
+                          final amt = double.tryParse(val) ?? 0;
+                          if (amt <= 0) return;
+                          u.freeTrialDailyAmount = amt;
+                          u.freeTrialActive = true;
+                          widget.onDataChanged();
+                          unawaited(_pushUserFreeTrialToCloud(u));
+                          setState(() {});
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Free trial enabled for ${u.username}: \$${formatCurrency(amt)}/day.')));
+                        }),
+                        icon: const Icon(Icons.card_giftcard, size: 18),
+                        label: Text(u.isOnFreeTrial ? 'Update Amount' : 'Grant Trial', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF22C55E), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                      ),
+                    ),
+                    if (u.isOnFreeTrial) ...[
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        onPressed: () {
+                          u.freeTrialActive = false;
+                          u.freeTrialDailyAmount = 0;
+                          widget.onDataChanged();
+                          unawaited(_pushUserFreeTrialToCloud(u));
+                          setState(() {});
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Free trial removed for ${u.username}.')));
+                        },
+                        style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEF4444), side: const BorderSide(color: Color(0xFFEF4444)), padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12)),
+                        child: const Text('Revoke', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -11707,7 +11887,8 @@ class _WalletScreenState extends State<WalletScreen> {
       return;
     }
 
-    final fee = amount * 0.15;
+    final noWithdrawFee = widget.user.isOnFreeTrial;
+    final fee = noWithdrawFee ? 0.0 : amount * 0.15;
     final receive = amount - fee;
 
     String handle = _handle.text.trim();
@@ -11727,7 +11908,9 @@ class _WalletScreenState extends State<WalletScreen> {
       amount: amount,
       type: TransactionType.withdrawal,
       method: _method,
-      sourceDetails: '($handle) - Fee: \$${formatCurrency(fee)} - You receive: \$${formatCurrency(receive)}',
+      sourceDetails: noWithdrawFee
+          ? '($handle) - Free trial: no fee - You receive: \$${formatCurrency(receive)}'
+          : '($handle) - Fee: \$${formatCurrency(fee)} - You receive: \$${formatCurrency(receive)}',
       timestamp: DateTime.now()
     ));
 
@@ -11737,7 +11920,9 @@ class _WalletScreenState extends State<WalletScreen> {
     widget.onDataChanged();
 
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Withdrawal request sent! You will receive \$${formatCurrency(receive)} after 15% fee.')
+      content: Text(noWithdrawFee
+          ? 'Withdrawal request sent! You will receive \$${formatCurrency(receive)} (no fee on free trial).'
+          : 'Withdrawal request sent! You will receive \$${formatCurrency(receive)} after 15% fee.')
     ));
     _amt.clear();
     _applySavedWithdrawHandle();
@@ -12078,11 +12263,16 @@ class _WalletScreenState extends State<WalletScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFF5C64C)),
               ),
-              child: const Text.rich(
+              child: Text.rich(
                 TextSpan(
                   children: [
                     TextSpan(text: 'Note: ', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF9A3412))),
-                    TextSpan(text: 'A 15% processing fee applies to all withdrawals. Withdrawal requests are processed within 24 hours after verification.', style: TextStyle(color: Color(0xFF9A3412))),
+                    TextSpan(
+                      text: widget.user.isOnFreeTrial
+                          ? 'Your free trial includes no withdrawal fees. Requests are processed within 24 hours after verification.'
+                          : 'A 15% processing fee applies to all withdrawals. Withdrawal requests are processed within 24 hours after verification.',
+                      style: const TextStyle(color: Color(0xFF9A3412)),
+                    ),
                   ],
                 ),
               ),
@@ -13873,7 +14063,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final resolvedRef = refIdx != -1 ? widget.allUsers[refIdx] : referrer!;
       rows.add(Map<String, dynamic>.from(resolvedRef.toJson()));
       if (rows.isNotEmpty) {
-        Supabase.instance.client.from('users').upsert(rows).then((_) {}).catchError((_) {});
+        final canWriteTrial = widget.user.isAdmin;
+        Supabase.instance.client.from('users').upsert(rows.map((r) {
+          final u = UserData.fromJson(r);
+          return _userRowForBulkSync(u, includeFreeTrial: canWriteTrial);
+        }).toList()).then((_) {}).catchError((_) {});
       }
     } catch (_) {}
     widget.onDataChanged();
@@ -14658,7 +14852,8 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _animCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
+    _animCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 4));
+    if (!ngmyPreferLightGraphics) _animCtrl.repeat();
     final now = DateTime.now();
     _issuedDateC.text = '${now.month}/${now.day}/${now.year}';
     _dueDateC.text = '${now.month}/${now.day + 7}/${now.year}';
