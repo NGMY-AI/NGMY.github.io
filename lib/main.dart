@@ -6296,6 +6296,314 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
+/// 3D-styled logout confirmation (profile screen).
+class _NgmyLogoutConfirmDialog extends StatefulWidget {
+  const _NgmyLogoutConfirmDialog();
+
+  @override
+  State<_NgmyLogoutConfirmDialog> createState() => _NgmyLogoutConfirmDialogState();
+}
+
+class _NgmyLogoutConfirmDialogState extends State<_NgmyLogoutConfirmDialog>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _float;
+  late final Animation<double> _glow;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    )..repeat(reverse: true);
+    _float = Tween<double>(begin: -4, end: 4).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+    _glow = Tween<double>(begin: 0.28, end: 0.62).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFFEF4444);
+    const accentDeep = Color(0xFF991B1B);
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 26),
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (context, _) {
+          final tiltX = math.sin(_ctrl.value * math.pi * 2) * 0.022;
+          final tiltY = math.cos(_ctrl.value * math.pi * 2) * 0.014;
+          final glow = _glow.value;
+          final lift = _float.value;
+
+          return Transform(
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.0012)
+              ..rotateX(tiltX)
+              ..rotateY(tiltY),
+            alignment: Alignment.center,
+            child: Transform.translate(
+              offset: Offset(0, lift),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: accent.withOpacity(glow),
+                      blurRadius: 36,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 14),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.45),
+                      blurRadius: 28,
+                      offset: const Offset(0, 22),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF450A0A),
+                              Color(0xFF7F1D1D),
+                              Color(0xFF1C1917),
+                            ],
+                            stops: [0.0, 0.45, 1.0],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: -40,
+                        right: -20,
+                        child: Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: accent.withOpacity(0.12 + glow * 0.15),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: -30,
+                        left: -10,
+                        child: Container(
+                          width: 90,
+                          height: 90,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withOpacity(0.04),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 26, 24, 20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  colors: [
+                                    accent.withOpacity(0.5),
+                                    accentDeep.withOpacity(0.15),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.35),
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: accent.withOpacity(0.55),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.35),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              child: Transform(
+                                transform: Matrix4.identity()
+                                  ..setEntry(3, 2, 0.002)
+                                  ..rotateY(-tiltY * 2)
+                                  ..rotateX(-tiltX * 2),
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.logout_rounded,
+                                  color: Colors.white,
+                                  size: 34,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            ShaderMask(
+                              shaderCallback: (bounds) => const LinearGradient(
+                                colors: [Colors.white, Color(0xFFFFE4E6)],
+                              ).createShader(bounds),
+                              child: const Text(
+                                'Log out?',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Are you sure you want to log out of your account?',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.82),
+                                fontSize: 14,
+                                height: 1.4,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'You can sign back in anytime.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.5),
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 22),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () => Navigator.pop(context, false),
+                                      borderRadius: BorderRadius.circular(14),
+                                      child: Ink(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(14),
+                                          color: Colors.white.withOpacity(0.1),
+                                          border: Border.all(
+                                            color: Colors.white.withOpacity(0.28),
+                                            width: 1.2,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.25),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Padding(
+                                          padding: EdgeInsets.symmetric(vertical: 14),
+                                          child: Center(
+                                            child: Text(
+                                              'Cancel',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () => Navigator.pop(context, true),
+                                      borderRadius: BorderRadius.circular(14),
+                                      child: Ink(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(14),
+                                          gradient: const LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              Color(0xFFFCA5A5),
+                                              Color(0xFFEF4444),
+                                              Color(0xFFB91C1C),
+                                            ],
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: accent.withOpacity(0.55 + glow * 0.2),
+                                              blurRadius: 14,
+                                              offset: const Offset(0, 6),
+                                            ),
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.3),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 8),
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Padding(
+                                          padding: EdgeInsets.symmetric(vertical: 14),
+                                          child: Center(
+                                            child: Text(
+                                              'Yes, log out',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _LateClockInBanner extends StatefulWidget {
   final String message;
   final double penaltyPercent;
@@ -14311,17 +14619,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _confirmLogout() async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Log out?'),
-        content: const Text('Are you sure you want to log out of your account?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Yes, log out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.58),
+      builder: (ctx) => const _NgmyLogoutConfirmDialog(),
     );
     if (ok == true && mounted) widget.onLogout();
   }
