@@ -8279,7 +8279,6 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
     _GameDef(id: 'sequence', title: 'Number Sequence', subtitle: 'Find patterns, win rewards', icon: Icons.numbers_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
     _GameDef(id: 'simon', title: 'Simon Says', subtitle: 'Memory color game!', icon: Icons.sports_esports_rounded, colors: [Color(0xFF7C3AED), Color(0xFF6D28D9)]),
     _GameDef(id: 'color', title: 'Color Rush', subtitle: 'Match colors fast!', icon: Icons.palette_rounded, colors: [Color(0xFFDB2777), Color(0xFFBE185D)]),
-    _GameDef(id: 'card', title: 'Card Match', subtitle: 'Find all the pairs!', icon: Icons.style_rounded, colors: [Color(0xFFDB2777), Color(0xFF9333EA)]),
     _GameDef(id: 'checkers_deluxe', title: 'Checkers Deluxe', subtitle: 'Wood board — play solo or invite a friend', icon: Icons.grid_on_rounded, colors: [Color(0xFF8B4513), Color(0xFF5D4037)]),
     _GameDef(id: 'tic_tac_go', title: 'Tic Tac Go', subtitle: '3 in a row — real-time multiplayer', icon: Icons.close_rounded, colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
     _GameDef(id: 'pool_8ball', title: '8-Ball Pool', subtitle: 'Aim, shoot, pocket the 8-ball', icon: Icons.sports_baseball_rounded, colors: [Color(0xFF166534), Color(0xFF14532D)]),
@@ -8688,7 +8687,7 @@ class GameBetScreen extends StatefulWidget {
 
 class _GameBetScreenState extends State<GameBetScreen> {
   final TextEditingController _customBetC = TextEditingController();
-  double _bet = 5;
+  double _bet = 2;
 
   @override
   void dispose() {
@@ -8918,7 +8917,11 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   Timer? _roundTimer;
   int _bankIndex = 0;
   String _scrambled = '';
-  // Memory / card
+  // Typing (2 sentences per round)
+  List<String> _typingSentences = [];
+  int _typingSentenceIdx = 0;
+  int _typingCorrectTotal = 0;
+  // Memory
   List<String> _memoryBase = [];
   List<String> _memoryValues = [];
   List<int> _revealedCards = [];
@@ -8932,24 +8935,47 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   final List<int> _simonSeq = [];
   int _simonShow = -1;
   int _simonInputAt = 0;
+  int _simonCorrectTaps = 0;
   bool _simonPlaying = false;
+  static const int _simonWinRounds = 6;
   final List<Color> _simonColors = const [Color(0xFFEF4444), Color(0xFF22C55E), Color(0xFF3B82F6), Color(0xFFF59E0B)];
   // Pattern
+  static const int _patternMoveTotal = 7;
   List<int> _patternSeq = [];
   int _patternFlash = -1;
   int _patternProgress = 0;
   bool _patternShowing = false;
+  // Number sequence (5 questions per round)
+  static const int _sequenceQuestionTotal = 5;
+  int _sequenceQuestion = 0;
+  late String _sequencePrompt;
   // Color rush
   late String _colorWord;
   late Color _colorInk;
   late String _colorTarget;
-  // Sequence number
-  late String _sequencePrompt;
   // Pro / casino / board games
   Timer? _miniTicker;
   NgmyProState? _pro;
 
   bool get _isPro => kNgmyProGameIds.contains(widget.gameId);
+
+  int get _simonTargetTaps => (_simonWinRounds * (_simonWinRounds + 1)) ~/ 2;
+
+  Future<void> _failMoveGame({String? reason}) async {
+    if (_won) return;
+    final done = _gameProgressDone();
+    final total = _gameProgressTotal();
+    if (done <= 0) {
+      await _gameLose(reason: reason ?? 'Wrong move — no progress earned.');
+      return;
+    }
+    final ratio = (done / total).clamp(0.0, 1.0);
+    if (ratio >= 1.0) {
+      await _payoutWin(subtitle: reason);
+    } else {
+      await _payoutPartial(ratio, done: done, total: total);
+    }
+  }
 
   Future<void> _showEndPopup({required bool win, required String title, String? subtitle, String? outcomeLabel}) async {
     if (!mounted) return;
@@ -8973,14 +8999,15 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         }
         return n;
       case 'typing':
-        return ngmyTypingCorrectCount(_answer, _inputC.text);
+        return _typingCorrectTotal + ngmyTypingCorrectCount(_answer, _inputC.text);
       case 'memory':
-      case 'card':
         return _pairsFound;
       case 'simon':
-        return _simonInputAt.clamp(0, _simonSeq.length);
+        return _simonCorrectTaps;
       case 'pattern':
-        return _patternProgress.clamp(0, _patternSeq.length);
+        return _patternProgress;
+      case 'sequence':
+        return _sequenceQuestion;
       default:
         if (_pro != null) return _pro!.progressDone(widget.gameId);
         return _won ? 1 : 0;
@@ -8992,14 +9019,19 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       case 'puzzle':
         return 8;
       case 'typing':
-        return _answer.isEmpty ? 1 : _answer.length;
+        var totalChars = 0;
+        for (final s in _typingSentences) {
+          totalChars += s.length;
+        }
+        return totalChars > 0 ? totalChars : (_answer.isEmpty ? 1 : _answer.length);
       case 'memory':
-      case 'card':
         return _memoryBase.length;
       case 'simon':
-        return _simonSeq.isEmpty ? 1 : _simonSeq.length;
+        return _simonTargetTaps;
       case 'pattern':
-        return _patternSeq.isEmpty ? 1 : _patternSeq.length;
+        return _patternMoveTotal;
+      case 'sequence':
+        return _sequenceQuestionTotal;
       default:
         if (_pro != null) return _pro!.progressTotal(widget.gameId);
         return 1;
@@ -9047,7 +9079,9 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         : widget.gameId == 'typing'
             ? kNgmySentenceBank.length
             : kNgmyWordBank.length;
-    final next = (_bankIndex + 1) % bankLen;
+    final next = widget.gameId == 'typing'
+        ? (_bankIndex + 2) % bankLen
+        : (_bankIndex + 1) % bankLen;
     await prefs.setInt(key, next);
     _bankIndex = next;
   }
@@ -9073,13 +9107,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       case 'memory':
         _memoryBase = ['🎮', '💎', '🚀', '🎯', '⚡', '🔥', '💰', '🧠'];
         _memoryCols = 4;
-        _prompt = 'Match all pairs!';
-        _setupMemoryBoard();
-        break;
-      case 'card':
-        _memoryBase = ['♠', '♥', '♦', '♣', '★', '✦'];
-        _memoryCols = 4;
-        _prompt = 'Match all cards!';
+        _prompt = 'Match all pairs — one wrong flip ends the round';
         _setupMemoryBoard();
         break;
       case 'scramble':
@@ -9089,8 +9117,15 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         _prompt = 'Unscramble (${_bankIndex + 1}/${kNgmyWordBank.length})';
         break;
       case 'typing':
-        _answer = kNgmySentenceBank[_bankIndex % kNgmySentenceBank.length];
-        _prompt = 'Sentence ${_bankIndex + 1} of ${kNgmySentenceBank.length} — type every character';
+        final i = _bankIndex % kNgmySentenceBank.length;
+        _typingSentences = [
+          kNgmySentenceBank[i],
+          kNgmySentenceBank[(i + 1) % kNgmySentenceBank.length],
+        ];
+        _typingSentenceIdx = 0;
+        _typingCorrectTotal = 0;
+        _answer = _typingSentences[0];
+        _prompt = 'Sentence 1 of 2 — type every character';
         _inputC.clear();
         break;
       case 'math':
@@ -9100,15 +9135,9 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         _optionChoices = q.choices;
         break;
       case 'sequence':
-        final bases = [2, 3, 4, 5];
-        final b = bases[_bankIndex % bases.length];
-        final n = 3 + (_bankIndex % 4);
-        final seq = List<int>.generate(n, (i) => math.pow(b, i + 1).toInt());
-        final next = math.pow(b, n).toInt();
-        _answer = next.toString();
-        _sequencePrompt = seq.join(', ');
-        _optionChoices = _shuffleChoices(_answer, [(next + b).toString(), (next - b).toString(), (next + b * 2).toString()]);
-        _prompt = 'What comes next?';
+        _sequenceQuestion = 0;
+        _setupSequenceQuestion();
+        _prompt = 'Question 1 of $_sequenceQuestionTotal — what comes next?';
         break;
       case 'puzzle':
         _puzzleTiles = List<int>.generate(9, (i) => i);
@@ -9120,13 +9149,14 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         _simonSeq.clear();
         _simonSeq.add(_rng.nextInt(4));
         _simonInputAt = 0;
-        _prompt = 'Repeat the color pattern';
+        _simonCorrectTaps = 0;
+        _prompt = 'Repeat the pattern — wrong tap ends round (paid by progress)';
         unawaited(_playSimonSequence());
         break;
       case 'pattern':
-        _patternSeq = List<int>.generate(3 + (_bankIndex % 3), (_) => _rng.nextInt(9));
+        _patternSeq = List<int>.generate(_patternMoveTotal, (_) => _rng.nextInt(9));
         _patternProgress = 0;
-        _prompt = 'Tap the tiles in order';
+        _prompt = 'Tap $_patternMoveTotal tiles in order — move 0/$_patternMoveTotal';
         unawaited(_flashPattern());
         break;
       case 'color':
@@ -9177,6 +9207,18 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     return list;
   }
 
+  void _setupSequenceQuestion() {
+    final seed = _bankIndex + _sequenceQuestion * 17;
+    final bases = [2, 3, 4, 5];
+    final b = bases[seed % bases.length];
+    final n = 3 + (seed % 4);
+    final seq = List<int>.generate(n, (i) => math.pow(b, i + 1).toInt());
+    final next = math.pow(b, n).toInt();
+    _answer = next.toString();
+    _sequencePrompt = seq.join(', ');
+    _optionChoices = _shuffleChoices(_answer, [(next + b).toString(), (next - b).toString(), (next + b * 2).toString()]);
+  }
+
   void _setupMemoryBoard() {
     _pairsFound = 0;
     _matchedCards.clear();
@@ -9200,25 +9242,41 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       });
       if (_pairsFound >= _memoryBase.length) {
         unawaited(_advanceBank());
-        _payoutWin();
+        unawaited(_payoutWin());
       }
       return;
     }
     _lockingCards = true;
     Future.delayed(const Duration(milliseconds: 580), () {
-      if (!mounted) return;
-      setState(() {
-        _revealedCards = [];
-        _lockingCards = false;
-      });
+      if (!mounted || _won) return;
+      setState(() => _revealedCards = []);
+      _lockingCards = false;
+      unawaited(_failMoveGame(reason: 'No match — paid for $_pairsFound/${_memoryBase.length} pairs.'));
     });
   }
 
   void _selectOption(String value) {
     if (_won) return;
-    if (value.toUpperCase() == _answer.toUpperCase()) {
+    final correct = value.toUpperCase() == _answer.toUpperCase();
+    if (widget.gameId == 'sequence') {
+      if (correct) {
+        setState(() => _sequenceQuestion++);
+        if (_sequenceQuestion >= _sequenceQuestionTotal) {
+          unawaited(_advanceBank());
+          unawaited(_payoutWin(subtitle: 'All $_sequenceQuestionTotal questions correct!'));
+        } else {
+          _setupSequenceQuestion();
+          _prompt = 'Question ${_sequenceQuestion + 1} of $_sequenceQuestionTotal — what comes next?';
+          setState(() {});
+        }
+      } else {
+        unawaited(_failMoveGame(reason: 'Wrong answer — paid for $_sequenceQuestion/$_sequenceQuestionTotal.'));
+      }
+      return;
+    }
+    if (correct) {
       unawaited(_advanceBank());
-      _payoutWin();
+      unawaited(_payoutWin());
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wrong — try again!')));
     }
@@ -9268,20 +9326,17 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   void _tapSimon(int c) {
     if (_won || _simonPlaying) return;
     if (_simonSeq[_simonInputAt] != c) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wrong color!')));
-      setState(() {
-        _simonSeq.clear();
-        _simonSeq.add(_rng.nextInt(4));
-        _simonInputAt = 0;
-      });
-      unawaited(_playSimonSequence());
+      unawaited(_failMoveGame(reason: 'Wrong color — paid for $_simonCorrectTaps/$_simonTargetTaps taps.'));
       return;
     }
-    setState(() => _simonInputAt++);
+    setState(() {
+      _simonCorrectTaps++;
+      _simonInputAt++;
+    });
     if (_simonInputAt >= _simonSeq.length) {
-      if (_simonSeq.length >= 6) {
+      if (_simonSeq.length >= _simonWinRounds) {
         unawaited(_advanceBank());
-        _payoutWin();
+        unawaited(_payoutWin(subtitle: 'Perfect Simon run!'));
         return;
       }
       setState(() {
@@ -9308,15 +9363,16 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   void _tapPattern(int i) {
     if (_won || _patternShowing) return;
     if (_patternSeq[_patternProgress] != i) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wrong tile!')));
-      setState(() => _patternProgress = 0);
-      unawaited(_flashPattern());
+      unawaited(_failMoveGame(reason: 'Wrong tile — paid for $_patternProgress/$_patternMoveTotal moves.'));
       return;
     }
-    setState(() => _patternProgress++);
-    if (_patternProgress >= _patternSeq.length) {
+    setState(() {
+      _patternProgress++;
+      _prompt = 'Tap $_patternMoveTotal tiles in order — move $_patternProgress/$_patternMoveTotal';
+    });
+    if (_patternProgress >= _patternMoveTotal) {
       unawaited(_advanceBank());
-      _payoutWin();
+      unawaited(_payoutWin(subtitle: 'All $_patternMoveTotal moves correct!'));
     }
   }
 
@@ -9536,7 +9592,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   }
 
   Widget _gameBoard() {
-    if (widget.gameId == 'memory' || widget.gameId == 'card') return _memoryGrid();
+    if (widget.gameId == 'memory') return _memoryGrid();
 
     if (widget.gameId == 'scramble') {
       return Column(
@@ -9575,8 +9631,24 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         controller: _inputC,
         onCorrectCount: (_) => setState(() {}),
         onCompleted: () {
-          unawaited(_advanceBank());
-          unawaited(_payoutWin(subtitle: 'Perfect sentence — full payout!'));
+          final correct = ngmyTypingCorrectCount(_answer, _inputC.text);
+          _typingCorrectTotal += correct;
+          if (_typingSentenceIdx >= 1) {
+            unawaited(_advanceBank());
+            final total = _typingSentences.fold<int>(0, (s, line) => s + line.length);
+            if (_typingCorrectTotal >= total) {
+              unawaited(_payoutWin(subtitle: 'Both sentences perfect — full payout!'));
+            } else {
+              unawaited(_payoutPartial(_typingCorrectTotal / total, done: _typingCorrectTotal, total: total));
+            }
+          } else {
+            setState(() {
+              _typingSentenceIdx = 1;
+              _answer = _typingSentences[1];
+              _inputC.clear();
+              _prompt = 'Sentence 2 of 2 — type every character';
+            });
+          }
         },
       );
     }
@@ -9585,6 +9657,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       return Column(
         children: [
           Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          if (widget.gameId == 'sequence')
+            Text('Answered $_sequenceQuestion/$_sequenceQuestionTotal', style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w800, fontSize: 12)),
           const SizedBox(height: 12),
           FittedBox(
             child: Text(
@@ -9663,6 +9737,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       return Column(
         children: [
           Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          Text('Progress $_simonCorrectTaps/$_simonTargetTaps', style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w800, fontSize: 12)),
           const SizedBox(height: 8),
           Expanded(
             child: GridView.count(
@@ -9698,6 +9773,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
           return Column(
             children: [
               Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+              Text('Move $_patternProgress/$_patternMoveTotal', style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w800, fontSize: 12)),
               Expanded(
                 child: Center(
                   child: SizedBox(

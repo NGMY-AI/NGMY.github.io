@@ -66,7 +66,7 @@ class _NgmyTypingSentencePanelState extends State<NgmyTypingSentencePanel> with 
     widget.onCorrectCount(correct);
     widget.onWrongCount?.call(wrong);
     setState(() {});
-    if (typed.length >= target.length && correct >= target.length && target.isNotEmpty) {
+    if (typed.length >= target.length && target.isNotEmpty) {
       widget.onCompleted?.call();
     }
   }

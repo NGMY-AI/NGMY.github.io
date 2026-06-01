@@ -26,7 +26,6 @@ const List<String> kNgmyGameIds = [
   'sequence',
   'simon',
   'color',
-  'card',
   ...kNgmyProGameIds,
 ];
 
@@ -42,7 +41,6 @@ const Map<String, String> kNgmyGameTitles = {
   'sequence': 'Number Sequence',
   'simon': 'Simon Says',
   'color': 'Color Rush',
-  'card': 'Card Match',
   ...kNgmyProGameTitles,
 };
 
@@ -78,7 +76,7 @@ int ngmyGameTimeLimitSeconds(String gameId, Map<String, int> limits) {
   return limits[gameId] ?? ngmyDefaultGameTimeLimits()[gameId] ?? 90;
 }
 
-/// Full sentences for typing skill game (character-by-character match).
+/// Full sentences for typing skill game (character-by-character match). Each has 7+ words.
 const List<String> kNgmySentenceBank = [
   'Today Jeremiah was eating apple in church with his sister.',
   'The skilled trader analyzed profit margins before placing the next order.',
@@ -90,6 +88,46 @@ const List<String> kNgmySentenceBank = [
   'Strong players practice daily until challenging tasks feel manageable.',
   'The conference speaker shared ideas that changed how teams collaborate.',
   'Every correct keystroke moves you closer to the maximum payout today.',
+  'The morning crew opened the store before sunrise to prepare fresh inventory.',
+  'Careful readers notice small details that others often miss completely.',
+  'The coach reminded everyone that patience and practice create lasting success.',
+  'Bright students finished the assignment early and helped their classmates afterward.',
+  'The river flooded the road after three days of heavy spring rain.',
+  'Honest workers report problems quickly instead of hiding them from managers.',
+  'The bakery sold every loaf before noon on the busy Saturday morning.',
+  'Creative teams brainstorm solutions until they find one that truly works.',
+  'The pilot checked every instrument twice before the long international flight.',
+  'Friendly neighbors brought food when the family needed extra support at home.',
+  'The librarian sorted hundreds of books returned during the busy holiday week.',
+  'Smart shoppers compare prices carefully before they commit to any purchase.',
+  'The gardener planted tomatoes peppers and herbs in neat rows behind the house.',
+  'Dedicated nurses stayed late to make sure every patient felt comfortable tonight.',
+  'The musician tuned the guitar slowly before the crowded evening performance began.',
+  'Young athletes stretched properly to prevent injuries during the intense summer camp.',
+  'The mechanic replaced worn brakes and rotated tires before the long road trip.',
+  'Clear instructions help new employees learn their responsibilities much faster every day.',
+  'The photographer captured golden light as the sun set over the quiet harbor.',
+  'Busy parents packed lunches snacks and water bottles for the school field trip.',
+  'The architect drew detailed plans before construction crews broke ground on Monday.',
+  'Helpful volunteers cleaned the park and planted flowers along the walking path.',
+  'The scientist recorded precise measurements during every step of the long experiment.',
+  'Curious children asked thoughtful questions while touring the museum with their teacher.',
+  'The chef seasoned the soup carefully and tasted it before serving guests.',
+  'Reliable drivers checked mirrors signals and blind spots before changing lanes safely.',
+  'The teacher explained the lesson again until every student understood the concept.',
+  'Winter storms knocked down branches but the crew cleared the road by noon.',
+  'The editor corrected grammar spelling and punctuation before sending the article out.',
+  'Generous donors funded scholarships for students who needed financial help this year.',
+  'The hiker packed extra water food and a flashlight for the mountain trail.',
+  'Local farmers harvested corn soybeans and wheat before the first frost arrived.',
+  'The counselor listened patiently and offered practical advice during the difficult conversation.',
+  'Engineers tested the bridge design repeatedly to ensure it could handle heavy traffic.',
+  'The barber swept the floor and sanitized tools between every appointment that morning.',
+  'Attentive students took organized notes during the long lecture about world history.',
+  'The firefighter inspected hoses ladders and oxygen tanks before responding to calls.',
+  'Small businesses thrive when owners treat customers with respect and genuine care.',
+  'The tailor measured sleeves pants and jacket length before cutting the new fabric.',
+  'Evening joggers wore reflective gear and stayed on the well lit neighborhood path.',
 ];
 
 /// 100 unique long words — cycling index per user in SharedPreferences.
