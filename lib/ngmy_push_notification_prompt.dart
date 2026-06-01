@@ -15,6 +15,7 @@ class NgmyPushNotificationPrompt {
         'subtitle': 'Turn on alerts for transactions, earnings & news',
         'orbitWords': const ['ALERT', 'NEWS', 'EARN', 'PAY', 'NGMY', 'UPDATE', 'NOW'],
         'sizeScale': 1.12,
+        'titleMaxLines': 1,
         'subtitleMaxLines': 3,
       },
       primaryLabel: 'Enable notifications',

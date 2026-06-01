@@ -211,6 +211,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   late FamilyTree _tree;
   final List<FamilyTree> _undoStack = [];
   bool _showHidden = false;
+  final Set<String> _expandedChildGroups = {};
 
   @override
   void initState() {
@@ -245,6 +246,65 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
     await _persist();
   }
 
+  Future<void> _openTreeSettings() async {
+    final p = WorksheetPalette.of(context);
+    var limit = _tree.visibleChildrenPerParent;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          backgroundColor: p.cardBg,
+          title: Text('Tree display settings', style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w800)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'How many children to show per parent before a "+ more" dropdown (0 = show all).',
+                style: TextStyle(color: p.secondaryText, height: 1.35, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: limit > 0 ? () => setLocal(() => limit -= 1) : null,
+                    icon: const Icon(Icons.remove_circle_outline),
+                  ),
+                  Expanded(
+                    child: Text(
+                      limit == 0 ? 'Show all children' : 'Show $limit children, then dropdown',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.w800, color: p.primaryText),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => setLocal(() => limit += 1),
+                    icon: const Icon(Icons.add_circle_outline),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+    _pushUndo();
+    setState(() {
+      _tree = _tree.copyWith(visibleChildrenPerParent: limit);
+      _expandedChildGroups.clear();
+    });
+    await _persist();
+  }
+
   Future<void> _addMember({String? parentId}) async {
     final result = await showDialog<FamilyMember>(
       context: context,
@@ -252,6 +312,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
         title: 'Add Member',
         parents: visibleMembers(_tree),
         initialParentId: parentId,
+        tree: _tree,
       ),
     );
     if (result == null) return;
@@ -269,6 +330,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
         title: 'Member Profile',
         member: member,
         parents: visibleMembers(_tree).where((m) => m.id != member.id).toList(),
+        tree: _tree,
       ),
     );
     if (result == null) return;
@@ -329,7 +391,12 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                     ),
                     title: Text(m.name, style: TextStyle(fontWeight: FontWeight.w700, color: p.primaryText)),
                     subtitle: Text(
-                      [m.birthDate, m.occupation, m.notes].where((e) => e.trim().isNotEmpty).join(' · '),
+                      [
+                        if (siblingDisplayOrder(_tree, m) > 0) '#${siblingDisplayOrder(_tree, m)} child',
+                        m.birthDate,
+                        m.occupation,
+                        m.notes,
+                      ].where((e) => e.toString().trim().isNotEmpty).join(' · '),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -414,6 +481,13 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                         ),
                         const SizedBox(width: 8),
                         FilledButton.icon(
+                          onPressed: _openTreeSettings,
+                          style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.greenDark),
+                          icon: const Icon(Icons.tune, size: 16),
+                          label: const Text('Display'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
                           onPressed: () => _addMember(parentId: rootMember(_tree)?.id),
                           style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
                           icon: const Icon(Icons.add, size: 16),
@@ -447,6 +521,16 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                                 child: FamilyTreeCanvas(
                                   tree: _tree,
                                   showHidden: _showHidden,
+                                  expandedChildGroups: _expandedChildGroups,
+                                  onToggleChildGroup: (parentId) {
+                                    setState(() {
+                                      if (_expandedChildGroups.contains(parentId)) {
+                                        _expandedChildGroups.remove(parentId);
+                                      } else {
+                                        _expandedChildGroups.add(parentId);
+                                      }
+                                    });
+                                  },
                                   onMemberTap: _editMember,
                                   isDark: p.isDark,
                                 ),
@@ -547,6 +631,8 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
 class FamilyTreeCanvas extends StatelessWidget {
   final FamilyTree tree;
   final bool showHidden;
+  final Set<String> expandedChildGroups;
+  final ValueChanged<String> onToggleChildGroup;
   final ValueChanged<FamilyMember> onMemberTap;
   final bool isDark;
 
@@ -554,14 +640,20 @@ class FamilyTreeCanvas extends StatelessWidget {
     super.key,
     required this.tree,
     required this.showHidden,
+    required this.expandedChildGroups,
+    required this.onToggleChildGroup,
     required this.onMemberTap,
     required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final layout = _FamilyTreeLayout.compute(tree, showHidden: showHidden);
-    if (layout.nodes.isEmpty) return const SizedBox.shrink();
+    final layout = _FamilyTreeLayout.compute(
+      tree,
+      showHidden: showHidden,
+      expandedChildGroups: expandedChildGroups,
+    );
+    if (layout.nodes.isEmpty && layout.overflowNodes.isEmpty) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -601,7 +693,21 @@ class FamilyTreeCanvas extends StatelessWidget {
                 child: _MemberNode(
                   member: member,
                   childCount: descendantCount(tree, member.id),
+                  siblingOrder: siblingDisplayOrder(tree, member),
                   onTap: () => onMemberTap(member),
+                ),
+              );
+            }),
+            ...layout.overflowNodes.map((overflow) {
+              return Positioned(
+                left: overflow.position.dx - _FamilyTreeLayout.nodeWidth / 2,
+                top: overflow.position.dy,
+                child: _OverflowChildrenNode(
+                  count: overflow.count,
+                  hiddenMembers: overflow.hiddenMembers,
+                  expanded: expandedChildGroups.contains(overflow.parentId),
+                  onTap: () => onToggleChildGroup(overflow.parentId),
+                  onMemberTap: onMemberTap,
                 ),
               );
             }),
@@ -610,6 +716,20 @@ class FamilyTreeCanvas extends StatelessWidget {
       ),
     );
   }
+}
+
+class _OverflowLayoutNode {
+  final String parentId;
+  final Offset position;
+  final List<FamilyMember> hiddenMembers;
+  final int count;
+
+  const _OverflowLayoutNode({
+    required this.parentId,
+    required this.position,
+    required this.hiddenMembers,
+    required this.count,
+  });
 }
 
 class _LayoutNode {
@@ -632,12 +752,14 @@ class _FamilyTreeLayout {
 
   final Map<String, _LayoutNode> nodes;
   final List<_TreeEdge> edges;
+  final List<_OverflowLayoutNode> overflowNodes;
   final double width;
   final double height;
 
   const _FamilyTreeLayout({
     required this.nodes,
     required this.edges,
+    this.overflowNodes = const [],
     required this.width,
     required this.height,
   });
@@ -649,10 +771,34 @@ class _FamilyTreeLayout {
 
   static Offset _nodeTop(Offset topCenter) => topCenter;
 
-  static _FamilyTreeLayout compute(FamilyTree tree, {required bool showHidden}) {
+  static ({List<FamilyMember> shown, List<FamilyMember> hidden, bool hasOverflow}) _splitChildren(
+    FamilyTree tree,
+    FamilyMember parent,
+    List<FamilyMember> kids,
+    Set<String> expanded,
+  ) {
+    final cap = familyTreeVisibleChildCap(tree, parent);
+    if (cap <= 0 || kids.length <= cap) {
+      return (shown: kids, hidden: const [], hasOverflow: false);
+    }
+    if (expanded.contains(parent.id)) {
+      return (shown: kids, hidden: const [], hasOverflow: false);
+    }
+    return (
+      shown: kids.take(cap).toList(),
+      hidden: kids.skip(cap).toList(),
+      hasOverflow: true,
+    );
+  }
+
+  static _FamilyTreeLayout compute(
+    FamilyTree tree, {
+    required bool showHidden,
+    Set<String> expandedChildGroups = const {},
+  }) {
     final visible = showHidden ? tree.members : visibleMembers(tree);
     if (visible.isEmpty) {
-      return const _FamilyTreeLayout(nodes: {}, edges: [], width: 0, height: 0);
+      return const _FamilyTreeLayout(nodes: {}, edges: [], overflowNodes: [], width: 0, height: 0);
     }
     final visibleIds = visible.map((m) => m.id).toSet();
     final root = visible.firstWhere(
@@ -662,28 +808,38 @@ class _FamilyTreeLayout {
 
     final nodes = <String, _LayoutNode>{};
     final edges = <_TreeEdge>[];
+    final overflowNodes = <_OverflowLayoutNode>[];
     final subtreeWidths = <String, double>{};
+
+    List<FamilyMember> kidsOf(String id) {
+      return visible.where((m) => m.parentId == id).toList()
+        ..sort((a, b) => a.birthOrder.compareTo(b.birthOrder));
+    }
 
     double measure(String id) {
       if (subtreeWidths.containsKey(id)) return subtreeWidths[id]!;
       final member = visible.firstWhere((m) => m.id == id);
-      final kids = visible.where((m) => m.parentId == id).toList()
-        ..sort((a, b) => a.birthOrder.compareTo(b.birthOrder));
+      final kids = kidsOf(id);
+      final split = _splitChildren(tree, member, kids, expandedChildGroups);
 
       var width = nodeWidth;
       if (member.spouseId != null && visibleIds.contains(member.spouseId)) {
         width = nodeWidth * 2 + horizontalGap;
       }
 
-      if (kids.isEmpty) {
+      if (split.shown.isEmpty) {
         subtreeWidths[id] = width;
         return width;
       }
 
       var total = 0.0;
-      for (var i = 0; i < kids.length; i++) {
-        total += measure(kids[i].id);
-        if (i < kids.length - 1) total += horizontalGap;
+      for (var i = 0; i < split.shown.length; i++) {
+        total += measure(split.shown[i].id);
+        if (i < split.shown.length - 1) total += horizontalGap;
+      }
+      if (split.hasOverflow) {
+        if (split.shown.isNotEmpty) total += horizontalGap;
+        total += nodeWidth;
       }
       subtreeWidths[id] = math.max(total, width);
       return subtreeWidths[id]!;
@@ -693,8 +849,8 @@ class _FamilyTreeLayout {
       if (nodes.containsKey(id)) return;
 
       final member = visible.firstWhere((m) => m.id == id);
-      final kids = visible.where((m) => m.parentId == id).toList()
-        ..sort((a, b) => a.birthOrder.compareTo(b.birthOrder));
+      final kids = kidsOf(id);
+      final split = _splitChildren(tree, member, kids, expandedChildGroups);
 
       final subtreeW = subtreeWidths[id] ?? nodeWidth;
       final rowTop = titleBlockHeight + depth * verticalStep;
@@ -704,7 +860,7 @@ class _FamilyTreeLayout {
         spouse = visible.firstWhere((m) => m.id == member.spouseId);
       }
 
-      if (kids.isEmpty) {
+      if (split.shown.isEmpty) {
         final centerX = left + subtreeW / 2;
         if (spouse != null && !nodes.containsKey(spouse.id)) {
           final half = nodeWidth / 2 + horizontalGap / 2;
@@ -724,14 +880,31 @@ class _FamilyTreeLayout {
       }
 
       var cursor = left;
-      for (final child in kids) {
+      final childRowTop = titleBlockHeight + (depth + 1) * verticalStep;
+      final childConnectorTops = <Offset>[];
+
+      for (final child in split.shown) {
         final w = subtreeWidths[child.id] ?? nodeWidth;
         place(child.id, cursor, depth + 1);
+        childConnectorTops.add(_nodeTop(nodes[child.id]!.position));
         cursor += w + horizontalGap;
       }
 
-      final childTops = kids.map((c) => nodes[c.id]!.position).toList();
-      final parentCenterX = (childTops.first.dx + childTops.last.dx) / 2;
+      if (split.hasOverflow) {
+        final overflowCenter = cursor + nodeWidth / 2;
+        overflowNodes.add(_OverflowLayoutNode(
+          parentId: id,
+          position: Offset(overflowCenter, childRowTop),
+          hiddenMembers: split.hidden,
+          count: split.hidden.length,
+        ));
+        childConnectorTops.add(_nodeTop(Offset(overflowCenter, childRowTop)));
+        cursor += nodeWidth;
+      }
+
+      final parentCenterX = childConnectorTops.length == 1
+          ? childConnectorTops.first.dx
+          : (childConnectorTops.first.dx + childConnectorTops.last.dx) / 2;
 
       Offset parentTop;
       Offset parentConnectorBottom;
@@ -752,7 +925,7 @@ class _FamilyTreeLayout {
       edges.add(_TreeEdge(
         parentConnectorBottom,
         Offset.zero,
-        childTops: childTops.map(_nodeTop).toList(),
+        childTops: childConnectorTops,
       ));
     }
 
@@ -767,6 +940,11 @@ class _FamilyTreeLayout {
       maxX = math.max(maxX, node.position.dx + nodeWidth / 2);
       maxY = math.max(maxY, node.position.dy + nodeHeight + verticalStep);
     }
+    for (final overflow in overflowNodes) {
+      minX = math.min(minX, overflow.position.dx - nodeWidth / 2);
+      maxX = math.max(maxX, overflow.position.dx + nodeWidth / 2);
+      maxY = math.max(maxY, overflow.position.dy + nodeHeight + 40);
+    }
 
     final shiftX = canvasPad - minX;
     if (shiftX != 0) {
@@ -775,6 +953,15 @@ class _FamilyTreeLayout {
         nodes[id] = _LayoutNode(
           member: n.member,
           position: Offset(n.position.dx + shiftX, n.position.dy),
+        );
+      }
+      for (var i = 0; i < overflowNodes.length; i++) {
+        final o = overflowNodes[i];
+        overflowNodes[i] = _OverflowLayoutNode(
+          parentId: o.parentId,
+          position: Offset(o.position.dx + shiftX, o.position.dy),
+          hiddenMembers: o.hiddenMembers,
+          count: o.count,
         );
       }
       for (var i = 0; i < edges.length; i++) {
@@ -792,6 +979,7 @@ class _FamilyTreeLayout {
     return _FamilyTreeLayout(
       nodes: nodes,
       edges: edges,
+      overflowNodes: overflowNodes,
       width: maxX + canvasPad,
       height: maxY + canvasPad,
     );
@@ -865,11 +1053,13 @@ class _FamilyTreeLinesPainter extends CustomPainter {
 class _MemberNode extends StatelessWidget {
   final FamilyMember member;
   final int childCount;
+  final int siblingOrder;
   final VoidCallback onTap;
 
   const _MemberNode({
     required this.member,
     required this.childCount,
+    this.siblingOrder = 0,
     required this.onTap,
   });
 
@@ -915,6 +1105,23 @@ class _MemberNode extends StatelessWidget {
                         : Icon(Icons.person, color: _ringColor, size: 30),
                   ),
                 ),
+                if (siblingOrder > 0)
+                  Positioned(
+                    left: -4,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        '#$siblingOrder',
+                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
                 if (childCount > 0)
                   Positioned(
                     right: -2,
@@ -950,17 +1157,101 @@ class _MemberNode extends StatelessWidget {
   }
 }
 
+class _OverflowChildrenNode extends StatelessWidget {
+  final int count;
+  final List<FamilyMember> hiddenMembers;
+  final bool expanded;
+  final VoidCallback onTap;
+  final ValueChanged<FamilyMember> onMemberTap;
+
+  const _OverflowChildrenNode({
+    required this.count,
+    required this.hiddenMembers,
+    required this.expanded,
+    required this.onTap,
+    required this.onMemberTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _FamilyTreeLayout.nodeWidth,
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: onTap,
+            child: Container(
+              width: _FamilyTreeLayout.avatarSize,
+              height: _FamilyTreeLayout.avatarSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: WorksheetPalette.teal.withValues(alpha: 0.15),
+                border: Border.all(color: WorksheetPalette.teal, width: 2, style: BorderStyle.solid),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(expanded ? Icons.expand_less : Icons.expand_more, color: WorksheetPalette.teal, size: 22),
+                  Text(
+                    '+$count',
+                    style: const TextStyle(color: WorksheetPalette.teal, fontSize: 11, fontWeight: FontWeight.w900),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            expanded ? 'SHOW LESS' : 'MORE KIDS',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: WorksheetPalette.teal),
+          ),
+          if (expanded) ...[
+            const SizedBox(height: 6),
+            ...hiddenMembers.map(
+              (m) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: InkWell(
+                  onTap: () => onMemberTap(m),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: WorksheetPalette.teal.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '#${m.birthOrder} ${m.name}',
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _MemberEditorDialog extends StatefulWidget {
   final String title;
   final FamilyMember? member;
   final List<FamilyMember> parents;
   final String? initialParentId;
+  final FamilyTree? tree;
 
   const _MemberEditorDialog({
     required this.title,
     this.member,
     this.parents = const [],
     this.initialParentId,
+    this.tree,
   });
 
   @override
@@ -978,6 +1269,7 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
   String? _spouseId;
   String? _photoPath;
   int _birthOrder = 1;
+  int _visibleChildrenCap = 0;
   bool _hidden = false;
 
   @override
@@ -993,7 +1285,8 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
     _parentId = m?.parentId ?? widget.initialParentId;
     _spouseId = m?.spouseId;
     _photoPath = m?.photoPath;
-    _birthOrder = m?.birthOrder ?? 1;
+    _birthOrder = m?.birthOrder ?? (widget.tree != null ? nextBirthOrderForParent(widget.tree!, widget.initialParentId) : 1);
+    _visibleChildrenCap = m?.visibleChildrenCap ?? 0;
     _hidden = m?.hidden ?? false;
   }
 
@@ -1121,7 +1414,10 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: Text('Birth order: $_birthOrder'),
+                    child: Text(
+                      'Child order: #$_birthOrder (${_ordinalLabel(_birthOrder)})',
+                      style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w700),
+                    ),
                   ),
                   IconButton(
                     onPressed: () => setState(() => _birthOrder = math.max(1, _birthOrder - 1)),
@@ -1133,6 +1429,31 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
                   ),
                 ],
               ),
+              if (widget.member != null && widget.tree != null && childrenOf(widget.tree!, widget.member!.id).isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _visibleChildrenCap == 0
+                            ? 'Show in tree: use tree default'
+                            : 'Show $_visibleChildrenCap in tree, rest in dropdown',
+                        style: TextStyle(color: p.secondaryText, fontSize: 12),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _visibleChildrenCap > 0
+                          ? () => setState(() => _visibleChildrenCap -= 1)
+                          : null,
+                      icon: const Icon(Icons.remove_circle_outline),
+                    ),
+                    IconButton(
+                      onPressed: () => setState(() => _visibleChildrenCap += 1),
+                      icon: const Icon(Icons.add_circle_outline),
+                    ),
+                  ],
+                ),
+              ],
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text('Hidden member', style: TextStyle(color: p.primaryText)),
@@ -1163,6 +1484,7 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
                 occupation: _jobC.text.trim(),
                 birthOrder: _birthOrder,
                 hidden: _hidden,
+                visibleChildrenCap: _visibleChildrenCap,
               ),
             );
           },
@@ -1171,5 +1493,19 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
         ),
       ],
     );
+  }
+
+  String _ordinalLabel(int n) {
+    if (n % 100 >= 11 && n % 100 <= 13) return '${n}th child';
+    switch (n % 10) {
+      case 1:
+        return '${n}st child';
+      case 2:
+        return '${n}nd child';
+      case 3:
+        return '${n}rd child';
+      default:
+        return '${n}th child';
+    }
   }
 }

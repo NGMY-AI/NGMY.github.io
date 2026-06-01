@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -150,6 +151,8 @@ class FamilyMember {
   final String occupation;
   final int birthOrder;
   final bool hidden;
+  /// How many of this member's children show in the tree before a "+ more" dropdown (0 = use tree default).
+  final int visibleChildrenCap;
 
   const FamilyMember({
     required this.id,
@@ -164,6 +167,7 @@ class FamilyMember {
     this.occupation = '',
     this.birthOrder = 1,
     this.hidden = false,
+    this.visibleChildrenCap = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -179,6 +183,7 @@ class FamilyMember {
         'occupation': occupation,
         'birthOrder': birthOrder,
         'hidden': hidden,
+        'visibleChildrenCap': visibleChildrenCap,
       };
 
   factory FamilyMember.fromJson(Map<String, dynamic> json) {
@@ -195,6 +200,7 @@ class FamilyMember {
       occupation: (json['occupation'] ?? '').toString(),
       birthOrder: (json['birthOrder'] as num?)?.toInt() ?? 1,
       hidden: json['hidden'] == true,
+      visibleChildrenCap: (json['visibleChildrenCap'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -210,6 +216,7 @@ class FamilyMember {
     String? occupation,
     int? birthOrder,
     bool? hidden,
+    int? visibleChildrenCap,
   }) {
     return FamilyMember(
       id: id,
@@ -224,6 +231,7 @@ class FamilyMember {
       occupation: occupation ?? this.occupation,
       birthOrder: birthOrder ?? this.birthOrder,
       hidden: hidden ?? this.hidden,
+      visibleChildrenCap: visibleChildrenCap ?? this.visibleChildrenCap,
     );
   }
 }
@@ -236,6 +244,8 @@ class FamilyTree {
   final List<String> collaboratorEmails;
   final List<FamilyMember> members;
   final DateTime createdAt;
+  /// Default max children shown per parent in the tree (0 = show all).
+  final int visibleChildrenPerParent;
 
   const FamilyTree({
     required this.id,
@@ -245,6 +255,7 @@ class FamilyTree {
     this.collaboratorEmails = const [],
     this.members = const [],
     required this.createdAt,
+    this.visibleChildrenPerParent = 0,
   });
 
   int get visibleMemberCount => members.where((m) => !m.hidden).length;
@@ -257,6 +268,7 @@ class FamilyTree {
         'collaboratorEmails': collaboratorEmails,
         'members': members.map((e) => e.toJson()).toList(),
         'createdAt': createdAt.toIso8601String(),
+        'visibleChildrenPerParent': visibleChildrenPerParent,
       };
 
   factory FamilyTree.fromJson(Map<String, dynamic> json) {
@@ -282,6 +294,7 @@ class FamilyTree {
       members: members,
       createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ??
           DateTime.now(),
+      visibleChildrenPerParent: (json['visibleChildrenPerParent'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -291,6 +304,7 @@ class FamilyTree {
     bool? isPrivate,
     List<String>? collaboratorEmails,
     List<FamilyMember>? members,
+    int? visibleChildrenPerParent,
   }) {
     return FamilyTree(
       id: id,
@@ -300,6 +314,7 @@ class FamilyTree {
       collaboratorEmails: collaboratorEmails ?? this.collaboratorEmails,
       members: members ?? this.members,
       createdAt: createdAt,
+      visibleChildrenPerParent: visibleChildrenPerParent ?? this.visibleChildrenPerParent,
     );
   }
 }
@@ -457,6 +472,28 @@ List<FamilyMember> childrenOf(FamilyTree tree, String parentId) {
       .where((m) => m.parentId == parentId)
       .toList()
     ..sort((a, b) => a.birthOrder.compareTo(b.birthOrder));
+}
+
+int familyTreeVisibleChildCap(FamilyTree tree, FamilyMember parent) {
+  if (parent.visibleChildrenCap > 0) return parent.visibleChildrenCap;
+  if (tree.visibleChildrenPerParent > 0) return tree.visibleChildrenPerParent;
+  return 0;
+}
+
+int siblingDisplayOrder(FamilyTree tree, FamilyMember member) {
+  final parentId = member.parentId;
+  if (parentId == null || parentId.isEmpty) return 0;
+  final siblings = childrenOf(tree, parentId);
+  final idx = siblings.indexWhere((m) => m.id == member.id);
+  if (idx >= 0) return idx + 1;
+  return member.birthOrder > 0 ? member.birthOrder : 0;
+}
+
+int nextBirthOrderForParent(FamilyTree tree, String? parentId) {
+  if (parentId == null || parentId.isEmpty) return 1;
+  final siblings = childrenOf(tree, parentId);
+  if (siblings.isEmpty) return 1;
+  return siblings.map((m) => m.birthOrder).reduce(math.max) + 1;
 }
 
 FamilyMember? rootMember(FamilyTree tree) {

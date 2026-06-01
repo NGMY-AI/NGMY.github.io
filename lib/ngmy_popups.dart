@@ -10,6 +10,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+Widget _ngmyPopupTitleText(String title, double size, {int maxLines = 1}) {
+  return FittedBox(
+    fit: BoxFit.scaleDown,
+    child: Text(
+      title,
+      textAlign: TextAlign.center,
+      maxLines: maxLines,
+      softWrap: false,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: size * 0.088,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.3,
+      ),
+    ),
+  );
+}
+
 /// Admin-managed 3D floating pop-ups + luxury video ad frames.
 class NgmyPopupDefaults {
   static const int standardCount = 20;
@@ -507,13 +525,11 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
           Icon(_icon, color: Colors.white.withValues(alpha: 0.95), size: size * 0.14),
           SizedBox(height: size * 0.03),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: _ngmyPopupTitleText(
               title,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white, fontSize: size * 0.09, fontWeight: FontWeight.w900),
+              size,
+              maxLines: (widget.config['titleMaxLines'] as num?)?.toInt() ?? 1,
             ),
           ),
           if (subtitle.isNotEmpty) ...[
@@ -748,13 +764,11 @@ class _Ngmy3DFloatingInteractiveBodyState extends State<_Ngmy3DFloatingInteracti
           Icon(_icon, color: Colors.white.withValues(alpha: 0.95), size: size * 0.14),
           SizedBox(height: size * 0.03),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: _ngmyPopupTitleText(
               title,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white, fontSize: size * 0.09, fontWeight: FontWeight.w900),
+              size,
+              maxLines: (widget.config['titleMaxLines'] as num?)?.toInt() ?? 1,
             ),
           ),
           if (subtitle.isNotEmpty) ...[
