@@ -413,10 +413,19 @@ class UserData {
   }
   double get currentTodayEarnings {
     if (!isClockedIn || clockInStartTime == null || activeInvestment == null) return 0.0;
-    final elapsed = DateTime.now().difference(clockInStartTime!);
-    final totalDaily = activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
-    double earnings = (totalDaily / 24.0) * (elapsed.inSeconds / 3600.0);
-    return earnings > totalDaily ? totalDaily : earnings;
+    final goal = todayDailyGoal;
+    if (goal <= 0) return 0.0;
+    final now = DateTime.now();
+    final noon = DateTime(now.year, now.month, now.day, 12);
+    if (!now.isBefore(noon)) return goal;
+    final start = clockInStartTime!.isAfter(noon) ? noon : clockInStartTime!;
+    final windowMs = noon.difference(start).inMilliseconds;
+    if (windowMs <= 0) return goal;
+    final elapsedMs = now.difference(start).inMilliseconds;
+    if (elapsedMs <= 0) return 0.0;
+    final progress = (elapsedMs / windowMs).clamp(0.0, 1.0);
+    final earnings = goal * progress;
+    return earnings > goal ? goal : earnings;
   }
   double get todayDailyGoal => activeInvestment == null ? 0.0 : (activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100)));
 

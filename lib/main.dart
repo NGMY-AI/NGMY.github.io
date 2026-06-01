@@ -2060,7 +2060,23 @@ double _ngmyClockInLatePenaltyPercent(DateTime now) {
   return 0;
 }
 
-const int _ngmyFreeTrialFillSeconds = 60;
+/// Today's 12:00 PM payout deadline (local time).
+DateTime _ngmyTodayNoon(DateTime now) => DateTime(now.year, now.month, now.day, 12);
+
+/// Progress from clock-in toward full daily earnings at noon (0.0–1.0).
+/// Later clock-ins use a shorter window, so the battery fills faster.
+double _ngmyClockInProgressToNoon(DateTime? clockInStart) {
+  if (clockInStart == null) return 0.0;
+  final now = DateTime.now();
+  final noon = _ngmyTodayNoon(now);
+  if (!now.isBefore(noon)) return 1.0;
+  final start = clockInStart.isAfter(noon) ? noon : clockInStart;
+  final windowMs = noon.difference(start).inMilliseconds;
+  if (windowMs <= 0) return 1.0;
+  final elapsedMs = now.difference(start).inMilliseconds;
+  if (elapsedMs <= 0) return 0.0;
+  return (elapsedMs / windowMs).clamp(0.0, 1.0);
+}
 
 bool _storeOrderIsDelivered(Map<String, dynamic> o) =>
     (o['fulfillmentStatus'] ?? '').toString() == 'delivered';
@@ -3341,16 +3357,11 @@ class UserData {
   }
   double get currentTodayEarnings {
     if (!isClockedIn || clockInStartTime == null) return 0.0;
-    final elapsed = DateTime.now().difference(clockInStartTime!);
-    if (isOnFreeTrial) {
-      final goal = freeTrialDailyAmount;
-      final earnings = (goal / _ngmyFreeTrialFillSeconds) * elapsed.inSeconds;
-      return earnings > goal ? goal : earnings;
-    }
-    if (activeInvestment == null) return 0.0;
-    final totalDaily = activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
-    double earnings = (totalDaily / 24.0) * (elapsed.inSeconds / 3600.0);
-    return earnings > totalDaily ? totalDaily : earnings;
+    final goal = todayDailyGoal;
+    if (goal <= 0) return 0.0;
+    final progress = _ngmyClockInProgressToNoon(clockInStartTime);
+    final earnings = goal * progress;
+    return earnings > goal ? goal : earnings;
   }
   double get todayDailyGoal {
     if (isOnFreeTrial) return freeTrialDailyAmount;
@@ -6518,6 +6529,12 @@ class _LateClockInDialogState extends State<_LateClockInDialog> with SingleTicke
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 12),
                   ),
+                const SizedBox(height: 10),
+                Text(
+                  'Daily earnings reach 100% by 12:00 PM. The later you clock in, the faster your battery fills.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white.withOpacity(0.72), fontSize: 11.5, height: 1.35),
+                ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
@@ -7844,9 +7861,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final penalty = _ngmyClockInLatePenaltyPercent(now);
     final latePart = hours <= 0 ? '$mins min late' : '$hours hr ${mins.toString().padLeft(2, '0')} min late';
     if (penalty > 0) {
-      return (message: '$latePart · ${penalty.toInt()}% penalty', penalty: penalty, blocked: false);
+      return (message: '$latePart · ${penalty.toInt()}% penalty · pays 12 PM', penalty: penalty, blocked: false);
     }
-    return (message: latePart, penalty: 0, blocked: false);
+    return (message: '$latePart · full payout 12:00 PM', penalty: 0, blocked: false);
   }
 
   String _maskName(String email, String username) {
