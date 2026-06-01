@@ -96,7 +96,7 @@ String _hashPassword(String password) {
   return sha256.convert(bytes).toString();
 }
 
-/// Selectable text — tap and drag to copy (works on web and mobile).
+/// Long-press to copy — avoids SelectionArea/Overlay issues on desktop.
 class CopyOnHoldText extends StatelessWidget {
   final String data;
   final TextStyle? style;
@@ -115,16 +115,24 @@ class CopyOnHoldText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SelectableText(
-      data,
-      style: style,
-      textAlign: textAlign,
-      maxLines: maxLines,
-      contextMenuBuilder: (context, editableTextState) {
-        return AdaptiveTextSelectionToolbar.editableText(
-          editableTextState: editableTextState,
+    return GestureDetector(
+      onLongPress: () {
+        Clipboard.setData(ClipboardData(text: data));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Copied to clipboard'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       },
+      child: Text(
+        data,
+        style: style,
+        textAlign: textAlign,
+        maxLines: maxLines,
+        overflow: overflow,
+      ),
     );
   }
 }
@@ -3635,13 +3643,43 @@ class _NGMYAppState extends State<NGMYApp> {
     return _notificationsReady;
   }
 
+  Future<bool> _pushPromptSnoozed(String email) async {
+    final key = 'ngmy_push_snooze_until_${email.toLowerCase().trim()}';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final untilMs = prefs.getInt(key);
+      if (untilMs == null) return false;
+      if (DateTime.now().millisecondsSinceEpoch >= untilMs) {
+        await prefs.remove(key);
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _snoozePushPromptOneHour(String email) async {
+    final key = 'ngmy_push_snooze_until_${email.toLowerCase().trim()}';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final until = DateTime.now().add(const Duration(hours: 1));
+      await prefs.setInt(key, until.millisecondsSinceEpoch);
+    } catch (_) {}
+  }
+
   Future<void> _promptPushNotificationsForUser(BuildContext context, String email) async {
     if (email.trim().isEmpty) return;
     if (await _pushNotificationsEnabled()) return;
+    if (await _pushPromptSnoozed(email)) return;
     if (!context.mounted) return;
 
     final enable = await NgmyPushNotificationPrompt.show(context);
-    if (enable != true || !context.mounted) return;
+    if (enable != true) {
+      await _snoozePushPromptOneHour(email);
+      return;
+    }
+    if (!context.mounted) return;
 
     if (kIsWeb) {
       await ngmyPushRequestPermission();
@@ -5353,7 +5391,6 @@ class _NGMYAppState extends State<NGMYApp> {
     if (_isLoading) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
-        builder: (context, child) => SelectionArea(child: child ?? const SizedBox.shrink()),
         home: const Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
@@ -5443,7 +5480,7 @@ class _NGMYAppState extends State<NGMYApp> {
         ),
         themeMode: _effectiveThemeMode,
         builder: (context, child) {
-          final content = SelectionArea(child: child ?? const SizedBox.shrink());
+          final content = child ?? const SizedBox.shrink();
           if (kIsWeb && Theme.of(context).brightness == Brightness.light) {
             ngmyApplyWebStatusBarStyle(lightMode: true);
             return ColoredBox(color: Colors.white, child: content);

@@ -131,14 +131,19 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pageBg = isDark ? const Color(0xFF121212) : const Color(0xFFF3F4F6);
+    final backIconColor = isDark ? Colors.white70 : Colors.black87;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: pageBg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        foregroundColor: backIconColor,
         leading: widget.onBack != null
             ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black87),
+                icon: Icon(Icons.arrow_back_ios_new_rounded, color: backIconColor),
                 onPressed: widget.onBack,
               )
             : null,

@@ -692,7 +692,6 @@ class FamilyTreeCanvas extends StatelessWidget {
                 top: pos.dy,
                 child: _MemberNode(
                   member: member,
-                  childCount: descendantCount(tree, member.id),
                   siblingOrder: siblingDisplayOrder(tree, member),
                   onTap: () => onMemberTap(member),
                 ),
@@ -1052,13 +1051,11 @@ class _FamilyTreeLinesPainter extends CustomPainter {
 
 class _MemberNode extends StatelessWidget {
   final FamilyMember member;
-  final int childCount;
   final int siblingOrder;
   final VoidCallback onTap;
 
   const _MemberNode({
     required this.member,
-    required this.childCount,
     this.siblingOrder = 0,
     required this.onTap,
   });
@@ -1119,24 +1116,6 @@ class _MemberNode extends StatelessWidget {
                       child: Text(
                         '#$siblingOrder',
                         style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  ),
-                if (childCount > 0)
-                  Positioned(
-                    right: -2,
-                    bottom: -2,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: WorksheetPalette.green,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '$childCount',
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
                       ),
                     ),
                   ),
