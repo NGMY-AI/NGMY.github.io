@@ -8520,9 +8520,9 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
         if (didPop) return;
         _exitGameCenter();
       },
-      child: Scaffold(
+      child: ngmyGameScreenShell(
         backgroundColor: const Color(0xFF2B1454),
-        body: Stack(
+        child: Stack(
           clipBehavior: Clip.none,
           children: [
             SingleChildScrollView(
@@ -8655,7 +8655,6 @@ class _NgmyDiceGameHost extends StatefulWidget {
 
 class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> {
   late NgmyDiceSettings _dice;
-  bool _countedThisSession = false;
 
   @override
   void initState() {
@@ -8686,10 +8685,8 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> {
         setState(() => widget.user.accountBalance -= bet);
         widget.user.points += 20;
         unawaited(_pushUserToCloudFast(widget.user));
-        if (!_countedThisSession) {
-          _countedThisSession = true;
-          widget.onGameStarted();
-        }
+        // Every successful roll/bet counts as a game (+20 points each time).
+        widget.onGameStarted();
         widget.onAddTransaction(
           AppTransaction(
             id: DateTime.now().microsecondsSinceEpoch.toString(),
