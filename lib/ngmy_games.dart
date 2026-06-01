@@ -5,6 +5,7 @@ import 'ngmy_dice_config.dart';
 import 'ngmy_dice_cube.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_result_popup.dart';
+import 'ngmy_game_session.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_multiplayer.dart';
 
@@ -71,6 +72,12 @@ Map<String, int> ngmyParseGameTimeLimits(dynamic raw) {
   }
   return out;
 }
+
+/// Minimum questions / moves / parts per Game Center round.
+const int kNgmyQuestionsPerGame = 5;
+const int kNgmyTypingSentencesPerGame = 5;
+const int kNgmyPatternMovesPerGame = 7;
+const int kNgmySimonWinRounds = 6;
 
 int ngmyGameTimeLimitSeconds(String gameId, Map<String, int> limits) {
   return limits[gameId] ?? ngmyDefaultGameTimeLimits()[gameId] ?? 90;
@@ -325,6 +332,9 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
           _rollPreview = null;
         }),
       );
+      await ngmyNotifyGameWin('Dice Roll', bonus > 0
+          ? '+\$${payout.toStringAsFixed(2)} total (includes \$3 bonus for +3!)'
+          : '+\$${payout.toStringAsFixed(2)} added to your balance');
     } else {
       await showNgmyGameResultPopup(
         context,

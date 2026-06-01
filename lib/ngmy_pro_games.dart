@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_multiplayer.dart';
+import 'ngmy_games.dart' show kNgmyQuestionsPerGame;
 
 /// Professional casino / board game implementations.
 class NgmyProState {
@@ -88,7 +89,7 @@ class NgmyProState {
         prompt = 'Connect 4 discs to win';
         break;
       case 'profit_solve':
-        goal = 3;
+        goal = kNgmyQuestionsPerGame;
         score = 0;
         _nextProfit(rng);
         prompt = 'Solve profit scenarios — $goal correct';
