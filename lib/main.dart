@@ -72,6 +72,8 @@ import 'ngmy_platform_graphics.dart';
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
 ThemeMode _ngmyInitialThemeMode = ThemeMode.light;
+const _ngmyStartupBg = Color(0xFF0B1220);
+const _ngmyStartupAccent = Color(0xFF22D3EE);
 
 Future<ThemeMode> _ngmyReadInitialThemeMode() async {
   try {
@@ -96,6 +98,14 @@ void main() async {
   };
 
   _ngmyInitialThemeMode = await _ngmyReadInitialThemeMode();
+  // Force a stable, non-white first frame (prevents iOS/Safari flash).
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: _ngmyStartupBg,
+    statusBarIconBrightness: Brightness.light,
+    statusBarBrightness: Brightness.dark,
+    systemNavigationBarColor: _ngmyStartupBg,
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
 
   await ngmyIgnoreTimeout(() async {
     try {
@@ -3698,15 +3708,13 @@ class NgmyStartupSplash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = isDark ? const Color(0xFF121212) : Colors.white;
-    final accent = isDark ? const Color(0xFFBB86FC) : const Color(0xFF00B25A);
     return ColoredBox(
-      color: bg,
+      color: _ngmyStartupBg,
       child: Center(
         child: SizedBox(
           width: 32,
           height: 32,
-          child: CircularProgressIndicator(strokeWidth: 2.5, color: accent),
+          child: const CircularProgressIndicator(strokeWidth: 2.5, color: _ngmyStartupAccent),
         ),
       ),
     );
@@ -5450,10 +5458,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _loadData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedTheme = prefs.getString('theme_mode');
-      if (savedTheme == 'light') _themeMode = ThemeMode.light;
-      if (savedTheme == 'dark') _themeMode = ThemeMode.dark;
-      if (savedTheme == 'system') _themeMode = ThemeMode.system;
+      // Theme is already loaded before first frame to prevent startup flashing.
 
       String? safeGet(String key) {
         try {
@@ -5552,12 +5557,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
 
       if (mounted) {
-        _applySystemUiForMode(_effectiveThemeMode);
         for (final a in _allAnnouncements) {
           _seenRealtimeAnnouncementIds.add(a.id);
         }
         _appShellSig = _computeAppShellSig();
+        // Keep splash stable; fade into app after a short minimum duration.
+        await Future<void>.delayed(const Duration(milliseconds: 900));
+        if (!mounted) return;
         setState(() => _isLoading = false);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _applySystemUiForMode(_effectiveThemeMode);
+        });
         _startBackgroundServices();
       }
 
