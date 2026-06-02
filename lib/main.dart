@@ -2267,6 +2267,9 @@ bool _ngmySameCalendarDay(DateTime? a, DateTime b) {
 void _ngmyApplyMidnightClockReset(UserData user) {
   final now = DateTime.now();
   final today = _ngmyDateOnly(now);
+  if (user.lastClockInEarningsDate != null && !_ngmySameCalendarDay(user.lastClockInEarningsDate, now)) {
+    user.todayClockInEarned = 0;
+  }
   if (user.isClockedIn && user.clockInStartTime != null) {
     final startedDay = _ngmyDateOnly(user.clockInStartTime!);
     if (startedDay.isBefore(today)) {
@@ -2275,6 +2278,20 @@ void _ngmyApplyMidnightClockReset(UserData user) {
       user.clockInPenaltyPercent = 0;
     }
   }
+}
+
+double? _ngmyClockInPayoutAmountForDay(String email, List<AppTransaction> txs, DateTime day) {
+  final id = _ngmyClockInTransactionId(email, day);
+  final key = email.toLowerCase().trim();
+  for (final t in txs) {
+    if (t.id == id && t.status == TransactionStatus.approved) return t.amount;
+    if (t.userEmail.toLowerCase().trim() != key) continue;
+    if (t.status != TransactionStatus.approved) continue;
+    if (t.type != TransactionType.reimbursement) continue;
+    if (!(t.sourceDetails ?? '').toLowerCase().contains('clock-in daily earnings')) continue;
+    if (_ngmySameCalendarDay(t.timestamp, day)) return t.amount;
+  }
+  return null;
 }
 
 /// Minutes after midnight before late clock-in UI appears (12:10 AM).
@@ -2347,6 +2364,10 @@ void _ngmyReconcileClockInSession(UserData user, List<AppTransaction> txs) {
   final now = DateTime.now();
   if (_ngmyHasClockInPayoutForDay(user.email, txs, now) ||
       _ngmySameCalendarDay(user.lastClockInEarningsDate, now)) {
+    final paid = _ngmyClockInPayoutAmountForDay(user.email, txs, now);
+    if (paid != null && paid > 0) {
+      user.todayClockInEarned = paid;
+    }
     user.isClockedIn = false;
     user.clockInStartTime = null;
     user.clockInPenaltyPercent = 0;
@@ -3690,6 +3711,8 @@ class UserData {
   bool canSellOnStore;
   DateTime? lastClockInDate;
   DateTime? lastClockInEarningsDate;
+  /// Amount earned today — stays on the Today tile after payout until midnight.
+  double todayClockInEarned;
   String passwordHash;
   String state;
   int helps;
@@ -3721,7 +3744,7 @@ class UserData {
   List<Map<String, dynamic>> mediaStories;
   List<String> readAnnouncementIds;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.freeTrialActive = false, this.freeTrialDailyAmount = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds}) : mediaFollowers = mediaFollowers ?? <String>[], mediaFollowing = mediaFollowing ?? <String>[], mediaHighlights = mediaHighlights ?? <Map<String, dynamic>>[], mediaStories = mediaStories ?? <Map<String, dynamic>>[], readAnnouncementIds = readAnnouncementIds ?? <String>[];
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.todayClockInEarned = 0.0, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.freeTrialActive = false, this.freeTrialDailyAmount = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds}) : mediaFollowers = mediaFollowers ?? <String>[], mediaFollowing = mediaFollowing ?? <String>[], mediaHighlights = mediaHighlights ?? <Map<String, dynamic>>[], mediaStories = mediaStories ?? <Map<String, dynamic>>[], readAnnouncementIds = readAnnouncementIds ?? <String>[];
   bool get isOnFreeTrial => freeTrialActive && freeTrialDailyAmount > 0;
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
@@ -3742,6 +3765,22 @@ class UserData {
     final earnings = goal * progress;
     return earnings > goal ? goal : earnings;
   }
+
+  /// Today tile: live earnings while clocked in; after deposit keeps today's total until midnight.
+  double get displayedTodayEarnings {
+    final now = DateTime.now();
+    if (isClockedIn && clockInStartTime != null && _ngmySameCalendarDay(clockInStartTime!, now)) {
+      return currentTodayEarnings;
+    }
+    if (todayClockInEarned > 0 && _ngmySameCalendarDay(lastClockInEarningsDate, now)) {
+      return todayClockInEarned;
+    }
+    return 0.0;
+  }
+
+  /// Unpaid clock-in accrual only (for total profit while session is active).
+  double get unpaidTodayEarnings =>
+      isClockedIn && clockInStartTime != null ? currentTodayEarnings : 0.0;
   /// Full daily clock-in amount before any late penalty (e.g. \$5.72).
   double get fullDailyEarningsBeforePenalty {
     if (isOnFreeTrial) return freeTrialDailyAmount;
@@ -3755,7 +3794,7 @@ class UserData {
     if (full <= 0) return 0.0;
     return full * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
   }
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'todayClockInEarned': todayClockInEarned, 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -3798,6 +3837,7 @@ class UserData {
       canSellOnStore: json['canSellOnStore'] == true,
       lastClockInDate: parseDate(json['lastClockInDate']),
       lastClockInEarningsDate: parseDate(json['lastClockInEarningsDate']),
+      todayClockInEarned: (json['todayClockInEarned'] ?? 0.0).toDouble(),
       passwordHash: json['passwordHash'] ?? '',
       state: json['state'] ?? 'Georgia',
       helps: json['helps'] ?? 0,
@@ -5632,6 +5672,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final remoteDate = remote.lastClockInEarningsDate;
       if (remoteDate == null || local.lastClockInEarningsDate!.isAfter(remoteDate)) {
         remote.lastClockInEarningsDate = local.lastClockInEarningsDate;
+      }
+    }
+    if (local.todayClockInEarned > 0) {
+      if (_ngmySameCalendarDay(local.lastClockInEarningsDate, DateTime.now())) {
+        remote.todayClockInEarned = math.max(remote.todayClockInEarned, local.todayClockInEarned);
       }
     }
     if (local.lastClockInDate != null) {
@@ -7755,6 +7800,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             widget.user.clockInPenaltyPercent = 0;
             widget.user.lastClockInDate = now;
             widget.user.lastClockInEarningsDate = now;
+            widget.user.todayClockInEarned = earned;
             completed = true;
           });
         }
@@ -8325,7 +8371,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Expanded(child: _money(context, label: 'Today', value: '\$${formatCurrency(widget.user.currentTodayEarnings)}', isToday: true)),
+                  Expanded(child: _money(context, label: 'Today', value: '\$${formatCurrency(widget.user.displayedTodayEarnings)}', isToday: true)),
                   const SizedBox(width: 15),
                   Expanded(child: _money(context, label: 'Balance', value: '\$${formatCurrency(widget.user.accountBalance)}', isToday: false)),
                 ],
@@ -8370,7 +8416,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Expanded(child: _info(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit + widget.user.currentTodayEarnings)}')),
+                  Expanded(child: _info(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit + widget.user.unpaidTodayEarnings)}')),
                   const SizedBox(width: 15),
                   Expanded(child: _info(context, 'Total Investment', '\$${formatCurrency(widget.user.totalInvestmentAmount)}')),
                 ],
@@ -8708,7 +8754,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     double scale = active ? (1.0 + math.sin(_smokeCtrl.value * 2 * math.pi) * 0.04) : 1.0;
                     double dailyGoal = widget.user.todayDailyGoal;
                     if (dailyGoal <= 0) dailyGoal = 1.0;
-                    double progress = widget.user.currentTodayEarnings / dailyGoal;
+                    double progress;
+                    if (widget.user.isClockedIn) {
+                      progress = widget.user.currentTodayEarnings / dailyGoal;
+                    } else if (widget.user.displayedTodayEarnings > 0) {
+                      progress = widget.user.displayedTodayEarnings / dailyGoal;
+                    } else {
+                      progress = 0.0;
+                    }
                     if (progress > 1.0) progress = 1.0;
                     if (progress < 0.0) progress = 0.0;
                     final startFill = Color.lerp(const Color(0xFFEFFFF8), const Color(0xFF22D3EE), progress * 0.55)!;
@@ -8883,10 +8936,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 const SizedBox(height: 4),
                 Text(alreadyDone ? 'Completed' : 'Daily Earnings', style: const TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                if (!alreadyDone) Text(
-                  '\$${formatCurrency(widget.user.currentTodayEarnings)}',
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
-                ),
+                if (!alreadyDone)
+                  Text(
+                    '\$${formatCurrency(widget.user.displayedTodayEarnings)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                  ),
+                if (alreadyDone && widget.user.displayedTodayEarnings > 0)
+                  Text(
+                    '\$${formatCurrency(widget.user.displayedTodayEarnings)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                  ),
                 if (!alreadyDone && widget.user.clockInPenaltyPercent > 0)
                   Text(
                     'Max today \$${formatCurrency(widget.user.todayDailyGoal)} (${widget.user.clockInPenaltyPercent.toInt()}% late fee)',
@@ -10213,6 +10272,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   int _myPairsFound = 0;
   List<int> _revealedCards = [];
   final Set<int> _matchedCards = {};
+  final Set<int> _myMatchedCardIndices = {};
   bool _lockingCards = false;
   int _pairsFound = 0;
   int _memoryCols = 4;
@@ -10412,31 +10472,15 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (session is! Map) return;
     final s = Map<String, dynamic>.from(session);
     if (widget.gameId == 'memory') {
-      final matched = <int>{};
-      final matchedRaw = s['memoryMatched'];
-      if (matchedRaw is List) {
-        for (final i in matchedRaw) {
-          final n = (i is num) ? i.toInt() : int.tryParse(i.toString());
-          if (n != null) matched.add(n);
-        }
-      }
+      final before = '${_matchedCards.length}|${_myMatchedCardIndices.length}|$_myPairsFound';
+      _applyMemoryMatchStateFromSession(s);
+      final after = '${_matchedCards.length}|${_myMatchedCardIndices.length}|$_myPairsFound';
       final seedAny = s['memorySeed'];
       final seed = (seedAny is num) ? seedAny.toInt() : int.tryParse(seedAny?.toString() ?? '');
 
-      var changed = false;
-      if (matched.length != _matchedCards.length || !_matchedCards.containsAll(matched)) {
-        _matchedCards
-          ..clear()
-          ..addAll(matched);
-        _pairsFound = (_matchedCards.length / 2).floor();
-        final key = widget.user.email.toLowerCase().trim();
-        final scoresRaw = s['scores'];
-        if (scoresRaw is Map) {
-          final myScore = (scoresRaw[key] as num?)?.toInt();
-          if (myScore != null) _myPairsFound = myScore;
-        }
+      var changed = before != after;
+      if (changed) {
         _revealedCards.removeWhere((i) => _matchedCards.contains(i));
-        changed = true;
       }
       if (seed != null && _memoryValues.isNotEmpty) {
         // Ensure board order matches session seed.
@@ -10945,10 +10989,46 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     _answer = _colorTarget;
   }
 
+  void _applyMemoryMatchStateFromSession(Map<String, dynamic> session) {
+    final key = widget.user.email.toLowerCase().trim();
+    _matchedCards.clear();
+    _myMatchedCardIndices.clear();
+    final byRaw = session['memoryMatchedBy'];
+    if (byRaw is Map) {
+      final union = <int>{};
+      for (final e in byRaw.entries) {
+        final email = e.key.toString().toLowerCase().trim();
+        final list = e.value is List ? e.value : const [];
+        for (final i in list) {
+          final n = (i is num) ? i.toInt() : int.tryParse(i.toString());
+          if (n == null) continue;
+          union.add(n);
+          if (email == key) _myMatchedCardIndices.add(n);
+        }
+      }
+      _matchedCards.addAll(union);
+    } else {
+      final matchedRaw = session['memoryMatched'];
+      if (matchedRaw is List) {
+        for (final i in matchedRaw) {
+          final n = (i is num) ? i.toInt() : int.tryParse(i.toString());
+          if (n != null) _matchedCards.add(n);
+        }
+      }
+    }
+    _pairsFound = (_matchedCards.length / 2).floor();
+    final scoresRaw = session['scores'];
+    if (scoresRaw is Map) {
+      final myScore = (scoresRaw[key] as num?)?.toInt();
+      if (myScore != null) _myPairsFound = myScore;
+    }
+  }
+
   void _setupMemoryBoard() {
     _pairsFound = 0;
     _myPairsFound = 0;
     _matchedCards.clear();
+    _myMatchedCardIndices.clear();
     _revealedCards = [];
     _lockingCards = false;
     _memoryValues = [..._memoryBase, ..._memoryBase];
@@ -10965,20 +11045,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       } else {
         _memoryValues.shuffle(_rng);
       }
-      final matchedRaw = session['memoryMatched'];
-      if (matchedRaw is List) {
-        for (final i in matchedRaw) {
-          final n = (i is num) ? i.toInt() : int.tryParse(i.toString());
-          if (n != null) _matchedCards.add(n);
-        }
-        _pairsFound = (_matchedCards.length / 2).floor();
-        final key = widget.user.email.toLowerCase().trim();
-        final scoresRaw = session['scores'];
-        if (scoresRaw is Map) {
-          final myScore = (scoresRaw[key] as num?)?.toInt();
-          if (myScore != null) _myPairsFound = myScore;
-        }
-      }
+      _applyMemoryMatchStateFromSession(session);
     } else {
       _memoryValues.shuffle(_rng);
     }
@@ -10995,8 +11062,12 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       setState(() {
         _matchedCards.add(a);
         _matchedCards.add(b);
+        if (_isSkillMultiplayer) {
+          _myMatchedCardIndices.add(a);
+          _myMatchedCardIndices.add(b);
+          _myPairsFound++;
+        }
         _pairsFound++;
-        if (_isSkillMultiplayer) _myPairsFound++;
         _revealedCards = [];
       });
       if (_isSkillMultiplayer) {
@@ -11283,8 +11354,19 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       scores[key] = _gameProgressDone();
       session['scores'] = scores;
       if (widget.gameId == 'memory') {
-        final matched = _matchedCards.toList()..sort();
-        session['memoryMatched'] = matched;
+        final byRaw = session['memoryMatchedBy'];
+        final by = byRaw is Map ? Map<String, dynamic>.from(byRaw) : <String, dynamic>{};
+        by[key] = _myMatchedCardIndices.toList()..sort();
+        session['memoryMatchedBy'] = by;
+        final union = <int>{};
+        for (final list in by.values) {
+          if (list is! List) continue;
+          for (final i in list) {
+            final n = (i is num) ? i.toInt() : int.tryParse(i.toString());
+            if (n != null) union.add(n);
+          }
+        }
+        session['memoryMatched'] = union.toList()..sort();
       }
       final wagersRaw = session['wagers'];
       final wagers = wagersRaw is Map ? Map<String, dynamic>.from(wagersRaw) : <String, dynamic>{};
@@ -11608,7 +11690,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
                       mainAxisExtent: side,
                     ),
                     itemBuilder: (_, i) {
-                      final isOpen = _revealedCards.contains(i) || _matchedCards.contains(i);
+                      final isMatched = _matchedCards.contains(i);
+                      final isMine = _isSkillMultiplayer && isMatched && _myMatchedCardIndices.contains(i);
+                      final isOpponent = _isSkillMultiplayer && isMatched && !isMine;
+                      final isOpen = _revealedCards.contains(i) || isMatched;
+                      final matchGradient = isMine
+                          ? const LinearGradient(colors: [Color(0xFF4ADE80), Color(0xFF14B8A6)])
+                          : const LinearGradient(colors: [Color(0xFF60A5FA), Color(0xFF2563EB)]);
                       return InkWell(
                         onTap: () => _pickMemoryCard(i),
                         borderRadius: BorderRadius.circular(10),
@@ -11616,9 +11704,14 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
                           duration: const Duration(milliseconds: 180),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(10),
-                            gradient: isOpen
-                                ? const LinearGradient(colors: [Color(0xFF4ADE80), Color(0xFF14B8A6)])
-                                : const LinearGradient(colors: [Color(0xFFA855F7), Color(0xFFEC4899)]),
+                            gradient: isMine
+                                ? matchGradient
+                                : isOpponent
+                                    ? matchGradient
+                                    : isOpen
+                                        ? const LinearGradient(colors: [Color(0xFF4ADE80), Color(0xFF14B8A6)])
+                                        : const LinearGradient(colors: [Color(0xFFA855F7), Color(0xFFEC4899)]),
+                            border: isOpponent ? Border.all(color: const Color(0xFF93C5FD), width: 2) : null,
                             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4)],
                           ),
                           child: Center(
