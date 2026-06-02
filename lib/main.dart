@@ -37,7 +37,6 @@ import 'ngmy_multiplayer.dart';
 import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
 import 'ngmy_dice_config.dart';
-import 'ngmy_resilient_icon.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_invoice_storage.dart';
 import 'ngmy_invoice_templates.dart';
@@ -50,6 +49,7 @@ import 'ngmy_offline.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_store_gift_celebration.dart';
 import 'ngmy_store_listing_extras.dart';
+import 'ngmy_store_payment_notification.dart';
 import 'ngmy_document_scanner.dart';
 import 'ngmy_oauth.dart';
 import 'ngmy_worksheets.dart';
@@ -233,6 +233,33 @@ String buildInvestmentRequestDetails({
       'amount:${amount.toStringAsFixed(2)}|'
       'roi:${roi.toStringAsFixed(6)}|'
       'payer:$payer';
+}
+
+/// Stable id so repeat taps cannot create duplicate investment charges.
+String ngmyInvestPurchaseTxnId(String email, String planName, double planAmount) {
+  final e = email.toLowerCase().trim();
+  final slug = planName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+  return 'invest_buy_${e}_${slug}_${planAmount.toStringAsFixed(2)}';
+}
+
+bool ngmyUserHasActivePlan(UserData user, {required String planName, required double planAmount}) {
+  final inv = user.activeInvestment;
+  if (inv == null || inv.daysLeft <= 0) return false;
+  return inv.name == planName && (inv.amount - planAmount).abs() < 0.0001;
+}
+
+bool ngmyHasApprovedInvestPurchase(
+  String email,
+  List<AppTransaction> transactions,
+  String txnId,
+) {
+  final key = email.toLowerCase().trim();
+  return transactions.any(
+    (t) =>
+        t.id == txnId &&
+        t.userEmail.toLowerCase().trim() == key &&
+        t.status == TransactionStatus.approved,
+  );
 }
 
 class AppTransaction {
@@ -1999,6 +2026,10 @@ Map<String, dynamic> _normalizeStoreOrder(Map<String, dynamic> order) {
     copy['shipByDeadline'] = created.add(kStoreShipByWindow).toUtc().toIso8601String();
   }
   if ((copy['shippingMethod'] ?? '').toString().isEmpty) copy['shippingMethod'] = 'car';
+  if ((copy['paymentStatus'] ?? '').toString().isEmpty) {
+    final via = (copy['paidVia'] ?? '').toString().toLowerCase();
+    copy['paymentStatus'] = (via == 'cashapp' || via == 'zelle') ? 'awaiting_proof' : 'approved';
+  }
   return copy;
 }
 
@@ -3631,6 +3662,29 @@ List<Map<String, dynamic>> _jsonMapList(dynamic raw) {
 }
 
 // --- MAIN APP ---
+
+/// Solid splash while local session loads — avoids Auth → Home white flash.
+class NgmyStartupSplash extends StatelessWidget {
+  const NgmyStartupSplash({super.key, required this.isDark});
+
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isDark ? const Color(0xFF121212) : Colors.white;
+    final accent = isDark ? const Color(0xFFBB86FC) : const Color(0xFF00B25A);
+    return ColoredBox(
+      color: bg,
+      child: Center(
+        child: SizedBox(
+          width: 32,
+          height: 32,
+          child: CircularProgressIndicator(strokeWidth: 2.5, color: accent),
+        ),
+      ),
+    );
+  }
+}
 
 class NGMYApp extends StatefulWidget {
   const NGMYApp({super.key});
@@ -5334,8 +5388,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       remote.clockInStartTime = local.clockInStartTime;
       remote.clockInPenaltyPercent = local.clockInPenaltyPercent;
     }
-    if (local.activeInvestment != null && remote.activeInvestment == null) {
-      remote.activeInvestment = local.activeInvestment;
+    if (local.activeInvestment != null) {
+      if (remote.activeInvestment == null) {
+        remote.activeInvestment = local.activeInvestment;
+      } else {
+        final localInv = local.activeInvestment!;
+        final remoteInv = remote.activeInvestment!;
+        final localNewer = localInv.purchaseDate.isAfter(remoteInv.purchaseDate);
+        final localHigher = localInv.amount > remoteInv.amount + 0.001;
+        if (localNewer || localHigher) {
+          remote.activeInvestment = localInv;
+        }
+      }
     }
     // NGMY points are earned locally during games — never let stale cloud rows drop them.
     if (local.points > remote.points) {
@@ -6003,7 +6067,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         ),
         themeMode: _effectiveThemeMode,
         builder: (context, child) => child ?? const SizedBox.shrink(),
-        home: _currentUser == null
+        home: _isLoading
+            ? NgmyStartupSplash(isDark: _effectiveThemeMode == ThemeMode.dark)
+            : _currentUser == null
             ? AuthScreen(
                 allUsers: _allUsers,
                 config: _config,
@@ -7173,6 +7239,7 @@ String _announcementsSig(List<Announcement> items) {
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
   bool _offline = false;
+  bool _investPurchaseInFlight = false;
   Timer? _onlineCheck;
   List<Widget>? _tabPages;
   String? _tabPagesKey;
@@ -7398,7 +7465,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override void dispose() { WidgetsBinding.instance.removeObserver(this); _t?.cancel(); _onlineCheck?.cancel(); super.dispose(); }
 
   List<Widget> _buildTabPages(List<AppTransaction> sorted) {
-    final cacheKey = '${widget.user.email}|${widget.allMedia.length}|${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}';
+    final inv = widget.user.activeInvestment;
+    final invSig = inv == null
+        ? 'none'
+        : '${inv.name}|${inv.amount.toStringAsFixed(2)}|${inv.daysLeft}|${inv.purchaseDate.millisecondsSinceEpoch}';
+    final cacheKey =
+        '${widget.user.email}|$invSig|${widget.user.accountBalance.toStringAsFixed(2)}|'
+        '${widget.user.pendingInvestmentName}|${widget.allMedia.length}|'
+        '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight';
     if (_tabPages != null && _tabPagesKey == cacheKey) return _tabPages!;
     _tabPagesKey = cacheKey;
     _tabPages = [
@@ -7457,16 +7531,27 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           }
         }
       }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead),
-      InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
-        if (cost <= 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('This plan is already active.')),
-          );
-          return;
-        }
-        if (widget.user.accountBalance >= cost) {
-          setState(() {
-            widget.user.accountBalance -= cost;
+      InvestScreen(
+        user: widget.user,
+        plans: widget.globalPlans,
+        purchaseInFlight: _investPurchaseInFlight,
+        onInvest: (n, p, r, cost) {
+          if (_investPurchaseInFlight) return;
+          if (cost <= 0 || ngmyUserHasActivePlan(widget.user, planName: n, planAmount: p)) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('This plan is already active.')),
+            );
+            return;
+          }
+          final txnId = ngmyInvestPurchaseTxnId(widget.user.email, n, p);
+          if (ngmyHasApprovedInvestPurchase(widget.user.email, widget.allTransactions, txnId)) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('You already own this plan. No additional charge was made.')),
+            );
+            return;
+          }
+          if (widget.user.accountBalance >= cost) {
+            setState(() => _investPurchaseInFlight = true);
             widget.user.activeInvestment = ActiveInvestment(
               name: n,
               amount: p,
@@ -7478,47 +7563,51 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             widget.user.pendingInvestmentName = null;
             widget.user.pendingInvestmentAmount = null;
             widget.user.pendingInvestmentRoi = null;
+            widget.onAddTransaction(
+              AppTransaction(
+                id: txnId,
+                userEmail: widget.user.email,
+                amount: cost,
+                type: TransactionType.adminRemove,
+                method: PaymentMethod.system,
+                sourceDetails: 'Direct investment buy: $n',
+                status: TransactionStatus.approved,
+                timestamp: DateTime.now(),
+              ),
+            );
+            widget.onDataChanged();
+            if (mounted) {
+              setState(() => _investPurchaseInFlight = false);
+              _tabPages = null;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Plan purchased: $n')),
+              );
+            }
+            return;
+          }
+          setState(() {
+            widget.user.pendingInvestmentName = n;
+            widget.user.pendingInvestmentAmount = p;
+            widget.user.pendingInvestmentRoi = r;
           });
-          widget.onAddTransaction(
-            AppTransaction(
-              id: 'invest_buy_${DateTime.now().microsecondsSinceEpoch}',
-              userEmail: widget.user.email,
+          widget.onDataChanged();
+          NgmyNavigator.push(
+            context,
+            SubmitPaymentPage(
+              user: widget.user,
               amount: cost,
-              type: TransactionType.adminRemove,
-              method: PaymentMethod.system,
-              sourceDetails: 'Direct investment buy: $n',
-              status: TransactionStatus.approved,
-              timestamp: DateTime.now(),
+              onAdd: widget.onAddTransaction,
+              config: widget.config,
+              requestTitle: 'Submit Investment Request',
+              successHint: 'Your investment request was sent to admin for approval.',
+              requestKind: 'investment',
+              investmentPlanName: n,
+              investmentPlanAmount: p,
+              investmentPlanRoi: r,
             ),
           );
-          widget.onDataChanged();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Plan purchased: $n')),
-          );
-          return;
-        }
-        setState(() {
-          widget.user.pendingInvestmentName = n;
-          widget.user.pendingInvestmentAmount = p;
-          widget.user.pendingInvestmentRoi = r;
-        });
-        widget.onDataChanged();
-        NgmyNavigator.push(
-          context,
-          SubmitPaymentPage(
-            user: widget.user,
-            amount: cost,
-            onAdd: widget.onAddTransaction,
-            config: widget.config,
-            requestTitle: 'Submit Investment Request',
-            successHint: 'Your investment request was sent to admin for approval.',
-            requestKind: 'investment',
-            investmentPlanName: n,
-            investmentPlanAmount: p,
-            investmentPlanRoi: r,
-          ),
-        );
-      }),
+        },
+      ),
       WalletScreen(user: widget.user, transactions: sorted.where((t) => t.userEmail == widget.user.email).take(30).toList(), onAdd: widget.onAddTransaction, config: widget.config, onDataChanged: widget.onDataChanged),
       NgmyHubScreen(
         user: widget.user,
@@ -9194,7 +9283,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
           children: [
             SizedBox(
               width: 100,
-              child: Center(child: NgmyGameTileIcon(emoji: g.emoji, icon: g.icon, size: 52)),
+              child: Center(child: Icon(g.icon, color: Colors.white, size: 64)),
             ),
             Expanded(
               child: Padding(
@@ -9207,7 +9296,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
                       children: [
                         Expanded(child: Text(g.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17))),
                         if (mp)
-                          const Text('👥', style: TextStyle(fontSize: 14)),
+                          const Icon(Icons.groups_rounded, color: Color(0xFFFBBF24), size: 18),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -9218,7 +9307,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
             ),
             if (mp)
               IconButton(
-                icon: const Text('➕', style: TextStyle(fontSize: 18, color: Color(0xFFFBBF24))),
+                icon: const Icon(Icons.person_add_rounded, color: Color(0xFFFBBF24)),
                 tooltip: 'Invite player',
                 onPressed: () => showMultiplayerInviteDialog(
                   context: context,
@@ -13928,10 +14017,29 @@ double _ngmyBottomNavScrollPadding(BuildContext context) {
   return 110 + MediaQuery.paddingOf(context).bottom;
 }
 
-class InvestScreen extends StatelessWidget {
-  final UserData user; final List<InvestmentPlan> plans; final Function(String, double, double, double) onInvest;
-  const InvestScreen({super.key, required this.user, required this.plans, required this.onInvest});
+class InvestScreen extends StatefulWidget {
+  final UserData user;
+  final List<InvestmentPlan> plans;
+  final bool purchaseInFlight;
+  final void Function(String name, double price, double roi, double cost) onInvest;
+
+  const InvestScreen({
+    super.key,
+    required this.user,
+    required this.plans,
+    required this.onInvest,
+    this.purchaseInFlight = false,
+  });
+
+  @override
+  State<InvestScreen> createState() => _InvestScreenState();
+}
+
+class _InvestScreenState extends State<InvestScreen> {
   @override Widget build(BuildContext context) {
+    final user = widget.user;
+    final plans = widget.plans;
+    final onInvest = widget.onInvest;
     final bottomPad = _ngmyBottomNavScrollPadding(context);
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -13941,7 +14049,12 @@ class InvestScreen extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPad),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const FloatingTitle(title: 'INVESTMENT PLANS'), const SizedBox(height: 20),
-      if (user.activeInvestment != null) ...[const Text('ACTIVE ASSET', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)), const SizedBox(height: 15), _activeCard(context, user.activeInvestment!, user), const SizedBox(height: 30)],
+      if (user.activeInvestment != null) ...[
+        const Text('ACTIVE ASSET', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 15),
+        _activeCard(context, user.activeInvestment!, user),
+        const SizedBox(height: 30),
+      ],
       const Text('AVAILABLE PLANS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)), const SizedBox(height: 15),
       ...plans.map((p) => _planRow(context, p)),
           ]),
@@ -14176,6 +14289,7 @@ class InvestScreen extends StatelessWidget {
   );
 
   Widget _planRow(BuildContext ctx, InvestmentPlan p) {
+    final user = widget.user;
     final cur = user.totalInvestmentAmount;
     final price = p.price;
     final diff = price - cur;
@@ -14225,7 +14339,7 @@ class InvestScreen extends StatelessWidget {
       buttonText = "Invest Now";
     }
 
-    final disableButton = isCurrent || isDowngrade || pendingSamePlan;
+    final disableButton = isCurrent || isDowngrade || pendingSamePlan || widget.purchaseInFlight;
 
     // Platinum metal for available plans — active asset card stays gold.
     const textColor = Color(0xFF0F172A);
@@ -14343,7 +14457,9 @@ class InvestScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 40,
                 child: ElevatedButton(
-                  onPressed: disableButton ? null : () => onInvest(p.name, price, InvestmentPlan.fixedRoi, requiredPayment),
+                  onPressed: disableButton
+                      ? null
+                      : () => widget.onInvest(p.name, price, InvestmentPlan.fixedRoi, requiredPayment),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1E293B),
                     foregroundColor: const Color(0xFFF8FAFC),
@@ -14357,7 +14473,10 @@ class InvestScreen extends StatelessWidget {
                   ),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text(buttonText.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11)),
+                    child: Text(
+                      widget.purchaseInFlight ? 'PROCESSING...' : buttonText.toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11),
+                    ),
                   ),
                 ),
               ),
@@ -21732,7 +21851,16 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   String _inquiryLastPreview(Map<String, dynamic> m) {
     final replies = _inquiryReplies(m);
-    if (replies.isNotEmpty) return (replies.last['message'] ?? '').toString();
+    if (replies.isNotEmpty) {
+      final last = replies.last;
+      if (NgmyStorePaymentReply.isPurchaseNotification(last)) {
+        final st = NgmyStorePaymentReply.paymentStatusOf(last);
+        if (st == 'pending') return 'Purchase notification — payment proof to review';
+        if (st == 'approved') return 'Payment confirmed';
+        return 'Payment rejected';
+      }
+      return (last['message'] ?? '').toString();
+    }
     return (m['message'] ?? '').toString();
   }
 
@@ -21748,6 +21876,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       if (isSeller) {
         if (m['read'] != true) return true;
         final replies = _inquiryReplies(m);
+        for (final r in replies) {
+          if (NgmyStorePaymentReply.isPurchaseNotification(r) && NgmyStorePaymentReply.isPending(r)) return true;
+        }
         if (replies.isNotEmpty && (replies.last['role'] ?? '').toString() == 'buyer') return true;
       } else {
         final replies = _inquiryReplies(m);
@@ -21801,12 +21932,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     return rows;
   }
 
-  List<({DateTime at, String who, String text, bool mine, String? itemHint})> _allMessagesInThread(
+  List<({DateTime at, String who, String text, bool mine, String? itemHint, Map<String, dynamic>? reply})> _allMessagesInThread(
     List<Map<String, dynamic>> inquiries,
     String me,
   ) {
     final isSeller = inquiries.any((m) => (m['sellerEmail'] ?? '').toString().toLowerCase().trim() == me);
-    final items = <({DateTime at, String who, String text, bool mine, String? itemHint})>[];
+    final items = <({DateTime at, String who, String text, bool mine, String? itemHint, Map<String, dynamic>? reply})>[];
     for (final inq in inquiries) {
       final title = (inq['listingTitle'] ?? 'Item').toString();
       final created = DateTime.tryParse((inq['createdAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -21816,22 +21947,209 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         text: (inq['message'] ?? '').toString(),
         mine: !isSeller,
         itemHint: title,
+        reply: null,
       ));
       for (final r in _inquiryReplies(inq)) {
         final at = DateTime.tryParse((r['createdAt'] ?? '').toString()) ?? created;
         final role = (r['role'] ?? '').toString();
         final mine = role == 'seller' ? isSeller : !isSeller;
+        if (NgmyStorePaymentReply.isPurchaseNotification(r)) {
+          items.add((
+            at: at,
+            who: (r['name'] ?? (role == 'seller' ? 'Seller' : 'Buyer')).toString(),
+            text: '',
+            mine: mine,
+            itemHint: (r['listingTitle'] ?? '').toString().isEmpty ? title : (r['listingTitle'] ?? '').toString(),
+            reply: r,
+          ));
+          continue;
+        }
         items.add((
           at: at,
           who: (r['name'] ?? (role == 'seller' ? 'Seller' : 'Buyer')).toString(),
           text: (r['message'] ?? '').toString(),
           mine: mine,
           itemHint: (r['listingTitle'] ?? '').toString().isEmpty ? null : (r['listingTitle'] ?? '').toString(),
+          reply: null,
         ));
       }
     }
     items.sort((a, b) => a.at.compareTo(b.at));
     return items;
+  }
+
+  Map<String, dynamic>? _orderById(String orderId) {
+    if (orderId.isEmpty) return null;
+    for (final o in _orders) {
+      if ((o['id'] ?? '').toString() == orderId) return o;
+    }
+    return null;
+  }
+
+  void _updateOrderFields(String orderId, Map<String, dynamic> patch) {
+    final idx = _orders.indexWhere((o) => (o['id'] ?? '').toString() == orderId);
+    if (idx < 0) return;
+    _orders[idx].addAll(patch);
+    _orders[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+  }
+
+  void _patchPaymentReplyInThread(String orderId, String paymentStatus) {
+    for (final inq in _inquiries) {
+      final replies = _inquiryReplies(inq);
+      for (var i = 0; i < replies.length; i++) {
+        final r = replies[i];
+        if (NgmyStorePaymentReply.isPurchaseNotification(r) && (r['orderId'] ?? '').toString() == orderId) {
+          r['paymentStatus'] = paymentStatus;
+          replies[i] = r;
+          inq['replies'] = replies;
+          unawaited(_upsertStoreInquiryRowSafe(inq));
+          break;
+        }
+      }
+    }
+  }
+
+  Future<void> _confirmStorePaymentNotification(Map<String, dynamic> reply) async {
+    final orderId = (reply['orderId'] ?? '').toString();
+    if (orderId.isEmpty) return;
+    _updateOrderFields(orderId, {'paymentStatus': 'approved'});
+    _patchPaymentReplyInThread(orderId, 'approved');
+    _save(refreshCloud: true);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment confirmed. You can ship this order from Sales.')),
+      );
+    }
+  }
+
+  Future<void> _rejectStorePaymentNotification(Map<String, dynamic> reply) async {
+    final orderId = (reply['orderId'] ?? '').toString();
+    if (orderId.isEmpty) return;
+    _updateOrderFields(orderId, {'paymentStatus': 'rejected', 'fulfillmentStatus': 'refunded', 'refunded': true});
+    _patchPaymentReplyInThread(orderId, 'rejected');
+    _save(refreshCloud: true);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment rejected. Buyer was notified in messages.')),
+      );
+    }
+  }
+
+  void _openPaymentScreenshotViewer(String? path) {
+    if (path == null || path.trim().isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Payment Proof', style: TextStyle(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.6),
+                child: NgmyPaymentProofImage(path: path),
+              ),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _paymentStatusBubblesForOrder(Map<String, dynamic>? order) {
+    if (order == null) return const [];
+    final out = <Widget>[];
+    final pay = (order['paymentStatus'] ?? '').toString();
+    if (pay == 'approved') {
+      out.add(const NgmyPurchaseStatusBubble(
+        icon: Icons.check_circle_rounded,
+        iconColor: Color(0xFF16A34A),
+        message: 'Payment confirmed! Your order has been approved and will be processed.',
+      ));
+    }
+    final fulfillment = (order['fulfillmentStatus'] ?? '').toString();
+    if (fulfillment == 'shipped' || fulfillment == 'in_transit' || fulfillment == 'arriving') {
+      final eta = DateTime.tryParse((order['estimatedArrival'] ?? '').toString());
+      final etaLabel = eta != null ? '${eta.month}/${eta.day}/${eta.year}' : 'soon';
+      out.add(NgmyPurchaseStatusBubble(
+        icon: Icons.inventory_2_outlined,
+        iconColor: const Color(0xFF92400E),
+        message: 'Your order has been shipped! Expected arrival: $etaLabel. Track your delivery in Receipts. You can confirm delivery after 2 hours.',
+      ));
+    }
+    if (fulfillment == 'delivered') {
+      out.add(const NgmyPurchaseStatusBubble(
+        icon: Icons.check_circle_rounded,
+        iconColor: Color(0xFF16A34A),
+        message: 'Seller marked order as delivered! Please confirm you received the item.',
+      ));
+    }
+    return out;
+  }
+
+  Future<void> _postStorePaymentNotificationToSeller({
+    required Map<String, dynamic> listing,
+    required Map<String, dynamic> order,
+    required String method,
+    required String screenshotPath,
+  }) async {
+    final sellerEmail = (listing['sellerEmail'] ?? '').toString();
+    final buyerEmail = widget.user.email;
+    final listingTitle = (listing['title'] ?? 'Item').toString();
+    final listingId = (listing['id'] ?? '').toString();
+    final orderId = (order['id'] ?? '').toString();
+    final code = (order['paymentVerificationCode'] ?? '').toString();
+    final product = (listing['category'] ?? listingTitle).toString();
+    final reply = <String, dynamic>{
+      'type': NgmyStorePaymentReply.purchaseNotification,
+      'role': 'buyer',
+      'name': widget.user.username,
+      'email': buyerEmail,
+      'message': 'Purchase notification',
+      'listingTitle': listingTitle,
+      'listingId': listingId,
+      'orderId': orderId,
+      'product': product,
+      'paymentMethod': ngmyStorePaymentMethodLabel(method),
+      'deliveryAddress': (order['buyerAddress'] ?? '').toString(),
+      'transactionCode': code,
+      'screenshotPath': screenshotPath,
+      'amount': (order['total'] as num?)?.toDouble() ?? 0.0,
+      'paymentStatus': 'pending',
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+    final existingIdx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+    if (existingIdx != null) {
+      final list = _inquiryReplies(_inquiries[existingIdx]);
+      list.add(reply);
+      _inquiries[existingIdx]['replies'] = list;
+      _inquiries[existingIdx]['read'] = false;
+      _inquiries[existingIdx]['buyerRead'] = true;
+      _inquiries[existingIdx]['listingTitle'] = listingTitle;
+      _inquiries[existingIdx]['listingId'] = listingId;
+      unawaited(_upsertStoreInquiryRowSafe(_inquiries[existingIdx]));
+    } else {
+      final inquiry = {
+        'id': DateTime.now().microsecondsSinceEpoch.toString(),
+        'listingId': listingId,
+        'listingTitle': listingTitle,
+        'sellerEmail': sellerEmail,
+        'buyerEmail': buyerEmail,
+        'buyerName': widget.user.username,
+        'message': 'Order placed — payment proof submitted',
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'read': false,
+        'buyerRead': true,
+        'replies': <Map<String, dynamic>>[reply],
+      };
+      _inquiries.add(inquiry);
+      unawaited(_upsertStoreInquiryRowSafe(inquiry));
+    }
+    _save();
   }
 
   void _markThreadRead(String me, List<Map<String, dynamic>> inquiries) {
@@ -22079,6 +22397,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final buyerName = (row['buyerName'] ?? 'Buyer').toString();
     final isSeller = sellerEmail.toLowerCase().trim() == me;
     final messages = _allMessagesInThread(inquiries, me);
+    var paymentActionBusy = false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -22107,23 +22426,73 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         ),
         const SizedBox(height: 8),
         Expanded(
-          child: ListView(
-            children: messages.map((msg) {
-              return Column(
-                crossAxisAlignment: msg.mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                children: [
-                  if (msg.itemHint != null && msg.itemHint!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        'Re: ${msg.itemHint}',
-                        style: TextStyle(fontSize: 10, color: _storeSheetTextMuted(ctx), fontWeight: FontWeight.w600),
+          child: StatefulBuilder(
+            builder: (ctx2, setThread) {
+              return ListView(
+                children: messages.expand((msg) {
+                  final reply = msg.reply;
+                  if (reply != null && NgmyStorePaymentReply.isPurchaseNotification(reply)) {
+                    final order = _orderById((reply['orderId'] ?? '').toString());
+                    final pending = NgmyStorePaymentReply.isPending(reply);
+                    return [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (msg.itemHint != null && msg.itemHint!.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                'Re: ${msg.itemHint}',
+                                style: TextStyle(fontSize: 10, color: _storeSheetTextMuted(ctx), fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          NgmyPurchaseNotificationCard(
+                            product: (reply['product'] ?? msg.itemHint ?? 'Item').toString(),
+                            paymentMethod: (reply['paymentMethod'] ?? 'CASHAPP').toString(),
+                            deliveryAddress: (reply['deliveryAddress'] ?? '').toString(),
+                            transactionCode: (reply['transactionCode'] ?? '').toString(),
+                            screenshotPath: (reply['screenshotPath'] ?? '').toString(),
+                            paymentStatus: NgmyStorePaymentReply.paymentStatusOf(reply),
+                            showActions: isSeller && pending,
+                            busy: paymentActionBusy,
+                            onScreenshotTap: () => _openPaymentScreenshotViewer((reply['screenshotPath'] ?? '').toString()),
+                            onConfirm: () async {
+                              setThread(() => paymentActionBusy = true);
+                              await _confirmStorePaymentNotification(reply);
+                              setThread(() => paymentActionBusy = false);
+                              onSent();
+                            },
+                            onReject: () async {
+                              setThread(() => paymentActionBusy = true);
+                              await _rejectStorePaymentNotification(reply);
+                              setThread(() => paymentActionBusy = false);
+                              onSent();
+                            },
+                          ),
+                          ..._paymentStatusBubblesForOrder(order),
+                        ],
                       ),
+                    ];
+                  }
+                  return [
+                    Column(
+                      crossAxisAlignment: msg.mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      children: [
+                        if (msg.itemHint != null && msg.itemHint!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              'Re: ${msg.itemHint}',
+                              style: TextStyle(fontSize: 10, color: _storeSheetTextMuted(ctx), fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        _inquiryBubble(isDark: isDark, who: msg.who, text: msg.text, mine: msg.mine),
+                      ],
                     ),
-                  _inquiryBubble(isDark: isDark, who: msg.who, text: msg.text, mine: msg.mine),
-                ],
+                  ];
+                }).toList(),
               );
-            }).toList(),
+            },
           ),
         ),
         Row(
@@ -23488,12 +23857,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             clipBehavior: Clip.none,
             children: [
               Container(
-                width: 40,
-                height: 40,
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
+                  color: Colors.white,
                   shape: BoxShape.circle,
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  border: Border.all(color: _storeAccent, width: 2.2),
                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6, offset: const Offset(0, 2))],
                 ),
                 child: const Icon(Icons.chat_bubble_rounded, color: _storeAccent, size: 21),
@@ -23636,42 +24003,174 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     );
   }
 
-  void _showExternalPaymentSheet(String method, Map<String, dynamic> listing, double total) {
+  void _showExternalPaymentSheet(String method, Map<String, dynamic> listing, Map<String, dynamic> order, double total) {
     final cashTag = _listingSellerCashTag(listing);
     final zelle = _listingSellerZelle(listing);
-    showDialog(
+    final code = (order['paymentVerificationCode'] ?? ngmyGenerateStorePaymentCode()).toString();
+    String? screenshotRef;
+    var submitting = false;
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Pay via ${_paymentLabel(method)}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Send \$${formatCurrency(total)} to the seller:', style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 12),
-            if (method == 'cashapp' && cashTag.isNotEmpty)
-              _storePaymentInfoTile(
-                label: 'Cash App — tap to open',
-                value: cashTag,
-                icon: Icons.payments_rounded,
-                color: const Color(0xFF00D632),
-                onTap: () => _openSellerCashApp(cashTag),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          Future<void> pickShot() async {
+            final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1600);
+            if (file == null) return;
+            final bytes = await file.readAsBytes();
+            final mime = file.mimeType ?? 'image/jpeg';
+            setSheet(() => screenshotRef = 'data:$mime;base64,${base64Encode(bytes)}');
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF121726) : Colors.white,
+                borderRadius: BorderRadius.circular(24),
               ),
-            if (method == 'zelle' && zelle.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              _storePaymentInfoTile(
-                label: 'Zelle — tap phone/email',
-                value: zelle,
-                icon: Icons.account_balance_rounded,
-                color: const Color(0xFF6D1ED4),
-                onTap: () => _openSellerZelle(zelle),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.payments_rounded, color: isDark ? Colors.white : const Color(0xFF0F172A), size: 28),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Pay via ${_paymentLabel(method)}',
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          ),
+                        ),
+                        IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                      ],
+                    ),
+                    Text(
+                      'Send \$${formatCurrency(total)} to the seller, then upload your payment screenshot. The seller will confirm in Messages.',
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54, height: 1.35),
+                    ),
+                    const SizedBox(height: 14),
+                    if (method == 'cashapp' && cashTag.isNotEmpty)
+                      _storePaymentInfoTile(
+                        label: 'Cash App — tap to open',
+                        value: cashTag,
+                        icon: Icons.payments_rounded,
+                        color: const Color(0xFF00D632),
+                        onTap: () => _openSellerCashApp(cashTag),
+                      ),
+                    if (method == 'zelle' && zelle.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _storePaymentInfoTile(
+                        label: 'Zelle — tap phone/email',
+                        value: zelle,
+                        icon: Icons.account_balance_rounded,
+                        color: const Color(0xFF6D1ED4),
+                        onTap: () => _openSellerZelle(zelle),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF93C5FD)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Transaction Code (put in payment note):', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFF1D4ED8))),
+                          const SizedBox(height: 6),
+                          Text(code, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Color(0xFF1D4ED8), letterSpacing: 1.2)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    GestureDetector(
+                      onTap: submitting ? null : pickShot,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFF2563EB), width: 1.5),
+                          borderRadius: BorderRadius.circular(12),
+                          color: const Color(0xFFF8FAFC),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(Icons.add_a_photo_outlined, size: 32, color: screenshotRef == null ? Colors.grey : const Color(0xFF16A34A)),
+                            const SizedBox(height: 8),
+                            Text(
+                              screenshotRef == null ? 'Tap to upload payment screenshot' : 'Screenshot attached — tap to change',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
+                            if (screenshotRef != null) ...[
+                              const SizedBox(height: 10),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 140),
+                                child: NgmyPaymentProofImage(path: screenshotRef),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: submitting || screenshotRef == null
+                            ? null
+                            : () async {
+                                setSheet(() => submitting = true);
+                                order['paymentVerificationCode'] = code;
+                                order['paymentStatus'] = 'pending';
+                                _updateOrderFields((order['id'] ?? '').toString(), {
+                                  'paymentVerificationCode': code,
+                                  'paymentStatus': 'pending',
+                                });
+                                await _postStorePaymentNotificationToSeller(
+                                  listing: listing,
+                                  order: order,
+                                  method: method,
+                                  screenshotPath: screenshotRef!,
+                                );
+                                await _persistOrdersAndRefresh(orderId: (order['id'] ?? '').toString());
+                                if (!ctx.mounted) return;
+                                Navigator.pop(ctx);
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Payment proof sent to seller in Messages.')),
+                                );
+                                _showSellerInbox();
+                              },
+                        icon: submitting
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.send_rounded),
+                        label: Text(submitting ? 'Sending…' : 'Send payment receipt to seller'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
-        ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -24901,6 +25400,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     }
 
     final now = DateTime.now().toUtc().toIso8601String();
+    final externalPay = selectedPay == 'cashapp' || selectedPay == 'zelle';
+    final payCode = externalPay ? ngmyGenerateStorePaymentCode() : '';
     final order = _normalizeStoreOrder({
       'id': 'order_${DateTime.now().microsecondsSinceEpoch}',
       'listingId': listingId,
@@ -24916,6 +25417,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       'buyerPhone': phone,
       'buyerAddress': address,
       'paidVia': selectedPay,
+      'paymentVerificationCode': payCode,
+      'paymentStatus': externalPay ? 'awaiting_proof' : 'approved',
       'createdAt': now,
       'updatedAt': now,
       'fulfillmentStatus': 'pending',
@@ -24998,7 +25501,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           ),
         ),
       );
-      _showExternalPaymentSheet(selectedPay, listing, total);
+      _showExternalPaymentSheet(selectedPay, listing, order, total);
     }
   }
 

@@ -373,9 +373,15 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
               },
             );
       if (mounted) {
-        if (ngmyHasStagedIosStudioVideo) {
+        final lower = msg.toLowerCase();
+        final needsIosSave = ngmyHasStagedIosStudioVideo ||
+            lower.contains('save video') ||
+            lower.contains('ios_pending') ||
+            lower.contains('ios_open') ||
+            lower.contains('shared');
+        if (needsIosSave) {
           await _showIosSaveVideoDialog(msg);
-        } else if (msg.toLowerCase().contains('failed') || msg.toLowerCase().contains('unsupported')) {
+        } else if (lower.contains('failed') || lower.contains('unsupported')) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700),
           );

@@ -138,9 +138,11 @@ Future<String> ngmyTriggerBrowserDownload(String href, String filename) async {
     debugPrint('[studio download] failed: $e');
     return 'failed';
   } finally {
-    if (tempObjectUrl != null) {
+    if (tempObjectUrl != null && ngmyStagedIosStudioVideoUrl != tempObjectUrl) {
       await Future<void>.delayed(const Duration(seconds: 45));
-      html.Url.revokeObjectUrl(tempObjectUrl);
+      try {
+        html.Url.revokeObjectUrl(tempObjectUrl);
+      } catch (_) {}
     }
   }
 }
@@ -401,7 +403,12 @@ Future<String> exportNgmyVideoStudioComposed({
     }
 
     String? mimeType;
-    for (final m in ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']) {
+    for (final m in [
+      'video/mp4',
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+    ]) {
       if (html.MediaRecorder.isTypeSupported(m)) {
         mimeType = m;
         break;
