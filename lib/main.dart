@@ -22790,6 +22790,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   Timer? _autoGpsTimer;
   final Set<String> _autoGpsOrderIds = {};
   int _trackingReplayToken = 0;
+  final Set<String> _storePaymentDecisionLocks = {};
 
   bool get _canSell => widget.user.isAdmin || widget.user.canSellOnStore;
 
@@ -23406,7 +23407,19 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         final at = DateTime.tryParse((r['createdAt'] ?? '').toString()) ?? created;
         final role = (r['role'] ?? '').toString();
         final mine = role == 'seller' ? isSeller : !isSeller;
-        if (NgmyStorePaymentReply.isPurchaseNotification(r) || NgmyStorePaymentReply.isPurchaseStatus(r)) {
+        if (NgmyStorePaymentReply.isPurchaseNotification(r)) {
+          if (!isSeller) continue;
+          items.add((
+            at: at,
+            who: (r['name'] ?? (role == 'seller' ? 'Seller' : 'Buyer')).toString(),
+            text: '',
+            mine: mine,
+            itemHint: (r['listingTitle'] ?? '').toString().isEmpty ? title : (r['listingTitle'] ?? '').toString(),
+            reply: r,
+          ));
+          continue;
+        }
+        if (NgmyStorePaymentReply.isPurchaseStatus(r)) {
           items.add((
             at: at,
             who: (r['name'] ?? (role == 'seller' ? 'Seller' : 'Buyer')).toString(),
@@ -23464,12 +23477,39 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _orders[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
   }
 
+  bool _threadHasPaymentStatusForOrder(String orderId, String sellerEmail, String buyerEmail) {
+    final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+    if (idx == null) return false;
+    return _inquiryReplies(_inquiries[idx]).any((r) =>
+        NgmyStorePaymentReply.isPurchaseStatus(r) && (r['orderId'] ?? '').toString() == orderId);
+  }
+
+  void _removePurchaseNotificationFromThread(String orderId) {
+    if (orderId.isEmpty) return;
+    for (final inq in _inquiries) {
+      final replies = _inquiryReplies(inq);
+      final before = replies.length;
+      replies.removeWhere((r) =>
+          NgmyStorePaymentReply.isPurchaseNotification(r) && (r['orderId'] ?? '').toString() == orderId);
+      if (replies.length != before) {
+        inq['replies'] = replies;
+        unawaited(_upsertStoreInquiryRowSafe(inq));
+      }
+    }
+  }
+
+  void _removeStoreOrderLocal(String orderId) {
+    if (orderId.isEmpty) return;
+    _orders.removeWhere((o) => (o['id'] ?? '').toString() == orderId);
+  }
+
   void _appendStorePaymentDecisionToThread({
     required String orderId,
     required String sellerEmail,
     required String buyerEmail,
     required bool approved,
   }) {
+    if (_threadHasPaymentStatusForOrder(orderId, sellerEmail, buyerEmail)) return;
     final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
     if (idx == null) return;
     final list = _inquiryReplies(_inquiries[idx]);
@@ -23510,66 +23550,70 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _listingsSig = _storeListingsSignature(_listings);
   }
 
-  void _patchPaymentReplyInThread(String orderId, String paymentStatus) {
-    for (final inq in _inquiries) {
-      final replies = _inquiryReplies(inq);
-      for (var i = 0; i < replies.length; i++) {
-        final r = replies[i];
-        if (NgmyStorePaymentReply.isPurchaseNotification(r) && (r['orderId'] ?? '').toString() == orderId) {
-          r['paymentStatus'] = paymentStatus;
-          replies[i] = r;
-          inq['replies'] = replies;
-          unawaited(_upsertStoreInquiryRowSafe(inq));
-          break;
-        }
-      }
-    }
-  }
-
   Future<void> _confirmStorePaymentNotification(Map<String, dynamic> reply) async {
     final orderId = (reply['orderId'] ?? '').toString();
-    if (orderId.isEmpty) return;
+    if (orderId.isEmpty || _storePaymentDecisionLocks.contains(orderId)) return;
+    if (!NgmyStorePaymentReply.isPending(reply)) return;
     final order = _orderById(orderId);
-    _updateOrderFields(orderId, {'paymentStatus': 'approved'});
-    _patchPaymentReplyInThread(orderId, 'approved');
-    if (order != null) {
-      _appendStorePaymentDecisionToThread(
-        orderId: orderId,
-        sellerEmail: (order['sellerEmail'] ?? widget.user.email).toString(),
-        buyerEmail: (order['buyerEmail'] ?? '').toString(),
-        approved: true,
-      );
-    }
-    await _persistOrdersAndRefresh(orderId: orderId);
-    _save(refreshCloud: true);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment confirmed. Order is now in Sales — you can ship it.')),
-      );
+    final pay = (order?['paymentStatus'] ?? '').toString();
+    if (pay == 'approved' || pay == 'rejected') return;
+
+    _storePaymentDecisionLocks.add(orderId);
+    try {
+      _updateOrderFields(orderId, {'paymentStatus': 'approved'});
+      _removePurchaseNotificationFromThread(orderId);
+      if (order != null) {
+        _appendStorePaymentDecisionToThread(
+          orderId: orderId,
+          sellerEmail: (order['sellerEmail'] ?? widget.user.email).toString(),
+          buyerEmail: (order['buyerEmail'] ?? '').toString(),
+          approved: true,
+        );
+      }
+      await _persistOrdersAndRefresh(orderId: orderId);
+      widget.onDataChanged();
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment confirmed. Order is now in Sales — you can ship it.')),
+        );
+      }
+    } finally {
+      _storePaymentDecisionLocks.remove(orderId);
     }
   }
 
   Future<void> _rejectStorePaymentNotification(Map<String, dynamic> reply) async {
     final orderId = (reply['orderId'] ?? '').toString();
-    if (orderId.isEmpty) return;
+    if (orderId.isEmpty || _storePaymentDecisionLocks.contains(orderId)) return;
+    if (!NgmyStorePaymentReply.isPending(reply)) return;
     final order = _orderById(orderId);
-    _updateOrderFields(orderId, {'paymentStatus': 'rejected', 'fulfillmentStatus': 'refunded', 'refunded': true});
-    _patchPaymentReplyInThread(orderId, 'rejected');
-    if (order != null) {
-      _restoreListingUnitsForRejectedOrder(order);
-      _appendStorePaymentDecisionToThread(
-        orderId: orderId,
-        sellerEmail: (order['sellerEmail'] ?? widget.user.email).toString(),
-        buyerEmail: (order['buyerEmail'] ?? '').toString(),
-        approved: false,
-      );
-    }
-    await _persistOrdersAndRefresh(orderId: orderId);
-    _save(refreshCloud: true);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment rejected. Buyer was notified in Messages.')),
-      );
+    final pay = (order?['paymentStatus'] ?? '').toString();
+    if (pay == 'approved' || pay == 'rejected') return;
+
+    _storePaymentDecisionLocks.add(orderId);
+    try {
+      if (order != null) {
+        _restoreListingUnitsForRejectedOrder(order);
+        _appendStorePaymentDecisionToThread(
+          orderId: orderId,
+          sellerEmail: (order['sellerEmail'] ?? widget.user.email).toString(),
+          buyerEmail: (order['buyerEmail'] ?? '').toString(),
+          approved: false,
+        );
+      }
+      _removePurchaseNotificationFromThread(orderId);
+      _removeStoreOrderLocal(orderId);
+      await _persistOrdersAndRefresh();
+      widget.onDataChanged();
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment rejected. Buyer was notified in Messages.')),
+        );
+      }
+    } finally {
+      _storePaymentDecisionLocks.remove(orderId);
     }
   }
 
@@ -23994,8 +24038,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                     ];
                   }
                   if (reply != null && NgmyStorePaymentReply.isPurchaseNotification(reply)) {
+                    if (!isSeller || !NgmyStorePaymentReply.isPending(reply)) return <Widget>[];
                     final order = _orderById((reply['orderId'] ?? '').toString());
-                    final pending = NgmyStorePaymentReply.isPending(reply);
+                    final orderId = (reply['orderId'] ?? '').toString();
+                    final locked = paymentActionBusy || _storePaymentDecisionLocks.contains(orderId);
                     return [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -24015,23 +24061,30 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                             transactionCode: (reply['transactionCode'] ?? '').toString(),
                             screenshotPath: _paymentProofPathForReply(reply, order),
                             paymentStatus: NgmyStorePaymentReply.paymentStatusOf(reply),
-                            showActions: isSeller && pending,
-                            busy: paymentActionBusy,
+                            showActions: true,
+                            busy: locked,
                             onScreenshotTap: () => _openPaymentScreenshotViewer(_paymentProofPathForReply(reply, order)),
-                            onConfirm: () async {
-                              setThread(() => paymentActionBusy = true);
-                              await _confirmStorePaymentNotification(reply);
-                              setThread(() => paymentActionBusy = false);
-                              onSent();
-                            },
-                            onReject: () async {
-                              setThread(() => paymentActionBusy = true);
-                              await _rejectStorePaymentNotification(reply);
-                              setThread(() => paymentActionBusy = false);
-                              onSent();
-                            },
+                            onConfirm: locked
+                                ? null
+                                : () async {
+                                    setThread(() => paymentActionBusy = true);
+                                    await _confirmStorePaymentNotification(reply);
+                                    if (ctx2.mounted) {
+                                      setThread(() => paymentActionBusy = false);
+                                      onSent();
+                                    }
+                                  },
+                            onReject: locked
+                                ? null
+                                : () async {
+                                    setThread(() => paymentActionBusy = true);
+                                    await _rejectStorePaymentNotification(reply);
+                                    if (ctx2.mounted) {
+                                      setThread(() => paymentActionBusy = false);
+                                      onSent();
+                                    }
+                                  },
                           ),
-                          ..._paymentStatusBubblesForOrder(order),
                         ],
                       ),
                     ];
@@ -24336,7 +24389,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   List<Map<String, dynamic>> _myPurchases() {
     final me = widget.user.email.toLowerCase().trim();
     final list = _orders
-        .where((o) => (o['buyerEmail'] ?? '').toString().toLowerCase().trim() == me)
+        .where((o) {
+          if ((o['buyerEmail'] ?? '').toString().toLowerCase().trim() != me) return false;
+          final pay = (o['paymentStatus'] ?? 'approved').toString();
+          return pay != 'rejected';
+        })
         .toList();
     _sortStoreOrdersForDisplay(list);
     return list;
