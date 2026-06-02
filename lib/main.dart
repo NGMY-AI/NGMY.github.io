@@ -3569,7 +3569,7 @@ class NGMYApp extends StatefulWidget {
 class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   ThemeMode _themeMode = ThemeMode.light;
   UserData? _currentUser;
-  bool _isLoading = true;
+  bool _isLoading = false;
   List<AppTransaction> _allTransactions = [];
   List<UserData> _allUsers = [];
   AppConfig _config = AppConfig();
@@ -5360,7 +5360,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
       if (mounted) {
         _applySystemUiForMode(_effectiveThemeMode);
-        setState(() => _isLoading = false);
+        setState(() {});
       }
 
       // 2. Fetch from Supabase when reachable (slow/offline uses local cache above).
@@ -5798,13 +5798,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   @override Widget build(BuildContext context) {
-    if (_isLoading) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
-      );
-    }
-
     final isDarkMode = _effectiveThemeMode == ThemeMode.dark;
     final style = isDarkMode
         ? const SystemUiOverlayStyle(
@@ -30344,7 +30337,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     });
   }
 
-  bool get _userChatLocked => _chatClosedForUsers && !widget.user.isAdmin;
+  bool get _newsPostingLocked => _chatClosedForUsers && !widget.user.isAdmin;
 
   Future<void> _refreshGeminiKeyFromCloud() async {
     final remote = await _fetchRemoteGeminiApiKey();
@@ -30355,14 +30348,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   Future<void> _sendMessage() async {
-    if (_userChatLocked) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Chat is temporarily closed by an admin.')),
-        );
-      }
-      return;
-    }
     final text = _chatController.text.trim();
     if (text.isEmpty) return;
 
@@ -30511,6 +30496,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   Future<void> _postCommunityNews() async {
+    if (_newsPostingLocked) return;
     final text = _newsController.text.trim();
     if (text.isEmpty && _pendingNewsImageUrl == null && _pendingNewsVideoUrl == null) return;
     setState(() => _isPostingNews = true);
@@ -30672,29 +30658,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                 isDark: isDark,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                  child: _userChatLocked
-                      ? Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.redAccent.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.redAccent.withOpacity(0.35)),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.lock_rounded, color: Colors.redAccent, size: 22),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Chat is locked by admin. You cannot send messages right now.',
-                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : Column(
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (_memoryLoaded && _messages.length <= 1)
@@ -30719,8 +30683,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                           Expanded(
                             child: TextField(
                               controller: _chatController,
-                              enabled: !_userChatLocked,
-                              readOnly: _userChatLocked,
                               minLines: 1,
                               maxLines: 4,
                               style: TextStyle(color: isDark ? Colors.white : Colors.black87),
@@ -30888,6 +30850,23 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   Widget _newsComposer(bool isDark) {
     const accent = Color(0xFF00B25A);
+    if (_newsPostingLocked) {
+      return _ngmyGlassComposerBar(
+        isDark: isDark,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Text(
+            'Unable to send messages at the moment.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.white60 : const Color(0xFF64748B),
+            ),
+          ),
+        ),
+      );
+    }
     return _ngmyGlassComposerBar(
       isDark: isDark,
       child: Padding(
