@@ -25092,9 +25092,13 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     required VoidCallback onTap,
     required IconData icon,
     required Color color,
+    bool isDark = false,
+    bool copyOnly = false,
   }) {
+    final bg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
+    final sub = isDark ? Colors.white54 : Colors.grey;
     return Material(
-      color: const Color(0xFFF1F5F9),
+      color: bg,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -25109,13 +25113,20 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey)),
+                    Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: sub)),
                     const SizedBox(height: 2),
-                    Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: color)),
+                    copyOnly
+                        ? CopyOnHoldText(
+                            value,
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : color),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        : Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: color)),
                   ],
                 ),
               ),
-              Icon(Icons.open_in_new_rounded, size: 18, color: color),
+              Icon(copyOnly ? Icons.content_copy_rounded : Icons.open_in_new_rounded, size: 18, color: color),
             ],
           ),
         ),
@@ -25183,16 +25194,19 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         value: cashTag,
                         icon: Icons.payments_rounded,
                         color: const Color(0xFF00D632),
+                        isDark: isDark,
                         onTap: () => _openSellerCashApp(cashTag),
                       ),
                     if (method == 'zelle' && zelle.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       _storePaymentInfoTile(
-                        label: 'Zelle — tap phone/email',
+                        label: 'Zelle — tap or hold to copy',
                         value: zelle,
                         icon: Icons.account_balance_rounded,
                         color: const Color(0xFF6D1ED4),
-                        onTap: () => _openSellerZelle(zelle),
+                        isDark: isDark,
+                        copyOnly: true,
+                        onTap: () => _copyStorePaymentInfo(zelle, label: 'Zelle info'),
                       ),
                     ],
                     const SizedBox(height: 14),
@@ -25433,24 +25447,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                   const SizedBox(height: 4),
                   Text((listing['title'] ?? '').toString().toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
                   const SizedBox(height: 4),
-                  Text(
-                    '\$${formatCurrency(price)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 15,
-                      color: Color(0xFF2563EB),
-                      decoration: TextDecoration.none,
-                      height: 1.1,
-                    ),
-                  ),
-                  if (delivery > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        '+\$${formatCurrency(delivery)} delivery',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _storePurple.withValues(alpha: 0.9), decoration: TextDecoration.none),
-                      ),
-                    ),
+                  _storeListingCardPrice(price, delivery),
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -25559,6 +25556,157 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     );
   }
 
+  /// Fixed-height price row on shop cards — price large, shipping smaller.
+  Widget _storeListingCardPrice(double price, double delivery) {
+    final shipLabel = delivery > 0 ? '+\$${formatCurrency(delivery)} shipping' : 'Free shipping';
+    return SizedBox(
+      height: 38,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '\$${formatCurrency(price)}',
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+              color: Color(0xFF2563EB),
+              height: 1.05,
+              decoration: TextDecoration.none,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            shipLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: delivery > 0 ? _storePurple.withValues(alpha: 0.92) : Colors.grey.shade600,
+              height: 1.1,
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _storeDetailPricePanel({required bool isDark, required double price, required double delivery}) {
+    final shipColor = isDark ? Colors.white60 : const Color(0xFF64748B);
+    return Container(
+      height: 78,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: _storeDetailFrameDecoration(isDark),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _storeDetailLabel('Price', isDark),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '\$${formatCurrency(price)}',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF2563EB),
+                  height: 1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  delivery > 0 ? '+\$${formatCurrency(delivery)} shipping' : 'Free shipping',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: shipColor, height: 1.2),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _storeCheckoutPricePanel({
+    required bool isDark,
+    required double price,
+    required double delivery,
+    required int buyQty,
+    required String title,
+  }) {
+    final sub = isDark ? Colors.white70 : const Color(0xFF475569);
+    final lineTotal = (price + delivery) * buyQty;
+    return Container(
+      height: 88,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '\$${formatCurrency(price)}',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                  height: 1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  delivery > 0 ? '+\$${formatCurrency(delivery)} shipping' : 'Free shipping',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: sub),
+                ),
+              ),
+              if (buyQty > 1) Text(' × $buyQty', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: sub)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+          ),
+          if (buyQty > 1)
+            Text(
+              'Total \$${formatCurrency(lineTotal)}',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: sub),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _copyStorePaymentInfo(String value, {String label = 'Payment info'}) async {
+    final t = value.trim();
+    if (t.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: t));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label copied.')));
+  }
+
   void _openListingMediaFullscreen(
     BuildContext context, {
     required List<String> images,
@@ -25632,10 +25780,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             ),
             title: Text(title, style: const TextStyle(fontSize: 16)),
           ),
-          body: Column(
+          body: Stack(
+            fit: StackFit.expand,
             children: [
-              Expanded(
-                flex: 24,
+              Positioned.fill(
                 child: _StoreListingMediaGallery(
                   imageRefs: images,
                   videoRef: videoRef,
@@ -25652,59 +25800,51 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                   ),
                 ),
               ),
-              Expanded(
-                flex: 7,
-                child: Transform.translate(
-                  offset: const Offset(0, 8),
-                  child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF121726) : Colors.white,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
-                      blurRadius: 20,
-                      offset: const Offset(0, -6),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 10),
-                    Center(
-                      child: Container(
-                        width: 48,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withValues(alpha: 0.22) : Colors.black.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(99),
+              DraggableScrollableSheet(
+                initialChildSize: 0.36,
+                minChildSize: 0.22,
+                maxChildSize: 0.93,
+                snap: true,
+                snapSizes: const [0.36, 0.58, 0.93],
+                builder: (sheetCtx, scrollController) {
+                  final bottomInset = MediaQuery.of(sheetCtx).padding.bottom;
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF121726) : Colors.white,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.14),
+                          blurRadius: 24,
+                          offset: const Offset(0, -8),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 10),
+                        Center(
+                          child: Container(
+                            width: 48,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white.withValues(alpha: 0.28) : Colors.black.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: ListView(
+                            controller: scrollController,
+                            padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottomInset),
+                            children: [
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           flex: 2,
-                          child: _storeDetailFrame(
-                            isDark: isDark,
-                            label: 'Price',
-                            child: _storeDetailValue(
-                              '\$${formatCurrency(price)}${delivery > 0 ? '\n+\$${formatCurrency(delivery)} ship' : ''}',
-                              isDark,
-                              fontSize: 20,
-                              weight: FontWeight.w900,
-                              color: const Color(0xFF2563EB),
-                            ),
-                          ),
+                          child: _storeDetailPricePanel(isDark: isDark, price: price, delivery: delivery),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -25823,10 +25963,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 6),
                           child: _storePaymentInfoTile(
-                            label: 'Cash App',
+                            label: 'Cash App — tap to open',
                             value: tag,
                             icon: Icons.payments_rounded,
                             color: const Color(0xFF00D632),
+                            isDark: isDark,
                             onTap: () => _openSellerCashApp(tag),
                           ),
                         );
@@ -25837,11 +25978,13 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 6),
                           child: _storePaymentInfoTile(
-                            label: 'Zelle',
+                            label: 'Zelle — tap or hold to copy',
                             value: z,
                             icon: Icons.account_balance_rounded,
                             color: const Color(0xFF6D1ED4),
-                            onTap: () => _openSellerZelle(z),
+                            isDark: isDark,
+                            copyOnly: true,
+                            onTap: () => _copyStorePaymentInfo(z, label: 'Zelle info'),
                           ),
                         );
                       }
@@ -25904,14 +26047,13 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                             ),
                         ],
                       ),
-                  ],
-                ),
-                      ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-                ),
+                  );
+                },
               ),
             ],
           ),
@@ -26486,6 +26628,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     required String phone,
     required String buyerName,
     required int quantity,
+    String? paymentScreenshot,
   }) {
     final price = (listing['price'] as num?)?.toDouble() ?? 0;
     final delivery = (listing['deliveryFee'] as num?)?.toDouble() ?? 0;
@@ -26612,16 +26755,31 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         ),
       );
     } else {
+      final hasProof = paymentScreenshot != null && paymentScreenshot.trim().isNotEmpty;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            giftTitle.isNotEmpty
-                ? 'Order placed — bonus gift: $giftTitle. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}.'
-                : 'Order placed. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}. Track in Purchases.',
+            hasProof
+                ? (giftTitle.isNotEmpty
+                    ? 'Order placed — payment proof sent to seller. Bonus gift: $giftTitle.'
+                    : 'Order placed — payment proof sent to seller. Track in Purchases.')
+                : (giftTitle.isNotEmpty
+                    ? 'Order placed — bonus gift: $giftTitle. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}.'
+                    : 'Order placed. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}. Track in Purchases.'),
           ),
         ),
       );
-      _showExternalPaymentSheet(selectedPay, listing, order, total);
+      if (hasProof) {
+        unawaited(_postStorePaymentNotificationToSeller(
+          listing: listing,
+          order: order,
+          method: selectedPay,
+          screenshotPath: paymentScreenshot!.trim(),
+        ));
+        _persistOrdersAndRefresh(orderId: (order['id'] ?? '').toString());
+      } else {
+        _showExternalPaymentSheet(selectedPay, listing, order, total);
+      }
     }
   }
 
@@ -26648,21 +26806,34 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final phoneC = TextEditingController(text: widget.user.phone);
     final nameC = TextEditingController(text: widget.user.fullName ?? widget.user.username);
     int buyQty = 1;
+    String? paymentScreenshotRef;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      useSafeArea: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           final total = unitTotal * buyQty;
           final balanceOk = widget.user.accountBalance >= total;
+          final needsPaymentProof = selectedPay == 'cashapp' || selectedPay == 'zelle';
+          final hasPaymentProof = paymentScreenshotRef != null && paymentScreenshotRef!.isNotEmpty;
           final canConfirm = addressC.text.trim().isNotEmpty &&
               phoneC.text.trim().isNotEmpty &&
               (selectedPay != 'ngmy' || balanceOk) &&
               (selectedPay != 'cashapp' || _listingSellerCashTag(listing).isNotEmpty) &&
-              (selectedPay != 'zelle' || _listingSellerZelle(listing).isNotEmpty);
+              (selectedPay != 'zelle' || _listingSellerZelle(listing).isNotEmpty) &&
+              (!needsPaymentProof || hasPaymentProof);
+
+          Future<void> pickPaymentScreenshot() async {
+            final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1600);
+            if (file == null) return;
+            final bytes = await file.readAsBytes();
+            final mime = file.mimeType ?? 'image/jpeg';
+            setDlg(() => paymentScreenshotRef = 'data:$mime;base64,${base64Encode(bytes)}');
+          }
 
           Widget payTile(String key, String emoji, String label, String? sub) {
             final sel = selectedPay == key;
@@ -26702,14 +26873,16 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             );
           }
 
+          final sheetBottom = MediaQuery.of(ctx).padding.bottom;
           return Padding(
             padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
             child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+              margin: EdgeInsets.fromLTRB(12, 0, 12, 12 + sheetBottom),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF121726) : Colors.white,
                 borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -26723,47 +26896,39 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                           child: const Text('Buy Item', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
                         ),
                         const Spacer(),
-                        IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                        IconButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: Icon(Icons.close_rounded, color: isDark ? Colors.white70 : Colors.black54),
+                        ),
                       ],
                     ),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    _storeCheckoutPricePanel(
+                      isDark: isDark,
+                      price: price,
+                      delivery: delivery,
+                      buyQty: buyQty,
+                      title: title,
+                    ),
+                    if (unitsRemaining > 1) ...[
+                      const SizedBox(height: 10),
+                      Row(
                         children: [
-                          Text(
-                            '\$${formatCurrency(price)}${delivery > 0 ? ' +\$${formatCurrency(delivery)} delivery' : ''}${buyQty > 1 ? ' × $buyQty' : ''}',
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF2563EB)),
+                          Text('Quantity', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                          IconButton(
+                            onPressed: buyQty > 1 ? () => setDlg(() => buyQty--) : null,
+                            icon: const Icon(Icons.remove_circle_outline),
                           ),
-                          Text(title, style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.black87 : Colors.black87)),
-                          if (unitsRemaining > 1) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Text('Quantity:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                                IconButton(
-                                  onPressed: buyQty > 1 ? () => setDlg(() => buyQty--) : null,
-                                  icon: const Icon(Icons.remove_circle_outline),
-                                ),
-                                Text('$buyQty', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                                IconButton(
-                                  onPressed: buyQty < unitsRemaining ? () => setDlg(() => buyQty++) : null,
-                                  icon: const Icon(Icons.add_circle_outline),
-                                ),
-                                Text('($unitsRemaining available)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                              ],
-                            ),
-                          ],
+                          Text('$buyQty', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
+                          IconButton(
+                            onPressed: buyQty < unitsRemaining ? () => setDlg(() => buyQty++) : null,
+                            icon: const Icon(Icons.add_circle_outline),
+                          ),
+                          Text('($unitsRemaining available)', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey)),
                         ],
                       ),
-                    ),
+                    ],
                     const SizedBox(height: 16),
-                    const Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
                     const SizedBox(height: 8),
                     if (payments.contains('ngmy')) payTile('ngmy', '💰', 'Account Balance', 'Balance: \$${formatCurrency(widget.user.accountBalance)}'),
                     if (payments.contains('cashapp'))
@@ -26772,26 +26937,119 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                       payTile('zelle', '🏦', 'Zelle', _listingSellerZelle(listing).isEmpty ? null : 'Send to: ${_listingSellerZelle(listing)}'),
                     if (selectedPay == 'ngmy' && !balanceOk)
                       Text('Not enough balance for \$${formatCurrency(total)}.', style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+                    if (needsPaymentProof) ...[
+                      const SizedBox(height: 12),
+                      if (selectedPay == 'cashapp' && _listingSellerCashTag(listing).isNotEmpty)
+                        _storePaymentInfoTile(
+                          label: 'Pay seller on Cash App',
+                          value: _listingSellerCashTag(listing),
+                          icon: Icons.payments_rounded,
+                          color: const Color(0xFF00D632),
+                          isDark: isDark,
+                          onTap: () => _openSellerCashApp(_listingSellerCashTag(listing)),
+                        ),
+                      if (selectedPay == 'zelle' && _listingSellerZelle(listing).isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        _storePaymentInfoTile(
+                          label: 'Zelle — tap or hold to copy',
+                          value: _listingSellerZelle(listing),
+                          icon: Icons.account_balance_rounded,
+                          color: const Color(0xFF6D1ED4),
+                          isDark: isDark,
+                          copyOnly: true,
+                          onTap: () => _copyStorePaymentInfo(_listingSellerZelle(listing), label: 'Zelle info'),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Text(
+                        'Payment screenshot (required)',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87),
+                      ),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: pickPaymentScreenshot,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: hasPaymentProof ? const Color(0xFF16A34A) : (isDark ? const Color(0xFF475569) : const Color(0xFF2563EB)),
+                              width: 1.5,
+                            ),
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.add_a_photo_outlined,
+                                size: 32,
+                                color: hasPaymentProof ? const Color(0xFF16A34A) : (isDark ? Colors.white54 : Colors.grey),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                hasPaymentProof ? 'Screenshot attached — tap to change' : 'Tap to upload Cash App or Zelle payment screenshot',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: isDark ? Colors.white70 : Colors.black87,
+                                ),
+                              ),
+                              if (hasPaymentProof) ...[
+                                const SizedBox(height: 10),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(maxHeight: 120),
+                                  child: NgmyPaymentProofImage(path: paymentScreenshotRef),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 14),
-                    const Text('Full name', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    Text('Full name', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
                     const SizedBox(height: 6),
-                    TextField(controller: nameC, decoration: _storeFieldDec('Your name', Icons.person_outline, isDark)),
+                    TextField(
+                      controller: nameC,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                      decoration: _storeFieldDec('Your name', Icons.person_outline, isDark),
+                    ),
                     const SizedBox(height: 10),
-                    const Text('Phone number', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    Text('Phone number', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
                     const SizedBox(height: 6),
-                    TextField(controller: phoneC, keyboardType: TextInputType.phone, decoration: _storeFieldDec('Phone for delivery updates', Icons.phone_outlined, isDark)),
+                    TextField(
+                      controller: phoneC,
+                      keyboardType: TextInputType.phone,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                      decoration: _storeFieldDec('Phone for delivery updates', Icons.phone_outlined, isDark),
+                    ),
                     const SizedBox(height: 10),
-                    const Text('Delivery Address', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    Text('Delivery Address', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: addressC,
                       maxLines: 3,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
                       onChanged: (_) => setDlg(() {}),
                       decoration: InputDecoration(
                         hintText: 'Street, city, state, zip — everything needed to ship',
+                        hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
                         filled: true,
                         fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: _storeAccent, width: 1.4),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -26814,6 +27072,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                     phone: phoneC.text.trim(),
                                     buyerName: nameC.text.trim(),
                                     quantity: buyQty,
+                                    paymentScreenshot: paymentScreenshotRef,
                                   );
                                 },
                           style: ElevatedButton.styleFrom(
