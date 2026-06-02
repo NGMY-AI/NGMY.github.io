@@ -3742,10 +3742,18 @@ class UserData {
     final earnings = goal * progress;
     return earnings > goal ? goal : earnings;
   }
-  double get todayDailyGoal {
+  /// Full daily clock-in amount before any late penalty (e.g. \$5.72).
+  double get fullDailyEarningsBeforePenalty {
     if (isOnFreeTrial) return freeTrialDailyAmount;
     if (activeInvestment == null) return 0.0;
-    return activeInvestment!.dailyAmount * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
+    return activeInvestment!.dailyAmount;
+  }
+
+  /// Maximum the user can earn today after late clock-in penalty (15% or 20% off full daily).
+  double get todayDailyGoal {
+    final full = fullDailyEarningsBeforePenalty;
+    if (full <= 0) return 0.0;
+    return full * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
   }
   Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds};
   factory UserData.fromJson(Map<String, dynamic> json) {
@@ -7350,8 +7358,15 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
 class _LateClockInDialog extends StatefulWidget {
   final double penaltyPercent;
   final DateTime clockTime;
+  final double fullDaily;
+  final double todayCap;
 
-  const _LateClockInDialog({required this.penaltyPercent, required this.clockTime});
+  const _LateClockInDialog({
+    required this.penaltyPercent,
+    required this.clockTime,
+    required this.fullDaily,
+    required this.todayCap,
+  });
 
   @override
   State<_LateClockInDialog> createState() => _LateClockInDialogState();
@@ -7453,8 +7468,14 @@ class _LateClockInDialogState extends State<_LateClockInDialog> with SingleTicke
                     child: Column(
                       children: [
                         Text(
-                          '${penalty.toInt()}% earnings deduction',
+                          '${penalty.toInt()}% off today\'s daily income',
                           style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Plan daily: \$${formatCurrency(widget.fullDaily)} → You earn up to \$${formatCurrency(widget.todayCap)} today',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -7613,12 +7634,22 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _showLateClockInDialog(double penalty, DateTime clockTime) async {
+  Future<void> _showLateClockInDialog(
+    double penalty,
+    DateTime clockTime, {
+    required double fullDaily,
+    required double todayCap,
+  }) async {
     if (!mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => _LateClockInDialog(penaltyPercent: penalty, clockTime: clockTime),
+      builder: (ctx) => _LateClockInDialog(
+        penaltyPercent: penalty,
+        clockTime: clockTime,
+        fullDaily: fullDaily,
+        todayCap: todayCap,
+      ),
     );
   }
 
@@ -7711,7 +7742,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         double earned = 0;
         bool completed = false;
         final goal = widget.user.todayDailyGoal;
-        if (goal > 0 && widget.user.currentTodayEarnings >= goal) {
+        if (goal > 0 && widget.user.currentTodayEarnings >= goal - 0.0001) {
           earned = goal;
           setState(() {
             widget.user.totalProfit += earned;
@@ -7731,13 +7762,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         if (completed) {
           if (earned > 0 &&
               !_ngmyHasClockInPayoutForDay(widget.user.email, widget.allTransactions, now)) {
+            final penaltyNote = widget.user.clockInPenaltyPercent > 0
+                ? ' (${widget.user.clockInPenaltyPercent.toInt()}% late deduction — cap \$${formatCurrency(earned)} of \$${formatCurrency(widget.user.fullDailyEarningsBeforePenalty)})'
+                : '';
             widget.onAddTransaction(AppTransaction(
               id: _ngmyClockInTransactionId(widget.user.email, now),
               userEmail: widget.user.email,
               amount: earned,
               type: TransactionType.reimbursement,
               method: PaymentMethod.system,
-              sourceDetails: 'Clock-in daily earnings',
+              sourceDetails: 'Clock-in daily earnings$penaltyNote',
               status: TransactionStatus.approved,
               timestamp: now,
             ));
@@ -7817,7 +7851,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         widget.onDataChanged();
         if (!onTrial) {
           if (_ngmyShowLateClockUi(now)) {
-            await _showLateClockInDialog(penalty, now);
+            await _showLateClockInDialog(
+              penalty,
+              now,
+              fullDaily: widget.user.fullDailyEarningsBeforePenalty,
+              todayCap: widget.user.todayDailyGoal,
+            );
           } else {
             await _showClockInConfirmedDialog();
           }
@@ -8848,8 +8887,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   '\$${formatCurrency(widget.user.currentTodayEarnings)}',
                   style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
                 ),
-                if (active && !alreadyDone)
+                if (!alreadyDone && widget.user.clockInPenaltyPercent > 0)
+                  Text(
+                    'Max today \$${formatCurrency(widget.user.todayDailyGoal)} (${widget.user.clockInPenaltyPercent.toInt()}% late fee)',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 7, fontWeight: FontWeight.w700),
+                  ),
+                if (active && !alreadyDone && widget.user.clockInPenaltyPercent <= 0)
                   const Text('Full at 12:00 PM', style: TextStyle(color: Colors.white60, fontSize: 7.5, fontWeight: FontWeight.w600)),
+                if (active && !alreadyDone && widget.user.clockInPenaltyPercent > 0)
+                  const Text('Fills to your max by 12:00 PM', style: TextStyle(color: Colors.white60, fontSize: 7.5, fontWeight: FontWeight.w600)),
                 if (!active && !alreadyDone && !blocked) const Text('ACTIVATE', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
                 if (blocked && !alreadyDone) const Text('CLOSED', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
                 if (alreadyDone) const Text('TOMORROW', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
@@ -9369,14 +9416,18 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
   }
 
   Future<void> _refreshInvites() async {
+    ngmyPruneStaleGameInvites(widget.config.gameInvites);
     final merged = await ngmySyncGameInvites(widget.config.gameInvites);
     if (!mounted) return;
+    ngmyPruneStaleGameInvites(widget.config.gameInvites);
     if (merged != null) {
       setState(() {
         _liveInvites = merged.map((e) => Map<String, dynamic>.from(e)).toList();
       });
     } else {
-      setState(() {});
+      setState(() {
+        _liveInvites = widget.config.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
+      });
     }
   }
 
@@ -9484,13 +9535,13 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
   }
 
   Widget _inviteBanner() {
+    ngmyPruneStaleGameInvites(widget.config.gameInvites);
+    ngmyPruneStaleGameInvites(_liveInvites);
     final pending = pendingInvitesFor(widget.user.email, _liveInvites);
-    final active = activeMatchesFor(widget.user.email, _liveInvites);
-    if (pending.isEmpty && active.isEmpty) return const SizedBox.shrink();
+    if (pending.isEmpty) return const SizedBox.shrink();
 
-    if (pending.isNotEmpty) {
-      final inv = pending.first;
-      return Container(
+    final inv = pending.first;
+    return Container(
         width: double.infinity,
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
@@ -9540,38 +9591,6 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
           ],
         ),
       );
-    }
-
-    final match = active.first;
-    final g = _games.firstWhere((e) => e.id == match['gameId'], orElse: () => _games.first);
-    final opponent = (match['fromEmail'] ?? '').toString().toLowerCase().trim() == widget.user.email.toLowerCase().trim()
-        ? (match['toEmail'] ?? 'Opponent')
-        : (match['fromName'] ?? match['fromEmail'] ?? 'Opponent');
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2563EB),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Active match', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-          Text(
-            'Continue ${g.title} vs $opponent — game ${((match['matchesPlayed'] as num?)?.toInt() ?? 0) + 1} of ${(match['matchesTotal'] as num?)?.toInt() ?? 1}',
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-          const SizedBox(height: 8),
-          FilledButton(
-            onPressed: () => _openGame(g, inviteId: match['id'].toString()),
-            child: const Text('Join Match'),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _gameTile(_GameDef g) {

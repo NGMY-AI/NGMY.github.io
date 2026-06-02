@@ -157,7 +157,28 @@ List<Map<String, dynamic>> pendingInvitesFor(String email, List<Map<String, dyna
       .toList();
 }
 
+/// Hide stale "active" rows in Game Center — only pending invites should show there.
+void ngmyPruneStaleGameInvites(List<Map<String, dynamic>> invites) {
+  for (final i in invites) {
+    if (inviteSeriesComplete(i)) {
+      i['status'] = 'finished';
+      i['seriesStatus'] = 'complete';
+      continue;
+    }
+    final session = i['sessionState'];
+    if (session is Map && session['gameOver'] == true) {
+      final total = (i['matchesTotal'] as num?)?.toInt() ?? 1;
+      final played = (i['matchesPlayed'] as num?)?.toInt() ?? 0;
+      if (played >= total) {
+        i['status'] = 'finished';
+        i['seriesStatus'] = 'complete';
+      }
+    }
+  }
+}
+
 List<Map<String, dynamic>> activeMatchesFor(String email, List<Map<String, dynamic>> invites) {
+  ngmyPruneStaleGameInvites(invites);
   final key = email.toLowerCase().trim();
   return invites.where((i) {
     if ((i['status'] ?? '') != 'active') return false;
