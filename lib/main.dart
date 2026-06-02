@@ -223,6 +223,13 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
         }
       } catch (_) {}
     }
+    if (currentUser == null) {
+      final lastEmail = (prefs.getString('ngmy_last_session_email') ?? '').toLowerCase().trim();
+      if (lastEmail.isNotEmpty) {
+        final index = users.indexWhere((u) => u.email.toLowerCase().trim() == lastEmail);
+        if (index != -1) currentUser = users[index];
+      }
+    }
 
     return NgmyLaunchBootstrap(
       themeMode: themeMode,
@@ -255,7 +262,17 @@ void main() async {
   _ngmyInitialThemeMode = launchBootstrap.themeMode;
   _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
 
-  await ngmyIgnoreTimeout(() async {
+  runZonedGuarded(() {
+    final app = NGMYApp(launchBootstrap: launchBootstrap);
+    runApp(
+      kIsWeb ? ExcludeSemantics(child: NgmyWebViewportGuard(child: app)) : app,
+    );
+  }, (e, st) {
+    debugPrint('[zone] $e\n$st');
+  });
+
+  // Never block first frame on cloud — cold start offline must show cached home immediately.
+  unawaited(ngmyIgnoreTimeout(() async {
     try {
       await Supabase.initialize(
         url: 'https://gvufllqqxjnpicmkxzcg.supabase.co',
@@ -270,16 +287,7 @@ void main() async {
     } catch (e) {
       debugPrint('Supabase init failed (app still starts): $e');
     }
-  }, timeout: const Duration(seconds: 10));
-
-  runZonedGuarded(() {
-    final app = NGMYApp(launchBootstrap: launchBootstrap);
-    runApp(
-      kIsWeb ? ExcludeSemantics(child: NgmyWebViewportGuard(child: app)) : app,
-    );
-  }, (e, st) {
-    debugPrint('[zone] $e\n$st');
-  });
+  }, timeout: const Duration(seconds: 12)));
 }
 
 // --- DATA MODELS ---
@@ -3859,6 +3867,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   ThemeMode _themeMode = _ngmyInitialThemeMode;
   UserData? _currentUser;
   bool _launchCacheHydrated = false;
+  bool _appOffline = false;
   Timer? _startupRebuildDebounce;
   List<AppTransaction> _allTransactions = [];
   List<UserData> _allUsers = [];
@@ -3901,6 +3910,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   String _computeAppShellSig() {
     final annSig = _allAnnouncements.map((a) => '${a.id}:${a.message.length}').join('|');
     return '${_currentUser?.email ?? ''}|${_allUsers.length}|${_allTransactions.length}|${_allMedia.length}|$annSig|${_config.ngmyChatClosed}';
+  }
+
+  Future<void> _startBackgroundServicesWhenReady() async {
+    for (var i = 0; i < 80; i++) {
+      try {
+        final _ = Supabase.instance.client;
+        break;
+      } catch (_) {
+        await Future.delayed(const Duration(milliseconds: 150));
+      }
+    }
+    if (!mounted) return;
+    _startBackgroundServices();
   }
 
   void _startBackgroundServices() {
@@ -4007,10 +4029,46 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
     _initLocalNotifications();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startBackgroundServices();
+      unawaited(_startBackgroundServicesWhenReady());
       _scheduleAutoThemeTick();
     });
     unawaited(_loadData());
+    unawaited(_probeOfflineAtLaunch());
+  }
+
+  Future<void> _probeOfflineAtLaunch() async {
+    final online = await ngmyCanReachCloud();
+    if (!mounted) return;
+    if (!online) {
+      setState(() => _appOffline = true);
+      await _persistLocalSnapshot();
+    }
+  }
+
+  Widget _offlineBanner() {
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF7C3AED).withOpacity(0.92),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Offline or slow connection — using data saved on this device.',
+                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -5747,9 +5805,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try {
       if (!await ngmyCanReachCloud()) {
         debugPrint('[ngmy] offline or slow network — using cached local data');
+        if (mounted) setState(() => _appOffline = true);
         await _persistLocalSnapshot();
         return;
       }
+      if (mounted && _appOffline) setState(() => _appOffline = false);
       final localUsersBeforeFetch = <String, UserData>{
         for (final u in _allUsers) u.email.toLowerCase().trim(): u,
       };
@@ -6049,6 +6109,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final merged = mergedByEmail[email];
           if (merged != null) _currentUser = merged;
           await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+          await prefs.setString('ngmy_last_session_email', email);
         }
       }
 
@@ -6272,9 +6333,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         themeMode: _effectiveThemeMode,
         builder: (context, child) {
           final body = child ?? const SizedBox.shrink();
+          final shell = _currentUser != null && _appOffline
+              ? Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    body,
+                    Positioned(top: 0, left: 0, right: 0, child: _offlineBanner()),
+                  ],
+                )
+              : body;
           return ColoredBox(
             color: Theme.of(context).scaffoldBackgroundColor,
-            child: body,
+            child: shell,
           );
         },
         home: _currentUser == null
@@ -6589,7 +6659,21 @@ class _AuthScreenState extends State<AuthScreen> {
             }
           })
           .catchError((err) {
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login error: $err')));
+            if (!mounted) return;
+            if (user.email.isNotEmpty && user.passwordHash.isNotEmpty && user.passwordHash == enteredHash) {
+              widget.onAuthComplete(email, '', '', enteredHash, true);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Signed in offline using data saved on this device.')),
+              );
+              return;
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'No connection. Open the app once online to sign in, or use the same password as your last successful login.',
+                ),
+              ),
+            );
           });
     } else {
       if (username.isEmpty) {
@@ -10046,8 +10130,19 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   int _typingSentenceIdx = 0;
   int _typingCorrectTotal = 0;
   // Memory
-  List<String> _memoryBase = [];
-  List<String> _memoryValues = [];
+  static const List<IconData> _memoryIcons = [
+    Icons.sports_esports_rounded,
+    Icons.diamond_rounded,
+    Icons.rocket_launch_rounded,
+    Icons.flag_rounded,
+    Icons.bolt_rounded,
+    Icons.local_fire_department_rounded,
+    Icons.paid_rounded,
+    Icons.psychology_rounded,
+  ];
+  List<int> _memoryBase = [];
+  List<int> _memoryValues = [];
+  int _myPairsFound = 0;
   List<int> _revealedCards = [];
   final Set<int> _matchedCards = {};
   bool _lockingCards = false;
@@ -10138,7 +10233,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       case 'typing':
         return _typingCorrectTotal + ngmyTypingCorrectCount(_answer, _inputC.text);
       case 'memory':
-        return _pairsFound;
+        return _isSkillMultiplayer ? _myPairsFound : _pairsFound;
       case 'simon':
         return _simonCorrectTaps;
       case 'pattern':
@@ -10249,7 +10344,12 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
           ..clear()
           ..addAll(matched);
         _pairsFound = (_matchedCards.length / 2).floor();
-        // If opponent matched something you were revealing, close them.
+        final key = widget.user.email.toLowerCase().trim();
+        final scoresRaw = s['scores'];
+        if (scoresRaw is Map) {
+          final myScore = (scoresRaw[key] as num?)?.toInt();
+          if (myScore != null) _myPairsFound = myScore;
+        }
         _revealedCards.removeWhere((i) => _matchedCards.contains(i));
         changed = true;
       }
@@ -10365,6 +10465,9 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       });
       if (widget.gameId == 'pattern') {
         unawaited(_beginPatternAfterMultiplayerGate());
+      } else if (widget.gameId == 'memory') {
+        _setupMemoryBoard();
+        if (mounted) setState(() {});
       }
     }
     _mpGateTimer?.cancel();
@@ -10592,7 +10695,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     _optionChoices = [];
     switch (widget.gameId) {
       case 'memory':
-        _memoryBase = ['🎮', '💎', '🚀', '🎯', '⚡', '🔥', '💰', '🧠'];
+        _memoryBase = List<int>.generate(_memoryIcons.length, (i) => i);
         _memoryCols = 4;
         _prompt = 'Match all pairs — keep trying until time runs out';
         _setupMemoryBoard();
@@ -10733,6 +10836,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   void _setupMemoryBoard() {
     _pairsFound = 0;
+    _myPairsFound = 0;
     _matchedCards.clear();
     _revealedCards = [];
     _lockingCards = false;
@@ -10757,6 +10861,12 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
           if (n != null) _matchedCards.add(n);
         }
         _pairsFound = (_matchedCards.length / 2).floor();
+        final key = widget.user.email.toLowerCase().trim();
+        final scoresRaw = session['scores'];
+        if (scoresRaw is Map) {
+          final myScore = (scoresRaw[key] as num?)?.toInt();
+          if (myScore != null) _myPairsFound = myScore;
+        }
       }
     } else {
       _memoryValues.shuffle(_rng);
@@ -10775,12 +10885,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         _matchedCards.add(a);
         _matchedCards.add(b);
         _pairsFound++;
+        if (_isSkillMultiplayer) _myPairsFound++;
         _revealedCards = [];
       });
       if (_isSkillMultiplayer) {
         unawaited(_publishSkillMultiplayerProgress());
       }
-      if (_pairsFound >= _memoryBase.length) {
+      if (_matchedCards.length >= _memoryValues.length) {
         unawaited(_advanceBank());
         if (_isSkillMultiplayer) {
           unawaited(_settleSkillMultiplayer(forceComplete: true));
@@ -11355,7 +11466,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         final side = math.min(cellW, cellH);
         return Column(
           children: [
-            Text('Pairs $_pairsFound/${_memoryBase.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+            Text(
+              _isSkillMultiplayer
+                  ? 'Your pairs $_myPairsFound/${_memoryBase.length} · Board ${_pairsFound}/${_memoryBase.length}'
+                  : 'Pairs $_pairsFound/${_memoryBase.length}',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 6),
             Expanded(
               child: Center(
@@ -11386,9 +11503,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
                             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4)],
                           ),
                           child: Center(
-                            child: FittedBox(
-                              child: Text(isOpen ? _memoryValues[i] : '?', style: TextStyle(fontSize: side * 0.42, fontWeight: FontWeight.w900, color: Colors.white)),
-                            ),
+                            child: isOpen
+                                ? Icon(
+                                    _memoryIcons[_memoryValues[i]],
+                                    size: side * 0.42,
+                                    color: Colors.white,
+                                  )
+                                : Text('?', style: TextStyle(fontSize: side * 0.42, fontWeight: FontWeight.w900, color: Colors.white)),
                           ),
                         ),
                       );
