@@ -1555,6 +1555,21 @@ Map<String, dynamic> _userRowForBulkSync(UserData u, {bool includeFreeTrial = fa
   return row;
 }
 
+Future<void> _pushUserCanSellOnStore(UserData u) async {
+  if (!await ngmyCanReachCloud()) return;
+  final email = u.email.trim();
+  if (email.isEmpty) return;
+  try {
+    await Supabase.instance.client.from('users').upsert({
+      'email': email,
+      'canSellOnStore': u.canSellOnStore,
+      'can_sell_on_store': u.canSellOnStore,
+    }).timeout(kNgmyCloudWriteTimeout);
+  } catch (e) {
+    debugPrint('[user] canSellOnStore upsert: $e');
+  }
+}
+
 Future<void> _pushUserFreeTrialToCloud(UserData u) async {
   if (!await ngmyCanReachCloud()) return;
   try {
@@ -2665,7 +2680,7 @@ List<Map<String, dynamic>> _mergeInquiryReplyLists(
       final key = NgmyStorePaymentReply.isPurchaseNotification(r) && orderId.isNotEmpty
           ? 'pn_$orderId'
           : NgmyStorePaymentReply.isPurchaseStatus(r) && orderId.isNotEmpty
-              ? 'ps_${orderId}_${NgmyStorePaymentReply.paymentStatusOf(r)}'
+              ? 'ps_$orderId'
               : 'msg_${created}_${(r['message'] ?? '').toString().hashCode}';
       byKey[key] = Map<String, dynamic>.from(r);
     }
@@ -3913,7 +3928,7 @@ class UserData {
       isAuthorizedRegistrar: json['isAuthorizedRegistrar'] ?? false,
       isApprovedWorker: json['isApprovedWorker'] ?? false,
       isApprovedHelper: json['isApprovedHelper'] ?? false,
-      canSellOnStore: json['canSellOnStore'] == true,
+      canSellOnStore: json['canSellOnStore'] == true || json['can_sell_on_store'] == true,
       lastClockInDate: parseDate(json['lastClockInDate']),
       lastClockInEarningsDate: parseDate(json['lastClockInEarningsDate']),
       todayClockInEarned: (json['todayClockInEarned'] ?? 0.0).toDouble(),
@@ -4229,16 +4244,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (email.isEmpty) return;
       final row = await supabase.from('users').select().eq('email', email).maybeSingle().timeout(kNgmyCloudLoadTimeout);
       if (row == null || !mounted) return;
-      final remote = UserData.fromJson(Map<String, dynamic>.from(row));
+      final rowMap = Map<String, dynamic>.from(row);
+      final hadCanSellKey = rowMap.containsKey('canSellOnStore') || rowMap.containsKey('can_sell_on_store');
+      final remote = UserData.fromJson(rowMap);
       final key = email.toLowerCase().trim();
       setState(() {
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
         if (idx >= 0) {
-          _preserveLocalSessionState(_allUsers[idx], remote);
-          _mergeUserMediaProfileFields(_allUsers[idx], remote);
+          final local = _allUsers[idx];
+          if (!hadCanSellKey) remote.canSellOnStore = local.canSellOnStore;
+          _preserveLocalSessionState(local, remote);
+          _mergeUserMediaProfileFields(local, remote);
           _ngmyReconcileClockInSession(remote, _allTransactions);
           _allUsers[idx] = remote;
         }
+        if (!hadCanSellKey) remote.canSellOnStore = _currentUser!.canSellOnStore;
         _preserveLocalSessionState(_currentUser!, remote);
         _ngmyReconcileClockInSession(remote, _allTransactions);
         _currentUser = remote;
@@ -5728,7 +5748,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (email.isEmpty) return;
         setState(() => _allUsers.removeWhere((u) => u.email.toLowerCase().trim() == email));
       } else {
-        final newRow = payload.newRecord;
+        final newRow = Map<String, dynamic>.from(payload.newRecord);
+        final hadCanSellKey = newRow.containsKey('canSellOnStore') || newRow.containsKey('can_sell_on_store');
         final updatedUser = UserData.fromJson(newRow);
         final email = updatedUser.email.toLowerCase().trim();
         if (email.isEmpty) return;
@@ -5738,6 +5759,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _allUsers.add(updatedUser);
           } else {
             final local = _allUsers[idx];
+            if (!hadCanSellKey) updatedUser.canSellOnStore = local.canSellOnStore;
             _preserveLocalSessionState(local, updatedUser);
             _mergeUserMediaProfileFields(local, updatedUser);
             _allUsers[idx] = updatedUser;
@@ -5837,6 +5859,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       remote.points = local.points;
     }
     _mergeUserMediaProfileFields(local, remote);
+    if (local.isApprovedWorker && !remote.isApprovedWorker) remote.isApprovedWorker = true;
+    if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
+    if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) remote.isAuthorizedRegistrar = true;
   }
 
   Future<void> _persistLocalSnapshot() async {
@@ -12528,6 +12553,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             u.canSellOnStore = on;
                             widget.onDataChanged();
                             setState(() {});
+                            unawaited(_pushUserCanSellOnStore(u));
+                            unawaited(_pushUserToCloudFast(u));
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(on ? '${u.username} can now use Sell Item in NGMY Store.' : 'Sell Item removed for ${u.username}.')),
                             );
@@ -22845,6 +22872,30 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _startAutoGpsTimerIfNeeded();
   }
 
+  @override
+  void didUpdateWidget(NgmyStoreScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldCanSell = oldWidget.user.isAdmin || oldWidget.user.canSellOnStore;
+    final newCanSell = widget.user.isAdmin || widget.user.canSellOnStore;
+    if (oldCanSell != newCanSell) {
+      final idx = _tabCtrl.index;
+      _tabCtrl.dispose();
+      _tabCtrl = TabController(length: newCanSell ? 3 : 2, vsync: this)
+        ..addListener(() {
+          if (!mounted) return;
+          final ordersTab = newCanSell ? 2 : 1;
+          if (_tabCtrl.index == ordersTab) {
+            _trackingReplayToken++;
+            unawaited(_syncLiveOrders());
+          }
+          setState(() {});
+        });
+      if (idx < _tabCtrl.length) {
+        _tabCtrl.index = idx.clamp(0, _tabCtrl.length - 1);
+      }
+    }
+  }
+
   bool _isMySaleOrder(Map<String, dynamic> order) {
     final me = widget.user.email.toLowerCase().trim();
     return (order['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
@@ -23199,26 +23250,59 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       '${sellerEmail.toLowerCase().trim()}|${buyerEmail.toLowerCase().trim()}';
 
   int? _findInquiryThreadIndex(String sellerEmail, String buyerEmail) {
+    final indices = _findAllInquiryThreadIndices(sellerEmail, buyerEmail);
+    return indices.isEmpty ? null : indices.first;
+  }
+
+  List<int> _findAllInquiryThreadIndices(String sellerEmail, String buyerEmail) {
     final sk = sellerEmail.toLowerCase().trim();
     final bk = buyerEmail.toLowerCase().trim();
+    final out = <int>[];
     for (var i = 0; i < _inquiries.length; i++) {
       final m = _inquiries[i];
       if ((m['sellerEmail'] ?? '').toString().toLowerCase().trim() == sk &&
           (m['buyerEmail'] ?? '').toString().toLowerCase().trim() == bk) {
-        return i;
+        out.add(i);
       }
     }
-    return null;
+    return out;
+  }
+
+  int? _newestInquiryThreadIndex(String sellerEmail, String buyerEmail) {
+    final indices = _findAllInquiryThreadIndices(sellerEmail, buyerEmail);
+    if (indices.isEmpty) return null;
+    var best = indices.first;
+    var bestAt = _inquiryLastAt(_inquiries[best]);
+    for (final i in indices.skip(1)) {
+      final at = _inquiryLastAt(_inquiries[i]);
+      if (at.compareTo(bestAt) > 0) {
+        best = i;
+        bestAt = at;
+      }
+    }
+    return best;
   }
 
   bool _orderHasPendingPaymentNotification(String orderId, String sellerEmail, String buyerEmail) {
-    final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
-    if (idx == null) return false;
-    for (final r in _inquiryReplies(_inquiries[idx])) {
-      if (NgmyStorePaymentReply.isPurchaseNotification(r) &&
-          (r['orderId'] ?? '').toString() == orderId &&
-          NgmyStorePaymentReply.isPending(r)) {
-        return true;
+    for (final idx in _findAllInquiryThreadIndices(sellerEmail, buyerEmail)) {
+      for (final r in _inquiryReplies(_inquiries[idx])) {
+        if (NgmyStorePaymentReply.isPurchaseNotification(r) &&
+            (r['orderId'] ?? '').toString() == orderId &&
+            NgmyStorePaymentReply.isPending(r)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  bool _threadHasPaymentDecisionForOrder(String orderId, String sellerEmail, String buyerEmail) {
+    for (final idx in _findAllInquiryThreadIndices(sellerEmail, buyerEmail)) {
+      for (final r in _inquiryReplies(_inquiries[idx])) {
+        if (!NgmyStorePaymentReply.isPurchaseStatus(r)) continue;
+        if ((r['orderId'] ?? '').toString() != orderId) continue;
+        final st = NgmyStorePaymentReply.paymentStatusOf(r);
+        if (st == 'approved' || st == 'rejected') return true;
       }
     }
     return false;
@@ -23234,6 +23318,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       final buyerEmail = (order['buyerEmail'] ?? '').toString();
       if (orderId.isEmpty || sellerEmail.isEmpty || buyerEmail.isEmpty) continue;
       if (_orderHasPendingPaymentNotification(orderId, sellerEmail, buyerEmail)) continue;
+      if (_threadHasPaymentDecisionForOrder(orderId, sellerEmail, buyerEmail)) continue;
 
       final listingId = (order['listingId'] ?? '').toString();
       Map<String, dynamic>? listing;
@@ -23460,11 +23545,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   String _paymentProofFromInquiries(String orderId, String sellerEmail, String buyerEmail) {
-    final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
-    if (idx == null) return '';
-    for (final r in _inquiryReplies(_inquiries[idx])) {
-      if (NgmyStorePaymentReply.isPurchaseNotification(r) && (r['orderId'] ?? '').toString() == orderId) {
-        return (r['screenshotPath'] ?? '').toString().trim();
+    for (final idx in _findAllInquiryThreadIndices(sellerEmail, buyerEmail)) {
+      for (final r in _inquiryReplies(_inquiries[idx])) {
+        if (NgmyStorePaymentReply.isPurchaseNotification(r) && (r['orderId'] ?? '').toString() == orderId) {
+          final path = (r['screenshotPath'] ?? '').toString().trim();
+          if (path.isNotEmpty) return path;
+        }
       }
     }
     return '';
@@ -23478,10 +23564,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   bool _threadHasPaymentStatusForOrder(String orderId, String sellerEmail, String buyerEmail) {
-    final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
-    if (idx == null) return false;
-    return _inquiryReplies(_inquiries[idx]).any((r) =>
-        NgmyStorePaymentReply.isPurchaseStatus(r) && (r['orderId'] ?? '').toString() == orderId);
+    return _threadHasPaymentDecisionForOrder(orderId, sellerEmail, buyerEmail);
   }
 
   void _removePurchaseNotificationFromThread(String orderId) {
@@ -23498,6 +23581,31 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     }
   }
 
+  void _dedupePaymentStatusRepliesForOrder(String orderId, String sellerEmail, String buyerEmail) {
+    final indices = _findAllInquiryThreadIndices(sellerEmail, buyerEmail);
+    if (indices.isEmpty) return;
+    Map<String, dynamic>? keepStatus;
+    for (final idx in indices) {
+      for (final r in _inquiryReplies(_inquiries[idx])) {
+        if (NgmyStorePaymentReply.isPurchaseStatus(r) && (r['orderId'] ?? '').toString() == orderId) {
+          keepStatus = r;
+        }
+      }
+    }
+    final hostIdx = _newestInquiryThreadIndex(sellerEmail, buyerEmail) ?? indices.first;
+    for (final idx in indices) {
+      final replies = _inquiryReplies(_inquiries[idx]);
+      final before = replies.length;
+      replies.removeWhere((r) =>
+          NgmyStorePaymentReply.isPurchaseStatus(r) && (r['orderId'] ?? '').toString() == orderId);
+      if (idx == hostIdx && keepStatus != null) replies.add(keepStatus);
+      if (replies.length != before || (idx == hostIdx && keepStatus != null)) {
+        _inquiries[idx]['replies'] = replies;
+        unawaited(_upsertStoreInquiryRowSafe(_inquiries[idx]));
+      }
+    }
+  }
+
   void _removeStoreOrderLocal(String orderId) {
     if (orderId.isEmpty) return;
     _orders.removeWhere((o) => (o['id'] ?? '').toString() == orderId);
@@ -23510,8 +23618,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     required bool approved,
   }) {
     if (_threadHasPaymentStatusForOrder(orderId, sellerEmail, buyerEmail)) return;
-    final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+    final idx = _newestInquiryThreadIndex(sellerEmail, buyerEmail);
     if (idx == null) return;
+    _removePurchaseNotificationFromThread(orderId);
     final list = _inquiryReplies(_inquiries[idx]);
     final order = _orderById(orderId);
     list.add({
@@ -23569,12 +23678,16 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       _updateOrderFields(orderId, {'paymentStatus': 'approved'});
       _removePurchaseNotificationFromThread(orderId);
       if (order != null) {
+        final sellerEmail = (order['sellerEmail'] ?? widget.user.email).toString();
+        final buyerEmail = (order['buyerEmail'] ?? '').toString();
+        _dedupePaymentStatusRepliesForOrder(orderId, sellerEmail, buyerEmail);
         _appendStorePaymentDecisionToThread(
           orderId: orderId,
-          sellerEmail: (order['sellerEmail'] ?? widget.user.email).toString(),
-          buyerEmail: (order['buyerEmail'] ?? '').toString(),
+          sellerEmail: sellerEmail,
+          buyerEmail: buyerEmail,
           approved: true,
         );
+        _dedupePaymentStatusRepliesForOrder(orderId, sellerEmail, buyerEmail);
       }
       await _persistOrdersAndRefresh(orderId: orderId);
       widget.onDataChanged();
@@ -23601,14 +23714,20 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     try {
       if (order != null) {
         _restoreListingUnitsForRejectedOrder(order);
+        final sellerEmail = (order['sellerEmail'] ?? widget.user.email).toString();
+        final buyerEmail = (order['buyerEmail'] ?? '').toString();
+        _removePurchaseNotificationFromThread(orderId);
+        _dedupePaymentStatusRepliesForOrder(orderId, sellerEmail, buyerEmail);
         _appendStorePaymentDecisionToThread(
           orderId: orderId,
-          sellerEmail: (order['sellerEmail'] ?? widget.user.email).toString(),
-          buyerEmail: (order['buyerEmail'] ?? '').toString(),
+          sellerEmail: sellerEmail,
+          buyerEmail: buyerEmail,
           approved: false,
         );
+        _dedupePaymentStatusRepliesForOrder(orderId, sellerEmail, buyerEmail);
+      } else {
+        _removePurchaseNotificationFromThread(orderId);
       }
-      _removePurchaseNotificationFromThread(orderId);
       _removeStoreOrderLocal(orderId);
       await _persistOrdersAndRefresh();
       widget.onDataChanged();
@@ -23808,7 +23927,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   void _showSellerInbox() {
-    _ensurePaymentReviewInquiriesFromOrders();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final me = widget.user.email.toLowerCase().trim();
     final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
