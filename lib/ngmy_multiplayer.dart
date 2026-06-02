@@ -1,7 +1,23 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_network_resilience.dart';
+
+/// Brief pause after both players enter so neither starts early.
+const int kNgmyMpLobbyAlignMs = 500;
+
+/// Shared countdown once both players are in the room.
+const int kNgmyMpCountdownSec = 4;
+
+/// Minimum interval between full cloud invite fetches during match sync.
+const Duration kNgmyInviteCloudRefreshMin = Duration(milliseconds: 120);
+
+List<Map<String, dynamic>> _inviteCloudCache = [];
+DateTime? _inviteCloudFetchedAt;
 
 /// Multiplayer-capable game ids.
 const Set<String> kNgmyMultiplayerGameIds = {
@@ -115,6 +131,7 @@ void addGameInvite(
   required String fromEmail,
   required String fromName,
   required String toEmail,
+  String? toName,
   required String gameId,
   required String gameTitle,
   required int matchesTotal,
@@ -129,6 +146,7 @@ void addGameInvite(
     'fromEmail': fromEmail.toLowerCase().trim(),
     'fromName': fromName,
     'toEmail': key,
+    if (toName != null && toName.trim().isNotEmpty) 'toName': toName.trim(),
     'gameId': gameId,
     'gameTitle': gameTitle,
     'status': 'pending',
@@ -242,6 +260,109 @@ Map<String, dynamic>? findInviteById(List<Map<String, dynamic>> invites, String 
     if ((i['id'] ?? '').toString() == id) return i;
   }
   return null;
+}
+
+void upsertInviteInList(List<Map<String, dynamic>> invites, Map<String, dynamic> invite) {
+  final id = (invite['id'] ?? '').toString();
+  if (id.isEmpty) return;
+  final idx = invites.indexWhere((i) => (i['id'] ?? '').toString() == id);
+  final copy = Map<String, dynamic>.from(invite);
+  if (idx >= 0) {
+    invites[idx] = copy;
+  } else {
+    invites.add(copy);
+  }
+}
+
+bool _looksLikeEmail(String value) => value.contains('@');
+
+String _playerDisplayNameFromSession(Map<String, dynamic> session, String playerEmail, Map<String, dynamic> invite) {
+  final from = (invite['fromEmail'] ?? '').toString().toLowerCase().trim();
+  final to = (invite['toEmail'] ?? '').toString().toLowerCase().trim();
+  final p1 = (session['player1Email'] ?? session['playerXEmail'] ?? from).toString().toLowerCase().trim();
+  final p2 = (session['player2Email'] ?? session['playerOEmail'] ?? to).toString().toLowerCase().trim();
+  if (playerEmail == p1) {
+    return (session['player1Name'] ?? session['playerXName'] ?? invite['fromName'] ?? '').toString().trim();
+  }
+  if (playerEmail == p2) {
+    return (session['player2Name'] ?? session['playerOName'] ?? invite['toName'] ?? '').toString().trim();
+  }
+  if (playerEmail == from) return (invite['fromName'] ?? '').toString().trim();
+  if (playerEmail == to) return (invite['toName'] ?? '').toString().trim();
+  return '';
+}
+
+/// Opponent label for banners and game headers (username, not email).
+String inviteOpponentDisplayName(
+  Map<String, dynamic> invite,
+  String yourEmail, {
+  Map<String, String>? emailToUsername,
+}) {
+  final key = yourEmail.toLowerCase().trim();
+  final from = (invite['fromEmail'] ?? '').toString().toLowerCase().trim();
+  final to = (invite['toEmail'] ?? '').toString().toLowerCase().trim();
+  final opponentEmail = key == from ? to : from;
+  final sessionRaw = invite['sessionState'];
+  final session = sessionRaw is Map ? Map<String, dynamic>.from(sessionRaw) : <String, dynamic>{};
+  var name = _playerDisplayNameFromSession(session, opponentEmail, invite);
+  if ((name.isEmpty || _looksLikeEmail(name)) && emailToUsername != null) {
+    name = emailToUsername[opponentEmail] ?? '';
+  }
+  if (name.isEmpty || _looksLikeEmail(name)) return 'Opponent';
+  return name;
+}
+
+Future<Map<String, String>> ngmyLoadEmailToUsernameMap() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('all_users');
+    if (raw == null || raw.isEmpty) return {};
+    final list = jsonDecode(raw);
+    if (list is! List) return {};
+    final out = <String, String>{};
+    for (final e in list) {
+      if (e is! Map) continue;
+      final email = (e['email'] ?? '').toString().toLowerCase().trim();
+      final username = (e['username'] ?? '').toString().trim();
+      if (email.isNotEmpty && username.isNotEmpty) out[email] = username;
+    }
+    return out;
+  } catch (_) {
+    return {};
+  }
+}
+
+Future<String> inviteOpponentDisplayNameResolved(Map<String, dynamic> invite, String yourEmail) async {
+  final map = await ngmyLoadEmailToUsernameMap();
+  return inviteOpponentDisplayName(invite, yourEmail, emailToUsername: map);
+}
+
+Future<List<Map<String, dynamic>>> _remoteInvitesCached({bool force = false}) async {
+  if (!force &&
+      _inviteCloudFetchedAt != null &&
+      DateTime.now().difference(_inviteCloudFetchedAt!) < kNgmyInviteCloudRefreshMin &&
+      _inviteCloudCache.isNotEmpty) {
+    return _inviteCloudCache;
+  }
+  final remote = await ngmyFetchGameInvitesFromCloud();
+  if (remote != null) {
+    _inviteCloudCache = remote;
+    _inviteCloudFetchedAt = DateTime.now();
+  }
+  return _inviteCloudCache;
+}
+
+/// Local + cached remote merge — avoids a cloud round-trip on every poll.
+Future<Map<String, dynamic>?> ngmyFetchInviteByIdMerged(
+  String inviteId,
+  List<Map<String, dynamic>> localInvites, {
+  bool forceRefresh = false,
+}) async {
+  final remote = await _remoteInvitesCached(force: forceRefresh);
+  final merged = mergeGameInvites(localInvites, remote);
+  final found = findInviteById(merged, inviteId);
+  if (found != null) upsertInviteInList(localInvites, found);
+  return found;
 }
 
 void respondInvite(List<Map<String, dynamic>> invites, String id, String status) {
@@ -411,6 +532,14 @@ Future<Map<String, dynamic>?> ngmyFetchInviteById(String inviteId) async {
   return findInviteById(remote, inviteId);
 }
 
+Future<Map<String, dynamic>?> ngmyFetchInviteByIdMergedOnlyLocal(
+  String inviteId,
+  List<Map<String, dynamic>> localInvites,
+) async {
+  return findInviteById(localInvites, inviteId) ??
+      ngmyFetchInviteByIdMerged(inviteId, localInvites);
+}
+
 /// Pull remote invites, merge with local, optionally push merged list back.
 Future<List<Map<String, dynamic>>?> ngmySyncGameInvites(List<Map<String, dynamic>> localInvites, {bool push = false}) async {
   final remote = await ngmyFetchGameInvitesFromCloud();
@@ -425,17 +554,29 @@ Future<List<Map<String, dynamic>>?> ngmySyncGameInvites(List<Map<String, dynamic
   return merged;
 }
 
-Future<bool> ngmyPublishGameInvites(List<Map<String, dynamic>> localInvites) async {
+Future<bool> ngmyPublishGameInvites(
+  List<Map<String, dynamic>> localInvites, {
+  bool preferCachedRemote = false,
+}) async {
   if (!await ngmyCanReachCloud()) return false;
   try {
     final client = Supabase.instance.client;
-    final row = await client.from('config').select('gameInvites').eq('id', _kConfigRowId).maybeSingle();
-    final remote = row != null && row['gameInvites'] is List ? parseGameInvites(row['gameInvites']) : <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> remote;
+    if (preferCachedRemote && _inviteCloudCache.isNotEmpty) {
+      remote = _inviteCloudCache;
+    } else {
+      final row = await client.from('config').select('gameInvites').eq('id', _kConfigRowId).maybeSingle();
+      remote = row != null && row['gameInvites'] is List ? parseGameInvites(row['gameInvites']) : <Map<String, dynamic>>[];
+      _inviteCloudCache = remote;
+      _inviteCloudFetchedAt = DateTime.now();
+    }
     final merged = mergeGameInvites(localInvites, remote);
     await client.from('config').upsert({'id': _kConfigRowId, 'gameInvites': merged});
     localInvites
       ..clear()
       ..addAll(merged);
+    _inviteCloudCache = merged;
+    _inviteCloudFetchedAt = DateTime.now();
     return true;
   } catch (e) {
     debugPrint('[gameInvites] publish: $e');
@@ -446,6 +587,16 @@ Future<bool> ngmyPublishGameInvites(List<Map<String, dynamic>> localInvites) asy
 Future<bool> ngmyPublishInviteSession(List<Map<String, dynamic>> localInvites, String inviteId, Map<String, dynamic> sessionState) async {
   updateInviteSession(localInvites, inviteId, sessionState);
   return ngmyPublishGameInvites(localInvites);
+}
+
+/// Updates local session immediately; cloud publish runs without blocking UI.
+void ngmyPublishInviteSessionFast(
+  List<Map<String, dynamic>> localInvites,
+  String inviteId,
+  Map<String, dynamic> sessionState,
+) {
+  updateInviteSession(localInvites, inviteId, sessionState);
+  unawaited(ngmyPublishGameInvites(localInvites, preferCachedRemote: true));
 }
 
 /// Solo vs NGMY system, or head-to-head when [inviteId] is set.
@@ -484,9 +635,12 @@ class NgmyGamePlayContext {
     final key = yourEmail.toLowerCase().trim();
     final session = invite['sessionState'] is Map ? Map<String, dynamic>.from(invite['sessionState'] as Map) : <String, dynamic>{};
     final opponentEmail = key == from ? to : from;
-    final opponentName = key == from
-        ? ((session['player2Name'] ?? session['playerOName'] ?? to).toString())
-        : ((invite['fromName'] ?? from).toString());
+    var opponentName = key == from
+        ? ((session['player2Name'] ?? session['playerOName'] ?? invite['toName'] ?? '').toString().trim())
+        : ((session['player1Name'] ?? session['playerXName'] ?? invite['fromName'] ?? '').toString().trim());
+    if (opponentName.isEmpty || _looksLikeEmail(opponentName)) {
+      opponentName = inviteOpponentDisplayName(invite, yourEmail);
+    }
     return NgmyGamePlayContext(
       vsComputer: false,
       youLabel: yourName,

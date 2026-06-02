@@ -13,9 +13,11 @@ import 'ngmy_video_studio_models.dart';
 
 const _metaTimeout = Duration(seconds: 18);
 const _maxRecordSeconds = 180.0;
-const _exportCanvasFps = 60;
-const _exportVideoBitsPerSecond = 20000000;
-const _exportAudioBitsPerSecond = 320000;
+const _exportCanvasFps = 30;
+const _exportVideoBitsPerSecond = 8000000;
+const _exportAudioBitsPerSecond = 192000;
+const _recorderTimesliceMs = 250;
+const _minRecordMs = 400;
 
 bool _ngmyIsAppleMobileBrowser() {
   final ua = html.window.navigator.userAgent.toLowerCase();
@@ -207,6 +209,44 @@ Future<bool> _waitVideoMeta(html.VideoElement v) async {
   }
 }
 
+Future<bool> _waitVideoCanPlay(html.VideoElement v) async {
+  if (v.readyState >= html.MediaElement.HAVE_CURRENT_DATA) return true;
+  try {
+    await v.onCanPlay.first.timeout(_metaTimeout);
+    return v.readyState >= html.MediaElement.HAVE_CURRENT_DATA;
+  } catch (_) {
+    return _waitVideoMeta(v);
+  }
+}
+
+/// Chrome often reports video/mp4 as supported but records zero bytes — prefer WebM.
+String? _pickRecorderMimeType() {
+  for (final m in [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+    'video/mp4',
+  ]) {
+    if (html.MediaRecorder.isTypeSupported(m)) return m;
+  }
+  return null;
+}
+
+Future<void> _stopRecorderDrain(html.MediaRecorder recorder, Completer<void> done) async {
+  if (recorder.state == 'recording') {
+    try {
+      js_util.callMethod(recorder, 'requestData', const []);
+    } catch (_) {}
+    try {
+      recorder.stop();
+    } catch (_) {}
+  }
+  try {
+    await done.future.timeout(const Duration(seconds: 10));
+  } catch (_) {}
+  await Future<void>.delayed(const Duration(milliseconds: 150));
+}
+
 bool _webSupportsComposedCapture() {
   final probe = html.CanvasElement(width: 4, height: 4);
   try {
@@ -363,6 +403,10 @@ Future<String> exportNgmyVideoStudioComposed({
     if (metaOk.contains(false)) {
       return 'Video could not load for export. Re-upload the clip and try Download again.';
     }
+    final playOk = await Future.wait(videos.values.map(_waitVideoCanPlay));
+    if (playOk.contains(false)) {
+      return 'Video is still loading. Wait a moment and tap Download again.';
+    }
 
     var durationSec = 3.0;
     for (final v in videos.values) {
@@ -385,11 +429,12 @@ Future<String> exportNgmyVideoStudioComposed({
     final composed = html.MediaStream();
     canvas
       ..style.position = 'fixed'
-      ..style.left = '0'
+      ..style.left = '-10000px'
       ..style.top = '0'
-      ..style.opacity = '0.01'
+      ..style.width = '${w}px'
+      ..style.height = '${h}px'
       ..style.pointerEvents = 'none'
-      ..style.zIndex = '-1';
+      ..style.zIndex = '0';
     html.document.body?.append(canvas);
 
     final canvasStream = _safeCaptureStream(canvas, fps: _exportCanvasFps);
@@ -434,51 +479,55 @@ Future<String> exportNgmyVideoStudioComposed({
       return _downloadAllVideoClips(sources);
     }
 
-    String? mimeType;
-    for (final m in [
-      'video/mp4',
-      'video/webm;codecs=vp9,opus',
-      'video/webm;codecs=vp8,opus',
-      'video/webm',
-    ]) {
-      if (html.MediaRecorder.isTypeSupported(m)) {
-        mimeType = m;
-        break;
-      }
+    final mimeType = _pickRecorderMimeType();
+    if (mimeType == null) {
+      return _downloadAllVideoClips(sources);
     }
-    mimeType ??= 'video/webm';
 
-    final recorder = html.MediaRecorder(composed, {
+    final recorderOptions = <String, dynamic>{
       'mimeType': mimeType,
       'videoBitsPerSecond': _exportVideoBitsPerSecond,
-      'audioBitsPerSecond': _exportAudioBitsPerSecond,
-    });
+    };
+    if (composed.getAudioTracks().isNotEmpty) {
+      recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
+    }
+
+    html.MediaRecorder recorder;
+    try {
+      recorder = html.MediaRecorder(composed, recorderOptions);
+    } catch (e) {
+      debugPrint('[studio export] MediaRecorder ctor failed: $e');
+      return _downloadAllVideoClips(sources);
+    }
+
     final chunks = <html.Blob>[];
     recorder.addEventListener('dataavailable', (event) {
       final b = (event as html.BlobEvent).data;
       if (b != null && b.size > 0) chunks.add(b);
     });
+    recorder.addEventListener('error', (event) {
+      debugPrint('[studio export] MediaRecorder error: $event');
+    });
     final done = Completer<void>();
-    recorder.addEventListener('stop', (_) => done.complete());
+    recorder.addEventListener('stop', (_) {
+      if (!done.isCompleted) done.complete();
+    });
 
     for (final v in videos.values) {
       v.playbackRate = 1.0;
       v.currentTime = 0;
     }
-    await Future.wait(videos.values.map((v) => v.play()));
 
-    recorder.start(100);
     var stopped = false;
     final startMs = DateTime.now().millisecondsSinceEpoch;
+    final recordStartedMs = startMs;
 
     try {
       ctx.imageSmoothingEnabled = true;
       js_util.setProperty(ctx, 'imageSmoothingQuality', 'high');
     } catch (_) {}
 
-    void drawFrame(num _) {
-      if (stopped) return;
-
+    void paintFrame() {
       if (backdrop != null) {
         ctx.drawImageScaled(backdrop!, 0, 0, w, h);
       } else {
@@ -523,7 +572,11 @@ Future<String> exportNgmyVideoStudioComposed({
           ctx.rect(dx, dy, dw, dh);
           ctx.clip();
         }
-        ctx.drawImageScaled(video, dx, dy, dw, dh);
+        try {
+          ctx.drawImageScaled(video, dx, dy, dw, dh);
+        } catch (e) {
+          debugPrint('[studio export] drawImage failed (CORS?): $e');
+        }
         ctx.restore();
       }
 
@@ -532,20 +585,47 @@ Future<String> exportNgmyVideoStudioComposed({
       } else if (config.showTextOverlay) {
         _drawTextOverlay(ctx, w.toDouble(), h.toDouble(), config);
       }
+    }
 
-      final t = videos.values.first.currentTime;
+    // Prime canvas so captureStream has frames before MediaRecorder starts.
+    paintFrame();
+    await Future<void>.delayed(const Duration(milliseconds: 32));
+    paintFrame();
+
+    try {
+      await Future.wait(videos.values.map((v) => v.play()));
+    } catch (e) {
+      debugPrint('[studio export] video play failed: $e');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    paintFrame();
+
+    try {
+      recorder.start(_recorderTimesliceMs);
+    } catch (e) {
+      debugPrint('[studio export] recorder.start failed: $e');
+      return _downloadAllVideoClips(sources);
+    }
+
+    void drawFrame(num _) {
+      if (stopped) return;
+      paintFrame();
+
+      final primary = videos.values.first;
+      final t = primary.currentTime;
       final elapsedSec = (DateTime.now().millisecondsSinceEpoch - startMs) / 1000.0;
+      final recordMs = DateTime.now().millisecondsSinceEpoch - recordStartedMs;
       onProgress?.call((t / durationSec).clamp(0.12, 0.98));
 
-      if (t >= durationSec - 0.08 ||
-          elapsedSec >= durationSec + 1.5 ||
-          videos.values.first.ended) {
+      final reachedEnd = t >= durationSec - 0.05 || primary.ended;
+      final timedOut = elapsedSec >= durationSec + 2.0;
+      if ((reachedEnd || timedOut) && recordMs >= _minRecordMs) {
         stopped = true;
         for (final v in videos.values) {
           v.pause();
           v.playbackRate = 1.0;
         }
-        if (recorder.state != 'inactive') recorder.stop();
+        unawaited(_stopRecorderDrain(recorder, done));
         return;
       }
       html.window.requestAnimationFrame(drawFrame);
@@ -555,24 +635,26 @@ Future<String> exportNgmyVideoStudioComposed({
 
     await Future.any([
       done.future,
-      Future.delayed(Duration(milliseconds: ((durationSec + 12) * 1000).round())),
+      Future.delayed(Duration(milliseconds: ((durationSec + 15) * 1000).round())),
     ]);
 
     if (!done.isCompleted) {
-      try {
-        recorder.stop();
-      } catch (_) {}
-      await done.future.timeout(const Duration(seconds: 4), onTimeout: () {});
+      await _stopRecorderDrain(recorder, done);
     }
 
     onProgress?.call(1.0);
 
     if (chunks.isEmpty) {
-      return 'Export produced no video data. Try a shorter clip or a different browser (Chrome/Edge).';
+      debugPrint('[studio export] empty chunks (mime=$mimeType), falling back to raw clips');
+      final raw = await _downloadAllVideoClips(sources);
+      if (raw.contains('failed') || raw.contains('No video')) return raw;
+      return 'Could not build the merged studio file in this browser — saved your original clip instead. '
+          'For full templates use Chrome or Edge on a computer. ($raw)';
     }
 
-    final blob = html.Blob(chunks, mimeType);
-    final ext = mimeType!.contains('mp4') ? 'mp4' : 'webm';
+    final blobType = mimeType.contains('webm') ? 'video/webm' : 'video/mp4';
+    final blob = html.Blob(chunks, blobType);
+    final ext = blobType.contains('webm') ? 'webm' : 'mp4';
     final filename = 'ngmy_${config.format.name}_${config.outputWidth}x${config.outputHeight}_$startMs.$ext';
     final url = html.Url.createObjectUrlFromBlob(blob);
     if (_ngmyIsAppleMobileBrowser()) {

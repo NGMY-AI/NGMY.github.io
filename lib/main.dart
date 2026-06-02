@@ -9403,16 +9403,24 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
   int _sessionGamesPlayed = 0;
   Timer? _invitePoll;
   List<Map<String, dynamic>> _liveInvites = [];
+  Map<String, String> _emailToUsername = {};
 
   int get _sessionPointsEarned => _sessionGamesPlayed * 20;
+
+  Future<void> _loadUsernameMap() async {
+    final map = await ngmyLoadEmailToUsernameMap();
+    if (!mounted) return;
+    setState(() => _emailToUsername = map);
+  }
 
   @override
   void initState() {
     super.initState();
     NgmyGameSession.enterBetScreen('game_center', 'Game Center');
     _liveInvites = widget.config.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
+    unawaited(_loadUsernameMap());
     unawaited(_refreshInvites());
-    _invitePoll = Timer.periodic(const Duration(seconds: 4), (_) => _refreshInvites());
+    _invitePoll = Timer.periodic(const Duration(seconds: 2), (_) => _refreshInvites());
   }
 
   Future<void> _refreshInvites() async {
@@ -9473,11 +9481,14 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
   ];
 
   void _sendInvite(_GameDef g, String toAccountId, int matchesTotal) async {
+    final toKey = toAccountId.toLowerCase().trim();
+    final toDisplay = _emailToUsername[toKey];
     addGameInvite(
       widget.config.gameInvites,
       fromEmail: widget.user.email,
       fromName: widget.user.username,
       toEmail: toAccountId,
+      toName: toDisplay,
       gameId: g.id,
       gameTitle: g.title,
       matchesTotal: matchesTotal,
@@ -9597,9 +9608,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
 
     final match = joinable.first;
     final g = _games.firstWhere((e) => e.id == match['gameId'], orElse: () => _games.first);
-    final opponent = (match['fromEmail'] ?? '').toString().toLowerCase().trim() == widget.user.email.toLowerCase().trim()
-        ? (match['toEmail'] ?? 'Opponent')
-        : (match['fromName'] ?? match['fromEmail'] ?? 'Opponent');
+    final opponent = inviteOpponentDisplayName(match, widget.user.email, emailToUsername: _emailToUsername);
     final remaining = inviteMatchesRemaining(match);
     return Container(
       width: double.infinity,
@@ -10245,6 +10254,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   DateTime? _mpStartAt;
   String _mpGateTitle = '';
   String _mpGateSubtitle = '';
+  String? _mpOpponentName;
 
   bool get _isPro => kNgmyProGameIds.contains(widget.gameId);
   bool get _isMultiplayer => widget.inviteId != null && widget.inviteId!.trim().isNotEmpty;
@@ -10350,10 +10360,11 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     unawaited(_loadBankIndex());
     if (_isMultiplayer) {
       _mpWaiting = true;
-      _mpGateTitle = 'Waiting for opponent…';
-      _mpGateSubtitle = 'Both players must tap Accept or Join Match and enter the game before play starts.';
+      _mpGateTitle = 'Connecting to match…';
+      _mpGateSubtitle = 'Both players enter the room together — play starts at the same time.';
+      unawaited(_loadMpOpponentName());
       unawaited(_initMultiplayerStartGate());
-      _mpGateTimer = Timer.periodic(const Duration(milliseconds: 500), (_) => unawaited(_pollMultiplayerStartGate()));
+      _mpGateTimer = Timer.periodic(const Duration(milliseconds: 150), (_) => unawaited(_pollMultiplayerStartGate()));
     }
     if (_isPro) {
       _initProGame();
@@ -10378,9 +10389,24 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     });
   }
 
+  Future<void> _loadMpOpponentName() async {
+    if (!_isMultiplayer || widget.inviteId == null) return;
+    final id = widget.inviteId!.trim();
+    final local = findInviteById(widget.config.gameInvites, id);
+    if (local != null) {
+      final name = await inviteOpponentDisplayNameResolved(local, widget.user.email);
+      if (mounted) setState(() => _mpOpponentName = name);
+      return;
+    }
+    final remote = await ngmyFetchInviteByIdMerged(id, widget.config.gameInvites);
+    if (remote == null || !mounted) return;
+    final name = await inviteOpponentDisplayNameResolved(remote, widget.user.email);
+    if (mounted) setState(() => _mpOpponentName = name);
+  }
+
   Future<void> _syncMultiplayerNonPro() async {
     if (!_isMultiplayer || widget.inviteId == null || _won) return;
-    final remote = await ngmyFetchInviteById(widget.inviteId!);
+    final remote = await ngmyFetchInviteByIdMerged(widget.inviteId!, widget.config.gameInvites);
     if (remote == null || !mounted) return;
     final session = remote['sessionState'];
     if (session is! Map) return;
@@ -10438,7 +10464,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
     final key = widget.user.email.toLowerCase().trim();
     Map<String, dynamic>? invite = findInviteById(widget.config.gameInvites, id);
-    invite ??= await ngmyFetchInviteById(id);
+    invite ??= await ngmyFetchInviteByIdMerged(id, widget.config.gameInvites, forceRefresh: publishJoin);
     if (invite == null) return;
 
     final fromEmail = (invite['fromEmail'] ?? '').toString().toLowerCase().trim();
@@ -10453,44 +10479,69 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
     final inGameRaw = session['inGame'];
     final inGame = inGameRaw is Map ? Map<String, dynamic>.from(inGameRaw) : <String, dynamic>{};
-    if (publishJoin) inGame[key] = true;
+    final readyAtRaw = session['readyAt'];
+    final readyAt = readyAtRaw is Map ? Map<String, dynamic>.from(readyAtRaw) : <String, dynamic>{};
+    final nowUtc = DateTime.now().toUtc();
+    if (publishJoin) {
+      inGame[key] = true;
+      readyAt[key] = nowUtc.toIso8601String();
+    }
     if (p1.isNotEmpty && !inGame.containsKey(p1)) inGame[p1] = false;
     if (p2.isNotEmpty && !inGame.containsKey(p2)) inGame[p2] = false;
+    if (p1.isNotEmpty && inGame[p1] == true && (readyAt[p1] ?? '').toString().isEmpty) {
+      readyAt[p1] = nowUtc.toIso8601String();
+    }
+    if (p2.isNotEmpty && inGame[p2] == true && (readyAt[p2] ?? '').toString().isEmpty) {
+      readyAt[p2] = nowUtc.toIso8601String();
+    }
     session['inGame'] = inGame;
+    session['readyAt'] = readyAt;
 
     DateTime? startAt;
     final startRaw = (session['startAt'] ?? '').toString();
     if (startRaw.isNotEmpty) startAt = DateTime.tryParse(startRaw)?.toLocal();
 
     final bothInGame = p1.isNotEmpty && p2.isNotEmpty && inGame[p1] == true && inGame[p2] == true;
-    final youAreP1 = p1.isNotEmpty && key == p1;
-    if (bothInGame && startAt == null && youAreP1) {
-      startAt = DateTime.now().add(const Duration(seconds: 3));
-      session['startAt'] = startAt.toUtc().toIso8601String();
-      if (widget.gameId == 'memory' && session['memorySeed'] == null) {
-        session['memorySeed'] = DateTime.now().microsecondsSinceEpoch % 2147483647;
-        session['memoryMatched'] = <int>[];
-      }
-      if (widget.gameId == 'pattern' && session['patternSeed'] == null) {
-        session['patternSeed'] = DateTime.now().microsecondsSinceEpoch % 2147483647;
+    var needPublish = publishJoin;
+
+    if (bothInGame && startAt == null) {
+      DateTime? r1;
+      DateTime? r2;
+      if (p1.isNotEmpty) r1 = DateTime.tryParse((readyAt[p1] ?? '').toString())?.toLocal();
+      if (p2.isNotEmpty) r2 = DateTime.tryParse((readyAt[p2] ?? '').toString())?.toLocal();
+      if (r1 != null && r2 != null) {
+        final latestReady = r1.isAfter(r2) ? r1 : r2;
+        final alignEnd = latestReady.add(const Duration(milliseconds: kNgmyMpLobbyAlignMs));
+        if (!DateTime.now().isBefore(alignEnd)) {
+          startAt = alignEnd.add(const Duration(seconds: kNgmyMpCountdownSec));
+          session['startAt'] = startAt.toUtc().toIso8601String();
+          if (widget.gameId == 'memory' && session['memorySeed'] == null) {
+            session['memorySeed'] = DateTime.now().microsecondsSinceEpoch % 2147483647;
+            session['memoryMatched'] = <int>[];
+          }
+          if (widget.gameId == 'pattern' && session['patternSeed'] == null) {
+            session['patternSeed'] = DateTime.now().microsecondsSinceEpoch % 2147483647;
+          }
+          needPublish = true;
+        }
       }
     }
 
-    if (publishJoin || (bothInGame && youAreP1 && startAt != null)) {
-      await ngmyPublishInviteSession(widget.config.gameInvites, id, session);
+    if (needPublish) {
+      ngmyPublishInviteSessionFast(widget.config.gameInvites, id, session);
       widget.onDataChanged();
     }
 
     if (!mounted) return;
+
+    final opponentLabel = _mpOpponentName ?? 'your opponent';
+
     if (!bothInGame) {
-      final waitingOnOpponent = inGame[key] == true;
       setState(() {
         _mpWaiting = true;
         _mpStartAt = startAt;
-        _mpGateTitle = waitingOnOpponent ? 'Waiting for opponent…' : 'Joining match…';
-        _mpGateSubtitle = waitingOnOpponent
-            ? 'Your opponent must accept the invite and tap Join Match to enter the game.'
-            : 'Entering the match room…';
+        _mpGateTitle = 'Waiting for both players…';
+        _mpGateSubtitle = 'You and $opponentLabel must be in the room before the match starts together.';
       });
       return;
     }
@@ -10499,8 +10550,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       setState(() {
         _mpWaiting = true;
         _mpStartAt = null;
-        _mpGateTitle = 'Starting soon…';
-        _mpGateSubtitle = 'Syncing start time…';
+        _mpGateTitle = 'Both players connected';
+        _mpGateSubtitle = 'Starting together in a moment…';
       });
       return;
     }
@@ -10508,11 +10559,12 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     final now = DateTime.now();
     if (now.isBefore(startAt)) {
       final left = startAt.difference(now);
+      final secs = left.inSeconds + (left.inMilliseconds % 1000 > 0 ? 1 : 0);
       setState(() {
         _mpWaiting = true;
         _mpStartAt = startAt;
-        _mpGateTitle = 'Match starting…';
-        _mpGateSubtitle = 'Starting in ${left.inSeconds + 1}s';
+        _mpGateTitle = 'Match starting together…';
+        _mpGateSubtitle = 'Both players start in ${secs.clamp(1, 99)}s';
       });
       return;
     }
@@ -10544,7 +10596,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (!_isMultiplayer || widget.inviteId == null || widget.gameId != 'pattern') return;
     var seed = _patternSeedFromLocalInvite();
     if (seed == null) {
-      final remote = await ngmyFetchInviteById(widget.inviteId!);
+      final remote = await ngmyFetchInviteByIdMerged(widget.inviteId!, widget.config.gameInvites);
       seed = _patternSeedFromInvite(remote);
     }
     if (!mounted) return;
@@ -10626,7 +10678,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   Future<void> _syncMultiplayerSession() async {
     if (!_isMultiplayer || _pro == null || _won || _mpPublishing) return;
     if (_mpWaiting) return;
-    final remote = await ngmyFetchInviteById(widget.inviteId!);
+    final remote = await ngmyFetchInviteByIdMerged(widget.inviteId!, widget.config.gameInvites);
     if (remote == null || !mounted) return;
     final localInvite = findInviteById(widget.config.gameInvites, widget.inviteId!);
     if (localInvite != null) {
@@ -11221,7 +11273,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (id.isEmpty) return;
     try {
       final key = widget.user.email.toLowerCase().trim();
-      final invite = findInviteById(widget.config.gameInvites, id) ?? await ngmyFetchInviteById(id);
+      final invite = findInviteById(widget.config.gameInvites, id) ??
+          await ngmyFetchInviteByIdMerged(id, widget.config.gameInvites);
       if (invite == null) return;
       final sessionRaw = invite['sessionState'];
       final session = sessionRaw is Map ? Map<String, dynamic>.from(sessionRaw) : <String, dynamic>{};
@@ -11252,7 +11305,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     await _publishSkillMultiplayerProgress();
     final id = widget.inviteId!.trim();
     final key = widget.user.email.toLowerCase().trim();
-    final invite = await ngmyFetchInviteById(id);
+    final invite = await ngmyFetchInviteByIdMerged(id, widget.config.gameInvites, forceRefresh: true);
     final totalProgress = _gameProgressTotal();
     if (invite == null) {
       // Fallback: pay only your solo progress.
@@ -11410,7 +11463,14 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
                     icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
                   ),
                   Expanded(
-                    child: Text(widget.gameTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                    child: Text(
+                      _isMultiplayer && (_mpOpponentName ?? '').isNotEmpty
+                          ? '${widget.gameTitle} vs $_mpOpponentName'
+                          : widget.gameTitle,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
