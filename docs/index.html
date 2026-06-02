@@ -103,6 +103,10 @@
 
   <link rel="manifest" href="manifest.json">
 
+  <!-- Preload icon fonts so Fun & Games / Game Center icons stay visible on slow networks -->
+  <link rel="preload" href="assets/fonts/MaterialIcons-Regular.otf" as="font" type="font/otf" crossorigin="anonymous">
+  <link rel="preload" href="assets/packages/cupertino_icons/assets/CupertinoIcons.ttf" as="font" type="font/ttf" crossorigin="anonymous">
+
 
 
   <style>
@@ -249,7 +253,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260602002740";
+      var CURRENT = "20260602005419";
 
       function showError(msg) {
 
@@ -312,7 +316,7 @@
 
   <script>
     (function () {
-      var deployId = '20260602002740';
+      var deployId = '20260602005419';
       var bootstrapSrc = 'flutter_bootstrap.js';
       var loadAttempts = 0;
 

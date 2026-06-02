@@ -208,7 +208,9 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
               borderRadius: BorderRadius.circular(10),
               boxShadow: [BoxShadow(color: _pink.withOpacity(0.45), blurRadius: 10)],
             ),
-            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+            child: const Center(
+              child: Text('✨', style: TextStyle(fontSize: 20)),
+            ),
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -231,8 +233,8 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
 
   Widget _categoryIcon(_CatItem item, bool selected) {
     return Container(
-      width: 32,
-      height: 32,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
         gradient: selected
             ? LinearGradient(colors: [item.color, item.color.withValues(alpha: 0.65)])
@@ -241,7 +243,9 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: selected ? Colors.white38 : Colors.white12),
       ),
-      child: Icon(item.icon, color: selected ? Colors.white : item.color, size: 18),
+      child: Center(
+        child: Text(item.emoji, style: const TextStyle(fontSize: 20, height: 1)),
+      ),
     );
   }
 
@@ -275,12 +279,10 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                   children: [
                     _categoryIcon(item, selected),
                     const SizedBox(height: 4),
-                    Text(item.emoji, style: const TextStyle(fontSize: 12)),
-                    const SizedBox(height: 2),
                     Text(
                       item.label,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: selected ? Colors.white : Colors.white38, fontSize: 9, fontWeight: FontWeight.w700),
+                      style: TextStyle(color: selected ? Colors.white : Colors.white54, fontSize: 9, fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
@@ -305,7 +307,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(item.icon, color: item.color, size: 18),
+          Text(item.emoji, style: const TextStyle(fontSize: 18)),
           const SizedBox(width: 8),
           Text(
             _category == 0 ? 'Your Love Journey' : '${item.label} Zone',
@@ -356,9 +358,8 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                   ),
                   child: Column(
                     children: [
-                      Icon(tab.icon, size: 16, color: selected ? Colors.white : Colors.white38),
-                      Text(tab.emoji, style: TextStyle(fontSize: 12, color: selected ? Colors.white : Colors.white38)),
-                      Text(tab.label, style: TextStyle(color: selected ? Colors.white : Colors.white38, fontSize: 10, fontWeight: FontWeight.w800)),
+                      Text(tab.emoji, style: TextStyle(fontSize: 18, color: selected ? Colors.white : Colors.white70)),
+                      Text(tab.label, style: TextStyle(color: selected ? Colors.white : Colors.white54, fontSize: 10, fontWeight: FontWeight.w800)),
                     ],
                   ),
                 ),
@@ -497,7 +498,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                    const Text('✨', style: TextStyle(fontSize: 16)),
                     const SizedBox(width: 8),
                     Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
                   ],
@@ -575,9 +576,9 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
               const SizedBox(height: 6),
               Text('Enter both names — your match shows here and in a love popup', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12)),
               const SizedBox(height: 20),
-              _nameField(controller: _yourNameC, hint: 'Your name', icon: Icons.person_outline_rounded),
+              _nameField(controller: _yourNameC, hint: 'Your name', emojiPrefix: '👤'),
               const SizedBox(height: 12),
-              _nameField(controller: _theirNameC, hint: 'Their name', icon: Icons.favorite_border_rounded),
+              _nameField(controller: _theirNameC, hint: 'Their name', emojiPrefix: '💕'),
               if (_matchScore != null) ...[
                 const SizedBox(height: 18),
                 _loveMatchResultCard(),
@@ -591,7 +592,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
     );
   }
 
-  Widget _nameField({required TextEditingController controller, required String hint, required IconData icon}) {
+  Widget _nameField({required TextEditingController controller, required String hint, required String emojiPrefix}) {
     return TextField(
       controller: controller,
       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
@@ -599,7 +600,10 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: Colors.white.withOpacity(0.35)),
-        prefixIcon: Icon(icon, color: _pinkGlow, size: 20),
+        prefix: Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: Text(emojiPrefix, style: const TextStyle(fontSize: 18)),
+        ),
         filled: true,
         fillColor: const Color(0xFF0A0F1C),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),

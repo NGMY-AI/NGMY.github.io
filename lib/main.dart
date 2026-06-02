@@ -37,6 +37,7 @@ import 'ngmy_multiplayer.dart';
 import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
 import 'ngmy_dice_config.dart';
+import 'ngmy_resilient_icon.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_invoice_storage.dart';
 import 'ngmy_invoice_templates.dart';
@@ -653,11 +654,7 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
 
   if (record.containsKey('gameInvites') && record['gameInvites'] is List) {
     final remote = (record['gameInvites'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    if (remote.isNotEmpty) {
-      next.gameInvites = remote;
-    } else if (keep.gameInvites.isNotEmpty) {
-      next.gameInvites = keep.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
-    }
+    next.gameInvites = mergeGameInvites(keep.gameInvites, remote);
   } else if (keep.gameInvites.isNotEmpty) {
     next.gameInvites = keep.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
   }
@@ -8961,12 +8958,14 @@ class _GameDef {
   final String id;
   final String title;
   final String subtitle;
+  final String emoji;
   final IconData icon;
   final List<Color> colors;
   const _GameDef({
     required this.id,
     required this.title,
     required this.subtitle,
+    required this.emoji,
     required this.icon,
     required this.colors,
   });
@@ -8975,6 +8974,7 @@ class _GameDef {
 class _GameCenterScreenState extends State<GameCenterScreen> {
   int _sessionGamesPlayed = 0;
   Timer? _invitePoll;
+  List<Map<String, dynamic>> _liveInvites = [];
 
   int get _sessionPointsEarned => _sessionGamesPlayed * 20;
 
@@ -8982,9 +8982,21 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
   void initState() {
     super.initState();
     NgmyGameSession.enterBetScreen('game_center', 'Game Center');
-    _invitePoll = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (mounted) setState(() {});
-    });
+    _liveInvites = widget.config.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
+    unawaited(_refreshInvites());
+    _invitePoll = Timer.periodic(const Duration(seconds: 4), (_) => _refreshInvites());
+  }
+
+  Future<void> _refreshInvites() async {
+    final merged = await ngmySyncGameInvites(widget.config.gameInvites);
+    if (!mounted) return;
+    if (merged != null) {
+      setState(() {
+        _liveInvites = merged.map((e) => Map<String, dynamic>.from(e)).toList();
+      });
+    } else {
+      setState(() {});
+    }
   }
 
   @override
@@ -8995,40 +9007,40 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
   }
 
   final List<_GameDef> _games = const [
-    _GameDef(id: 'dice', title: 'Dice Roll', subtitle: 'Roll for cash & prizes!', icon: Icons.casino_rounded, colors: [Color(0xFF6D28D9), Color(0xFF7C3AED)]),
-    _GameDef(id: 'puzzle', title: '8-Puzzle Solver', subtitle: 'Solve puzzle, win up to \$10', icon: Icons.grid_view_rounded, colors: [Color(0xFF0EA5E9), Color(0xFF1D4ED8)]),
-    _GameDef(id: 'typing', title: 'Sentence Typing', subtitle: 'Type full sentences — earn by accuracy', icon: Icons.keyboard_rounded, colors: [Color(0xFF16A34A), Color(0xFF2563EB)]),
-    _GameDef(id: 'memory', title: 'Memory Match', subtitle: 'Match pairs, win \$5', icon: Icons.psychology_rounded, colors: [Color(0xFFDB2777), Color(0xFF9333EA)]),
-    _GameDef(id: 'math', title: 'Math Quiz', subtitle: '500+ questions, rewards', icon: Icons.calculate_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
-    _GameDef(id: 'reflex', title: 'Reflex Test', subtitle: 'Quick clicks, win up to \$10', icon: Icons.flash_on_rounded, colors: [Color(0xFFF97316), Color(0xFFDC2626)]),
-    _GameDef(id: 'scramble', title: 'Word Scramble', subtitle: 'Unscramble words', icon: Icons.abc_rounded, colors: [Color(0xFF7C3AED), Color(0xFF9333EA)]),
-    _GameDef(id: 'pattern', title: 'Pattern Memory', subtitle: 'Remember patterns', icon: Icons.extension_rounded, colors: [Color(0xFF4F46E5), Color(0xFF4338CA)]),
-    _GameDef(id: 'sequence', title: 'Number Sequence', subtitle: 'Find patterns, win rewards', icon: Icons.numbers_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
-    _GameDef(id: 'simon', title: 'Simon Says', subtitle: 'Memory color game!', icon: Icons.sports_esports_rounded, colors: [Color(0xFF7C3AED), Color(0xFF6D28D9)]),
-    _GameDef(id: 'color', title: 'Color Rush', subtitle: 'Match colors fast!', icon: Icons.palette_rounded, colors: [Color(0xFFDB2777), Color(0xFFBE185D)]),
-    _GameDef(id: 'checkers_deluxe', title: 'Checkers Deluxe', subtitle: 'Wood board — play solo or invite a friend', icon: Icons.grid_on_rounded, colors: [Color(0xFF8B4513), Color(0xFF5D4037)]),
-    _GameDef(id: 'tic_tac_go', title: 'Tic Tac Go', subtitle: '3 in a row — real-time multiplayer', icon: Icons.close_rounded, colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
-    _GameDef(id: 'pool_8ball', title: '8-Ball Pool', subtitle: 'Aim, shoot, pocket the 8-ball', icon: Icons.sports_baseball_rounded, colors: [Color(0xFF166534), Color(0xFF14532D)]),
-    _GameDef(id: 'blackjack_vegas', title: 'Blackjack Vegas', subtitle: 'Beat the dealer — casino classic', icon: Icons.style_rounded, colors: [Color(0xFF0F172A), Color(0xFF334155)]),
-    _GameDef(id: 'roulette_euro', title: 'European Roulette', subtitle: 'Pick your number and spin', icon: Icons.trip_origin_rounded, colors: [Color(0xFF7F1D1D), Color(0xFFB91C1C)]),
-    _GameDef(id: 'slots_jackpot', title: 'Slots Jackpot', subtitle: 'Match symbols for big wins', icon: Icons.casino_rounded, colors: [Color(0xFF7C3AED), Color(0xFFDB2777)]),
-    _GameDef(id: 'poker_texas', title: 'Texas Hold\'em', subtitle: 'Poker skill — invite opponents', icon: Icons.account_balance_wallet_rounded, colors: [Color(0xFF15803D), Color(0xFF166534)]),
-    _GameDef(id: 'chess_royale', title: 'Chess Royale', subtitle: 'Classic chess — multiplayer', icon: Icons.extension_rounded, colors: [Color(0xFF1E293B), Color(0xFF475569)]),
-    _GameDef(id: 'connect_four_pro', title: 'Connect Four Pro', subtitle: 'Drop discs — beat your rival', icon: Icons.view_column_rounded, colors: [Color(0xFFDC2626), Color(0xFF991B1B)]),
-    _GameDef(id: 'domino_block', title: 'Domino Block', subtitle: 'Strategic domino tiles', icon: Icons.view_module_rounded, colors: [Color(0xFFF5F5F4), Color(0xFF78716C)]),
-    _GameDef(id: 'plinko_prizes', title: 'Plinko Prizes', subtitle: 'Drop the chip — win prizes', icon: Icons.grain_rounded, colors: [Color(0xFF06B6D4), Color(0xFF0891B2)]),
-    _GameDef(id: 'spin_wheel', title: 'Spin Wheel', subtitle: 'Spin for cash multipliers', icon: Icons.attractions_rounded, colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
-    _GameDef(id: 'baccarat_punto', title: 'Baccarat', subtitle: 'High-stakes punto banco', icon: Icons.diamond_rounded, colors: [Color(0xFF1E1B4B), Color(0xFF312E81)]),
-    _GameDef(id: 'craps_table', title: 'Craps Table', subtitle: 'Roll the dice — casino table', icon: Icons.casino_outlined, colors: [Color(0xFF065F46), Color(0xFF047857)]),
-    _GameDef(id: 'casino_war', title: 'Casino War', subtitle: 'Higher card wins the pot', icon: Icons.compare_arrows_rounded, colors: [Color(0xFFBE123C), Color(0xFF9F1239)]),
-    _GameDef(id: 'bingo_live', title: 'Bingo Live', subtitle: 'Mark numbers — shout bingo', icon: Icons.apps_rounded, colors: [Color(0xFFEC4899), Color(0xFFBE185D)]),
-    _GameDef(id: 'solitaire_klondike', title: 'Solitaire Klondike', subtitle: 'Clear the deck — earn rewards', icon: Icons.filter_none_rounded, colors: [Color(0xFF22C55E), Color(0xFF16A34A)]),
-    _GameDef(id: 'backgammon_pro', title: 'Backgammon Pro', subtitle: 'Race your pieces home', icon: Icons.dashboard_rounded, colors: [Color(0xFFB45309), Color(0xFF92400E)]),
-    _GameDef(id: 'billiards_snooker', title: 'Billiards Snooker', subtitle: 'Pro snooker table physics', icon: Icons.sports_rounded, colors: [Color(0xFF14532D), Color(0xFF052E16)]),
-    _GameDef(id: 'profit_solve', title: 'Profit Solve', subtitle: 'Business profit — type the answer', icon: Icons.attach_money_rounded, colors: [Color(0xFF10B981), Color(0xFF047857)]),
+    _GameDef(id: 'dice', title: 'Dice Roll', subtitle: 'Roll for cash & prizes!', emoji: '🎲', icon: Icons.casino_rounded, colors: [Color(0xFF6D28D9), Color(0xFF7C3AED)]),
+    _GameDef(id: 'puzzle', title: '8-Puzzle Solver', subtitle: 'Solve puzzle, win up to \$10', emoji: '🧩', icon: Icons.grid_view_rounded, colors: [Color(0xFF0EA5E9), Color(0xFF1D4ED8)]),
+    _GameDef(id: 'typing', title: 'Sentence Typing', subtitle: 'Type full sentences — earn by accuracy', emoji: '⌨️', icon: Icons.keyboard_rounded, colors: [Color(0xFF16A34A), Color(0xFF2563EB)]),
+    _GameDef(id: 'memory', title: 'Memory Match', subtitle: 'Match pairs, win \$5', emoji: '🧠', icon: Icons.psychology_rounded, colors: [Color(0xFFDB2777), Color(0xFF9333EA)]),
+    _GameDef(id: 'math', title: 'Math Quiz', subtitle: '500+ questions, rewards', emoji: '➕', icon: Icons.calculate_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
+    _GameDef(id: 'reflex', title: 'Reflex Test', subtitle: 'Quick clicks, win up to \$10', emoji: '⚡', icon: Icons.flash_on_rounded, colors: [Color(0xFFF97316), Color(0xFFDC2626)]),
+    _GameDef(id: 'scramble', title: 'Word Scramble', subtitle: 'Unscramble words', emoji: '🔤', icon: Icons.abc_rounded, colors: [Color(0xFF7C3AED), Color(0xFF9333EA)]),
+    _GameDef(id: 'pattern', title: 'Pattern Memory', subtitle: 'Remember patterns', emoji: '🎯', icon: Icons.extension_rounded, colors: [Color(0xFF4F46E5), Color(0xFF4338CA)]),
+    _GameDef(id: 'sequence', title: 'Number Sequence', subtitle: 'Find patterns, win rewards', emoji: '🔢', icon: Icons.numbers_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
+    _GameDef(id: 'simon', title: 'Simon Says', subtitle: 'Memory color game!', emoji: '🎮', icon: Icons.sports_esports_rounded, colors: [Color(0xFF7C3AED), Color(0xFF6D28D9)]),
+    _GameDef(id: 'color', title: 'Color Rush', subtitle: 'Match colors fast!', emoji: '🎨', icon: Icons.palette_rounded, colors: [Color(0xFFDB2777), Color(0xFFBE185D)]),
+    _GameDef(id: 'checkers_deluxe', title: 'Checkers Deluxe', subtitle: 'Wood board — play solo or invite a friend', emoji: '⚫', icon: Icons.grid_on_rounded, colors: [Color(0xFF8B4513), Color(0xFF5D4037)]),
+    _GameDef(id: 'tic_tac_go', title: 'Tic Tac Go', subtitle: '3 in a row — real-time multiplayer', emoji: '❌', icon: Icons.close_rounded, colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
+    _GameDef(id: 'pool_8ball', title: '8-Ball Pool', subtitle: 'Aim, shoot, pocket the 8-ball', emoji: '🎱', icon: Icons.sports_baseball_rounded, colors: [Color(0xFF166534), Color(0xFF14532D)]),
+    _GameDef(id: 'blackjack_vegas', title: 'Blackjack Vegas', subtitle: 'Beat the dealer — casino classic', emoji: '🃏', icon: Icons.style_rounded, colors: [Color(0xFF0F172A), Color(0xFF334155)]),
+    _GameDef(id: 'roulette_euro', title: 'European Roulette', subtitle: 'Pick your number and spin', emoji: '🎡', icon: Icons.trip_origin_rounded, colors: [Color(0xFF7F1D1D), Color(0xFFB91C1C)]),
+    _GameDef(id: 'slots_jackpot', title: 'Slots Jackpot', subtitle: 'Match symbols for big wins', emoji: '🎰', icon: Icons.casino_rounded, colors: [Color(0xFF7C3AED), Color(0xFFDB2777)]),
+    _GameDef(id: 'poker_texas', title: 'Texas Hold\'em', subtitle: 'Poker skill — invite opponents', emoji: '♠️', icon: Icons.account_balance_wallet_rounded, colors: [Color(0xFF15803D), Color(0xFF166534)]),
+    _GameDef(id: 'chess_royale', title: 'Chess Royale', subtitle: 'Classic chess — multiplayer', emoji: '♟️', icon: Icons.extension_rounded, colors: [Color(0xFF1E293B), Color(0xFF475569)]),
+    _GameDef(id: 'connect_four_pro', title: 'Connect Four Pro', subtitle: 'Drop discs — beat your rival', emoji: '🔴', icon: Icons.view_column_rounded, colors: [Color(0xFFDC2626), Color(0xFF991B1B)]),
+    _GameDef(id: 'domino_block', title: 'Domino Block', subtitle: 'Strategic domino tiles', emoji: '🁓', icon: Icons.view_module_rounded, colors: [Color(0xFFF5F5F4), Color(0xFF78716C)]),
+    _GameDef(id: 'plinko_prizes', title: 'Plinko Prizes', subtitle: 'Drop the chip — win prizes', emoji: '💎', icon: Icons.grain_rounded, colors: [Color(0xFF06B6D4), Color(0xFF0891B2)]),
+    _GameDef(id: 'spin_wheel', title: 'Spin Wheel', subtitle: 'Spin for cash multipliers', emoji: '🎡', icon: Icons.attractions_rounded, colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
+    _GameDef(id: 'baccarat_punto', title: 'Baccarat', subtitle: 'High-stakes punto banco', emoji: '💎', icon: Icons.diamond_rounded, colors: [Color(0xFF1E1B4B), Color(0xFF312E81)]),
+    _GameDef(id: 'craps_table', title: 'Craps Table', subtitle: 'Roll the dice — casino table', emoji: '🎲', icon: Icons.casino_outlined, colors: [Color(0xFF065F46), Color(0xFF047857)]),
+    _GameDef(id: 'casino_war', title: 'Casino War', subtitle: 'Higher card wins the pot', emoji: '⚔️', icon: Icons.compare_arrows_rounded, colors: [Color(0xFFBE123C), Color(0xFF9F1239)]),
+    _GameDef(id: 'bingo_live', title: 'Bingo Live', subtitle: 'Mark numbers — shout bingo', emoji: '🎱', icon: Icons.apps_rounded, colors: [Color(0xFFEC4899), Color(0xFFBE185D)]),
+    _GameDef(id: 'solitaire_klondike', title: 'Solitaire Klondike', subtitle: 'Clear the deck — earn rewards', emoji: '🃏', icon: Icons.filter_none_rounded, colors: [Color(0xFF22C55E), Color(0xFF16A34A)]),
+    _GameDef(id: 'backgammon_pro', title: 'Backgammon Pro', subtitle: 'Race your pieces home', emoji: '🎲', icon: Icons.dashboard_rounded, colors: [Color(0xFFB45309), Color(0xFF92400E)]),
+    _GameDef(id: 'billiards_snooker', title: 'Billiards Snooker', subtitle: 'Pro snooker table physics', emoji: '🎱', icon: Icons.sports_rounded, colors: [Color(0xFF14532D), Color(0xFF052E16)]),
+    _GameDef(id: 'profit_solve', title: 'Profit Solve', subtitle: 'Business profit — type the answer', emoji: '💰', icon: Icons.attach_money_rounded, colors: [Color(0xFF10B981), Color(0xFF047857)]),
   ];
 
-  void _sendInvite(_GameDef g, String toAccountId) {
+  void _sendInvite(_GameDef g, String toAccountId) async {
     addGameInvite(
       widget.config.gameInvites,
       fromEmail: widget.user.email,
@@ -9038,10 +9050,15 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
       gameTitle: g.title,
     );
     widget.onDataChanged();
+    await ngmyPublishGameInvites(widget.config.gameInvites);
+    if (!mounted) return;
+    setState(() {
+      _liveInvites = widget.config.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
+    });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Invite sent to $toAccountId for ${g.title}')));
   }
 
-  void _openGame(_GameDef g) {
+  void _openGame(_GameDef g, {String? inviteId}) {
     if (g.id == 'dice') {
       NgmyNavigator.push(
         context,
@@ -9068,55 +9085,91 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
         onAddTransaction: widget.onAddTransaction,
         onDataChanged: widget.onDataChanged,
         onGameStarted: () => setState(() => _sessionGamesPlayed++),
+        inviteId: inviteId,
       ),
       routeName: kRouteGameBet,
     );
   }
 
   Widget _inviteBanner() {
-    final pending = pendingInvitesFor(widget.user.email, widget.config.gameInvites);
-    if (pending.isEmpty) return const SizedBox.shrink();
-    final inv = pending.first;
+    final pending = pendingInvitesFor(widget.user.email, _liveInvites);
+    final active = activeMatchesFor(widget.user.email, _liveInvites);
+    if (pending.isEmpty && active.isEmpty) return const SizedBox.shrink();
+
+    if (pending.isNotEmpty) {
+      final inv = pending.first;
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF7C3AED),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Multiplayer invite', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+            Text('${inv['fromName'] ?? inv['fromEmail']} wants to play ${inv['gameTitle']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      respondInvite(widget.config.gameInvites, inv['id'].toString(), 'rejected');
+                      widget.onDataChanged();
+                      await ngmyPublishGameInvites(widget.config.gameInvites);
+                      await _refreshInvites();
+                    },
+                    child: const Text('Decline'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () async {
+                      activateInviteMatch(widget.config.gameInvites, inv['id'].toString(), accepterName: widget.user.username);
+                      widget.onDataChanged();
+                      await ngmyPublishGameInvites(widget.config.gameInvites);
+                      await _refreshInvites();
+                      final g = _games.firstWhere((e) => e.id == inv['gameId'], orElse: () => _games.first);
+                      _openGame(g, inviteId: inv['id'].toString());
+                    },
+                    child: const Text('Accept & Play'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    final match = active.first;
+    final g = _games.firstWhere((e) => e.id == match['gameId'], orElse: () => _games.first);
+    final opponent = (match['fromEmail'] ?? '').toString().toLowerCase().trim() == widget.user.email.toLowerCase().trim()
+        ? (match['toEmail'] ?? 'Opponent')
+        : (match['fromName'] ?? match['fromEmail'] ?? 'Opponent');
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF7C3AED),
+        color: const Color(0xFF2563EB),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white24),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Multiplayer invite', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-          Text('${inv['fromName'] ?? inv['fromEmail']} wants to play ${inv['gameTitle']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          const Text('Active match', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+          Text('Continue ${g.title} vs $opponent', style: const TextStyle(color: Colors.white70, fontSize: 12)),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    respondInvite(widget.config.gameInvites, inv['id'].toString(), 'rejected');
-                    widget.onDataChanged();
-                    setState(() {});
-                  },
-                  child: const Text('Decline'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () {
-                    respondInvite(widget.config.gameInvites, inv['id'].toString(), 'accepted');
-                    widget.onDataChanged();
-                    final g = _games.firstWhere((e) => e.id == inv['gameId'], orElse: () => _games.first);
-                    _openGame(g);
-                  },
-                  child: const Text('Accept & Play'),
-                ),
-              ),
-            ],
+          FilledButton(
+            onPressed: () => _openGame(g, inviteId: match['id'].toString()),
+            child: const Text('Join Match'),
           ),
         ],
       ),
@@ -9141,7 +9194,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
           children: [
             SizedBox(
               width: 100,
-              child: Center(child: Icon(g.icon, color: Colors.white, size: 64)),
+              child: Center(child: NgmyGameTileIcon(emoji: g.emoji, icon: g.icon, size: 52)),
             ),
             Expanded(
               child: Padding(
@@ -9154,7 +9207,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
                       children: [
                         Expanded(child: Text(g.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17))),
                         if (mp)
-                          const Icon(Icons.groups_rounded, color: Color(0xFFFBBF24), size: 18),
+                          const Text('👥', style: TextStyle(fontSize: 14)),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -9165,7 +9218,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
             ),
             if (mp)
               IconButton(
-                icon: const Icon(Icons.person_add_rounded, color: Color(0xFFFBBF24)),
+                icon: const Text('➕', style: TextStyle(fontSize: 18, color: Color(0xFFFBBF24))),
                 tooltip: 'Invite player',
                 onPressed: () => showMultiplayerInviteDialog(
                   context: context,
@@ -9175,7 +9228,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
               ),
             const Padding(
               padding: EdgeInsets.only(right: 10),
-              child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 36),
+              child: Text('▶️', style: TextStyle(fontSize: 28)),
             ),
           ],
         ),
@@ -9405,6 +9458,7 @@ class GameBetScreen extends StatefulWidget {
   final Function(AppTransaction) onAddTransaction;
   final VoidCallback onDataChanged;
   final VoidCallback onGameStarted;
+  final String? inviteId;
   const GameBetScreen({
     super.key,
     required this.user,
@@ -9416,6 +9470,7 @@ class GameBetScreen extends StatefulWidget {
     required this.onAddTransaction,
     required this.onDataChanged,
     required this.onGameStarted,
+    this.inviteId,
   });
 
   @override
@@ -9479,6 +9534,7 @@ class _GameBetScreenState extends State<GameBetScreen> {
         wager: wager,
         onAddTransaction: widget.onAddTransaction,
         onDataChanged: widget.onDataChanged,
+        inviteId: widget.inviteId,
       ),
       routeName: kRouteGamePlay,
     );
@@ -9631,6 +9687,7 @@ class GamePlayScreen extends StatefulWidget {
   final double wager;
   final Function(AppTransaction) onAddTransaction;
   final VoidCallback onDataChanged;
+  final String? inviteId;
   const GamePlayScreen({
     super.key,
     required this.user,
@@ -9642,6 +9699,7 @@ class GamePlayScreen extends StatefulWidget {
     required this.wager,
     required this.onAddTransaction,
     required this.onDataChanged,
+    this.inviteId,
   });
 
   @override
@@ -9704,8 +9762,12 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   // Pro / casino / board games
   Timer? _miniTicker;
   NgmyProState? _pro;
+  Timer? _mpSyncTimer;
+  NgmyGamePlayContext? _playCtx;
+  bool _mpPublishing = false;
 
   bool get _isPro => kNgmyProGameIds.contains(widget.gameId);
+  bool get _isMultiplayer => widget.inviteId != null && widget.inviteId!.trim().isNotEmpty;
 
   int get _simonTargetTaps => (kNgmySimonWinRounds * (kNgmySimonWinRounds + 1)) ~/ 2;
 
@@ -9806,8 +9868,11 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     _setupRound();
     unawaited(_loadBankIndex());
     if (_isPro) {
-      _pro = NgmyProState()..setup(widget.gameId, _rng);
+      _initProGame();
       _miniTicker = Timer.periodic(const Duration(milliseconds: 50), (_) => _tickPro());
+      if (_isMultiplayer) {
+        _mpSyncTimer = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(_syncMultiplayerSession()));
+      }
     }
     _roundTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _won) return;
@@ -9847,12 +9912,104 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     _bankIndex = next;
   }
 
+  void _initProGame() {
+    if (_isMultiplayer) {
+      final invite = findInviteById(widget.config.gameInvites, widget.inviteId!);
+      _playCtx = invite != null
+          ? NgmyGamePlayContext.fromInvite(invite, widget.user.email, widget.user.username)
+          : NgmyGamePlayContext.solo(youLabel: widget.user.username, yourEmail: widget.user.email);
+    } else {
+      _playCtx = NgmyGamePlayContext.solo(youLabel: widget.user.username, yourEmail: widget.user.email);
+    }
+    _pro = NgmyProState()..setup(widget.gameId, _rng, context: _playCtx);
+    _prompt = _pro!.prompt;
+    if (_isMultiplayer) {
+      final invite = findInviteById(widget.config.gameInvites, widget.inviteId!);
+      final session = invite?['sessionState'];
+      if (session is Map) {
+        _pro!.applySessionState(widget.gameId, Map<String, dynamic>.from(session), widget.user.email);
+        _prompt = _pro!.prompt;
+        if (_pro!.gameOver) {
+          final result = _pro!.lastDraw
+              ? NgmyProMoveResult.draw
+              : (_pro!.lastYouWin == true ? NgmyProMoveResult.youWin : NgmyProMoveResult.youLose);
+          unawaited(_handleProGameEnd(result));
+        }
+      }
+    }
+  }
+
+  Future<void> _syncMultiplayerSession() async {
+    if (!_isMultiplayer || _pro == null || _won || _mpPublishing) return;
+    final remote = await ngmyFetchInviteById(widget.inviteId!);
+    if (remote == null || !mounted) return;
+    final localInvite = findInviteById(widget.config.gameInvites, widget.inviteId!);
+    if (localInvite != null) {
+      localInvite.clear();
+      localInvite.addAll(remote);
+    }
+    final session = remote['sessionState'];
+    if (session is! Map) return;
+    final sessionMap = Map<String, dynamic>.from(session);
+    final remoteUpdated = DateTime.tryParse((remote['sessionUpdatedAt'] ?? '').toString());
+    final localUpdated = DateTime.tryParse((localInvite?['sessionUpdatedAt'] ?? '').toString());
+    if (remoteUpdated != null && localUpdated != null && !remoteUpdated.isAfter(localUpdated)) return;
+    _pro!.applySessionState(widget.gameId, sessionMap, widget.user.email);
+    _prompt = _pro!.prompt;
+    if (_pro!.gameOver) {
+      final result = _pro!.lastDraw
+          ? NgmyProMoveResult.draw
+          : (_pro!.lastYouWin == true ? NgmyProMoveResult.youWin : NgmyProMoveResult.youLose);
+      await _handleProGameEnd(result);
+    } else if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _publishMultiplayerMove() async {
+    if (!_isMultiplayer || _pro == null || widget.inviteId == null || _mpPublishing) return;
+    _mpPublishing = true;
+    try {
+      final session = _pro!.exportSessionState(widget.gameId);
+      await ngmyPublishInviteSession(widget.config.gameInvites, widget.inviteId!, session);
+      widget.onDataChanged();
+    } finally {
+      _mpPublishing = false;
+    }
+  }
+
+  Future<void> _handleProGameEnd(NgmyProMoveResult result) async {
+    if (_won || _pro == null) return;
+    final label = _pro!.lastWinnerLabel.isNotEmpty ? _pro!.lastWinnerLabel : 'Game over';
+    switch (result) {
+      case NgmyProMoveResult.youWin:
+        await _payoutWin(subtitle: label, outcomeLabel: label);
+      case NgmyProMoveResult.youLose:
+        await _gameLose(reason: label, outcomeLabel: label);
+      case NgmyProMoveResult.draw:
+        await _gameLose(reason: label, outcomeLabel: label);
+      case NgmyProMoveResult.continueGame:
+        break;
+    }
+  }
+
+  Future<void> _onProGameEnd(NgmyProMoveResult result, NgmyProState state) async {
+    if (_isMultiplayer) {
+      await _publishMultiplayerMove();
+      if (result == NgmyProMoveResult.continueGame) return;
+    } else if (result == NgmyProMoveResult.continueGame) {
+      return;
+    }
+    await _handleProGameEnd(result);
+  }
+
   @override
   void dispose() {
     NgmyGameSession.leavePlayScreen();
     _simonPlayGen++;
     _roundTimer?.cancel();
     _miniTicker?.cancel();
+    _mpSyncTimer?.cancel();
     _inputC.dispose();
     super.dispose();
   }
@@ -9937,8 +10094,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         break;
       default:
         if (kNgmyProGameIds.contains(widget.gameId)) {
-          _pro = NgmyProState()..setup(widget.gameId, _rng);
-          _prompt = _pro!.prompt;
+          _prompt = _pro?.prompt ?? 'Play to win';
         } else {
           _prompt = 'Complete this round to win!';
           _answer = 'OK';
@@ -10221,7 +10377,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     }
   }
 
-  Future<void> _payoutWin({String? subtitle}) async {
+  Future<void> _payoutWin({String? subtitle, String? outcomeLabel}) async {
     if (_won) return;
     _won = true;
     _simonPlayGen++;
@@ -10247,7 +10403,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     widget.onDataChanged();
     if (!mounted) return;
     final winSubtitle = subtitle ?? '+\$${payout.toStringAsFixed(2)} added to your balance!';
-    await _showEndPopup(win: true, title: 'YOU WIN!', subtitle: winSubtitle);
+    await _showEndPopup(win: true, title: 'YOU WIN!', subtitle: winSubtitle, outcomeLabel: outcomeLabel);
     await ngmyNotifyGameWin(widget.gameTitle, winSubtitle);
   }
 
@@ -10307,14 +10463,14 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     await ngmyNotifyGameWin(widget.gameTitle, partialSubtitle);
   }
 
-  Future<void> _gameLose({String reason = 'Try again next time!'}) async {
+  Future<void> _gameLose({String reason = 'Try again next time!', String? outcomeLabel}) async {
     if (_won) return;
     _won = true;
     _simonPlayGen++;
     _roundTimer?.cancel();
     _miniTicker?.cancel();
     if (!mounted) return;
-    await _showEndPopup(win: false, title: 'YOU LOSE', subtitle: reason);
+    await _showEndPopup(win: false, title: 'YOU LOSE', subtitle: reason, outcomeLabel: outcomeLabel);
   }
 
   @override
@@ -10767,7 +10923,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         state: _pro!,
         rng: _rng,
         onChanged: () => setState(() {}),
-        onFullWin: () => unawaited(_payoutWin(subtitle: 'You won this round!')),
+        onGameEnd: (result, state) => unawaited(_onProGameEnd(result, state)),
       );
     }
 

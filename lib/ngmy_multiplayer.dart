@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'ngmy_network_resilience.dart';
 
 /// Multiplayer-capable game ids.
 const Set<String> kNgmyMultiplayerGameIds = {
@@ -57,12 +60,46 @@ const Map<String, String> kNgmyProGameTitles = {
   'profit_solve': 'Profit Solve',
 };
 
+const String _kConfigRowId = '1';
+
 List<Map<String, dynamic>> parseGameInvites(dynamic raw) {
   if (raw is! List) return [];
   return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
 }
 
-void addGameInvite(List<Map<String, dynamic>> invites, {
+DateTime _inviteTimestamp(Map<String, dynamic> invite) {
+  for (final key in ['sessionUpdatedAt', 'respondedAt', 'createdAt']) {
+    final parsed = DateTime.tryParse((invite[key] ?? '').toString());
+    if (parsed != null) return parsed;
+  }
+  return DateTime.fromMillisecondsSinceEpoch(0);
+}
+
+/// Union invites by id — keeps the newest update so two players never wipe each other's invites.
+List<Map<String, dynamic>> mergeGameInvites(List<Map<String, dynamic>> local, List<Map<String, dynamic>> remote) {
+  final byId = <String, Map<String, dynamic>>{};
+  for (final raw in [...remote, ...local]) {
+    final item = Map<String, dynamic>.from(raw);
+    final id = (item['id'] ?? '').toString();
+    if (id.isEmpty) continue;
+    final created = DateTime.tryParse((item['createdAt'] ?? '').toString());
+    if ((item['status'] ?? 'pending') == 'pending' &&
+        created != null &&
+        DateTime.now().difference(created).inDays > 14) {
+      continue;
+    }
+    final existing = byId[id];
+    if (existing == null || _inviteTimestamp(item).isAfter(_inviteTimestamp(existing))) {
+      byId[id] = item;
+    }
+  }
+  final out = byId.values.toList()
+    ..sort((a, b) => _inviteTimestamp(b).compareTo(_inviteTimestamp(a)));
+  return out;
+}
+
+void addGameInvite(
+  List<Map<String, dynamic>> invites, {
   required String fromEmail,
   required String fromName,
   required String toEmail,
@@ -89,8 +126,28 @@ void addGameInvite(List<Map<String, dynamic>> invites, {
 List<Map<String, dynamic>> pendingInvitesFor(String email, List<Map<String, dynamic>> invites) {
   final key = email.toLowerCase().trim();
   return invites
-      .where((i) => (i['toEmail'] ?? '').toString().toLowerCase().trim() == key && (i['status'] ?? 'pending') == 'pending')
+      .where((i) =>
+          (i['toEmail'] ?? '').toString().toLowerCase().trim() == key && (i['status'] ?? 'pending') == 'pending')
       .toList();
+}
+
+List<Map<String, dynamic>> activeMatchesFor(String email, List<Map<String, dynamic>> invites) {
+  final key = email.toLowerCase().trim();
+  return invites.where((i) {
+    if ((i['status'] ?? '') != 'active') return false;
+    final session = i['sessionState'];
+    if (session is Map && session['gameOver'] == true) return false;
+    final from = (i['fromEmail'] ?? '').toString().toLowerCase().trim();
+    final to = (i['toEmail'] ?? '').toString().toLowerCase().trim();
+    return from == key || to == key;
+  }).toList();
+}
+
+Map<String, dynamic>? findInviteById(List<Map<String, dynamic>> invites, String id) {
+  for (final i in invites) {
+    if ((i['id'] ?? '').toString() == id) return i;
+  }
+  return null;
 }
 
 void respondInvite(List<Map<String, dynamic>> invites, String id, String status) {
@@ -100,6 +157,206 @@ void respondInvite(List<Map<String, dynamic>> invites, String id, String status)
       i['respondedAt'] = DateTime.now().toIso8601String();
       return;
     }
+  }
+}
+
+Map<String, dynamic> _initSessionForGame(Map<String, dynamic> invite, {String? accepterName}) {
+  final gameId = (invite['gameId'] ?? '').toString();
+  final fromEmail = (invite['fromEmail'] ?? '').toString().toLowerCase().trim();
+  final toEmail = (invite['toEmail'] ?? '').toString().toLowerCase().trim();
+  final fromName = (invite['fromName'] ?? fromEmail).toString();
+  final toName = (accepterName ?? toEmail).toString();
+  switch (gameId) {
+    case 'tic_tac_go':
+      return {
+        'ttt': List<String>.filled(9, ''),
+        'turnEmail': fromEmail,
+        'playerXEmail': fromEmail,
+        'playerXName': fromName,
+        'playerOEmail': toEmail,
+        'playerOName': toName,
+        'gameOver': false,
+        'winnerEmail': '',
+        'winnerLabel': '',
+        'isDraw': false,
+      };
+    case 'connect_four_pro':
+      return {
+        'c4': List.generate(6, (_) => List.filled(7, 0)),
+        'c4Turn': 1,
+        'player1Email': fromEmail,
+        'player1Name': fromName,
+        'player2Email': toEmail,
+        'player2Name': toName,
+        'gameOver': false,
+        'winnerEmail': '',
+        'winnerLabel': '',
+        'isDraw': false,
+      };
+    case 'checkers_deluxe':
+      return {
+        'checkers': List.generate(8, (r) => List.generate(8, (c) {
+          if ((r + c) % 2 == 1) {
+            if (r < 3) return 2;
+            if (r > 4) return 1;
+          }
+          return 0;
+        })),
+        'checkersTurn': 1,
+        'player1Email': fromEmail,
+        'player1Name': fromName,
+        'player2Email': toEmail,
+        'player2Name': toName,
+        'gameOver': false,
+        'winnerEmail': '',
+        'winnerLabel': '',
+        'isDraw': false,
+      };
+    default:
+      return {
+        'gameOver': false,
+        'winnerEmail': '',
+        'winnerLabel': '',
+        'player1Email': fromEmail,
+        'player1Name': fromName,
+        'player2Email': toEmail,
+        'player2Name': toName,
+      };
+  }
+}
+
+void activateInviteMatch(List<Map<String, dynamic>> invites, String id, {String? accepterName}) {
+  for (final i in invites) {
+    if ((i['id'] ?? '').toString() == id) {
+      i['status'] = 'active';
+      i['respondedAt'] = DateTime.now().toIso8601String();
+      i['sessionState'] = _initSessionForGame(i, accepterName: accepterName);
+      i['sessionUpdatedAt'] = DateTime.now().toIso8601String();
+      return;
+    }
+  }
+}
+
+void updateInviteSession(List<Map<String, dynamic>> invites, String id, Map<String, dynamic> sessionState) {
+  for (final i in invites) {
+    if ((i['id'] ?? '').toString() == id) {
+      i['sessionState'] = Map<String, dynamic>.from(sessionState);
+      i['sessionUpdatedAt'] = DateTime.now().toIso8601String();
+      if (sessionState['gameOver'] == true) {
+        i['status'] = 'finished';
+      }
+      return;
+    }
+  }
+}
+
+Future<List<Map<String, dynamic>>?> ngmyFetchGameInvitesFromCloud() async {
+  if (!await ngmyCanReachCloud()) return null;
+  try {
+    final row = await Supabase.instance.client
+        .from('config')
+        .select('gameInvites')
+        .eq('id', _kConfigRowId)
+        .maybeSingle();
+    if (row == null || row['gameInvites'] is! List) return [];
+    return parseGameInvites(row['gameInvites']);
+  } catch (e) {
+    debugPrint('[gameInvites] fetch: $e');
+    return null;
+  }
+}
+
+Future<Map<String, dynamic>?> ngmyFetchInviteById(String inviteId) async {
+  final remote = await ngmyFetchGameInvitesFromCloud();
+  if (remote == null) return null;
+  return findInviteById(remote, inviteId);
+}
+
+/// Pull remote invites, merge with local, optionally push merged list back.
+Future<List<Map<String, dynamic>>?> ngmySyncGameInvites(List<Map<String, dynamic>> localInvites, {bool push = false}) async {
+  final remote = await ngmyFetchGameInvitesFromCloud();
+  if (remote == null) return null;
+  final merged = mergeGameInvites(localInvites, remote);
+  localInvites
+    ..clear()
+    ..addAll(merged);
+  if (push) {
+    await ngmyPublishGameInvites(localInvites);
+  }
+  return merged;
+}
+
+Future<bool> ngmyPublishGameInvites(List<Map<String, dynamic>> localInvites) async {
+  if (!await ngmyCanReachCloud()) return false;
+  try {
+    final client = Supabase.instance.client;
+    final row = await client.from('config').select('gameInvites').eq('id', _kConfigRowId).maybeSingle();
+    final remote = row != null && row['gameInvites'] is List ? parseGameInvites(row['gameInvites']) : <Map<String, dynamic>>[];
+    final merged = mergeGameInvites(localInvites, remote);
+    await client.from('config').upsert({'id': _kConfigRowId, 'gameInvites': merged});
+    localInvites
+      ..clear()
+      ..addAll(merged);
+    return true;
+  } catch (e) {
+    debugPrint('[gameInvites] publish: $e');
+    return false;
+  }
+}
+
+Future<bool> ngmyPublishInviteSession(List<Map<String, dynamic>> localInvites, String inviteId, Map<String, dynamic> sessionState) async {
+  updateInviteSession(localInvites, inviteId, sessionState);
+  return ngmyPublishGameInvites(localInvites);
+}
+
+/// Solo vs NGMY system, or head-to-head when [inviteId] is set.
+class NgmyGamePlayContext {
+  final bool vsComputer;
+  final String youLabel;
+  final String opponentLabel;
+  final String yourEmail;
+  final String? opponentEmail;
+  final String? inviteId;
+  final bool youArePlayerOne;
+
+  const NgmyGamePlayContext({
+    required this.vsComputer,
+    required this.youLabel,
+    required this.opponentLabel,
+    required this.yourEmail,
+    this.opponentEmail,
+    this.inviteId,
+    this.youArePlayerOne = true,
+  });
+
+  factory NgmyGamePlayContext.solo({required String youLabel, required String yourEmail}) {
+    return NgmyGamePlayContext(
+      vsComputer: true,
+      youLabel: youLabel,
+      opponentLabel: 'NGMY',
+      yourEmail: yourEmail.toLowerCase().trim(),
+    );
+  }
+
+  factory NgmyGamePlayContext.fromInvite(Map<String, dynamic> invite, String yourEmail, String yourName) {
+    final id = (invite['id'] ?? '').toString();
+    final from = (invite['fromEmail'] ?? '').toString().toLowerCase().trim();
+    final to = (invite['toEmail'] ?? '').toString().toLowerCase().trim();
+    final key = yourEmail.toLowerCase().trim();
+    final session = invite['sessionState'] is Map ? Map<String, dynamic>.from(invite['sessionState'] as Map) : <String, dynamic>{};
+    final opponentEmail = key == from ? to : from;
+    final opponentName = key == from
+        ? ((session['player2Name'] ?? session['playerOName'] ?? to).toString())
+        : ((invite['fromName'] ?? from).toString());
+    return NgmyGamePlayContext(
+      vsComputer: false,
+      youLabel: yourName,
+      opponentLabel: opponentName,
+      yourEmail: key,
+      opponentEmail: opponentEmail,
+      inviteId: id,
+      youArePlayerOne: key == from,
+    );
   }
 }
 
@@ -123,12 +380,15 @@ Future<void> showMultiplayerInviteDialog({
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Enter the other player\'s account ID (email). They will see the request in Game Center in real time.'),
+          const Text(
+            'Enter the other player\'s account email. They will see the invite in Game Center within a few seconds.',
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: c,
+            keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
-              labelText: 'Account ID / Email',
+              labelText: 'Account email',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.person_search_rounded),
             ),

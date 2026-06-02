@@ -3,7 +3,7 @@
 
 const CACHE_PREFIX = 'ngmy-pwa-';
 const SCOPE_PATH = '/NGMY.github.io/';
-const CACHE_NAME = CACHE_PREFIX + '20260602002740';
+const CACHE_NAME = CACHE_PREFIX + '20260602005419';
 
 const PRECACHE_URLS = ['/NGMY.github.io/','/NGMY.github.io/.last_build_id','/NGMY.github.io/.nojekyll','/NGMY.github.io/assets/AssetManifest.bin','/NGMY.github.io/assets/AssetManifest.bin.json','/NGMY.github.io/assets/assets/video_studio/yt_news_desk.png','/NGMY.github.io/assets/assets/video_studio/yt_studio_curved.png','/NGMY.github.io/assets/FontManifest.json','/NGMY.github.io/assets/fonts/MaterialIcons-Regular.otf','/NGMY.github.io/assets/NOTICES','/NGMY.github.io/assets/packages/cupertino_icons/assets/CupertinoIcons.ttf','/NGMY.github.io/assets/shaders/ink_sparkle.frag','/NGMY.github.io/assets/shaders/stretch_effect.frag','/NGMY.github.io/canvaskit/canvaskit.js','/NGMY.github.io/canvaskit/canvaskit.js.symbols','/NGMY.github.io/canvaskit/canvaskit.wasm','/NGMY.github.io/canvaskit/chromium/canvaskit.js','/NGMY.github.io/canvaskit/chromium/canvaskit.js.symbols','/NGMY.github.io/canvaskit/chromium/canvaskit.wasm','/NGMY.github.io/canvaskit/experimental_webparagraph/canvaskit.js','/NGMY.github.io/canvaskit/experimental_webparagraph/canvaskit.js.symbols','/NGMY.github.io/canvaskit/experimental_webparagraph/canvaskit.wasm','/NGMY.github.io/canvaskit/skwasm.js','/NGMY.github.io/canvaskit/skwasm.js.symbols','/NGMY.github.io/canvaskit/skwasm.wasm','/NGMY.github.io/canvaskit/skwasm_heavy.js','/NGMY.github.io/canvaskit/skwasm_heavy.js.symbols','/NGMY.github.io/canvaskit/skwasm_heavy.wasm','/NGMY.github.io/canvaskit/wimp.js','/NGMY.github.io/canvaskit/wimp.js.symbols','/NGMY.github.io/canvaskit/wimp.wasm','/NGMY.github.io/favicon.png','/NGMY.github.io/flutter.js','/NGMY.github.io/flutter_bootstrap.js','/NGMY.github.io/icons/Icon-192.png','/NGMY.github.io/icons/Icon-512.png','/NGMY.github.io/icons/Icon-maskable-192.png','/NGMY.github.io/icons/Icon-maskable-512.png','/NGMY.github.io/index.html','/NGMY.github.io/main.dart.js','/NGMY.github.io/manifest.json','/NGMY.github.io/version.json'];
 
@@ -87,6 +87,10 @@ function isCriticalScript(url) {
   return /\/(main\.dart\.js|flutter_bootstrap\.js|flutter\.js|canvaskit|dart_sdk)/i.test(url.pathname);
 }
 
+function isCriticalFont(url) {
+  return /MaterialIcons-Regular\.otf|CupertinoIcons\.ttf/i.test(url.pathname);
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
@@ -102,7 +106,7 @@ self.addEventListener('fetch', (event) => {
         cached = await cacheLookupByPathname(url);
       }
 
-      if ((isAppShellAsset(url) || isCriticalScript(url)) && cached) {
+      if ((isAppShellAsset(url) || isCriticalScript(url) || isCriticalFont(url)) && cached) {
         event.waitUntil(
           fetch(event.request)
             .then((res) => {

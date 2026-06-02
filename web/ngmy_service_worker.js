@@ -87,6 +87,10 @@ function isCriticalScript(url) {
   return /\/(main\.dart\.js|flutter_bootstrap\.js|flutter\.js|canvaskit|dart_sdk)/i.test(url.pathname);
 }
 
+function isCriticalFont(url) {
+  return /MaterialIcons-Regular\.otf|CupertinoIcons\.ttf/i.test(url.pathname);
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
@@ -102,7 +106,7 @@ self.addEventListener('fetch', (event) => {
         cached = await cacheLookupByPathname(url);
       }
 
-      if ((isAppShellAsset(url) || isCriticalScript(url)) && cached) {
+      if ((isAppShellAsset(url) || isCriticalScript(url) || isCriticalFont(url)) && cached) {
         event.waitUntil(
           fetch(event.request)
             .then((res) => {
