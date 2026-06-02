@@ -12,6 +12,7 @@ const Set<String> kNgmyMultiplayerGameIds = {
   'backgammon_pro',
   'pool_8ball',
   'poker_texas',
+  'memory',
 };
 
 const List<String> kNgmyProGameIds = [

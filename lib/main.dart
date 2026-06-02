@@ -9503,8 +9503,6 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
                     Row(
                       children: [
                         Expanded(child: Text(g.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17))),
-                        if (mp)
-                          const Icon(Icons.groups_rounded, color: Color(0xFFFBBF24), size: 18),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -10062,6 +10060,11 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   Timer? _mpSyncTimer;
   NgmyGamePlayContext? _playCtx;
   bool _mpPublishing = false;
+  Timer? _mpGateTimer;
+  bool _mpWaiting = false;
+  DateTime? _mpStartAt;
+  String _mpGateTitle = '';
+  String _mpGateSubtitle = '';
 
   bool get _isPro => kNgmyProGameIds.contains(widget.gameId);
   bool get _isMultiplayer => widget.inviteId != null && widget.inviteId!.trim().isNotEmpty;
@@ -10164,6 +10167,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     _secondsLeft = ngmyGameTimeLimitSeconds(widget.gameId, widget.config.gameTimeLimits);
     _setupRound();
     unawaited(_loadBankIndex());
+    if (_isMultiplayer) {
+      _mpWaiting = true;
+      _mpGateTitle = 'Waiting for opponent…';
+      _mpGateSubtitle = 'Both players must join before the game starts.';
+      unawaited(_initMultiplayerStartGate());
+      _mpGateTimer = Timer.periodic(const Duration(milliseconds: 700), (_) => unawaited(_pollMultiplayerStartGate()));
+    }
     if (_isPro) {
       _initProGame();
       _miniTicker = Timer.periodic(const Duration(milliseconds: 50), (_) => _tickPro());
@@ -10173,6 +10183,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     }
     _roundTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _won) return;
+      if (_mpWaiting) return;
       if (_secondsLeft <= 0) {
         setState(() => _secondsLeft = 0);
         _roundTimer?.cancel();
@@ -10181,6 +10192,96 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       }
       setState(() => _secondsLeft--);
     });
+  }
+
+  Future<void> _initMultiplayerStartGate() async {
+    await _pollMultiplayerStartGate(publishJoin: true);
+  }
+
+  Future<void> _pollMultiplayerStartGate({bool publishJoin = false}) async {
+    if (!_isMultiplayer || widget.inviteId == null) return;
+    final id = widget.inviteId!.trim();
+    if (id.isEmpty) return;
+
+    final key = widget.user.email.toLowerCase().trim();
+    Map<String, dynamic>? invite = findInviteById(widget.config.gameInvites, id);
+    invite ??= await ngmyFetchInviteById(id);
+    if (invite == null) return;
+
+    final fromEmail = (invite['fromEmail'] ?? '').toString().toLowerCase().trim();
+    final toEmail = (invite['toEmail'] ?? '').toString().toLowerCase().trim();
+    final sessionRaw = invite['sessionState'];
+    final session = sessionRaw is Map ? Map<String, dynamic>.from(sessionRaw) : <String, dynamic>{};
+
+    final p1 = (session['player1Email'] ?? session['playerXEmail'] ?? fromEmail).toString().toLowerCase().trim();
+    final p2 = (session['player2Email'] ?? session['playerOEmail'] ?? toEmail).toString().toLowerCase().trim();
+    if (p1.isNotEmpty) session['player1Email'] = p1;
+    if (p2.isNotEmpty) session['player2Email'] = p2;
+
+    final joinedRaw = session['joined'];
+    final joined = joinedRaw is Map ? Map<String, dynamic>.from(joinedRaw) : <String, dynamic>{};
+    if (publishJoin) joined[key] = true;
+    if (p1.isNotEmpty && !joined.containsKey(p1)) joined[p1] = false;
+    if (p2.isNotEmpty && !joined.containsKey(p2)) joined[p2] = false;
+    session['joined'] = joined;
+
+    DateTime? startAt;
+    final startRaw = (session['startAt'] ?? '').toString();
+    if (startRaw.isNotEmpty) startAt = DateTime.tryParse(startRaw)?.toLocal();
+
+    final bothJoined = p1.isNotEmpty && p2.isNotEmpty && joined[p1] == true && joined[p2] == true;
+    final youAreP1 = p1.isNotEmpty && key == p1;
+    if (bothJoined && startAt == null && youAreP1) {
+      startAt = DateTime.now().add(const Duration(seconds: 3));
+      session['startAt'] = startAt.toUtc().toIso8601String();
+    }
+
+    if (publishJoin || (bothJoined && youAreP1 && startAt != null)) {
+      await ngmyPublishInviteSession(widget.config.gameInvites, id, session);
+      widget.onDataChanged();
+    }
+
+    if (!mounted) return;
+    if (!bothJoined) {
+      setState(() {
+        _mpWaiting = true;
+        _mpStartAt = startAt;
+        _mpGateTitle = 'Waiting for opponent…';
+        _mpGateSubtitle = 'Opponent must join before the game starts.';
+      });
+      return;
+    }
+
+    if (startAt == null) {
+      setState(() {
+        _mpWaiting = true;
+        _mpStartAt = null;
+        _mpGateTitle = 'Starting soon…';
+        _mpGateSubtitle = 'Syncing start time…';
+      });
+      return;
+    }
+
+    final now = DateTime.now();
+    if (now.isBefore(startAt)) {
+      final left = startAt.difference(now);
+      setState(() {
+        _mpWaiting = true;
+        _mpStartAt = startAt;
+        _mpGateTitle = 'Match starting…';
+        _mpGateSubtitle = 'Starting in ${left.inSeconds + 1}s';
+      });
+      return;
+    }
+
+    if (_mpWaiting) {
+      setState(() {
+        _mpWaiting = false;
+        _mpStartAt = startAt;
+      });
+    }
+    _mpGateTimer?.cancel();
+    _mpGateTimer = null;
   }
 
   Future<void> _loadBankIndex() async {
@@ -10238,6 +10339,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   Future<void> _syncMultiplayerSession() async {
     if (!_isMultiplayer || _pro == null || _won || _mpPublishing) return;
+    if (_mpWaiting) return;
     final remote = await ngmyFetchInviteById(widget.inviteId!);
     if (remote == null || !mounted) return;
     final localInvite = findInviteById(widget.config.gameInvites, widget.inviteId!);
@@ -10307,12 +10409,14 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     _roundTimer?.cancel();
     _miniTicker?.cancel();
     _mpSyncTimer?.cancel();
+    _mpGateTimer?.cancel();
     _inputC.dispose();
     super.dispose();
   }
 
   void _tickPro() {
     if (!mounted || _won || _secondsLeft <= 0 || _pro == null) return;
+    if (_mpWaiting) return;
     final win = _pro!.tick(widget.gameId, _rng);
     if (win) {
       unawaited(_payoutWin(subtitle: 'Goal completed!'));
@@ -10468,6 +10572,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   }
 
   void _pickMemoryCard(int index) {
+    if (_mpWaiting) return;
     if (_won || _lockingCards || _matchedCards.contains(index) || _revealedCards.contains(index)) return;
     setState(() => _revealedCards.add(index));
     if (_revealedCards.length < 2) return;
@@ -10480,9 +10585,16 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         _pairsFound++;
         _revealedCards = [];
       });
+      if (_isMultiplayer && widget.gameId == 'memory') {
+        unawaited(_publishMemoryMultiplayerProgress());
+      }
       if (_pairsFound >= _memoryBase.length) {
         unawaited(_advanceBank());
-        unawaited(_payoutWin());
+        if (_isMultiplayer && widget.gameId == 'memory') {
+          unawaited(_settleMemoryMultiplayer(forceComplete: true));
+        } else {
+          unawaited(_payoutWin());
+        }
       }
       return;
     }
@@ -10706,6 +10818,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   Future<void> _settleProgress() async {
     if (_won) return;
+    if (_isMultiplayer && widget.gameId == 'memory') {
+      await _settleMemoryMultiplayer();
+      return;
+    }
     final done = _gameProgressDone();
     final total = _gameProgressTotal();
     if (total <= 0 || done <= 0) {
@@ -10718,6 +10834,126 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     } else {
       await _payoutPartial(ratio, done: done, total: total);
     }
+  }
+
+  Future<void> _publishMemoryMultiplayerProgress() async {
+    if (!_isMultiplayer || widget.inviteId == null) return;
+    final id = widget.inviteId!.trim();
+    if (id.isEmpty) return;
+    try {
+      final key = widget.user.email.toLowerCase().trim();
+      final invite = findInviteById(widget.config.gameInvites, id) ?? await ngmyFetchInviteById(id);
+      if (invite == null) return;
+      final sessionRaw = invite['sessionState'];
+      final session = sessionRaw is Map ? Map<String, dynamic>.from(sessionRaw) : <String, dynamic>{};
+      final scoresRaw = session['scores'];
+      final scores = scoresRaw is Map ? Map<String, dynamic>.from(scoresRaw) : <String, dynamic>{};
+      scores[key] = _pairsFound;
+      session['scores'] = scores;
+      final wagersRaw = session['wagers'];
+      final wagers = wagersRaw is Map ? Map<String, dynamic>.from(wagersRaw) : <String, dynamic>{};
+      wagers[key] = widget.wager;
+      session['wagers'] = wagers;
+      await ngmyPublishInviteSession(widget.config.gameInvites, id, session);
+      widget.onDataChanged();
+    } catch (_) {}
+  }
+
+  Future<void> _settleMemoryMultiplayer({bool forceComplete = false}) async {
+    if (_won) return;
+    if (!_isMultiplayer || widget.inviteId == null) {
+      await _settleProgress();
+      return;
+    }
+
+    await _publishMemoryMultiplayerProgress();
+    final id = widget.inviteId!.trim();
+    final key = widget.user.email.toLowerCase().trim();
+    final invite = await ngmyFetchInviteById(id);
+    if (invite == null) {
+      // Fallback: pay only your solo progress.
+      final ratio = (_pairsFound / _gameProgressTotal()).clamp(0.0, 1.0);
+      if (ratio <= 0) {
+        await _gameLose(reason: "Time's up — no progress to pay.");
+      } else if (ratio >= 1.0) {
+        await _payoutWin(subtitle: 'Complete! Max payout earned.');
+      } else {
+        await _payoutPartial(ratio, done: _pairsFound, total: _gameProgressTotal());
+      }
+      return;
+    }
+
+    final fromEmail = (invite['fromEmail'] ?? '').toString().toLowerCase().trim();
+    final toEmail = (invite['toEmail'] ?? '').toString().toLowerCase().trim();
+    final other = key == fromEmail ? toEmail : fromEmail;
+
+    final sessionRaw = invite['sessionState'];
+    final session = sessionRaw is Map ? Map<String, dynamic>.from(sessionRaw) : <String, dynamic>{};
+    final scoresRaw = session['scores'];
+    final scores = scoresRaw is Map ? Map<String, dynamic>.from(scoresRaw) : <String, dynamic>{};
+    final yourPairs = (scores[key] as num?)?.toInt() ?? _pairsFound;
+    final otherPairs = (scores[other] as num?)?.toInt() ?? 0;
+
+    final totalPairs = _gameProgressTotal();
+    final yourRatio = (yourPairs / totalPairs).clamp(0.0, 1.0);
+
+    // Solo payout for YOUR progress (always).
+    if (yourRatio <= 0) {
+      await _gameLose(reason: "Time's up — no progress to pay.");
+      return;
+    }
+
+    // Winner bonus uses opponent's wager.
+    final wagersRaw = session['wagers'];
+    final wagers = wagersRaw is Map ? Map<String, dynamic>.from(wagersRaw) : <String, dynamic>{};
+    final otherWager = (wagers[other] as num?)?.toDouble() ?? 0.0;
+
+    final winnerEmail = yourPairs == otherPairs ? '' : (yourPairs > otherPairs ? key : other);
+    final bonusRatio = yourPairs >= totalPairs ? 1.0 : yourRatio;
+    final bonus = (winnerEmail == key && otherWager > 0) ? otherWager * bonusRatio : 0.0;
+
+    _won = true;
+    _simonPlayGen++;
+    _roundTimer?.cancel();
+    _miniTicker?.cancel();
+
+    final soloPayout = widget.wager * 1.46 * yourRatio;
+    final totalPayout = soloPayout + bonus;
+    setState(() {
+      widget.user.accountBalance += totalPayout;
+      // Profit: solo profit component only (keeps same solo economics).
+      widget.user.totalProfit += (soloPayout - widget.wager * yourRatio);
+    });
+
+    widget.onAddTransaction(
+      AppTransaction(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        userEmail: widget.user.email,
+        amount: totalPayout,
+        type: TransactionType.reimbursement,
+        method: PaymentMethod.system,
+        sourceDetails: winnerEmail == key
+            ? 'Multiplayer memory payout: ${widget.gameTitle} ($yourPairs/$totalPairs) + bonus \$${bonus.toStringAsFixed(2)}'
+            : 'Multiplayer memory payout: ${widget.gameTitle} ($yourPairs/$totalPairs)',
+        status: TransactionStatus.approved,
+        timestamp: DateTime.now(),
+      ),
+    );
+    widget.onDataChanged();
+
+    if (!mounted) return;
+    final label = winnerEmail.isEmpty
+        ? 'Draw'
+        : (winnerEmail == key ? 'Winner' : 'Lost');
+    final subtitle = winnerEmail == key
+        ? '+\$${totalPayout.toStringAsFixed(2)} (includes opponent bonus \$${bonus.toStringAsFixed(2)})'
+        : '+\$${soloPayout.toStringAsFixed(2)} (your progress payout)';
+    await _showEndPopup(
+      win: true,
+      title: 'MATCH OVER',
+      outcomeLabel: '$yourPairs/$totalPairs · $label',
+      subtitle: subtitle,
+    );
   }
 
   Future<void> _payoutPartial(double ratio, {required int done, required int total}) async {
@@ -10773,7 +11009,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   @override
   Widget build(BuildContext context) {
     final timerText = '${_secondsLeft ~/ 60}:${(_secondsLeft % 60).toString().padLeft(2, '0')}';
-    return ngmyGameScreenShell(
+    final body = ngmyGameScreenShell(
       backgroundColor: const Color(0xFF1C1236),
       child: SafeArea(
         child: Padding(
@@ -10833,6 +11069,44 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
           ),
         ),
       ),
+    );
+    if (!_mpWaiting) return body;
+    return Stack(
+      children: [
+        body,
+        Positioned.fill(
+          child: Container(
+            color: Colors.black.withOpacity(0.55),
+            alignment: Alignment.center,
+            child: IgnorePointer(
+              ignoring: false,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 18),
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0B1020).withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(
+                      width: 26,
+                      height: 26,
+                      child: CircularProgressIndicator(strokeWidth: 2.6, color: Color(0xFFFBBF24)),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(_mpGateTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                    const SizedBox(height: 6),
+                    Text(_mpGateSubtitle, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.25)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -14873,7 +15147,8 @@ class _StatsScreenState extends State<StatsScreen> {
                 ],
               ),
               Transform.translate(
-                offset: const Offset(0, -14),
+                // Pull the growth frame up without moving the top 4 tiles.
+                offset: const Offset(0, -28),
                 child: Container(
                 width: double.infinity,
                 decoration: _statsFrameDecoration(context, elevated: true),
