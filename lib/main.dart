@@ -71,8 +71,32 @@ import 'ngmy_platform_graphics.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
+ThemeMode _ngmyInitialThemeMode = ThemeMode.light;
+
+Future<ThemeMode> _ngmyReadInitialThemeMode() async {
+  try {
+    final p = await SharedPreferences.getInstance();
+    final savedTheme = (p.getString('theme_mode') ?? '').trim();
+    if (savedTheme == 'light') return ThemeMode.light;
+    if (savedTheme == 'dark') return ThemeMode.dark;
+    if (savedTheme == 'system') return ThemeMode.system;
+  } catch (_) {}
+  return ThemeMode.light;
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('[flutter] ${details.exceptionAsString()}\n${details.stack}');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('[platform] $error\n$stack');
+    return true;
+  };
+
+  _ngmyInitialThemeMode = await _ngmyReadInitialThemeMode();
+
   await ngmyIgnoreTimeout(() async {
     try {
       await Supabase.initialize(
@@ -89,11 +113,16 @@ void main() async {
       debugPrint('Supabase init failed (app still starts): $e');
     }
   }, timeout: const Duration(seconds: 10));
-  runApp(
-    kIsWeb
-        ? const ExcludeSemantics(child: NgmyWebViewportGuard(child: NGMYApp()))
-        : const NGMYApp(),
-  );
+
+  runZonedGuarded(() {
+    runApp(
+      kIsWeb
+          ? const ExcludeSemantics(child: NgmyWebViewportGuard(child: NGMYApp()))
+          : const NGMYApp(),
+    );
+  }, (e, st) {
+    debugPrint('[zone] $e\n$st');
+  });
 }
 
 // --- DATA MODELS ---
@@ -770,7 +799,6 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     'civicRegistrarApplications': config.civicRegistrarApplications,
     'jobPosts': config.jobPosts,
     'jobWorkerApplications': config.jobWorkerApplications,
-    'mediaDeliveryQueue': config.mediaDeliveryQueue,
   };
   try {
     await client.from('config').upsert(combined);
@@ -787,7 +815,6 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     {'id': kNgmyConfigRowId, 'civicRegistrarApplications': config.civicRegistrarApplications},
     {'id': kNgmyConfigRowId, 'jobPosts': config.jobPosts},
     {'id': kNgmyConfigRowId, 'jobWorkerApplications': config.jobWorkerApplications},
-    {'id': kNgmyConfigRowId, 'mediaDeliveryQueue': config.mediaDeliveryQueue},
   ]) {
     try {
       await client.from('config').upsert(row);
@@ -3692,7 +3719,7 @@ class NGMYApp extends StatefulWidget {
 }
 
 class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = _ngmyInitialThemeMode;
   UserData? _currentUser;
   bool _isLoading = true;
   List<AppTransaction> _allTransactions = [];
@@ -18284,48 +18311,195 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showStatePicker() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final q = TextEditingController();
+    final filtered = ValueNotifier<List<String>>(_usStates);
+
+    void applyFilter() {
+      final s = q.text.trim().toLowerCase();
+      if (s.isEmpty) {
+        filtered.value = _usStates;
+        return;
+      }
+      filtered.value = _usStates.where((st) => st.toLowerCase().contains(s)).toList(growable: false);
+    }
+
+    q.addListener(applyFilter);
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
-      builder: (c) => Container(
-        padding: const EdgeInsets.all(25),
-        child: Column(
-          children: [
-            const Text('Select State', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-            const SizedBox(height: 15),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _usStates.length,
-                itemBuilder: (ctx, i) => ListTile(
-                  title: Text(_usStates[i], style: const TextStyle(fontWeight: FontWeight.w600)),
-                  onTap: () async {
-                    final newState = _usStates[i];
-                    Navigator.pop(c);
-                    if (!_canBypassCivicGate()) {
-                      final ok = await civicRegistryIsUnlocked(widget.user.email, newState);
-                      if (!ok) {
-                        setState(() {
-                          _selectedState = newState;
-                          _selectedCity = 'All Cities';
-                          _selectedRoom = 'All Rooms';
-                          _registryUnlocked = false;
-                        });
-                        return;
-                      }
-                    }
-                    setState(() {
-                      _selectedState = newState;
-                      _selectedCity = 'All Cities';
-                      _selectedRoom = 'All Rooms';
-                    });
-                  },
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        final bg = isDark ? const Color(0xFF0B1220) : Colors.white;
+        final border = isDark ? Colors.white10 : const Color(0xFFE5E7EB);
+        final text = isDark ? Colors.white : const Color(0xFF0F172A);
+        final muted = isDark ? Colors.white70 : Colors.black54;
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => Navigator.pop(sheetCtx),
+          child: SafeArea(
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: GestureDetector(
+                onTap: () {},
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  decoration: BoxDecoration(
+                    color: bg,
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(color: border, width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.12),
+                        blurRadius: 26,
+                        offset: const Offset(0, 14),
+                      ),
+                    ],
+                  ),
+                  child: DraggableScrollableSheet(
+                    expand: false,
+                    initialChildSize: 0.75,
+                    minChildSize: 0.45,
+                    maxChildSize: 0.92,
+                    builder: (_, controller) {
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          left: 18,
+                          right: 18,
+                          top: 14,
+                          bottom: 14 + MediaQuery.viewInsetsOf(sheetCtx).bottom,
+                        ),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white24 : Colors.black12,
+                                borderRadius: BorderRadius.circular(99),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Select your state',
+                                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: text),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Close',
+                                  onPressed: () => Navigator.pop(sheetCtx),
+                                  icon: Icon(Icons.close_rounded, color: muted),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white10 : const Color(0xFFF3F4F6),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: border),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.search_rounded, color: muted),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: q,
+                                      style: TextStyle(color: text, fontSize: 14),
+                                      decoration: InputDecoration(
+                                        hintText: 'Search state…',
+                                        hintStyle: TextStyle(color: muted),
+                                        border: InputBorder.none,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Clear',
+                                    onPressed: () => q.text = '',
+                                    icon: Icon(Icons.backspace_rounded, color: muted, size: 18),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Expanded(
+                              child: ValueListenableBuilder<List<String>>(
+                                valueListenable: filtered,
+                                builder: (_, states, __) {
+                                  if (states.isEmpty) {
+                                    return Center(
+                                      child: Text('No results', style: TextStyle(color: muted, fontWeight: FontWeight.w700)),
+                                    );
+                                  }
+                                  return ListView.separated(
+                                    controller: controller,
+                                    itemCount: states.length,
+                                    separatorBuilder: (_, __) => Divider(height: 1, color: border),
+                                    itemBuilder: (_, i) {
+                                      final state = states[i];
+                                      final selected = state == _selectedState;
+                                      return ListTile(
+                                        dense: true,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                        title: Text(
+                                          state,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            color: text,
+                                          ),
+                                        ),
+                                        trailing: selected ? Icon(Icons.check_circle_rounded, color: Colors.greenAccent.shade400) : null,
+                                        onTap: () async {
+                                          Navigator.pop(sheetCtx);
+                                          final newState = state;
+                                          if (!_canBypassCivicGate()) {
+                                            final ok = await civicRegistryIsUnlocked(widget.user.email, newState);
+                                            if (!ok) {
+                                              if (!mounted) return;
+                                              setState(() {
+                                                _selectedState = newState;
+                                                _selectedCity = 'All Cities';
+                                                _selectedRoom = 'All Rooms';
+                                                _registryUnlocked = false;
+                                              });
+                                              return;
+                                            }
+                                          }
+                                          if (!mounted) return;
+                                          setState(() {
+                                            _selectedState = newState;
+                                            _selectedCity = 'All Cities';
+                                            _selectedRoom = 'All Rooms';
+                                          });
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
+      },
+    ).whenComplete(() {
+      q.dispose();
+      filtered.dispose();
+    });
   }
 
   bool _memberMatchesHelpScope(UserData u) {

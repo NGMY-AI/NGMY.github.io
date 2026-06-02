@@ -129,6 +129,176 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
     });
   }
 
+  Future<void> _pickState() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final q = TextEditingController();
+    final filtered = ValueNotifier<List<String>>(widget.usStates);
+
+    void applyFilter() {
+      final s = q.text.trim().toLowerCase();
+      if (s.isEmpty) {
+        filtered.value = widget.usStates;
+        return;
+      }
+      filtered.value = widget.usStates.where((st) => st.toLowerCase().contains(s)).toList(growable: false);
+    }
+
+    q.addListener(applyFilter);
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        final bg = isDark ? const Color(0xFF0B1220) : Colors.white;
+        final border = isDark ? Colors.white10 : const Color(0xFFE5E7EB);
+        final text = isDark ? Colors.white : const Color(0xFF0F172A);
+        final muted = isDark ? Colors.white70 : Colors.black54;
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => Navigator.pop(sheetCtx),
+          child: SafeArea(
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: GestureDetector(
+                onTap: () {},
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  decoration: BoxDecoration(
+                    color: bg,
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(color: border, width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.12),
+                        blurRadius: 26,
+                        offset: const Offset(0, 14),
+                      ),
+                    ],
+                  ),
+                  child: DraggableScrollableSheet(
+                    expand: false,
+                    initialChildSize: 0.78,
+                    minChildSize: 0.48,
+                    maxChildSize: 0.92,
+                    builder: (_, controller) {
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          left: 18,
+                          right: 18,
+                          top: 14,
+                          bottom: 14 + MediaQuery.viewInsetsOf(sheetCtx).bottom,
+                        ),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white24 : Colors.black12,
+                                borderRadius: BorderRadius.circular(99),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Select your state',
+                                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: text),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Close',
+                                  onPressed: () => Navigator.pop(sheetCtx),
+                                  icon: Icon(Icons.close_rounded, color: muted),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white10 : const Color(0xFFF3F4F6),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: border),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.search_rounded, color: muted),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: q,
+                                      style: TextStyle(color: text, fontSize: 14),
+                                      decoration: InputDecoration(
+                                        hintText: 'Search state…',
+                                        hintStyle: TextStyle(color: muted),
+                                        border: InputBorder.none,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Clear',
+                                    onPressed: () => q.text = '',
+                                    icon: Icon(Icons.backspace_rounded, color: muted, size: 18),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Expanded(
+                              child: ValueListenableBuilder<List<String>>(
+                                valueListenable: filtered,
+                                builder: (_, states, __) {
+                                  if (states.isEmpty) {
+                                    return Center(
+                                      child: Text('No results', style: TextStyle(color: muted, fontWeight: FontWeight.w700)),
+                                    );
+                                  }
+                                  return ListView.separated(
+                                    controller: controller,
+                                    itemCount: states.length,
+                                    separatorBuilder: (_, __) => Divider(height: 1, color: border),
+                                    itemBuilder: (_, i) {
+                                      final state = states[i];
+                                      final selected = state == _state;
+                                      return ListTile(
+                                        dense: true,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                        title: Text(state, style: TextStyle(fontWeight: FontWeight.w800, color: text)),
+                                        trailing: selected ? Icon(Icons.check_circle_rounded, color: Colors.greenAccent.shade400) : null,
+                                        onTap: () => Navigator.pop(sheetCtx, state),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    q.dispose();
+    filtered.dispose();
+
+    if (!mounted) return;
+    if (picked == null || picked.trim().isEmpty) return;
+    setState(() {
+      _state = picked;
+      _error = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -214,23 +384,25 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
                 ),
                 const SizedBox(height: 8),
                 _fieldShell(
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _state,
-                      isExpanded: true,
-                      dropdownColor: _redBottom,
-                      icon: Icon(Icons.unfold_more_rounded, color: Colors.white.withValues(alpha: 0.9)),
-                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
-                      items: widget.usStates
-                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                          .toList(),
-                      onChanged: (v) {
-                        if (v == null) return;
-                        setState(() {
-                          _state = v;
-                          _error = null;
-                        });
-                      },
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: _busy ? null : _pickState,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _state,
+                                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white.withValues(alpha: 0.9)),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
