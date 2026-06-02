@@ -72,8 +72,6 @@ import 'ngmy_platform_graphics.dart';
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
 ThemeMode _ngmyInitialThemeMode = ThemeMode.light;
-const _ngmyStartupBg = Color(0xFF0B1220);
-const _ngmyStartupAccent = Color(0xFF22D3EE);
 
 Future<ThemeMode> _ngmyReadInitialThemeMode() async {
   try {
@@ -84,6 +82,36 @@ Future<ThemeMode> _ngmyReadInitialThemeMode() async {
     if (savedTheme == 'system') return ThemeMode.system;
   } catch (_) {}
   return ThemeMode.light;
+}
+
+ThemeMode _ngmyResolveThemeMode(ThemeMode mode) {
+  if (mode != ThemeMode.system) return mode;
+  final now = DateTime.now();
+  final mins = now.hour * 60 + now.minute;
+  const startLight = 9 * 60;
+  const startDark = 20 * 60;
+  return (mins >= startLight && mins < startDark) ? ThemeMode.light : ThemeMode.dark;
+}
+
+void _ngmyApplySystemChromeForThemeMode(ThemeMode mode) {
+  final dark = _ngmyResolveThemeMode(mode) == ThemeMode.dark;
+  SystemChrome.setSystemUIOverlayStyle(
+    dark
+        ? const SystemUiOverlayStyle(
+            statusBarColor: Color(0xFF121212),
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+            systemNavigationBarColor: Color(0xFF121212),
+            systemNavigationBarIconBrightness: Brightness.light,
+          )
+        : const SystemUiOverlayStyle(
+            statusBarColor: Colors.white,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+            systemNavigationBarColor: Colors.white,
+            systemNavigationBarIconBrightness: Brightness.dark,
+          ),
+  );
 }
 
 void main() async {
@@ -98,14 +126,7 @@ void main() async {
   };
 
   _ngmyInitialThemeMode = await _ngmyReadInitialThemeMode();
-  // Force a stable, non-white first frame (prevents iOS/Safari flash).
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: _ngmyStartupBg,
-    statusBarIconBrightness: Brightness.light,
-    statusBarBrightness: Brightness.dark,
-    systemNavigationBarColor: _ngmyStartupBg,
-    systemNavigationBarIconBrightness: Brightness.light,
-  ));
+  _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
 
   await ngmyIgnoreTimeout(() async {
     try {
@@ -3700,27 +3721,6 @@ List<Map<String, dynamic>> _jsonMapList(dynamic raw) {
 
 // --- MAIN APP ---
 
-/// Solid splash while local session loads — avoids Auth → Home white flash.
-class NgmyStartupSplash extends StatelessWidget {
-  const NgmyStartupSplash({super.key, required this.isDark});
-
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: _ngmyStartupBg,
-      child: Center(
-        child: SizedBox(
-          width: 32,
-          height: 32,
-          child: const CircularProgressIndicator(strokeWidth: 2.5, color: _ngmyStartupAccent),
-        ),
-      ),
-    );
-  }
-}
-
 class NGMYApp extends StatefulWidget {
   const NGMYApp({super.key});
   @override State<NGMYApp> createState() => _NGMYAppState();
@@ -3844,10 +3844,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     ngmyOnGameWinNotify = null;
     NgmyNavigator.install();
     _initLocalNotifications();
-    _loadData().then((_) {
-      _scheduleAutoThemeTick();
-      _startBackgroundServices();
-    });
+    _loadData().then((_) => _scheduleAutoThemeTick());
   }
 
   @override
@@ -3913,14 +3910,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   final supabase = Supabase.instance.client;
 
-  ThemeMode get _effectiveThemeMode {
-    if (_themeMode != ThemeMode.system) return _themeMode;
-    final now = DateTime.now();
-    final mins = now.hour * 60 + now.minute;
-    const startLight = 9 * 60;  // 9:00 AM
-    const startDark = 20 * 60;  // 8:00 PM
-    return (mins >= startLight && mins < startDark) ? ThemeMode.light : ThemeMode.dark;
-  }
+  ThemeMode get _effectiveThemeMode => _ngmyResolveThemeMode(_themeMode);
 
   void _applySystemUiForMode(ThemeMode mode) {
     final isDarkMode = mode == ThemeMode.dark;
@@ -5561,28 +5551,43 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _seenRealtimeAnnouncementIds.add(a.id);
         }
         _appShellSig = _computeAppShellSig();
-        // Keep splash stable; fade into app after a short minimum duration.
-        await Future<void>.delayed(const Duration(milliseconds: 900));
-        if (!mounted) return;
+        _applySystemUiForMode(_effectiveThemeMode);
         setState(() => _isLoading = false);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          _applySystemUiForMode(_effectiveThemeMode);
-        });
         _startBackgroundServices();
       }
 
-      // 2. Fetch from Supabase when reachable (slow/offline uses local cache above).
+      // Cloud sync runs in background so home is not shown twice.
+      unawaited(_bootstrapCloudData(
+        prefs: prefs,
+        safeGet: safeGet,
+        localMedia: localMedia,
+        localCurrent: _currentUser,
+      ));
+    } catch (e) {
+      debugPrint('General load error: $e');
+      if (mounted) {
+        _applySystemUiForMode(_effectiveThemeMode);
+        setState(() => _isLoading = false);
+        _startBackgroundServices();
+      }
+    }
+  }
+
+  Future<void> _bootstrapCloudData({
+    required SharedPreferences prefs,
+    required String? Function(String key) safeGet,
+    required List<MediaPost> localMedia,
+    required UserData? localCurrent,
+  }) async {
+    try {
       if (!await ngmyCanReachCloud()) {
         debugPrint('[ngmy] offline or slow network — using cached local data');
         await _persistLocalSnapshot();
-        if (mounted) setState(() {});
         return;
       }
       final localUsersBeforeFetch = <String, UserData>{
         for (final u in _allUsers) u.email.toLowerCase().trim(): u,
       };
-      final localCurrent = _currentUser;
       await ngmyIgnoreTimeout(() async {
       try {
         final usersData = await supabase.from('users').select();
@@ -5617,7 +5622,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _seenRealtimeAnnouncementIds.add(a.id);
           }
           await _pruneExpiredAnnouncements(updateUi: false);
-          if (mounted) setState(() {});
         }
 
         final localStoreListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
@@ -5754,13 +5758,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _allowConfigDiffNotifications = true;
       await _persistLocalSnapshot();
       unawaited(_notifyStoreMarketDayListings());
-    } catch (e) { debugPrint("General load error: $e"); }
-    if (mounted) {
-      final nextSig = _computeAppShellSig();
-      if (nextSig != _appShellSig) {
-        _appShellSig = nextSig;
-        setState(() {});
-      }
+    } catch (e) {
+      debugPrint('[ngmy] cloud bootstrap: $e');
+    }
+    if (!mounted) return;
+    final nextSig = _computeAppShellSig();
+    if (nextSig != _appShellSig) {
+      _appShellSig = nextSig;
+      setState(() {});
     }
   }
 
@@ -6104,9 +6109,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           ),
         ),
         themeMode: _effectiveThemeMode,
-        builder: (context, child) => child ?? const SizedBox.shrink(),
+        builder: (context, child) {
+          final body = child ?? const SizedBox.shrink();
+          return ColoredBox(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            child: body,
+          );
+        },
         home: _isLoading
-            ? NgmyStartupSplash(isDark: _effectiveThemeMode == ThemeMode.dark)
+            ? ColoredBox(color: isDarkMode ? const Color(0xFF121212) : Colors.white)
             : _currentUser == null
             ? AuthScreen(
                 allUsers: _allUsers,
