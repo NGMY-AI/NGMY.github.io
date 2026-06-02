@@ -10728,7 +10728,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => _showJobApplicationsAdmin(isDark), isDark),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => _showPopupsAdmin(isDark), isDark),
             _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => _showGamesAdmin(isDark), isDark),
-            _menuFrame('Free Trial', Icons.card_giftcard_rounded, const Color(0xFF22C55E), () => setState(() => _idx = 1), isDark),
           ],
         ),
         const SizedBox(height: 28),
@@ -14281,6 +14280,7 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
   final ImagePicker _picker = ImagePicker();
   Uint8List? _pendingLogoBytes;
   bool _logoUploading = false;
+  bool _apiKeyVisible = false;
 
   @override
   void initState() {
@@ -14313,6 +14313,54 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
   void _saveAdminProfile() {
     widget.config.adminAnnouncementName = _adminNameC.text.trim();
     widget.onDataChanged();
+  }
+
+  Future<void> _showAiApiKeyHelp() async {
+    final key = _apiC.text.trim();
+    final provider = key.isEmpty ? 'Not set' : ngmyAiProviderLabel(ngmyParseAiCredentials(key).provider);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Color(0xFF3B82F6)),
+            SizedBox(width: 8),
+            Text('AI API Key'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Detected provider: $provider', style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 10),
+              if (key.isNotEmpty) ...[
+                const Text('Current key:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 4),
+                SelectableText(
+                  key,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+              ],
+              const Text(
+                'Supported keys:\n'
+                '• Google Gemini — starts with AIza…\n'
+                '• OpenAI — starts with sk-…\n'
+                '• Claude — starts with sk-ant-…\n'
+                '• Other APIs — compat:https://api.example.com/v1|your-key\n\n'
+                'Tap the eye icon on the field to show or hide the key while editing.',
+                style: TextStyle(fontSize: 13, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ),
+    );
   }
 
   Future<void> _pickAdminPhoto() async {
@@ -14515,11 +14563,30 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                           const SizedBox(height: 12),
                           TextField(
                             controller: _apiC,
-                            obscureText: true,
+                            obscureText: !_apiKeyVisible,
                             decoration: widget.adminInputDecoration(
                               label: 'AI API Key (any provider)',
                               hint: 'Gemini (AIza…), OpenAI (sk-…), Claude (sk-ant-…)',
                               isDark: isDark,
+                            ).copyWith(
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      _apiKeyVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                      size: 20,
+                                    ),
+                                    tooltip: _apiKeyVisible ? 'Hide API key' : 'Show API key',
+                                    onPressed: () => setState(() => _apiKeyVisible = !_apiKeyVisible),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.info_outline, size: 20),
+                                    tooltip: 'View API key info',
+                                    onPressed: _showAiApiKeyHelp,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           const SizedBox(height: 6),
