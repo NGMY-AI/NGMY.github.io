@@ -2640,6 +2640,76 @@ List<Map<String, dynamic>> _mergeStoreOrdersLists(
   return byId.values.toList();
 }
 
+List<Map<String, dynamic>> _storeInquiryReplies(Map<String, dynamic> m) {
+  final raw = m['replies'];
+  if (raw is! List) return [];
+  return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+}
+
+String _storeInquiryLastAt(Map<String, dynamic> m) {
+  final replies = _storeInquiryReplies(m);
+  if (replies.isNotEmpty) return (replies.last['createdAt'] ?? m['createdAt'] ?? '').toString();
+  return (m['createdAt'] ?? '').toString();
+}
+
+List<Map<String, dynamic>> _mergeInquiryReplyLists(
+  List<Map<String, dynamic>> a,
+  List<Map<String, dynamic>> b,
+) {
+  final byKey = <String, Map<String, dynamic>>{};
+  void addAll(List<Map<String, dynamic>> list) {
+    for (final r in list) {
+      final type = (r['type'] ?? '').toString();
+      final orderId = (r['orderId'] ?? '').toString();
+      final created = (r['createdAt'] ?? '').toString();
+      final key = NgmyStorePaymentReply.isPurchaseNotification(r) && orderId.isNotEmpty
+          ? 'pn_$orderId'
+          : NgmyStorePaymentReply.isPurchaseStatus(r) && orderId.isNotEmpty
+              ? 'ps_${orderId}_${NgmyStorePaymentReply.paymentStatusOf(r)}'
+              : 'msg_${created}_${(r['message'] ?? '').toString().hashCode}';
+      byKey[key] = Map<String, dynamic>.from(r);
+    }
+  }
+
+  addAll(a);
+  addAll(b);
+  final out = byKey.values.toList()
+    ..sort((x, y) => (x['createdAt'] ?? '').toString().compareTo((y['createdAt'] ?? '').toString()));
+  return out;
+}
+
+List<Map<String, dynamic>> _mergeStoreInquiriesLists(
+  List<Map<String, dynamic>> local,
+  List<Map<String, dynamic>> remote,
+) {
+  final byId = <String, Map<String, dynamic>>{};
+  for (final raw in remote) {
+    final id = (raw['id'] ?? '').toString();
+    if (id.isEmpty) continue;
+    byId[id] = Map<String, dynamic>.from(raw);
+  }
+  for (final raw in local) {
+    final id = (raw['id'] ?? '').toString();
+    if (id.isEmpty) continue;
+    final localCopy = Map<String, dynamic>.from(raw);
+    final existing = byId[id];
+    if (existing == null) {
+      byId[id] = localCopy;
+      continue;
+    }
+    final mergedReplies = _mergeInquiryReplyLists(_storeInquiryReplies(existing), _storeInquiryReplies(localCopy));
+    final pickLocal = _storeInquiryLastAt(localCopy).compareTo(_storeInquiryLastAt(existing)) >= 0;
+    final picked = Map<String, dynamic>.from(pickLocal ? localCopy : existing);
+    picked['replies'] = mergedReplies;
+    if (pickLocal) {
+      picked['read'] = localCopy['read'];
+      picked['buyerRead'] = localCopy['buyerRead'];
+    }
+    byId[id] = picked;
+  }
+  return byId.values.toList();
+}
+
 Future<bool> _pushStoreOrdersToSupabase(List<Map<String, dynamic>> localOrders, {String? forceLocalOrderId}) async {
   try {
     final client = Supabase.instance.client;
@@ -3956,6 +4026,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   final Set<String> _disabledSupabaseTables = {};
   final Set<String> _seenRealtimeAnnouncementIds = {};
   final Set<String> _seenRealtimeStoreOrderIds = {};
+  final Set<String> _seenGameInviteNotifyIds = {};
   final Set<String> _seenJobPostIds = {};
   final Set<String> _seenStoreListingNotifyIds = {};
   final Map<String, DateTime> _notificationCooldown = {};
@@ -4081,7 +4152,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   @override void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    ngmyOnGameWinNotify = null;
+    ngmyOnGameWinNotify = (gameTitle, body) async {
+      await _pushInAppNotification(
+        title: 'You won — $gameTitle',
+        body: body,
+        tag: 'game_win_${gameTitle.hashCode}',
+        cooldown: const Duration(seconds: 8),
+      );
+    };
+    ngmyInAppNotify = ({required String title, required String body, String? tag, Duration cooldown = const Duration(seconds: 50)}) =>
+        _pushInAppNotification(title: title, body: body, tag: tag, cooldown: cooldown);
     NgmyNavigator.install();
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
     _initLocalNotifications();
@@ -4174,6 +4254,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   @override void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     ngmyOnGameWinNotify = null;
+    ngmyInAppNotify = null;
     try { _startupRebuildDebounce?.cancel(); } catch (_) {}
     try { _autoThemeTimer?.cancel(); } catch (_) {}
     try { _configRefreshTimer?.cancel(); } catch (_) {}
@@ -4464,7 +4545,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           next.geminiApiKey = keepGemini;
         }
         if (next.storeListings.isEmpty && keepListings.isNotEmpty) next.storeListings = keepListings;
-        if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) next.storeInquiries = keepInquiries;
+        if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) {
+          next.storeInquiries = keepInquiries;
+        } else if (keepInquiries.isNotEmpty || next.storeInquiries.isNotEmpty) {
+          next.storeInquiries = _mergeStoreInquiriesLists(keepInquiries, next.storeInquiries);
+        }
         if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
         else next.storeOrders = _mergeStoreOrdersLists(keepOrders, next.storeOrders);
         if (_maintainStoreOrders(next.storeOrders)) {
@@ -4533,17 +4618,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _mergeStoreInquiriesIntoConfig(List<Map<String, dynamic>> remote) {
-    final byId = <String, Map<String, dynamic>>{};
-    for (final m in _config.storeInquiries) {
-      final id = (m['id'] ?? '').toString();
-      if (id.isNotEmpty) byId[id] = Map<String, dynamic>.from(m);
-    }
-    for (final m in remote) {
-      final id = (m['id'] ?? '').toString();
-      if (id.isEmpty) continue;
-      byId[id] = Map<String, dynamic>.from(m);
-    }
-    _config.storeInquiries = byId.values.toList();
+    _config.storeInquiries = _mergeStoreInquiriesLists(_config.storeInquiries, remote);
   }
 
   List<String> _purgeExpiredSoldStoreListings() {
@@ -4987,9 +5062,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (t.status == TransactionStatus.rejected) return 'Transaction rejected';
       return 'Transaction update';
     }
-    if (t.type == TransactionType.reimbursement &&
-        (t.sourceDetails ?? '').toLowerCase().contains('clock-in')) {
-      return 'Clock-in income received';
+    if (t.type == TransactionType.reimbursement) {
+      final sd = (t.sourceDetails ?? '').toLowerCase();
+      if (sd.contains('clock-in session started')) return 'Clock-in started';
+      if (sd.contains('clock-in')) return 'Clock-in income received';
     }
     switch (t.type) {
       case TransactionType.deposit:
@@ -5314,6 +5390,28 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
   }
 
+  void _notifyPendingGameInvites(AppConfig prev, AppConfig next) {
+    final me = _currentUser?.email.toLowerCase().trim();
+    if (me == null || me.isEmpty) return;
+    final prevIds = prev.gameInvites.map((i) => (i['id'] ?? '').toString()).where((id) => id.isNotEmpty).toSet();
+    for (final raw in next.gameInvites) {
+      final inv = Map<String, dynamic>.from(raw);
+      final id = (inv['id'] ?? '').toString();
+      if (id.isEmpty || prevIds.contains(id) || _seenGameInviteNotifyIds.contains(id)) continue;
+      final to = (inv['toEmail'] ?? '').toString().toLowerCase().trim();
+      if (to != me) continue;
+      if ((inv['status'] ?? 'pending').toString() != 'pending') continue;
+      _seenGameInviteNotifyIds.add(id);
+      final from = (inv['fromName'] ?? inv['fromEmail'] ?? 'Someone').toString();
+      final game = (inv['gameTitle'] ?? 'a game').toString();
+      unawaited(_pushInAppNotification(
+        title: 'Game invite',
+        body: '$from invited you to play $game. Open Game Center to accept.',
+        tag: 'game_invite_$id',
+      ));
+    }
+  }
+
   void _notifySellerOfNewStoreOrders(AppConfig prev, AppConfig next) {
     final me = _currentUser?.email.toLowerCase().trim();
     if (me == null || me.isEmpty) return;
@@ -5354,6 +5452,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     for (final raw in _config.storeListings) {
       final id = (raw['id'] ?? '').toString();
       if (id.isNotEmpty) _seenStoreListingNotifyIds.add(id);
+    }
+    for (final raw in _config.gameInvites) {
+      final id = (raw['id'] ?? '').toString();
+      if (id.isNotEmpty) _seenGameInviteNotifyIds.add(id);
     }
   }
 
@@ -5445,7 +5547,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         else next.storeOrders = _mergeStoreOrdersLists(keepOrders, next.storeOrders);
         _maintainStoreOrders(next.storeOrders);
         if (next.storeListings.isEmpty && keepListings.isNotEmpty) next.storeListings = keepListings;
-        if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) next.storeInquiries = keepInquiries;
+        if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) {
+          next.storeInquiries = keepInquiries;
+        } else if (keepInquiries.isNotEmpty || next.storeInquiries.isNotEmpty) {
+          next.storeInquiries = _mergeStoreInquiriesLists(keepInquiries, next.storeInquiries);
+        }
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
@@ -5482,6 +5588,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (_appConfigSig(_config) != _appConfigSig(next)) {
           if (_allowConfigDiffNotifications) {
             _notifySellerOfNewStoreOrders(_config, next);
+            _notifyPendingGameInvites(_config, next);
             _notifyApprovedWorkersOfNewJobs(_config, next);
           }
           setState(() => _config = next);
@@ -7907,11 +8014,29 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           return;
         }
         final penalty = onTrial ? 0.0 : _ngmyClockInLatePenaltyPercent(now);
+        final sessionId = 'clockin_start_${widget.user.email.toLowerCase().trim()}_${now.millisecondsSinceEpoch}';
         setState(() {
           widget.user.isClockedIn = true;
           widget.user.clockInStartTime = now;
           widget.user.clockInPenaltyPercent = penalty;
         });
+        widget.onAddTransaction(AppTransaction(
+          id: sessionId,
+          userEmail: widget.user.email,
+          amount: 0,
+          type: TransactionType.reimbursement,
+          method: PaymentMethod.system,
+          sourceDetails: 'Clock-in session started',
+          status: TransactionStatus.approved,
+          timestamp: now,
+        ));
+        unawaited(ngmyInAppNotify?.call(
+          title: 'Clock-in started',
+          body: onTrial
+              ? 'Free trial session running — earnings accrue until payout.'
+              : 'Session active until 12:00 PM. Earnings show in Today and Transaction History.',
+          tag: 'clockin_start_$sessionId',
+        ) ?? Future.value());
         widget.onDataChanged();
         if (!onTrial) {
           if (_ngmyShowLateClockUi(now)) {
@@ -14785,6 +14910,7 @@ class _WalletScreenState extends State<WalletScreen> {
         return 'Purchase';
       case TransactionType.reimbursement:
         if (raw.contains('points converted')) return 'Points Conversion';
+        if (raw.contains('clock-in session started')) return 'Clock In Started';
         if (raw.contains('clock-in')) return 'Clock In';
         if (raw.contains('game payout')) return 'Game Reward';
         if (raw.contains('ticket sale')) return 'Ticket Sale';
@@ -22705,6 +22831,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       unawaited(_syncLiveOrders());
     });
     unawaited(_syncLiveOrders());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _ensurePaymentReviewInquiriesFromOrders();
+    });
     for (final o in _orders) {
       if (o['autoLocationEnabled'] == true && _isMySaleOrder(o)) {
         final id = (o['id'] ?? '').toString();
@@ -23080,6 +23210,98 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     return null;
   }
 
+  bool _orderHasPendingPaymentNotification(String orderId, String sellerEmail, String buyerEmail) {
+    final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+    if (idx == null) return false;
+    for (final r in _inquiryReplies(_inquiries[idx])) {
+      if (NgmyStorePaymentReply.isPurchaseNotification(r) &&
+          (r['orderId'] ?? '').toString() == orderId &&
+          NgmyStorePaymentReply.isPending(r)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Rebuilds purchase-notification cards in Messages from orders (fixes empty inbox when inquiry sync failed).
+  void _ensurePaymentReviewInquiriesFromOrders() {
+    var changed = false;
+    for (final order in _orders) {
+      if (!_storeOrderAwaitingPaymentProof(order)) continue;
+      final orderId = (order['id'] ?? '').toString();
+      final sellerEmail = (order['sellerEmail'] ?? '').toString();
+      final buyerEmail = (order['buyerEmail'] ?? '').toString();
+      if (orderId.isEmpty || sellerEmail.isEmpty || buyerEmail.isEmpty) continue;
+      if (_orderHasPendingPaymentNotification(orderId, sellerEmail, buyerEmail)) continue;
+
+      final listingId = (order['listingId'] ?? '').toString();
+      Map<String, dynamic>? listing;
+      for (final l in _listings) {
+        if ((l['id'] ?? '').toString() == listingId) {
+          listing = l;
+          break;
+        }
+      }
+      final listingTitle = (order['title'] ?? listing?['title'] ?? 'Item').toString();
+      final method = (order['paidVia'] ?? 'cashapp').toString();
+      var proof = (order['paymentProofPath'] ?? '').toString();
+      if (proof.isEmpty) proof = _paymentProofFromInquiries(orderId, sellerEmail, buyerEmail);
+      final code = (order['paymentVerificationCode'] ?? '').toString();
+      final product = (listing?['category'] ?? listingTitle).toString();
+      final buyerName = (order['buyerName'] ?? 'Buyer').toString();
+
+      final reply = <String, dynamic>{
+        'type': NgmyStorePaymentReply.purchaseNotification,
+        'role': 'buyer',
+        'name': buyerName,
+        'email': buyerEmail,
+        'message': 'Purchase notification',
+        'listingTitle': listingTitle,
+        'listingId': listingId,
+        'orderId': orderId,
+        'product': product,
+        'paymentMethod': ngmyStorePaymentMethodLabel(method),
+        'deliveryAddress': (order['buyerAddress'] ?? '').toString(),
+        'transactionCode': code,
+        'screenshotPath': proof,
+        'amount': (order['total'] as num?)?.toDouble() ?? 0.0,
+        'paymentStatus': 'pending',
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+      };
+
+      final existingIdx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+      if (existingIdx != null) {
+        final list = _inquiryReplies(_inquiries[existingIdx]);
+        list.add(reply);
+        _inquiries[existingIdx]['replies'] = list;
+        _inquiries[existingIdx]['read'] = false;
+        _inquiries[existingIdx]['listingTitle'] = listingTitle;
+        _inquiries[existingIdx]['listingId'] = listingId;
+        unawaited(_upsertStoreInquiryRowSafe(_inquiries[existingIdx]));
+      } else {
+        _inquiries.add({
+          'id': 'inq_pay_${orderId}_${DateTime.now().microsecondsSinceEpoch}',
+          'listingId': listingId,
+          'listingTitle': listingTitle,
+          'sellerEmail': sellerEmail,
+          'buyerEmail': buyerEmail,
+          'buyerName': buyerName,
+          'message': 'Order placed — payment proof submitted',
+          'createdAt': DateTime.now().toUtc().toIso8601String(),
+          'read': false,
+          'buyerRead': true,
+          'replies': <Map<String, dynamic>>[reply],
+        });
+        unawaited(_upsertStoreInquiryRowSafe(_inquiries.last));
+      }
+      changed = true;
+    }
+    if (changed) {
+      widget.onDataChanged();
+      if (mounted) setState(() {});
+    }
+  }
+
   String _inquiryLastPreview(Map<String, dynamic> m) {
     final replies = _inquiryReplies(m);
     if (replies.isNotEmpty) {
@@ -23215,6 +23437,24 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       if ((o['id'] ?? '').toString() == orderId) return o;
     }
     return null;
+  }
+
+  String _paymentProofPathForReply(Map<String, dynamic> reply, Map<String, dynamic>? order) {
+    final fromReply = (reply['screenshotPath'] ?? '').toString().trim();
+    if (fromReply.isNotEmpty) return fromReply;
+    if (order != null) return (order['paymentProofPath'] ?? '').toString().trim();
+    return '';
+  }
+
+  String _paymentProofFromInquiries(String orderId, String sellerEmail, String buyerEmail) {
+    final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+    if (idx == null) return '';
+    for (final r in _inquiryReplies(_inquiries[idx])) {
+      if (NgmyStorePaymentReply.isPurchaseNotification(r) && (r['orderId'] ?? '').toString() == orderId) {
+        return (r['screenshotPath'] ?? '').toString().trim();
+      }
+    }
+    return '';
   }
 
   void _updateOrderFields(String orderId, Map<String, dynamic> patch) {
@@ -23459,7 +23699,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       _inquiries.add(inquiry);
       unawaited(_upsertStoreInquiryRowSafe(inquiry));
     }
-    _save();
+    widget.onDataChanged();
+    if (mounted) setState(() {});
   }
 
   void _markThreadRead(String me, List<Map<String, dynamic>> inquiries) {
@@ -23509,6 +23750,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   void _showSellerInbox() {
+    _ensurePaymentReviewInquiriesFromOrders();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final me = widget.user.email.toLowerCase().trim();
     final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
@@ -23771,11 +24013,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                             paymentMethod: (reply['paymentMethod'] ?? 'CASHAPP').toString(),
                             deliveryAddress: (reply['deliveryAddress'] ?? '').toString(),
                             transactionCode: (reply['transactionCode'] ?? '').toString(),
-                            screenshotPath: (reply['screenshotPath'] ?? '').toString(),
+                            screenshotPath: _paymentProofPathForReply(reply, order),
                             paymentStatus: NgmyStorePaymentReply.paymentStatusOf(reply),
                             showActions: isSeller && pending,
                             busy: paymentActionBusy,
-                            onScreenshotTap: () => _openPaymentScreenshotViewer((reply['screenshotPath'] ?? '').toString()),
+                            onScreenshotTap: () => _openPaymentScreenshotViewer(_paymentProofPathForReply(reply, order)),
                             onConfirm: () async {
                               setThread(() => paymentActionBusy = true);
                               await _confirmStorePaymentNotification(reply);
@@ -25515,10 +25757,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                             : () async {
                                 setSheet(() => submitting = true);
                                 order['paymentVerificationCode'] = code;
-                                order['paymentStatus'] = 'pending';
+                                order['paymentStatus'] = 'awaiting_proof';
+                                order['paymentProofPath'] = screenshotRef!;
                                 _updateOrderFields((order['id'] ?? '').toString(), {
                                   'paymentVerificationCode': code,
-                                  'paymentStatus': 'pending',
+                                  'paymentStatus': 'awaiting_proof',
+                                  'paymentProofPath': screenshotRef!,
                                 });
                                 await _postStorePaymentNotificationToSeller(
                                   listing: listing,
@@ -25526,6 +25770,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                   method: method,
                                   screenshotPath: screenshotRef!,
                                 );
+                                _ensurePaymentReviewInquiriesFromOrders();
                                 await _persistOrdersAndRefresh(orderId: (order['id'] ?? '').toString());
                                 if (!ctx.mounted) return;
                                 Navigator.pop(ctx);
@@ -27018,13 +27263,20 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         ),
       );
       if (hasProof) {
+        final proof = paymentScreenshot!.trim();
+        _updateOrderFields((order['id'] ?? '').toString(), {
+          'paymentProofPath': proof,
+          'paymentStatus': 'awaiting_proof',
+        });
+        order['paymentProofPath'] = proof;
         unawaited(_postStorePaymentNotificationToSeller(
           listing: listing,
           order: order,
           method: selectedPay,
-          screenshotPath: paymentScreenshot!.trim(),
+          screenshotPath: proof,
         ));
-        _persistOrdersAndRefresh(orderId: (order['id'] ?? '').toString());
+        _ensurePaymentReviewInquiriesFromOrders();
+        unawaited(_persistOrdersAndRefresh(orderId: (order['id'] ?? '').toString()));
       } else {
         _showExternalPaymentSheet(selectedPay, listing, order, total);
       }

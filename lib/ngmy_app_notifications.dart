@@ -31,6 +31,16 @@ Future<void> ngmyMarkStoreMarketNotifiedToday(String listingId) async {
   await prefs.setBool(ngmyStoreMarketDayPrefsKey(listingId, DateTime.now()), true);
 }
 
+typedef NgmyInAppNotify = Future<void> Function({
+  required String title,
+  required String body,
+  String? tag,
+  Duration cooldown,
+});
+
+/// Wired from the app shell so screens like MainScreen can show in-app / push alerts.
+NgmyInAppNotify? ngmyInAppNotify;
+
 bool ngmyIsGameRelatedTransaction({String? sourceDetails}) {
   final s = (sourceDetails ?? '').toLowerCase();
   if (s.isEmpty) return false;
