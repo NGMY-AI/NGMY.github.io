@@ -1704,6 +1704,7 @@ const _kNgmySettingsTermsKey = 'terms_and_conditions';
 const _kNgmySettingsPrivacyKey = 'privacy_policy';
 const _kNgmySettingsPlansKey = 'investment_plans';
 const _kNgmySettingsPopupsKey = 'ngmy_popups';
+const _kNgmySettingsChatClosedKey = 'ngmy_chat_closed';
 const _kStoreSystemTermsId = 'ngmy:system:terms';
 const _kStoreSystemPrivacyId = 'ngmy:system:privacy';
 const _kStoreSystemPlansId = 'ngmy:system:investment_plans';
@@ -3263,19 +3264,52 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   return row;
 }
 
-/// Persists chat open/closed for all users (Supabase + local cache).
-Future<void> ngmyPersistNgmyChatClosed(AppConfig config, bool closed) async {
+/// Persists News open/closed for all users (ngmy_settings + config column).
+Future<bool> ngmyPersistNgmyChatClosed(AppConfig config, bool closed) async {
   config.ngmyChatClosed = closed;
   try {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('app_config', jsonEncode(config.toJson()));
-    if (!await ngmyDeviceIsOnline()) return;
-    final row = await _configRowForSupabaseUpsert(config: config, isAdmin: true);
-    row['ngmyChatClosed'] = closed;
-    await Supabase.instance.client.from('config').upsert(row);
   } catch (e) {
-    debugPrint('[ngmyChatClosed] persist error: $e');
+    debugPrint('[ngmyChatClosed] local save: $e');
   }
+  if (!await ngmyCanReachCloud()) return true;
+  var saved = await _upsertNgmySettingSafe(_kNgmySettingsChatClosedKey, {'closed': closed});
+  try {
+    final existing = await _fetchNgmyConfigRow(columns: 'id');
+    final idValue = _ngmyConfigRowIdValue(existing);
+    await Supabase.instance.client.from('config').update({'ngmyChatClosed': closed}).eq('id', idValue);
+    saved = true;
+  } catch (e) {
+    final missing = _missingColumnFromError(e);
+    if (missing != 'ngmyChatClosed') {
+      try {
+        final existing = await _fetchNgmyConfigRow(columns: 'id');
+        final idValue = _ngmyConfigRowIdValue(existing);
+        await Supabase.instance.client.from('config').upsert({'id': idValue, 'ngmyChatClosed': closed});
+        saved = true;
+      } catch (e2) {
+        debugPrint('[ngmyChatClosed] config save: $e2');
+      }
+    }
+  }
+  return saved;
+}
+
+Future<bool?> ngmyFetchRemoteNgmyChatClosed() async {
+  final settings = await _fetchNgmySettingSafe(_kNgmySettingsChatClosedKey);
+  if (settings != null && settings.containsKey('closed')) {
+    return settings['closed'] == true;
+  }
+  try {
+    final row = await _fetchNgmyConfigRow(columns: 'ngmyChatClosed');
+    if (row != null && row.containsKey('ngmyChatClosed')) {
+      return row['ngmyChatClosed'] == true;
+    }
+  } catch (e) {
+    debugPrint('[ngmyChatClosed] fetch: $e');
+  }
+  return null;
 }
 
 void _applyNgmyChatClosedFromRemote(AppConfig next, Map<String, dynamic> record, {required bool localClosed}) {
@@ -3569,7 +3603,7 @@ class NGMYApp extends StatefulWidget {
 class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   ThemeMode _themeMode = ThemeMode.light;
   UserData? _currentUser;
-  bool _isLoading = false;
+  bool _isLoading = true;
   List<AppTransaction> _allTransactions = [];
   List<UserData> _allUsers = [];
   AppConfig _config = AppConfig();
@@ -5072,6 +5106,24 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _onNgmySettingsChange(PostgresChangePayload payload) {
     if (_isSyncing) return;
+    try {
+      final key = (payload.newRecord['key'] ?? '').toString();
+      if (key == _kNgmySettingsChatClosedKey) {
+        final value = payload.newRecord['value'];
+        if (value is Map) {
+          final closed = value['closed'] == true;
+          if (_config.ngmyChatClosed != closed) {
+            setState(() => _config.ngmyChatClosed = closed);
+            SharedPreferences.getInstance().then((prefs) {
+              prefs.setString('app_config', jsonEncode(_config.toJson()));
+            }).catchError((_) {});
+          }
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint('[ngmy_settings] news closed realtime: $e');
+    }
     unawaited(_refreshLegalAndPlansFromCloud());
   }
 
@@ -5360,7 +5412,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
       if (mounted) {
         _applySystemUiForMode(_effectiveThemeMode);
-        setState(() {});
+        setState(() => _isLoading = false);
       }
 
       // 2. Fetch from Supabase when reachable (slow/offline uses local cache above).
@@ -5433,6 +5485,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (_config.investmentPlans.isNotEmpty) {
             _globalPlans = _investmentPlansFromMaps(_config.investmentPlans);
           }
+        }
+        final remoteNewsClosed = await ngmyFetchRemoteNgmyChatClosed();
+        if (remoteNewsClosed != null) {
+          _config.ngmyChatClosed = remoteNewsClosed;
         }
         await _refreshLegalAndPlansFromCloud(updateUi: false);
         await _refreshPopupsFromCloud(updateUi: false);
@@ -14815,14 +14871,22 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                             onPressed: () async {
                               final closed = !widget.config.ngmyChatClosed;
                               setState(() => widget.config.ngmyChatClosed = closed);
-                              await ngmyPersistNgmyChatClosed(widget.config, closed);
+                              final saved = await ngmyPersistNgmyChatClosed(widget.config, closed);
+                              if (!saved) {
+                                if (mounted) setState(() => widget.config.ngmyChatClosed = !closed);
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Could not save. Check connection and try again.')),
+                                );
+                                return;
+                              }
                               widget.onDataChanged();
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(closed
-                                      ? 'Chat closed — users cannot send messages.'
-                                      : 'Chat reopened for all users.'),
+                                      ? 'News closed for users.'
+                                      : 'News reopened for users.'),
                                 ),
                               );
                             },
@@ -30246,10 +30310,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         }
       }
       if (await ngmyDeviceIsOnline()) {
-        final row = await _fetchNgmyConfigRow(columns: 'ngmyChatClosed');
-        if (row != null && row.containsKey('ngmyChatClosed')) {
-          closed = row['ngmyChatClosed'] == true;
+        final remote = await ngmyFetchRemoteNgmyChatClosed();
+        if (remote != null) {
+          closed = remote;
           widget.config.ngmyChatClosed = closed;
+          await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
         }
       }
     } catch (_) {}
