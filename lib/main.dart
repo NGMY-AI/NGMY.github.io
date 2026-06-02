@@ -2062,11 +2062,20 @@ double _ngmyClockInLatePenaltyPercent(DateTime now) {
   return 0;
 }
 
-/// Today's 12:00 PM payout deadline (local time).
+/// Today's 12:00 PM payout deadline (local time). All clock-in sessions end here.
 DateTime _ngmyTodayNoon(DateTime now) => DateTime(now.year, now.month, now.day, 12);
 
-/// Progress from clock-in toward full daily earnings at noon (0.0–1.0).
-/// Later clock-ins use a shorter window, so the battery fills faster.
+bool _ngmyIsPastNoon(DateTime now) => !now.isBefore(_ngmyTodayNoon(now));
+
+/// True between midnight and 12:00 PM on a weekday (when clock-in is allowed).
+bool _ngmyIsClockInWindowOpen(DateTime now, {bool allowFreeTrialOnWeekend = false}) {
+  if (_ngmyIsPastNoon(now)) return false;
+  if (_ngmyIsWeekend(now) && !allowFreeTrialOnWeekend) return false;
+  return true;
+}
+
+/// Progress from clock-in toward full daily earnings at 12:00 PM (0.0–1.0).
+/// Midnight clock-in → fills steadily over 12 hours. Later clock-ins → shorter window, faster fill.
 double _ngmyClockInProgressToNoon(DateTime? clockInStart) {
   if (clockInStart == null) return 0.0;
   final now = DateTime.now();
@@ -7259,10 +7268,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           );
           return;
         }
-        if (!onTrial && now.hour >= 12) {
+        if (!onTrial && !_ngmyIsClockInWindowOpen(now)) {
           _showOfficialNotice(
             title: 'Clock-In Window Closed',
-            message: 'You must clock in before 12:00 PM (noon). The window opens again at midnight.',
+            message: 'You must clock in before 12:00 PM (midday). The window opens again at midnight.',
             isError: true,
           );
           return;
@@ -7989,7 +7998,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     bool alreadyDone = widget.user.alreadyClockedInToday && !active;
     final onTrial = widget.user.isOnFreeTrial;
     final weekend = !onTrial && _ngmyIsWeekend(now);
-    final missedWindow = !onTrial && now.hour >= 12;
+    final missedWindow = !onTrial && _ngmyIsPastNoon(now);
     final blocked = !active && !alreadyDone && (weekend || missedWindow);
     final clockMuted = alreadyDone || blocked;
     final lateInfo = _clockLateInfo();
@@ -8279,6 +8288,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   '\$${formatCurrency(widget.user.currentTodayEarnings)}',
                   style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
                 ),
+                if (active && !alreadyDone)
+                  const Text('Full at 12:00 PM', style: TextStyle(color: Colors.white60, fontSize: 7.5, fontWeight: FontWeight.w600)),
                 if (!active && !alreadyDone && !blocked) const Text('ACTIVATE', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
                 if (blocked && !alreadyDone) const Text('CLOSED', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
                 if (alreadyDone) const Text('TOMORROW', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
@@ -8309,7 +8320,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     if (_ngmyIsWeekend(now)) {
       return (message: 'Clock-in closed · Weekends', penalty: 0, blocked: true);
     }
-    if (now.hour >= 12 && !widget.user.isClockedIn) {
+    if (_ngmyIsPastNoon(now) && !widget.user.isClockedIn) {
       return (message: 'Missed today · Opens at midnight', penalty: 0, blocked: true);
     }
     final midnight = _ngmyDateOnly(now);
@@ -8320,9 +8331,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final penalty = _ngmyClockInLatePenaltyPercent(now);
     final latePart = hours <= 0 ? '$mins min late' : '$hours hr ${mins.toString().padLeft(2, '0')} min late';
     if (penalty > 0) {
-      return (message: '$latePart · ${penalty.toInt()}% penalty · pays 12 PM', penalty: penalty, blocked: false);
+      return (message: '$latePart · ${penalty.toInt()}% penalty · full at 12:00 PM', penalty: penalty, blocked: false);
     }
-    return (message: '$latePart · full payout 12:00 PM', penalty: 0, blocked: false);
+    return (message: '$latePart · battery fills by 12:00 PM', penalty: 0, blocked: false);
   }
 
   String _maskName(String email, String username) {
@@ -28226,7 +28237,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   Future<void> _pickAndPost({required bool isVideo, String tagRaw = '', NgmyMediaMonetization monetization = const NgmyMediaMonetization()}) async {
     if (_isPosting) return;
     final limit = widget.config.maxMediaPostsPerWeek;
-    if (_weeklyPostsForCurrentUser() >= limit) {
+    if (!widget.user.isAdmin && limit > 0 && _weeklyPostsForCurrentUser() >= limit) {
       if (mounted) {
         _showGlassNotice('Limit Reached', 'You can only upload $limit posts every 7 days.', isError: true);
       }
