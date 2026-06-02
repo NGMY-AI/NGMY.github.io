@@ -9552,6 +9552,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   int _simonCorrectTaps = 0;
   bool _simonPlaying = false;
   final List<Color> _simonColors = const [Color(0xFFEF4444), Color(0xFF22C55E), Color(0xFF3B82F6), Color(0xFFF59E0B)];
+  int _simonPlayGen = 0;
+  int _proTickFrames = 0;
   // Pattern
   List<int> _patternSeq = [];
   int _patternFlash = -1;
@@ -9717,6 +9719,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   @override
   void dispose() {
     NgmyGameSession.leavePlayScreen();
+    _simonPlayGen++;
     _roundTimer?.cancel();
     _miniTicker?.cancel();
     _inputC.dispose();
@@ -9725,9 +9728,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   void _tickPro() {
     if (!mounted || _won || _secondsLeft <= 0 || _pro == null) return;
-    var win = false;
-    setState(() => win = _pro!.tick(widget.gameId, _rng));
-    if (win) unawaited(_payoutWin(subtitle: 'Goal completed!'));
+    final win = _pro!.tick(widget.gameId, _rng);
+    if (win) {
+      unawaited(_payoutWin(subtitle: 'Goal completed!'));
+      return;
+    }
+    _proTickFrames++;
+    if (_proTickFrames % 5 == 0 && mounted) setState(() {});
   }
 
   void _setupRound() {
@@ -9736,7 +9743,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       case 'memory':
         _memoryBase = ['🎮', '💎', '🚀', '🎯', '⚡', '🔥', '💰', '🧠'];
         _memoryCols = 4;
-        _prompt = 'Match all pairs — one wrong flip ends the round';
+        _prompt = 'Match all pairs — keep trying until time runs out';
         _setupMemoryBoard();
         break;
       case 'scramble':
@@ -9898,9 +9905,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     _lockingCards = true;
     Future.delayed(const Duration(milliseconds: 580), () {
       if (!mounted || _won) return;
-      setState(() => _revealedCards = []);
-      _lockingCards = false;
-      unawaited(_failMoveGame(reason: 'No match — paid for $_pairsFound/${_memoryBase.length} pairs.'));
+      setState(() {
+        _revealedCards = [];
+        _lockingCards = false;
+      });
     });
   }
 
@@ -10010,16 +10018,23 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   }
 
   Future<void> _playSimonSequence() async {
+    final gen = ++_simonPlayGen;
     _simonPlaying = true;
+    if (mounted) setState(() => _simonShow = -1);
     for (var i = 0; i < _simonSeq.length; i++) {
-      if (!mounted) return;
+      if (!mounted || gen != _simonPlayGen) return;
       setState(() => _simonShow = _simonSeq[i]);
-      await Future<void>.delayed(const Duration(milliseconds: 450));
-      if (!mounted) return;
+      await Future<void>.delayed(const Duration(milliseconds: 280));
+      if (!mounted || gen != _simonPlayGen) return;
       setState(() => _simonShow = -1);
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await Future<void>.delayed(const Duration(milliseconds: 320));
     }
-    if (mounted) setState(() => _simonPlaying = false);
+    if (mounted && gen == _simonPlayGen) {
+      setState(() {
+        _simonPlaying = false;
+        _simonShow = -1;
+      });
+    }
   }
 
   void _tapSimon(int c) {
@@ -10078,6 +10093,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   Future<void> _payoutWin({String? subtitle}) async {
     if (_won) return;
     _won = true;
+    _simonPlayGen++;
     _roundTimer?.cancel();
     _miniTicker?.cancel();
     final payout = widget.wager * 1.46;
@@ -10163,6 +10179,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   Future<void> _gameLose({String reason = 'Try again next time!'}) async {
     if (_won) return;
     _won = true;
+    _simonPlayGen++;
     _roundTimer?.cancel();
     _miniTicker?.cancel();
     if (!mounted) return;
@@ -10455,16 +10472,20 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
               crossAxisSpacing: 10,
               physics: const NeverScrollableScrollPhysics(),
               children: List.generate(4, (i) {
-                final lit = _simonShow == i;
+                final lit = !_simonPlaying && _simonShow == i;
                 return InkWell(
-                  onTap: () => _tapSimon(i),
+                  onTap: _simonPlaying ? null : () => _tapSimon(i),
                   borderRadius: BorderRadius.circular(16),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
+                    duration: const Duration(milliseconds: 80),
                     decoration: BoxDecoration(
-                      color: lit ? _simonColors[i] : _simonColors[i].withOpacity(0.35),
+                      color: lit ? _simonColors[i] : _simonColors[i].withOpacity(0.12),
                       borderRadius: BorderRadius.circular(16),
-                      boxShadow: lit ? [BoxShadow(color: _simonColors[i].withOpacity(0.8), blurRadius: 18)] : [],
+                      border: Border.all(
+                        color: lit ? Colors.white.withOpacity(0.5) : Colors.white.withOpacity(0.08),
+                        width: lit ? 2 : 1,
+                      ),
+                      boxShadow: lit ? [BoxShadow(color: _simonColors[i].withOpacity(0.85), blurRadius: 16)] : [],
                     ),
                   ),
                 );
@@ -10542,51 +10563,70 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     }
 
     if (widget.gameId == 'reflex') {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-          Text('Fast taps $_reflexRoundDone/$kNgmyQuestionsPerGame', style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w800, fontSize: 12)),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: () {
-              if (!_readyReflex) {
-                Future.delayed(Duration(milliseconds: 700 + _rng.nextInt(1400)), () {
-                  if (!mounted || _won) return;
-                  setState(() {
-                    _readyReflex = true;
-                    _reflexStart = DateTime.now();
-                  });
-                });
-                return;
-              }
-              final ms = _reflexStart == null ? 999 : DateTime.now().difference(_reflexStart!).inMilliseconds;
-              if (ms < 450) {
-                setState(() {
-                  _reflexRoundDone++;
-                  _readyReflex = false;
-                  _reflexStart = null;
-                });
-                if (_reflexRoundDone >= kNgmyQuestionsPerGame) {
-                  unawaited(_advanceBank());
-                  unawaited(_payoutWin(subtitle: 'All $kNgmyQuestionsPerGame reflex rounds — lightning fast!'));
-                } else {
-                  _prompt = 'Round ${_reflexRoundDone + 1} of $kNgmyQuestionsPerGame — wait for green, tap fast';
-                  setState(() {});
-                }
-              } else {
-                unawaited(_failMoveGame(reason: 'Too slow (${ms}ms) — paid for $_reflexRoundDone/$kNgmyQuestionsPerGame.'));
-              }
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(color: _readyReflex ? const Color(0xFF22C55E) : const Color(0xFFEF4444), shape: BoxShape.circle, boxShadow: [BoxShadow(color: (_readyReflex ? Colors.green : Colors.red).withOpacity(0.5), blurRadius: 24)]),
-              child: Center(child: Text(_readyReflex ? 'TAP!' : 'WAIT', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22))),
-            ),
-          ),
-        ],
+      return LayoutBuilder(
+        builder: (context, c) {
+          final tapSize = math.min(math.min(c.maxWidth, c.maxHeight) * 0.62, 240.0);
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              Text('Fast taps $_reflexRoundDone/$kNgmyQuestionsPerGame', style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w800, fontSize: 12)),
+              const SizedBox(height: 12),
+              Expanded(
+                child: Center(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      if (!_readyReflex) {
+                        Future.delayed(Duration(milliseconds: 350 + _rng.nextInt(550)), () {
+                          if (!mounted || _won) return;
+                          setState(() {
+                            _readyReflex = true;
+                            _reflexStart = DateTime.now();
+                          });
+                        });
+                        return;
+                      }
+                      final ms = _reflexStart == null ? 999 : DateTime.now().difference(_reflexStart!).inMilliseconds;
+                      if (ms < 520) {
+                        setState(() {
+                          _reflexRoundDone++;
+                          _readyReflex = false;
+                          _reflexStart = null;
+                        });
+                        if (_reflexRoundDone >= kNgmyQuestionsPerGame) {
+                          unawaited(_advanceBank());
+                          unawaited(_payoutWin(subtitle: 'All $kNgmyQuestionsPerGame reflex rounds — lightning fast!'));
+                        } else {
+                          _prompt = 'Round ${_reflexRoundDone + 1} of $kNgmyQuestionsPerGame — wait for green, tap fast';
+                          setState(() {});
+                        }
+                      } else {
+                        unawaited(_failMoveGame(reason: 'Too slow (${ms}ms) — paid for $_reflexRoundDone/$kNgmyQuestionsPerGame.'));
+                      }
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 90),
+                      width: tapSize,
+                      height: tapSize,
+                      decoration: BoxDecoration(
+                        color: _readyReflex ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                        boxShadow: [BoxShadow(color: (_readyReflex ? Colors.green : Colors.red).withOpacity(0.5), blurRadius: 24)],
+                      ),
+                      child: Center(
+                        child: Text(
+                          _readyReflex ? 'TAP!' : 'WAIT',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: tapSize * 0.16),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       );
     }
 
@@ -14218,7 +14258,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   _sTile(context, 'Global Rank', '#1', Icons.public, Colors.orange),
                 ],
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 8),
               Container(
                 width: double.infinity,
                 decoration: _statsFrameDecoration(context, elevated: true),

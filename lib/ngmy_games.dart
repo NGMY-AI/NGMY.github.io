@@ -169,40 +169,91 @@ class NgmyMathQuestion {
   const NgmyMathQuestion({required this.prompt, required this.answer, required this.choices});
 }
 
+List<String> _mathChoiceStrings(int ans, math.Random rng) {
+  final wrong = <int>{};
+  while (wrong.length < 3) {
+    final delta = rng.nextInt(41) - 20;
+    if (delta == 0) continue;
+    wrong.add(ans + delta);
+  }
+  wrong.remove(ans);
+  while (wrong.length < 3) wrong.add(ans + wrong.length * 7 + 3);
+  final choices = [ans.toString(), ...wrong.map((w) => w.toString())];
+  choices.shuffle(rng);
+  return choices;
+}
+
 List<NgmyMathQuestion> buildNgmyMathBank() {
   final bank = <NgmyMathQuestion>[];
   final rng = math.Random(42);
-  for (var i = 0; i < 100; i++) {
-    final a = 12 + rng.nextInt(88);
-    final b = 8 + rng.nextInt(72);
-    final op = i % 4;
+  for (var i = 0; i < 200; i++) {
     late String prompt;
     late int ans;
-    if (op == 0) {
-      prompt = '$a + $b = ?';
-      ans = a + b;
-    } else if (op == 1) {
-      prompt = '$a × $b = ?';
-      ans = a * b;
-    } else if (op == 2) {
-      final hi = math.max(a, b);
-      final lo = math.min(a, b);
-      prompt = '$hi − $lo = ?';
-      ans = hi - lo;
+    if (i < 70) {
+      final a = 18 + rng.nextInt(120);
+      final b = 12 + rng.nextInt(95);
+      final op = i % 4;
+      if (op == 0) {
+        prompt = '$a + $b = ?';
+        ans = a + b;
+      } else if (op == 1) {
+        prompt = '$a × $b = ?';
+        ans = a * b;
+      } else if (op == 2) {
+        final hi = math.max(a, b);
+        final lo = math.min(a, b);
+        prompt = '$hi − $lo = ?';
+        ans = hi - lo;
+      } else {
+        final d = math.max(2, b % 12 + 2);
+        final q = a ~/ d;
+        prompt = '$q × $d = ?';
+        ans = q * d;
+      }
+    } else if (i < 140) {
+      final a = 25 + rng.nextInt(75);
+      final b = 15 + rng.nextInt(55);
+      final c = 4 + rng.nextInt(18);
+      final kind = i % 3;
+      if (kind == 0) {
+        prompt = '($a + $b) × $c = ?';
+        ans = (a + b) * c;
+      } else if (kind == 1) {
+        prompt = '$a² + $b = ?';
+        ans = a * a + b;
+      } else {
+        final pct = 10 + rng.nextInt(8) * 5;
+        prompt = '$pct% of $a = ?';
+        ans = (a * pct / 100).round();
+      }
     } else {
-      final d = b == 0 ? 1 : b;
-      final q = a ~/ d;
-      prompt = '$q × $d = ?';
-      ans = q * d;
+      final a = 30 + rng.nextInt(90);
+      final b = 20 + rng.nextInt(70);
+      final c = 6 + rng.nextInt(24);
+      final kind = i % 4;
+      if (kind == 0) {
+        prompt = '$a × $b − $c = ?';
+        ans = a * b - c;
+      } else if (kind == 1) {
+        prompt = '($a − $b) × $c = ?';
+        ans = (a - b) * c;
+      } else if (kind == 2) {
+        final n = 2 + rng.nextInt(8);
+        prompt = '$nⁿ + $a = ?';
+        ans = math.pow(n, n).toInt() + a;
+      } else {
+        final d = math.max(3, c);
+        final rem = a % d;
+        final q = a ~/ d;
+        prompt = '$a ÷ $d = ? (quotient only)';
+        ans = q;
+        if (rem != 0) {
+          prompt = '$a ÷ $d = ? (ignore remainder)';
+          ans = q;
+        }
+      }
     }
-    final wrong = <int>{};
-    while (wrong.length < 3) {
-      wrong.add(ans + rng.nextInt(17) - 8);
-    }
-    wrong.remove(ans);
-    while (wrong.length < 3) wrong.add(ans + wrong.length + 3);
-    final choices = [ans.toString(), ...wrong.map((w) => w.toString())]..shuffle(rng);
-    bank.add(NgmyMathQuestion(prompt: prompt, answer: ans.toString(), choices: choices));
+    bank.add(NgmyMathQuestion(prompt: prompt, answer: ans.toString(), choices: _mathChoiceStrings(ans, rng)));
   }
   return bank;
 }
