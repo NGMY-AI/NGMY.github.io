@@ -344,7 +344,10 @@
       }
 
       function startApp() {
+        var bootStarted = false;
         var go = function () {
+          if (bootStarted) return;
+          bootStarted = true;
           if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', loadFlutterBootstrap);
           } else {

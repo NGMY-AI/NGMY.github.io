@@ -73,17 +73,6 @@ const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
 ThemeMode _ngmyInitialThemeMode = ThemeMode.light;
 
-Future<ThemeMode> _ngmyReadInitialThemeMode() async {
-  try {
-    final p = await SharedPreferences.getInstance();
-    final savedTheme = (p.getString('theme_mode') ?? '').trim();
-    if (savedTheme == 'light') return ThemeMode.light;
-    if (savedTheme == 'dark') return ThemeMode.dark;
-    if (savedTheme == 'system') return ThemeMode.system;
-  } catch (_) {}
-  return ThemeMode.light;
-}
-
 ThemeMode _ngmyResolveThemeMode(ThemeMode mode) {
   if (mode != ThemeMode.system) return mode;
   final now = DateTime.now();
@@ -95,6 +84,9 @@ ThemeMode _ngmyResolveThemeMode(ThemeMode mode) {
 
 void _ngmyApplySystemChromeForThemeMode(ThemeMode mode) {
   final dark = _ngmyResolveThemeMode(mode) == ThemeMode.dark;
+  if (kIsWeb) {
+    ngmyApplyWebStatusBarStyle(lightMode: !dark);
+  }
   SystemChrome.setSystemUIOverlayStyle(
     dark
         ? const SystemUiOverlayStyle(
@@ -114,6 +106,140 @@ void _ngmyApplySystemChromeForThemeMode(ThemeMode mode) {
   );
 }
 
+/// Session restored from disk before the first Flutter frame (prevents home swap flash).
+class NgmyLaunchBootstrap {
+  const NgmyLaunchBootstrap({
+    required this.themeMode,
+    this.currentUser,
+    this.users = const [],
+    this.transactions = const [],
+    this.media = const [],
+    this.announcements = const [],
+    this.config,
+    this.plans = const [],
+  });
+
+  final ThemeMode themeMode;
+  final UserData? currentUser;
+  final List<UserData> users;
+  final List<AppTransaction> transactions;
+  final List<MediaPost> media;
+  final List<Announcement> announcements;
+  final AppConfig? config;
+  final List<InvestmentPlan> plans;
+
+  static const empty = NgmyLaunchBootstrap(themeMode: ThemeMode.light);
+}
+
+String? _ngmyPrefsJson(SharedPreferences prefs, String key) {
+  try {
+    final val = prefs.getString(key);
+    if (val == null || val.trim().isEmpty || val == 'null') return null;
+    final trimmed = val.trim();
+    if (trimmed.contains('\u0000')) {
+      prefs.remove(key);
+      return null;
+    }
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
+    return trimmed;
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    var themeMode = ThemeMode.light;
+    final savedTheme = (prefs.getString('theme_mode') ?? '').trim();
+    if (savedTheme == 'light') themeMode = ThemeMode.light;
+    if (savedTheme == 'dark') themeMode = ThemeMode.dark;
+    if (savedTheme == 'system') themeMode = ThemeMode.system;
+
+    var plans = <InvestmentPlan>[];
+    final plansJson = _ngmyPrefsJson(prefs, 'investment_plans');
+    if (plansJson != null) {
+      try {
+        final decoded = jsonDecode(plansJson);
+        if (decoded is List) {
+          plans = decoded.map((e) => InvestmentPlan.fromJson(e)).toList();
+          for (final pl in plans) {
+            pl.applyFixedRoi();
+          }
+        }
+      } catch (_) {}
+    }
+
+    AppConfig? config;
+    final configJson = _ngmyPrefsJson(prefs, 'app_config');
+    if (configJson != null) {
+      try {
+        final map = jsonDecode(configJson);
+        if (map is Map<String, dynamic>) config = AppConfig.fromJson(map);
+      } catch (_) {}
+    }
+
+    var media = <MediaPost>[];
+    final mediaJson = _ngmyPrefsJson(prefs, 'all_media');
+    if (mediaJson != null) {
+      try {
+        media = (jsonDecode(mediaJson) as List).map((e) => MediaPost.fromJson(e)).toList();
+      } catch (_) {}
+    }
+
+    var users = <UserData>[];
+    final usersJson = _ngmyPrefsJson(prefs, 'all_users');
+    if (usersJson != null) {
+      try {
+        users = (jsonDecode(usersJson) as List).map((e) => UserData.fromJson(e)).toList();
+      } catch (_) {}
+    }
+
+    var transactions = <AppTransaction>[];
+    final txnJson = _ngmyPrefsJson(prefs, 'all_transactions');
+    if (txnJson != null) {
+      try {
+        transactions = (jsonDecode(txnJson) as List).map((e) => AppTransaction.fromJson(e)).toList();
+      } catch (_) {}
+    }
+
+    var announcements = <Announcement>[];
+    final annJson = _ngmyPrefsJson(prefs, 'all_announcements');
+    if (annJson != null) {
+      try {
+        announcements = (jsonDecode(annJson) as List).map((e) => Announcement.fromJson(e)).toList();
+      } catch (_) {}
+    }
+
+    UserData? currentUser;
+    final userJson = _ngmyPrefsJson(prefs, 'current_user');
+    if (userJson != null) {
+      try {
+        final map = jsonDecode(userJson);
+        if (map is Map<String, dynamic>) {
+          final localUser = UserData.fromJson(map);
+          final index = users.indexWhere((u) => u.email.toLowerCase().trim() == localUser.email.toLowerCase().trim());
+          currentUser = index != -1 ? users[index] : localUser;
+        }
+      } catch (_) {}
+    }
+
+    return NgmyLaunchBootstrap(
+      themeMode: themeMode,
+      currentUser: currentUser,
+      users: users,
+      transactions: transactions,
+      media: media,
+      announcements: announcements,
+      config: config,
+      plans: plans,
+    );
+  } catch (e) {
+    debugPrint('[ngmy] launch bootstrap: $e');
+    return NgmyLaunchBootstrap.empty;
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   FlutterError.onError = (details) {
@@ -125,7 +251,8 @@ void main() async {
     return true;
   };
 
-  _ngmyInitialThemeMode = await _ngmyReadInitialThemeMode();
+  final launchBootstrap = await ngmyLoadLaunchBootstrap();
+  _ngmyInitialThemeMode = launchBootstrap.themeMode;
   _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
 
   await ngmyIgnoreTimeout(() async {
@@ -146,10 +273,9 @@ void main() async {
   }, timeout: const Duration(seconds: 10));
 
   runZonedGuarded(() {
+    final app = NGMYApp(launchBootstrap: launchBootstrap);
     runApp(
-      kIsWeb
-          ? const ExcludeSemantics(child: NgmyWebViewportGuard(child: NGMYApp()))
-          : const NGMYApp(),
+      kIsWeb ? ExcludeSemantics(child: NgmyWebViewportGuard(child: app)) : app,
     );
   }, (e, st) {
     debugPrint('[zone] $e\n$st');
@@ -3722,14 +3848,18 @@ List<Map<String, dynamic>> _jsonMapList(dynamic raw) {
 // --- MAIN APP ---
 
 class NGMYApp extends StatefulWidget {
-  const NGMYApp({super.key});
+  const NGMYApp({super.key, required this.launchBootstrap});
+
+  final NgmyLaunchBootstrap launchBootstrap;
+
   @override State<NGMYApp> createState() => _NGMYAppState();
 }
 
 class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   ThemeMode _themeMode = _ngmyInitialThemeMode;
   UserData? _currentUser;
-  bool _isLoading = true;
+  bool _launchCacheHydrated = false;
+  Timer? _startupRebuildDebounce;
   List<AppTransaction> _allTransactions = [];
   List<UserData> _allUsers = [];
   AppConfig _config = AppConfig();
@@ -3838,13 +3968,49 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   bool _notificationsReady = false;
   int _nextNotificationId = 1;
 
+  void _hydrateFromLaunchBootstrap(NgmyLaunchBootstrap b) {
+    _themeMode = b.themeMode;
+    _currentUser = b.currentUser;
+    if (b.users.isNotEmpty) _allUsers = List<UserData>.from(b.users);
+    if (b.transactions.isNotEmpty) _allTransactions = List<AppTransaction>.from(b.transactions);
+    if (b.media.isNotEmpty) _allMedia = List<MediaPost>.from(b.media);
+    if (b.announcements.isNotEmpty) _allAnnouncements = List<Announcement>.from(b.announcements);
+    if (b.config != null) _config = b.config!;
+    if (b.plans.isNotEmpty) _globalPlans = List<InvestmentPlan>.from(b.plans);
+    for (final a in _allAnnouncements) {
+      _seenRealtimeAnnouncementIds.add(a.id);
+    }
+    for (final o in _config.storeOrders) {
+      final id = (o['id'] ?? '').toString();
+      if (id.isNotEmpty) _seenRealtimeStoreOrderIds.add(id);
+    }
+    _appShellSig = _computeAppShellSig();
+    _launchCacheHydrated = true;
+  }
+
+  void _scheduleDeferredStartupRebuild() {
+    _startupRebuildDebounce?.cancel();
+    _startupRebuildDebounce = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      final nextSig = _computeAppShellSig();
+      if (nextSig == _appShellSig) return;
+      _appShellSig = nextSig;
+      setState(() {});
+    });
+  }
+
   @override void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     ngmyOnGameWinNotify = null;
     NgmyNavigator.install();
+    _hydrateFromLaunchBootstrap(widget.launchBootstrap);
     _initLocalNotifications();
-    _loadData().then((_) => _scheduleAutoThemeTick());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startBackgroundServices();
+      _scheduleAutoThemeTick();
+    });
+    unawaited(_loadData());
   }
 
   @override
@@ -3893,6 +4059,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   @override void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     ngmyOnGameWinNotify = null;
+    try { _startupRebuildDebounce?.cancel(); } catch (_) {}
     try { _autoThemeTimer?.cancel(); } catch (_) {}
     try { _configRefreshTimer?.cancel(); } catch (_) {}
     try { _mediaDeliveryTimer?.cancel(); } catch (_) {}
@@ -4886,23 +5053,26 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final fullName = (authUser?.userMetadata?['full_name'] ?? '').toString().trim();
       _signInOrCreateFromGoogle(email, fullName: fullName);
     });
-    final current = supabase.auth.currentUser;
-    final email = current?.email?.toLowerCase().trim();
-    if (email != null && email.isNotEmpty) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final current = supabase.auth.currentUser;
+      final email = current?.email?.toLowerCase().trim();
+      if (email == null || email.isEmpty) return;
       final fullName = (current?.userMetadata?['full_name'] ?? '').toString().trim();
       _signInOrCreateFromGoogle(email, fullName: fullName);
-    }
+    });
   }
 
   Future<void> _signInOrCreateFromGoogle(String email, {String fullName = ''}) async {
+    final emailNorm = email.toLowerCase().trim();
+    if (_currentUser?.email.toLowerCase().trim() == emailNorm) return;
     final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
-    final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+    final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailNorm);
     if (!mounted) return;
     setState(() {
       if (idx == -1) {
         final user = UserData(
-          email: email,
-          username: fullName.isNotEmpty ? fullName : email.split('@').first,
+          email: emailNorm,
+          username: fullName.isNotEmpty ? fullName : emailNorm.split('@').first,
           isAdmin: admins.contains(email),
           // Google users do not need local password flow.
           passwordHash: '',
@@ -5546,17 +5716,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
       }
 
-      if (mounted) {
+      if (mounted && !_launchCacheHydrated) {
         for (final a in _allAnnouncements) {
           _seenRealtimeAnnouncementIds.add(a.id);
         }
         _appShellSig = _computeAppShellSig();
         _applySystemUiForMode(_effectiveThemeMode);
-        setState(() => _isLoading = false);
-        _startBackgroundServices();
+        setState(() {});
+        _launchCacheHydrated = true;
       }
 
-      // Cloud sync runs in background so home is not shown twice.
+      // Cloud sync runs in background — UI refresh is debounced to avoid a second flash.
       unawaited(_bootstrapCloudData(
         prefs: prefs,
         safeGet: safeGet,
@@ -5565,11 +5735,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       ));
     } catch (e) {
       debugPrint('General load error: $e');
-      if (mounted) {
-        _applySystemUiForMode(_effectiveThemeMode);
-        setState(() => _isLoading = false);
-        _startBackgroundServices();
-      }
     }
   }
 
@@ -5762,11 +5927,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       debugPrint('[ngmy] cloud bootstrap: $e');
     }
     if (!mounted) return;
-    final nextSig = _computeAppShellSig();
-    if (nextSig != _appShellSig) {
-      _appShellSig = nextSig;
-      setState(() {});
-    }
+    _scheduleDeferredStartupRebuild();
   }
 
   bool _isMissingTableError(Object error, String table) {
@@ -6116,9 +6277,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             child: body,
           );
         },
-        home: _isLoading
-            ? ColoredBox(color: isDarkMode ? const Color(0xFF121212) : Colors.white)
-            : _currentUser == null
+        home: _currentUser == null
             ? AuthScreen(
                 allUsers: _allUsers,
                 config: _config,
