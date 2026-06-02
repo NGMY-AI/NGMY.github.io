@@ -9538,8 +9538,10 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
     ngmyPruneStaleGameInvites(widget.config.gameInvites);
     ngmyPruneStaleGameInvites(_liveInvites);
     final pending = pendingInvitesFor(widget.user.email, _liveInvites);
-    if (pending.isEmpty) return const SizedBox.shrink();
+    final joinable = activeMatchesFor(widget.user.email, _liveInvites);
+    if (pending.isEmpty && joinable.isEmpty) return const SizedBox.shrink();
 
+    if (pending.isNotEmpty) {
     final inv = pending.first;
     return Container(
         width: double.infinity,
@@ -9591,6 +9593,44 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
           ],
         ),
       );
+    }
+
+    final match = joinable.first;
+    final g = _games.firstWhere((e) => e.id == match['gameId'], orElse: () => _games.first);
+    final opponent = (match['fromEmail'] ?? '').toString().toLowerCase().trim() == widget.user.email.toLowerCase().trim()
+        ? (match['toEmail'] ?? 'Opponent')
+        : (match['fromName'] ?? match['fromEmail'] ?? 'Opponent');
+    final remaining = inviteMatchesRemaining(match);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2563EB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Join room', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+          Text(
+            '${g.title} vs $opponent · $remaining game${remaining == 1 ? '' : 's'} left',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            inviteJoinRoomSubtitle(match, widget.user.email),
+            style: const TextStyle(color: Colors.white60, fontSize: 11),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: () => _openGame(g, inviteId: match['id'].toString()),
+            child: const Text('Join room'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _gameTile(_GameDef g) {

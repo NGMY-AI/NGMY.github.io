@@ -157,41 +157,83 @@ List<Map<String, dynamic>> pendingInvitesFor(String email, List<Map<String, dyna
       .toList();
 }
 
-/// Hide stale "active" rows in Game Center — only pending invites should show there.
+/// Mark finished invites when every game in the series has been played.
 void ngmyPruneStaleGameInvites(List<Map<String, dynamic>> invites) {
   for (final i in invites) {
     if (inviteSeriesComplete(i)) {
       i['status'] = 'finished';
       i['seriesStatus'] = 'complete';
-      continue;
-    }
-    final session = i['sessionState'];
-    if (session is Map && session['gameOver'] == true) {
-      final total = (i['matchesTotal'] as num?)?.toInt() ?? 1;
-      final played = (i['matchesPlayed'] as num?)?.toInt() ?? 0;
-      if (played >= total) {
-        i['status'] = 'finished';
-        i['seriesStatus'] = 'complete';
-      }
     }
   }
+}
+
+/// True when this player should see a Join room banner (games left in the series).
+bool inviteNeedsJoinRoom(Map<String, dynamic> invite, String email) {
+  if ((invite['status'] ?? '') != 'active') return false;
+  if ((invite['seriesStatus'] ?? '') == 'complete') return false;
+  if (inviteSeriesComplete(invite)) return false;
+
+  final key = email.toLowerCase().trim();
+  final from = (invite['fromEmail'] ?? '').toString().toLowerCase().trim();
+  final to = (invite['toEmail'] ?? '').toString().toLowerCase().trim();
+  if (from != key && to != key) return false;
+
+  return inviteMatchesRemaining(invite) > 0;
+}
+
+String inviteJoinRoomSubtitle(Map<String, dynamic> invite, String email) {
+  final total = (invite['matchesTotal'] as num?)?.toInt() ?? 1;
+  final played = (invite['matchesPlayed'] as num?)?.toInt() ?? 0;
+  final gameNum = played + 1;
+  final key = email.toLowerCase().trim();
+
+  final sessionRaw = invite['sessionState'];
+  if (sessionRaw is! Map) {
+    return 'Game $gameNum of $total — tap Join room when you are ready';
+  }
+  final session = Map<String, dynamic>.from(sessionRaw);
+  final inGameRaw = session['inGame'];
+  final inGame = inGameRaw is Map ? Map<String, dynamic>.from(inGameRaw) : <String, dynamic>{};
+
+  final p1 = (session['player1Email'] ?? session['playerXEmail'] ?? invite['fromEmail'] ?? '')
+      .toString()
+      .toLowerCase()
+      .trim();
+  final p2 = (session['player2Email'] ?? session['playerOEmail'] ?? invite['toEmail'] ?? '')
+      .toString()
+      .toLowerCase()
+      .trim();
+  String? other;
+  if (p1 == key && p2.isNotEmpty) {
+    other = p2;
+  } else if (p2 == key && p1.isNotEmpty) {
+    other = p1;
+  }
+  final youIn = inGame[key] == true;
+  final otherIn = other != null && inGame[other] == true;
+
+  if (youIn && !otherIn) {
+    return 'Game $gameNum of $total — waiting for opponent to join the room';
+  }
+  if (!youIn && otherIn) {
+    return 'Game $gameNum of $total — your opponent is in the room. Join now';
+  }
+  if (!youIn && !otherIn) {
+    return 'Game $gameNum of $total — both players tap Join room to start';
+  }
+  return 'Game $gameNum of $total — match in progress';
 }
 
 List<Map<String, dynamic>> activeMatchesFor(String email, List<Map<String, dynamic>> invites) {
   ngmyPruneStaleGameInvites(invites);
   final key = email.toLowerCase().trim();
   return invites.where((i) {
-    if ((i['status'] ?? '') != 'active') return false;
-    if (inviteSeriesComplete(i)) return false;
-    final session = i['sessionState'];
-    if (session is Map && session['gameOver'] == true) return false;
+    if (!inviteNeedsJoinRoom(i, key)) return false;
     final updatedAt = DateTime.tryParse((i['sessionUpdatedAt'] ?? '').toString()) ??
         DateTime.tryParse((i['respondedAt'] ?? '').toString()) ??
         DateTime.tryParse((i['createdAt'] ?? '').toString());
-    if (updatedAt != null && DateTime.now().difference(updatedAt).inHours > 48) return false;
-    final from = (i['fromEmail'] ?? '').toString().toLowerCase().trim();
-    final to = (i['toEmail'] ?? '').toString().toLowerCase().trim();
-    return from == key || to == key;
+    if (updatedAt != null && DateTime.now().difference(updatedAt).inHours > 72) return false;
+    return true;
   }).toList();
 }
 
