@@ -22,7 +22,7 @@ flutter pub get
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "`n[2/6] flutter build web (release) ..."
-flutter build web --release --base-href=$BaseHref
+flutter build web --release --base-href=$BaseHref --no-wasm-dry-run
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if (-not (Test-Path "build\web\index.html")) {

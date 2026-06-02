@@ -2080,6 +2080,40 @@ double _ngmyClockInProgressToNoon(DateTime? clockInStart) {
   return (elapsedMs / windowMs).clamp(0.0, 1.0);
 }
 
+String _ngmyClockInTransactionId(String email, DateTime day) {
+  final d = _ngmyDateOnly(day);
+  final key = email.toLowerCase().trim();
+  return 'clock_${key}_${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
+}
+
+bool _ngmyHasClockInPayoutForDay(String email, List<AppTransaction> txs, DateTime day) {
+  final id = _ngmyClockInTransactionId(email, day);
+  final key = email.toLowerCase().trim();
+  for (final t in txs) {
+    if (t.id == id) return true;
+    if (t.userEmail.toLowerCase().trim() != key) continue;
+    if (t.status != TransactionStatus.approved) continue;
+    if (t.type != TransactionType.reimbursement) continue;
+    if (!(t.sourceDetails ?? '').toLowerCase().contains('clock-in daily earnings')) continue;
+    if (_ngmySameCalendarDay(t.timestamp, day)) return true;
+  }
+  return false;
+}
+
+void _ngmyReconcileClockInSession(UserData user, List<AppTransaction> txs) {
+  _ngmyApplyMidnightClockReset(user);
+  final now = DateTime.now();
+  if (_ngmyHasClockInPayoutForDay(user.email, txs, now) ||
+      _ngmySameCalendarDay(user.lastClockInEarningsDate, now)) {
+    user.isClockedIn = false;
+    user.clockInStartTime = null;
+    user.clockInPenaltyPercent = 0;
+    if (!_ngmySameCalendarDay(user.lastClockInEarningsDate, now)) {
+      user.lastClockInEarningsDate = now;
+    }
+  }
+}
+
 bool _storeOrderIsDelivered(Map<String, dynamic> o) =>
     (o['fulfillmentStatus'] ?? '').toString() == 'delivered';
 
@@ -3558,6 +3592,59 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   final Set<String> _seenJobPostIds = {};
   final Set<String> _seenStoreListingNotifyIds = {};
   final Map<String, DateTime> _notificationCooldown = {};
+  final Set<String> _notifiedTransactionKeys = {};
+  bool _allowConfigDiffNotifications = false;
+  Future<void> _seedTransactionNotificationBaseline() async {
+    for (final t in _allTransactions) {
+      _notifiedTransactionKeys.add('txn_${t.id}');
+      if (t.status == TransactionStatus.approved) {
+        _notifiedTransactionKeys.add('txn_${t.id}_approved');
+      }
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('ngmy_notified_txn_keys');
+      if (raw != null && raw.trim().isNotEmpty) {
+        final list = jsonDecode(raw);
+        if (list is List) {
+          for (final e in list) {
+            final s = e.toString().trim();
+            if (s.isNotEmpty) _notifiedTransactionKeys.add(s);
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistNotifiedTransactionKeys() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = _notifiedTransactionKeys.toList();
+      if (keys.length > 600) {
+        keys.removeRange(0, keys.length - 600);
+      }
+      await prefs.setString('ngmy_notified_txn_keys', jsonEncode(keys));
+    } catch (_) {}
+  }
+
+  void _markTransactionNotified(AppTransaction t, {bool statusChanged = false}) {
+    _notifiedTransactionKeys.add('txn_${t.id}');
+    if (statusChanged && t.status == TransactionStatus.approved) {
+      _notifiedTransactionKeys.add('txn_${t.id}_approved');
+    }
+    unawaited(_persistNotifiedTransactionKeys());
+  }
+
+  bool _shouldSkipTransactionNotification(AppTransaction t, {bool statusChanged = false}) {
+    if (!statusChanged && _notifiedTransactionKeys.contains('txn_${t.id}')) return true;
+    if (statusChanged &&
+        t.status == TransactionStatus.approved &&
+        _notifiedTransactionKeys.contains('txn_${t.id}_approved')) {
+      return true;
+    }
+    return false;
+  }
+
   DateTime? _adminMediaProtectUntil;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   OverlayEntry? _inAppNoticeEntry;
@@ -3582,8 +3669,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      if (_currentUser != null) {
+        _ngmyReconcileClockInSession(_currentUser!, _allTransactions);
+      }
       unawaited(_refreshCurrentUserFromCloud());
-      unawaited(_notifyStoreMarketDayListings());
+      if (_allowConfigDiffNotifications) {
+        unawaited(_notifyStoreMarketDayListings());
+      }
     }
   }
 
@@ -3602,9 +3694,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (idx >= 0) {
           _preserveLocalSessionState(_allUsers[idx], remote);
           _mergeUserMediaProfileFields(_allUsers[idx], remote);
+          _ngmyReconcileClockInSession(remote, _allTransactions);
           _allUsers[idx] = remote;
         }
         _preserveLocalSessionState(_currentUser!, remote);
+        _ngmyReconcileClockInSession(remote, _allTransactions);
         _currentUser = remote;
       });
       final prefs = await SharedPreferences.getInstance();
@@ -4575,12 +4669,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _notifyTransactionEvent(AppTransaction t, {bool statusChanged = false}) async {
     if (NgmyGameSession.suppressExternalNotifications) return;
     if (ngmyIsGameRelatedTransaction(sourceDetails: t.sourceDetails)) return;
+    if (_shouldSkipTransactionNotification(t, statusChanged: statusChanged)) return;
     final currentEmail = _currentUser?.email.toLowerCase().trim();
     if (currentEmail == null || currentEmail.isEmpty) return;
     if (t.userEmail.toLowerCase().trim() != currentEmail) return;
+    _markTransactionNotified(t, statusChanged: statusChanged);
     await _pushInAppNotification(
       title: _notificationTitleForTransaction(t, statusChanged: statusChanged),
       body: _notificationBodyForTransaction(t, statusChanged: statusChanged),
+      tag: 'txn_${t.id}',
     );
   }
 
@@ -4915,8 +5012,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           next.geminiApiKey = keepGeminiKey;
         }
         if (_appConfigSig(_config) != _appConfigSig(next)) {
-          _notifySellerOfNewStoreOrders(_config, next);
-          _notifyApprovedWorkersOfNewJobs(_config, next);
+          if (_allowConfigDiffNotifications) {
+            _notifySellerOfNewStoreOrders(_config, next);
+            _notifyApprovedWorkersOfNewJobs(_config, next);
+          }
           setState(() => _config = next);
           SharedPreferences.getInstance().then((prefs) {
             prefs.setString('app_config', jsonEncode(_config.toJson()));
@@ -5101,7 +5200,23 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _preserveLocalSessionState(UserData local, UserData remote) {
-    if (local.isClockedIn && local.clockInStartTime != null) {
+    if (local.lastClockInEarningsDate != null) {
+      final remoteDate = remote.lastClockInEarningsDate;
+      if (remoteDate == null || local.lastClockInEarningsDate!.isAfter(remoteDate)) {
+        remote.lastClockInEarningsDate = local.lastClockInEarningsDate;
+      }
+    }
+    if (local.lastClockInDate != null) {
+      final remoteDate = remote.lastClockInDate;
+      if (remoteDate == null || local.lastClockInDate!.isAfter(remoteDate)) {
+        remote.lastClockInDate = local.lastClockInDate;
+      }
+    }
+    if (_ngmySameCalendarDay(remote.lastClockInEarningsDate, DateTime.now())) {
+      remote.isClockedIn = false;
+      remote.clockInStartTime = null;
+      remote.clockInPenaltyPercent = 0;
+    } else if (local.isClockedIn && local.clockInStartTime != null) {
       remote.isClockedIn = true;
       remote.clockInStartTime = local.clockInStartTime;
       remote.clockInPenaltyPercent = local.clockInPenaltyPercent;
@@ -5204,6 +5319,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           prefs.remove('all_transactions');
         }
       }
+      for (final o in _config.storeOrders) {
+        final id = (o['id'] ?? '').toString();
+        if (id.isNotEmpty) _seenRealtimeStoreOrderIds.add(id);
+      }
+      _seedNotificationSeenIds();
+      await _seedTransactionNotificationBaseline();
       final userJsonEarly = safeGet('current_user');
       if (userJsonEarly != null) {
         try {
@@ -5381,6 +5502,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       if (_currentUser != null) {
         NgmyMediaProfile.normalizeUserMediaFields(_currentUser);
+        _ngmyReconcileClockInSession(_currentUser!, _allTransactions);
         final localReads = await NgmyAnnouncementReads.loadLocal(_currentUser!.email);
         if (localReads.isNotEmpty) {
           _currentUser!.readAnnouncementIds =
@@ -5401,7 +5523,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final id = (o['id'] ?? '').toString();
         if (id.isNotEmpty) _seenRealtimeStoreOrderIds.add(id);
       }
-      _seedNotificationSeenIds();
+      await _seedTransactionNotificationBaseline();
+      _allowConfigDiffNotifications = true;
       await _persistLocalSnapshot();
       unawaited(_notifyStoreMarketDayListings());
     } catch (e) { debugPrint("General load error: $e"); }
@@ -5845,6 +5968,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 },
                 onDataChanged: _onDataChanged,
                 onAddTransaction: (t) {
+                  if (_allTransactions.any((x) => x.id == t.id)) return;
                   UserData? syncedUser;
                   setState(() {
                     _allTransactions.add(t);
@@ -6925,8 +7049,6 @@ class MainScreen extends StatefulWidget {
 }
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
-  bool _clockPayoutLocked = false;
-  DateTime? _clockPayoutDay;
   bool _offline = false;
   Timer? _onlineCheck;
 
@@ -7035,7 +7157,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     NgmyPopupOrchestrator.resolveVideoUrl = _resolveSupabaseStorageUrlResilient;
-    _ngmyApplyMidnightClockReset(widget.user);
+    _ngmyReconcileClockInSession(widget.user, widget.allTransactions);
     _refreshOnlineStatus();
     _runScheduledPopups();
     WidgetsBinding.instance.addPostFrameCallback((_) => _promptPushNotificationsIfNeeded());
@@ -7044,25 +7166,21 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
       _ngmyApplyMidnightClockReset(widget.user);
       final now = DateTime.now();
-      if (_clockPayoutDay == null || !_ngmySameCalendarDay(_clockPayoutDay, now)) {
-        _clockPayoutDay = now;
-        _clockPayoutLocked = false;
-      }
       if (widget.user.isClockedIn) {
-        if (_ngmySameCalendarDay(widget.user.lastClockInEarningsDate, now)) {
+        if (_ngmyHasClockInPayoutForDay(widget.user.email, widget.allTransactions, now) ||
+            _ngmySameCalendarDay(widget.user.lastClockInEarningsDate, now)) {
           widget.user.isClockedIn = false;
           widget.user.clockInStartTime = null;
+          widget.user.clockInPenaltyPercent = 0;
           widget.onDataChanged();
           return;
         }
         double earned = 0;
         bool completed = false;
         final goal = widget.user.todayDailyGoal;
-        if (!_clockPayoutLocked && goal > 0 && widget.user.currentTodayEarnings >= goal) {
-          _clockPayoutLocked = true;
+        if (goal > 0 && widget.user.currentTodayEarnings >= goal) {
           earned = goal;
           setState(() {
-            widget.user.accountBalance += earned;
             widget.user.totalProfit += earned;
             if (widget.user.activeInvestment != null) {
               widget.user.activeInvestment!.totalEarned += earned;
@@ -7078,9 +7196,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         }
 
         if (completed) {
-          if (earned > 0) {
+          if (earned > 0 &&
+              !_ngmyHasClockInPayoutForDay(widget.user.email, widget.allTransactions, now)) {
             widget.onAddTransaction(AppTransaction(
-              id: '${now.millisecondsSinceEpoch}_clock',
+              id: _ngmyClockInTransactionId(widget.user.email, now),
               userEmail: widget.user.email,
               amount: earned,
               type: TransactionType.reimbursement,
@@ -7153,7 +7272,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           widget.user.isClockedIn = true;
           widget.user.clockInStartTime = now;
           widget.user.clockInPenaltyPercent = penalty;
-          _clockPayoutLocked = false;
         });
         widget.onDataChanged();
         if (!onTrial) await _showLateClockInDialog(penalty, now);
