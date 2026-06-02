@@ -23513,6 +23513,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
     if (idx == null) return;
     final list = _inquiryReplies(_inquiries[idx]);
+    final order = _orderById(orderId);
     list.add({
       'type': NgmyStorePaymentReply.purchaseStatus,
       'role': 'seller',
@@ -23520,6 +23521,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       'email': widget.user.email,
       'orderId': orderId,
       'paymentStatus': approved ? 'approved' : 'rejected',
+      'listingTitle': _inquiries[idx]['listingTitle'] ?? order?['title'] ?? '',
+      'product': order?['title'] ?? _inquiries[idx]['listingTitle'] ?? 'Item',
+      'paymentMethod': ngmyStorePaymentMethodLabel((order?['paidVia'] ?? '').toString()),
+      'amount': (order?['total'] as num?)?.toDouble(),
+      'transactionCode': (order?['paymentVerificationCode'] ?? '').toString(),
       'message': approved
           ? 'Payment confirmed! Your order has been approved and will be processed.'
           : 'Payment rejected. The seller could not verify your payment proof.',
@@ -23646,40 +23652,48 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final out = <Widget>[];
     final pay = (order['paymentStatus'] ?? '').toString();
     if (pay == 'awaiting_proof') {
-      out.add(const NgmyPurchaseStatusBubble(
-        icon: Icons.hourglass_top_rounded,
-        iconColor: Color(0xFFD97706),
-        message: 'Payment proof sent. Waiting for the seller to confirm in Messages.',
-      ));
+      out.add(NgmyPurchaseStatusCard.fromStoreReply({
+        'paymentStatus': 'awaiting_proof',
+        'message': 'Payment proof sent. Waiting for the seller to confirm in Messages.',
+        'listingTitle': order['title'],
+        'product': order['title'],
+        'paymentMethod': ngmyStorePaymentMethodLabel((order['paidVia'] ?? '').toString()),
+        'amount': order['total'],
+        'transactionCode': order['paymentVerificationCode'],
+      }, order: order));
     } else if (pay == 'approved') {
-      out.add(const NgmyPurchaseStatusBubble(
-        icon: Icons.check_circle_rounded,
-        iconColor: Color(0xFF16A34A),
-        message: 'Payment confirmed! Your order has been approved and will be processed.',
-      ));
+      out.add(NgmyPurchaseStatusCard.fromStoreReply({
+        'paymentStatus': 'approved',
+        'message': 'Payment confirmed! Your order has been approved and will be processed.',
+        'listingTitle': order['title'],
+        'product': order['title'],
+        'paymentMethod': ngmyStorePaymentMethodLabel((order['paidVia'] ?? '').toString()),
+        'amount': order['total'],
+        'transactionCode': order['paymentVerificationCode'],
+      }, order: order));
     } else if (pay == 'rejected') {
-      out.add(const NgmyPurchaseStatusBubble(
-        icon: Icons.cancel_rounded,
-        iconColor: Color(0xFFDC2626),
-        message: 'Payment rejected. The seller could not verify your payment proof.',
-      ));
+      out.add(NgmyPurchaseStatusCard.fromStoreReply({
+        'paymentStatus': 'rejected',
+        'message': 'Payment rejected. The seller could not verify your payment proof.',
+        'listingTitle': order['title'],
+        'product': order['title'],
+        'paymentMethod': ngmyStorePaymentMethodLabel((order['paidVia'] ?? '').toString()),
+        'amount': order['total'],
+        'transactionCode': order['paymentVerificationCode'],
+      }, order: order));
     }
     final fulfillment = (order['fulfillmentStatus'] ?? '').toString();
     if (fulfillment == 'shipped' || fulfillment == 'in_transit' || fulfillment == 'arriving') {
       final eta = DateTime.tryParse((order['estimatedArrival'] ?? '').toString());
       final etaLabel = eta != null ? '${eta.month}/${eta.day}/${eta.year}' : 'soon';
-      out.add(NgmyPurchaseStatusBubble(
-        icon: Icons.inventory_2_outlined,
-        iconColor: const Color(0xFF92400E),
-        message: 'Your order has been shipped! Expected arrival: $etaLabel. Track your delivery in Receipts. You can confirm delivery after 2 hours.',
+      out.add(NgmyPurchaseStatusCard.shipping(
+        headline: 'Order shipped',
+        productName: (order['title'] ?? '').toString(),
+        subtitle: 'Expected arrival: $etaLabel. Track in Purchases.',
       ));
     }
     if (fulfillment == 'delivered') {
-      out.add(const NgmyPurchaseStatusBubble(
-        icon: Icons.check_circle_rounded,
-        iconColor: Color(0xFF16A34A),
-        message: 'Seller marked order as delivered! Please confirm you received the item.',
-      ));
+      out.add(NgmyPurchaseStatusCard.delivered(productName: (order['title'] ?? '').toString()));
     }
     return out;
   }
@@ -24028,12 +24042,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                 children: messages.expand((msg) {
                   final reply = msg.reply;
                   if (reply != null && NgmyStorePaymentReply.isPurchaseStatus(reply)) {
-                    final approved = NgmyStorePaymentReply.paymentStatusOf(reply) == 'approved';
+                    final orderId = (reply['orderId'] ?? '').toString();
                     return [
-                      NgmyPurchaseStatusBubble(
-                        icon: approved ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                        iconColor: approved ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
-                        message: (reply['message'] ?? '').toString(),
+                      NgmyPurchaseStatusCard.fromStoreReply(
+                        reply,
+                        order: orderId.isEmpty ? null : _orderById(orderId),
                       ),
                     ];
                   }
