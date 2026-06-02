@@ -45,7 +45,7 @@ alter table public.config add column if not exists "geminiApiKey" text default '
 alter table public.config add column if not exists gemini_api_key text default '';
 
 insert into public.config (id, "geminiApiKey", gemini_api_key)
-values (1, '', '')
+values ('1', '', '')
 on conflict (id) do nothing;
 alter table public.config add column if not exists "termsAndConditions" text default '';
 alter table public.config add column if not exists "privacyPolicy" text default '';

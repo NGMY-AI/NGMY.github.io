@@ -69,6 +69,17 @@ After every `git push` to `main`, Pages should rebuild automatically.
 
 Run in Supabase SQL Editor: `supabase/SUPABASE_SETUP.sql` and related `.sql` files in `supabase/`.
 
+**NGMY Helper (AI on phone/web):** also run `supabase/gemini_api_key_column.sql` and `supabase/ai_api_key_columns.sql`.
+
+**Web/PWA CORS fix:** deploy the AI proxy Edge Function once (Supabase CLI):
+
+```powershell
+cd C:\Users\appbu\StudioProjects\ngmy
+supabase functions deploy ngmy-ai-chat --project-ref gvufllqqxjnpicmkxzcg
+```
+
+Without this function, the helper may fail in the browser even with a valid API key.
+
 **Game Center timers / dice (required for admin settings to sync to all users):**
 
 `supabase/game_center_settings_columns.sql`

@@ -34,6 +34,5 @@ typedef NgmyGameWinNotifier = Future<void> Function(String gameTitle, String bod
 
 NgmyGameWinNotifier? ngmyOnGameWinNotify;
 
-Future<void> ngmyNotifyGameWin(String gameTitle, String body) async {
-  await ngmyOnGameWinNotify?.call(gameTitle, body);
-}
+/// In-game result popups handle wins; skip extra OS/push alerts (reduces spam while playing).
+Future<void> ngmyNotifyGameWin(String gameTitle, String body) async {}

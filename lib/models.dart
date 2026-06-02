@@ -188,7 +188,7 @@ class AppConfig {
 }
 
 String _geminiKeyFromMap(Map<String, dynamic> json) {
-  for (final field in ['geminiApiKey', 'gemini_api_key', 'geminiapikey']) {
+  for (final field in ['aiApiKey', 'ai_api_key', 'geminiApiKey', 'gemini_api_key', 'geminiapikey']) {
     final v = json[field]?.toString().trim();
     if (v != null && v.isNotEmpty) return v;
   }

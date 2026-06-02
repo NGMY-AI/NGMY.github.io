@@ -27,7 +27,7 @@ alter table public.config add column if not exists "privacyPolicy" text default 
 alter table public.config add column if not exists "investmentPlans" jsonb default '[]'::jsonb;
 
 insert into public.config (id, "termsAndConditions", "privacyPolicy", "investmentPlans")
-values (1, '', '', '[]'::jsonb)
+values ('1', '', '', '[]'::jsonb)
 on conflict (id) do nothing;
 
 -- Realtime: Dashboard → Database → Publications → supabase_realtime → enable "ngmy_settings"

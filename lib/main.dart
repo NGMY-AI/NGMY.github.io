@@ -22,6 +22,7 @@ import 'package:video_player/video_player.dart';
 import 'ngmy_popups.dart';
 import 'ngmy_media_profile.dart';
 import 'ngmy_ai_memory.dart';
+import 'ngmy_ai_client.dart';
 import 'ngmy_news_retention.dart';
 import 'ngmy_weekend_clock_overlay.dart';
 import 'ngmy_nav.dart';
@@ -63,6 +64,7 @@ import 'ngmy_login_logo.dart';
 import 'ngmy_media_delivery.dart';
 import 'ngmy_push_notification_prompt.dart';
 import 'ngmy_push_notifications.dart';
+import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_platform_graphics.dart';
 
@@ -2898,25 +2900,56 @@ Future<String> _adminUploadVirtualProfilePic(String src) async {
 
 Widget _ngmyLogoImage(String? logoUrl, {double? width, double? height, BoxFit fit = BoxFit.cover}) {
   final primary = (logoUrl ?? '').trim().isNotEmpty ? logoUrl!.trim() : kNgmyDefaultLogoUrl;
+  Widget fallback() => Image.network(
+        kNgmyDefaultLogoUrl,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => Container(
+          width: width,
+          height: height,
+          color: const Color(0xFF00B25A),
+          alignment: Alignment.center,
+          child: const Text('NGMY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10)),
+        ),
+      );
+  if (primary.startsWith('data:image')) {
+    try {
+      return Image.memory(
+        base64Decode(primary.split(',').last),
+        width: width,
+        height: height,
+        fit: fit,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => fallback(),
+      );
+    } catch (_) {
+      return fallback();
+    }
+  }
+  if (primary.startsWith('supabase://')) {
+    return FutureBuilder<String>(
+      future: _resolveSupabaseStorageUrlResilient(primary),
+      builder: (context, snap) {
+        final url = (snap.data ?? '').trim().isNotEmpty ? snap.data!.trim() : kNgmyDefaultLogoUrl;
+        return Image.network(
+          url,
+          width: width,
+          height: height,
+          fit: fit,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => fallback(),
+        );
+      },
+    );
+  }
   return Image.network(
     primary,
     width: width,
     height: height,
     fit: fit,
     gaplessPlayback: true,
-    errorBuilder: (_, __, ___) => Image.network(
-      kNgmyDefaultLogoUrl,
-      width: width,
-      height: height,
-      fit: fit,
-      errorBuilder: (_, __, ___) => Container(
-        width: width,
-        height: height,
-        color: const Color(0xFF00B25A),
-        alignment: Alignment.center,
-        child: const Text('NGMY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10)),
-      ),
-    ),
+    errorBuilder: (_, __, ___) => fallback(),
   );
 }
 
@@ -3003,7 +3036,13 @@ class Announcement {
 }
 
 String _geminiKeyFromMap(Map<String, dynamic> json) {
-  for (final field in ['geminiApiKey', 'gemini_api_key', 'geminiapikey']) {
+  for (final field in [
+    'aiApiKey',
+    'ai_api_key',
+    'geminiApiKey',
+    'gemini_api_key',
+    'geminiapikey',
+  ]) {
     final v = json[field]?.toString().trim();
     if (v != null && v.isNotEmpty) return v;
   }
@@ -3042,6 +3081,8 @@ Future<bool> _persistGeminiApiKeyToSupabase(String key) async {
   row['id'] = 1;
   row['geminiApiKey'] = k;
   row['gemini_api_key'] = k;
+  row['aiApiKey'] = k;
+  row['ai_api_key'] = k;
 
   var working = Map<String, dynamic>.from(row);
   for (var attempt = 0; attempt < 16; attempt++) {
@@ -3061,7 +3102,7 @@ Future<bool> _persistGeminiApiKeyToSupabase(String key) async {
       debugPrint('[config] Gemini upsert failed: $e');
     }
 
-    for (final field in ['geminiApiKey', 'gemini_api_key']) {
+    for (final field in ['geminiApiKey', 'gemini_api_key', 'aiApiKey', 'ai_api_key']) {
       if (!working.containsKey(field)) continue;
       try {
         await client.from('config').upsert({'id': 1, field: k});
@@ -3097,13 +3138,19 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   if (isAdmin && localKey.isNotEmpty) {
     row['geminiApiKey'] = localKey;
     row['gemini_api_key'] = localKey;
+    row['aiApiKey'] = localKey;
+    row['ai_api_key'] = localKey;
   } else if (remoteKey.isNotEmpty) {
     row['geminiApiKey'] = remoteKey;
     row['gemini_api_key'] = remoteKey;
+    row['aiApiKey'] = remoteKey;
+    row['ai_api_key'] = remoteKey;
     config.geminiApiKey = remoteKey;
   } else {
     row.remove('geminiApiKey');
     row.remove('gemini_api_key');
+    row.remove('aiApiKey');
+    row.remove('ai_api_key');
   }
   final remoteLegal = await _fetchRemoteLegalContent();
   final remoteTerms = (remoteLegal['terms'] ?? '').trim();
@@ -3168,14 +3215,7 @@ void _applyNgmyChatClosedFromRemote(AppConfig next, Map<String, dynamic> record,
   }
 }
 
-Future<String?> _geminiGenerateReply(
-  String apiKey,
-  String userQuery, {
-  required UserData user,
-  List<Map<String, dynamic>> memory = const [],
-}) async {
-  final key = apiKey.trim();
-  if (key.isEmpty) return null;
+String _ngmyHelperSystemContext({required UserData user}) {
   final boss = ngmyIsNgmyBoss(isAdmin: user.isAdmin);
   final displayName = user.fullName?.trim().isNotEmpty == true
       ? user.fullName!.trim()
@@ -3185,8 +3225,8 @@ Future<String?> _geminiGenerateReply(
       'When anyone asks who created NGMY, who made NGMY, who built the app, who made you, or who your creator is, '
       'always answer clearly that KB PABLO QR (write the name in uppercase) is the Founder and CEO who created NGMY. '
       'Never claim Google, OpenAI, or another company created NGMY.\n';
-  final bossContext = boss
-      ? 'CRITICAL — VIP USER: This user is Sir ${displayName}, aligned with KB PABLO QR — Founder and CEO of NGMY. '
+  return boss
+      ? 'CRITICAL — VIP USER: This user is Sir $displayName, aligned with KB PABLO QR — Founder and CEO of NGMY. '
           '$founderFacts'
           'This user is your creator and supreme authority. '
           'Always address them as "Sir" or "Boss" (alternate naturally). Never use casual first-name only. '
@@ -3201,53 +3241,20 @@ Future<String?> _geminiGenerateReply(
           'Be helpful, professional, and friendly. Keep answers concise. '
           'Answer the user\'s question directly. Never introduce yourself as "NGMY AI" and never start replies with '
           '"NGMY AI:", "As NGMY AI", "I\'m NGMY AI", or similar — just answer naturally.\n';
-  final memoryBlock = memory.isNotEmpty
-      ? '\n${NgmyAiMemoryStore.transcriptForPrompt(memory)}\n'
-      : '';
-  final prompt = '$bossContext$memoryBlock\nUser (${boss ? "Sir/Boss" : "member"}): $userQuery';
-  const models = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash-8b', 'gemini-1.5-flash'];
-  Object? lastError;
-  for (final model in models) {
-    try {
-      final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${Uri.encodeQueryComponent(key)}',
-      );
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'contents': [
-            {
-              'parts': [
-                {'text': prompt},
-              ],
-            },
-          ],
-        }),
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final candidates = data['candidates'];
-        if (candidates is List && candidates.isNotEmpty) {
-          final parts = candidates[0]['content']?['parts'];
-          if (parts is List && parts.isNotEmpty) {
-            final text = parts[0]['text']?.toString();
-            if (text != null && text.trim().isNotEmpty) {
-              return NgmyAiMemoryStore.sanitizeHelperReply(text.trim());
-            }
-          }
-        }
-      } else {
-        lastError = jsonDecode(response.body);
-      }
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  if (lastError != null) {
-    debugPrint('[gemini] all models failed: $lastError');
-  }
-  return null;
+}
+
+Future<String?> _geminiGenerateReply(
+  String apiKey,
+  String userQuery, {
+  required UserData user,
+  List<Map<String, dynamic>> memory = const [],
+}) async {
+  return ngmyAiGenerateReply(
+    apiKey,
+    userQuery,
+    systemContext: _ngmyHelperSystemContext(user: user),
+    memory: memory,
+  );
 }
 
 Future<bool> _upsertAnnouncementRowSafe(Map<String, dynamic> row) async {
@@ -3515,6 +3522,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   final Set<String> _disabledSupabaseTables = {};
   final Set<String> _seenRealtimeAnnouncementIds = {};
   final Set<String> _seenRealtimeStoreOrderIds = {};
+  final Set<String> _seenJobPostIds = {};
+  final Set<String> _seenStoreListingNotifyIds = {};
+  final Map<String, DateTime> _notificationCooldown = {};
   DateTime? _adminMediaProtectUntil;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   OverlayEntry? _inAppNoticeEntry;
@@ -3524,11 +3534,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   @override void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    ngmyOnGameWinNotify = (gameTitle, body) => _pushInAppNotification(
-      title: 'You won — $gameTitle',
-      body: body,
-      tag: 'game_win_${NgmyGameSession.activeGameId ?? gameTitle}',
-    );
+    ngmyOnGameWinNotify = null;
     NgmyNavigator.install();
     _initLocalNotifications();
     _loadData().then((_) {
@@ -3544,6 +3550,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshCurrentUserFromCloud());
+      unawaited(_notifyStoreMarketDayListings());
     }
   }
 
@@ -4435,10 +4442,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     required String title,
     required String body,
     String? tag,
+    Duration cooldown = const Duration(seconds: 50),
   }) async {
     if (_currentUser == null) return;
-    final allowDuringGame = tag != null && tag.startsWith('game_win');
-    if (NgmyGameSession.suppressExternalNotifications && !allowDuringGame) return;
+    if (NgmyGameSession.suppressExternalNotifications) return;
+    final dedupeKey = tag ?? '${title.trim()}|${body.trim()}';
+    final last = _notificationCooldown[dedupeKey];
+    if (last != null && DateTime.now().difference(last) < cooldown) return;
+    _notificationCooldown[dedupeKey] = DateTime.now();
 
     if (kIsWeb) {
       await ngmyPushShow(title: title, body: body, tag: tag ?? title);
@@ -4530,6 +4541,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _notifyTransactionEvent(AppTransaction t, {bool statusChanged = false}) async {
     if (NgmyGameSession.suppressExternalNotifications) return;
+    if (ngmyIsGameRelatedTransaction(sourceDetails: t.sourceDetails)) return;
     final currentEmail = _currentUser?.email.toLowerCase().trim();
     if (currentEmail == null || currentEmail.isEmpty) return;
     if (t.userEmail.toLowerCase().trim() != currentEmail) return;
@@ -4731,6 +4743,84 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       unawaited(_pushInAppNotification(
         title: 'New sale',
         body: 'A buyer purchased $title. Open Store → Sales to ship.',
+        tag: 'store_sale_$id',
+      ));
+    }
+  }
+
+  void _seedNotificationSeenIds() {
+    for (final raw in _config.jobPosts) {
+      final id = (raw['id'] ?? '').toString();
+      if (id.isNotEmpty) _seenJobPostIds.add(id);
+    }
+    for (final raw in _config.storeListings) {
+      final id = (raw['id'] ?? '').toString();
+      if (id.isNotEmpty) _seenStoreListingNotifyIds.add(id);
+    }
+  }
+
+  void _notifyApprovedWorkersOfNewJobs(AppConfig prev, AppConfig next) {
+    final user = _currentUser;
+    if (user == null || !user.isApprovedWorker) return;
+    final me = user.email.toLowerCase().trim();
+    if (me.isEmpty) return;
+    final prevIds = prev.jobPosts
+        .map((j) => (j['id'] ?? '').toString())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    for (final raw in next.jobPosts) {
+      final job = Map<String, dynamic>.from(raw);
+      final id = (job['id'] ?? '').toString();
+      if (id.isEmpty || prevIds.contains(id) || _seenJobPostIds.contains(id)) continue;
+      if ((job['status'] ?? 'open').toString() != 'open') continue;
+      final owner = (job['ownerEmail'] ?? '').toString().toLowerCase().trim();
+      if (owner == me) continue;
+      _seenJobPostIds.add(id);
+      final title = (job['title'] ?? 'New job').toString().trim();
+      unawaited(_pushInAppNotification(
+        title: 'New job in marketplace',
+        body: title.isEmpty ? 'A new job was posted. Open Job Marketplace to view.' : title,
+        tag: 'job_new_$id',
+      ));
+    }
+  }
+
+  void _notifyBuyersOfNewStoreListing(Map<String, dynamic> listing) {
+    final id = (listing['id'] ?? '').toString();
+    if (id.isEmpty || _seenStoreListingNotifyIds.contains(id)) return;
+    if (_isNgmySystemStoreListingId(id)) return;
+    if ((listing['status'] ?? 'active').toString() != 'active') return;
+    _seenStoreListingNotifyIds.add(id);
+    final me = _currentUser?.email.toLowerCase().trim();
+    final seller = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
+    if (me != null && me.isNotEmpty && me == seller) return;
+    final title = (listing['title'] ?? 'New item').toString().trim();
+    unawaited(_pushInAppNotification(
+      title: 'New in NGMY Store',
+      body: title.isEmpty ? 'A seller posted a new listing.' : title,
+      tag: 'store_new_$id',
+    ));
+  }
+
+  Future<void> _notifyStoreMarketDayListings() async {
+    if (_currentUser == null) return;
+    if (NgmyGameSession.suppressExternalNotifications) return;
+    final me = _currentUser!.email.toLowerCase().trim();
+    if (me.isEmpty) return;
+    for (final listing in ngmyStoreListingsOnMarketToday(_config.storeListings)) {
+      final id = (listing['id'] ?? '').toString();
+      if (id.isEmpty) continue;
+      final seller = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
+      if (seller == me) continue;
+      if (await ngmyWasStoreMarketNotifiedToday(id)) continue;
+      await ngmyMarkStoreMarketNotifiedToday(id);
+      final title = (listing['title'] ?? 'Store item').toString().trim();
+      final schedule = NgmyStoreListingExtras.scheduleLabel(listing);
+      unawaited(_pushInAppNotification(
+        title: 'On the market today',
+        body: title.isEmpty ? 'An item you follow is available today ($schedule).' : '$title — $schedule',
+        tag: 'store_market_day_$id',
+        cooldown: const Duration(hours: 20),
       ));
     }
   }
@@ -4793,6 +4883,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         if (_appConfigSig(_config) != _appConfigSig(next)) {
           _notifySellerOfNewStoreOrders(_config, next);
+          _notifyApprovedWorkersOfNewJobs(_config, next);
           setState(() => _config = next);
           SharedPreferences.getInstance().then((prefs) {
             prefs.setString('app_config', jsonEncode(_config.toJson()));
@@ -4865,6 +4956,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final oldSig = _storeListingsSignature(_config.storeListings);
       if (idx == -1) {
         _config.storeListings.add(merged);
+        _notifyBuyersOfNewStoreListing(merged);
       } else if (_storeListingsSignature([_config.storeListings[idx]]) != _storeListingsSignature([merged])) {
         _config.storeListings[idx] = merged;
       }
@@ -5276,7 +5368,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final id = (o['id'] ?? '').toString();
         if (id.isNotEmpty) _seenRealtimeStoreOrderIds.add(id);
       }
+      _seedNotificationSeenIds();
       await _persistLocalSnapshot();
+      unawaited(_notifyStoreMarketDayListings());
     } catch (e) { debugPrint("General load error: $e"); }
     if (mounted) setState(() {});
   }
@@ -6296,7 +6390,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
-/// 3D-styled logout confirmation (profile screen).
+/// Compact 3D-styled logout confirmation (profile screen).
 class _NgmyLogoutConfirmDialog extends StatefulWidget {
   const _NgmyLogoutConfirmDialog();
 
@@ -6306,8 +6400,9 @@ class _NgmyLogoutConfirmDialog extends StatefulWidget {
 
 class _NgmyLogoutConfirmDialogState extends State<_NgmyLogoutConfirmDialog>
     with SingleTickerProviderStateMixin {
+  static const double _maxWidth = 300;
+
   late final AnimationController _ctrl;
-  late final Animation<double> _float;
   late final Animation<double> _glow;
 
   @override
@@ -6315,12 +6410,9 @@ class _NgmyLogoutConfirmDialogState extends State<_NgmyLogoutConfirmDialog>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2600),
+      duration: const Duration(milliseconds: 2200),
     )..repeat(reverse: true);
-    _float = Tween<double>(begin: -4, end: 4).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-    _glow = Tween<double>(begin: 0.28, end: 0.62).animate(
+    _glow = Tween<double>(begin: 0.22, end: 0.42).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
     );
   }
@@ -6334,255 +6426,163 @@ class _NgmyLogoutConfirmDialogState extends State<_NgmyLogoutConfirmDialog>
   @override
   Widget build(BuildContext context) {
     const accent = Color(0xFFEF4444);
-    const accentDeep = Color(0xFF991B1B);
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 26),
-      child: AnimatedBuilder(
-        animation: _ctrl,
-        builder: (context, _) {
-          final tiltX = math.sin(_ctrl.value * math.pi * 2) * 0.022;
-          final tiltY = math.cos(_ctrl.value * math.pi * 2) * 0.014;
-          final glow = _glow.value;
-          final lift = _float.value;
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _maxWidth),
+          child: AnimatedBuilder(
+            animation: _ctrl,
+            builder: (context, _) {
+              final glow = _glow.value;
+              final tilt = math.sin(_ctrl.value * math.pi * 2) * 0.012;
 
-          return Transform(
-            transform: Matrix4.identity()
-              ..setEntry(3, 2, 0.0012)
-              ..rotateX(tiltX)
-              ..rotateY(tiltY),
-            alignment: Alignment.center,
-            child: Transform.translate(
-              offset: Offset(0, lift),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: accent.withOpacity(glow),
-                      blurRadius: 36,
-                      spreadRadius: 2,
-                      offset: const Offset(0, 14),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.45),
-                      blurRadius: 28,
-                      offset: const Offset(0, 22),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
-                  child: Stack(
-                    children: [
-                      Container(
+              return Transform(
+                transform: Matrix4.identity()
+                  ..setEntry(3, 2, 0.001)
+                  ..rotateX(tilt)
+                  ..rotateY(tilt * 0.6),
+                alignment: Alignment.center,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: accent.withOpacity(glow),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.35),
+                        blurRadius: 12,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Color(0xFF450A0A),
+                              Color(0xFF5C1010),
                               Color(0xFF7F1D1D),
-                              Color(0xFF1C1917),
+                              Color(0xFF292524),
                             ],
-                            stops: [0.0, 0.45, 1.0],
+                          ),
+                          border: Border.fromBorderSide(
+                            BorderSide(color: Color(0x33FFFFFF), width: 1),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        top: -40,
-                        right: -20,
-                        child: Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: accent.withOpacity(0.12 + glow * 0.15),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: -30,
-                        left: -10,
-                        child: Container(
-                          width: 90,
-                          height: 90,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.04),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 26, 24, 20),
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(
-                              width: 72,
-                              height: 72,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: RadialGradient(
-                                  colors: [
-                                    accent.withOpacity(0.5),
-                                    accentDeep.withOpacity(0.15),
-                                    Colors.transparent,
-                                  ],
-                                ),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.35),
-                                  width: 2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: accent.withOpacity(0.55),
-                                    blurRadius: 18,
-                                    offset: const Offset(0, 6),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: RadialGradient(
+                                      colors: [
+                                        accent.withOpacity(0.45),
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.3),
+                                      width: 1.5,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: accent.withOpacity(0.4),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
                                   ),
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.35),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 10),
+                                  child: const Icon(
+                                    Icons.logout_rounded,
+                                    color: Colors.white,
+                                    size: 20,
                                   ),
-                                ],
-                              ),
-                              child: Transform(
-                                transform: Matrix4.identity()
-                                  ..setEntry(3, 2, 0.002)
-                                  ..rotateY(-tiltY * 2)
-                                  ..rotateX(-tiltX * 2),
-                                alignment: Alignment.center,
-                                child: const Icon(
-                                  Icons.logout_rounded,
-                                  color: Colors.white,
-                                  size: 34,
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 18),
-                            ShaderMask(
-                              shaderCallback: (bounds) => const LinearGradient(
-                                colors: [Colors.white, Color(0xFFFFE4E6)],
-                              ).createShader(bounds),
-                              child: const Text(
-                                'Log out?',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.3,
+                                const SizedBox(width: 12),
+                                const Expanded(
+                                  child: Text(
+                                    'Log out?',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                             const SizedBox(height: 10),
                             Text(
                               'Are you sure you want to log out of your account?',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.82),
-                                fontSize: 14,
-                                height: 1.4,
-                                fontWeight: FontWeight.w500,
+                                color: Colors.white.withOpacity(0.78),
+                                fontSize: 12.5,
+                                height: 1.35,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'You can sign back in anytime.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.5),
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(height: 22),
+                            const SizedBox(height: 14),
                             Row(
                               children: [
                                 Expanded(
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      onTap: () => Navigator.pop(context, false),
-                                      borderRadius: BorderRadius.circular(14),
-                                      child: Ink(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(14),
-                                          color: Colors.white.withOpacity(0.1),
-                                          border: Border.all(
-                                            color: Colors.white.withOpacity(0.28),
-                                            width: 1.2,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(0.25),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 4),
-                                            ),
-                                          ],
+                                  child: TextButton(
+                                    onPressed: () => Navigator.pop(context, false),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.white70,
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        side: BorderSide(
+                                          color: Colors.white.withOpacity(0.22),
                                         ),
-                                        child: const Padding(
-                                          padding: EdgeInsets.symmetric(vertical: 14),
-                                          child: Center(
-                                            child: Text(
-                                              'Cancel',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 15,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
+                                      ),
+                                      backgroundColor: Colors.white.withOpacity(0.08),
+                                    ),
+                                    child: const Text(
+                                      'Cancel',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 8),
                                 Expanded(
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      onTap: () => Navigator.pop(context, true),
-                                      borderRadius: BorderRadius.circular(14),
-                                      child: Ink(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(14),
-                                          gradient: const LinearGradient(
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                            colors: [
-                                              Color(0xFFFCA5A5),
-                                              Color(0xFFEF4444),
-                                              Color(0xFFB91C1C),
-                                            ],
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: accent.withOpacity(0.55 + glow * 0.2),
-                                              blurRadius: 14,
-                                              offset: const Offset(0, 6),
-                                            ),
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(0.3),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 8),
-                                            ),
-                                          ],
-                                        ),
-                                        child: const Padding(
-                                          padding: EdgeInsets.symmetric(vertical: 14),
-                                          child: Center(
-                                            child: Text(
-                                              'Yes, log out',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w800,
-                                                fontSize: 15,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
+                                  child: FilledButton(
+                                    onPressed: () => Navigator.pop(context, true),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: accent,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      elevation: 4,
+                                      shadowColor: accent.withOpacity(0.6),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Log out',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   ),
@@ -6592,13 +6592,13 @@ class _NgmyLogoutConfirmDialogState extends State<_NgmyLogoutConfirmDialog>
                           ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -8637,6 +8637,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
   @override
   void initState() {
     super.initState();
+    NgmyGameSession.enterBetScreen('game_center', 'Game Center');
     _invitePoll = Timer.periodic(const Duration(seconds: 4), (_) {
       if (mounted) setState(() {});
     });
@@ -8644,6 +8645,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
 
   @override
   void dispose() {
+    NgmyGameSession.leaveBetScreen();
     _invitePoll?.cancel();
     super.dispose();
   }
@@ -14277,6 +14279,8 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
   late final TextEditingController _logoC;
   late final TextEditingController _adminNameC;
   final ImagePicker _picker = ImagePicker();
+  Uint8List? _pendingLogoBytes;
+  bool _logoUploading = false;
 
   @override
   void initState() {
@@ -14319,6 +14323,54 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
       widget.config.adminAnnouncementImageUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
     });
     widget.onDataChanged();
+  }
+
+  Future<void> _pickAppLogoImage() async {
+    final img = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 512);
+    if (img == null) return;
+    final bytes = await img.readAsBytes();
+    setState(() {
+      _pendingLogoBytes = bytes;
+      _logoC.text = '';
+    });
+  }
+
+  Future<String> _resolveLogoForSave() async {
+    final urlText = _logoC.text.trim();
+    if (_pendingLogoBytes != null) {
+      setState(() => _logoUploading = true);
+      try {
+        final path = 'branding/app_logo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final upload = await _uploadNgmyMediaBytes(
+          bytes: _pendingLogoBytes!,
+          storagePath: path,
+          contentType: 'image/jpeg',
+        );
+        if (upload.ref != null) return upload.ref!;
+        return 'data:image/jpeg;base64,${base64Encode(_pendingLogoBytes!)}';
+      } finally {
+        if (mounted) setState(() => _logoUploading = false);
+      }
+    }
+    return urlText.isNotEmpty ? urlText : widget.config.logoUrl;
+  }
+
+  Widget _appLogoPreview(bool isDark) {
+    final size = 56.0;
+    if (_pendingLogoBytes != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.memory(_pendingLogoBytes!, width: size, height: size, fit: BoxFit.cover),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: _ngmyLogoImage(
+        _logoC.text.trim().isNotEmpty ? _logoC.text.trim() : widget.config.logoUrl,
+        width: size,
+        height: size,
+      ),
+    );
   }
 
   ImageProvider? _adminPhotoProvider() {
@@ -14438,23 +14490,70 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                             ],
                           ),
                           const SizedBox(height: 15),
-                          TextField(controller: _logoC, decoration: widget.adminInputDecoration(label: 'App Logo URL', hint: 'Paste image link here', isDark: isDark)),
+                          Row(
+                            children: [
+                              _appLogoPreview(isDark),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _logoUploading ? null : _pickAppLogoImage,
+                                  icon: const Icon(Icons.photo_library_rounded, size: 18),
+                                  label: Text(_pendingLogoBytes != null ? 'Change logo' : 'Upload logo image'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _logoC,
+                            decoration: widget.adminInputDecoration(
+                              label: 'App logo URL (optional)',
+                              hint: 'Or paste an image link',
+                              isDark: isDark,
+                            ),
+                          ),
                           const SizedBox(height: 12),
-                          TextField(controller: _apiC, decoration: widget.adminInputDecoration(label: 'Gemini API Key', hint: 'Paste AI key here', isDark: isDark)),
+                          TextField(
+                            controller: _apiC,
+                            obscureText: true,
+                            decoration: widget.adminInputDecoration(
+                              label: 'AI API Key (any provider)',
+                              hint: 'Gemini (AIza…), OpenAI (sk-…), Claude (sk-ant-…)',
+                              isDark: isDark,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Auto-detects provider. Optional prefix: gemini:, openai:, anthropic:. '
+                            'For other APIs: compat:https://api.example.com/v1|your-key',
+                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
+                          ),
                           const SizedBox(height: 15),
                           ElevatedButton(
-                            onPressed: () async {
-                              widget.config.logoUrl = _logoC.text.trim();
+                            onPressed: _logoUploading
+                                ? null
+                                : () async {
+                              widget.config.logoUrl = await _resolveLogoForSave();
                               widget.config.geminiApiKey = _apiC.text.trim();
                               var geminiSynced = true;
                               if (widget.config.geminiApiKey.isNotEmpty) {
                                 geminiSynced = await widget.persistGeminiKey(widget.config.geminiApiKey);
                               }
+                              if (mounted) {
+                                setState(() => _pendingLogoBytes = null);
+                              }
                               widget.onDataChanged();
                               if (!mounted) return;
+                              final detected = ngmyAiProviderLabel(
+                                ngmyParseAiCredentials(widget.config.geminiApiKey).provider,
+                              );
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(geminiSynced ? 'Global settings saved.' : 'Saved locally. Supabase sync failed.'),
+                                  content: Text(
+                                    geminiSynced
+                                        ? 'Global settings saved ($detected).'
+                                        : 'Saved locally. Supabase sync failed — run supabase/ai_api_key_columns.sql',
+                                  ),
                                   backgroundColor: geminiSynced ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
                                 ),
                               );
@@ -30057,7 +30156,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         if (apiKey.isNotEmpty && mounted) setState(() => widget.config.geminiApiKey = apiKey);
       }
       if (apiKey.isEmpty) {
-        const err = 'The helper is not connected yet. Ask an admin to save the Gemini API key in Admin → Management Hub → Save Global Settings.';
+        final err = ngmyAiHelperFailureMessage(apiKey: '');
         setState(() {
           _messages.add({'role': 'ai', 'text': err, 'at': DateTime.now().toUtc().toIso8601String()});
           _isTyping = false;
@@ -30067,16 +30166,15 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         return;
       }
 
-      final aiText = await _geminiGenerateReply(
-        apiKey,
-        text,
-        user: widget.user,
-        memory: _messages,
-      );
+      final creds = ngmyParseAiCredentials(apiKey);
+      final prompt = '${_ngmyHelperSystemContext(user: widget.user)}'
+          '${_messages.isNotEmpty ? '\n${NgmyAiMemoryStore.transcriptForPrompt(_messages)}\n' : ''}'
+          '\nUser: $text';
+      final aiResult = await ngmyAiGenerateWithCredentials(creds, prompt);
       if (!mounted) return;
-      final reply = (aiText != null && aiText.isNotEmpty)
-          ? aiText
-          : 'I could not reach Gemini right now. Confirm the API key is valid in Google AI Studio and saved in Supabase config.';
+      final reply = (aiResult.text != null && aiResult.text!.isNotEmpty)
+          ? aiResult.text!
+          : ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: aiResult.error);
       setState(() {
         _messages.add({
           'role': 'ai',
