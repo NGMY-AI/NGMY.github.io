@@ -90,6 +90,8 @@ void installWebHistorySync(GlobalKey<NavigatorState> navigatorKey) {
 
 void onNavigatorDidPush() {
 
+  if (_stackDepth >= 24) return;
+
   _stackDepth++;
 
   html.window.history.pushState(<String, dynamic>{'ngmy': _stackDepth}, '', html.window.location.href);

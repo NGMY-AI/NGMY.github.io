@@ -463,11 +463,13 @@ class NgmyVideoStudioExportConfig {
   int get outputWidth => format.exportWidth;
   int get outputHeight => format.exportHeight;
 
-  /// One local video, no logos/banners — download the file directly (no re-encode wait).
-  bool get canDirectDownload =>
-      videoSourcesBySlot.length == 1 &&
-      logoDataUrlBySlot.isEmpty &&
-      newsBannerStyle == null &&
-      !showTextOverlay &&
-      (backgroundAsset == null || backgroundAsset!.trim().isEmpty);
+  /// One local video — download the raw clip directly (templates with text still use composed export).
+  bool get canDirectDownload {
+    final filled = videoSourcesBySlot.values.where((s) => s.trim().isNotEmpty).length;
+    return filled == 1 &&
+        logoDataUrlBySlot.isEmpty &&
+        newsBannerStyle == null &&
+        !showTextOverlay &&
+        (backgroundAsset == null || backgroundAsset!.trim().isEmpty);
+  }
 }

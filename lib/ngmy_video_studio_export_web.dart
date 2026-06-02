@@ -25,13 +25,38 @@ bool _ngmyIsAppleMobileBrowser() {
 Future<html.Blob?> _ngmyBlobFromHref(String href) async {
   final src = href.trim();
   if (src.isEmpty) return null;
-  if (src.startsWith('blob:') || src.startsWith('data:') || src.startsWith('http')) {
+  if (src.startsWith('data:')) {
     try {
       final resp = await html.HttpRequest.request(src, responseType: 'blob');
       final blob = resp.response as html.Blob?;
       if (blob != null && blob.size > 0) return blob;
     } catch (e) {
-      debugPrint('[studio download] blob fetch failed: $e');
+      debugPrint('[studio download] data url fetch failed: $e');
+    }
+    return null;
+  }
+  if (src.startsWith('blob:')) {
+    try {
+      final resp = await html.window.fetch(src);
+      return await resp.blob();
+    } catch (e) {
+      debugPrint('[studio download] blob url fetch failed: $e');
+    }
+    return null;
+  }
+  if (src.startsWith('http')) {
+    try {
+      final resp = await html.window.fetch(src, {'mode': 'cors', 'credentials': 'omit'});
+      if (resp.ok) return await resp.blob();
+    } catch (e) {
+      debugPrint('[studio download] http fetch failed: $e');
+    }
+    try {
+      final resp = await html.HttpRequest.request(src, responseType: 'blob');
+      final blob = resp.response as html.Blob?;
+      if (blob != null && blob.size > 0) return blob;
+    } catch (e) {
+      debugPrint('[studio download] xhr fetch failed: $e');
     }
   }
   return null;
@@ -43,6 +68,22 @@ Future<String> ngmyTriggerBrowserDownload(String href, String filename) async {
   String? tempObjectUrl;
 
   try {
+    if (href.startsWith('blob:')) {
+      if (_ngmyIsAppleMobileBrowser()) {
+        ngmyStageIosStudioVideo(href, safeName);
+        return 'ios_pending';
+      }
+      final anchor = html.AnchorElement()
+        ..href = href
+        ..download = safeName
+        ..style.display = 'none';
+      html.document.body?.append(anchor);
+      anchor.click();
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      anchor.remove();
+      return 'saved';
+    }
+
     final blob = await _ngmyBlobFromHref(href);
     if (blob != null) {
       if (!safeName.contains('.') && blob.type.isNotEmpty) {
@@ -53,8 +94,8 @@ Future<String> ngmyTriggerBrowserDownload(String href, String filename) async {
       tempObjectUrl = html.Url.createObjectUrlFromBlob(blob);
 
       if (_ngmyIsAppleMobileBrowser()) {
-        html.window.open(tempObjectUrl, '_blank');
-        return 'ios_open';
+        ngmyStageIosStudioVideo(tempObjectUrl, safeName);
+        return 'ios_pending';
       }
 
       final anchor = html.AnchorElement()
@@ -77,6 +118,7 @@ Future<String> ngmyTriggerBrowserDownload(String href, String filename) async {
       ..href = href
       ..download = safeName
       ..target = '_blank'
+      ..rel = 'noopener'
       ..style.display = 'none';
     html.document.body?.append(anchor);
     anchor.click();

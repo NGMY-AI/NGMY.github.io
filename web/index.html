@@ -286,42 +286,12 @@
 
   <script>
     (function () {
-      function forceViewportReset() {
+      function scrollTopOnce() {
         window.scrollTo(0, 0);
         document.documentElement.scrollTop = 0;
         if (document.body) document.body.scrollTop = 0;
-        try { window.dispatchEvent(new Event('resize')); } catch (e) {}
       }
-
-      function scheduleViewportSync() {
-        forceViewportReset();
-        setTimeout(forceViewportReset, 50);
-        setTimeout(forceViewportReset, 150);
-        setTimeout(forceViewportReset, 400);
-        setTimeout(forceViewportReset, 1000);
-        setTimeout(forceViewportReset, 2000);
-      }
-
-      window.addEventListener('load', scheduleViewportSync);
-      window.addEventListener('pageshow', function (event) {
-        scheduleViewportSync();
-      });
-
-      document.addEventListener('touchstart', function () {
-        if (window.scrollY !== 0 || (window.visualViewport && window.visualViewport.offsetTop !== 0)) {
-          forceViewportReset();
-        }
-      }, { passive: true });
-
-      if (window.visualViewport) {
-        var timer;
-        function onViewportChange() {
-          clearTimeout(timer);
-          timer = setTimeout(forceViewportReset, 16);
-        }
-        window.visualViewport.addEventListener('resize', onViewportChange);
-        window.visualViewport.addEventListener('scroll', onViewportChange);
-      }
+      window.addEventListener('pageshow', scrollTopOnce);
     })();
   </script>
 

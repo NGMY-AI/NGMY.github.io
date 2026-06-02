@@ -3802,8 +3802,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             systemNavigationBarIconBrightness: Brightness.dark,
           );
     SystemChrome.setSystemUIOverlayStyle(style);
-    if (kIsWeb && !isDarkMode) {
-      ngmyApplyWebStatusBarStyle(lightMode: true);
+    if (kIsWeb) {
+      ngmyApplyWebStatusBarStyle(lightMode: !isDarkMode);
     }
   }
 
@@ -5941,7 +5941,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         builder: (context, child) {
           final content = child ?? const SizedBox.shrink();
           if (kIsWeb && Theme.of(context).brightness == Brightness.light) {
-            ngmyApplyWebStatusBarStyle(lightMode: true);
             return ColoredBox(color: Colors.white, child: content);
           }
           return content;
@@ -6014,6 +6013,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 },
               )
             : MainScreen(
+                key: ValueKey('main_${_currentUser!.email.toLowerCase().trim()}'),
                 user: _currentUser!, allTransactions: _allTransactions, allUsers: _allUsers, globalPlans: _globalPlans,
                 allMedia: _allMedia,
                 allAnnouncements: _allAnnouncements,
@@ -7111,6 +7111,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
   bool _offline = false;
   Timer? _onlineCheck;
+  List<Widget>? _tabPages;
+  String? _tabPagesKey;
 
   void _runScheduledPopups() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -7283,10 +7285,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
   @override void dispose() { WidgetsBinding.instance.removeObserver(this); _t?.cancel(); _onlineCheck?.cancel(); super.dispose(); }
 
-  @override Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sorted = List<AppTransaction>.from(widget.allTransactions)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    final pages = [
+  List<Widget> _buildTabPages(List<AppTransaction> sorted) {
+    final cacheKey = '${widget.user.email}|${widget.allMedia.length}|${widget.allAnnouncements.length}|${widget.config.logoUrl}';
+    if (_tabPages != null && _tabPagesKey == cacheKey) return _tabPages!;
+    _tabPagesKey = cacheKey;
+    _tabPages = [
       HomeScreen(user: widget.user, onClockIn: () async {
         final now = DateTime.now();
         _ngmyApplyMidnightClockReset(widget.user);
@@ -7424,6 +7427,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       StatsScreen(user: widget.user, transactions: sorted),
       ProfileScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged, onAddTransaction: widget.onAddTransaction),
     ];
+    return _tabPages!;
+  }
+
+  @override Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sorted = List<AppTransaction>.from(widget.allTransactions)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final pages = _buildTabPages(sorted);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
