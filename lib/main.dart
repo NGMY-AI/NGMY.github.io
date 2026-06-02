@@ -3639,6 +3639,22 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   final Map<String, DateTime> _notificationCooldown = {};
   final Set<String> _notifiedTransactionKeys = {};
   bool _allowConfigDiffNotifications = false;
+  bool _realtimeStarted = false;
+  String _appShellSig = '';
+
+  String _computeAppShellSig() {
+    final annSig = _allAnnouncements.map((a) => '${a.id}:${a.message.length}').join('|');
+    return '${_currentUser?.email ?? ''}|${_allUsers.length}|${_allTransactions.length}|${_allMedia.length}|$annSig|${_config.ngmyChatClosed}';
+  }
+
+  void _startBackgroundServices() {
+    if (_realtimeStarted) return;
+    _realtimeStarted = true;
+    _subscribeToRealtime();
+    _subscribeToAuthState();
+    _startConfigRefreshLoop();
+    _startMediaDeliveryLoop();
+  }
   Future<void> _seedTransactionNotificationBaseline() async {
     for (final t in _allTransactions) {
       _notifiedTransactionKeys.add('txn_${t.id}');
@@ -3704,10 +3720,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _initLocalNotifications();
     _loadData().then((_) {
       _scheduleAutoThemeTick();
-      _subscribeToRealtime();
-      _subscribeToAuthState();
-      _startConfigRefreshLoop();
-      _startMediaDeliveryLoop();
+      _startBackgroundServices();
     });
   }
 
@@ -5412,7 +5425,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
       if (mounted) {
         _applySystemUiForMode(_effectiveThemeMode);
+        for (final a in _allAnnouncements) {
+          _seenRealtimeAnnouncementIds.add(a.id);
+        }
+        _appShellSig = _computeAppShellSig();
         setState(() => _isLoading = false);
+        _startBackgroundServices();
       }
 
       // 2. Fetch from Supabase when reachable (slow/offline uses local cache above).
@@ -5456,6 +5474,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final annData = await supabase.from('announcements').select();
         if (annData != null) {
           _allAnnouncements = (annData as List).map((e) => Announcement.fromJson(e)).toList();
+          for (final a in _allAnnouncements) {
+            _seenRealtimeAnnouncementIds.add(a.id);
+          }
           await _pruneExpiredAnnouncements(updateUi: false);
           if (mounted) setState(() {});
         }
@@ -5595,7 +5616,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await _persistLocalSnapshot();
       unawaited(_notifyStoreMarketDayListings());
     } catch (e) { debugPrint("General load error: $e"); }
-    if (mounted) setState(() {});
+    if (mounted) {
+      final nextSig = _computeAppShellSig();
+      if (nextSig != _appShellSig) {
+        _appShellSig = nextSig;
+        setState(() {});
+      }
+    }
   }
 
   bool _isMissingTableError(Object error, String table) {
@@ -5938,13 +5965,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           ),
         ),
         themeMode: _effectiveThemeMode,
-        builder: (context, child) {
-          final content = child ?? const SizedBox.shrink();
-          if (kIsWeb && Theme.of(context).brightness == Brightness.light) {
-            return ColoredBox(color: Colors.white, child: content);
-          }
-          return content;
-        },
+        builder: (context, child) => child ?? const SizedBox.shrink(),
         home: _currentUser == null
             ? AuthScreen(
                 allUsers: _allUsers,
@@ -7107,6 +7128,14 @@ class MainScreen extends StatefulWidget {
   const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead});
   @override State<MainScreen> createState() => _MainScreenState();
 }
+
+String _announcementsSig(List<Announcement> items) {
+  if (items.isEmpty) return '0';
+  final sorted = List<Announcement>.from(items)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  final latest = sorted.first;
+  return '${items.length}:${latest.id}:${latest.timestamp.millisecondsSinceEpoch}';
+}
+
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
   bool _offline = false;
@@ -7286,7 +7315,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override void dispose() { WidgetsBinding.instance.removeObserver(this); _t?.cancel(); _onlineCheck?.cancel(); super.dispose(); }
 
   List<Widget> _buildTabPages(List<AppTransaction> sorted) {
-    final cacheKey = '${widget.user.email}|${widget.allMedia.length}|${widget.allAnnouncements.length}|${widget.config.logoUrl}';
+    final cacheKey = '${widget.user.email}|${widget.allMedia.length}|${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}';
     if (_tabPages != null && _tabPagesKey == cacheKey) return _tabPages!;
     _tabPagesKey = cacheKey;
     _tabPages = [
@@ -14253,14 +14282,14 @@ class _StatsScreenState extends State<StatsScreen> {
           child: Column(
             children: [
               const FloatingTitle(title: 'PLATFORM STATS'),
-              const SizedBox(height: 25),
+              const SizedBox(height: 12),
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: 2,
-                mainAxisSpacing: 15,
+                mainAxisSpacing: 10,
                 crossAxisSpacing: 15,
-                childAspectRatio: 1.25,
+                childAspectRatio: 1.3,
                 children: [
                   _sTile(context, 'Total Volume', '\$${formatCurrency(totalVol)}', Icons.account_balance, Colors.blue),
                   _sTile(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit)}', Icons.auto_graph, Colors.purple),
@@ -14268,14 +14297,14 @@ class _StatsScreenState extends State<StatsScreen> {
                   _sTile(context, 'Global Rank', '#1', Icons.public, Colors.orange),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 2),
               Container(
                 width: double.infinity,
                 decoration: _statsFrameDecoration(context, elevated: true),
                 child: Stack(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
                       child: Column(
                         children: [
                     ShaderMask(
@@ -30283,13 +30312,17 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   bool _memoryLoaded = false;
   bool _chatClosedForUsers = false;
   Timer? _chatGateTimer;
+  Timer? _newsPollTimer;
   int _unreadNewsInternal = 0;
+  List<Announcement> _newsItems = [];
+  RealtimeChannel? _newsChannel;
+  final Set<String> _seenNewsIds = {};
 
   Future<void> _refreshUnreadNewsInternal() async {
     final count = await NgmyAnnouncementReads.unreadCountForEmail(
       widget.user.email,
       widget.user.readAnnouncementIds,
-      widget.announcements.map((a) => a.id),
+      _newsItems.map((a) => a.id),
     );
     if (mounted) setState(() => _unreadNewsInternal = count);
   }
@@ -30316,17 +30349,145 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   void initState() {
     super.initState();
     _chatClosedForUsers = widget.config.ngmyChatClosed;
+    _newsItems = List<Announcement>.from(widget.announcements);
+    for (final a in _newsItems) {
+      if (a.id.isNotEmpty) _seenNewsIds.add(a.id);
+    }
     _loadChatMemory();
     _startChatGateWatcher();
+    _subscribeNewsRealtime();
+    _newsPollTimer = Timer.periodic(const Duration(seconds: 12), (_) => unawaited(_pollNewsFromCloud()));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshGeminiKeyFromCloud();
       _refreshUnreadNewsInternal();
+      if (_activeTab == 1) _scrollNewsToBottom(jump: true);
     });
   }
 
+  void _subscribeNewsRealtime() {
+    try {
+      _newsChannel?.unsubscribe();
+      _newsChannel = Supabase.instance.client
+          .channel('ngmy_news_live_${widget.user.email.hashCode}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'announcements',
+            callback: (payload) => _onNewsRealtime(payload),
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('[news] realtime subscribe: $e');
+    }
+  }
+
+  void _onNewsRealtime(PostgresChangePayload payload) {
+    try {
+      if (payload.eventType == PostgresChangeEvent.delete) {
+        final id = (payload.oldRecord['id'] ?? '').toString();
+        if (id.isEmpty) return;
+        setState(() => _newsItems.removeWhere((a) => a.id == id));
+        return;
+      }
+      final ann = Announcement.fromJson(payload.newRecord);
+      if (ann.id.isEmpty) return;
+      final isNew = !_seenNewsIds.contains(ann.id);
+      setState(() {
+        final idx = _newsItems.indexWhere((a) => a.id == ann.id);
+        if (idx == -1) {
+          _newsItems.add(ann);
+        } else {
+          _newsItems[idx] = ann;
+        }
+      });
+      if (isNew) {
+        _seenNewsIds.add(ann.id);
+        final me = widget.user.email.toLowerCase().trim();
+        final author = ann.authorEmail.toLowerCase().trim();
+        if (author != me) {
+          unawaited(_notifyNewsMessage(ann));
+        }
+      }
+      if (_activeTab == 1) {
+        _scrollNewsToBottom();
+      } else {
+        unawaited(_refreshUnreadNewsInternal());
+      }
+    } catch (e) {
+      debugPrint('[news] realtime apply: $e');
+    }
+  }
+
+  Future<void> _pollNewsFromCloud() async {
+    if (!mounted || !await ngmyCanReachCloud()) return;
+    try {
+      final rows = await Supabase.instance.client.from('announcements').select();
+      if (rows == null || !mounted) return;
+      final remote = (rows as List).map((e) => Announcement.fromJson(e)).toList();
+      _mergeNewsItems(remote, notifyNew: true);
+    } catch (e) {
+      debugPrint('[news] poll: $e');
+    }
+  }
+
+  void _mergeNewsItems(List<Announcement> incoming, {bool notifyNew = false}) {
+    final byId = <String, Announcement>{for (final a in _newsItems) a.id: a};
+    var added = false;
+    for (final ann in incoming) {
+      if (ann.id.isEmpty) continue;
+      final isNew = !_seenNewsIds.contains(ann.id);
+      byId[ann.id] = ann;
+      if (isNew) {
+        _seenNewsIds.add(ann.id);
+        added = true;
+        if (notifyNew) {
+          final me = widget.user.email.toLowerCase().trim();
+          if (ann.authorEmail.toLowerCase().trim() != me) {
+            unawaited(_notifyNewsMessage(ann));
+          }
+        }
+      }
+    }
+    final next = byId.values.toList();
+    final oldSig = _newsItems.map((a) => '${a.id}:${a.message.length}:${a.timestamp.millisecondsSinceEpoch}').join('|');
+    final newSig = next.map((a) => '${a.id}:${a.message.length}:${a.timestamp.millisecondsSinceEpoch}').join('|');
+    if (oldSig == newSig) return;
+    setState(() => _newsItems = next);
+    if (_activeTab == 1) {
+      _scrollNewsToBottom();
+    } else if (added) {
+      unawaited(_refreshUnreadNewsInternal());
+    }
+  }
+
+  Future<void> _notifyNewsMessage(Announcement ann) async {
+    if (!mounted) return;
+    final preview = ann.message.trim().isNotEmpty
+        ? ann.message.trim()
+        : (ann.videoUrl != null ? 'New video in News' : 'New photo in News');
+    final title = ann.authorUsername.trim().isNotEmpty ? ann.authorUsername.trim() : 'New in News';
+    if (kIsWeb) {
+      await ngmyPushShow(title: title, body: preview, tag: 'news_${ann.id}');
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$title: ${preview.length > 80 ? '${preview.substring(0, 80)}…' : preview}'),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: 'View',
+          onPressed: () {
+            _selectNewsTab();
+            _scrollNewsToBottom(jump: true);
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _markNewsAsRead() async {
-    if (widget.announcements.isEmpty) return;
-    final ids = widget.announcements.map((a) => a.id).where((id) => id.isNotEmpty).toList();
+    if (_newsItems.isEmpty) return;
+    final ids = _newsItems.map((a) => a.id).where((id) => id.isNotEmpty).toList();
     if (widget.onMarkAnnouncementsRead != null) {
       await widget.onMarkAnnouncementsRead!(ids);
     }
@@ -30421,18 +30582,23 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   @override
   void didUpdateWidget(covariant AnnouncementScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _mergeNewsItems(widget.announcements);
     if (oldWidget.announcements != widget.announcements) {
       _refreshUnreadNewsInternal();
     }
     if (_activeTab != 1) return;
-    final oldSig = oldWidget.announcements.map((a) => a.id).join('|');
-    final newSig = widget.announcements.map((a) => a.id).join('|');
+    final oldSig = oldWidget.announcements.map((a) => '${a.id}:${a.message.length}').join('|');
+    final newSig = widget.announcements.map((a) => '${a.id}:${a.message.length}').join('|');
     if (oldSig != newSig) _scrollNewsToBottom();
   }
 
   @override
   void dispose() {
     _chatGateTimer?.cancel();
+    _newsPollTimer?.cancel();
+    try {
+      _newsChannel?.unsubscribe();
+    } catch (_) {}
     _chatController.dispose();
     _newsController.dispose();
     _scrollController.dispose();
@@ -30635,6 +30801,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       postType: 'community',
     );
     widget.onPostToNews(ann);
+    setState(() {
+      _newsItems.removeWhere((a) => a.id == ann.id);
+      _newsItems.add(ann);
+      _seenNewsIds.add(ann.id);
+    });
     _newsController.clear();
     _pendingNewsImageUrl = null;
     _pendingNewsVideoUrl = null;
@@ -30645,7 +30816,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   List<Announcement> get _sortedNews {
-    final list = widget.announcements
+    final list = _newsItems
         .where((a) => !NgmyNewsRetention.isExpired(a.timestamp))
         .toList();
     list.sort((a, b) => a.timestamp.compareTo(b.timestamp));

@@ -72,7 +72,22 @@
           m.setAttribute('content', '#ffffff');
         });
       }
+      function ngmyApplyDarkChromeEarly() {
+        var root = document.documentElement;
+        root.classList.remove('ngmy-app-light');
+        root.style.setProperty('background-color', '#121212', 'important');
+        root.style.setProperty('color-scheme', 'dark');
+        if (document.body) {
+          document.body.style.setProperty('background-color', '#121212', 'important');
+        }
+        var statusMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+        if (statusMeta) statusMeta.setAttribute('content', 'black-translucent');
+        document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
+          m.setAttribute('content', '#121212');
+        });
+      }
       if (ngmyThemeIsLight()) ngmyApplyLightChromeEarly();
+      else ngmyApplyDarkChromeEarly();
     })();
   </script>
 
@@ -114,7 +129,7 @@
 
     flutter-view, flt-glass-pane {
 
-      background-color: #121212;
+      background-color: #ffffff;
 
       -webkit-user-select: text;
 
@@ -234,7 +249,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260601234737";
+      var CURRENT = "20260602000243";
 
       function showError(msg) {
 
@@ -297,7 +312,7 @@
 
   <script>
     (function () {
-      var deployId = '20260601234737';
+      var deployId = '20260602000243';
       var bootstrapSrc = 'flutter_bootstrap.js';
       var loadAttempts = 0;
 
