@@ -735,7 +735,7 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
   if (!await ngmyCanReachCloud()) return;
   final client = Supabase.instance.client;
   final combined = <String, dynamic>{
-    'id': 1,
+    'id': kNgmyConfigRowId,
     'gameTimeLimits': config.gameTimeLimits,
     'diceSettings': config.diceSettings,
     'gameInvites': config.gameInvites,
@@ -753,15 +753,15 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     debugPrint('[config] combined critical upsert: $e');
   }
   for (final row in [
-    {'id': 1, 'gameTimeLimits': config.gameTimeLimits},
-    {'id': 1, 'diceSettings': config.diceSettings},
-    {'id': 1, 'gameInvites': config.gameInvites},
-    {'id': 1, 'civicRegistryPin': config.civicRegistryPin},
-    {'id': 1, 'civicRegistryPinsByState': config.civicRegistryPinsByState},
-    {'id': 1, 'civicRegistrarApplications': config.civicRegistrarApplications},
-    {'id': 1, 'jobPosts': config.jobPosts},
-    {'id': 1, 'jobWorkerApplications': config.jobWorkerApplications},
-    {'id': 1, 'mediaDeliveryQueue': config.mediaDeliveryQueue},
+    {'id': kNgmyConfigRowId, 'gameTimeLimits': config.gameTimeLimits},
+    {'id': kNgmyConfigRowId, 'diceSettings': config.diceSettings},
+    {'id': kNgmyConfigRowId, 'gameInvites': config.gameInvites},
+    {'id': kNgmyConfigRowId, 'civicRegistryPin': config.civicRegistryPin},
+    {'id': kNgmyConfigRowId, 'civicRegistryPinsByState': config.civicRegistryPinsByState},
+    {'id': kNgmyConfigRowId, 'civicRegistrarApplications': config.civicRegistrarApplications},
+    {'id': kNgmyConfigRowId, 'jobPosts': config.jobPosts},
+    {'id': kNgmyConfigRowId, 'jobWorkerApplications': config.jobWorkerApplications},
+    {'id': kNgmyConfigRowId, 'mediaDeliveryQueue': config.mediaDeliveryQueue},
   ]) {
     try {
       await client.from('config').upsert(row);
@@ -1101,7 +1101,7 @@ List<Map<String, dynamic>> _investmentPlansToMaps(List<InvestmentPlan> plans) =>
 
 Future<List<Map<String, dynamic>>> _fetchRemoteInvestmentPlans() async {
   try {
-    final cfg = await Supabase.instance.client.from('config').select('investmentPlans').eq('id', 1).maybeSingle();
+    final cfg = await _fetchNgmyConfigRow(columns: 'investmentPlans');
     if (cfg == null) return [];
     final raw = cfg['investmentPlans'];
     if (raw is! List) return [];
@@ -1678,7 +1678,7 @@ Future<void> _persistTombstonedMediaIds(Set<String> ids) async {
 
 Future<Map<String, String>> _fetchRemoteLegalContent() async {
   try {
-    final row = await Supabase.instance.client.from('config').select().eq('id', 1).maybeSingle();
+    final row = await _fetchNgmyConfigRow();
     if (row == null) return {};
     final map = Map<String, dynamic>.from(row);
     return {
@@ -1754,7 +1754,7 @@ Future<Map<String, dynamic>?> _fetchNgmySettingSafe(String key) async {
 
 Future<bool> _upsertConfigLegalColumns(String terms, String privacy) async {
   final row = <String, dynamic>{
-    'id': 1,
+    'id': kNgmyConfigRowId,
     'termsAndConditions': terms,
     'privacyPolicy': privacy,
   };
@@ -1777,7 +1777,7 @@ Future<bool> _upsertConfigLegalColumns(String terms, String privacy) async {
 }
 
 Future<bool> _upsertConfigInvestmentPlansColumn(List<Map<String, dynamic>> plans) async {
-  final row = <String, dynamic>{'id': 1, 'investmentPlans': plans};
+  final row = <String, dynamic>{'id': kNgmyConfigRowId, 'investmentPlans': plans};
   for (int i = 0; i < 8; i++) {
     try {
       await Supabase.instance.client.from('config').upsert([row]);
@@ -2210,7 +2210,7 @@ Future<({List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos})>
   }
 
   try {
-    final row = await Supabase.instance.client.from('config').select('ngmyPopups, ngmyVideoPopups').eq('id', 1).maybeSingle();
+    final row = await _fetchNgmyConfigRow(columns: 'ngmyPopups, ngmyVideoPopups');
     if (row != null) {
       final popups = (row['ngmyPopups'] as List?)
               ?.map((e) => _normalizeNgmyPopupItem(Map<String, dynamic>.from(e as Map)))
@@ -2230,7 +2230,7 @@ Future<({List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos})>
 }
 
 Future<bool> _upsertConfigNgmyPopupsColumns(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos) async {
-  var row = <String, dynamic>{'id': 1, 'ngmyPopups': popups, 'ngmyVideoPopups': videos};
+  var row = <String, dynamic>{'id': kNgmyConfigRowId, 'ngmyPopups': popups, 'ngmyVideoPopups': videos};
   for (int i = 0; i < 8; i++) {
     try {
       await Supabase.instance.client.from('config').upsert(row);
@@ -2243,7 +2243,7 @@ Future<bool> _upsertConfigNgmyPopupsColumns(List<Map<String, dynamic>> popups, L
         continue;
       }
       try {
-        await Supabase.instance.client.from('config').update({'ngmyPopups': popups, 'ngmyVideoPopups': videos}).eq('id', 1);
+        await Supabase.instance.client.from('config').update({'ngmyPopups': popups, 'ngmyVideoPopups': videos}).eq('id', kNgmyConfigRowId);
         return true;
       } catch (e2) {
         debugPrint('[popups] config column save error: $e2');
@@ -2340,7 +2340,7 @@ List<Map<String, dynamic>> _mergeStoreOrdersLists(
 Future<bool> _pushStoreOrdersToSupabase(List<Map<String, dynamic>> localOrders, {String? forceLocalOrderId}) async {
   try {
     final client = Supabase.instance.client;
-    final cfg = await client.from('config').select('storeOrders').eq('id', 1).maybeSingle();
+    final cfg = await _fetchNgmyConfigRow(columns: 'storeOrders');
     var remote = <Map<String, dynamic>>[];
     if (cfg != null && cfg['storeOrders'] is List) {
       remote = (cfg['storeOrders'] as List).map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
@@ -2364,7 +2364,7 @@ Future<bool> _pushStoreOrdersToSupabase(List<Map<String, dynamic>> localOrders, 
         }
       }
     }
-    await client.from('config').update({'storeOrders': merged}).eq('id', 1);
+    await client.from('config').update({'storeOrders': merged}).eq('id', kNgmyConfigRowId);
     return true;
   } catch (e) {
     debugPrint('[storeOrders] push error: $e');
@@ -3049,6 +3049,35 @@ String _geminiKeyFromMap(Map<String, dynamic> json) {
   return '';
 }
 
+/// Supabase config row id (TEXT column in NGMY — must be '1', not integer 1).
+const String kNgmyConfigRowId = '1';
+
+Future<Map<String, dynamic>?> _fetchNgmyConfigRow({String columns = '*'}) async {
+  final client = Supabase.instance.client;
+  for (final id in [kNgmyConfigRowId, 1]) {
+    try {
+      final row = await client.from('config').select(columns).eq('id', id).maybeSingle();
+      if (row != null) return Map<String, dynamic>.from(row);
+    } catch (e) {
+      debugPrint('[config] fetch id=$id: $e');
+    }
+  }
+  try {
+    final row = await client.from('config').select(columns).limit(1).maybeSingle();
+    if (row != null) return Map<String, dynamic>.from(row);
+  } catch (e) {
+    debugPrint('[config] fetch any row: $e');
+  }
+  return null;
+}
+
+dynamic _ngmyConfigRowIdValue(Map<String, dynamic>? row) {
+  if (row == null) return kNgmyConfigRowId;
+  final id = row['id'];
+  if (id == null) return kNgmyConfigRowId;
+  return id is String ? id : id.toString();
+}
+
 String? _missingColumnFromError(Object error) {
   final text = error.toString();
   final m = RegExp("Could not find the '([^']+)' column").firstMatch(text);
@@ -3057,9 +3086,9 @@ String? _missingColumnFromError(Object error) {
 
 Future<String> _fetchRemoteGeminiApiKey() async {
   try {
-    final row = await Supabase.instance.client.from('config').select().eq('id', 1).maybeSingle();
+    final row = await _fetchNgmyConfigRow();
     if (row == null) return '';
-    return _geminiKeyFromMap(Map<String, dynamic>.from(row));
+    return _geminiKeyFromMap(row);
   } catch (e) {
     debugPrint('[config] fetch gemini key error: $e');
     return '';
@@ -3071,14 +3100,12 @@ Future<bool> _persistGeminiApiKeyToSupabase(String key) async {
   if (k.isEmpty) return false;
   final client = Supabase.instance.client;
 
-  Map<String, dynamic> row = {'id': 1};
-  try {
-    final existing = await client.from('config').select().eq('id', 1).maybeSingle();
-    if (existing != null) row = Map<String, dynamic>.from(existing);
-  } catch (e) {
-    debugPrint('[config] load before gemini save: $e');
-  }
-  row['id'] = 1;
+  final existing = await _fetchNgmyConfigRow();
+  final idValue = _ngmyConfigRowIdValue(existing);
+  Map<String, dynamic> row = existing != null
+      ? Map<String, dynamic>.from(existing)
+      : <String, dynamic>{'id': idValue};
+  row['id'] = idValue;
   row['geminiApiKey'] = k;
   row['gemini_api_key'] = k;
   row['aiApiKey'] = k;
@@ -3090,7 +3117,7 @@ Future<bool> _persistGeminiApiKeyToSupabase(String key) async {
       await client.from('config').upsert(working);
       final verify = await _fetchRemoteGeminiApiKey();
       if (verify.isNotEmpty) {
-        debugPrint('[config] Gemini API key synced for all users.');
+        debugPrint('[config] AI API key synced for all users.');
         return true;
       }
     } catch (e) {
@@ -3099,28 +3126,28 @@ Future<bool> _persistGeminiApiKeyToSupabase(String key) async {
         working = Map<String, dynamic>.from(working)..remove(missing);
         continue;
       }
-      debugPrint('[config] Gemini upsert failed: $e');
+      debugPrint('[config] AI key upsert failed: $e');
     }
 
     for (final field in ['geminiApiKey', 'gemini_api_key', 'aiApiKey', 'ai_api_key']) {
       if (!working.containsKey(field)) continue;
       try {
-        await client.from('config').upsert({'id': 1, field: k});
+        await client.from('config').upsert({'id': idValue, field: k});
         if ((await _fetchRemoteGeminiApiKey()).isNotEmpty) {
-          debugPrint('[config] Gemini API key saved via $field.');
+          debugPrint('[config] AI API key saved via $field.');
           return true;
         }
       } catch (e) {
-        debugPrint('[config] Gemini save via $field failed: $e');
+        debugPrint('[config] AI key save via $field failed: $e');
       }
       try {
-        await client.from('config').update({field: k}).eq('id', 1);
+        await client.from('config').update({field: k}).eq('id', idValue);
         if ((await _fetchRemoteGeminiApiKey()).isNotEmpty) {
-          debugPrint('[config] Gemini API key updated via $field.');
+          debugPrint('[config] AI API key updated via $field.');
           return true;
         }
       } catch (e) {
-        debugPrint('[config] Gemini update via $field failed: $e');
+        debugPrint('[config] AI key update via $field failed: $e');
       }
     }
     break;
@@ -3132,7 +3159,7 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   required AppConfig config,
   required bool isAdmin,
 }) async {
-  final row = <String, dynamic>{'id': 1, ...config.toJson()};
+  final row = <String, dynamic>{'id': kNgmyConfigRowId, ...config.toJson()};
   final localKey = config.geminiApiKey.trim();
   final remoteKey = await _fetchRemoteGeminiApiKey();
   if (isAdmin && localKey.isNotEmpty) {
@@ -3235,12 +3262,18 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'Be warm, respectful, discreet, and proactive. Speak with deference but also genuine friendship. '
           'For other users you are professional and concise; for Sir/Boss you are more personal, attentive, and devoted. '
           'Answer directly — never open with "NGMY AI", "I\'m NGMY AI", or similar branding.\n'
+          'Never tell users to configure API keys, Gemini, OpenAI, Claude, or Supabase — admins handle that. '
+          'The AI is connected and working — never say you are waiting for an API key or that Gemini is unreachable. '
+          'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n'
       : 'You are the helpful assistant for the NGMY platform (Next Generation - Make Yours). '
           '$founderFacts'
           'NGMY offers investment plans, daily clock-in earnings, loans, NGMY Store, job marketplace, and civic registry. '
           'Be helpful, professional, and friendly. Keep answers concise. '
           'Answer the user\'s question directly. Never introduce yourself as "NGMY AI" and never start replies with '
-          '"NGMY AI:", "As NGMY AI", "I\'m NGMY AI", or similar — just answer naturally.\n';
+          '"NGMY AI:", "As NGMY AI", "I\'m NGMY AI", or similar — just answer naturally.\n'
+          'Never tell users to configure API keys, Gemini, OpenAI, Claude, or Supabase — admins handle that. '
+          'The AI is connected and working — never say you are waiting for an API key or that Gemini is unreachable. '
+          'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n';
 }
 
 Future<String?> _geminiGenerateReply(
@@ -20911,7 +20944,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   Future<void> _refreshStoreOrdersFromConfig() async {
     try {
-      final cfg = await Supabase.instance.client.from('config').select('storeOrders').eq('id', 1).maybeSingle();
+      final cfg = await _fetchNgmyConfigRow(columns: 'storeOrders');
       if (cfg == null || cfg['storeOrders'] is! List) return;
       final remote = (cfg['storeOrders'] as List).map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
       widget.config.storeOrders = _mergeStoreOrdersLists(widget.config.storeOrders, remote);
@@ -30089,7 +30122,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         }
       }
       if (await ngmyDeviceIsOnline()) {
-        final row = await Supabase.instance.client.from('config').select('ngmyChatClosed').eq('id', 1).maybeSingle();
+        final row = await _fetchNgmyConfigRow(columns: 'ngmyChatClosed');
         if (row != null && row.containsKey('ngmyChatClosed')) {
           closed = row['ngmyChatClosed'] == true;
           widget.config.ngmyChatClosed = closed;

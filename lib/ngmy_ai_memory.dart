@@ -78,10 +78,26 @@ class NgmyAiMemoryStore {
     await prefs.setString(_storageKey(email), jsonEncode(list));
   }
 
-  /// Compact transcript for Gemini context window.
+  /// Compact transcript for Gemini context window (skips old API-key error loops).
   static String transcriptForPrompt(List<Map<String, dynamic>> memory, {int maxMessages = 24}) {
     if (memory.isEmpty) return '';
-    final slice = memory.length <= maxMessages ? memory : memory.sublist(memory.length - maxMessages);
+    final filtered = memory.where((m) {
+      final text = (m['text'] ?? '').toString().toLowerCase();
+      if (text.isEmpty) return false;
+      const skip = [
+        'api key',
+        'gemini connection',
+        'google ai studio',
+        'supabase config',
+        'could not reach gemini',
+        'ngmy helper is not connected',
+        'ai proxy not deployed',
+        'save global settings',
+      ];
+      return !skip.any(text.contains);
+    }).toList();
+    if (filtered.isEmpty) return '';
+    final slice = filtered.length <= maxMessages ? filtered : filtered.sublist(filtered.length - maxMessages);
     final buf = StringBuffer('Recent conversation memory (local, last ${slice.length} messages):\n');
     for (final m in slice) {
       final who = m['role'] == 'user' ? 'User' : 'Assistant';

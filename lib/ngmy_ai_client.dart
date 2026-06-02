@@ -255,6 +255,39 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
 }) async {
   try {
     final client = Supabase.instance.client;
+    final body = <String, dynamic>{
+      'provider': provider.name,
+      'apiKey': apiKey,
+      'prompt': prompt,
+      if (openAiBaseUrl != null && openAiBaseUrl.isNotEmpty) 'openAiBaseUrl': openAiBaseUrl,
+    };
+
+    // Preferred: Supabase Functions client (handles auth headers).
+    try {
+      final res = await client.functions.invoke('ngmy-ai-chat', body: body);
+      if (res.status == 200) {
+        final data = res.data;
+        if (data is Map) {
+          final text = data['text']?.toString();
+          if (text != null && text.trim().isNotEmpty) {
+            return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
+          }
+          final err = data['error']?.toString();
+          if (err != null && err.isNotEmpty) return (text: null, error: err);
+        }
+      } else if (res.status == 404) {
+        return (
+          text: null,
+          error: 'AI proxy not deployed yet. Admin: run supabase functions deploy ngmy-ai-chat in Supabase.',
+        );
+      } else {
+        return (text: null, error: 'AI proxy HTTP ${res.status}');
+      }
+    } catch (e) {
+      debugPrint('[ngmy-ai] functions.invoke failed: $e');
+    }
+
+    // Fallback: raw HTTP to functions URL.
     final restUrl = client.rest.url;
     final base = restUrl.contains('/rest/v1')
         ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
@@ -271,12 +304,7 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
             'Authorization': 'Bearer $token',
             if (anonKey.isNotEmpty) 'apikey': anonKey,
           },
-          body: jsonEncode({
-            'provider': provider.name,
-            'apiKey': apiKey,
-            'prompt': prompt,
-            if (openAiBaseUrl != null && openAiBaseUrl.isNotEmpty) 'openAiBaseUrl': openAiBaseUrl,
-          }),
+          body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 95));
     if (response.statusCode == 200) {
@@ -288,10 +316,16 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
       final err = data['error']?.toString();
       if (err != null && err.isNotEmpty) return (text: null, error: err);
     }
+    if (response.statusCode == 404) {
+      return (
+        text: null,
+        error: 'AI proxy not deployed. Deploy ngmy-ai-chat Edge Function in Supabase Dashboard.',
+      );
+    }
     return (text: null, error: _extractApiErrorMessage('HTTP ${response.statusCode}', body: response.body));
   } catch (e) {
     debugPrint('[ngmy-ai] proxy error: $e');
-    return (text: null, error: null);
+    return (text: null, error: _extractApiErrorMessage(e));
   }
 }
 
@@ -381,11 +415,15 @@ String ngmyAiHelperFailureMessage({
 }) {
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
-    return 'The helper is not connected yet. Ask an admin to save an AI API key in Admin → Management Hub → Save Global Settings.';
+    return 'NGMY Helper is not connected yet. An admin must save the AI API key in Management Hub → Save Global Settings, then reload the app.';
   }
   final provider = ngmyAiProviderLabel(creds.provider);
-  if (lastError != null && lastError.trim().isNotEmpty) {
-    return 'Could not reach $provider right now: $lastError';
+  final err = (lastError ?? '').trim();
+  if (err.contains('proxy not deployed') || err.contains('404')) {
+    return 'Your API key is saved, but the web AI proxy is not deployed in Supabase yet. Admin: deploy the ngmy-ai-chat Edge Function, then try again.';
   }
-  return 'Could not reach $provider right now. Check the API key in Admin → Management Hub (Gemini, OpenAI, or Claude keys are supported).';
+  if (err.isNotEmpty) {
+    return 'NGMY Helper could not reach $provider: $err';
+  }
+  return 'NGMY Helper could not reach $provider. Check the key in Management Hub and reload the app.';
 }
