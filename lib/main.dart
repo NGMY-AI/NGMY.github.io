@@ -9306,12 +9306,12 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
   final List<_GameDef> _games = const [
     _GameDef(id: 'dice', title: 'Dice Roll', subtitle: 'Roll for cash & prizes!', emoji: '🎲', icon: Icons.casino_rounded, colors: [Color(0xFF6D28D9), Color(0xFF7C3AED)]),
     _GameDef(id: 'puzzle', title: '8-Puzzle Solver', subtitle: 'Solve puzzle, win up to \$10', emoji: '🧩', icon: Icons.grid_view_rounded, colors: [Color(0xFF0EA5E9), Color(0xFF1D4ED8)]),
-    _GameDef(id: 'typing', title: 'Sentence Typing', subtitle: 'Type full sentences — earn by accuracy', emoji: '⌨️', icon: Icons.keyboard_rounded, colors: [Color(0xFF16A34A), Color(0xFF2563EB)]),
-    _GameDef(id: 'memory', title: 'Memory Match', subtitle: 'Match pairs, win \$5', emoji: '🧠', icon: Icons.psychology_rounded, colors: [Color(0xFFDB2777), Color(0xFF9333EA)]),
+    _GameDef(id: 'typing', title: 'Sentence Typing', subtitle: 'Type sentences — solo or invite a friend', emoji: '⌨️', icon: Icons.keyboard_rounded, colors: [Color(0xFF16A34A), Color(0xFF2563EB)]),
+    _GameDef(id: 'memory', title: 'Memory Match', subtitle: 'Match pairs — solo or multiplayer', emoji: '🧠', icon: Icons.psychology_rounded, colors: [Color(0xFFDB2777), Color(0xFF9333EA)]),
     _GameDef(id: 'math', title: 'Math Quiz', subtitle: '500+ questions, rewards', emoji: '➕', icon: Icons.calculate_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
     _GameDef(id: 'reflex', title: 'Reflex Test', subtitle: 'Quick clicks, win up to \$10', emoji: '⚡', icon: Icons.flash_on_rounded, colors: [Color(0xFFF97316), Color(0xFFDC2626)]),
-    _GameDef(id: 'scramble', title: 'Word Scramble', subtitle: 'Unscramble words', emoji: '🔤', icon: Icons.abc_rounded, colors: [Color(0xFF7C3AED), Color(0xFF9333EA)]),
-    _GameDef(id: 'pattern', title: 'Pattern Memory', subtitle: 'Remember patterns', emoji: '🎯', icon: Icons.extension_rounded, colors: [Color(0xFF4F46E5), Color(0xFF4338CA)]),
+    _GameDef(id: 'scramble', title: 'Word Scramble', subtitle: 'Unscramble words — solo or invite a friend', emoji: '🔤', icon: Icons.abc_rounded, colors: [Color(0xFF7C3AED), Color(0xFF9333EA)]),
+    _GameDef(id: 'pattern', title: 'Pattern Memory', subtitle: 'Remember the pattern — solo or multiplayer', emoji: '🎯', icon: Icons.extension_rounded, colors: [Color(0xFF4F46E5), Color(0xFF4338CA)]),
     _GameDef(id: 'sequence', title: 'Number Sequence', subtitle: 'Find patterns, win rewards', emoji: '🔢', icon: Icons.numbers_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
     _GameDef(id: 'simon', title: 'Simon Says', subtitle: 'Memory color game!', emoji: '🎮', icon: Icons.sports_esports_rounded, colors: [Color(0xFF7C3AED), Color(0xFF6D28D9)]),
     _GameDef(id: 'color', title: 'Color Rush', subtitle: 'Match colors fast!', emoji: '🎨', icon: Icons.palette_rounded, colors: [Color(0xFFDB2777), Color(0xFFBE185D)]),
@@ -9337,7 +9337,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
     _GameDef(id: 'profit_solve', title: 'Profit Solve', subtitle: 'Business profit — type the answer', emoji: '💰', icon: Icons.attach_money_rounded, colors: [Color(0xFF10B981), Color(0xFF047857)]),
   ];
 
-  void _sendInvite(_GameDef g, String toAccountId) async {
+  void _sendInvite(_GameDef g, String toAccountId, int matchesTotal) async {
     addGameInvite(
       widget.config.gameInvites,
       fromEmail: widget.user.email,
@@ -9345,6 +9345,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
       toEmail: toAccountId,
       gameId: g.id,
       gameTitle: g.title,
+      matchesTotal: matchesTotal,
     );
     widget.onDataChanged();
     await ngmyPublishGameInvites(widget.config.gameInvites);
@@ -9352,10 +9353,20 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
     setState(() {
       _liveInvites = widget.config.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
     });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Invite sent to $toAccountId for ${g.title}')));
+    final gamesLabel = matchesTotal == 1 ? '1 game' : '$matchesTotal games';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Invite sent to $toAccountId — ${g.title} ($gamesLabel)')));
   }
 
   void _openGame(_GameDef g, {String? inviteId}) {
+    if (inviteId != null && inviteId.trim().isNotEmpty) {
+      final inv = findInviteById(widget.config.gameInvites, inviteId.trim());
+      if (inv != null && inviteSeriesComplete(inv)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This match series is finished. Send a new invite to play again.')),
+        );
+        return;
+      }
+    }
     if (g.id == 'dice') {
       NgmyNavigator.push(
         context,
@@ -9408,7 +9419,10 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Multiplayer invite', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-            Text('${inv['fromName'] ?? inv['fromEmail']} wants to play ${inv['gameTitle']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            Text(
+              '${inv['fromName'] ?? inv['fromEmail']} wants to play ${inv['gameTitle']} (${(inv['matchesTotal'] as num?)?.toInt() ?? 1} game${((inv['matchesTotal'] as num?)?.toInt() ?? 1) == 1 ? '' : 's'})',
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -9462,7 +9476,10 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Active match', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-          Text('Continue ${g.title} vs $opponent', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(
+            'Continue ${g.title} vs $opponent — game ${((match['matchesPlayed'] as num?)?.toInt() ?? 0) + 1} of ${(match['matchesTotal'] as num?)?.toInt() ?? 1}',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
           const SizedBox(height: 8),
           FilledButton(
             onPressed: () => _openGame(g, inviteId: match['id'].toString()),
@@ -9518,7 +9535,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
                 onPressed: () => showMultiplayerInviteDialog(
                   context: context,
                   gameTitle: g.title,
-                  onSend: (id) => _sendInvite(g, id),
+                  onSend: (id, total) => _sendInvite(g, id, total),
                 ),
               ),
             const Padding(
@@ -9790,6 +9807,15 @@ class _GameBetScreenState extends State<GameBetScreen> {
   }
 
   void _startGame() {
+    if (widget.inviteId != null && widget.inviteId!.trim().isNotEmpty) {
+      final inv = findInviteById(widget.config.gameInvites, widget.inviteId!.trim());
+      if (inv != null && inviteSeriesComplete(inv)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This match series is finished. Send a new invite to play again.')),
+        );
+        return;
+      }
+    }
     final custom = double.tryParse(_customBetC.text.trim());
     final wager = (custom != null && custom >= 2) ? custom : _bet;
     if (wager < 2) {
@@ -10068,6 +10094,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   bool get _isPro => kNgmyProGameIds.contains(widget.gameId);
   bool get _isMultiplayer => widget.inviteId != null && widget.inviteId!.trim().isNotEmpty;
+  bool get _isSkillMultiplayer => _isMultiplayer && kNgmySkillMultiplayerGameIds.contains(widget.gameId);
 
   int get _simonTargetTaps => (kNgmySimonWinRounds * (kNgmySimonWinRounds + 1)) ~/ 2;
 
@@ -10170,19 +10197,19 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (_isMultiplayer) {
       _mpWaiting = true;
       _mpGateTitle = 'Waiting for opponent…';
-      _mpGateSubtitle = 'Both players must join before the game starts.';
+      _mpGateSubtitle = 'Both players must tap Accept or Join Match and enter the game before play starts.';
       unawaited(_initMultiplayerStartGate());
-      _mpGateTimer = Timer.periodic(const Duration(milliseconds: 700), (_) => unawaited(_pollMultiplayerStartGate()));
+      _mpGateTimer = Timer.periodic(const Duration(milliseconds: 500), (_) => unawaited(_pollMultiplayerStartGate()));
     }
     if (_isPro) {
       _initProGame();
       _miniTicker = Timer.periodic(const Duration(milliseconds: 50), (_) => _tickPro());
       if (_isMultiplayer) {
-        _mpSyncTimer = Timer.periodic(const Duration(milliseconds: 650), (_) => unawaited(_syncMultiplayerSession()));
+        _mpSyncTimer = Timer.periodic(const Duration(milliseconds: 400), (_) => unawaited(_syncMultiplayerSession()));
       }
     }
     if (_isMultiplayer && !_isPro) {
-      _mpSyncTimer = Timer.periodic(const Duration(milliseconds: 650), (_) => unawaited(_syncMultiplayerNonPro()));
+      _mpSyncTimer = Timer.periodic(const Duration(milliseconds: 400), (_) => unawaited(_syncMultiplayerNonPro()));
     }
     _roundTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _won) return;
@@ -10265,40 +10292,46 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (p1.isNotEmpty) session['player1Email'] = p1;
     if (p2.isNotEmpty) session['player2Email'] = p2;
 
-    final joinedRaw = session['joined'];
-    final joined = joinedRaw is Map ? Map<String, dynamic>.from(joinedRaw) : <String, dynamic>{};
-    if (publishJoin) joined[key] = true;
-    if (p1.isNotEmpty && !joined.containsKey(p1)) joined[p1] = false;
-    if (p2.isNotEmpty && !joined.containsKey(p2)) joined[p2] = false;
-    session['joined'] = joined;
+    final inGameRaw = session['inGame'];
+    final inGame = inGameRaw is Map ? Map<String, dynamic>.from(inGameRaw) : <String, dynamic>{};
+    if (publishJoin) inGame[key] = true;
+    if (p1.isNotEmpty && !inGame.containsKey(p1)) inGame[p1] = false;
+    if (p2.isNotEmpty && !inGame.containsKey(p2)) inGame[p2] = false;
+    session['inGame'] = inGame;
 
     DateTime? startAt;
     final startRaw = (session['startAt'] ?? '').toString();
     if (startRaw.isNotEmpty) startAt = DateTime.tryParse(startRaw)?.toLocal();
 
-    final bothJoined = p1.isNotEmpty && p2.isNotEmpty && joined[p1] == true && joined[p2] == true;
+    final bothInGame = p1.isNotEmpty && p2.isNotEmpty && inGame[p1] == true && inGame[p2] == true;
     final youAreP1 = p1.isNotEmpty && key == p1;
-    if (bothJoined && startAt == null && youAreP1) {
+    if (bothInGame && startAt == null && youAreP1) {
       startAt = DateTime.now().add(const Duration(seconds: 3));
       session['startAt'] = startAt.toUtc().toIso8601String();
       if (widget.gameId == 'memory' && session['memorySeed'] == null) {
         session['memorySeed'] = DateTime.now().microsecondsSinceEpoch % 2147483647;
         session['memoryMatched'] = <int>[];
       }
+      if (widget.gameId == 'pattern' && session['patternSeed'] == null) {
+        session['patternSeed'] = DateTime.now().microsecondsSinceEpoch % 2147483647;
+      }
     }
 
-    if (publishJoin || (bothJoined && youAreP1 && startAt != null)) {
+    if (publishJoin || (bothInGame && youAreP1 && startAt != null)) {
       await ngmyPublishInviteSession(widget.config.gameInvites, id, session);
       widget.onDataChanged();
     }
 
     if (!mounted) return;
-    if (!bothJoined) {
+    if (!bothInGame) {
+      final waitingOnOpponent = inGame[key] == true;
       setState(() {
         _mpWaiting = true;
         _mpStartAt = startAt;
-        _mpGateTitle = 'Waiting for opponent…';
-        _mpGateSubtitle = 'Opponent must join before the game starts.';
+        _mpGateTitle = waitingOnOpponent ? 'Waiting for opponent…' : 'Joining match…';
+        _mpGateSubtitle = waitingOnOpponent
+            ? 'Your opponent must accept the invite and tap Join Match to enter the game.'
+            : 'Entering the match room…';
       });
       return;
     }
@@ -10330,9 +10363,49 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         _mpWaiting = false;
         _mpStartAt = startAt;
       });
+      if (widget.gameId == 'pattern') {
+        unawaited(_beginPatternAfterMultiplayerGate());
+      }
     }
     _mpGateTimer?.cancel();
     _mpGateTimer = null;
+  }
+
+  void _buildPatternSequence({int? seed}) {
+    final rng = seed != null ? math.Random(seed) : _rng;
+    _patternSeq = List<int>.generate(kNgmyPatternMovesPerGame, (_) => rng.nextInt(9));
+    _patternProgress = 0;
+    _patternFlash = -1;
+  }
+
+  Future<void> _beginPatternAfterMultiplayerGate() async {
+    if (!_isMultiplayer || widget.inviteId == null || widget.gameId != 'pattern') return;
+    var seed = _patternSeedFromLocalInvite();
+    if (seed == null) {
+      final remote = await ngmyFetchInviteById(widget.inviteId!);
+      seed = _patternSeedFromInvite(remote);
+    }
+    if (!mounted) return;
+    _buildPatternSequence(seed: seed);
+    setState(() {
+      _prompt = 'Tap $kNgmyPatternMovesPerGame tiles in order — move 0/$kNgmyPatternMovesPerGame';
+    });
+    unawaited(_flashPattern());
+  }
+
+  int? _patternSeedFromInvite(Map<String, dynamic>? invite) {
+    if (invite == null) return null;
+    final session = invite['sessionState'];
+    if (session is! Map) return null;
+    final seedAny = session['patternSeed'];
+    if (seedAny is num) return seedAny.toInt();
+    return int.tryParse(seedAny?.toString() ?? '');
+  }
+
+  int? _patternSeedFromLocalInvite() {
+    if (widget.inviteId == null) return null;
+    final invite = findInviteById(widget.config.gameInvites, widget.inviteId!);
+    return _patternSeedFromInvite(invite);
   }
 
   Future<void> _loadBankIndex() async {
@@ -10441,6 +10514,9 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       case NgmyProMoveResult.continueGame:
         break;
     }
+    if (_isMultiplayer) {
+      await _completeMultiplayerMatchRound();
+    }
   }
 
   Future<void> _onProGameEnd(NgmyProMoveResult result, NgmyProState state) async {
@@ -10453,8 +10529,43 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     await _handleProGameEnd(result);
   }
 
+  Future<void> _leaveMultiplayerGate() async {
+    if (!_isMultiplayer || widget.inviteId == null || _won) return;
+    final id = widget.inviteId!.trim();
+    final invite = findInviteById(widget.config.gameInvites, id);
+    if (invite == null) return;
+    final key = widget.user.email.toLowerCase().trim();
+    final sessionRaw = invite['sessionState'];
+    if (sessionRaw is! Map) return;
+    final session = Map<String, dynamic>.from(sessionRaw);
+    final inGameRaw = session['inGame'];
+    final inGame = inGameRaw is Map ? Map<String, dynamic>.from(inGameRaw) : <String, dynamic>{};
+    inGame[key] = false;
+    session['inGame'] = inGame;
+    session.remove('startAt');
+    await ngmyPublishInviteSession(widget.config.gameInvites, id, session);
+    widget.onDataChanged();
+  }
+
+  Future<void> _completeMultiplayerMatchRound() async {
+    if (!_isMultiplayer || widget.inviteId == null) return;
+    final id = widget.inviteId!.trim();
+    final invite = findInviteById(widget.config.gameInvites, id);
+    if (invite == null) return;
+    final sessionRaw = invite['sessionState'];
+    final session = sessionRaw is Map ? Map<String, dynamic>.from(sessionRaw) : <String, dynamic>{};
+    session['gameOver'] = true;
+    updateInviteSession(widget.config.gameInvites, id, session);
+    recordInviteMatchPlayed(widget.config.gameInvites, id);
+    await ngmyPublishGameInvites(widget.config.gameInvites);
+    widget.onDataChanged();
+  }
+
   @override
   void dispose() {
+    if (_isMultiplayer && !_won) {
+      unawaited(_leaveMultiplayerGate());
+    }
     NgmyGameSession.leavePlayScreen();
     _simonPlayGen++;
     _roundTimer?.cancel();
@@ -10528,10 +10639,16 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         unawaited(_playSimonSequence());
         break;
       case 'pattern':
-        _patternSeq = List<int>.generate(kNgmyPatternMovesPerGame, (_) => _rng.nextInt(9));
-        _patternProgress = 0;
-        _prompt = 'Tap $kNgmyPatternMovesPerGame tiles in order — move 0/$kNgmyPatternMovesPerGame';
-        unawaited(_flashPattern());
+        if (_isMultiplayer) {
+          _patternSeq = [];
+          _patternProgress = 0;
+          _patternFlash = -1;
+          _prompt = 'Waiting to sync pattern with opponent…';
+        } else {
+          _buildPatternSequence();
+          _prompt = 'Tap $kNgmyPatternMovesPerGame tiles in order — move 0/$kNgmyPatternMovesPerGame';
+          unawaited(_flashPattern());
+        }
         break;
       case 'color':
         _colorQuestion = 0;
@@ -10660,13 +10777,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         _pairsFound++;
         _revealedCards = [];
       });
-      if (_isMultiplayer && widget.gameId == 'memory') {
-        unawaited(_publishMemoryMultiplayerProgress());
+      if (_isSkillMultiplayer) {
+        unawaited(_publishSkillMultiplayerProgress());
       }
       if (_pairsFound >= _memoryBase.length) {
         unawaited(_advanceBank());
-        if (_isMultiplayer && widget.gameId == 'memory') {
-          unawaited(_settleMemoryMultiplayer(forceComplete: true));
+        if (_isSkillMultiplayer) {
+          unawaited(_settleSkillMultiplayer(forceComplete: true));
         } else {
           unawaited(_payoutWin());
         }
@@ -10748,9 +10865,16 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (widget.gameId == 'scramble') {
       if (correct) {
         setState(() => _scrambleQuestion++);
+        if (_isSkillMultiplayer) {
+          unawaited(_publishSkillMultiplayerProgress());
+        }
         if (_scrambleQuestion >= kNgmyQuestionsPerGame) {
           unawaited(_advanceBank());
-          unawaited(_payoutWin(subtitle: 'All $kNgmyQuestionsPerGame words unscrambled!'));
+          if (_isSkillMultiplayer) {
+            unawaited(_settleSkillMultiplayer(forceComplete: true));
+          } else {
+            unawaited(_payoutWin(subtitle: 'All $kNgmyQuestionsPerGame words unscrambled!'));
+          }
         } else {
           _setupScrambleQuestion();
           _prompt = 'Word ${_scrambleQuestion + 1} of $kNgmyQuestionsPerGame — unscramble';
@@ -10833,14 +10957,17 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   }
 
   Future<void> _flashPattern() async {
+    if (_patternSeq.isEmpty) return;
     _patternShowing = true;
+    if (mounted) setState(() => _patternFlash = -1);
+    await Future<void>.delayed(const Duration(milliseconds: 120));
     for (final cell in _patternSeq) {
       if (!mounted) return;
       setState(() => _patternFlash = cell);
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await Future<void>.delayed(const Duration(milliseconds: 480));
       if (!mounted) return;
       setState(() => _patternFlash = -1);
-      await Future<void>.delayed(const Duration(milliseconds: 180));
+      await Future<void>.delayed(const Duration(milliseconds: 220));
     }
     if (mounted) setState(() => _patternShowing = false);
   }
@@ -10855,9 +10982,16 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       _patternProgress++;
       _prompt = 'Tap $kNgmyPatternMovesPerGame tiles in order — move $_patternProgress/$kNgmyPatternMovesPerGame';
     });
+    if (_isSkillMultiplayer) {
+      unawaited(_publishSkillMultiplayerProgress());
+    }
     if (_patternProgress >= kNgmyPatternMovesPerGame) {
       unawaited(_advanceBank());
-      unawaited(_payoutWin(subtitle: 'All $kNgmyPatternMovesPerGame moves correct!'));
+      if (_isSkillMultiplayer) {
+        unawaited(_settleSkillMultiplayer(forceComplete: true));
+      } else {
+        unawaited(_payoutWin(subtitle: 'All $kNgmyPatternMovesPerGame moves correct!'));
+      }
     }
   }
 
@@ -10893,8 +11027,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   Future<void> _settleProgress() async {
     if (_won) return;
-    if (_isMultiplayer && widget.gameId == 'memory') {
-      await _settleMemoryMultiplayer();
+    if (_isSkillMultiplayer) {
+      await _settleSkillMultiplayer();
       return;
     }
     final done = _gameProgressDone();
@@ -10911,8 +11045,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     }
   }
 
-  Future<void> _publishMemoryMultiplayerProgress() async {
-    if (!_isMultiplayer || widget.inviteId == null) return;
+  Future<void> _publishSkillMultiplayerProgress() async {
+    if (!_isSkillMultiplayer || widget.inviteId == null) return;
     final id = widget.inviteId!.trim();
     if (id.isEmpty) return;
     try {
@@ -10923,10 +11057,12 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       final session = sessionRaw is Map ? Map<String, dynamic>.from(sessionRaw) : <String, dynamic>{};
       final scoresRaw = session['scores'];
       final scores = scoresRaw is Map ? Map<String, dynamic>.from(scoresRaw) : <String, dynamic>{};
-      scores[key] = _pairsFound;
+      scores[key] = _gameProgressDone();
       session['scores'] = scores;
-      final matched = _matchedCards.toList()..sort();
-      session['memoryMatched'] = matched;
+      if (widget.gameId == 'memory') {
+        final matched = _matchedCards.toList()..sort();
+        session['memoryMatched'] = matched;
+      }
       final wagersRaw = session['wagers'];
       final wagers = wagersRaw is Map ? Map<String, dynamic>.from(wagersRaw) : <String, dynamic>{};
       wagers[key] = widget.wager;
@@ -10936,27 +11072,29 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     } catch (_) {}
   }
 
-  Future<void> _settleMemoryMultiplayer({bool forceComplete = false}) async {
+  Future<void> _settleSkillMultiplayer({bool forceComplete = false}) async {
     if (_won) return;
     if (!_isMultiplayer || widget.inviteId == null) {
       await _settleProgress();
       return;
     }
 
-    await _publishMemoryMultiplayerProgress();
+    await _publishSkillMultiplayerProgress();
     final id = widget.inviteId!.trim();
     final key = widget.user.email.toLowerCase().trim();
     final invite = await ngmyFetchInviteById(id);
+    final totalProgress = _gameProgressTotal();
     if (invite == null) {
       // Fallback: pay only your solo progress.
-      final ratio = (_pairsFound / _gameProgressTotal()).clamp(0.0, 1.0);
+      final ratio = (_gameProgressDone() / totalProgress).clamp(0.0, 1.0);
       if (ratio <= 0) {
         await _gameLose(reason: "Time's up — no progress to pay.");
       } else if (ratio >= 1.0) {
         await _payoutWin(subtitle: 'Complete! Max payout earned.');
       } else {
-        await _payoutPartial(ratio, done: _pairsFound, total: _gameProgressTotal());
+        await _payoutPartial(ratio, done: _gameProgressDone(), total: totalProgress);
       }
+      await _completeMultiplayerMatchRound();
       return;
     }
 
@@ -10968,15 +11106,15 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     final session = sessionRaw is Map ? Map<String, dynamic>.from(sessionRaw) : <String, dynamic>{};
     final scoresRaw = session['scores'];
     final scores = scoresRaw is Map ? Map<String, dynamic>.from(scoresRaw) : <String, dynamic>{};
-    final yourPairs = (scores[key] as num?)?.toInt() ?? _pairsFound;
-    final otherPairs = (scores[other] as num?)?.toInt() ?? 0;
+    final yourProgress = (scores[key] as num?)?.toInt() ?? _gameProgressDone();
+    final otherProgress = (scores[other] as num?)?.toInt() ?? 0;
 
-    final totalPairs = _gameProgressTotal();
-    final yourRatio = (yourPairs / totalPairs).clamp(0.0, 1.0);
+    final yourRatio = (yourProgress / totalProgress).clamp(0.0, 1.0);
 
     // Solo payout for YOUR progress (always).
     if (yourRatio <= 0) {
       await _gameLose(reason: "Time's up — no progress to pay.");
+      await _completeMultiplayerMatchRound();
       return;
     }
 
@@ -10985,8 +11123,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     final wagers = wagersRaw is Map ? Map<String, dynamic>.from(wagersRaw) : <String, dynamic>{};
     final otherWager = (wagers[other] as num?)?.toDouble() ?? 0.0;
 
-    final winnerEmail = yourPairs == otherPairs ? '' : (yourPairs > otherPairs ? key : other);
-    final bonusRatio = yourPairs >= totalPairs ? 1.0 : yourRatio;
+    final winnerEmail = yourProgress == otherProgress ? '' : (yourProgress > otherProgress ? key : other);
+    final bonusRatio = yourProgress >= totalProgress ? 1.0 : yourRatio;
     final bonus = (winnerEmail == key && otherWager > 0) ? otherWager * bonusRatio : 0.0;
 
     _won = true;
@@ -11010,8 +11148,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         type: TransactionType.reimbursement,
         method: PaymentMethod.system,
         sourceDetails: winnerEmail == key
-            ? 'Multiplayer memory payout: ${widget.gameTitle} ($yourPairs/$totalPairs) + bonus \$${bonus.toStringAsFixed(2)}'
-            : 'Multiplayer memory payout: ${widget.gameTitle} ($yourPairs/$totalPairs)',
+            ? 'Multiplayer payout: ${widget.gameTitle} ($yourProgress/$totalProgress) + bonus \$${bonus.toStringAsFixed(2)}'
+            : 'Multiplayer payout: ${widget.gameTitle} ($yourProgress/$totalProgress)',
         status: TransactionStatus.approved,
         timestamp: DateTime.now(),
       ),
@@ -11028,9 +11166,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     await _showEndPopup(
       win: true,
       title: 'MATCH OVER',
-      outcomeLabel: '$yourPairs/$totalPairs · $label',
+      outcomeLabel: '$yourProgress/$totalProgress · $label',
       subtitle: subtitle,
     );
+    await _completeMultiplayerMatchRound();
   }
 
   Future<void> _payoutPartial(double ratio, {required int done, required int total}) async {
@@ -11174,9 +11313,27 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2.6, color: Color(0xFFFBBF24)),
                     ),
                     const SizedBox(height: 12),
-                    Text(_mpGateTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                    Text(
+                      _mpGateTitle,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
                     const SizedBox(height: 6),
-                    Text(_mpGateSubtitle, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.25)),
+                    Text(
+                      _mpGateSubtitle,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        height: 1.25,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -11291,13 +11448,21 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
           _typingCorrectTotal += correct;
           if (_typingSentenceIdx >= kNgmyTypingSentencesPerGame - 1) {
             unawaited(_advanceBank());
-            final total = _typingSentences.fold<int>(0, (s, line) => s + line.length);
-            if (_typingCorrectTotal >= total) {
-              unawaited(_payoutWin(subtitle: 'All $kNgmyTypingSentencesPerGame sentences perfect — full payout!'));
+            if (_isSkillMultiplayer) {
+              unawaited(_publishSkillMultiplayerProgress());
+              unawaited(_settleSkillMultiplayer(forceComplete: true));
             } else {
-              unawaited(_payoutPartial(_typingCorrectTotal / total, done: _typingCorrectTotal, total: total));
+              final total = _typingSentences.fold<int>(0, (s, line) => s + line.length);
+              if (_typingCorrectTotal >= total) {
+                unawaited(_payoutWin(subtitle: 'All $kNgmyTypingSentencesPerGame sentences perfect — full payout!'));
+              } else {
+                unawaited(_payoutPartial(_typingCorrectTotal / total, done: _typingCorrectTotal, total: total));
+              }
             }
           } else {
+            if (_isSkillMultiplayer) {
+              unawaited(_publishSkillMultiplayerProgress());
+            }
             setState(() {
               _typingSentenceIdx++;
               _answer = _typingSentences[_typingSentenceIdx];
@@ -11450,14 +11615,22 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 6, mainAxisSpacing: 6, mainAxisExtent: side),
                       itemBuilder: (_, i) {
                         final lit = _patternFlash == i;
-                        return InkWell(
-                          onTap: () => _tapPattern(i),
-                          borderRadius: BorderRadius.circular(10),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 100),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: lit ? const Color(0xFF4ADE80) : Colors.white.withOpacity(0.12),
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _tapPattern(i),
+                            borderRadius: BorderRadius.circular(10),
+                            splashColor: Colors.transparent,
+                            highlightColor: Colors.transparent,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                color: lit ? const Color(0xFF22C55E) : const Color(0xFF3D3D5C),
+                                border: Border.all(
+                                  color: lit ? const Color(0xFF86EFAC) : const Color(0xFF5C5C7A),
+                                  width: lit ? 2.5 : 1,
+                                ),
+                              ),
                             ),
                           ),
                         );
@@ -15225,7 +15398,7 @@ class _StatsScreenState extends State<StatsScreen> {
               ),
               Transform.translate(
                 // Pull the growth frame up without moving the top 4 tiles.
-                offset: const Offset(0, -46),
+                offset: const Offset(0, -64),
                 child: Container(
                 width: double.infinity,
                 decoration: _statsFrameDecoration(context, elevated: true),

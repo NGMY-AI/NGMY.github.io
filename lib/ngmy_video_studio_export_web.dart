@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:html' as html;
+import 'dart:js_util' as js_util;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -11,8 +12,10 @@ import 'ngmy_news_banner_painter.dart';
 import 'ngmy_video_studio_models.dart';
 
 const _metaTimeout = Duration(seconds: 18);
-const _exportPlaybackRate = 2.0;
-const _maxRecordSeconds = 90.0;
+const _maxRecordSeconds = 180.0;
+const _exportCanvasFps = 60;
+const _exportVideoBitsPerSecond = 20000000;
+const _exportAudioBitsPerSecond = 320000;
 
 bool _ngmyIsAppleMobileBrowser() {
   final ua = html.window.navigator.userAgent.toLowerCase();
@@ -214,7 +217,40 @@ bool _webSupportsComposedCapture() {
   }
 }
 
-html.MediaStream? _safeCaptureStream(dynamic element, {int fps = 30}) {
+void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video) {
+  if (composed.getAudioTracks().isNotEmpty) return;
+  video.muted = false;
+  video.volume = 1.0;
+  try {
+    final cap = video.captureStream();
+    for (final t in cap.getAudioTracks()) {
+      composed.addTrack(t);
+      return;
+    }
+  } catch (e) {
+    debugPrint('[studio export] captureStream audio failed: $e');
+  }
+  try {
+    final ctor = js_util.getProperty(html.window, 'AudioContext') ??
+        js_util.getProperty(html.window, 'webkitAudioContext');
+    if (ctor == null) return;
+    final ctx = js_util.callConstructor(ctor, []);
+    final src = js_util.callMethod(ctx, 'createMediaElementSource', [video]);
+    final dest = js_util.callMethod(ctx, 'createMediaStreamDestination', []);
+    js_util.callMethod(src, 'connect', [dest]);
+    final stream = js_util.getProperty(dest, 'stream');
+    if (stream is html.MediaStream) {
+      for (final t in stream.getAudioTracks()) {
+        composed.addTrack(t);
+      }
+    }
+    js_util.callMethod(ctx, 'resume', []);
+  } catch (e) {
+    debugPrint('[studio export] WebAudio audio attach failed: $e');
+  }
+}
+
+html.MediaStream? _safeCaptureStream(dynamic element, {int fps = _exportCanvasFps}) {
   try {
     if (element is html.CanvasElement) {
       return element.captureStream(fps);
@@ -356,7 +392,7 @@ Future<String> exportNgmyVideoStudioComposed({
       ..style.zIndex = '-1';
     html.document.body?.append(canvas);
 
-    final canvasStream = _safeCaptureStream(canvas, fps: 30);
+    final canvasStream = _safeCaptureStream(canvas, fps: _exportCanvasFps);
     if (canvasStream != null) {
       for (final t in canvasStream.getVideoTracks()) {
         composed.addTrack(t);
@@ -382,13 +418,9 @@ Future<String> exportNgmyVideoStudioComposed({
       }
     }
 
-    final audioStream = _safeCaptureStream(videos.values.first);
-    if (audioStream != null) {
-      try {
-        for (final t in audioStream.getAudioTracks()) {
-          composed.addTrack(t);
-        }
-      } catch (_) {}
+    for (final v in videos.values) {
+      _appendVideoAudioTracks(composed, v);
+      if (composed.getAudioTracks().isNotEmpty) break;
     }
 
     if (composed.getTracks().isEmpty) {
@@ -416,7 +448,11 @@ Future<String> exportNgmyVideoStudioComposed({
     }
     mimeType ??= 'video/webm';
 
-    final recorder = html.MediaRecorder(composed, {'mimeType': mimeType});
+    final recorder = html.MediaRecorder(composed, {
+      'mimeType': mimeType,
+      'videoBitsPerSecond': _exportVideoBitsPerSecond,
+      'audioBitsPerSecond': _exportAudioBitsPerSecond,
+    });
     final chunks = <html.Blob>[];
     recorder.addEventListener('dataavailable', (event) {
       final b = (event as html.BlobEvent).data;
@@ -426,15 +462,19 @@ Future<String> exportNgmyVideoStudioComposed({
     recorder.addEventListener('stop', (_) => done.complete());
 
     for (final v in videos.values) {
-      v.playbackRate = _exportPlaybackRate;
+      v.playbackRate = 1.0;
       v.currentTime = 0;
     }
     await Future.wait(videos.values.map((v) => v.play()));
 
-    recorder.start(250);
+    recorder.start(100);
     var stopped = false;
     final startMs = DateTime.now().millisecondsSinceEpoch;
-    final recordTargetSec = durationSec / _exportPlaybackRate;
+
+    try {
+      ctx.imageSmoothingEnabled = true;
+      js_util.setProperty(ctx, 'imageSmoothingQuality', 'high');
+    } catch (_) {}
 
     void drawFrame(num _) {
       if (stopped) return;
@@ -494,9 +534,12 @@ Future<String> exportNgmyVideoStudioComposed({
       }
 
       final t = videos.values.first.currentTime;
+      final elapsedSec = (DateTime.now().millisecondsSinceEpoch - startMs) / 1000.0;
       onProgress?.call((t / durationSec).clamp(0.12, 0.98));
 
-      if (t >= durationSec - 0.05 || videos.values.first.ended) {
+      if (t >= durationSec - 0.08 ||
+          elapsedSec >= durationSec + 1.5 ||
+          videos.values.first.ended) {
         stopped = true;
         for (final v in videos.values) {
           v.pause();
@@ -512,7 +555,7 @@ Future<String> exportNgmyVideoStudioComposed({
 
     await Future.any([
       done.future,
-      Future.delayed(Duration(milliseconds: ((recordTargetSec + 8) * 1000).round())),
+      Future.delayed(Duration(milliseconds: ((durationSec + 12) * 1000).round())),
     ]);
 
     if (!done.isCompleted) {

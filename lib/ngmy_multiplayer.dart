@@ -13,6 +13,17 @@ const Set<String> kNgmyMultiplayerGameIds = {
   'pool_8ball',
   'poker_texas',
   'memory',
+  'typing',
+  'scramble',
+  'pattern',
+};
+
+/// Head-to-head skill games: progress scores synced; winner bonus like memory.
+const Set<String> kNgmySkillMultiplayerGameIds = {
+  'memory',
+  'typing',
+  'scramble',
+  'pattern',
 };
 
 const List<String> kNgmyProGameIds = [
@@ -106,6 +117,7 @@ void addGameInvite(
   required String toEmail,
   required String gameId,
   required String gameTitle,
+  required int matchesTotal,
 }) {
   final key = toEmail.toLowerCase().trim();
   invites.removeWhere((i) =>
@@ -121,7 +133,20 @@ void addGameInvite(
     'gameTitle': gameTitle,
     'status': 'pending',
     'createdAt': DateTime.now().toIso8601String(),
+    'matchesTotal': matchesTotal,
+    'matchesPlayed': 0,
+    'seriesStatus': 'active',
   });
+}
+
+int inviteMatchesRemaining(Map<String, dynamic> invite) {
+  final total = (invite['matchesTotal'] as num?)?.toInt() ?? 1;
+  final played = (invite['matchesPlayed'] as num?)?.toInt() ?? 0;
+  return (total - played).clamp(0, total);
+}
+
+bool inviteSeriesComplete(Map<String, dynamic> invite) {
+  return inviteMatchesRemaining(invite) <= 0;
 }
 
 List<Map<String, dynamic>> pendingInvitesFor(String email, List<Map<String, dynamic>> invites) {
@@ -136,13 +161,13 @@ List<Map<String, dynamic>> activeMatchesFor(String email, List<Map<String, dynam
   final key = email.toLowerCase().trim();
   return invites.where((i) {
     if ((i['status'] ?? '') != 'active') return false;
+    if (inviteSeriesComplete(i)) return false;
     final session = i['sessionState'];
     if (session is Map && session['gameOver'] == true) return false;
-    // Hide very stale active matches so Game Center doesn't show "Join Match" forever.
     final updatedAt = DateTime.tryParse((i['sessionUpdatedAt'] ?? '').toString()) ??
         DateTime.tryParse((i['respondedAt'] ?? '').toString()) ??
         DateTime.tryParse((i['createdAt'] ?? '').toString());
-    if (updatedAt != null && DateTime.now().difference(updatedAt).inHours > 8) return false;
+    if (updatedAt != null && DateTime.now().difference(updatedAt).inHours > 48) return false;
     final from = (i['fromEmail'] ?? '').toString().toLowerCase().trim();
     final to = (i['toEmail'] ?? '').toString().toLowerCase().trim();
     return from == key || to == key;
@@ -236,10 +261,58 @@ void activateInviteMatch(List<Map<String, dynamic>> invites, String id, {String?
     if ((i['id'] ?? '').toString() == id) {
       i['status'] = 'active';
       i['respondedAt'] = DateTime.now().toIso8601String();
-      i['sessionState'] = _initSessionForGame(i, accepterName: accepterName);
+      final session = _initSessionForGame(i, accepterName: accepterName);
+      final fromEmail = (i['fromEmail'] ?? '').toString().toLowerCase().trim();
+      final toEmail = (i['toEmail'] ?? '').toString().toLowerCase().trim();
+      final p1 = (session['player1Email'] ?? session['playerXEmail'] ?? fromEmail).toString().toLowerCase().trim();
+      final p2 = (session['player2Email'] ?? session['playerOEmail'] ?? toEmail).toString().toLowerCase().trim();
+      if (p1.isNotEmpty) session['player1Email'] = p1;
+      if (p2.isNotEmpty) session['player2Email'] = p2;
+      final inGame = <String, dynamic>{};
+      if (p1.isNotEmpty) inGame[p1] = false;
+      if (p2.isNotEmpty) inGame[p2] = false;
+      session['inGame'] = inGame;
+      i['sessionState'] = session;
       i['sessionUpdatedAt'] = DateTime.now().toIso8601String();
       return;
     }
+  }
+}
+
+/// After one game in a series ends: bump [matchesPlayed], finish invite when done, reset gate for next game.
+void recordInviteMatchPlayed(List<Map<String, dynamic>> invites, String id) {
+  for (final i in invites) {
+    if ((i['id'] ?? '').toString() != id) continue;
+    final played = ((i['matchesPlayed'] as num?)?.toInt() ?? 0) + 1;
+    i['matchesPlayed'] = played;
+    final total = (i['matchesTotal'] as num?)?.toInt() ?? 1;
+    if (played >= total) {
+      i['status'] = 'finished';
+      i['seriesStatus'] = 'complete';
+    } else {
+      final sessionRaw = i['sessionState'];
+      if (sessionRaw is Map) {
+        final s = Map<String, dynamic>.from(sessionRaw);
+        s['gameOver'] = false;
+        s.remove('startAt');
+        final p1 = (s['player1Email'] ?? s['playerXEmail'] ?? '').toString().toLowerCase().trim();
+        final p2 = (s['player2Email'] ?? s['playerOEmail'] ?? '').toString().toLowerCase().trim();
+        final inGame = <String, dynamic>{};
+        if (p1.isNotEmpty) inGame[p1] = false;
+        if (p2.isNotEmpty) inGame[p2] = false;
+        s['inGame'] = inGame;
+        final gid = (i['gameId'] ?? '').toString();
+        if (gid == 'memory') {
+          s['memoryMatched'] = <int>[];
+          s.remove('memorySeed');
+        } else if (gid == 'pattern') {
+          s.remove('patternSeed');
+        }
+        i['sessionState'] = s;
+      }
+    }
+    i['sessionUpdatedAt'] = DateTime.now().toIso8601String();
+    return;
   }
 }
 
@@ -248,9 +321,6 @@ void updateInviteSession(List<Map<String, dynamic>> invites, String id, Map<Stri
     if ((i['id'] ?? '').toString() == id) {
       i['sessionState'] = Map<String, dynamic>.from(sessionState);
       i['sessionUpdatedAt'] = DateTime.now().toIso8601String();
-      if (sessionState['gameOver'] == true) {
-        i['status'] = 'finished';
-      }
       return;
     }
   }
@@ -369,15 +439,16 @@ class NgmyGamePlayContext {
 Future<void> showMultiplayerInviteDialog({
   required BuildContext context,
   required String gameTitle,
-  required void Function(String accountId) onSend,
+  required void Function(String accountId, int matchesTotal) onSend,
 }) {
-  final c = TextEditingController();
+  final emailC = TextEditingController();
+  final gamesC = TextEditingController(text: '3');
   return showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Row(
         children: [
-          const Icon(Icons.groups_rounded, color: Color(0xFF7C3AED)),
+          const Icon(Icons.person_add_rounded, color: Color(0xFF7C3AED)),
           const SizedBox(width: 8),
           Expanded(child: Text('Invite Player — $gameTitle')),
         ],
@@ -387,16 +458,27 @@ Future<void> showMultiplayerInviteDialog({
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Enter the other player\'s account email. They will see the invite in Game Center within a few seconds.',
+            'Enter the other player\'s account email. They must accept the invite in Game Center to play.',
           ),
           const SizedBox(height: 12),
           TextField(
-            controller: c,
+            controller: emailC,
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
               labelText: 'Account email',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.person_search_rounded),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: gamesC,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Number of games in this match',
+              hintText: 'Best of 1–20 (default 3)',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.sports_esports_rounded),
             ),
           ),
         ],
@@ -405,14 +487,20 @@ Future<void> showMultiplayerInviteDialog({
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
         FilledButton(
           onPressed: () {
-            final id = c.text.trim();
-            if (id.isEmpty) return;
+            final email = emailC.text.trim();
+            if (email.isEmpty) return;
+            var total = int.tryParse(gamesC.text.trim()) ?? 3;
+            if (total < 1) total = 1;
+            if (total > 20) total = 20;
             Navigator.pop(ctx);
-            onSend(id);
+            onSend(email, total);
           },
           child: const Text('Send Invite'),
         ),
       ],
     ),
-  ).whenComplete(() => c.dispose());
+  ).whenComplete(() {
+    emailC.dispose();
+    gamesC.dispose();
+  });
 }
