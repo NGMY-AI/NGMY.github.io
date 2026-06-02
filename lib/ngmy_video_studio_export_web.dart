@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'ngmy_studio_download.dart';
 import 'ngmy_news_banner_painter.dart';
 import 'ngmy_video_studio_models.dart';
 
@@ -13,43 +14,102 @@ const _metaTimeout = Duration(seconds: 18);
 const _exportPlaybackRate = 2.0;
 const _maxRecordSeconds = 90.0;
 
-/// Triggers a file save in the browser. Revokes temporary object URLs only after a delay
-/// so mobile/desktop browsers can finish the download.
-Future<void> ngmyTriggerBrowserDownload(String href, String filename) async {
-  var downloadHref = href.trim();
-  String? tempObjectUrl;
+bool _ngmyIsAppleMobileBrowser() {
+  final ua = html.window.navigator.userAgent.toLowerCase();
+  return ua.contains('iphone') ||
+      ua.contains('ipad') ||
+      ua.contains('ipod') ||
+      (ua.contains('macintosh') && ua.contains('mobile'));
+}
 
-  if (downloadHref.startsWith('blob:') || downloadHref.startsWith('data:')) {
+Future<html.Blob?> _ngmyBlobFromHref(String href) async {
+  final src = href.trim();
+  if (src.isEmpty) return null;
+  if (src.startsWith('blob:') || src.startsWith('data:') || src.startsWith('http')) {
     try {
-      final resp = await html.HttpRequest.request(downloadHref, responseType: 'blob');
+      final resp = await html.HttpRequest.request(src, responseType: 'blob');
       final blob = resp.response as html.Blob?;
-      if (blob != null && blob.size > 0) {
-        tempObjectUrl = html.Url.createObjectUrlFromBlob(blob);
-        downloadHref = tempObjectUrl;
-        final type = blob.type;
-        if (!filename.contains('.') && type.isNotEmpty) {
-          final sub = type.split('/').last;
-          if (sub.isNotEmpty && sub != '*') filename = '$filename.$sub';
-        }
-      }
+      if (blob != null && blob.size > 0) return blob;
     } catch (e) {
-      debugPrint('[studio download] blob read failed, using href directly: $e');
+      debugPrint('[studio download] blob fetch failed: $e');
     }
   }
+  return null;
+}
 
-  final anchor = html.AnchorElement()
-    ..href = downloadHref
-    ..download = filename
-    ..style.display = 'none';
-  html.document.body?.append(anchor);
-  anchor.click();
+/// Triggers a file save in the browser. On iPhone opens the video so user can Share → Save Video.
+Future<String> ngmyTriggerBrowserDownload(String href, String filename) async {
+  var safeName = filename.trim().isEmpty ? 'ngmy_video.mp4' : filename.trim();
+  String? tempObjectUrl;
 
-  await Future<void>.delayed(const Duration(milliseconds: 1200));
-  anchor.remove();
+  try {
+    final blob = await _ngmyBlobFromHref(href);
+    if (blob != null) {
+      if (!safeName.contains('.') && blob.type.isNotEmpty) {
+        final sub = blob.type.split('/').last;
+        if (sub.isNotEmpty && sub != '*') safeName = '$safeName.$sub';
+      }
 
-  if (tempObjectUrl != null) {
-    await Future<void>.delayed(const Duration(seconds: 3));
-    html.Url.revokeObjectUrl(tempObjectUrl);
+      tempObjectUrl = html.Url.createObjectUrlFromBlob(blob);
+
+      if (_ngmyIsAppleMobileBrowser()) {
+        html.window.open(tempObjectUrl, '_blank');
+        return 'ios_open';
+      }
+
+      final anchor = html.AnchorElement()
+        ..href = tempObjectUrl
+        ..download = safeName
+        ..style.display = 'none';
+      html.document.body?.append(anchor);
+      anchor.click();
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      anchor.remove();
+      return 'saved';
+    }
+
+    if (_ngmyIsAppleMobileBrowser()) {
+      html.window.open(href, '_blank');
+      return 'ios_open';
+    }
+
+    final anchor = html.AnchorElement()
+      ..href = href
+      ..download = safeName
+      ..target = '_blank'
+      ..style.display = 'none';
+    html.document.body?.append(anchor);
+    anchor.click();
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    anchor.remove();
+    return 'saved';
+  } catch (e) {
+    debugPrint('[studio download] failed: $e');
+    return 'failed';
+  } finally {
+    if (tempObjectUrl != null) {
+      await Future<void>.delayed(const Duration(seconds: 45));
+      html.Url.revokeObjectUrl(tempObjectUrl);
+    }
+  }
+}
+
+String _ngmyDownloadResultMessage(String mode, {int clipCount = 1}) {
+  switch (mode) {
+    case 'ios_pending':
+      return 'Tap Open & Save Video below, then Share ↗ → Save Video (or Add to Photos).';
+    case 'ios_open':
+      return clipCount > 1
+          ? 'Each clip opened in a new tab — tap Share ↗ then Save Video for each one.'
+          : 'Video opened — tap Share ↗ at the bottom, then Save Video (or Add to Photos).';
+    case 'saved':
+      return clipCount > 1
+          ? 'Download started — saving $clipCount clip(s) to your device.'
+          : 'Download started — your video is saving now.';
+    case 'failed':
+      return 'Download failed. Try again or use Chrome on a computer.';
+    default:
+      return 'Download finished.';
   }
 }
 
@@ -70,8 +130,8 @@ Future<String> exportNgmyVideoStudioDirect({
 
   try {
     if (src.startsWith('blob:') || src.startsWith('http') || src.startsWith('https') || src.startsWith('data:')) {
-      await ngmyTriggerBrowserDownload(src, filename);
-      return 'Download started — your video file is saving now.';
+      final mode = await ngmyTriggerBrowserDownload(src, filename);
+      return _ngmyDownloadResultMessage(mode);
     }
     return 'Unsupported video source for download.';
   } catch (e) {
@@ -115,17 +175,22 @@ html.MediaStream? _safeCaptureStream(dynamic element, {int fps = 30}) {
 
 Future<String> _downloadAllVideoClips(Map<String, String> sources) async {
   var n = 0;
+  var lastMode = 'saved';
   for (final src in sources.values) {
     if (src.trim().isEmpty) continue;
-    await exportNgmyVideoStudioDirect(videoSourceUrl: src);
+    var ext = 'mp4';
+    final lower = src.toLowerCase();
+    if (lower.contains('.webm')) ext = 'webm';
+    else if (lower.contains('.mov')) ext = 'mov';
+    final filename = 'ngmy_studio_${DateTime.now().millisecondsSinceEpoch}_$n.$ext';
+    lastMode = await ngmyTriggerBrowserDownload(src, filename);
     n++;
     if (n < sources.length) {
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await Future<void>.delayed(const Duration(milliseconds: 600));
     }
   }
   if (n == 0) return 'No video to download.';
-  if (n == 1) return 'Download started — your video is saving now.';
-  return 'Download started — saving $n clip(s). Full studio merge works best in Chrome on desktop.';
+  return _ngmyDownloadResultMessage(lastMode, clipCount: n);
 }
 
 void _configureVideoElement(html.VideoElement v, String src) {
@@ -407,13 +472,18 @@ Future<String> exportNgmyVideoStudioComposed({
     final ext = mimeType!.contains('mp4') ? 'mp4' : 'webm';
     final filename = 'ngmy_${config.format.name}_${config.outputWidth}x${config.outputHeight}_$startMs.$ext';
     final url = html.Url.createObjectUrlFromBlob(blob);
-    await ngmyTriggerBrowserDownload(url, filename);
-    await Future<void>.delayed(const Duration(seconds: 3));
-    html.Url.revokeObjectUrl(url);
-    if (!usedCanvasStream) {
-      return 'Downloaded $filename (video track — full studio merge needs Chrome/Edge on desktop).';
+    if (_ngmyIsAppleMobileBrowser()) {
+      ngmyStageIosStudioVideo(url, filename);
+      if (!usedCanvasStream) {
+        return '${_ngmyDownloadResultMessage('ios_pending')} (Full studio merge works best in Chrome on desktop.)';
+      }
+      return _ngmyDownloadResultMessage('ios_pending');
     }
-    return 'Downloaded $filename';
+    final mode = await ngmyTriggerBrowserDownload(url, filename);
+    if (!usedCanvasStream) {
+      return '${_ngmyDownloadResultMessage(mode)} (video track — full studio merge needs Chrome/Edge on desktop.)';
+    }
+    return _ngmyDownloadResultMessage(mode);
   } catch (e, st) {
     debugPrint('[studio export] composed failed: $e\n$st');
     try {

@@ -72,20 +72,22 @@ const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Supabase.initialize(
-      url: 'https://gvufllqqxjnpicmkxzcg.supabase.co',
-      anonKey:
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2dWZsbHFxeGpucGljbWt4emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA1OTksImV4cCI6MjA5NTM5NjU5OX0.NoJnis6t_RLSJOHu5iLdjGaCTxVj5ZAFnG3gBZ3XYbM',
-      authOptions: const FlutterAuthClientOptions(
-        authFlowType: AuthFlowType.pkce,
-        detectSessionInUri: true,
-      ),
-    );
-    await ngmyRecoverOAuthSessionIfNeeded();
-  } catch (e) {
-    debugPrint('Supabase init failed (app still starts): $e');
-  }
+  await ngmyIgnoreTimeout(() async {
+    try {
+      await Supabase.initialize(
+        url: 'https://gvufllqqxjnpicmkxzcg.supabase.co',
+        anonKey:
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2dWZsbHFxeGpucGljbWt4emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA1OTksImV4cCI6MjA5NTM5NjU5OX0.NoJnis6t_RLSJOHu5iLdjGaCTxVj5ZAFnG3gBZ3XYbM',
+        authOptions: const FlutterAuthClientOptions(
+          authFlowType: AuthFlowType.pkce,
+          detectSessionInUri: true,
+        ),
+      );
+      await ngmyRecoverOAuthSessionIfNeeded();
+    } catch (e) {
+      debugPrint('Supabase init failed (app still starts): $e');
+    }
+  }, timeout: const Duration(seconds: 10));
   runApp(
     kIsWeb
         ? const ExcludeSemantics(child: NgmyWebViewportGuard(child: NGMYApp()))

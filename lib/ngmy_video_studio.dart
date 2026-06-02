@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import 'ngmy_studio_download.dart';
 import 'ngmy_video_studio_blob_stub.dart' if (dart.library.html) 'ngmy_video_studio_blob.dart' as blob_util;
 import 'ngmy_video_studio_export.dart';
 import 'ngmy_video_studio_logo.dart';
@@ -291,6 +292,48 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     );
   }
 
+  Future<void> _showIosSaveVideoDialog(String hint) async {
+    if (!mounted) return;
+    final name = ngmyStagedIosStudioVideoName ?? 'your video';
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title: const Text('Save your video', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+        content: Text(
+          '$hint\n\nFile: $name',
+          style: const TextStyle(color: Colors.white70, height: 1.35),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ngmyClearStagedIosStudioVideo();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF00B25A)),
+            onPressed: () {
+              ngmyOpenStagedIosStudioVideo();
+              Navigator.pop(ctx);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Video opened — tap Share ↗ then Save Video.'),
+                    duration: Duration(seconds: 5),
+                  ),
+                );
+              }
+            },
+            child: const Text('Open & Save Video'),
+          ),
+        ],
+      ),
+    );
+    if (ngmyHasStagedIosStudioVideo) ngmyClearStagedIosStudioVideo();
+  }
+
   Future<void> _export() async {
     final hasVideo = _slotMedia.values.any((m) => m.source != null && m.source!.isNotEmpty);
     if (!hasVideo) {
@@ -323,7 +366,13 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                 });
               },
             );
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      if (mounted) {
+        if (ngmyHasStagedIosStudioVideo) {
+          await _showIosSaveVideoDialog(msg);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

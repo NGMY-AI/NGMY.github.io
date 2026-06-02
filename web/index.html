@@ -114,7 +114,7 @@
 
     flutter-view, flt-glass-pane {
 
-      background-color: transparent !important;
+      background-color: #121212;
 
       -webkit-user-select: text;
 
@@ -334,12 +334,18 @@
   <script>
     (function () {
       var deployId = '__NGMY_DEPLOY_ID__';
-      var bootstrapSrc = 'flutter_bootstrap.js?v=' + deployId;
+      var bootstrapSrc = 'flutter_bootstrap.js';
       var loadAttempts = 0;
 
-      function showBootstrapError() {
+      function hideNgmyBoot() {
         var boot = document.getElementById('ngmy-boot');
         if (boot) boot.style.display = 'none';
+      }
+
+      window.addEventListener('flutter-first-frame', hideNgmyBoot, { once: true });
+
+      function showBootstrapError() {
+        hideNgmyBoot();
         window.__ngmyShowLoadError && window.__ngmyShowLoadError(
           navigator.onLine
             ? 'Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/'
@@ -352,10 +358,6 @@
         var s = document.createElement('script');
         s.src = bootstrapSrc;
         s.async = false;
-        s.onload = function () {
-          var boot = document.getElementById('ngmy-boot');
-          if (boot) boot.style.display = 'none';
-        };
         s.onerror = function () {
           if (loadAttempts < 3) {
             setTimeout(loadFlutterBootstrap, loadAttempts === 1 ? 400 : 1200);
@@ -367,12 +369,26 @@
       }
 
       function startApp() {
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', loadFlutterBootstrap);
+        var go = function () {
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadFlutterBootstrap);
+          } else {
+            loadFlutterBootstrap();
+          }
+        };
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.ready.then(go).catch(go);
+          setTimeout(go, 2500);
         } else {
-          loadFlutterBootstrap();
+          go();
         }
       }
+
+      setTimeout(function () {
+        if (!document.querySelector('flutter-view') && !window._flutter) {
+          if (!navigator.onLine) showBootstrapError();
+        }
+      }, 50000);
 
       if (!('serviceWorker' in navigator)) {
         startApp();

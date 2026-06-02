@@ -48,9 +48,27 @@ const INDEX_CANDIDATES = [
   'index.html',
 ];
 
+async function cacheLookup(request) {
+  const hit = await caches.match(request);
+  if (hit) return hit;
+  return caches.match(request, { ignoreSearch: true });
+}
+
+async function cacheLookupByPathname(url) {
+  const cache = await caches.open(CACHE_NAME);
+  const keys = await cache.keys();
+  for (const req of keys) {
+    if (new URL(req.url).pathname === url.pathname) {
+      const match = await cache.match(req);
+      if (match) return match;
+    }
+  }
+  return undefined;
+}
+
 async function offlineDocument() {
   for (const u of INDEX_CANDIDATES) {
-    const hit = await caches.match(u);
+    const hit = await cacheLookup(new Request(u));
     if (hit) return hit;
   }
   return undefined;
@@ -79,20 +97,12 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      const cached = await caches.match(event.request);
-
-      if (isAppShellAsset(url) && cached) {
-        event.waitUntil(
-          fetch(event.request)
-            .then((res) => {
-              if (res && res.status === 200) return cache.put(event.request, res.clone());
-            })
-            .catch(() => {}),
-        );
-        return cached;
+      let cached = await cacheLookup(event.request);
+      if (!cached && (isAppShellAsset(url) || isCriticalScript(url))) {
+        cached = await cacheLookupByPathname(url);
       }
 
-      if (isCriticalScript(url) && cached) {
+      if ((isAppShellAsset(url) || isCriticalScript(url)) && cached) {
         event.waitUntil(
           fetch(event.request)
             .then((res) => {
@@ -113,9 +123,12 @@ self.addEventListener('fetch', (event) => {
         } catch (_) {
           const offline = await offlineDocument();
           if (offline) return offline;
-          return cached || new Response(
-            '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NGMY Offline</title></head><body style="font-family:system-ui;background:#121212;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px"><div><h2>NGMY is offline</h2><p>Open the app once while online so it can cache for offline use.</p><button onclick="location.reload()" style="margin-top:16px;padding:12px 24px;border:none;border-radius:8px;background:#00B25A;color:#fff;font-weight:700">Retry</button></div></body></html>',
-            { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+          return (
+            cached ||
+            new Response(
+              '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NGMY Offline</title></head><body style="font-family:system-ui;background:#121212;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px"><div><h2>NGMY is offline</h2><p>Open the app once while online so it can cache for offline use.</p><button onclick="location.reload()" style="margin-top:16px;padding:12px 24px;border:none;border-radius:8px;background:#00B25A;color:#fff;font-weight:700">Retry</button></div></body></html>',
+              { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+            )
           );
         }
       }
@@ -138,6 +151,8 @@ self.addEventListener('fetch', (event) => {
         }
         return res;
       } catch (_) {
+        const fallback = await cacheLookupByPathname(url);
+        if (fallback) return fallback;
         return cached;
       }
     })(),
