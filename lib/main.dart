@@ -10178,8 +10178,11 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       _initProGame();
       _miniTicker = Timer.periodic(const Duration(milliseconds: 50), (_) => _tickPro());
       if (_isMultiplayer) {
-        _mpSyncTimer = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(_syncMultiplayerSession()));
+        _mpSyncTimer = Timer.periodic(const Duration(milliseconds: 650), (_) => unawaited(_syncMultiplayerSession()));
       }
+    }
+    if (_isMultiplayer && !_isPro) {
+      _mpSyncTimer = Timer.periodic(const Duration(milliseconds: 650), (_) => unawaited(_syncMultiplayerNonPro()));
     }
     _roundTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _won) return;
@@ -10192,6 +10195,50 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       }
       setState(() => _secondsLeft--);
     });
+  }
+
+  Future<void> _syncMultiplayerNonPro() async {
+    if (!_isMultiplayer || widget.inviteId == null || _won) return;
+    final remote = await ngmyFetchInviteById(widget.inviteId!);
+    if (remote == null || !mounted) return;
+    final session = remote['sessionState'];
+    if (session is! Map) return;
+    final s = Map<String, dynamic>.from(session);
+    if (widget.gameId == 'memory') {
+      final matched = <int>{};
+      final matchedRaw = s['memoryMatched'];
+      if (matchedRaw is List) {
+        for (final i in matchedRaw) {
+          final n = (i is num) ? i.toInt() : int.tryParse(i.toString());
+          if (n != null) matched.add(n);
+        }
+      }
+      final seedAny = s['memorySeed'];
+      final seed = (seedAny is num) ? seedAny.toInt() : int.tryParse(seedAny?.toString() ?? '');
+
+      var changed = false;
+      if (matched.length != _matchedCards.length || !_matchedCards.containsAll(matched)) {
+        _matchedCards
+          ..clear()
+          ..addAll(matched);
+        _pairsFound = (_matchedCards.length / 2).floor();
+        // If opponent matched something you were revealing, close them.
+        _revealedCards.removeWhere((i) => _matchedCards.contains(i));
+        changed = true;
+      }
+      if (seed != null && _memoryValues.isNotEmpty) {
+        // Ensure board order matches session seed.
+        final expected = [..._memoryBase, ..._memoryBase]..shuffle(math.Random(seed));
+        if (expected.length == _memoryValues.length) {
+          // Compare just a few positions to avoid heavy compares.
+          if (expected[0] != _memoryValues[0] || expected[1] != _memoryValues[1]) {
+            _memoryValues = expected;
+            changed = true;
+          }
+        }
+      }
+      if (changed && mounted) setState(() {});
+    }
   }
 
   Future<void> _initMultiplayerStartGate() async {
@@ -10234,6 +10281,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (bothJoined && startAt == null && youAreP1) {
       startAt = DateTime.now().add(const Duration(seconds: 3));
       session['startAt'] = startAt.toUtc().toIso8601String();
+      if (widget.gameId == 'memory' && session['memorySeed'] == null) {
+        session['memorySeed'] = DateTime.now().microsecondsSinceEpoch % 2147483647;
+        session['memoryMatched'] = <int>[];
+      }
     }
 
     if (publishJoin || (bothJoined && youAreP1 && startAt != null)) {
@@ -10568,7 +10619,31 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     _matchedCards.clear();
     _revealedCards = [];
     _lockingCards = false;
-    _memoryValues = [..._memoryBase, ..._memoryBase]..shuffle(_rng);
+    _memoryValues = [..._memoryBase, ..._memoryBase];
+    if (_isMultiplayer && widget.inviteId != null) {
+      // Multiplayer must share the same board. Use a deterministic seed stored in session.
+      // If missing, player1 creates it (through the start gate / first sync).
+      final inv = findInviteById(widget.config.gameInvites, widget.inviteId!);
+      final sessionRaw = inv?['sessionState'];
+      final session = sessionRaw is Map ? Map<String, dynamic>.from(sessionRaw) : <String, dynamic>{};
+      final seedAny = session['memorySeed'];
+      final seed = (seedAny is num) ? seedAny.toInt() : int.tryParse(seedAny?.toString() ?? '');
+      if (seed != null) {
+        _memoryValues.shuffle(math.Random(seed));
+      } else {
+        _memoryValues.shuffle(_rng);
+      }
+      final matchedRaw = session['memoryMatched'];
+      if (matchedRaw is List) {
+        for (final i in matchedRaw) {
+          final n = (i is num) ? i.toInt() : int.tryParse(i.toString());
+          if (n != null) _matchedCards.add(n);
+        }
+        _pairsFound = (_matchedCards.length / 2).floor();
+      }
+    } else {
+      _memoryValues.shuffle(_rng);
+    }
   }
 
   void _pickMemoryCard(int index) {
@@ -10850,6 +10925,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       final scores = scoresRaw is Map ? Map<String, dynamic>.from(scoresRaw) : <String, dynamic>{};
       scores[key] = _pairsFound;
       session['scores'] = scores;
+      final matched = _matchedCards.toList()..sort();
+      session['memoryMatched'] = matched;
       final wagersRaw = session['wagers'];
       final wagers = wagersRaw is Map ? Map<String, dynamic>.from(wagersRaw) : <String, dynamic>{};
       wagers[key] = widget.wager;
@@ -15148,7 +15225,7 @@ class _StatsScreenState extends State<StatsScreen> {
               ),
               Transform.translate(
                 // Pull the growth frame up without moving the top 4 tiles.
-                offset: const Offset(0, -28),
+                offset: const Offset(0, -46),
                 child: Container(
                 width: double.infinity,
                 decoration: _statsFrameDecoration(context, elevated: true),

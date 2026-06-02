@@ -138,6 +138,11 @@ List<Map<String, dynamic>> activeMatchesFor(String email, List<Map<String, dynam
     if ((i['status'] ?? '') != 'active') return false;
     final session = i['sessionState'];
     if (session is Map && session['gameOver'] == true) return false;
+    // Hide very stale active matches so Game Center doesn't show "Join Match" forever.
+    final updatedAt = DateTime.tryParse((i['sessionUpdatedAt'] ?? '').toString()) ??
+        DateTime.tryParse((i['respondedAt'] ?? '').toString()) ??
+        DateTime.tryParse((i['createdAt'] ?? '').toString());
+    if (updatedAt != null && DateTime.now().difference(updatedAt).inHours > 8) return false;
     final from = (i['fromEmail'] ?? '').toString().toLowerCase().trim();
     final to = (i['toEmail'] ?? '').toString().toLowerCase().trim();
     return from == key || to == key;
