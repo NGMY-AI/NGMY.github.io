@@ -68,6 +68,13 @@ Future<String> ngmyTriggerBrowserDownload(String href, String filename) async {
   String? tempObjectUrl;
 
   try {
+    if (href.startsWith('blob:') || href.startsWith('http') || href.startsWith('data:')) {
+      if (_ngmyIsAppleMobileBrowser()) {
+        final shared = await ngmyTryShareStudioVideoUrl(href, safeName);
+        if (shared) return 'shared';
+      }
+    }
+
     if (href.startsWith('blob:')) {
       if (_ngmyIsAppleMobileBrowser()) {
         ngmyStageIosStudioVideo(href, safeName);
@@ -94,6 +101,8 @@ Future<String> ngmyTriggerBrowserDownload(String href, String filename) async {
       tempObjectUrl = html.Url.createObjectUrlFromBlob(blob);
 
       if (_ngmyIsAppleMobileBrowser()) {
+        final shared = await ngmyTryShareStudioVideoUrl(tempObjectUrl, safeName);
+        if (shared) return 'shared';
         ngmyStageIosStudioVideo(tempObjectUrl, safeName);
         return 'ios_pending';
       }
@@ -138,6 +147,8 @@ Future<String> ngmyTriggerBrowserDownload(String href, String filename) async {
 
 String _ngmyDownloadResultMessage(String mode, {int clipCount = 1}) {
   switch (mode) {
+    case 'shared':
+      return 'Video shared — choose Save Video or Save to Files.';
     case 'ios_pending':
       return 'Tap Open & Save Video below, then Share ↗ → Save Video (or Add to Photos).';
     case 'ios_open':

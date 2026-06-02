@@ -297,11 +297,12 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     final name = ngmyStagedIosStudioVideoName ?? 'your video';
     await showDialog<void>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A2E),
         title: const Text('Save your video', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
         content: Text(
-          '$hint\n\nFile: $name',
+          'Tap Save below, then choose Save Video or Add to Photos.\n\nFile: $name',
           style: const TextStyle(color: Colors.white70, height: 1.35),
         ),
         actions: [
@@ -314,19 +315,24 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFF00B25A)),
-            onPressed: () {
-              ngmyOpenStagedIosStudioVideo();
+            onPressed: () async {
               Navigator.pop(ctx);
+              final shared = await ngmyTryShareStagedStudioVideo();
+              if (!shared) ngmyOpenStagedIosStudioVideo();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Video opened — tap Share ↗ then Save Video.'),
-                    duration: Duration(seconds: 5),
+                  SnackBar(
+                    content: Text(
+                      shared
+                          ? 'Choose Save Video in the share menu.'
+                          : 'Video opened — tap Share ↗ then Save Video.',
+                    ),
+                    duration: const Duration(seconds: 6),
                   ),
                 );
               }
             },
-            child: const Text('Open & Save Video'),
+            child: const Text('Save to Photos / Files'),
           ),
         ],
       ),
@@ -369,8 +375,14 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       if (mounted) {
         if (ngmyHasStagedIosStudioVideo) {
           await _showIosSaveVideoDialog(msg);
+        } else if (msg.toLowerCase().contains('failed') || msg.toLowerCase().contains('unsupported')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700),
+          );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg), duration: const Duration(seconds: 5)),
+          );
         }
       }
     } catch (e) {
@@ -406,21 +418,26 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           ],
         ),
         actions: [
-          if (_exporting && _exportStatus.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: Center(
-                child: Text(
-                  _exportStatus,
-                  style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
-                ),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: FilledButton.icon(
+              onPressed: _exporting ? null : _export,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF00B25A),
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFF00B25A).withValues(alpha: 0.55),
+                disabledForegroundColor: Colors.white70,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
+              icon: _exporting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.download_rounded, size: 18),
+              label: Text(_exporting ? (_exportStatus.isNotEmpty ? _exportStatus : 'Saving…') : 'Download'),
             ),
-          TextButton.icon(
-            onPressed: _exporting ? null : _export,
-            icon: const Icon(Icons.download_rounded, size: 20),
-            label: const Text('Download'),
-            style: TextButton.styleFrom(foregroundColor: Colors.white),
           ),
           IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(context)),
         ],

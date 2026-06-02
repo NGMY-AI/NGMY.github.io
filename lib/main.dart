@@ -2057,9 +2057,19 @@ void _ngmyApplyMidnightClockReset(UserData user) {
   }
 }
 
+/// Minutes after midnight before late clock-in UI appears (12:10 AM).
+const int kNgmyLateClockUiStartMinutes = 10;
+
+int _ngmyMinutesSinceMidnight(DateTime now) {
+  return now.difference(_ngmyDateOnly(now)).inMinutes;
+}
+
+bool _ngmyShowLateClockUi(DateTime now) =>
+    _ngmyMinutesSinceMidnight(now) >= kNgmyLateClockUiStartMinutes;
+
 double _ngmyClockInLatePenaltyPercent(DateTime now) {
-  final midnight = _ngmyDateOnly(now);
-  final minutesLate = now.difference(midnight).inMinutes;
+  final minutesLate = _ngmyMinutesSinceMidnight(now);
+  if (minutesLate < kNgmyLateClockUiStartMinutes) return 0;
   if (minutesLate >= 30) return 20;
   if (minutesLate >= 10) return 15;
   return 0;
@@ -6977,9 +6987,10 @@ class _LateClockInDialogState extends State<_LateClockInDialog> with SingleTicke
     super.dispose();
   }
 
-  String _formatLate(DateTime now) {
-    final midnight = _ngmyDateOnly(now);
-    final diff = now.difference(midnight);
+  String _formatLate(DateTime clockTime) {
+    if (!_ngmyShowLateClockUi(clockTime)) return 'Session started';
+    final midnight = _ngmyDateOnly(clockTime);
+    final diff = clockTime.difference(midnight);
     final hours = diff.inHours;
     final mins = diff.inMinutes % 60;
     if (hours <= 0 && mins <= 0) return 'Right on time';
@@ -6990,7 +7001,8 @@ class _LateClockInDialogState extends State<_LateClockInDialog> with SingleTicke
   @override
   Widget build(BuildContext context) {
     final penalty = widget.penaltyPercent;
-    final onTime = penalty <= 0;
+    final showLate = _ngmyShowLateClockUi(widget.clockTime);
+    final onTime = !showLate || penalty <= 0;
     final accent = onTime ? const Color(0xFF00B25A) : (penalty >= 20 ? const Color(0xFFEF4444) : const Color(0xFFF97316));
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -7034,16 +7046,17 @@ class _LateClockInDialogState extends State<_LateClockInDialog> with SingleTicke
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  onTime ? 'Clock-In Confirmed' : 'Late Clock-In',
+                  showLate && !onTime ? 'Late Clock-In' : 'Clock-In Confirmed',
                   style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  _formatLate(widget.clockTime),
-                  style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 14),
-                if (!onTime)
+                if (showLate)
+                  Text(
+                    _formatLate(widget.clockTime),
+                    style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                if (showLate) const SizedBox(height: 14),
+                if (showLate && !onTime)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -7069,18 +7082,12 @@ class _LateClockInDialogState extends State<_LateClockInDialog> with SingleTicke
                       ],
                     ),
                   )
-                else
+                else if (showLate)
                   Text(
                     'You clocked in before the penalty window. Full daily earnings apply.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 12),
                   ),
-                const SizedBox(height: 10),
-                Text(
-                  'Daily earnings reach 100% by 12:00 PM. The later you clock in, the faster your battery fills.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white.withOpacity(0.72), fontSize: 11.5, height: 1.35),
-                ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
@@ -7229,6 +7236,55 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _showClockInConfirmedDialog() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF052E16), Color(0xFF14532D)],
+            ),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.verified_rounded, color: Color(0xFF00B25A), size: 48),
+              const SizedBox(height: 14),
+              const Text(
+                'Clock-In Confirmed',
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF00B25A),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void didUpdateWidget(MainScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -7366,7 +7422,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           widget.user.clockInPenaltyPercent = penalty;
         });
         widget.onDataChanged();
-        if (!onTrial) await _showLateClockInDialog(penalty, now);
+        if (!onTrial) {
+          if (_ngmyShowLateClockUi(now)) {
+            await _showLateClockInDialog(penalty, now);
+          } else {
+            await _showClockInConfirmedDialog();
+          }
+        }
       }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead),
       InvestScreen(user: widget.user, plans: widget.globalPlans, onInvest: (n, p, r, cost) {
         if (cost <= 0) {
@@ -8413,17 +8475,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     if (_ngmyIsPastNoon(now) && !widget.user.isClockedIn) {
       return (message: 'Missed today · Opens at midnight', penalty: 0, blocked: true);
     }
+    if (!_ngmyShowLateClockUi(now)) return null;
     final midnight = _ngmyDateOnly(now);
     final diff = now.difference(midnight);
-    if (diff.inMinutes <= 0) return null;
     final hours = diff.inHours;
     final mins = diff.inMinutes % 60;
     final penalty = _ngmyClockInLatePenaltyPercent(now);
     final latePart = hours <= 0 ? '$mins min late' : '$hours hr ${mins.toString().padLeft(2, '0')} min late';
     if (penalty > 0) {
-      return (message: '$latePart · ${penalty.toInt()}% penalty · full at 12:00 PM', penalty: penalty, blocked: false);
+      return (message: '$latePart · ${penalty.toInt()}% penalty', penalty: penalty, blocked: false);
     }
-    return (message: '$latePart · battery fills by 12:00 PM', penalty: 0, blocked: false);
+    return (message: latePart, penalty: 0, blocked: false);
   }
 
   String _maskName(String email, String username) {
@@ -14282,14 +14344,14 @@ class _StatsScreenState extends State<StatsScreen> {
           child: Column(
             children: [
               const FloatingTitle(title: 'PLATFORM STATS'),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: 2,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 15,
-                childAspectRatio: 1.3,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1.48,
                 children: [
                   _sTile(context, 'Total Volume', '\$${formatCurrency(totalVol)}', Icons.account_balance, Colors.blue),
                   _sTile(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit)}', Icons.auto_graph, Colors.purple),
@@ -14297,14 +14359,15 @@ class _StatsScreenState extends State<StatsScreen> {
                   _sTile(context, 'Global Rank', '#1', Icons.public, Colors.orange),
                 ],
               ),
-              const SizedBox(height: 2),
-              Container(
+              Transform.translate(
+                offset: const Offset(0, -6),
+                child: Container(
                 width: double.infinity,
                 decoration: _statsFrameDecoration(context, elevated: true),
                 child: Stack(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
                       child: Column(
                         children: [
                     ShaderMask(
@@ -14395,6 +14458,7 @@ class _StatsScreenState extends State<StatsScreen> {
                     ),
                   ],
                 ),
+              ),
               ),
             ],
           ),
