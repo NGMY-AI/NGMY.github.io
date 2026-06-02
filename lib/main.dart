@@ -2225,6 +2225,12 @@ Map<String, dynamic> _normalizeStoreOrder(Map<String, dynamic> order) {
   return copy;
 }
 
+bool _storeOrderPaymentApproved(Map<String, dynamic> order) =>
+    (order['paymentStatus'] ?? 'approved').toString() == 'approved';
+
+bool _storeOrderAwaitingPaymentProof(Map<String, dynamic> order) =>
+    (order['paymentStatus'] ?? '').toString() == 'awaiting_proof';
+
 /// When seller ETA passes, mark shipped/in-transit orders delivered automatically.
 bool _autoMarkStoreOrdersDelivered(List<Map<String, dynamic>> orders) {
   var changed = false;
@@ -2748,6 +2754,9 @@ String? _minutesUntilEta(Map<String, dynamic> order) {
 }
 
 String _orderStatusLabel(Map<String, dynamic> order) {
+  final pay = (order['paymentStatus'] ?? 'approved').toString();
+  if (pay == 'awaiting_proof') return 'Awaiting payment review';
+  if (pay == 'rejected') return 'Payment rejected';
   switch ((order['fulfillmentStatus'] ?? 'pending').toString()) {
     case 'shipped':
       return 'Shipped';
@@ -5320,11 +5329,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (seller != me) continue;
       _seenRealtimeStoreOrderIds.add(id);
       final title = (o['title'] ?? 'Item').toString();
-      unawaited(_pushInAppNotification(
-        title: 'New sale',
-        body: 'A buyer purchased $title. Open Store → Sales to ship.',
-        tag: 'store_sale_$id',
-      ));
+      final pay = (o['paymentStatus'] ?? '').toString();
+      if (pay == 'awaiting_proof') {
+        unawaited(_pushInAppNotification(
+          title: 'Payment proof to review',
+          body: 'A buyer paid for $title with Cash App or Zelle. Open Messages to confirm or reject.',
+          tag: 'store_pay_review_$id',
+        ));
+      } else if (pay == 'approved') {
+        unawaited(_pushInAppNotification(
+          title: 'New sale',
+          body: 'Payment confirmed for $title. Open Store → Sales to ship.',
+          tag: 'store_sale_$id',
+        ));
+      }
     }
   }
 
@@ -23166,7 +23184,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         final at = DateTime.tryParse((r['createdAt'] ?? '').toString()) ?? created;
         final role = (r['role'] ?? '').toString();
         final mine = role == 'seller' ? isSeller : !isSeller;
-        if (NgmyStorePaymentReply.isPurchaseNotification(r)) {
+        if (NgmyStorePaymentReply.isPurchaseNotification(r) || NgmyStorePaymentReply.isPurchaseStatus(r)) {
           items.add((
             at: at,
             who: (r['name'] ?? (role == 'seller' ? 'Seller' : 'Buyer')).toString(),
@@ -23206,6 +23224,52 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _orders[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
   }
 
+  void _appendStorePaymentDecisionToThread({
+    required String orderId,
+    required String sellerEmail,
+    required String buyerEmail,
+    required bool approved,
+  }) {
+    final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+    if (idx == null) return;
+    final list = _inquiryReplies(_inquiries[idx]);
+    list.add({
+      'type': NgmyStorePaymentReply.purchaseStatus,
+      'role': 'seller',
+      'name': widget.user.username,
+      'email': widget.user.email,
+      'orderId': orderId,
+      'paymentStatus': approved ? 'approved' : 'rejected',
+      'message': approved
+          ? 'Payment confirmed! Your order has been approved and will be processed.'
+          : 'Payment rejected. The seller could not verify your payment proof.',
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+    });
+    _inquiries[idx]['replies'] = list;
+    _inquiries[idx]['read'] = true;
+    _inquiries[idx]['buyerRead'] = false;
+    unawaited(_upsertStoreInquiryRowSafe(_inquiries[idx]));
+  }
+
+  void _restoreListingUnitsForRejectedOrder(Map<String, dynamic> order) {
+    final listingId = (order['listingId'] ?? '').toString();
+    if (listingId.isEmpty) return;
+    final qty = (order['quantity'] as num?)?.toInt() ?? 1;
+    final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == listingId);
+    if (idx < 0) return;
+    final remaining = ((_listings[idx]['unitsRemaining'] as num?)?.toInt() ?? 0) + qty;
+    _listings[idx]['unitsRemaining'] = remaining;
+    if ((_listings[idx]['status'] ?? '') == 'sold') {
+      _listings[idx]['status'] = 'active';
+      _listings[idx].remove('buyerEmail');
+      _listings[idx].remove('buyerName');
+      _listings[idx].remove('soldAt');
+    }
+    _listings[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+    unawaited(_upsertStoreListingRowSafe(_listings[idx]));
+    _listingsSig = _storeListingsSignature(_listings);
+  }
+
   void _patchPaymentReplyInThread(String orderId, String paymentStatus) {
     for (final inq in _inquiries) {
       final replies = _inquiryReplies(inq);
@@ -23225,12 +23289,22 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   Future<void> _confirmStorePaymentNotification(Map<String, dynamic> reply) async {
     final orderId = (reply['orderId'] ?? '').toString();
     if (orderId.isEmpty) return;
+    final order = _orderById(orderId);
     _updateOrderFields(orderId, {'paymentStatus': 'approved'});
     _patchPaymentReplyInThread(orderId, 'approved');
+    if (order != null) {
+      _appendStorePaymentDecisionToThread(
+        orderId: orderId,
+        sellerEmail: (order['sellerEmail'] ?? widget.user.email).toString(),
+        buyerEmail: (order['buyerEmail'] ?? '').toString(),
+        approved: true,
+      );
+    }
+    await _persistOrdersAndRefresh(orderId: orderId);
     _save(refreshCloud: true);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment confirmed. You can ship this order from Sales.')),
+        const SnackBar(content: Text('Payment confirmed. Order is now in Sales — you can ship it.')),
       );
     }
   }
@@ -23238,12 +23312,23 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   Future<void> _rejectStorePaymentNotification(Map<String, dynamic> reply) async {
     final orderId = (reply['orderId'] ?? '').toString();
     if (orderId.isEmpty) return;
+    final order = _orderById(orderId);
     _updateOrderFields(orderId, {'paymentStatus': 'rejected', 'fulfillmentStatus': 'refunded', 'refunded': true});
     _patchPaymentReplyInThread(orderId, 'rejected');
+    if (order != null) {
+      _restoreListingUnitsForRejectedOrder(order);
+      _appendStorePaymentDecisionToThread(
+        orderId: orderId,
+        sellerEmail: (order['sellerEmail'] ?? widget.user.email).toString(),
+        buyerEmail: (order['buyerEmail'] ?? '').toString(),
+        approved: false,
+      );
+    }
+    await _persistOrdersAndRefresh(orderId: orderId);
     _save(refreshCloud: true);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment rejected. Buyer was notified in messages.')),
+        const SnackBar(content: Text('Payment rejected. Buyer was notified in Messages.')),
       );
     }
   }
@@ -23276,11 +23361,23 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     if (order == null) return const [];
     final out = <Widget>[];
     final pay = (order['paymentStatus'] ?? '').toString();
-    if (pay == 'approved') {
+    if (pay == 'awaiting_proof') {
+      out.add(const NgmyPurchaseStatusBubble(
+        icon: Icons.hourglass_top_rounded,
+        iconColor: Color(0xFFD97706),
+        message: 'Payment proof sent. Waiting for the seller to confirm in Messages.',
+      ));
+    } else if (pay == 'approved') {
       out.add(const NgmyPurchaseStatusBubble(
         icon: Icons.check_circle_rounded,
         iconColor: Color(0xFF16A34A),
         message: 'Payment confirmed! Your order has been approved and will be processed.',
+      ));
+    } else if (pay == 'rejected') {
+      out.add(const NgmyPurchaseStatusBubble(
+        icon: Icons.cancel_rounded,
+        iconColor: Color(0xFFDC2626),
+        message: 'Payment rejected. The seller could not verify your payment proof.',
       ));
     }
     final fulfillment = (order['fulfillmentStatus'] ?? '').toString();
@@ -23644,6 +23741,16 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
               return ListView(
                 children: messages.expand((msg) {
                   final reply = msg.reply;
+                  if (reply != null && NgmyStorePaymentReply.isPurchaseStatus(reply)) {
+                    final approved = NgmyStorePaymentReply.paymentStatusOf(reply) == 'approved';
+                    return [
+                      NgmyPurchaseStatusBubble(
+                        icon: approved ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                        iconColor: approved ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                        message: (reply['message'] ?? '').toString(),
+                      ),
+                    ];
+                  }
                   if (reply != null && NgmyStorePaymentReply.isPurchaseNotification(reply)) {
                     final order = _orderById((reply['orderId'] ?? '').toString());
                     final pending = NgmyStorePaymentReply.isPending(reply);
@@ -23996,10 +24103,21 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   List<Map<String, dynamic>> _mySalesOrders() {
     final me = widget.user.email.toLowerCase().trim();
     final list = _orders
-        .where((o) => (o['sellerEmail'] ?? '').toString().toLowerCase().trim() == me)
+        .where((o) =>
+            (o['sellerEmail'] ?? '').toString().toLowerCase().trim() == me &&
+            _storeOrderPaymentApproved(o))
         .toList();
     _sortStoreOrdersForDisplay(list);
     return list;
+  }
+
+  List<Map<String, dynamic>> _myPendingPaymentReviewOrders() {
+    final me = widget.user.email.toLowerCase().trim();
+    return _orders
+        .where((o) =>
+            (o['sellerEmail'] ?? '').toString().toLowerCase().trim() == me &&
+            _storeOrderAwaitingPaymentProof(o))
+        .toList();
   }
 
   String _formatReceiptWhen(String iso) {
@@ -24140,6 +24258,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   Widget _sellerSalesTab(List<Map<String, dynamic>> sales) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final awaitingReview = _myPendingPaymentReviewOrders().length;
     final pending = sales.where((o) => (o['fulfillmentStatus'] ?? 'pending').toString() == 'pending').length;
     return RefreshIndicator(
       color: _storePurple,
@@ -24149,6 +24268,32 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       },
       child: CustomScrollView(
         slivers: [
+          if (awaitingReview > 0)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF2A2210) : const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.mark_email_unread_outlined, color: Color(0xFFD97706), size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '$awaitingReview Cash App/Zelle payment(s) waiting in Messages — confirm or reject before they appear here.',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.orange.shade200 : const Color(0xFF9A3412)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
@@ -24167,7 +24312,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                       child: Text(
                         pending > 0
                             ? '$pending order(s) need shipping — confirm address and mark shipped below.'
-                            : 'New buyer orders appear here. Use Mark as Shipped, then update location and ETA.',
+                            : 'Confirmed payments appear here. Use Mark as Shipped, then update location and ETA.',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF334155)),
                       ),
                     ),
@@ -24177,9 +24322,20 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             ),
           ),
           if (sales.isEmpty)
-            const SliverFillRemaining(
+            SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(child: Text('No sales yet. Orders show here when someone buys your item.', style: TextStyle(color: Colors.grey))),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    awaitingReview > 0
+                        ? 'No confirmed sales yet. Open Messages to review payment proof.'
+                        : 'No sales yet. Cash App/Zelle orders appear here after you confirm payment in Messages.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
             )
           else
             SliverList(
@@ -25134,10 +25290,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   String _normalizeCashAppDisplayTag(String raw) {
-    var t = raw.trim();
+    var t = raw.trim().replaceAll(RegExp(r'^\$+'), '');
     if (t.isEmpty) return '';
-    if (!t.startsWith(r'$')) t = '\$$t';
-    return t;
+    return '\$$t';
   }
 
   String _cashAppBareHandle(String tag) {
@@ -27025,7 +27180,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                     const SizedBox(height: 8),
                     if (payments.contains('ngmy')) payTile('ngmy', '💰', 'Account Balance', 'Balance: \$${formatCurrency(widget.user.accountBalance)}'),
                     if (payments.contains('cashapp'))
-                      payTile('cashapp', '💵', 'Cash App', _listingSellerCashTag(listing).isEmpty ? null : '\$${_listingSellerCashTag(listing)}'),
+                      payTile('cashapp', '💵', 'Cash App', _listingSellerCashTag(listing).isEmpty ? null : _normalizeCashAppDisplayTag(_listingSellerCashTag(listing))),
                     if (payments.contains('zelle'))
                       payTile('zelle', '🏦', 'Zelle', _listingSellerZelle(listing).isEmpty ? null : 'Send to: ${_listingSellerZelle(listing)}'),
                     if (selectedPay == 'ngmy' && !balanceOk)
