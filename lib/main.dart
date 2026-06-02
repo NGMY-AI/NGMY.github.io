@@ -3035,6 +3035,36 @@ Widget _ngmyGlassComposerBar({required bool isDark, required Widget child, Borde
   );
 }
 
+/// Frosted pill frame — matches bottom nav / menu bar styling.
+Widget _ngmyMenuPillFrame(BuildContext context, {required bool isDark, required Widget child}) {
+  final fillColor = Theme.of(context).cardColor.withValues(alpha: isDark ? 0.50 : 0.56);
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(30),
+    child: BackdropFilter(
+      filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: fillColor,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.07),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: child,
+      ),
+    ),
+  );
+}
+
 class Announcement {
   final String id;
   final String title;
@@ -14344,14 +14374,14 @@ class _StatsScreenState extends State<StatsScreen> {
           child: Column(
             children: [
               const FloatingTitle(title: 'PLATFORM STATS'),
-              const SizedBox(height: 8),
+              const SizedBox(height: 22),
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: 2,
                 mainAxisSpacing: 8,
                 crossAxisSpacing: 12,
-                childAspectRatio: 1.48,
+                childAspectRatio: 1.42,
                 children: [
                   _sTile(context, 'Total Volume', '\$${formatCurrency(totalVol)}', Icons.account_balance, Colors.blue),
                   _sTile(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit)}', Icons.auto_graph, Colors.purple),
@@ -14360,7 +14390,7 @@ class _StatsScreenState extends State<StatsScreen> {
                 ],
               ),
               Transform.translate(
-                offset: const Offset(0, -6),
+                offset: const Offset(0, -14),
                 child: Container(
                 width: double.infinity,
                 decoration: _statsFrameDecoration(context, elevated: true),
@@ -30999,7 +31029,10 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                   : Column(
                       children: [
                         Expanded(child: _newsView(isDark)),
-                        _newsComposer(isDark),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
+                          child: _newsComposer(isDark),
+                        ),
                       ],
                     ),
             ),
@@ -31201,18 +31234,17 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   Widget _newsComposer(bool isDark) {
     const accent = Color(0xFF00B25A);
     if (_newsPostingLocked) {
-      return _ngmyGlassComposerBar(
+      return _ngmyMenuPillFrame(
+        context,
         isDark: isDark,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Text(
-            'Unable to send messages at the moment.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: isDark ? Colors.white60 : const Color(0xFF64748B),
-            ),
+        child: Text(
+          'Unable to send messages at the moment.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.15,
+            color: isDark ? Colors.white70 : const Color(0xFF475569),
           ),
         ),
       );
