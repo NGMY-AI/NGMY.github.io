@@ -22422,10 +22422,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          if (_canChangeCivicState())
-            IconButton(onPressed: _showStatePicker, icon: const Icon(Icons.map_rounded), tooltip: 'Change State'),
-        ],
       ),
       body: SelectionContainer.disabled(
         child: SingleChildScrollView(
@@ -23093,135 +23089,151 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.green.withOpacity(0.3)),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.verified_user_rounded, color: Colors.green, size: 20),
+            child: const Icon(Icons.verified_user_rounded, color: Colors.green, size: 18),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'Authorized Registrar',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                    color: isDark ? Colors.white : Colors.black87,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-                const SizedBox(height: 6),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    if (_canChangeCivicState())
-                      InkWell(
-                        onTap: _showStatePicker,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.map_rounded, size: 14, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
-                              const SizedBox(width: 4),
-                              Text(
-                                st,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    else
-                      Text(st, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
-                    Flexible(
-                      child: Text(
-                        ' · $enrolledCount reg · $registrarCount/$kNgmyMaxRegistrarsPerState AR',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 10, color: muted),
+                    Text(
+                      'Authorized Registrar',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        color: isDark ? Colors.white : Colors.black87,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    if (_canManageCivicRegistry() && _hasCivicRegistrarReviewAccess(widget.user, widget.config))
-                      TextButton(
-                        onPressed: () {
-                          showNgmyCivicRegistrarApplicationsSheet(
-                            context,
-                            config: widget.config,
-                            allUsers: widget.allUsers,
-                            reviewer: widget.user,
-                            onDataChanged: widget.onDataChanged,
-                          );
-                        },
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF6200EE),
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-                          minimumSize: const Size(0, 28),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text('Requests', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 10)),
-                      )
-                    else if (_shouldShowRegistrarApplyButton())
-                      TextButton(
-                        onPressed: _showRegistrarApplicationDialog,
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF6200EE),
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-                          minimumSize: const Size(0, 28),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 10)),
-                      )
-                    else if (_hasPendingRegistrarApplication())
-                      const Text('Pending', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w800, fontSize: 10))
-                    else if (_registrarSlotsFullInSelectedState() && !_hasRegistrarAccess())
-                      Text('Full', style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 10)),
-                    if (_canManageCivicRegistry() && (_isCivicRegistryKing(widget.user) || widget.user.isAdmin))
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                        icon: const Icon(Icons.pin_rounded, size: 18, color: Color(0xFF6200EE)),
-                        tooltip: 'Set state registry PIN',
-                        onPressed: () => _openCivicRegistryPinSheet(
-                          context,
-                          config: widget.config,
-                          reviewer: widget.user,
-                          onDataChanged: widget.onDataChanged,
-                          initialState: _selectedState,
-                        ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          if (_canChangeCivicState())
+                            InkWell(
+                              onTap: _showStatePicker,
+                              borderRadius: BorderRadius.circular(6),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 2),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.map_rounded, size: 13, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      st,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          else
+                            Text(
+                              st,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted),
+                            ),
+                          Flexible(
+                            child: Text(
+                              ' · $registrarCount/$kNgmyMaxRegistrarsPerState AR',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.right,
+                              style: TextStyle(fontSize: 9, color: muted),
+                            ),
+                          ),
+                          if (_canManageCivicRegistry() && _hasCivicRegistrarReviewAccess(widget.user, widget.config))
+                            TextButton(
+                              onPressed: () {
+                                showNgmyCivicRegistrarApplicationsSheet(
+                                  context,
+                                  config: widget.config,
+                                  allUsers: widget.allUsers,
+                                  reviewer: widget.user,
+                                  onDataChanged: widget.onDataChanged,
+                                );
+                              },
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF6200EE),
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                minimumSize: const Size(0, 24),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text('Requests', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 9)),
+                            )
+                          else if (_shouldShowRegistrarApplyButton())
+                            TextButton(
+                              onPressed: _showRegistrarApplicationDialog,
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF6200EE),
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                minimumSize: const Size(0, 24),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 9)),
+                            )
+                          else if (_hasPendingRegistrarApplication())
+                            const Text('Pending', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w800, fontSize: 9))
+                          else if (_registrarSlotsFullInSelectedState() && !_hasRegistrarAccess())
+                            Text('Full', style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 9)),
+                          if (_canManageCivicRegistry() && (_isCivicRegistryKing(widget.user) || widget.user.isAdmin))
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                              icon: const Icon(Icons.pin_rounded, size: 16, color: Color(0xFF6200EE)),
+                              tooltip: 'Set state registry PIN',
+                              onPressed: () => _openCivicRegistryPinSheet(
+                                context,
+                                config: widget.config,
+                                reviewer: widget.user,
+                                onDataChanged: widget.onDataChanged,
+                                initialState: _selectedState,
+                              ),
+                            ),
+                        ],
                       ),
+                    ),
                   ],
                 ),
                 if (_canManageCivicRegistry()) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 5),
                   SelectionContainer.disabled(
                     child: GestureDetector(
                       onTap: _showHelpModeDialog,
                       child: Container(
-                        height: 28,
+                        height: 26,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: widget.config.helpModeActive ? Colors.red : Colors.green,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           widget.config.helpModeActive ? 'Deactivate Help Mode' : 'Activate Help Mode',
@@ -23231,8 +23243,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ),
                   ),
                 ] else if (slotsLeft > 0 && slotsLeft < kNgmyMaxRegistrarsPerState) ...[
-                  const SizedBox(height: 4),
-                  Text('$slotsLeft registrar slot${slotsLeft == 1 ? '' : 's'} left in $st', style: TextStyle(fontSize: 9, color: muted)),
+                  const SizedBox(height: 3),
+                  Text('$slotsLeft slot${slotsLeft == 1 ? '' : 's'} left', style: TextStyle(fontSize: 9, color: muted)),
                 ],
               ],
             ),
