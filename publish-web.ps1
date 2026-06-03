@@ -155,7 +155,7 @@ Write-Host "  5. Add to Home Screen again from the NEW URL only" -ForegroundColo
 Write-Host ""
 Write-Host "GITHUB PAGES (required after 404 / private repo):" -ForegroundColor Magenta
 Write-Host "  https://github.com/NGMY-AI/NGMY.github.io/settings/pages" -ForegroundColor White
-Write-Host "  Source: GitHub Actions (or branch main + folder /docs), then Save" -ForegroundColor White
+Write-Host "  Source: branch main + folder /docs (NOT GitHub Actions — avoids deploy emails)" -ForegroundColor White
 Write-Host ""
 Write-Host "[7/7] Checking live site (only works AFTER push + Pages enabled) ..." -ForegroundColor Cyan
 try {

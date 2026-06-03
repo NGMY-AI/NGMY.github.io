@@ -1,39 +1,23 @@
-# Redeploys the Flutter web build in /docs whenever main is pushed.
-# After making the repo private/public again, enable Pages once:
-#   GitHub → NGMY-AI/NGMY.github.io → Settings → Pages → Source: GitHub Actions
+# Site is published from the /docs folder on branch main (see publish-web.ps1).
+# This workflow is intentionally NOT run on push — it avoids failed-deploy emails when
+# GitHub Pages is set to "Deploy from branch /docs" instead of "GitHub Actions".
+#
+# To publish: run .\publish-web.ps1 then git push origin main
 
 name: Deploy GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
-  deploy:
-    # No `environment:` block — avoids GitHub "deployment" notification emails on every publish.
+  note:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload site (docs/)
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Pages uses docs/ on main
+        run: |
+          echo "No Action deploy needed."
+          echo "Enable Pages: Settings → Pages → Source: branch main, folder /docs"
+          echo "Or run publish-web.ps1 locally and push docs/ to main."
