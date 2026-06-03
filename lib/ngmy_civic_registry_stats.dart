@@ -2,6 +2,76 @@ const int kNgmyMaxRegistrarsPerState = 15;
 
 /// Civic Registry per-state registrar caps and lists.
 class NgmyCivicRegistryStats {
+  static Map<String, List<String>> parseCivicCitiesByState(dynamic raw) {
+    if (raw is! Map) return {};
+    final out = <String, List<String>>{};
+    for (final e in raw.entries) {
+      final state = e.key.toString().trim();
+      if (state.isEmpty) continue;
+      final list = e.value;
+      if (list is List) {
+        out[state] = list.map((c) => c.toString().trim()).where((c) => c.isNotEmpty).toList();
+      }
+    }
+    return out;
+  }
+
+  static List<String> citiesForState({
+    required Map<String, List<String>> civicCitiesByState,
+    required List<String> legacyCities,
+    required String state,
+  }) {
+    final st = state.trim().toLowerCase();
+    if (st.isEmpty) return const [];
+    if (civicCitiesByState.isNotEmpty) {
+      for (final e in civicCitiesByState.entries) {
+        if (e.key.trim().toLowerCase() == st) {
+          return List<String>.from(e.value);
+        }
+      }
+      return const [];
+    }
+    if (legacyCities.isNotEmpty) return List<String>.from(legacyCities);
+    return const [];
+  }
+
+  static Map<String, List<String>> migrateLegacyCities({
+    required Map<String, List<String>> civicCitiesByState,
+    required List<String> legacyCities,
+    String defaultState = 'Georgia',
+  }) {
+    if (civicCitiesByState.isNotEmpty || legacyCities.isEmpty) {
+      return civicCitiesByState;
+    }
+    return {defaultState: List<String>.from(legacyCities)};
+  }
+
+  static Map<String, List<String>> setCitiesForState({
+    required Map<String, List<String>> civicCitiesByState,
+    required String state,
+    required List<String> cities,
+  }) {
+    final st = state.trim();
+    final next = Map<String, List<String>>.from(civicCitiesByState);
+    if (st.isEmpty) return next;
+    next[st] = cities.map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
+    return next;
+  }
+
+  static List<String> allCitiesUnion(Map<String, List<String>> civicCitiesByState) {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final list in civicCitiesByState.values) {
+      for (final c in list) {
+        final t = c.trim();
+        if (t.isEmpty || !seen.add(t)) continue;
+        out.add(t);
+      }
+    }
+    out.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return out;
+  }
+
   static String _emailKey(String email) => email.toLowerCase().trim();
 
   static String registrarStateForUser({

@@ -1,0 +1,4 @@
+-- Civic Registry cities are stored per state in config.civicCitiesByState (JSON).
+-- No new table/column required if config is already a JSON document row.
+-- Run only if you split config into columns later:
+-- alter table config add column if not exists "civicCitiesByState" jsonb default '{}'::jsonb;

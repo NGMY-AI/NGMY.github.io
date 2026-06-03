@@ -35,6 +35,7 @@ import 'ngmy_game_admin_sheet.dart';
 import 'ngmy_game_result_popup.dart';
 import 'ngmy_multiplayer.dart';
 import 'ngmy_supabase_sync_throttle.dart';
+import 'ngmy_supabase_columns.dart';
 import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
 import 'ngmy_dice_config.dart';
@@ -526,6 +527,8 @@ class AppConfig {
   String geminiApiKey;
   String logoUrl;
   List<String> cities;
+  /// State name → city names for Civic Registry (registrars manage their state only).
+  Map<String, List<String>> civicCitiesByState;
   List<String> rooms;
   bool helpModeActive;
   String helpPurpose;
@@ -584,6 +587,7 @@ class AppConfig {
     this.geminiApiKey = '',
     this.logoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
     this.cities = const ['Stone Mountain', 'Atlanta', 'Savannah'],
+    Map<String, List<String>>? civicCitiesByState,
     this.rooms = const ["Room M'minji", 'VIP Room', 'Main Lobby'],
     this.helpModeActive = false,
     this.helpPurpose = '',
@@ -627,7 +631,11 @@ class AppConfig {
     this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
     Map<String, String>? familyTreePhotoAccessUntilByEmail,
     List<String>? storeSellAccessEmails,
-  })  : loanApplications = loanApplications ?? [],
+  })  : civicCitiesByState = NgmyCivicRegistryStats.migrateLegacyCities(
+          civicCitiesByState: civicCitiesByState ?? const {},
+          legacyCities: cities,
+        ),
+        loanApplications = loanApplications ?? [],
         familyTreePhotoAccessUntilByEmail = familyTreePhotoAccessUntilByEmail ?? const {},
         civicRegistryPinsByState = civicRegistryPinsByState ?? const {},
         civicRegistrarApplications = civicRegistrarApplications ?? const [],
@@ -692,8 +700,15 @@ class AppConfig {
     'familyTreePhotoMonthlyFee': familyTreePhotoMonthlyFee,
     'familyTreePhotoAccessUntilByEmail': familyTreePhotoAccessUntilByEmail,
     'storeSellAccessEmails': storeSellAccessEmails,
+    'civicCitiesByState': civicCitiesByState.map((k, v) => MapEntry(k, v)),
   };
-  factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
+  factory AppConfig.fromJson(Map<String, dynamic> json) {
+    final legacyCities = List<String>.from(json['cities'] ?? ['Stone Mountain', 'Atlanta', 'Savannah']);
+    final byState = NgmyCivicRegistryStats.migrateLegacyCities(
+      civicCitiesByState: NgmyCivicRegistryStats.parseCivicCitiesByState(json['civicCitiesByState']),
+      legacyCities: legacyCities,
+    );
+    return AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
     officialBitcoin: json['officialBitcoin'] ?? 'bc1q...',
     termsAndConditions: json['termsAndConditions'] ?? 'Welcome to NGMY. By using our services, you agree to...',
@@ -702,7 +717,10 @@ class AppConfig {
     loanHowItWorks: json['loanHowItWorks'] ?? '1. Submit your loan application with collateral details\n2. Your application will be reviewed within a few hours\n3. If approved, the loan amount will be credited to your account\n4. Make payments over 2 months (total repayment: loan + 36% interest)\n5. Upon full repayment, your collateral is released',
     geminiApiKey: _geminiKeyFromMap(json),
     logoUrl: json['logoUrl'] ?? 'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
-    cities: List<String>.from(json['cities'] ?? ['Stone Mountain', 'Atlanta', 'Savannah']),
+    cities: byState.isNotEmpty
+        ? NgmyCivicRegistryStats.allCitiesUnion(byState)
+        : legacyCities,
+    civicCitiesByState: byState,
     rooms: List<String>.from(json['rooms'] ?? ["Room M'minji", 'VIP Room', 'Main Lobby']),
     helpModeActive: json['helpModeActive'] ?? false,
     helpPurpose: json['helpPurpose'] ?? '',
@@ -757,6 +775,7 @@ class AppConfig {
       (json['storeSellAccessEmails'] ?? const []).map((e) => e.toString().toLowerCase().trim()).where((e) => e.isNotEmpty),
     ),
   );
+  }
 }
 
 Map<String, String> _familyTreePhotoAccessFromJson(dynamic raw) {
@@ -1475,6 +1494,8 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     'familyTreeCreateFee': config.familyTreeCreateFee,
     'familyTreePhotoMonthlyFee': config.familyTreePhotoMonthlyFee,
     'familyTreePhotoAccessUntilByEmail': config.familyTreePhotoAccessUntilByEmail,
+    'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
+    'cities': config.cities,
   };
   if (shouldWriteRegistrarApps) {
     combined['civicRegistrarApplications'] = registrarApps;
@@ -1500,6 +1521,7 @@ Future<void> ngmyFlushCriticalConfigLocalAndCloud(AppConfig config, {bool cloud 
 
 Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
   if (!await ngmyCanReachCloud()) return;
+  NgmySupabaseSyncThrottle.markCloudWriteBurst();
   try {
     await Supabase.instance.client.from('transactions').upsert(Map<String, dynamic>.from(t.toJson()));
   } catch (e) {
@@ -1509,6 +1531,7 @@ Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
 
 Future<void> _pushUserToCloudFast(UserData u, {bool includeFreeTrial = false}) async {
   if (!await ngmyCanReachCloud()) return;
+  NgmySupabaseSyncThrottle.markCloudWriteBurst();
   try {
     await Supabase.instance.client.from('users').upsert(_userRowForBulkSync(u, includeFreeTrial: includeFreeTrial));
   } catch (e) {
@@ -2246,7 +2269,7 @@ Future<List<MediaPost>?> _fetchMediaPostsFromSupabase({int limit = 100}) async {
   try {
     final rows = await Supabase.instance.client
         .from('media')
-        .select()
+        .select(NgmySupabaseColumns.mediaFeed)
         .order('timestamp', ascending: false)
         .limit(limit);
     if (rows == null) return null;
@@ -4059,7 +4082,7 @@ String? _missingColumnFromError(Object error) {
 
 Future<String> _fetchRemoteGeminiApiKey() async {
   try {
-    final row = await _fetchNgmyConfigRow();
+    final row = await _fetchNgmyConfigRow(columns: NgmySupabaseColumns.geminiOnly);
     if (row == null) return '';
     return _geminiKeyFromMap(row);
   } catch (e) {
@@ -4612,6 +4635,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Timer? _saveDebounceTimer;
   Timer? _heavySaveTimer;
   bool _pendingHeavySave = false;
+  final Set<String> _dirtyUserEmails = {};
+  final Set<String> _dirtyTransactionIds = {};
+  DateTime? _lastAdminMaintenanceSync;
   DateTime? _lastCurrentUserCloudRefresh;
   Timer? _legalPlansRefreshDebounce;
   final Set<String> _disabledSupabaseTables = {};
@@ -4985,19 +5011,123 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   String _appConfigSig(AppConfig c) => jsonEncode(c.toJson());
 
-  void _onDataChanged() {
+  void _markUserDirty(String? email) {
+    final key = email?.toLowerCase().trim() ?? '';
+    if (key.isNotEmpty) _dirtyUserEmails.add(key);
+  }
+
+  void _markTransactionDirty(String? id) {
+    final key = id?.trim() ?? '';
+    if (key.isNotEmpty) _dirtyTransactionIds.add(key);
+  }
+
+  /// Local disk only — use after targeted cloud upserts (approve/deny, fast push).
+  Future<void> _persistLocalOnly() async {
+    _maintainStoreOrders(_config.storeOrders);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _allUsers.removeWhere((u) => u.email.trim().isEmpty);
+      if (_currentUser != null) {
+        final email = _currentUser!.email.toLowerCase().trim();
+        if (email.isNotEmpty) {
+          await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+          await prefs.setString('ngmy_last_session_email', email);
+        }
+      }
+      await prefs.setString('all_transactions', jsonEncode(_allTransactions.map((e) => e.toJson()).toList()));
+      await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+      await prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
+      await prefs.setString('app_config', jsonEncode(_config.toJson()));
+      await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
+      await prefs.setString('all_announcements', jsonEncode(_allAnnouncements.map((e) => e.toJson()).toList()));
+      await _persistLocalSnapshot();
+    } catch (e) {
+      debugPrint('[ngmy] local persist: $e');
+    }
+  }
+
+  bool _userNeedsAdminCloudSync(UserData u) {
+    final email = u.email.toLowerCase().trim();
+    if (email.isEmpty) return false;
+    if (_dirtyUserEmails.contains(email)) return true;
+    return _allTransactions.any(
+      (t) => t.userEmail.toLowerCase().trim() == email && t.status == TransactionStatus.pending,
+    );
+  }
+
+  List<Map<String, dynamic>> _transactionsForAdminCloudSync() {
+    final cutoff = DateTime.now().subtract(const Duration(days: 2));
+    final seen = <String>{};
+    final rows = <Map<String, dynamic>>[];
+    for (final t in _allTransactions) {
+      if (t.id.isEmpty || !seen.add(t.id)) continue;
+      final pending = t.status == TransactionStatus.pending;
+      final recent = t.timestamp.isAfter(cutoff);
+      final dirty = _dirtyTransactionIds.contains(t.id);
+      if (pending || recent || dirty) {
+        rows.add(Map<String, dynamic>.from(t.toJson()));
+      }
+    }
+    return rows;
+  }
+
+  /// Admin maintenance sync — pending users/transactions only, never full config blob.
+  Future<void> _syncAdminDirtyToCloud() async {
+    if (_currentUser?.isAdmin != true) return;
+    if (!await ngmyCanReachCloud()) return;
+    final now = DateTime.now();
+    if (_lastAdminMaintenanceSync != null &&
+        now.difference(_lastAdminMaintenanceSync!) < const Duration(minutes: 2)) {
+      return;
+    }
+    _lastAdminMaintenanceSync = now;
+    _isSyncing = true;
+    NgmySupabaseSyncThrottle.markCloudWriteBurst(const Duration(seconds: 8));
+    try {
+      await _persistLocalOnly();
+      final usersToSync = _allUsers.where(_userNeedsAdminCloudSync).toList();
+      if (usersToSync.isNotEmpty) {
+        await _safeUpsertRows(
+          'users',
+          usersToSync.map((u) => _userRowForBulkSync(u, includeFreeTrial: true)).toList(),
+        );
+      }
+      final txRows = _transactionsForAdminCloudSync();
+      if (txRows.isNotEmpty) {
+        await _safeUpsertRows('transactions', txRows);
+      }
+      _dirtyUserEmails.clear();
+      _dirtyTransactionIds.clear();
+      await ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: true);
+    } catch (e) {
+      debugPrint('[ngmy] admin dirty sync: $e');
+    } finally {
+      Future.delayed(const Duration(milliseconds: 200), () => _isSyncing = false);
+    }
+  }
+
+  void _onDataChanged({String? dirtyUserEmail, String? dirtyTransactionId}) {
+    _markUserDirty(dirtyUserEmail ?? _currentUser?.email);
+    _markTransactionDirty(dirtyTransactionId);
     unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: true));
     _pendingHeavySave = true;
     _saveDebounceTimer?.cancel();
-    _saveDebounceTimer = Timer(const Duration(seconds: 4), () {
+    _saveDebounceTimer = Timer(const Duration(seconds: 8), () {
       if (!mounted) return;
-      unawaited(_saveData(heavy: false, fullCloud: false));
+      unawaited(_persistLocalOnly());
+      if (_currentUser?.isAdmin != true) {
+        unawaited(_saveData(heavy: false, fullCloud: false));
+      }
     });
     _heavySaveTimer?.cancel();
-    _heavySaveTimer = Timer(const Duration(minutes: 3), () {
+    _heavySaveTimer = Timer(const Duration(minutes: 15), () {
       if (!mounted || !_pendingHeavySave) return;
       _pendingHeavySave = false;
-      unawaited(_saveData(heavy: true, fullCloud: _currentUser?.isAdmin == true));
+      if (_currentUser?.isAdmin == true) {
+        unawaited(_syncAdminDirtyToCloud());
+      } else {
+        unawaited(_saveData(heavy: true, fullCloud: false));
+      }
     });
   }
 
@@ -5149,7 +5279,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _configRefreshTimer = Timer.periodic(const Duration(minutes: 8), (_) async {
       if (_isSyncing) return;
       try {
-        final cfg = await supabase.from('config').select().maybeSingle();
+        final cfg = await _fetchNgmyConfigRow(columns: NgmySupabaseColumns.configPoll);
         if (cfg == null) return;
         if (!mounted) return;
         final keepGemini = _config.geminiApiKey.trim();
@@ -5169,7 +5299,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final keepChatClosed = _config.ngmyChatClosed;
         final cfgMap = Map<String, dynamic>.from(cfg);
         final keepConfig = AppConfig.fromJson(_config.toJson());
-        final next = AppConfig.fromJson(cfgMap);
+        final next = AppConfig.fromJson({..._config.toJson(), ...cfgMap});
         _applyRemoteConfigMerge(next, cfgMap, keepConfig);
         _applyNgmyChatClosedFromRemote(next, cfgMap, localClosed: keepChatClosed);
         _applyRemoteLegalToConfig(next, cfgMap);
@@ -5509,7 +5639,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _startMediaDeliveryLoop() {
     _mediaDeliveryTimer?.cancel();
-    _mediaDeliveryTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+    _mediaDeliveryTimer = Timer.periodic(const Duration(minutes: 2), (_) {
       unawaited(_processMediaDeliveryQueue());
     });
     unawaited(_processMediaDeliveryQueue());
@@ -6234,6 +6364,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _onConfigChange(PostgresChangePayload payload) {
+    if (NgmySupabaseSyncThrottle.shouldSuppressRealtimeEcho) return;
     try {
       if (payload.eventType != PostgresChangeEvent.delete) {
         final keepListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
@@ -6790,7 +6921,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
 
         final transData = bootstrapAdmin || sessionEmail.isEmpty
-            ? await supabase.from('transactions').select()
+            ? await supabase.from('transactions').select().order('timestamp', ascending: false).limit(300)
             : await supabase.from('transactions').select().eq('userEmail', sessionEmail);
         if (transData != null) {
           _allTransactions = (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
@@ -6819,10 +6950,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         );
         final localGeminiKey = _config.geminiApiKey.trim();
         final localConfigSnapshot = AppConfig.fromJson(_config.toJson());
-        final configData = await supabase.from('config').select().maybeSingle();
-        if (configData != null) {
-          final cfgMap = Map<String, dynamic>.from(configData);
-          final next = AppConfig.fromJson(cfgMap);
+        var cfgMap = <String, dynamic>{};
+        final configCore = await _fetchNgmyConfigRow(columns: NgmySupabaseColumns.configBootstrapCore);
+        if (configCore != null) cfgMap.addAll(configCore);
+        final configHeavy = await _fetchNgmyConfigRow(columns: NgmySupabaseColumns.configBootstrapHeavy);
+        if (configHeavy != null) cfgMap.addAll(configHeavy);
+        if (cfgMap.isNotEmpty) {
+          final next = AppConfig.fromJson({..._config.toJson(), ...cfgMap});
           _applyRemoteConfigMerge(next, cfgMap, localConfigSnapshot);
           _config = next;
           (_config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(
@@ -7024,6 +7158,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _safeUpsertRows(String table, List<Map<String, dynamic>> rows) async {
     if (rows.isEmpty) return;
     if (_disabledSupabaseTables.contains(table)) return;
+    NgmySupabaseSyncThrottle.markCloudWriteBurst();
 
     final working = rows.map((e) => Map<String, dynamic>.from(e)).toList();
     final removed = <String>{};
@@ -7160,54 +7295,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final userEmail = _currentUser?.email.toLowerCase().trim() ?? '';
 
       if (heavy && fullCloud && isAdmin) {
-        if (_allTransactions.isNotEmpty) {
-          await _safeUpsertRows(
-            'transactions',
-            _allTransactions.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
-          );
-        }
-
-        if (_allUsers.isNotEmpty) {
-          await _safeUpsertRows(
-            'users',
-            _allUsers.map((u) => _userRowForBulkSync(u, includeFreeTrial: true)).toList(),
-          );
-        }
-
-        await _pruneStaleMediaAgainstCloud();
-
-        await _pruneExpiredAnnouncements(updateUi: false);
-        if (_allAnnouncements.isNotEmpty) {
-          await _safeUpsertRows(
-            'announcements',
-            _allAnnouncements.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
-          );
-        }
-
-        await _reloadStoreFromSupabase();
-        if (_maintainStoreOrders(_config.storeOrders)) {
-          await _pushStoreOrdersToSupabase(_config.storeOrders);
-        }
-        await _syncStoreToSupabase();
-        _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
-        await _persistInvestmentPlansToCloud(_config.investmentPlans);
-        final configRow = await _configRowForSupabaseUpsert(
-          config: _config,
-          isAdmin: true,
-        );
-        configRow['storeListings'] = _config.storeListings;
-        configRow['storeInquiries'] = _config.storeInquiries;
-        configRow['storeOrders'] = _config.storeOrders;
-        _config.storeOrders = List<Map<String, dynamic>>.from(
-          _config.storeOrders.map((e) => Map<String, dynamic>.from(e)),
-        );
-        configRow['helpHelperApplications'] = _config.helpHelperApplications;
-        configRow['helpRequests'] = _config.helpRequests;
-        configRow['helpBusinesses'] = _config.helpBusinesses;
-        configRow['ngmyPopups'] = _config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)).toList();
-        configRow['ngmyVideoPopups'] = _config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)).toList();
-        await _persistNgmyPopupsToCloud(_config.ngmyPopups, _config.ngmyVideoPopups);
-        await _safeUpsertRows('config', [configRow]);
+        await _syncAdminDirtyToCloud();
       } else {
         if (_currentUser != null) {
           await _pushUserToCloudFast(_currentUser!);
@@ -7450,7 +7538,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       _allUsers.add(user);
                     });
                   }
-                  await _saveData();
+                  if (_currentUser != null) {
+                    unawaited(_pushUserToCloudFast(_currentUser!, includeFreeTrial: true));
+                  }
+                  await _persistLocalOnly();
                 },
               )
             : MainScreen(
@@ -7493,8 +7584,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     }
                   });
                   unawaited(_pushTransactionToCloudFast(t));
-                  if (syncedUser != null) unawaited(_pushUserToCloudFast(syncedUser!));
-                  unawaited(_saveData());
+                  if (syncedUser != null) {
+                    unawaited(_pushUserToCloudFast(syncedUser!));
+                    _markUserDirty(syncedUser!.email);
+                  }
+                  _markTransactionDirty(t.id);
+                  unawaited(_persistLocalOnly());
                   _notifyTransactionEvent(t);
                 },
                 onProcessTransaction: (t, approve) {
@@ -7553,8 +7648,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   if (_currentUser != null && _currentUser!.email == t.userEmail) _currentUser = targetUser;
                 });
                   unawaited(_pushTransactionToCloudFast(t));
-                  if (syncedUser != null) unawaited(_pushUserToCloudFast(syncedUser!));
-                  unawaited(_saveData());
+                  if (syncedUser != null) {
+                    unawaited(_pushUserToCloudFast(syncedUser!));
+                    _markUserDirty(syncedUser!.email);
+                  }
+                  _markTransactionDirty(t.id);
+                  unawaited(_persistLocalOnly());
                   _notifyTransactionEvent(t, statusChanged: true);
                 },
                 onAddPlan: (p) {
@@ -7566,7 +7665,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   });
                   unawaited(() async {
                     await _persistInvestmentPlansToCloud(_config.investmentPlans);
-                    await _saveData();
+                    await _persistLocalOnly();
                   }());
                 },
                 onPostMedia: (post) {
@@ -7592,17 +7691,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   setState(() => _allAnnouncements.add(ann));
                   unawaited(_upsertAnnouncement(ann));
                   unawaited(_persistAnnouncementsLocally());
-                  unawaited(_saveData());
+                  unawaited(_persistLocalOnly());
                 },
               onDeleteAnnouncement: (id) {
                 setState(() => _allAnnouncements.removeWhere((a) => a.id == id));
                 _deleteAnnouncementById(id);
-                _saveData();
+                unawaited(_persistLocalOnly());
               },
                 onClearAllAnnouncements: () {
                 setState(() => _allAnnouncements.clear());
                 _clearAllAnnouncementsRemote();
-                _saveData();
+                unawaited(_persistLocalOnly());
               },
                 onSyncAdminMediaPost: _syncAdminMediaPost,
                 onSyncAdminUserMedia: _syncAdminUserMediaProfile,
@@ -9650,8 +9749,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final missedWindow = !onTrial && _ngmyIsPastNoon(now);
     final blocked = !active && !alreadyDone && (weekend || missedWindow);
     final clockMuted = alreadyDone || blocked;
-    final lateInfo = _clockLateInfo();
-    final showLate = !onTrial && !active && !alreadyDone && widget.user.activeInvestment != null && lateInfo != null;
 
     return GestureDetector(
       onTap: (active || alreadyDone || blocked || (!onTrial && widget.user.activeInvestment == null))
@@ -9887,17 +9984,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                                 ),
                                               ),
                                             ),
-                                            Positioned(
-                                              top: 5 + ((1 - progress) * 38),
-                                              child: Container(
-                                                width: 24,
-                                                height: 2.2,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white.withOpacity(0.85),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                ),
-                                              ),
-                                            ),
                                           ],
                                         ),
                                       ),
@@ -9950,16 +10036,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     '\$${formatCurrency(widget.user.displayedTodayEarnings)}',
                     style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
                   ),
-                if (!alreadyDone && widget.user.clockInPenaltyPercent > 0)
-                  Text(
-                    'Max today \$${formatCurrency(widget.user.todayDailyGoal)} (${widget.user.clockInPenaltyPercent.toInt()}% late fee)',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 7, fontWeight: FontWeight.w700),
-                  ),
-                if (active && !alreadyDone && widget.user.clockInPenaltyPercent <= 0)
-                  const Text('Full at 12:00 PM', style: TextStyle(color: Colors.white60, fontSize: 7.5, fontWeight: FontWeight.w600)),
-                if (active && !alreadyDone && widget.user.clockInPenaltyPercent > 0)
-                  const Text('Fills to your max by 12:00 PM', style: TextStyle(color: Colors.white60, fontSize: 7.5, fontWeight: FontWeight.w600)),
                 if (!active && !alreadyDone && !blocked) const Text('ACTIVATE', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
                 if (blocked && !alreadyDone) const Text('CLOSED', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
                 if (alreadyDone) const Text('TOMORROW', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
@@ -9970,14 +10046,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
-          if (showLate && lateInfo != null) ...[
-            const SizedBox(height: 5),
-            _LateClockInBanner(
-              message: lateInfo.message,
-              penaltyPercent: lateInfo.penalty,
-              isBlocked: lateInfo.blocked,
-            ),
-          ],
         ],
       ),
     );
@@ -20443,6 +20511,35 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   bool _canManageCivicRegistry() => _hasRegistrarAccess();
 
+  String _registrarHomeState() => NgmyCivicRegistryStats.registrarStateForUser(
+        email: widget.user.email,
+        userState: widget.user.state,
+        applications: widget.config.civicRegistrarApplications,
+      );
+
+  bool _canManageCitiesForSelectedState() {
+    if (!_canManageCivicRegistry()) return false;
+    if (_isCivicRegistryKing(widget.user) || widget.user.isAdmin || widget.user.isCivicRegistryAdmin) {
+      return true;
+    }
+    return _selectedState.trim().toLowerCase() == _registrarHomeState().trim().toLowerCase();
+  }
+
+  List<String> _citiesForSelectedState() => NgmyCivicRegistryStats.citiesForState(
+        civicCitiesByState: widget.config.civicCitiesByState,
+        legacyCities: widget.config.cities,
+        state: _selectedState,
+      );
+
+  void _setCitiesForSelectedState(List<String> cities) {
+    widget.config.civicCitiesByState = NgmyCivicRegistryStats.setCitiesForState(
+      civicCitiesByState: widget.config.civicCitiesByState,
+      state: _selectedState,
+      cities: cities,
+    );
+    widget.config.cities = NgmyCivicRegistryStats.allCitiesUnion(widget.config.civicCitiesByState);
+  }
+
   int get _maxCivicTabIndex => _canManageCivicRegistry() ? 3 : 1;
 
   Future<void> _hydrateRegistrarApplication() async {
@@ -20928,9 +21025,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     Text('Email: ${widget.user.email}', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54)),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
-                      value: widget.config.cities.contains(cityC.text) ? cityC.text : null,
+                      value: _citiesForSelectedState().contains(cityC.text) ? cityC.text : null,
                       decoration: const InputDecoration(labelText: 'City *'),
-                      items: widget.config.cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      items: _citiesForSelectedState().map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                       onChanged: (v) {
                         if (v != null) cityC.text = v;
                       },
@@ -21020,7 +21117,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email address.')));
       return;
     }
-    if (!widget.config.cities.contains(city)) {
+    if (!_citiesForSelectedState().contains(city)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please choose a city from Manage Cities & Rooms.')));
       return;
     }
@@ -21445,7 +21542,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) {
-          final scopeOptions = scopeType == 'room' ? widget.config.rooms : widget.config.cities;
+          final scopeOptions = scopeType == 'room' ? widget.config.rooms : _citiesForSelectedState();
           if (scopeType == 'all') {
             scopeValue = '';
           } else if (scopeOptions.isNotEmpty && !scopeOptions.contains(scopeValue)) {
@@ -21733,7 +21830,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             ),
                             SizedBox(height: 6),
                             Text(
-                              'Create or delete options used in enrollment dropdowns.',
+                              'Add cities for your state only. They appear in enrollment for that state.',
                               style: TextStyle(fontSize: 12, color: Colors.grey),
                             ),
                           ],
@@ -21749,7 +21846,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFD1D5DB)),
                         ),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('Add City', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Add City — $_selectedState', style: const TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       Row(
                         children: [
@@ -21757,7 +21854,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             child: TextField(
                               controller: cityC,
                               decoration: InputDecoration(
-                                hintText: 'City name',
+                                hintText: 'City in $_selectedState',
                                 filled: true,
                                 fillColor: isDark ? Colors.black26 : Colors.grey.shade100,
                                 border: OutlineInputBorder(
@@ -21772,8 +21869,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             onPressed: () {
                               final value = cityC.text.trim();
                               if (value.isEmpty) return;
-                              if (!widget.config.cities.contains(value)) {
-                                setState(() => widget.config.cities.add(value));
+                              final stateCities = _citiesForSelectedState();
+                              if (!stateCities.contains(value)) {
+                                setState(() {
+                                  _setCitiesForSelectedState([...stateCities, value]);
+                                });
                                 widget.onDataChanged();
                               }
                               cityC.clear();
@@ -21787,11 +21887,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: widget.config.cities.map((c) {
+                        children: _citiesForSelectedState().map((c) {
                           return Chip(
                             label: Text(c),
                             onDeleted: () {
-                              setState(() => widget.config.cities.remove(c));
+                              setState(() {
+                                _setCitiesForSelectedState(_citiesForSelectedState()..remove(c));
+                              });
                               if (_selectedCity == c) _selectedCity = 'All Cities';
                               if (_cityC.text == c) _cityC.clear();
                               widget.onDataChanged();
@@ -23188,7 +23290,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 initialSelection: _cityC.text.isNotEmpty ? _cityC.text : null,
                 hintText: 'Select city',
                 inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
-                dropdownMenuEntries: widget.config.cities.map((c) => DropdownMenuEntry(value: c, label: c)).toList(),
+                dropdownMenuEntries: _citiesForSelectedState().map((c) => DropdownMenuEntry(value: c, label: c)).toList(),
                 onSelected: (v) { if (v != null) setState(() => _cityC.text = v); },
               ),
               const SizedBox(height: 20),
@@ -23331,7 +23433,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 isExpanded: true,
                 value: _selectedCity,
                 underline: const SizedBox.shrink(),
-                items: ['All Cities', ...widget.config.cities].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
+                items: ['All Cities', ..._citiesForSelectedState()].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
                 onChanged: (v) => setState(() => _selectedCity = v!),
               ),
             ),
@@ -23360,7 +23462,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           ),
         ]),
 
-        if (_canManageCivicRegistry()) ...[
+        if (_canManageCitiesForSelectedState()) ...[
           const SizedBox(height: 15),
           ElevatedButton.icon(onPressed: _showManageCitiesRooms, icon: const Icon(Icons.settings, size: 16), label: const Text('Manage Cities & Rooms', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)))),
         ],
@@ -24233,7 +24335,7 @@ class _StoreReceiptsPageState extends State<_StoreReceiptsPage> {
   @override
   void initState() {
     super.initState();
-    _poll = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(_runPoll()));
+    _poll = Timer.periodic(const Duration(seconds: 20), (_) => unawaited(_runPoll()));
     unawaited(_runPoll());
   }
 
@@ -24950,7 +25052,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       widget.config.storeInquiries = merged;
       _ensurePaymentReviewInquiriesFromOrders();
       _ensureStoreThreadsFromOrders();
-      widget.onDataChanged();
+      await ngmyFlushCriticalConfigLocalAndCloud(widget.config, cloud: false);
       if (!mounted) return;
       if (!silent) {
         setState(() {});
@@ -35232,7 +35334,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _loadChatMemory();
     _startChatGateWatcher();
     _subscribeNewsRealtime();
-    _newsPollTimer = Timer.periodic(const Duration(seconds: 60), (_) => unawaited(_pollNewsFromCloud()));
+    _newsPollTimer = Timer.periodic(const Duration(minutes: 3), (_) => unawaited(_pollNewsFromCloud()));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshGeminiKeyFromCloud();
       _refreshUnreadNewsInternal();
@@ -35297,7 +35399,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   Future<void> _pollNewsFromCloud() async {
     if (!mounted || !await ngmyCanReachCloud()) return;
     try {
-      final rows = await Supabase.instance.client.from('announcements').select();
+      final rows = await Supabase.instance.client
+          .from('announcements')
+          .select('id,title,message,authorEmail,authorUsername,imageUrl,videoUrl,timestamp,expiresAt')
+          .order('timestamp', ascending: false)
+          .limit(40);
       if (rows == null || !mounted) return;
       final remote = (rows as List).map((e) => Announcement.fromJson(e)).toList();
       _mergeNewsItems(remote, notifyNew: true);
