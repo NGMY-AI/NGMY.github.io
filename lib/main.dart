@@ -23076,9 +23076,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _authorizedRegistrarCard(bool isDark) {
     final st = _selectedState.trim();
-    final enrolledCount = widget.allUsers
-        .where((u) => u.isEnrolledInRegistry && u.state.trim().toLowerCase() == st.toLowerCase())
-        .length;
     final registrarCount = NgmyCivicRegistryStats.activeRegistrarsInState(
       state: st,
       applications: widget.config.civicRegistrarApplications,
