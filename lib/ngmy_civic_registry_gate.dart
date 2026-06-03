@@ -7,15 +7,15 @@ String civicRegistryPinForState(Map<String, String> pinsByState, String state) {
   return (pinsByState[state.trim()] ?? '').trim();
 }
 
-/// One PIN for all users (admin sets in Management). Falls back to per-state map if empty.
+/// Per-state PIN first; optional global fallback when a state has no PIN set.
 String civicRegistryEffectivePin({
   required String globalPin,
   required Map<String, String> pinsByState,
   required String state,
 }) {
-  final g = globalPin.trim();
-  if (g.isNotEmpty) return g;
-  return civicRegistryPinForState(pinsByState, state);
+  final perState = civicRegistryPinForState(pinsByState, state);
+  if (perState.isNotEmpty) return perState;
+  return globalPin.trim();
 }
 
 Future<bool> civicRegistryIsUnlocked(String userEmail, String state) async {

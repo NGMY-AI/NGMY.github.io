@@ -41,6 +41,14 @@ typedef NgmyInAppNotify = Future<void> Function({
 /// Wired from the app shell so screens like MainScreen can show in-app / push alerts.
 NgmyInAppNotify? ngmyInAppNotify;
 
+typedef NgmyStoreOrdersChanged = void Function(
+  List<Map<String, dynamic>> previousOrders,
+  List<Map<String, dynamic>> nextOrders,
+);
+
+/// Wired from the app shell when store orders refresh (e.g. seller polling).
+NgmyStoreOrdersChanged? ngmyOnStoreOrdersChanged;
+
 bool ngmyIsGameRelatedTransaction({String? sourceDetails}) {
   final s = (sourceDetails ?? '').toLowerCase();
   if (s.isEmpty) return false;

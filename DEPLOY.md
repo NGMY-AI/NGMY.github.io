@@ -63,6 +63,14 @@ Do this once:
 
 After every `git push` to `main`, Pages should rebuild automatically.
 
+### Stop email on every deploy
+
+GitHub sends mail when **Deployments** notifications are on, or when a workflow uses a protected **environment**.
+
+This repo’s workflow no longer uses a `github-pages` environment (fewer deployment emails).
+
+To turn off the rest: GitHub → **Settings** → **Notifications** → uncheck **Deployments** (and **Actions** if you only want failures). You can also set the **NGMY.github.io** repo to **Watch: Custom** and disable **Deployments**.
+
 ---
 
 ## Supabase SQL (not PowerShell)

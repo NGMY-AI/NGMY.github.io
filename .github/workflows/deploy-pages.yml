@@ -20,9 +20,7 @@ concurrency:
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # No `environment:` block — avoids GitHub "deployment" notification emails on every publish.
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

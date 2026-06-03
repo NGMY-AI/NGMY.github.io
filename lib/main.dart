@@ -58,6 +58,13 @@ import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_loans.dart';
 import 'ngmy_bottom_nav_frame.dart';
+import 'ngmy_civic_read_state.dart';
+import 'ngmy_civic_registrar_application.dart';
+import 'ngmy_admin_menu_badges.dart';
+import 'ngmy_civic_state_switches.dart';
+import 'ngmy_civic_registry_stats.dart';
+import 'ngmy_civic_registry_admin.dart';
+import 'ngmy_civic_registry_pins.dart';
 import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_web_viewport.dart';
 import 'ngmy_web_status_bar.dart';
@@ -556,6 +563,8 @@ class AppConfig {
   /// One PIN for all Civic Registry users (set in Growth Income / Admin Management).
   String civicRegistryPin;
   List<Map<String, dynamic>> civicRegistrarApplications;
+  /// Emails allowed to use Sell Item in NGMY Store (admin-granted; persisted in config).
+  List<String> storeSellAccessEmails;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -605,9 +614,11 @@ class AppConfig {
     Map<String, String>? civicRegistryPinsByState,
     this.civicRegistryPin = '',
     List<Map<String, dynamic>>? civicRegistrarApplications,
+    List<String>? storeSellAccessEmails,
   })  : loanApplications = loanApplications ?? [],
         civicRegistryPinsByState = civicRegistryPinsByState ?? const {},
         civicRegistrarApplications = civicRegistrarApplications ?? const [],
+        storeSellAccessEmails = storeSellAccessEmails ?? const [],
         gameTimeLimits = gameTimeLimits ?? ngmyDefaultGameTimeLimits(),
         diceSettings = diceSettings ?? NgmyDiceSettings().toJson(),
         gameInvites = gameInvites ?? [],
@@ -663,6 +674,7 @@ class AppConfig {
     'civicRegistryPinsByState': civicRegistryPinsByState,
     'civicRegistryPin': civicRegistryPin,
     'civicRegistrarApplications': civicRegistrarApplications,
+    'storeSellAccessEmails': storeSellAccessEmails,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
     officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
@@ -719,6 +731,9 @@ class AppConfig {
     civicRegistryPin: (json['civicRegistryPin'] ?? '').toString(),
     civicRegistrarApplications: List<Map<String, dynamic>>.from(
       (json['civicRegistrarApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
+    ),
+    storeSellAccessEmails: List<String>.from(
+      (json['storeSellAccessEmails'] ?? const []).map((e) => e.toString().toLowerCase().trim()).where((e) => e.isNotEmpty),
     ),
   );
 }
@@ -784,6 +799,35 @@ Map<String, dynamic> _mergeDiceSettingsPreferCustom(Map<String, dynamic> localJs
   return merged.toJson();
 }
 
+int _registrarStatusRank(String status) {
+  switch (status.toLowerCase()) {
+    case 'revoked':
+      return 4;
+    case 'approved':
+      return 3;
+    case 'rejected':
+      return 2;
+    case 'pending':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+Map<String, dynamic> _pickRegistrarApplicationRow(
+  Map<String, dynamic> a,
+  Map<String, dynamic> b,
+) {
+  final as = (a['status'] ?? 'pending').toString();
+  final bs = (b['status'] ?? 'pending').toString();
+  final ar = _registrarStatusRank(as);
+  final br = _registrarStatusRank(bs);
+  if (ar != br) return ar > br ? a : b;
+  final ac = (a['reviewedAt'] ?? a['createdAt'] ?? '').toString();
+  final bc = (b['reviewedAt'] ?? b['createdAt'] ?? '').toString();
+  return ac.compareTo(bc) >= 0 ? a : b;
+}
+
 List<Map<String, dynamic>> _mergeCivicRegistrarApplications(
   List<Map<String, dynamic>> local,
   List<Map<String, dynamic>> remote,
@@ -802,20 +846,278 @@ List<Map<String, dynamic>> _mergeCivicRegistrarApplications(
       byId[id] = r;
       continue;
     }
-    final rs = (r['status'] ?? 'pending').toString();
-    final es = (existing['status'] ?? 'pending').toString();
-    if (es == 'pending' && rs != 'pending') {
-      byId[id] = r;
-    } else if (rs == 'pending' && es != 'pending') {
+    byId[id] = _pickRegistrarApplicationRow(existing, r);
+  }
+  final byEmail = <String, Map<String, dynamic>>{};
+  final noEmail = <Map<String, dynamic>>[];
+  for (final a in byId.values) {
+    final email = (a['userEmail'] ?? '').toString().toLowerCase().trim();
+    if (email.isEmpty) {
+      noEmail.add(a);
       continue;
-    } else {
-      final rc = (r['createdAt'] ?? '').toString();
-      final ec = (existing['createdAt'] ?? '').toString();
-      byId[id] = rc.compareTo(ec) >= 0 ? r : existing;
+    }
+    final existing = byEmail[email];
+    byEmail[email] = existing == null ? a : _pickRegistrarApplicationRow(existing, a);
+  }
+  return [...byEmail.values, ...noEmail]
+    ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+}
+
+String? _registrarApplicationStatusForEmail(AppConfig config, String email) {
+  final key = email.toLowerCase().trim();
+  if (key.isEmpty) return null;
+  Map<String, dynamic>? best;
+  for (final a in config.civicRegistrarApplications) {
+    if ((a['userEmail'] ?? '').toString().toLowerCase().trim() != key) continue;
+    final row = Map<String, dynamic>.from(a);
+    best = best == null ? row : _pickRegistrarApplicationRow(best, row);
+  }
+  return best == null ? null : (best['status'] ?? 'pending').toString().toLowerCase();
+}
+
+void _applyRegistrarGrantsFromConfig(
+  AppConfig config,
+  List<UserData> users, {
+  UserData? currentUser,
+}) {
+  for (final u in users) {
+    final status = _registrarApplicationStatusForEmail(config, u.email);
+    if (status == 'revoked' || status == 'rejected') {
+      u.isAuthorizedRegistrar = false;
+    } else if (status == 'approved') {
+      u.isAuthorizedRegistrar = true;
     }
   }
-  return byId.values.toList()
-      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+  if (currentUser != null) {
+    final status = _registrarApplicationStatusForEmail(config, currentUser.email);
+    if (status == 'revoked' || status == 'rejected') {
+      currentUser.isAuthorizedRegistrar = false;
+    } else if (status == 'approved') {
+      currentUser.isAuthorizedRegistrar = true;
+    }
+  }
+}
+
+List<Map<String, dynamic>> _civicRegistrarApplicationsFromConfigValue(dynamic raw) {
+  if (raw is List) {
+    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+  if (raw is String && raw.trim().isNotEmpty) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+  }
+  return const [];
+}
+
+Future<List<Map<String, dynamic>>> _fetchRemoteCivicRegistrarApplications() async {
+  try {
+    final row = await _fetchNgmyConfigRow(columns: 'civicRegistrarApplications');
+    if (row == null) return const [];
+    return _civicRegistrarApplicationsFromConfigValue(row['civicRegistrarApplications']);
+  } catch (e) {
+    debugPrint('[config] fetch civicRegistrarApplications: $e');
+    return const [];
+  }
+}
+
+Future<({String global, Map<String, String> byState})> _fetchRemoteCivicRegistryPins() async {
+  try {
+    final row = await _fetchNgmyConfigRow(columns: 'civicRegistryPin,civicRegistryPinsByState');
+    if (row == null) return (global: '', byState: <String, String>{});
+    return (
+      global: (row['civicRegistryPin'] ?? '').toString().trim(),
+      byState: _civicRegistryPinsFromJson(row['civicRegistryPinsByState']),
+    );
+  } catch (e) {
+    debugPrint('[config] fetch civic registry pins: $e');
+    return (global: '', byState: <String, String>{});
+  }
+}
+
+Future<void> _mergeCivicRegistryPinsIntoConfig(AppConfig config) async {
+  final remote = await _fetchRemoteCivicRegistryPins();
+  final backup = await NgmyCivicRegistryPins.loadLocalBackup();
+  if (remote.global.isNotEmpty) {
+    config.civicRegistryPin = remote.global;
+  } else if (config.civicRegistryPin.trim().isEmpty && backup.global.trim().isNotEmpty) {
+    config.civicRegistryPin = backup.global.trim();
+  }
+  config.civicRegistryPinsByState = NgmyCivicRegistryPins.mergeMaps(
+    NgmyCivicRegistryPins.mergeMaps(backup.byState, config.civicRegistryPinsByState),
+    remote.byState,
+  );
+  await NgmyCivicRegistryPins.saveLocalBackup(
+    globalPin: config.civicRegistryPin,
+    pinsByState: config.civicRegistryPinsByState,
+  );
+}
+
+Future<void> _persistCivicRegistryPins(
+  AppConfig config, {
+  required String state,
+  required String pin,
+  String? globalPin,
+}) async {
+  final st = state.trim();
+  final p = pin.trim();
+  if (st.isNotEmpty && p.isNotEmpty) {
+    config.civicRegistryPinsByState = Map<String, String>.from(config.civicRegistryPinsByState)..[st] = p;
+  }
+  if (globalPin != null && globalPin.trim().isNotEmpty) {
+    config.civicRegistryPin = globalPin.trim();
+  }
+  await NgmyCivicRegistryPins.saveLocalBackup(
+    globalPin: config.civicRegistryPin,
+    pinsByState: config.civicRegistryPinsByState,
+  );
+  await _mergeCivicRegistryPinsIntoConfig(config);
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_config', jsonEncode(config.toJson()));
+  } catch (e) {
+    debugPrint('[config] local civic pins save: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    await _persistCriticalConfigFields(config);
+  }
+}
+
+/// Civic Registry "king" — crowned by admin; may approve registrars and change states in one state.
+bool _isCivicRegistryKing(UserData user) => user.isCivicRegistryAdmin;
+
+String _reviewerCivicStateScope(UserData reviewer, AppConfig config) {
+  if (reviewer.isAdmin) return '';
+  if (!_isCivicRegistryKing(reviewer)) return '';
+  final serving = NgmyCivicRegistryStats.registrarStateForUser(
+    email: reviewer.email,
+    userState: reviewer.state,
+    applications: config.civicRegistrarApplications,
+  );
+  if (serving.trim().isNotEmpty) return serving.trim();
+  return reviewer.state.trim();
+}
+
+bool _reviewerCanActOnRegistrarApp(UserData reviewer, Map<String, dynamic> app, AppConfig config) {
+  if (reviewer.isAdmin) return true;
+  if (!_hasCivicRegistrarReviewAccess(reviewer, config)) return false;
+  final scope = _reviewerCivicStateScope(reviewer, config).trim().toLowerCase();
+  if (scope.isEmpty) return false;
+  return (app['state'] ?? '').toString().trim().toLowerCase() == scope;
+}
+
+/// Only app admin or Civic Registry Admin (king) may approve registrar applications.
+bool _hasCivicRegistrarReviewAccess(UserData reviewer, AppConfig config) {
+  if (reviewer.isAdmin) return true;
+  return _isCivicRegistryKing(reviewer);
+}
+
+void _openCivicRegistryPinSheet(
+  BuildContext context, {
+  required AppConfig config,
+  required UserData reviewer,
+  required VoidCallback onDataChanged,
+  String? initialState,
+}) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  const usStates = [
+    'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
+    'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland',
+    'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey',
+    'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina',
+    'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming',
+  ];
+  final scope = _reviewerCivicStateScope(reviewer, config);
+  showNgmyCivicRegistryPinSheet(
+    context,
+    isDark: isDark,
+    usStates: usStates,
+    globalPin: config.civicRegistryPin,
+    pinsByState: config.civicRegistryPinsByState,
+    initialState: initialState ?? (scope.isNotEmpty ? scope : reviewer.state),
+    canEditAnyState: reviewer.isAdmin,
+    reviewerAssignedState: reviewer.isAdmin ? '' : (_isCivicRegistryKing(reviewer) ? scope : ''),
+    onSave: (state, pin, globalPin) => _persistCivicRegistryPins(
+      config,
+      state: state,
+      pin: pin,
+      globalPin: reviewer.isAdmin ? globalPin : null,
+    ).then((_) => onDataChanged()),
+  );
+}
+
+void _mergeRegistrarApplicationsIntoConfig(AppConfig config, List<Map<String, dynamic>> remote) {
+  config.civicRegistrarApplications = _mergeCivicRegistrarApplications(
+    config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+    remote,
+  );
+}
+
+Future<bool> _persistCivicRegistrarApplications(AppConfig config) async {
+  _mergeRegistrarApplicationsIntoConfig(config, await _fetchRemoteCivicRegistrarApplications());
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_config', jsonEncode(config.toJson()));
+  } catch (e) {
+    debugPrint('[registrar] local config save: $e');
+  }
+  if (!await ngmyCanReachCloud()) return false;
+  await _persistCriticalConfigFields(config);
+  return true;
+}
+
+Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
+  if (!await ngmyCanReachCloud()) return;
+  final email = u.email.trim();
+  if (email.isEmpty) return;
+  try {
+    await Supabase.instance.client.from('users').upsert({
+      'email': email,
+      'isAuthorizedRegistrar': u.isAuthorizedRegistrar,
+      'isCivicRegistryAdmin': u.isCivicRegistryAdmin,
+      'civicRegistryStateSwitchesUsed': u.civicRegistryStateSwitchesUsed,
+      'civicRegistryAnchorState': u.civicRegistryAnchorState,
+    }).timeout(kNgmyCloudWriteTimeout);
+  } catch (e) {
+    debugPrint('[user] civic registrar profile upsert: $e');
+  }
+}
+
+NgmyCivicRegistryUserRow _civicRegistryUserRow(UserData u) => NgmyCivicRegistryUserRow(
+      email: u.email,
+      username: u.username,
+      state: u.state,
+      isAuthorizedRegistrar: u.isAuthorizedRegistrar,
+      isCivicRegistryAdmin: u.isCivicRegistryAdmin,
+      stateSwitchesUsed: u.civicRegistryStateSwitchesUsed,
+      anchorState: u.civicRegistryAnchorState,
+      isEnrolledInRegistry: u.isEnrolledInRegistry,
+    );
+
+Future<void> _syncRegistrarStateAfterConfigChange(
+  AppConfig config,
+  List<UserData> users, {
+  UserData? currentUser,
+}) async {
+  _applyRegistrarGrantsFromConfig(config, users, currentUser: currentUser);
+  final targets = <UserData>[];
+  if (currentUser != null) targets.add(currentUser);
+  for (final u in users) {
+    final status = _registrarApplicationStatusForEmail(config, u.email);
+    if (status == 'approved' || status == 'revoked' || status == 'rejected') {
+      targets.add(u);
+    }
+  }
+  final seen = <String>{};
+  for (final u in targets) {
+    final key = u.email.toLowerCase().trim();
+    if (key.isEmpty || seen.contains(key)) continue;
+    seen.add(key);
+    await _pushUserAuthorizedRegistrar(u);
+  }
 }
 
 List<Map<String, dynamic>> _mergeJobPostsLists(
@@ -893,25 +1195,17 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
 
   if (record.containsKey('civicRegistryPinsByState') && record['civicRegistryPinsByState'] is Map) {
     final remotePins = _civicRegistryPinsFromJson(record['civicRegistryPinsByState']);
-    if (remotePins.isNotEmpty) {
-      next.civicRegistryPinsByState = remotePins;
-    } else if (keep.civicRegistryPinsByState.isNotEmpty) {
-      next.civicRegistryPinsByState = Map<String, String>.from(keep.civicRegistryPinsByState);
-    }
+    next.civicRegistryPinsByState = NgmyCivicRegistryPins.mergeMaps(keep.civicRegistryPinsByState, remotePins);
   } else if (keep.civicRegistryPinsByState.isNotEmpty) {
     next.civicRegistryPinsByState = Map<String, String>.from(keep.civicRegistryPinsByState);
   }
 
-  if (record.containsKey('civicRegistrarApplications') && record['civicRegistrarApplications'] is List) {
-    final remoteApps = (record['civicRegistrarApplications'] as List)
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
-    if (remoteApps.isNotEmpty) {
-      next.civicRegistrarApplications = _mergeCivicRegistrarApplications(keep.civicRegistrarApplications, remoteApps);
-    } else if (keep.civicRegistrarApplications.isNotEmpty) {
-      next.civicRegistrarApplications =
-          keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
-    }
+  if (record.containsKey('civicRegistrarApplications')) {
+    final remoteApps = _civicRegistrarApplicationsFromConfigValue(record['civicRegistrarApplications']);
+    next.civicRegistrarApplications = _mergeCivicRegistrarApplications(
+      keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+      remoteApps,
+    );
   } else if (keep.civicRegistrarApplications.isNotEmpty) {
     next.civicRegistrarApplications =
         keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
@@ -949,10 +1243,100 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
   } else if (keep.mediaDeliveryQueue.isNotEmpty) {
     next.mediaDeliveryQueue = keep.mediaDeliveryQueue.map((e) => Map<String, dynamic>.from(e)).toList();
   }
+
+  if (record.containsKey('storeSellAccessEmails') && record['storeSellAccessEmails'] is List) {
+    final remote = (record['storeSellAccessEmails'] as List)
+        .map((e) => e.toString().toLowerCase().trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    final local = _storeSellAccessEmailSet(keep);
+    // Remote list is authoritative when present (admin saves revokes). Never union — union blocks removals.
+    // When remote is empty, keep local grants (offline admin edits / column not yet populated).
+    if (remote.isNotEmpty) {
+      next.storeSellAccessEmails = remote.toList()..sort();
+    } else if (local.isNotEmpty) {
+      next.storeSellAccessEmails = local.toList()..sort();
+    } else {
+      next.storeSellAccessEmails = const [];
+    }
+  } else if (keep.storeSellAccessEmails.isNotEmpty) {
+    next.storeSellAccessEmails = List<String>.from(keep.storeSellAccessEmails);
+  }
+
+  // Legacy global lists — preserve on config sync so receipt badges are not wiped mid-session.
+  if (keep.openedContributionReceiptKeys.isNotEmpty) {
+    next.openedContributionReceiptKeys = List<String>.from(
+      NgmyCivicReadState.mergeSets(keep.openedContributionReceiptKeys, next.openedContributionReceiptKeys),
+    );
+  }
+  if (keep.dismissedContributionReceiptKeys.isNotEmpty) {
+    next.dismissedContributionReceiptKeys = List<String>.from(
+      NgmyCivicReadState.mergeSets(keep.dismissedContributionReceiptKeys, next.dismissedContributionReceiptKeys),
+    );
+  }
+}
+
+Set<String> _storeSellAccessEmailSet(AppConfig config) => config.storeSellAccessEmails
+    .map((e) => e.toLowerCase().trim())
+    .where((e) => e.isNotEmpty)
+    .toSet();
+
+void _applyStoreSellAccessEmailsToUsers(AppConfig config, List<UserData> users, {UserData? currentUser}) {
+  final grants = _storeSellAccessEmailSet(config);
+  for (final u in users) {
+    if (u.isAdmin) continue;
+    u.canSellOnStore = grants.contains(u.email.toLowerCase().trim());
+  }
+  if (currentUser != null && !currentUser.isAdmin) {
+    currentUser.canSellOnStore = grants.contains(currentUser.email.toLowerCase().trim());
+  }
+}
+
+bool _canSellOnStoreForEmail(AppConfig config, String email) =>
+    _storeSellAccessEmailSet(config).contains(email.toLowerCase().trim());
+
+void _updateStoreSellAccessGrant(AppConfig config, UserData u, bool on) {
+  if (u.isAdmin) return;
+  final email = u.email.toLowerCase().trim();
+  if (email.isEmpty) return;
+  u.canSellOnStore = on;
+  final list = List<String>.from(config.storeSellAccessEmails);
+  if (on) {
+    if (!list.contains(email)) list.add(email);
+  } else {
+    list.remove(email);
+  }
+  list.sort();
+  config.storeSellAccessEmails = list;
+}
+
+Future<void> _persistStoreSellAccessEmails(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_config', jsonEncode(config.toJson()));
+  } catch (e) {
+    debugPrint('[config] local storeSellAccessEmails: $e');
+  }
+  if (!await ngmyCanReachCloud()) return;
+  try {
+    await Supabase.instance.client.from('config').upsert({
+      'id': kNgmyConfigRowId,
+      'storeSellAccessEmails': config.storeSellAccessEmails,
+    });
+  } catch (e) {
+    debugPrint('[config] storeSellAccessEmails upsert: $e');
+  }
 }
 
 Future<void> _persistCriticalConfigFields(AppConfig config) async {
   if (!await ngmyCanReachCloud()) return;
+  await _mergeCivicRegistryPinsIntoConfig(config);
+  final remoteRegistrarApps = await _fetchRemoteCivicRegistrarApplications();
+  final localRegistrarBefore = config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
+  _mergeRegistrarApplicationsIntoConfig(config, remoteRegistrarApps);
+  final registrarApps = config.civicRegistrarApplications;
+  final shouldWriteRegistrarApps =
+      registrarApps.isNotEmpty || remoteRegistrarApps.isNotEmpty || localRegistrarBefore.isNotEmpty;
   final client = Supabase.instance.client;
   final combined = <String, dynamic>{
     'id': kNgmyConfigRowId,
@@ -961,26 +1345,32 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     'gameInvites': config.gameInvites,
     'civicRegistryPin': config.civicRegistryPin,
     'civicRegistryPinsByState': config.civicRegistryPinsByState,
-    'civicRegistrarApplications': config.civicRegistrarApplications,
     'jobPosts': config.jobPosts,
     'jobWorkerApplications': config.jobWorkerApplications,
+    'storeSellAccessEmails': config.storeSellAccessEmails,
   };
+  if (shouldWriteRegistrarApps) {
+    combined['civicRegistrarApplications'] = registrarApps;
+  }
   try {
     await client.from('config').upsert(combined);
     return;
   } catch (e) {
     debugPrint('[config] combined critical upsert: $e');
   }
-  for (final row in [
+  final rows = <Map<String, dynamic>>[
     {'id': kNgmyConfigRowId, 'gameTimeLimits': config.gameTimeLimits},
     {'id': kNgmyConfigRowId, 'diceSettings': config.diceSettings},
     {'id': kNgmyConfigRowId, 'gameInvites': config.gameInvites},
     {'id': kNgmyConfigRowId, 'civicRegistryPin': config.civicRegistryPin},
     {'id': kNgmyConfigRowId, 'civicRegistryPinsByState': config.civicRegistryPinsByState},
-    {'id': kNgmyConfigRowId, 'civicRegistrarApplications': config.civicRegistrarApplications},
     {'id': kNgmyConfigRowId, 'jobPosts': config.jobPosts},
     {'id': kNgmyConfigRowId, 'jobWorkerApplications': config.jobWorkerApplications},
-  ]) {
+  ];
+  if (shouldWriteRegistrarApps) {
+    rows.insert(5, {'id': kNgmyConfigRowId, 'civicRegistrarApplications': registrarApps});
+  }
+  for (final row in rows) {
     try {
       await client.from('config').upsert(row);
     } catch (e) {
@@ -1040,6 +1430,14 @@ void _mergeUserMediaProfileFields(UserData local, UserData remote) {
   remote.mediaFollowers = <String>{...remote.mediaFollowers, ...local.mediaFollowers}.toList();
   remote.mediaFollowing = <String>{...remote.mediaFollowing, ...local.mediaFollowing}.toList();
   remote.readAnnouncementIds = NgmyAnnouncementReads.mergeReadSets(local.readAnnouncementIds, remote.readAnnouncementIds).toList();
+  remote.openedContributionReceiptKeys = NgmyCivicReadState.mergeSets(
+    local.openedContributionReceiptKeys,
+    remote.openedContributionReceiptKeys,
+  ).toList();
+  remote.dismissedContributionReceiptKeys = NgmyCivicReadState.mergeSets(
+    local.dismissedContributionReceiptKeys,
+    remote.dismissedContributionReceiptKeys,
+  ).toList();
   if ((local.mediaBio ?? '').trim().isNotEmpty && (remote.mediaBio ?? '').trim().isEmpty) {
     remote.mediaBio = local.mediaBio;
   }
@@ -1049,94 +1447,6 @@ void _mergeUserMediaProfileFields(UserData local, UserData remote) {
   if (local.mediaStories.isNotEmpty && remote.mediaStories.isEmpty) {
     remote.mediaStories = local.mediaStories.map((e) => Map<String, dynamic>.from(e)).toList();
   }
-}
-
-void showNgmyCivicRegistryPinSheet(
-  BuildContext context, {
-  required AppConfig config,
-  required VoidCallback onDataChanged,
-}) {
-  final pinCtrl = TextEditingController(text: config.civicRegistryPin);
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      final isDark = Theme.of(ctx).brightness == Brightness.dark;
-      return Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 22),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F111A) : Colors.white,
-              borderRadius: BorderRadius.circular(26),
-              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.account_balance_rounded, color: Color(0xFF6200EE)),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text('Civic Registry PIN', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                    ),
-                    IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'One PIN for every member in every state. Share it only with people who should access the registry.',
-                  style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: pinCtrl,
-                  keyboardType: TextInputType.number,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: 'Registry PIN',
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () {
-                    final pin = pinCtrl.text.trim();
-                    if (pin.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Enter a PIN before saving.')),
-                      );
-                      return;
-                    }
-                    config.civicRegistryPin = pin;
-                    onDataChanged();
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Civic Registry PIN saved for all users.')),
-                    );
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF6200EE),
-                    minimumSize: const Size(double.infinity, 48),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: const Text('Save PIN', style: TextStyle(fontWeight: FontWeight.w800)),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    },
-  ).whenComplete(pinCtrl.dispose);
 }
 
 void showNgmyCivicRegistrarApplicationsSheet(
@@ -1154,9 +1464,15 @@ void showNgmyCivicRegistrarApplicationsSheet(
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setST) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final scope = _reviewerCivicStateScope(reviewer, config).trim().toLowerCase();
         final apps = List<Map<String, dynamic>>.from(
           config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)),
-        )..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+        )
+          ..retainWhere((a) {
+            if (scope.isEmpty) return true;
+            return (a['state'] ?? '').toString().trim().toLowerCase() == scope;
+          })
+          ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
         final pendingApps = apps.where((a) => (a['status'] ?? 'pending').toString() == 'pending').toList();
 
         String fmt(String raw) {
@@ -1172,7 +1488,7 @@ void showNgmyCivicRegistrarApplicationsSheet(
         return Align(
           alignment: Alignment.bottomCenter,
           child: Container(
-            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.88),
             margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F111A) : Colors.white,
@@ -1188,7 +1504,14 @@ void showNgmyCivicRegistrarApplicationsSheet(
                   children: [
                     const Icon(Icons.verified_user_rounded, color: Color(0xFF6200EE)),
                     const SizedBox(width: 8),
-                    const Expanded(child: Text('Authorized Registrar Requests', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18))),
+                    Expanded(
+                      child: Text(
+                        scope.isEmpty
+                            ? 'Authorized Registrar Requests'
+                            : 'Registrar Requests — ${_reviewerCivicStateScope(reviewer, config)}',
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                      ),
+                    ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(color: Colors.orange.withOpacity(0.12), borderRadius: BorderRadius.circular(9)),
@@ -1207,7 +1530,7 @@ void showNgmyCivicRegistrarApplicationsSheet(
                             final status = (app['status'] ?? 'pending').toString();
                             final statusColor = status == 'approved'
                                 ? Colors.green
-                                : status == 'rejected'
+                                : status == 'revoked' || status == 'rejected'
                                     ? Colors.red
                                     : Colors.orange;
                             final email = (app['userEmail'] ?? '').toString().toLowerCase().trim();
@@ -1241,19 +1564,33 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                   const SizedBox(height: 5),
                                   Text('Email: ${app['userEmail'] ?? ''}'),
                                   if ((app['state'] ?? '').toString().trim().isNotEmpty) Text('State: ${app['state']}'),
-                                  if ((app['reason'] ?? '').toString().trim().isNotEmpty) Text('Reason: ${app['reason']}'),
+                                  if ((app['phone'] ?? '').toString().trim().isNotEmpty) Text('Phone: ${app['phone']}'),
+                                  if ((app['reason'] ?? '').toString().trim().isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text('Reason: ${app['reason']}', style: const TextStyle(height: 1.35)),
+                                    ),
+                                  if ((app['experience'] ?? '').toString().trim().isNotEmpty)
+                                    Text('Experience: ${app['experience']}', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 12)),
                                   Text('Submitted: ${fmt((app['createdAt'] ?? '').toString())}', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 11)),
-                                  if (status == 'pending') ...[
+                                  if (status == 'pending' && _reviewerCanActOnRegistrarApp(reviewer, app, config)) ...[
                                     const SizedBox(height: 8),
                                     Row(
                                       children: [
                                         Expanded(
                                           child: OutlinedButton(
-                                            onPressed: () {
+                                            onPressed: () async {
                                               app['status'] = 'rejected';
                                               app['reviewedAt'] = DateTime.now().toIso8601String();
                                               app['reviewedBy'] = reviewer.email;
                                               config.civicRegistrarApplications = apps;
+                                              await NgmyCivicRegistrarApplication.save(email, Map<String, dynamic>.from(app));
+                                              await _persistCivicRegistrarApplications(config);
+                                              if (userIndex != -1) {
+                                                allUsers[userIndex].isAuthorizedRegistrar = false;
+                                                await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
+                                              }
+                                              await _syncRegistrarStateAfterConfigChange(config, allUsers);
                                               onDataChanged();
                                               onParentSetState?.call();
                                               setST(() {});
@@ -1264,14 +1601,35 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: ElevatedButton(
-                                            onPressed: () {
+                                            onPressed: () async {
+                                              final appState = (app['state'] ?? '').toString().trim();
+                                              if (appState.isNotEmpty &&
+                                                  !NgmyCivicRegistryStats.canApproveRegistrarForState(
+                                                    state: appState,
+                                                    applications: apps,
+                                                    users: allUsers,
+                                                  )) {
+                                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      '$appState already has $kNgmyMaxRegistrarsPerState authorized registrars. Revoke one or set Civic Registry Admin.',
+                                                    ),
+                                                  ),
+                                                );
+                                                return;
+                                              }
                                               app['status'] = 'approved';
                                               app['reviewedAt'] = DateTime.now().toIso8601String();
                                               app['reviewedBy'] = reviewer.email;
                                               config.civicRegistrarApplications = apps;
                                               if (userIndex != -1) {
                                                 allUsers[userIndex].isAuthorizedRegistrar = true;
+                                                allUsers[userIndex].state = appState.isNotEmpty ? appState : allUsers[userIndex].state;
+                                                await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
                                               }
+                                              await NgmyCivicRegistrarApplication.save(email, Map<String, dynamic>.from(app));
+                                              await _persistCivicRegistrarApplications(config);
+                                              await _syncRegistrarStateAfterConfigChange(config, allUsers);
                                               onDataChanged();
                                               onParentSetState?.call();
                                               setST(() {});
@@ -1280,6 +1638,31 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                           ),
                                         ),
                                       ],
+                                    ),
+                                  ] else if (status == 'approved' && _reviewerCanActOnRegistrarApp(reviewer, app, config)) ...[
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton(
+                                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                                        onPressed: () async {
+                                          app['status'] = 'revoked';
+                                          app['revokedAt'] = DateTime.now().toUtc().toIso8601String();
+                                          app['revokedBy'] = reviewer.email;
+                                          config.civicRegistrarApplications = apps;
+                                          if (userIndex != -1) {
+                                            allUsers[userIndex].isAuthorizedRegistrar = false;
+                                            await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
+                                          }
+                                          await NgmyCivicRegistrarApplication.save(email, Map<String, dynamic>.from(app));
+                                          await _persistCivicRegistrarApplications(config);
+                                          await _syncRegistrarStateAfterConfigChange(config, allUsers);
+                                          onDataChanged();
+                                          onParentSetState?.call();
+                                          setST(() {});
+                                        },
+                                        child: const Text('Revoke Registrar Access'),
+                                      ),
                                     ),
                                   ],
                                 ],
@@ -1553,6 +1936,21 @@ Map<String, dynamic> _userRowForBulkSync(UserData u, {bool includeFreeTrial = fa
     row.remove('freeTrialDailyAmount');
   }
   return row;
+}
+
+Future<void> _pushUserContributionReceiptReads(UserData u) async {
+  if (!await ngmyCanReachCloud()) return;
+  final email = u.email.trim();
+  if (email.isEmpty) return;
+  try {
+    await Supabase.instance.client.from('users').upsert({
+      'email': email,
+      'openedContributionReceiptKeys': u.openedContributionReceiptKeys,
+      'dismissedContributionReceiptKeys': u.dismissedContributionReceiptKeys,
+    }).timeout(kNgmyCloudWriteTimeout);
+  } catch (e) {
+    debugPrint('[user] contribution receipt reads upsert: $e');
+  }
 }
 
 Future<void> _pushUserCanSellOnStore(UserData u) async {
@@ -2688,6 +3086,18 @@ List<Map<String, dynamic>> _mergeInquiryReplyLists(
 
   addAll(a);
   addAll(b);
+  // After seller confirms/rejects, cloud merge must not resurrect the purchase-notification card.
+  final decidedOrders = <String>{};
+  for (final e in byKey.entries) {
+    if (!e.key.startsWith('ps_')) continue;
+    final st = NgmyStorePaymentReply.paymentStatusOf(e.value);
+    if (st == 'approved' || st == 'rejected') {
+      decidedOrders.add(e.key.substring(3));
+    }
+  }
+  for (final oid in decidedOrders) {
+    byKey.remove('pn_$oid');
+  }
   final out = byKey.values.toList()
     ..sort((x, y) => (x['createdAt'] ?? '').toString().compareTo((y['createdAt'] ?? '').toString()));
   return out;
@@ -2716,13 +3126,17 @@ List<Map<String, dynamic>> _mergeStoreInquiriesLists(
     final pickLocal = _storeInquiryLastAt(localCopy).compareTo(_storeInquiryLastAt(existing)) >= 0;
     final picked = Map<String, dynamic>.from(pickLocal ? localCopy : existing);
     picked['replies'] = mergedReplies;
-    if (pickLocal) {
-      picked['read'] = localCopy['read'];
-      picked['buyerRead'] = localCopy['buyerRead'];
-    }
+    picked['read'] = localCopy['read'] == true || existing['read'] == true;
+    picked['buyerRead'] = localCopy['buyerRead'] == true || existing['buyerRead'] == true;
     byId[id] = picked;
   }
-  return byId.values.toList();
+  return byId.values.where(_storeInquiryThreadIsValid).toList();
+}
+
+bool _storeInquiryThreadIsValid(Map<String, dynamic> m) {
+  final seller = (m['sellerEmail'] ?? '').toString().trim();
+  final buyer = (m['buyerEmail'] ?? '').toString().trim();
+  return seller.isNotEmpty && buyer.isNotEmpty;
 }
 
 Future<bool> _pushStoreOrdersToSupabase(List<Map<String, dynamic>> localOrders, {String? forceLocalOrderId}) async {
@@ -2935,9 +3349,34 @@ Map<String, dynamic> _storeListingFromRow(Map<String, dynamic> row) {
 }
 
 Map<String, dynamic> _storeInquiryFromRow(Map<String, dynamic> row) {
+  Map<String, dynamic>? out;
   final data = row['data'];
-  if (data is Map) return Map<String, dynamic>.from(data);
-  return Map<String, dynamic>.from(row);
+  if (data is Map) {
+    out = Map<String, dynamic>.from(data);
+  } else if (data is String && data.trim().isNotEmpty) {
+    try {
+      final parsed = jsonDecode(data);
+      if (parsed is Map) out = Map<String, dynamic>.from(parsed);
+    } catch (_) {}
+  }
+  out ??= Map<String, dynamic>.from(row);
+  final rowId = (row['id'] ?? '').toString();
+  if (rowId.isNotEmpty) out['id'] = rowId;
+  final replies = out['replies'];
+  if (replies is List) {
+    out['replies'] = replies.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+  return out;
+}
+
+List<Map<String, dynamic>> _storeInquiriesFromConfigMap(Map<String, dynamic>? cfg) {
+  if (cfg == null) return const [];
+  final raw = cfg['storeInquiries'];
+  if (raw is! List) return const [];
+  return raw
+      .map((e) => Map<String, dynamic>.from(e as Map))
+      .where((m) => (m['id'] ?? '').toString().isNotEmpty)
+      .toList();
 }
 
 DateTime? _listingUpdatedAt(Map<String, dynamic> listing) {
@@ -3580,6 +4019,7 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   required AppConfig config,
   required bool isAdmin,
 }) async {
+  await _mergeCivicRegistryPinsIntoConfig(config);
   final row = <String, dynamic>{'id': kNgmyConfigRowId, ...config.toJson()};
   final localKey = config.geminiApiKey.trim();
   final remoteKey = await _fetchRemoteGeminiApiKey();
@@ -3608,7 +4048,12 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   row['gameInvites'] = config.gameInvites;
   row['civicRegistryPin'] = config.civicRegistryPin;
   row['civicRegistryPinsByState'] = config.civicRegistryPinsByState;
-  row['civicRegistrarApplications'] = config.civicRegistrarApplications;
+  if (isAdmin) {
+    _mergeRegistrarApplicationsIntoConfig(config, await _fetchRemoteCivicRegistrarApplications());
+    row['civicRegistrarApplications'] = config.civicRegistrarApplications;
+  } else {
+    row.remove('civicRegistrarApplications');
+  }
   row['jobPosts'] = config.jobPosts;
   row['jobWorkerApplications'] = config.jobWorkerApplications;
   if (isAdmin) {
@@ -3800,6 +4245,10 @@ class UserData {
   bool forceLogout; int referralCount; int points;
   String? profilePicturePath;
   bool isAuthorizedRegistrar;
+  /// Civic Registry "king" — may serve any state; does not count toward per-state registrar cap.
+  bool isCivicRegistryAdmin;
+  int civicRegistryStateSwitchesUsed;
+  String civicRegistryAnchorState;
   bool isApprovedWorker;
   bool isApprovedHelper;
   bool canSellOnStore;
@@ -3837,8 +4286,12 @@ class UserData {
   List<Map<String, dynamic>> mediaHighlights;
   List<Map<String, dynamic>> mediaStories;
   List<String> readAnnouncementIds;
+  List<String> openedContributionReceiptKeys;
+  List<String> dismissedContributionReceiptKeys;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.todayClockInEarned = 0.0, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.freeTrialActive = false, this.freeTrialDailyAmount = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds}) : mediaFollowers = mediaFollowers ?? <String>[], mediaFollowing = mediaFollowing ?? <String>[], mediaHighlights = mediaHighlights ?? <Map<String, dynamic>>[], mediaStories = mediaStories ?? <Map<String, dynamic>>[], readAnnouncementIds = readAnnouncementIds ?? <String>[];
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isCivicRegistryAdmin = false, this.civicRegistryStateSwitchesUsed = 0, this.civicRegistryAnchorState = '', this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.todayClockInEarned = 0.0, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.freeTrialActive = false, this.freeTrialDailyAmount = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds,
+    List<String>? openedContributionReceiptKeys,
+    List<String>? dismissedContributionReceiptKeys}) : mediaFollowers = mediaFollowers ?? <String>[], mediaFollowing = mediaFollowing ?? <String>[], mediaHighlights = mediaHighlights ?? <Map<String, dynamic>>[], mediaStories = mediaStories ?? <Map<String, dynamic>>[], readAnnouncementIds = readAnnouncementIds ?? <String>[], openedContributionReceiptKeys = openedContributionReceiptKeys ?? <String>[], dismissedContributionReceiptKeys = dismissedContributionReceiptKeys ?? <String>[];
   bool get isOnFreeTrial => freeTrialActive && freeTrialDailyAmount > 0;
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
@@ -3888,7 +4341,7 @@ class UserData {
     if (full <= 0) return 0.0;
     return full * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
   }
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'todayClockInEarned': todayClockInEarned, 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isCivicRegistryAdmin': isCivicRegistryAdmin, 'civicRegistryStateSwitchesUsed': civicRegistryStateSwitchesUsed, 'civicRegistryAnchorState': civicRegistryAnchorState, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'todayClockInEarned': todayClockInEarned, 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds, 'openedContributionReceiptKeys': openedContributionReceiptKeys, 'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -3926,6 +4379,11 @@ class UserData {
       points: json['points'] ?? 0,
       profilePicturePath: json['profilePicturePath'],
       isAuthorizedRegistrar: json['isAuthorizedRegistrar'] ?? false,
+      isCivicRegistryAdmin: json['isCivicRegistryAdmin'] ?? false,
+      civicRegistryStateSwitchesUsed: (json['civicRegistryStateSwitchesUsed'] ?? 0) is int
+          ? json['civicRegistryStateSwitchesUsed'] as int
+          : int.tryParse('${json['civicRegistryStateSwitchesUsed']}') ?? 0,
+      civicRegistryAnchorState: (json['civicRegistryAnchorState'] ?? '').toString(),
       isApprovedWorker: json['isApprovedWorker'] ?? false,
       isApprovedHelper: json['isApprovedHelper'] ?? false,
       canSellOnStore: json['canSellOnStore'] == true || json['can_sell_on_store'] == true,
@@ -3962,6 +4420,8 @@ class UserData {
       mediaHighlights: _jsonMapList(json['mediaHighlights']),
       mediaStories: _jsonMapList(json['mediaStories']),
       readAnnouncementIds: _jsonStringList(json['readAnnouncementIds']),
+      openedContributionReceiptKeys: _jsonStringList(json['openedContributionReceiptKeys']),
+      dismissedContributionReceiptKeys: _jsonStringList(json['dismissedContributionReceiptKeys']),
     );
   }
 }
@@ -4032,6 +4492,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   RealtimeChannel? _announcementsChannel;
   RealtimeChannel? _configChannel;
   RealtimeChannel? _storeListingsChannel;
+  RealtimeChannel? _storeInquiriesChannel;
   RealtimeChannel? _ngmySettingsChannel;
   StreamSubscription<AuthState>? _authSub;
   bool _isSyncing = false;
@@ -4177,6 +4638,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     };
     ngmyInAppNotify = ({required String title, required String body, String? tag, Duration cooldown = const Duration(seconds: 50)}) =>
         _pushInAppNotification(title: title, body: body, tag: tag, cooldown: cooldown);
+    ngmyOnStoreOrdersChanged = (prevOrders, nextOrders) {
+      if (!_allowConfigDiffNotifications) return;
+      _notifySellerOfNewStoreOrders(
+        AppConfig(storeOrders: prevOrders),
+        AppConfig(storeOrders: nextOrders),
+      );
+    };
     NgmyNavigator.install();
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
     _initLocalNotifications();
@@ -4252,13 +4720,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
         if (idx >= 0) {
           final local = _allUsers[idx];
-          if (!hadCanSellKey) remote.canSellOnStore = local.canSellOnStore;
+          remote.canSellOnStore = _canSellOnStoreForEmail(_config, key);
+          if (hadCanSellKey && !remote.canSellOnStore) {
+            // Stale user row had sell=true but config grant list says no — push correction.
+            unawaited(_pushUserCanSellOnStore(remote));
+          }
           _preserveLocalSessionState(local, remote);
           _mergeUserMediaProfileFields(local, remote);
           _ngmyReconcileClockInSession(remote, _allTransactions);
           _allUsers[idx] = remote;
         }
-        if (!hadCanSellKey) remote.canSellOnStore = _currentUser!.canSellOnStore;
+        remote.canSellOnStore = _canSellOnStoreForEmail(_config, key);
         _preserveLocalSessionState(_currentUser!, remote);
         _ngmyReconcileClockInSession(remote, _allTransactions);
         _currentUser = remote;
@@ -4275,6 +4747,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     ngmyOnGameWinNotify = null;
     ngmyInAppNotify = null;
+    ngmyOnStoreOrdersChanged = null;
     try { _startupRebuildDebounce?.cancel(); } catch (_) {}
     try { _autoThemeTimer?.cancel(); } catch (_) {}
     try { _configRefreshTimer?.cancel(); } catch (_) {}
@@ -4286,6 +4759,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try { _announcementsChannel?.unsubscribe(); } catch (_) {}
     try { _configChannel?.unsubscribe(); } catch (_) {}
     try { _storeListingsChannel?.unsubscribe(); } catch (_) {}
+    try { _storeInquiriesChannel?.unsubscribe(); } catch (_) {}
     try { _ngmySettingsChannel?.unsubscribe(); } catch (_) {}
     try { _authSub?.cancel(); } catch (_) {}
     super.dispose();
@@ -4551,6 +5025,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepLoans = List<Map<String, dynamic>>.from(_config.loanApplications.map((e) => Map<String, dynamic>.from(e)));
+        final keepRegistrarApps = List<Map<String, dynamic>>.from(
+          _config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)),
+        );
         final keepChatClosed = _config.ngmyChatClosed;
         final cfgMap = Map<String, dynamic>.from(cfg);
         final keepConfig = AppConfig.fromJson(_config.toJson());
@@ -4583,6 +5060,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         } else {
           next.loanApplications = _mergeLoanApplicationsLists(keepLoans, next.loanApplications);
         }
+        if (next.civicRegistrarApplications.isEmpty && keepRegistrarApps.isNotEmpty) {
+          next.civicRegistrarApplications = keepRegistrarApps;
+        } else {
+          next.civicRegistrarApplications = _mergeCivicRegistrarApplications(
+            keepRegistrarApps,
+            next.civicRegistrarApplications,
+          );
+        }
         final remotePopups = (cfgMap['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         final remoteVideoPopups = (cfgMap['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         next.ngmyPopups = _mergeNgmyPopupsFromRemote(keepPopups, remotePopups, NgmyPopupDefaults.ensurePopups);
@@ -4609,9 +5094,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         final plansSigAfter = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
         if (_appConfigSig(_config) == _appConfigSig(next) && plansSigBefore == plansSigAfter) return;
-        setState(() => _config = next);
+        setState(() {
+          _config = next;
+          _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
+          _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
+        });
         SharedPreferences.getInstance().then((prefs) {
           prefs.setString('app_config', jsonEncode(_config.toJson()));
+          prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+          if (_currentUser != null) {
+            prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+          }
           prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
         }).catchError((_) {});
       } catch (_) {
@@ -4672,8 +5165,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final inquiriesBefore = _config.storeInquiries.length;
     final remoteListings = await _fetchStoreListingsFromSupabase();
     final remoteInquiries = await _fetchStoreInquiriesFromSupabase();
+    final cfg = await _fetchNgmyConfigRow(columns: 'storeInquiries');
+    final configInquiries = _storeInquiriesFromConfigMap(cfg);
     _mergeStoreListingsIntoConfig(remoteListings);
     _mergeStoreInquiriesIntoConfig(remoteInquiries);
+    if (configInquiries.isNotEmpty) {
+      _mergeStoreInquiriesIntoConfig(configInquiries);
+    }
     _purgeExpiredSoldStoreListings();
     if (!mounted) return;
     final listingsSigAfter = _storeListingsSignature(_config.storeListings);
@@ -5213,9 +5711,88 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     );
     overlay.insert(_inAppNoticeEntry!);
     Future.delayed(const Duration(seconds: 4), () {
+      if (!mounted) {
+        _inAppNoticeEntry = null;
+        return;
+      }
       _inAppNoticeEntry?.remove();
       _inAppNoticeEntry = null;
     });
+  }
+
+  Future<void> _notifyAdminPendingRequest({
+    required String title,
+    required String body,
+    required String tag,
+  }) async {
+    if (_currentUser?.isAdmin != true) return;
+    await _pushInAppNotification(
+      title: title,
+      body: body,
+      tag: tag,
+      cooldown: const Duration(seconds: 12),
+    );
+  }
+
+  Future<void> _notifyAdminAboutPendingTransaction(AppTransaction tx) async {
+    if (_currentUser?.isAdmin != true) return;
+    if (tx.status != TransactionStatus.pending) return;
+    if (tx.type == TransactionType.withdrawal) {
+      await _notifyAdminPendingRequest(
+        title: 'New withdrawal request',
+        body: '${tx.userEmail} requested ${formatCurrency(tx.amount)}. Open Admin → Wallet.',
+        tag: 'admin_withdraw_${tx.id}',
+      );
+    } else if (tx.type == TransactionType.deposit) {
+      await _notifyAdminPendingRequest(
+        title: 'New deposit request',
+        body: '${tx.userEmail} submitted ${formatCurrency(tx.amount)}. Open Admin → Wallet.',
+        tag: 'admin_deposit_${tx.id}',
+      );
+    }
+  }
+
+  void _notifyAdminOnNewPendingRegistrarApps(AppConfig prev, AppConfig next) {
+    if (_currentUser?.isAdmin != true) return;
+    final prevIds = prev.civicRegistrarApplications
+        .where((a) => (a['status'] ?? 'pending').toString() == 'pending')
+        .map((a) => (a['id'] ?? '').toString())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    for (final raw in next.civicRegistrarApplications) {
+      final app = Map<String, dynamic>.from(raw);
+      if ((app['status'] ?? 'pending').toString() != 'pending') continue;
+      final id = (app['id'] ?? '').toString();
+      if (id.isEmpty || prevIds.contains(id)) continue;
+      final name = (app['fullName'] ?? app['username'] ?? 'Someone').toString();
+      final state = (app['state'] ?? '').toString();
+      unawaited(_notifyAdminPendingRequest(
+        title: 'Registrar application',
+        body: '$name applied${state.isNotEmpty ? ' ($state)' : ''}. Open Admin → Civic Registry.',
+        tag: 'admin_registrar_$id',
+      ));
+    }
+  }
+
+  void _notifyAdminOnNewPendingJobApps(AppConfig prev, AppConfig next) {
+    if (_currentUser?.isAdmin != true) return;
+    final prevIds = prev.jobWorkerApplications
+        .where((a) => (a['status'] ?? 'pending').toString() == 'pending')
+        .map((a) => (a['id'] ?? '').toString())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    for (final raw in next.jobWorkerApplications) {
+      final app = Map<String, dynamic>.from(raw);
+      if ((app['status'] ?? 'pending').toString() != 'pending') continue;
+      final id = (app['id'] ?? '').toString();
+      if (id.isEmpty || prevIds.contains(id)) continue;
+      final name = (app['fullName'] ?? app['username'] ?? 'Applicant').toString();
+      unawaited(_notifyAdminPendingRequest(
+        title: 'Job application',
+        body: '$name submitted a worker application. Open Admin → Job Apps.',
+        tag: 'admin_job_$id',
+      ));
+    }
   }
 
   Future<void> _notifyTransactionEvent(AppTransaction t, {bool statusChanged = false}) async {
@@ -5362,6 +5939,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           )
           .subscribe();
 
+      _storeInquiriesChannel = supabase
+          .channel('public:store_inquiries')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'store_inquiries',
+            callback: (payload) => _onStoreInquiryChange(payload),
+          )
+          .subscribe();
+
       _ngmySettingsChannel = supabase
           .channel('public:ngmy_settings')
           .onPostgresChanges(
@@ -5460,6 +6047,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           body: 'Payment confirmed for $title. Open Store → Sales to ship.',
           tag: 'store_sale_$id',
         ));
+      } else {
+        final via = (o['paidVia'] ?? '').toString();
+        final viaLabel = via.isEmpty ? '' : ' (${ngmyStorePaymentMethodLabel(via)})';
+        unawaited(_pushInAppNotification(
+          title: 'New store order',
+          body: 'Someone ordered $title$viaLabel. Open Store → Messages or Sales.',
+          tag: 'store_order_$id',
+        ));
       }
     }
   }
@@ -5555,6 +6150,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final keepHelpBiz = List<Map<String, dynamic>>.from(_config.helpBusinesses.map((e) => Map<String, dynamic>.from(e)));
         final keepOrders = List<Map<String, dynamic>>.from(_config.storeOrders.map((e) => Map<String, dynamic>.from(e)));
         final keepPlans = List<Map<String, dynamic>>.from(_config.investmentPlans.map((e) => Map<String, dynamic>.from(e)));
+        final keepRegistrarApps = List<Map<String, dynamic>>.from(
+          _config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)),
+        );
         final keepGeminiKey = _config.geminiApiKey.trim();
         final remoteGemini = _geminiKeyFromMap(Map<String, dynamic>.from(payload.newRecord));
         final record = Map<String, dynamic>.from(payload.newRecord);
@@ -5594,6 +6192,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         } else {
           next.jobWorkerApplications = _mergeJobWorkerApplicationsLists(keepJobWorkerApps, next.jobWorkerApplications);
         }
+        if (next.civicRegistrarApplications.isEmpty && keepRegistrarApps.isNotEmpty) {
+          next.civicRegistrarApplications = keepRegistrarApps;
+        } else {
+          next.civicRegistrarApplications = _mergeCivicRegistrarApplications(
+            keepRegistrarApps,
+            next.civicRegistrarApplications,
+          );
+        }
         final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
         final remotePopups = (record['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -5610,10 +6216,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _notifySellerOfNewStoreOrders(_config, next);
             _notifyPendingGameInvites(_config, next);
             _notifyApprovedWorkersOfNewJobs(_config, next);
+            _notifyAdminOnNewPendingRegistrarApps(_config, next);
+            _notifyAdminOnNewPendingJobApps(_config, next);
           }
-          setState(() => _config = next);
+          setState(() {
+            _config = next;
+            _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
+            _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
+          });
           SharedPreferences.getInstance().then((prefs) {
             prefs.setString('app_config', jsonEncode(_config.toJson()));
+            prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+            if (_currentUser != null) {
+              prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+            }
           }).catchError((_) {});
           unawaited(_processMediaDeliveryQueue());
         }
@@ -5675,6 +6291,41 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       debugPrint('[ngmy_settings] news closed realtime: $e');
     }
     unawaited(_refreshLegalAndPlansFromCloud());
+  }
+
+  void _onStoreInquiryChange(PostgresChangePayload payload) {
+    if (_isSyncing) return;
+    try {
+      if (payload.eventType == PostgresChangeEvent.delete) {
+        final id = (payload.oldRecord['id'] ?? '').toString();
+        if (id.isEmpty) return;
+        setState(() => _config.storeInquiries.removeWhere((m) => (m['id'] ?? '').toString() == id));
+        return;
+      }
+      final inquiry = _storeInquiryFromRow(Map<String, dynamic>.from(payload.newRecord));
+      final id = (inquiry['id'] ?? '').toString();
+      if (id.isEmpty) return;
+      setState(() {
+        final idx = _config.storeInquiries.indexWhere((m) => (m['id'] ?? '').toString() == id);
+        if (idx == -1) {
+          _config.storeInquiries.add(inquiry);
+        } else {
+          final local = Map<String, dynamic>.from(_config.storeInquiries[idx]);
+          final mergedReplies = _mergeInquiryReplyLists(_storeInquiryReplies(local), _storeInquiryReplies(inquiry));
+          final pickLocal = _storeInquiryLastAt(local).compareTo(_storeInquiryLastAt(inquiry)) >= 0;
+          final picked = Map<String, dynamic>.from(pickLocal ? local : inquiry);
+          picked['replies'] = mergedReplies;
+          picked['read'] = local['read'] == true || inquiry['read'] == true;
+          picked['buyerRead'] = local['buyerRead'] == true || inquiry['buyerRead'] == true;
+          _config.storeInquiries[idx] = picked;
+        }
+      });
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('app_config', jsonEncode(_config.toJson()));
+      }).catchError((_) {});
+    } catch (e) {
+      debugPrint('Store inquiry realtime apply error: $e');
+    }
   }
 
   void _onStoreListingChange(PostgresChangePayload payload) {
@@ -5756,10 +6407,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         setState(() {
           final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
           if (idx == -1) {
+            updatedUser.canSellOnStore = _canSellOnStoreForEmail(_config, email);
             _allUsers.add(updatedUser);
           } else {
             final local = _allUsers[idx];
-            if (!hadCanSellKey) updatedUser.canSellOnStore = local.canSellOnStore;
+            updatedUser.canSellOnStore = _canSellOnStoreForEmail(_config, email);
             _preserveLocalSessionState(local, updatedUser);
             _mergeUserMediaProfileFields(local, updatedUser);
             _allUsers[idx] = updatedUser;
@@ -5768,6 +6420,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             if (updatedUser.forceLogout) {
               _currentUser = null;
             } else {
+              updatedUser.canSellOnStore = _canSellOnStoreForEmail(_config, email);
               _preserveLocalSessionState(_currentUser!, updatedUser);
               _currentUser = updatedUser;
             }
@@ -5807,6 +6460,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final statusChanged = previous != null && previous!.status != tx.status;
         if (previous == null || statusChanged) {
           unawaited(_notifyTransactionEvent(tx, statusChanged: statusChanged));
+        }
+        if (previous == null && tx.status == TransactionStatus.pending) {
+          unawaited(_notifyAdminAboutPendingTransaction(tx));
         }
       }
     } catch (e) {
@@ -5917,6 +6573,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         try {
           final map = jsonDecode(configJson);
           if (map is Map<String, dynamic>) _config = AppConfig.fromJson(map);
+          final pinBackup = await NgmyCivicRegistryPins.loadLocalBackup();
+          if (pinBackup.global.trim().isNotEmpty && _config.civicRegistryPin.trim().isEmpty) {
+            _config.civicRegistryPin = pinBackup.global.trim();
+          }
+          _config.civicRegistryPinsByState = NgmyCivicRegistryPins.mergeMaps(
+            pinBackup.byState,
+            _config.civicRegistryPinsByState,
+          );
         } catch (_) {}
       }
       final localMediaJson = safeGet('all_media');
@@ -6054,6 +6718,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
         final localStoreListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
         final localStoreInquiries = List<Map<String, dynamic>>.from(_config.storeInquiries.map((e) => Map<String, dynamic>.from(e)));
+        final localRegistrarApps = List<Map<String, dynamic>>.from(
+          _config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)),
+        );
         final localGeminiKey = _config.geminiApiKey.trim();
         final localConfigSnapshot = AppConfig.fromJson(_config.toJson());
         final configData = await supabase.from('config').select().maybeSingle();
@@ -6068,6 +6735,26 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _applyRemoteLegalToConfig(_config, cfgMap);
           _mergeStoreListingsIntoConfig(localStoreListings);
           _mergeStoreInquiriesIntoConfig(localStoreInquiries);
+          _config.civicRegistrarApplications = _mergeCivicRegistrarApplications(
+            localRegistrarApps,
+            _config.civicRegistrarApplications,
+          );
+          final remoteRegistrarApps = await _fetchRemoteCivicRegistrarApplications();
+          _mergeRegistrarApplicationsIntoConfig(_config, remoteRegistrarApps);
+          _config.civicRegistrarApplications = _mergeCivicRegistrarApplications(
+            localRegistrarApps,
+            _config.civicRegistrarApplications,
+          );
+          await _mergeCivicRegistryPinsIntoConfig(_config);
+          final registrarEmail = _currentUser?.email ?? '';
+          if (registrarEmail.trim().isNotEmpty) {
+            final localRegistrarApp = await NgmyCivicRegistrarApplication.load(registrarEmail);
+            _config.civicRegistrarApplications = NgmyCivicRegistrarApplication.mergeLocalIntoList(
+              _config.civicRegistrarApplications,
+              registrarEmail,
+              localRegistrarApp,
+            );
+          }
           final remoteGemini = _geminiKeyFromMap(cfgMap);
           if (remoteGemini.isNotEmpty) {
             _config.geminiApiKey = remoteGemini;
@@ -6077,6 +6764,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (_config.investmentPlans.isNotEmpty) {
             _globalPlans = _investmentPlansFromMaps(_config.investmentPlans);
           }
+          _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
+          _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
         }
         final remoteNewsClosed = await ngmyFetchRemoteNgmyChatClosed();
         if (remoteNewsClosed != null) {
@@ -6136,7 +6825,27 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final computed = ngmyBalanceFromApprovedTransactions(u.email, _allTransactions);
         if (computed > u.accountBalance + 0.001) u.accountBalance = computed;
       }
+      _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
       if (_currentUser != null) {
+        final registrarEmail = _currentUser!.email;
+        final localRegistrarApp = await NgmyCivicRegistrarApplication.load(registrarEmail);
+        if (localRegistrarApp != null) {
+          _config.civicRegistrarApplications = NgmyCivicRegistrarApplication.mergeLocalIntoList(
+            _config.civicRegistrarApplications,
+            registrarEmail,
+            localRegistrarApp,
+          );
+          _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
+        }
+        final civicLocal = await NgmyCivicStateSwitches.loadLocal(registrarEmail);
+        if (civicLocal != null) {
+          final used = civicLocal['used'];
+          final anchor = (civicLocal['anchor'] ?? '').toString();
+          if (used is int) _currentUser!.civicRegistryStateSwitchesUsed = used;
+          if (anchor.isNotEmpty && _currentUser!.civicRegistryAnchorState.trim().isEmpty) {
+            _currentUser!.civicRegistryAnchorState = anchor;
+          }
+        }
         final key = _currentUser!.email.toLowerCase().trim();
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
         if (idx != -1) {
@@ -6172,9 +6881,29 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _allUsers[idx].readAnnouncementIds = _currentUser!.readAnnouncementIds;
           }
         }
+        final key = _currentUser!.email.toLowerCase().trim();
+        if (key.isNotEmpty) {
+          final localOpened = await NgmyCivicReadState.loadOpened(key);
+          final localDismissed = await NgmyCivicReadState.loadDismissed(key);
+          _currentUser!.openedContributionReceiptKeys = NgmyCivicReadState.mergeSets(
+            NgmyCivicReadState.mergeSets(_currentUser!.openedContributionReceiptKeys, localOpened),
+            _config.openedContributionReceiptKeys,
+          ).toList();
+          _currentUser!.dismissedContributionReceiptKeys = NgmyCivicReadState.mergeSets(
+            NgmyCivicReadState.mergeSets(_currentUser!.dismissedContributionReceiptKeys, localDismissed),
+            _config.dismissedContributionReceiptKeys,
+          ).toList();
+          final uIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+          if (uIdx >= 0) {
+            _allUsers[uIdx].openedContributionReceiptKeys = _currentUser!.openedContributionReceiptKeys;
+            _allUsers[uIdx].dismissedContributionReceiptKeys = _currentUser!.dismissedContributionReceiptKeys;
+          }
+        }
       }
       (_config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure((_config as dynamic).mediaVirtualProfiles);
       NgmyMediaProfile.pruneExpiredStoriesAllUsers(_allUsers);
+
+      _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
 
       _purgeExpiredSoldStoreListings();
       await _pruneExpiredAnnouncements(updateUi: false);
@@ -12389,7 +13118,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _navItem(1, Icons.people_outline, 'Users', isDark, frameBg, frameBorder),
             _navItem(2, Icons.trending_up_rounded, 'Invest', isDark, frameBg, frameBorder),
             _navItem(3, Icons.edit_note_rounded, 'Creator', isDark, frameBg, frameBorder),
-            _navItem(4, Icons.account_balance_wallet_outlined, 'Wallet', isDark, frameBg, frameBorder),
+            _navItem(
+              4,
+              Icons.account_balance_wallet_outlined,
+              'Wallet',
+              isDark,
+              frameBg,
+              frameBorder,
+              badgeCount: _adminWalletPendingCount(),
+            ),
             _navItem(5, Icons.play_circle_outline, 'Media', isDark, frameBg, frameBorder),
             _navItem(6, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
           ],
@@ -12398,7 +13135,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _navItem(int i, IconData icon, String label, bool isDark, Color frameBg, Color frameBorder) {
+  int _adminWalletPendingCount() {
+    final pendingDeposits = widget.allTransactions
+        .where((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending)
+        .length;
+    final pendingWithdrawals = widget.allTransactions
+        .where((t) => t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending)
+        .length;
+    return NgmyAdminMenuCounts.pendingWalletAdminCount(
+      pendingDeposits: pendingDeposits,
+      pendingWithdrawals: pendingWithdrawals,
+    );
+  }
+
+  Widget _navItem(int i, IconData icon, String label, bool isDark, Color frameBg, Color frameBorder, {int badgeCount = 0}) {
     final selected = _idx == i;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -12407,39 +13157,63 @@ class _AdminDashboardState extends State<AdminDashboard> {
         child: InkWell(
           onTap: () => setState(() => _idx = i),
           borderRadius: BorderRadius.circular(12),
-          child: Ink(
-            decoration: BoxDecoration(
-              color: selected ? (isDark ? const Color(0xFF1F2937) : Colors.white) : frameBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: selected ? const Color(0xFF00B25A) : frameBorder,
-                width: selected ? 2.2 : 1.8,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Ink(
+                decoration: BoxDecoration(
+                  color: selected ? (isDark ? const Color(0xFF1F2937) : Colors.white) : frameBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: selected ? const Color(0xFF00B25A) : frameBorder,
+                    width: selected ? 2.2 : 1.8,
+                  ),
+                  boxShadow: selected
+                      ? [BoxShadow(color: const Color(0xFF00B25A).withOpacity(isDark ? 0.22 : 0.12), blurRadius: 8, offset: const Offset(0, 3))]
+                      : null,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, color: selected ? const Color(0xFF00B25A) : (isDark ? Colors.white54 : Colors.grey), size: 20),
+                      const SizedBox(height: 2),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: selected ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white54 : Colors.grey),
+                          fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                          fontSize: 9,
+                          height: 1.1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              boxShadow: selected
-                  ? [BoxShadow(color: const Color(0xFF00B25A).withOpacity(isDark ? 0.22 : 0.12), blurRadius: 8, offset: const Offset(0, 3))]
-                  : null,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, color: selected ? const Color(0xFF00B25A) : (isDark ? Colors.white54 : Colors.grey), size: 20),
-                  const SizedBox(height: 2),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: selected ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white54 : Colors.grey),
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                      fontSize: 9,
-                      height: 1.1,
+              if (badgeCount > 0)
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white, width: 1.2),
+                    ),
+                    child: Text(
+                      badgeCount > 99 ? '99+' : '$badgeCount',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, height: 1),
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
+            ],
           ),
         ),
       ),
@@ -12550,9 +13324,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           value: u.canSellOnStore,
                           activeColor: const Color(0xFF7C3AED),
                           onChanged: (on) {
-                            u.canSellOnStore = on;
+                            _updateStoreSellAccessGrant(widget.config, u, on);
                             widget.onDataChanged();
                             setState(() {});
+                            unawaited(_persistStoreSellAccessEmails(widget.config));
                             unawaited(_pushUserCanSellOnStore(u));
                             unawaited(_pushUserToCloudFast(u));
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -12586,12 +13361,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
           crossAxisSpacing: 15,
           childAspectRatio: 1.1,
           children: [
-            _menuFrame('Loan Center', Icons.handshake_outlined, Colors.teal, () => _showLoanAdmin(isDark), isDark),
+            _menuFrame('Loan Center', Icons.handshake_outlined, Colors.teal, () => _showLoanAdmin(isDark), isDark, badgeCount: NgmyAdminMenuCounts.pendingLoanApplications(widget.config.loanApplications)),
             _menuFrame('Announcements', Icons.campaign_outlined, Colors.orange, () => _showAnnouncementAdmin(isDark), isDark),
-            _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => _showCivicRegistryAdmin(isDark), isDark),
-            _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => _showJobApplicationsAdmin(isDark), isDark),
+            _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => _showCivicRegistryAdmin(isDark), isDark, badgeCount: NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications)),
+            _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => _showJobApplicationsAdmin(isDark), isDark, badgeCount: NgmyAdminMenuCounts.pendingJobWorkerApplications(widget.config.jobWorkerApplications)),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => _showPopupsAdmin(isDark), isDark),
-            _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => _showGamesAdmin(isDark), isDark),
+            _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => _showGamesAdmin(isDark), isDark, badgeCount: NgmyAdminMenuCounts.pendingGameInvites(widget.config.gameInvites)),
           ],
         ),
         const SizedBox(height: 28),
@@ -12661,13 +13436,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   void _showCivicRegistryAdmin(bool isDark) {
+    final pending = NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.55),
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.72),
           margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
           decoration: BoxDecoration(
@@ -12682,27 +13458,36 @@ class _AdminDashboardState extends State<AdminDashboard> {
               const Text('Civic Registry', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
               const SizedBox(height: 8),
               Text(
-                'Set the shared PIN or review Authorized Registrar applications.',
-                style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+                'PIN, registrar requests, state limits, and per-state capacity (max $kNgmyMaxRegistrarsPerState per state).',
+                style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
               ListTile(
                 leading: const Icon(Icons.pin_rounded, color: Color(0xFF6200EE)),
                 title: const Text('Registry PIN', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('One PIN for all members'),
+                subtitle: const Text('Per-state PINs + optional global fallback'),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () {
                   Navigator.pop(ctx);
-                  showNgmyCivicRegistryPinSheet(context, config: widget.config, onDataChanged: widget.onDataChanged);
+                  _openCivicRegistryPinSheet(
+                    context,
+                    config: widget.config,
+                    reviewer: widget.user,
+                    onDataChanged: widget.onDataChanged,
+                  );
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.verified_user_rounded, color: Color(0xFF6200EE)),
                 title: const Text('Registrar Applications', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text(
-                  '${widget.config.civicRegistrarApplications.where((a) => (a['status'] ?? 'pending') == 'pending').length} pending',
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
+                subtitle: Text('$pending pending request${pending == 1 ? '' : 's'}'),
+                trailing: pending > 0
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
+                        child: Text('$pending', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+                      )
+                    : const Icon(Icons.chevron_right_rounded),
                 onTap: () {
                   Navigator.pop(ctx);
                   showNgmyCivicRegistrarApplicationsSheet(
@@ -12711,7 +13496,67 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     allUsers: widget.allUsers,
                     reviewer: widget.user,
                     onDataChanged: widget.onDataChanged,
-                    onParentSetState: () => setState(() {}),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.map_rounded, color: Color(0xFF6200EE)),
+                title: const Text('Manage Registry by State', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text('Stats, registrars, Civic Registry Admin (max $kNgmyMaxRegistrarsPerState slots)'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  showNgmyManageRegistryByStateSheet(
+                    context,
+                    isDark: isDark,
+                    usStates: const [
+                      'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
+                      'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland',
+                      'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey',
+                      'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina',
+                      'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming',
+                    ],
+                    applications: widget.config.civicRegistrarApplications,
+                    users: widget.allUsers.map(_civicRegistryUserRow).toList(),
+                    readUsers: () => widget.allUsers.map(_civicRegistryUserRow).toList(),
+                    onToggleRegistryAdmin: (email, on) {
+                      final i = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email.toLowerCase().trim());
+                      if (i == -1) return;
+                      widget.allUsers[i].isCivicRegistryAdmin = on;
+                      if (on) widget.allUsers[i].isAuthorizedRegistrar = true;
+                      unawaited(_pushUserAuthorizedRegistrar(widget.allUsers[i]));
+                      widget.onDataChanged();
+                    },
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.restart_alt_rounded, color: Color(0xFF6200EE)),
+                title: const Text('Reset State Change Limit', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Search users — grant 3 more state changes'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  showNgmyResetCivicStateSwitchesSheet(
+                    context,
+                    isDark: isDark,
+                    users: widget.allUsers.map(_civicRegistryUserRow).toList(),
+                    onReset: (row) {
+                      final i = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == row.email.toLowerCase().trim());
+                      if (i == -1) return;
+                      widget.allUsers[i].civicRegistryStateSwitchesUsed = 0;
+                      unawaited(_pushUserAuthorizedRegistrar(widget.allUsers[i]));
+                      unawaited(NgmyCivicStateSwitches.saveLocal(
+                        email: widget.allUsers[i].email,
+                        switchesUsed: 0,
+                        anchorState: widget.allUsers[i].civicRegistryAnchorState,
+                      ));
+                      widget.onDataChanged();
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('${widget.allUsers[i].username} can change state ${NgmyCivicStateSwitches.maxSwitches} more times.')),
+                      );
+                    },
                   );
                 },
               ),
@@ -12934,45 +13779,73 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _menuFrame(String title, IconData icon, Color color, VoidCallback onTap, bool isDark) => Material(
+  Widget _menuFrame(String title, IconData icon, Color color, VoidCallback onTap, bool isDark, {int badgeCount = 0}) => Material(
     color: Colors.transparent,
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              color.withOpacity(isDark ? 0.55 : 0.75),
-              color.withOpacity(isDark ? 0.35 : 0.55),
-              color.withOpacity(isDark ? 0.25 : 0.4),
-            ],
-          ),
-          boxShadow: [
-            BoxShadow(color: color.withOpacity(0.35), blurRadius: 14, offset: const Offset(0, 6)),
-            BoxShadow(color: Colors.black.withOpacity(isDark ? 0.35 : 0.12), blurRadius: 6, offset: const Offset(0, 3)),
-          ],
-          border: Border.all(color: Colors.white.withOpacity(0.28), width: 1.2),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.18),
-                shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3))],
+      child: Stack(
+        clipBehavior: Clip.none,
+        fit: StackFit.expand,
+        children: [
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  color.withOpacity(isDark ? 0.55 : 0.75),
+                  color.withOpacity(isDark ? 0.35 : 0.55),
+                  color.withOpacity(isDark ? 0.25 : 0.4),
+                ],
               ),
-              child: Icon(icon, color: Colors.white, size: 24),
+              boxShadow: [
+                BoxShadow(color: color.withOpacity(0.35), blurRadius: 14, offset: const Offset(0, 6)),
+                BoxShadow(color: Colors.black.withOpacity(isDark ? 0.35 : 0.12), blurRadius: 6, offset: const Offset(0, 3)),
+              ],
+              border: Border.all(color: Colors.white.withOpacity(0.28), width: 1.2),
             ),
-            const SizedBox(height: 10),
-            Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white)),
-          ],
-        ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.18),
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3))],
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 24),
+                ),
+                const SizedBox(height: 10),
+                Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white)),
+              ],
+            ),
+          ),
+          if (badgeCount > 0)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white, width: 1.5),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 4)],
+                ),
+                child: Text(
+                  badgeCount > 99 ? '99+' : '$badgeCount',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, height: 1.1),
+                ),
+              ),
+            ),
+        ],
       ),
     ),
   );
@@ -19159,6 +20032,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   final _roomC = TextEditingController();
   final Set<String> _dismissedReceiptKeys = {};
   final Set<String> _openedReceiptKeys = {};
+  Map<String, dynamic>? _localRegistrarBackup;
   bool _maintenanceQueued = false;
 
   final List<String> _usStates = [
@@ -19174,19 +20048,60 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     super.initState();
     _selectedState = widget.user.state;
     _ensureUniqueRegistryIds();
-    _openedReceiptKeys
-      ..clear()
-      ..addAll(widget.config.openedContributionReceiptKeys);
-    _dismissedReceiptKeys
-      ..clear()
-      ..addAll(widget.config.dismissedContributionReceiptKeys);
+    unawaited(_hydrateReceiptReadState());
+    unawaited(_hydrateRegistrarApplication());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _runHelpModeLifecycleMaintenance();
       _checkRegistryUnlock();
     });
   }
 
-  bool _canBypassCivicGate() => widget.user.isAuthorizedRegistrar;
+  @override
+  void didUpdateWidget(CivicRegistryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user.email != widget.user.email) {
+      unawaited(_hydrateReceiptReadState());
+      unawaited(_hydrateRegistrarApplication());
+    }
+  }
+
+  Future<void> _hydrateReceiptReadState() async {
+    final email = widget.user.email.toLowerCase().trim();
+    if (email.isEmpty) return;
+    final localOpened = await NgmyCivicReadState.loadOpened(email);
+    final localDismissed = await NgmyCivicReadState.loadDismissed(email);
+    if (!mounted) return;
+    setState(() {
+      _openedReceiptKeys
+        ..clear()
+        ..addAll(NgmyCivicReadState.hydrateOpened(
+          email: email,
+          local: localOpened,
+          userRow: widget.user.openedContributionReceiptKeys,
+          legacyConfig: widget.config.openedContributionReceiptKeys,
+        ));
+      _dismissedReceiptKeys
+        ..clear()
+        ..addAll(NgmyCivicReadState.hydrateDismissed(
+          email: email,
+          local: localDismissed,
+          userRow: widget.user.dismissedContributionReceiptKeys,
+          legacyConfig: widget.config.dismissedContributionReceiptKeys,
+        ));
+    });
+  }
+
+  bool _hasRegistrarAccess() {
+    if (widget.user.isCivicRegistryAdmin && widget.user.isAuthorizedRegistrar) return true;
+    return NgmyCivicRegistrarApplication.hasRegistrarAccess(
+      applications: widget.config.civicRegistrarApplications,
+      email: widget.user.email,
+      userFlag: widget.user.isAuthorizedRegistrar,
+      localBackup: _localRegistrarBackup,
+    );
+  }
+
+  bool _canBypassCivicGate() => _hasRegistrarAccess();
 
   Future<void> _checkRegistryUnlock() async {
     if (_canBypassCivicGate()) {
@@ -19206,28 +20121,143 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _onRegistryUnlocked(String state) {
+    NgmyCivicStateSwitches.onGateUnlock(
+      state: state,
+      currentAnchor: widget.user.civicRegistryAnchorState,
+      setAnchorState: (s) => widget.user.civicRegistryAnchorState = s,
+      setUserState: (s) => widget.user.state = s,
+    );
     setState(() {
       _selectedState = state;
-      widget.user.state = state;
       _registryUnlocked = true;
     });
+    unawaited(NgmyCivicStateSwitches.saveLocal(
+      email: widget.user.email,
+      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+      anchorState: widget.user.civicRegistryAnchorState,
+    ));
+    unawaited(_pushUserAuthorizedRegistrar(widget.user));
     widget.onDataChanged();
   }
 
-  bool _canManageCivicRegistry() => widget.user.isAuthorizedRegistrar;
-
-  int get _maxCivicTabIndex => _canManageCivicRegistry() ? 3 : 1;
-
-  bool _hasPendingRegistrarApplication() {
-    return widget.config.civicRegistrarApplications.any(
-      (a) =>
-          (a['userEmail'] ?? '').toString().toLowerCase().trim() == widget.user.email.toLowerCase().trim() &&
-          (a['status'] ?? 'pending').toString() == 'pending',
+  bool _canChangeCivicState() {
+    if (_hasRegistrarAccess() && !_isCivicRegistryKing(widget.user) && !widget.user.isAdmin) {
+      return false;
+    }
+    return NgmyCivicStateSwitches.canChangeState(
+      isAdmin: widget.user.isAdmin,
+      isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
+      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
     );
   }
 
+  Future<bool> _applyCivicStateChange(String newState) async {
+    final from = _selectedState;
+    if (from.trim().toLowerCase() == newState.trim().toLowerCase()) return true;
+    final ok = NgmyCivicStateSwitches.tryConsumeSwitch(
+      isAdmin: widget.user.isAdmin,
+      isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
+      fromState: from,
+      toState: newState,
+      anchorState: widget.user.civicRegistryAnchorState,
+      setAnchorState: (s) => widget.user.civicRegistryAnchorState = s,
+      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+      setSwitchesUsed: (n) => widget.user.civicRegistryStateSwitchesUsed = n,
+    );
+    if (!ok) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'You have used all 3 state changes. Ask an admin to reset your limit in Civic Registry settings.',
+            ),
+          ),
+        );
+      }
+      return false;
+    }
+    unawaited(NgmyCivicStateSwitches.saveLocal(
+      email: widget.user.email,
+      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+      anchorState: widget.user.civicRegistryAnchorState,
+    ));
+    unawaited(_pushUserAuthorizedRegistrar(widget.user));
+    widget.onDataChanged();
+    if (!_canBypassCivicGate()) {
+      final unlocked = await civicRegistryIsUnlocked(widget.user.email, newState);
+      if (!unlocked) {
+        if (!mounted) return false;
+        setState(() {
+          _selectedState = newState;
+          _selectedCity = 'All Cities';
+          _selectedRoom = 'All Rooms';
+          _registryUnlocked = false;
+        });
+        return false;
+      }
+    }
+    if (!mounted) return false;
+    setState(() {
+      _selectedState = newState;
+      _selectedCity = 'All Cities';
+      _selectedRoom = 'All Rooms';
+    });
+    return true;
+  }
+
+  bool _canManageCivicRegistry() => _hasRegistrarAccess();
+
+  int get _maxCivicTabIndex => _canManageCivicRegistry() ? 3 : 1;
+
+  Future<void> _hydrateRegistrarApplication() async {
+    final email = widget.user.email;
+    if (email.trim().isEmpty) return;
+    final local = await NgmyCivicRegistrarApplication.load(email);
+    _localRegistrarBackup = local;
+    if (local != null) {
+      widget.config.civicRegistrarApplications = NgmyCivicRegistrarApplication.mergeLocalIntoList(
+        widget.config.civicRegistrarApplications,
+        email,
+        local,
+      );
+    }
+    _mergeRegistrarApplicationsIntoConfig(widget.config, await _fetchRemoteCivicRegistrarApplications());
+    if (local != null) {
+      widget.config.civicRegistrarApplications = NgmyCivicRegistrarApplication.mergeLocalIntoList(
+        widget.config.civicRegistrarApplications,
+        email,
+        local,
+      );
+    }
+    final status = _registrarApplicationStatusForEmail(widget.config, email);
+    if (status == 'approved') {
+      widget.user.isAuthorizedRegistrar = true;
+    } else if (status == 'revoked' || status == 'rejected') {
+      widget.user.isAuthorizedRegistrar = false;
+    }
+    if (mounted) setState(() {});
+  }
+
+  bool _hasPendingRegistrarApplication() {
+    if (_hasRegistrarAccess()) return false;
+    if (NgmyCivicRegistrarApplication.isRevokedForEmail(
+      widget.config.civicRegistrarApplications,
+      widget.user.email,
+    )) {
+      return false;
+    }
+    if (NgmyCivicRegistrarApplication.isPendingForEmail(
+      widget.config.civicRegistrarApplications,
+      widget.user.email,
+    )) {
+      return true;
+    }
+    final local = _localRegistrarBackup;
+    return local != null && (local['status'] ?? 'pending').toString().toLowerCase() == 'pending';
+  }
+
   Future<void> _showRegistrarApplicationDialog() async {
-    if (widget.user.isAuthorizedRegistrar) {
+    if (_hasRegistrarAccess()) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are already an Authorized Registrar.')));
       return;
     }
@@ -19235,61 +20265,198 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your registrar application is pending review.')));
       return;
     }
+    final nameC = TextEditingController(text: (widget.user.fullName ?? '').trim().isNotEmpty ? widget.user.fullName!.trim() : widget.user.username);
+    final phoneC = TextEditingController(text: widget.user.phone);
     final reasonC = TextEditingController();
-    final ok = await showDialog<bool>(
+    final experienceC = TextEditingController();
+    final ok = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Apply — Authorized Registrar'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Authorized Registrars can enroll members, manage help mode, and maintain the registry for their state.',
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonC,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Why should you be approved?',
-                border: OutlineInputBorder(),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final surface = isDark ? const Color(0xFF121726) : Colors.white;
+        final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFE2E8F0);
+        final muted = isDark ? Colors.white60 : Colors.black54;
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: border, width: 1.2),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 24, offset: const Offset(0, 8))],
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6200EE).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.verified_user_rounded, color: Color(0xFF6200EE), size: 26),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Authorized Registrar Application',
+                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: isDark ? Colors.white : Colors.black87),
+                              ),
+                              Text('Civic Registry • ${widget.user.state}', style: TextStyle(fontSize: 12, color: muted)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Registrars enroll members, run help mode, and keep the registry accurate for their state. All fields marked * are required.',
+                      style: TextStyle(fontSize: 12.5, height: 1.4, color: muted),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameC,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        labelText: 'Your full name *',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: phoneC,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Phone number (optional)',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: reasonC,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        labelText: 'Why do you want to become an Authorized Registrar? *',
+                        alignLabelWithHint: true,
+                        hintText: 'Explain your experience, community role, and how you will use this access responsibly.',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: experienceC,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: 'Relevant experience (optional)',
+                        alignLabelWithHint: true,
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF6200EE), padding: const EdgeInsets.symmetric(vertical: 14)),
+                            onPressed: () {
+                              if (nameC.text.trim().isEmpty || reasonC.text.trim().isEmpty) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(content: Text('Enter your full name and reason for applying.')),
+                                );
+                                return;
+                              }
+                              Navigator.pop(ctx, true);
+                            },
+                            child: const Text('Submit Application', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Submit')),
-        ],
-      ),
+          ),
+        );
+      },
     );
-    if (ok == true && reasonC.text.trim().isNotEmpty) {
-      widget.config.civicRegistrarApplications = [
-        ...widget.config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)),
-        {
-          'id': DateTime.now().microsecondsSinceEpoch.toString(),
-          'userEmail': widget.user.email,
-          'username': widget.user.username,
-          'fullName': widget.user.fullName ?? widget.user.username,
-          'state': widget.user.state,
-          'reason': reasonC.text.trim(),
-          'status': 'pending',
-          'createdAt': DateTime.now().toIso8601String(),
-        },
-      ];
+    if (ok == true) {
+      final applicantName = nameC.text.trim();
+      final reason = reasonC.text.trim();
+      final app = <String, dynamic>{
+        'id': DateTime.now().microsecondsSinceEpoch.toString(),
+        'userEmail': widget.user.email,
+        'username': widget.user.username,
+        'fullName': applicantName,
+        'applicantName': applicantName,
+        'phone': phoneC.text.trim(),
+        'state': widget.user.state,
+        'reason': reason,
+        'experience': experienceC.text.trim(),
+        'status': 'pending',
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+      };
+      await NgmyCivicRegistrarApplication.save(widget.user.email, app);
+      _localRegistrarBackup = Map<String, dynamic>.from(app);
+      widget.config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
+        widget.config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+        app,
+      );
+      final synced = await _persistCivicRegistrarApplications(widget.config);
       widget.onDataChanged();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Application sent. An admin will review it in the dashboard.')),
+          SnackBar(
+            content: Text(
+              synced
+                  ? 'Application submitted. An admin will review it in the dashboard.'
+                  : 'Application saved on this device. Connect to the internet to sync with the server.',
+            ),
+          ),
         );
         setState(() {});
       }
-    } else if (ok == true) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please explain why you are applying.')));
     }
+    nameC.dispose();
+    phoneC.dispose();
     reasonC.dispose();
+    experienceC.dispose();
   }
 
   List<UserData> _registryMembersMatchingSearch() {
@@ -19306,9 +20473,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return widget.allUsers.where(matchesFilters).toList();
   }
 
-  void _syncReceiptFlagsToConfig() {
-    widget.config.openedContributionReceiptKeys = _openedReceiptKeys.toList();
-    widget.config.dismissedContributionReceiptKeys = _dismissedReceiptKeys.toList();
+  Future<void> _persistReceiptReadState() async {
+    final email = widget.user.email.toLowerCase().trim();
+    if (email.isEmpty) return;
+    widget.user.openedContributionReceiptKeys = _openedReceiptKeys.toList();
+    widget.user.dismissedContributionReceiptKeys = _dismissedReceiptKeys.toList();
+    await NgmyCivicReadState.saveOpened(email, _openedReceiptKeys);
+    await NgmyCivicReadState.saveDismissed(email, _dismissedReceiptKeys);
+    unawaited(_pushUserContributionReceiptReads(widget.user));
     widget.onDataChanged();
   }
 
@@ -19376,7 +20548,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
 
     if (changed) {
-      _syncReceiptFlagsToConfig();
+      unawaited(_persistReceiptReadState());
     }
   }
 
@@ -19668,26 +20840,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                         trailing: selected ? Icon(Icons.check_circle_rounded, color: Colors.greenAccent.shade400) : null,
                                         onTap: () async {
                                           Navigator.pop(sheetCtx);
-                                          final newState = state;
-                                          if (!_canBypassCivicGate()) {
-                                            final ok = await civicRegistryIsUnlocked(widget.user.email, newState);
-                                            if (!ok) {
-                                              if (!mounted) return;
-                                              setState(() {
-                                                _selectedState = newState;
-                                                _selectedCity = 'All Cities';
-                                                _selectedRoom = 'All Rooms';
-                                                _registryUnlocked = false;
-                                              });
-                                              return;
-                                            }
-                                          }
-                                          if (!mounted) return;
-                                          setState(() {
-                                            _selectedState = newState;
-                                            _selectedCity = 'All Cities';
-                                            _selectedRoom = 'All Rooms';
-                                          });
+                                          await _applyCivicStateChange(state);
                                         },
                                       );
                                     },
@@ -20674,7 +21827,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     setState(() {
       _openedReceiptKeys.addAll(keys);
     });
-    _syncReceiptFlagsToConfig();
+    unawaited(_persistReceiptReadState());
     String? selectedKey;
 
     showDialog(
@@ -20763,7 +21916,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               const SizedBox(height: 6),
                               SelectionContainer.disabled(
                                 child: GestureDetector(
-                                  onTap: () => setDialog(() => selectedKey = k),
+                                  onTap: () {
+                                    setDialog(() {
+                                      selectedKey = k;
+                                      _openedReceiptKeys.add(k);
+                                    });
+                                    unawaited(_persistReceiptReadState());
+                                    if (mounted) setState(() {});
+                                  },
                                   child: Container(
                                     height: 38,
                                     width: double.infinity,
@@ -20795,7 +21955,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     onPressed: () {
                                       if (selectedKey == null) return;
                                       setState(() => _dismissedReceiptKeys.add(selectedKey!));
-                                      _syncReceiptFlagsToConfig();
+                                      unawaited(_persistReceiptReadState());
                                       setDialog(() {
                                         selectedKey = null;
                                       });
@@ -21240,7 +22400,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          IconButton(onPressed: _showStatePicker, icon: const Icon(Icons.map_rounded), tooltip: 'Change State'),
+          if (_canChangeCivicState())
+            IconButton(onPressed: _showStatePicker, icon: const Icon(Icons.map_rounded), tooltip: 'Change State'),
         ],
       ),
       body: SelectionContainer.disabled(
@@ -21379,7 +22540,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   const SizedBox(width: 15),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Authorized Registrar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), Text('$_selectedState • ${widget.allUsers.where((u)=>u.isEnrolledInRegistry && u.state.trim().toLowerCase() == _selectedState.trim().toLowerCase()).length} registered', style: TextStyle(color: Colors.grey.shade600, fontSize: 11))])),
 
-                  if (_canManageCivicRegistry())
+                  if (_canManageCivicRegistry()) ...[
+                    if (_hasCivicRegistrarReviewAccess(widget.user, widget.config))
+                      TextButton(
+                        onPressed: () {
+                          showNgmyCivicRegistrarApplicationsSheet(
+                            context,
+                            config: widget.config,
+                            allUsers: widget.allUsers,
+                            reviewer: widget.user,
+                            onDataChanged: widget.onDataChanged,
+                          );
+                        },
+                        style: TextButton.styleFrom(foregroundColor: const Color(0xFF6200EE), padding: const EdgeInsets.symmetric(horizontal: 6)),
+                        child: const Text('Requests', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 10)),
+                      ),
                     SelectionContainer.disabled(
                       child: GestureDetector(
                         onTap: _showHelpModeDialog,
@@ -21398,8 +22573,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           ),
                         ),
                       ),
-                    )
-                  else if (!widget.user.isAuthorizedRegistrar && !_hasPendingRegistrarApplication())
+                    ),
+                    if (_isCivicRegistryKing(widget.user) || widget.user.isAdmin)
+                      IconButton(
+                        icon: const Icon(Icons.pin_rounded, size: 20, color: Color(0xFF6200EE)),
+                        tooltip: 'Set state registry PIN',
+                        onPressed: () => _openCivicRegistryPinSheet(
+                          context,
+                          config: widget.config,
+                          reviewer: widget.user,
+                          onDataChanged: widget.onDataChanged,
+                          initialState: _selectedState,
+                        ),
+                      ),
+                  ] else if (!_hasRegistrarAccess() && !_hasPendingRegistrarApplication())
                     TextButton(
                       onPressed: _showRegistrarApplicationDialog,
                       style: TextButton.styleFrom(
@@ -21939,50 +23126,228 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Widget _rankingsSection(bool isDark) {
+    final st = _selectedState.trim();
     final enrolled = widget.allUsers
-        .where((u) => u.isEnrolledInRegistry && u.state.trim().toLowerCase() == _selectedState.trim().toLowerCase())
+        .where((u) => u.isEnrolledInRegistry && u.state.trim().toLowerCase() == st.toLowerCase())
         .toList();
-    enrolled.sort((a, b) => b.helps.compareTo(a.helps));
 
-    final topHelpers = enrolled.where((u) => u.helps >= 10).toList();
-    final theMiss = enrolled.where((u) => u.helps > 0 && u.helps < 10).toList();
-    final nonHelpers = enrolled.where((u) => u.helps == 0).toList();
+    final topHelpers = enrolled.where((u) => u.helps > 0).toList()..sort((a, b) => b.helps.compareTo(a.helps));
+    final leastHelpers = enrolled.where((u) => u.missed > 0).toList()
+      ..sort((a, b) {
+        final c = a.helps.compareTo(b.helps);
+        return c != 0 ? c : b.missed.compareTo(a.missed);
+      });
+    final nonHelpers = enrolled.where((u) => u.helps == 0).toList()..sort((a, b) => b.missed.compareTo(a.missed));
+
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final muted = isDark ? Colors.white54 : Colors.black54;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Ranking - Top Helpers', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
-            TextButton.icon(onPressed: _showStatePicker, icon: const Icon(Icons.edit_location_alt_rounded, size: 16), label: Text(_selectedState, style: const TextStyle(fontSize: 12))),
-          ],
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF93C5FD).withOpacity(0.6)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6200EE).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.location_on_rounded, color: Color(0xFF6200EE)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('$st Rankings', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
+                    Text('Your home state community leaderboards.', style: TextStyle(fontSize: 11, color: muted, height: 1.3)),
+                  ],
+                ),
+              ),
+              if (_canChangeCivicState())
+                TextButton(
+                  onPressed: _showStatePicker,
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF6200EE),
+                    backgroundColor: const Color(0xFF6200EE).withOpacity(0.1),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  child: const Text('Change State', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                ),
+            ],
+          ),
+        ),
+        if (!widget.user.isCivicRegistryAdmin && !widget.user.isAdmin) ...[
+          const SizedBox(height: 8),
+          Text(
+            'State changes left: ${NgmyCivicStateSwitches.remainingSwitches(isAdmin: widget.user.isAdmin, isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin, switchesUsed: widget.user.civicRegistryStateSwitchesUsed)}',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 10, color: muted),
+          ),
+        ],
+        const SizedBox(height: 22),
+        _rankingsCategoryHeader(
+          icon: Icons.emoji_events_rounded,
+          iconColor: Colors.green,
+          title: 'Top Helpers',
+          isDark: isDark,
         ),
         const SizedBox(height: 10),
-        if (topHelpers.isEmpty) const Text('No top helpers yet.', style: TextStyle(color: Colors.grey, fontSize: 12))
-        else ...topHelpers.map((u) => _rankTile(u, Colors.orange)),
+        if (topHelpers.isEmpty)
+          _rankingsEmptyBox('No data yet for $st.', isDark)
+        else
+          ...topHelpers.asMap().entries.map((e) => _civicRankCard(e.key + 1, e.value, const Color(0xFFE8F5E9), Colors.green, isDark)),
 
-        const SizedBox(height: 25),
-        const Text('The Miss (Active)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+        const SizedBox(height: 22),
+        _rankingsCategoryHeader(
+          icon: Icons.trending_down_rounded,
+          iconColor: Colors.orange,
+          title: 'Least Helpers',
+          isDark: isDark,
+        ),
         const SizedBox(height: 10),
-        if (theMiss.isEmpty) const Text('No active helpers in this range.', style: TextStyle(color: Colors.grey, fontSize: 12))
-        else ...theMiss.map((u) => _rankTile(u, Colors.blue)),
+        if (leastHelpers.isEmpty)
+          _rankingsEmptyBox('No least helpers listed for $st.', isDark)
+        else
+          ...leastHelpers.asMap().entries.map((e) => _civicRankCard(e.key + 1, e.value, const Color(0xFFFFF3E0), Colors.orange, isDark)),
 
-        const SizedBox(height: 25),
-        const Text('Non-Helpers', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+        const SizedBox(height: 22),
+        _rankingsCategoryHeader(
+          icon: Icons.warning_amber_rounded,
+          iconColor: Colors.red,
+          title: 'Non-Helpers (Red Status)',
+          isDark: isDark,
+        ),
         const SizedBox(height: 10),
-        if (nonHelpers.isEmpty) const Text('Everyone is helping!', style: TextStyle(color: Colors.grey, fontSize: 12))
-        else ...nonHelpers.map((u) => _rankTile(u, Colors.grey)),
+        if (nonHelpers.isEmpty)
+          _rankingsEmptyBox('Everyone in $st is helping!', isDark)
+        else
+          ...nonHelpers.asMap().entries.map((e) => _civicRankCard(e.key + 1, e.value, const Color(0xFFFFEBEE), Colors.red, isDark)),
+
+        const SizedBox(height: 20),
+        if (_canChangeCivicState()) ...[
+          OutlinedButton(
+            onPressed: _showStatePicker,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 46),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              foregroundColor: muted,
+            ),
+            child: const Text('Change My State', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          const SizedBox(height: 10),
+        ],
+        OutlinedButton(
+          onPressed: () => NgmyNavigator.pop(context),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 46),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            foregroundColor: muted,
+          ),
+          child: const Text('Back', style: TextStyle(fontWeight: FontWeight.w700)),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF172554) : const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFF93C5FD).withOpacity(0.4)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.groups_rounded, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
+                  const SizedBox(width: 8),
+                  Text('About Civic Registry', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF1E40AF))),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _aboutItem('Community-based identity and records system'),
+              _aboutItem('Public can verify if someone is registered and \'clean\''),
+              _aboutItem('Private details visible only to Admin & Authorized Registrars'),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _rankTile(UserData u, Color color) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Text(u.username[0], style: TextStyle(color: color, fontWeight: FontWeight.bold))),
-      title: Text(u.username, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-      trailing: Text('${u.helps} Helps', style: TextStyle(color: color, fontWeight: FontWeight.w900)),
+  Widget _rankingsCategoryHeader({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required bool isDark,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: iconColor, size: 22),
+        const SizedBox(width: 8),
+        Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+      ],
+    );
+  }
+
+  Widget _rankingsEmptyBox(String message, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+      ),
+      child: Text(message, textAlign: TextAlign.center, style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 12)),
+    );
+  }
+
+  Widget _civicRankCard(int rank, UserData u, Color bg, Color accent, bool isDark) {
+    final name = (u.fullName ?? u.username).trim();
+    final id = (u.registryId ?? '—').trim();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? accent.withOpacity(0.12) : bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withOpacity(0.35)),
+      ),
+      child: Row(
+        children: [
+          Text(
+            '#$rank',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+                const SizedBox(height: 2),
+                Text(id, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB))),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('${u.helps} helps', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.green)),
+              Text('${u.missed} missed', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.red)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -22814,6 +24179,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   final Set<String> _likedListingIds = {};
   final Map<String, String> _listingMediaUrlCache = {};
   Timer? _liveOrderPollTimer;
+  Timer? _storeMessagesPollTimer;
   Timer? _autoGpsTimer;
   final Set<String> _autoGpsOrderIds = {};
   int _trackingReplayToken = 0;
@@ -22858,10 +24224,16 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       if (!mounted) return;
       unawaited(_syncLiveOrders());
     });
+    _storeMessagesPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted) return;
+      unawaited(_refreshStoreMessagesFromCloud(silent: true));
+    });
     unawaited(_syncLiveOrders());
+    unawaited(_refreshStoreMessagesFromCloud(silent: true));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _ensurePaymentReviewInquiriesFromOrders();
+      _ensureStoreThreadsFromOrders();
     });
     for (final o in _orders) {
       if (o['autoLocationEnabled'] == true && _isMySaleOrder(o)) {
@@ -22989,14 +24361,54 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     if (after != before || refunded) {
       setState(() {});
     }
+    _ensurePaymentReviewInquiriesFromOrders();
+    _ensureStoreThreadsFromOrders();
   }
+
+  /// Pulls store message threads from Supabase table + config json (never wipes local until merged).
+  Future<void> _refreshStoreMessagesFromCloud({bool silent = false}) async {
+    try {
+      final local = widget.config.storeInquiries
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      final fromTable = await _fetchStoreInquiriesFromSupabase();
+      var merged = _mergeStoreInquiriesLists(local, fromTable);
+      final cfg = await _fetchNgmyConfigRow(columns: 'storeInquiries');
+      final fromConfig = _storeInquiriesFromConfigMap(cfg);
+      if (fromConfig.isNotEmpty) {
+        merged = _mergeStoreInquiriesLists(merged, fromConfig);
+      }
+      widget.config.storeInquiries = merged;
+      _ensurePaymentReviewInquiriesFromOrders();
+      _ensureStoreThreadsFromOrders();
+      widget.onDataChanged();
+      if (!mounted) return;
+      if (!silent) {
+        setState(() {});
+      } else {
+        final sig = '${widget.config.storeInquiries.length}|${_groupedStoreMessageThreads(widget.user.email.toLowerCase().trim()).length}';
+        if (sig != _lastMessagesSig) {
+          _lastMessagesSig = sig;
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      debugPrint('[store] messages refresh error: $e');
+    }
+  }
+
+  String _lastMessagesSig = '';
 
   Future<void> _refreshStoreOrdersFromConfig() async {
     try {
+      final prevOrders = widget.config.storeOrders
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
       final cfg = await _fetchNgmyConfigRow(columns: 'storeOrders');
       if (cfg == null || cfg['storeOrders'] is! List) return;
       final remote = (cfg['storeOrders'] as List).map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
       widget.config.storeOrders = _mergeStoreOrdersLists(widget.config.storeOrders, remote);
+      ngmyOnStoreOrdersChanged?.call(prevOrders, widget.config.storeOrders);
       if (_maintainStoreOrders(widget.config.storeOrders)) {
         unawaited(_pushStoreOrdersToSupabase(widget.config.storeOrders));
       }
@@ -23087,6 +24499,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     if (state == AppLifecycleState.resumed && mounted) {
       setState(() => _trackingReplayToken++);
       unawaited(_syncLiveOrders());
+      unawaited(_refreshStoreMessagesFromCloud(silent: true));
     }
   }
 
@@ -23094,6 +24507,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _liveOrderPollTimer?.cancel();
+    _storeMessagesPollTimer?.cancel();
     _autoGpsTimer?.cancel();
     _tabCtrl.dispose();
     _searchC.dispose();
@@ -23306,6 +24720,50 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       }
     }
     return false;
+  }
+
+  /// Ensures every store order for the current user has a message thread (so Sales always show in Messages).
+  void _ensureStoreThreadsFromOrders() {
+    var changed = false;
+    final me = widget.user.email.toLowerCase().trim();
+    for (final order in _orders) {
+      final sellerEmail = (order['sellerEmail'] ?? '').toString().toLowerCase().trim();
+      final buyerEmail = (order['buyerEmail'] ?? '').toString().toLowerCase().trim();
+      if (sellerEmail.isEmpty || buyerEmail.isEmpty) continue;
+      if (sellerEmail != me && buyerEmail != me) continue;
+      if (_findAllInquiryThreadIndices(sellerEmail, buyerEmail).isNotEmpty) continue;
+
+      final listingTitle = (order['title'] ?? 'Item').toString();
+      final buyerName = (order['buyerName'] ?? 'Buyer').toString();
+      final orderId = (order['id'] ?? '').toString();
+      final pay = (order['paymentStatus'] ?? '').toString();
+      final msg = pay == 'awaiting_proof'
+          ? 'Order placed — payment proof to review'
+          : pay == 'approved'
+              ? 'Order confirmed — ready to fulfill'
+              : pay == 'rejected'
+                  ? 'Order payment was not approved'
+                  : 'Store order update';
+
+      _inquiries.add({
+        'id': orderId.isNotEmpty ? 'inq_order_$orderId' : 'inq_order_${DateTime.now().microsecondsSinceEpoch}',
+        'listingId': (order['listingId'] ?? '').toString(),
+        'listingTitle': listingTitle,
+        'sellerEmail': sellerEmail,
+        'buyerEmail': buyerEmail,
+        'buyerName': buyerName,
+        'message': msg,
+        'createdAt': (order['createdAt'] ?? DateTime.now().toUtc().toIso8601String()).toString(),
+        'read': sellerEmail != me,
+        'buyerRead': buyerEmail != me,
+        'replies': <Map<String, dynamic>>[],
+      });
+      changed = true;
+    }
+    if (changed) {
+      widget.onDataChanged();
+      if (mounted) setState(() {});
+    }
   }
 
   /// Rebuilds purchase-notification cards in Messages from orders (fixes empty inbox when inquiry sync failed).
@@ -23611,17 +25069,26 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _orders.removeWhere((o) => (o['id'] ?? '').toString() == orderId);
   }
 
+  Future<void> _persistInquiriesTouchingOrder(String orderId) async {
+    if (orderId.isEmpty) return;
+    for (final inq in _inquiries) {
+      final hasOrder = _inquiryReplies(inq).any((r) => (r['orderId'] ?? '').toString() == orderId);
+      if (hasOrder) await _upsertStoreInquiryRowSafe(inq);
+    }
+  }
+
   void _appendStorePaymentDecisionToThread({
     required String orderId,
     required String sellerEmail,
     required String buyerEmail,
     required bool approved,
   }) {
-    if (_threadHasPaymentStatusForOrder(orderId, sellerEmail, buyerEmail)) return;
     final idx = _newestInquiryThreadIndex(sellerEmail, buyerEmail);
     if (idx == null) return;
     _removePurchaseNotificationFromThread(orderId);
     final list = _inquiryReplies(_inquiries[idx]);
+    list.removeWhere((r) =>
+        NgmyStorePaymentReply.isPurchaseStatus(r) && (r['orderId'] ?? '').toString() == orderId);
     final order = _orderById(orderId);
     list.add({
       'type': NgmyStorePaymentReply.purchaseStatus,
@@ -23688,6 +25155,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           approved: true,
         );
         _dedupePaymentStatusRepliesForOrder(orderId, sellerEmail, buyerEmail);
+        await _persistInquiriesTouchingOrder(orderId);
+      } else {
+        await _persistInquiriesTouchingOrder(orderId);
       }
       await _persistOrdersAndRefresh(orderId: orderId);
       widget.onDataChanged();
@@ -23725,9 +25195,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           approved: false,
         );
         _dedupePaymentStatusRepliesForOrder(orderId, sellerEmail, buyerEmail);
+        await _persistInquiriesTouchingOrder(orderId);
       } else {
         _removePurchaseNotificationFromThread(orderId);
+        await _persistInquiriesTouchingOrder(orderId);
       }
+      _updateOrderFields(orderId, {'paymentStatus': 'rejected'});
       _removeStoreOrderLocal(orderId);
       await _persistOrdersAndRefresh();
       widget.onDataChanged();
@@ -23890,6 +25363,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         _markInquiryBuyerRead(id);
       }
     }
+    widget.onDataChanged();
   }
 
   void _sendThreadReply({
@@ -23932,6 +25406,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
     final replyC = TextEditingController();
     final sheetNav = <String, dynamic>{'threadKey': null};
+    Timer? inboxPoll;
+
+    Future<void> refreshInbox(StateSetter setSheet) async {
+      await _refreshStoreMessagesFromCloud(silent: true);
+      if (context.mounted) setSheet(() {});
+    }
 
     showModalBottomSheet(
       context: context,
@@ -23939,6 +25419,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
+          if (inboxPoll == null) {
+            unawaited(refreshInbox(setSheet));
+            inboxPoll = Timer.periodic(const Duration(seconds: 3), (_) => refreshInbox(setSheet));
+          }
           final sheetMessages = _groupedStoreMessageThreads(me);
           final openKey = sheetNav['threadKey'] as String?;
           Map<String, dynamic>? openRow;
@@ -24106,7 +25590,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           );
         },
       ),
-    ).whenComplete(replyC.dispose);
+    ).whenComplete(() {
+      inboxPoll?.cancel();
+      replyC.dispose();
+    });
   }
 
   Widget _storeInboxThreadPane({

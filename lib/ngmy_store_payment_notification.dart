@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -559,14 +560,90 @@ class _StatusPalette {
   final IconData icon;
 }
 
-class NgmyPaymentProofImage extends StatelessWidget {
+class _NgmyPaymentProofCache {
+  static final _bytes = <String, Uint8List>{};
+  static const _maxEntries = 32;
+
+  static Uint8List? get(String key) => _bytes[key];
+
+  static void put(String key, Uint8List value) {
+    if (!_bytes.containsKey(key) && _bytes.length >= _maxEntries) {
+      _bytes.remove(_bytes.keys.first);
+    }
+    _bytes[key] = value;
+  }
+}
+
+class NgmyPaymentProofImage extends StatefulWidget {
   const NgmyPaymentProofImage({super.key, this.path});
 
   final String? path;
 
   @override
+  State<NgmyPaymentProofImage> createState() => _NgmyPaymentProofImageState();
+}
+
+class _NgmyPaymentProofImageState extends State<NgmyPaymentProofImage> {
+  Uint8List? _memoryBytes;
+  String? _resolvedPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveBytes();
+  }
+
+  @override
+  void didUpdateWidget(NgmyPaymentProofImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = widget.path?.trim() ?? '';
+    final prev = oldWidget.path?.trim() ?? '';
+    if (next != prev) _resolveBytes();
+  }
+
+  void _resolveBytes() {
+    final p = widget.path?.trim() ?? '';
+    if (p.isEmpty) {
+      if (_resolvedPath != null || _memoryBytes != null) {
+        setState(() {
+          _resolvedPath = null;
+          _memoryBytes = null;
+        });
+      }
+      return;
+    }
+    if (p == _resolvedPath) return;
+    if (p.startsWith('data:image')) {
+      final cached = _NgmyPaymentProofCache.get(p);
+      if (cached != null) {
+        setState(() {
+          _memoryBytes = cached;
+          _resolvedPath = p;
+        });
+        return;
+      }
+      try {
+        final comma = p.indexOf(',');
+        if (comma > 0) {
+          final bytes = base64Decode(p.substring(comma + 1));
+          _NgmyPaymentProofCache.put(p, bytes);
+          setState(() {
+            _memoryBytes = bytes;
+            _resolvedPath = p;
+          });
+          return;
+        }
+      } catch (_) {}
+    }
+    setState(() {
+      _memoryBytes = null;
+      _resolvedPath = p;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final p = path?.trim() ?? '';
+    final p = _resolvedPath ?? widget.path?.trim() ?? '';
     if (p.isEmpty) {
       return Center(
         child: Padding(
@@ -581,20 +658,38 @@ class NgmyPaymentProofImage extends StatelessWidget {
         ),
       );
     }
-    if (p.startsWith('data:image')) {
-      try {
-        final comma = p.indexOf(',');
-        if (comma > 0) {
-          final bytes = base64Decode(p.substring(comma + 1));
-          return Image.memory(bytes, fit: BoxFit.contain);
-        }
-      } catch (_) {}
+    if (_memoryBytes != null) {
+      return RepaintBoundary(
+        child: Image.memory(
+          _memoryBytes!,
+          key: ValueKey('proof_mem_$p'),
+          fit: BoxFit.contain,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.medium,
+        ),
+      );
     }
     if (p.startsWith('http://') || p.startsWith('https://')) {
-      return Image.network(p, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const _Err());
+      return RepaintBoundary(
+        child: Image.network(
+          p,
+          key: ValueKey('proof_net_$p'),
+          fit: BoxFit.contain,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => const _Err(),
+        ),
+      );
     }
     if (!kIsWeb) {
-      return Image.file(File(p), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const _Err());
+      return RepaintBoundary(
+        child: Image.file(
+          File(p),
+          key: ValueKey('proof_file_$p'),
+          fit: BoxFit.contain,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => const _Err(),
+        ),
+      );
     }
     return const _Err();
   }
