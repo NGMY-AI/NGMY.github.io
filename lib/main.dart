@@ -563,6 +563,8 @@ class AppConfig {
   /// One PIN for all Civic Registry users (set in Growth Income / Admin Management).
   String civicRegistryPin;
   List<Map<String, dynamic>> civicRegistrarApplications;
+  /// When true, members see self-enroll on the Civic Registry header (admin toggle).
+  bool civicSelfEnrollmentEnabled;
   /// Emails allowed to use Sell Item in NGMY Store (admin-granted; persisted in config).
   List<String> storeSellAccessEmails;
 
@@ -614,6 +616,7 @@ class AppConfig {
     Map<String, String>? civicRegistryPinsByState,
     this.civicRegistryPin = '',
     List<Map<String, dynamic>>? civicRegistrarApplications,
+    this.civicSelfEnrollmentEnabled = false,
     List<String>? storeSellAccessEmails,
   })  : loanApplications = loanApplications ?? [],
         civicRegistryPinsByState = civicRegistryPinsByState ?? const {},
@@ -674,6 +677,7 @@ class AppConfig {
     'civicRegistryPinsByState': civicRegistryPinsByState,
     'civicRegistryPin': civicRegistryPin,
     'civicRegistrarApplications': civicRegistrarApplications,
+    'civicSelfEnrollmentEnabled': civicSelfEnrollmentEnabled,
     'storeSellAccessEmails': storeSellAccessEmails,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
@@ -732,6 +736,7 @@ class AppConfig {
     civicRegistrarApplications: List<Map<String, dynamic>>.from(
       (json['civicRegistrarApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
     ),
+    civicSelfEnrollmentEnabled: json['civicSelfEnrollmentEnabled'] == true,
     storeSellAccessEmails: List<String>.from(
       (json['storeSellAccessEmails'] ?? const []).map((e) => e.toString().toLowerCase().trim()).where((e) => e.isNotEmpty),
     ),
@@ -1086,6 +1091,42 @@ Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
   }
 }
 
+Map<String, dynamic> _userRowForRegistryUpsert(UserData u) {
+  final row = <String, dynamic>{
+    'email': u.email.trim(),
+    'username': u.username,
+    'phone': u.phone,
+    'state': u.state,
+    'isEnrolledInRegistry': u.isEnrolledInRegistry,
+    'helps': u.helps,
+    'missed': u.missed,
+  };
+  if ((u.fullName ?? '').trim().isNotEmpty) row['fullName'] = u.fullName;
+  if ((u.dob ?? '').trim().isNotEmpty) row['dob'] = u.dob;
+  if ((u.idType ?? '').trim().isNotEmpty) row['idType'] = u.idType;
+  if ((u.registryId ?? '').trim().isNotEmpty) row['registryId'] = u.registryId;
+  if ((u.homeAddress ?? '').trim().isNotEmpty) row['homeAddress'] = u.homeAddress;
+  if ((u.city ?? '').trim().isNotEmpty) row['city'] = u.city;
+  if ((u.room ?? '').trim().isNotEmpty) row['room'] = u.room;
+  return row;
+}
+
+void _preserveRegistryEnrollmentFromLocal(UserData local, UserData remote) {
+  if (!local.isEnrolledInRegistry) return;
+  remote.isEnrolledInRegistry = true;
+  if ((local.fullName ?? '').trim().isNotEmpty) remote.fullName = local.fullName;
+  if ((local.dob ?? '').trim().isNotEmpty) remote.dob = local.dob;
+  if ((local.idType ?? '').trim().isNotEmpty) remote.idType = local.idType;
+  if ((local.registryId ?? '').trim().isNotEmpty) remote.registryId = local.registryId;
+  if ((local.homeAddress ?? '').trim().isNotEmpty) remote.homeAddress = local.homeAddress;
+  if ((local.city ?? '').trim().isNotEmpty) remote.city = local.city;
+  if ((local.room ?? '').trim().isNotEmpty) remote.room = local.room;
+  if (local.state.trim().isNotEmpty) remote.state = local.state;
+  if (local.phone.trim().isNotEmpty) remote.phone = local.phone;
+  remote.helps = local.helps;
+  remote.missed = local.missed;
+}
+
 NgmyCivicRegistryUserRow _civicRegistryUserRow(UserData u) => NgmyCivicRegistryUserRow(
       email: u.email,
       username: u.username,
@@ -1209,6 +1250,12 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
   } else if (keep.civicRegistrarApplications.isNotEmpty) {
     next.civicRegistrarApplications =
         keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  if (record.containsKey('civicSelfEnrollmentEnabled')) {
+    next.civicSelfEnrollmentEnabled = record['civicSelfEnrollmentEnabled'] == true;
+  } else {
+    next.civicSelfEnrollmentEnabled = keep.civicSelfEnrollmentEnabled;
   }
 
   if (record.containsKey('jobPosts') && record['jobPosts'] is List) {
@@ -6518,6 +6565,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (local.isApprovedWorker && !remote.isApprovedWorker) remote.isApprovedWorker = true;
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
     if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) remote.isAuthorizedRegistrar = true;
+    _preserveRegistryEnrollmentFromLocal(local, remote);
   }
 
   Future<void> _persistLocalSnapshot() async {
@@ -6689,6 +6737,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             final key = u.email.toLowerCase().trim();
             final local = localUsersBeforeFetch[key];
             if (local != null) _preserveLocalSessionState(local, u);
+          }
+          for (final local in localUsersBeforeFetch.values) {
+            if (!local.isEnrolledInRegistry) continue;
+            final key = local.email.toLowerCase().trim();
+            if (key.isEmpty) continue;
+            final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+            if (idx == -1) {
+              _allUsers.add(local);
+            } else {
+              _preserveRegistryEnrollmentFromLocal(local, _allUsers[idx]);
+            }
           }
           for (final u in _allUsers) {
             NgmyMediaProfile.normalizeUserMediaFields(u);
@@ -13442,7 +13501,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Container(
+        return StatefulBuilder(
+          builder: (ctx, setST) => Container(
           constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.72),
           margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
@@ -13462,6 +13522,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
               ),
               const SizedBox(height: 12),
+              SwitchListTile(
+                secondary: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF6200EE)),
+                title: const Text('Self-enrollment button', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Shows enroll icon on the purple Civic Registry header for members'),
+                value: widget.config.civicSelfEnrollmentEnabled,
+                onChanged: (v) {
+                  setST(() => widget.config.civicSelfEnrollmentEnabled = v);
+                  widget.onDataChanged();
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.pin_rounded, color: Color(0xFF6200EE)),
                 title: const Text('Registry PIN', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -13562,6 +13632,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
             ],
           ),
+        ),
         );
       },
     );
@@ -20609,7 +20680,147 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return '$prefix${DateTime.now().microsecondsSinceEpoch}';
   }
 
-  Future<void> _registerMember() async {
+  void _showSelfEnrollmentSheet() {
+    if (widget.user.isEnrolledInRegistry) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are already enrolled in the registry.')));
+      return;
+    }
+    if (!widget.config.civicSelfEnrollmentEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Self-enrollment is not available right now.')));
+      return;
+    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final nameC = TextEditingController(text: (widget.user.fullName ?? widget.user.username).trim());
+    final dobC = TextEditingController(text: widget.user.dob ?? '');
+    final idTypeC = TextEditingController(text: widget.user.idType ?? '');
+    final addressC = TextEditingController(text: widget.user.homeAddress ?? '');
+    final phoneC = TextEditingController(text: widget.user.phone);
+    final cityC = TextEditingController(text: widget.user.city ?? '');
+    final roomC = TextEditingController(text: widget.user.room ?? '');
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.88),
+              margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F111A) : Colors.white,
+                borderRadius: BorderRadius.circular(26),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('Enroll Yourself', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Same enrollment as a registrar would complete for you in $_selectedState.',
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: nameC,
+                      decoration: const InputDecoration(labelText: 'Full Name *'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: dobC,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')), DateSlashFormatter()],
+                      decoration: const InputDecoration(labelText: 'Date of Birth (MM/DD/YYYY) *'),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      value: idTypeC.text.isNotEmpty && ['National ID', 'Passport', 'Drivers License', 'Voters Card'].contains(idTypeC.text)
+                          ? idTypeC.text
+                          : null,
+                      decoration: const InputDecoration(labelText: 'ID Type *'),
+                      items: ['National ID', 'Passport', 'Drivers License', 'Voters Card']
+                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) idTypeC.text = v;
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(controller: addressC, decoration: const InputDecoration(labelText: 'Home Address *')),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: phoneC,
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(labelText: 'Phone *'),
+                    ),
+                    const SizedBox(height: 10),
+                    Text('Email: ${widget.user.email}', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54)),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      value: widget.config.cities.contains(cityC.text) ? cityC.text : null,
+                      decoration: const InputDecoration(labelText: 'City *'),
+                      items: widget.config.cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (v) {
+                        if (v != null) cityC.text = v;
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      value: widget.config.rooms.contains(roomC.text) ? roomC.text : null,
+                      decoration: const InputDecoration(labelText: 'Room *'),
+                      items: widget.config.rooms.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                      onChanged: (v) {
+                        if (v != null) roomC.text = v;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () async {
+                        _fullNameC.text = nameC.text;
+                        _dobC.text = dobC.text;
+                        _idTypeC.text = idTypeC.text;
+                        _addressC.text = addressC.text;
+                        _phoneC.text = phoneC.text;
+                        _emailC.text = widget.user.email;
+                        _cityC.text = cityC.text;
+                        _roomC.text = roomC.text;
+                        final idx = widget.allUsers.indexWhere(
+                          (u) => u.email.toLowerCase().trim() == widget.user.email.toLowerCase().trim(),
+                        );
+                        final target = idx != -1 ? widget.allUsers[idx] : widget.user;
+                        await _registerMember(targetUser: target, closeSelfSheet: ctx);
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF00B25A),
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                      child: const Text('Complete Enrollment', style: TextStyle(fontWeight: FontWeight.w800)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    ).whenComplete(() {
+      nameC.dispose();
+      dobC.dispose();
+      idTypeC.dispose();
+      addressC.dispose();
+      phoneC.dispose();
+      cityC.dispose();
+      roomC.dispose();
+    });
+  }
+
+  Future<void> _registerMember({UserData? targetUser, BuildContext? closeSelfSheet}) async {
     final fullName = _fullNameC.text.trim();
     final dob = _dobC.text.trim();
     final idType = _idTypeC.text.trim();
@@ -20653,66 +20864,98 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
-    final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-    UserData targetUser;
-    if (idx != -1) {
-      targetUser = widget.allUsers[idx];
+    UserData enrolledUser;
+    if (targetUser != null) {
+      enrolledUser = targetUser;
+      if (email.isNotEmpty && enrolledUser.email.toLowerCase().trim() != email) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Use your account email for self-enrollment.')));
+        return;
+      }
     } else {
-      targetUser = UserData(
-        email: email,
-        username: fullName.split(' ').first,
-        phone: phone,
-        state: _selectedState,
-      );
-      widget.allUsers.add(targetUser);
+      final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+      if (idx != -1) {
+        enrolledUser = widget.allUsers[idx];
+      } else {
+        enrolledUser = UserData(
+          email: email,
+          username: fullName.split(' ').first,
+          phone: phone,
+          state: _selectedState,
+        );
+        widget.allUsers.add(enrolledUser);
+      }
     }
 
     setState(() {
-      targetUser.isEnrolledInRegistry = true;
-      targetUser.fullName = fullName;
-      targetUser.dob = dob;
-      targetUser.idType = idType;
-      targetUser.homeAddress = address;
-      targetUser.phone = phone;
-      targetUser.email = email;
-      targetUser.city = city;
-      targetUser.room = room;
-      targetUser.state = _selectedState;
-      targetUser.registryId = targetUser.registryId?.isNotEmpty == true
-          ? targetUser.registryId
+      enrolledUser.isEnrolledInRegistry = true;
+      enrolledUser.fullName = fullName;
+      enrolledUser.dob = dob;
+      enrolledUser.idType = idType;
+      enrolledUser.homeAddress = address;
+      enrolledUser.phone = phone;
+      if (email.isNotEmpty) enrolledUser.email = email;
+      enrolledUser.city = city;
+      enrolledUser.room = room;
+      enrolledUser.state = _selectedState;
+      enrolledUser.registryId = enrolledUser.registryId?.isNotEmpty == true
+          ? enrolledUser.registryId
           : _generateUniqueRegistryId(_selectedState);
-      if (widget.allUsers.any((u) => u != targetUser && (u.registryId ?? '').trim() == (targetUser.registryId ?? '').trim())) {
-        targetUser.registryId = _generateUniqueRegistryId(_selectedState);
+      if (widget.allUsers.any((u) => u != enrolledUser && (u.registryId ?? '').trim() == (enrolledUser.registryId ?? '').trim())) {
+        enrolledUser.registryId = _generateUniqueRegistryId(_selectedState);
       }
 
-      _fullNameC.clear();
-      _dobC.clear();
-      _addressC.clear();
-      _phoneC.clear();
-      _emailC.clear();
-      _cityC.clear();
-      _roomC.clear();
-      _activeTab = 2;
+      if (targetUser == null) {
+        _fullNameC.clear();
+        _dobC.clear();
+        _addressC.clear();
+        _phoneC.clear();
+        _emailC.clear();
+        _cityC.clear();
+        _roomC.clear();
+        _activeTab = 2;
+      }
     });
-    await _persistRegistryMember(targetUser);
+    final saved = await _persistRegistryMember(enrolledUser);
     widget.onDataChanged();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Member Registered Successfully!'), backgroundColor: Colors.green));
+    if (closeSelfSheet != null && closeSelfSheet.mounted) Navigator.pop(closeSelfSheet);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          saved
+              ? 'Member enrolled and saved.'
+              : 'Member enrolled on this device. Will sync when online — run supabase/users_civic_enrollment_columns.sql if members vanish.',
+        ),
+        backgroundColor: saved ? Colors.green : Colors.orange,
+      ),
+    );
   }
 
-  Future<void> _persistRegistryMember(UserData member) async {
-    try {
-      await Supabase.instance.client
-          .from('users')
-          .upsert([Map<String, dynamic>.from(member.toJson())]);
-    } catch (e) {
-      debugPrint('Registry member upsert failed: $e');
+  Future<bool> _persistRegistryMember(UserData member) async {
+    var cloudOk = true;
+    if (await ngmyCanReachCloud()) {
+      try {
+        await Supabase.instance.client
+            .from('users')
+            .upsert(_userRowForRegistryUpsert(member))
+            .timeout(kNgmyCloudWriteTimeout);
+      } catch (e) {
+        cloudOk = false;
+        debugPrint('Registry member upsert failed: $e');
+      }
+    } else {
+      cloudOk = false;
     }
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('all_users', jsonEncode(widget.allUsers.map((e) => e.toJson()).toList()));
+      if (widget.user.email.toLowerCase().trim() == member.email.toLowerCase().trim()) {
+        await prefs.setString('current_user', jsonEncode(widget.user.toJson()));
+      }
     } catch (e) {
       debugPrint('Registry member local save failed: $e');
     }
+    return cloudOk;
   }
 
   void _showStatePicker() {
@@ -22460,8 +22703,28 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 20),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Civic Registry', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)), const Text('Community Identity & Trust System', style: TextStyle(color: Colors.white70, fontSize: 12))])),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('Civic Registry', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
+                        Text('Community Identity & Trust System', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  if (widget.config.civicSelfEnrollmentEnabled)
+                    SelectionContainer.disabled(
+                      child: IconButton(
+                        onPressed: widget.user.isEnrolledInRegistry ? null : _showSelfEnrollmentSheet,
+                        icon: Icon(
+                          widget.user.isEnrolledInRegistry ? Icons.verified_rounded : Icons.person_add_alt_1_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        tooltip: widget.user.isEnrolledInRegistry ? 'You are enrolled' : 'Enroll yourself',
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -22990,6 +23253,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   );
                   if (confirm != true) return;
                   setState(() => u.isEnrolledInRegistry = false);
+                  await _persistRegistryMember(u);
                   widget.onDataChanged();
                 }),
               ],
