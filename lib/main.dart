@@ -36,6 +36,7 @@ import 'ngmy_game_result_popup.dart';
 import 'ngmy_multiplayer.dart';
 import 'ngmy_supabase_sync_throttle.dart';
 import 'ngmy_supabase_columns.dart';
+import 'ngmy_income_sound.dart';
 import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
 import 'ngmy_dice_config.dart';
@@ -396,10 +397,38 @@ double ngmyBalanceFromApprovedTransactions(String email, List<AppTransaction> tr
   return balance;
 }
 
+bool ngmyTransactionCountsAsIncome(AppTransaction t) {
+  if (t.status != TransactionStatus.approved) return false;
+  if (!_ngmyTxnIncreasesBalance(t)) return false;
+  if (t.type == TransactionType.deposit && isInvestmentRequestDetails(t.sourceDetails)) {
+    return false;
+  }
+  return t.amount >= 0.01;
+}
+
+void ngmyPlayIncomeSoundForTransaction(AppTransaction t) {
+  if (!ngmyTransactionCountsAsIncome(t)) return;
+  unawaited(NgmyIncomeSound.playForUser(
+    beneficiaryEmail: t.userEmail,
+    amount: t.amount,
+  ));
+}
+
+void ngmyPlayIncomeSoundForAmount({
+  required String beneficiaryEmail,
+  required double amount,
+}) {
+  unawaited(NgmyIncomeSound.playForUser(
+    beneficiaryEmail: beneficiaryEmail,
+    amount: amount,
+  ));
+}
+
 void ngmyApplyApprovedTransactionToBalance(UserData user, AppTransaction t) {
   if (t.status != TransactionStatus.approved) return;
   if (_ngmyTxnIncreasesBalance(t)) {
     user.accountBalance += t.amount;
+    ngmyPlayIncomeSoundForTransaction(t);
   } else {
     user.accountBalance -= t.amount;
   }
@@ -6657,6 +6686,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (previous == null || statusChanged) {
           unawaited(_notifyTransactionEvent(tx, statusChanged: statusChanged));
         }
+        final becameApproved = tx.status == TransactionStatus.approved &&
+            (previous == null || previous!.status != TransactionStatus.approved);
+        if (becameApproved) {
+          final userKey = tx.userEmail.toLowerCase().trim();
+          final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
+          final shouldApplyBalance = previous == null || previous!.status == TransactionStatus.pending;
+          if (userIdx >= 0 && shouldApplyBalance) {
+            ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], tx);
+            if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
+              _currentUser = _allUsers[userIdx];
+            }
+          } else if (ngmyTransactionCountsAsIncome(tx)) {
+            ngmyPlayIncomeSoundForTransaction(tx);
+          }
+        }
         if (previous == null && tx.status == TransactionStatus.pending) {
           unawaited(_notifyAdminAboutPendingTransaction(tx));
         }
@@ -7654,6 +7698,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   }
                   _markTransactionDirty(t.id);
                   unawaited(_persistLocalOnly());
+                  if (approve) {
+                    ngmyPlayIncomeSoundForTransaction(t);
+                  }
                   _notifyTransactionEvent(t, statusChanged: true);
                 },
                 onAddPlan: (p) {
@@ -8835,6 +8882,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(MainScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.user.email != widget.user.email) {
+      NgmyIncomeSound.bindSession(widget.user.email);
+    }
     final oldSig = jsonEncode({'p': oldWidget.config.ngmyPopups, 'v': oldWidget.config.ngmyVideoPopups});
     final newSig = jsonEncode({'p': widget.config.ngmyPopups, 'v': widget.config.ngmyVideoPopups});
     if (oldSig != newSig) _runScheduledPopups();
@@ -8850,6 +8900,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    NgmyIncomeSound.bindSession(widget.user.email);
     NgmyPopupOrchestrator.resolveVideoUrl = _resolveSupabaseStorageUrlResilient;
     _ngmyReconcileClockInSession(widget.user, widget.allTransactions);
     _refreshOnlineStatus();
@@ -8919,7 +8970,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       }
     });
   }
-  @override void dispose() { WidgetsBinding.instance.removeObserver(this); _t?.cancel(); _onlineCheck?.cancel(); super.dispose(); }
+  @override
+  @override void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _t?.cancel();
+    _onlineCheck?.cancel();
+    NgmyIncomeSound.bindSession(null);
+    super.dispose();
+  }
 
   List<Widget> _buildTabPages(List<AppTransaction> sorted) {
     final inv = widget.user.activeInvestment;
