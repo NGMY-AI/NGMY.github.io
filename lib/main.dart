@@ -34,6 +34,7 @@ import 'ngmy_games.dart';
 import 'ngmy_game_admin_sheet.dart';
 import 'ngmy_game_result_popup.dart';
 import 'ngmy_multiplayer.dart';
+import 'ngmy_supabase_sync_throttle.dart';
 import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
 import 'ngmy_dice_config.dart';
@@ -1480,39 +1481,21 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
   }
   try {
     await client.from('config').upsert(combined);
-    return;
   } catch (e) {
     debugPrint('[config] combined critical upsert: $e');
   }
-  final rows = <Map<String, dynamic>>[
-    {'id': kNgmyConfigRowId, 'gameTimeLimits': config.gameTimeLimits},
-    {'id': kNgmyConfigRowId, 'diceSettings': config.diceSettings},
-    {'id': kNgmyConfigRowId, 'gameInvites': config.gameInvites},
-    {'id': kNgmyConfigRowId, 'civicRegistryPin': config.civicRegistryPin},
-    {'id': kNgmyConfigRowId, 'civicRegistryPinsByState': config.civicRegistryPinsByState},
-    {'id': kNgmyConfigRowId, 'jobPosts': config.jobPosts},
-    {'id': kNgmyConfigRowId, 'jobWorkerApplications': config.jobWorkerApplications},
-  ];
-  if (shouldWriteRegistrarApps) {
-    rows.insert(5, {'id': kNgmyConfigRowId, 'civicRegistrarApplications': registrarApps});
-  }
-  for (final row in rows) {
-    try {
-      await client.from('config').upsert(row);
-    } catch (e) {
-      debugPrint('[config] persist ${row.keys.where((k) => k != 'id').join(', ')}: $e');
-    }
-  }
 }
 
-Future<void> ngmyFlushCriticalConfigLocalAndCloud(AppConfig config) async {
+Future<void> ngmyFlushCriticalConfigLocalAndCloud(AppConfig config, {bool cloud = true}) async {
   try {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('app_config', jsonEncode(config.toJson()));
   } catch (e) {
     debugPrint('[config] local flush: $e');
   }
-  await _persistCriticalConfigFields(config);
+  if (cloud) {
+    NgmySupabaseSyncThrottle.scheduleCriticalConfigPersist(config, _persistCriticalConfigFields);
+  }
 }
 
 Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
@@ -2259,9 +2242,13 @@ Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
   return false;
 }
 
-Future<List<MediaPost>?> _fetchMediaPostsFromSupabase() async {
+Future<List<MediaPost>?> _fetchMediaPostsFromSupabase({int limit = 100}) async {
   try {
-    final rows = await Supabase.instance.client.from('media').select();
+    final rows = await Supabase.instance.client
+        .from('media')
+        .select()
+        .order('timestamp', ascending: false)
+        .limit(limit);
     if (rows == null) return null;
     return (rows as List)
         .map((e) => MediaPost.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -4889,6 +4876,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try { _inAppNoticeEntry?.remove(); } catch (_) {}
     try { _saveDebounceTimer?.cancel(); } catch (_) {}
     try { _heavySaveTimer?.cancel(); } catch (_) {}
+    NgmySupabaseSyncThrottle.reset();
     try { _legalPlansRefreshDebounce?.cancel(); } catch (_) {}
     try { _appSyncChannel?.unsubscribe(); } catch (_) {}
     try { _authSub?.cancel(); } catch (_) {}
@@ -4998,18 +4986,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   String _appConfigSig(AppConfig c) => jsonEncode(c.toJson());
 
   void _onDataChanged() {
-    unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config));
+    unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: true));
     _pendingHeavySave = true;
     _saveDebounceTimer?.cancel();
     _saveDebounceTimer = Timer(const Duration(seconds: 4), () {
       if (!mounted) return;
-      unawaited(_saveData(heavy: false));
+      unawaited(_saveData(heavy: false, fullCloud: false));
     });
     _heavySaveTimer?.cancel();
-    _heavySaveTimer = Timer(const Duration(seconds: 90), () {
+    _heavySaveTimer = Timer(const Duration(minutes: 3), () {
       if (!mounted || !_pendingHeavySave) return;
       _pendingHeavySave = false;
-      unawaited(_saveData(heavy: true));
+      unawaited(_saveData(heavy: true, fullCloud: _currentUser?.isAdmin == true));
     });
   }
 
@@ -5405,27 +5393,25 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _reloadUsersMediaProfilesFromSupabase() async {
     if (!await ngmyCanReachCloud()) return;
+    final email = _currentUser?.email.toLowerCase().trim() ?? '';
+    if (email.isEmpty) return;
     try {
-      final usersData = await supabase.from('users').select();
-      if (usersData == null || !mounted) return;
-      final remoteUsers = (usersData as List).map((e) => UserData.fromJson(e)).toList();
+      final row = await supabase.from('users').select().eq('email', email).maybeSingle();
+      if (row == null || !mounted) return;
+      final remote = UserData.fromJson(Map<String, dynamic>.from(row));
       setState(() {
-        for (final remote in remoteUsers) {
-          final key = remote.email.toLowerCase().trim();
-          if (key.isEmpty) continue;
-          final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
-          if (idx == -1) {
-            _allUsers.add(remote);
-            continue;
-          }
+        final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+        if (idx == -1) {
+          _allUsers.add(remote);
+        } else {
           final local = _allUsers[idx];
           _preserveLocalSessionState(local, remote);
           _mergeUserMediaProfileFields(local, remote);
           _allUsers[idx] = remote;
-          if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == key) {
-            _preserveLocalSessionState(_currentUser!, remote);
-            _currentUser = remote;
-          }
+        }
+        if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == email) {
+          _preserveLocalSessionState(_currentUser!, remote);
+          _currentUser = remote;
         }
       });
       try {
@@ -6762,36 +6748,55 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       };
       await ngmyIgnoreTimeout(() async {
       try {
-        final usersData = await supabase.from('users').select();
-        if (usersData != null) {
-          _allUsers = (usersData as List).map((e) => UserData.fromJson(e)).toList();
-          for (final u in _allUsers) {
-            final key = u.email.toLowerCase().trim();
-            final local = localUsersBeforeFetch[key];
-            if (local != null) _preserveLocalSessionState(local, u);
+        final sessionEmail = (localCurrent?.email ?? '').toLowerCase().trim();
+        final bootstrapAdmin = localCurrent?.isAdmin == true;
+
+        if (bootstrapAdmin) {
+          final usersData = await supabase.from('users').select();
+          if (usersData != null) {
+            _allUsers = (usersData as List).map((e) => UserData.fromJson(e)).toList();
           }
-          for (final local in localUsersBeforeFetch.values) {
-            if (!local.isEnrolledInRegistry) continue;
-            final key = local.email.toLowerCase().trim();
-            if (key.isEmpty) continue;
-            final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
-            if (idx == -1) {
-              _allUsers.add(local);
+        } else if (sessionEmail.isNotEmpty) {
+          final row = await supabase.from('users').select().eq('email', sessionEmail).maybeSingle();
+          if (row != null) {
+            final remote = UserData.fromJson(Map<String, dynamic>.from(row));
+            final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sessionEmail);
+            if (idx >= 0) {
+              _preserveLocalSessionState(_allUsers[idx], remote);
+              _allUsers[idx] = remote;
             } else {
-              _preserveRegistryEnrollmentFromLocal(local, _allUsers[idx]);
+              _allUsers.add(remote);
             }
           }
-          for (final u in _allUsers) {
-            NgmyMediaProfile.normalizeUserMediaFields(u);
+        }
+        for (final u in _allUsers) {
+          final key = u.email.toLowerCase().trim();
+          final local = localUsersBeforeFetch[key];
+          if (local != null) _preserveLocalSessionState(local, u);
+        }
+        for (final local in localUsersBeforeFetch.values) {
+          if (!local.isEnrolledInRegistry) continue;
+          final key = local.email.toLowerCase().trim();
+          if (key.isEmpty) continue;
+          final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+          if (idx == -1) {
+            _allUsers.add(local);
+          } else {
+            _preserveRegistryEnrollmentFromLocal(local, _allUsers[idx]);
           }
         }
+        for (final u in _allUsers) {
+          NgmyMediaProfile.normalizeUserMediaFields(u);
+        }
 
-        final transData = await supabase.from('transactions').select();
+        final transData = bootstrapAdmin || sessionEmail.isEmpty
+            ? await supabase.from('transactions').select()
+            : await supabase.from('transactions').select().eq('userEmail', sessionEmail);
         if (transData != null) {
           _allTransactions = (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
         }
 
-        final mediaData = await supabase.from('media').select();
+        final mediaData = await supabase.from('media').select().order('timestamp', ascending: false).limit(100);
         if (mediaData != null) {
           final remoteMedia = (mediaData as List).map((e) => MediaPost.fromJson(e)).toList();
           _allMedia = _mergeMediaWithRemote(localMedia, remoteMedia, tombstones: _tombstonedMediaIds);
@@ -7090,7 +7095,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _allTransactions.removeWhere((t) => ids.contains(t.id));
   }
 
-  Future<void> _saveData({bool heavy = true}) async {
+  Future<void> _saveData({bool heavy = true, bool fullCloud = true}) async {
     if (heavy) {
       _pendingHeavySave = false;
       _heavySaveTimer?.cancel();
@@ -7147,11 +7152,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
       await prefs.setString('all_announcements', jsonEncode(_allAnnouncements.map((e) => e.toJson()).toList()));
       await _persistLocalSnapshot();
-      unawaited(_persistCriticalConfigFields(_config));
+      NgmySupabaseSyncThrottle.scheduleCriticalConfigPersist(_config, _persistCriticalConfigFields);
 
       if (online) {
       await ngmyIgnoreTimeout(() async {
-      if (heavy) {
+      final isAdmin = _currentUser?.isAdmin == true;
+      final userEmail = _currentUser?.email.toLowerCase().trim() ?? '';
+
+      if (heavy && fullCloud && isAdmin) {
         if (_allTransactions.isNotEmpty) {
           await _safeUpsertRows(
             'transactions',
@@ -7160,10 +7168,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
 
         if (_allUsers.isNotEmpty) {
-          final canWriteTrial = _currentUser?.isAdmin == true;
           await _safeUpsertRows(
             'users',
-            _allUsers.map((u) => _userRowForBulkSync(u, includeFreeTrial: canWriteTrial)).toList(),
+            _allUsers.map((u) => _userRowForBulkSync(u, includeFreeTrial: true)).toList(),
           );
         }
 
@@ -7182,13 +7189,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await _pushStoreOrdersToSupabase(_config.storeOrders);
         }
         await _syncStoreToSupabase();
-        if (_currentUser?.isAdmin == true) {
-          _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
-          await _persistInvestmentPlansToCloud(_config.investmentPlans);
-        }
+        _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
+        await _persistInvestmentPlansToCloud(_config.investmentPlans);
         final configRow = await _configRowForSupabaseUpsert(
           config: _config,
-          isAdmin: _currentUser?.isAdmin ?? false,
+          isAdmin: true,
         );
         configRow['storeListings'] = _config.storeListings;
         configRow['storeInquiries'] = _config.storeInquiries;
@@ -7199,17 +7204,25 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         configRow['helpHelperApplications'] = _config.helpHelperApplications;
         configRow['helpRequests'] = _config.helpRequests;
         configRow['helpBusinesses'] = _config.helpBusinesses;
-        if (_currentUser?.isAdmin == true) {
-          configRow['ngmyPopups'] = _config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)).toList();
-          configRow['ngmyVideoPopups'] = _config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)).toList();
-          await _persistNgmyPopupsToCloud(_config.ngmyPopups, _config.ngmyVideoPopups);
-        }
+        configRow['ngmyPopups'] = _config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)).toList();
+        configRow['ngmyVideoPopups'] = _config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)).toList();
+        await _persistNgmyPopupsToCloud(_config.ngmyPopups, _config.ngmyVideoPopups);
         await _safeUpsertRows('config', [configRow]);
-      } else if (_currentUser != null) {
-        await _pushUserToCloudFast(_currentUser!);
+      } else {
+        if (_currentUser != null) {
+          await _pushUserToCloudFast(_currentUser!);
+        }
+        if (userEmail.isNotEmpty) {
+          final mine = _allTransactions
+              .where((t) => t.userEmail.toLowerCase().trim() == userEmail)
+              .map((e) => Map<String, dynamic>.from(e.toJson()))
+              .toList();
+          if (mine.isNotEmpty) {
+            await _safeUpsertRows('transactions', mine);
+          }
+        }
       }
-      await _persistCriticalConfigFields(_config);
-      }, timeout: Duration(seconds: heavy ? 28 : 12));
+      }, timeout: Duration(seconds: heavy && fullCloud ? 28 : 10));
       } else {
         _config.storeOrders = ordersSnapshot;
       }
