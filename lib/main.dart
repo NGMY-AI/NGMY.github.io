@@ -4615,19 +4615,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   List<Announcement> _allAnnouncements = [];
   Set<String> _tombstonedMediaIds = {};
 
-  RealtimeChannel? _usersChannel;
-  RealtimeChannel? _transactionsChannel;
-  RealtimeChannel? _mediaChannel;
-  RealtimeChannel? _announcementsChannel;
-  RealtimeChannel? _configChannel;
-  RealtimeChannel? _storeListingsChannel;
-  RealtimeChannel? _storeInquiriesChannel;
-  RealtimeChannel? _ngmySettingsChannel;
+  /// Single realtime channel (all tables) — avoids 8 separate subscriptions per client.
+  RealtimeChannel? _appSyncChannel;
   StreamSubscription<AuthState>? _authSub;
   bool _isSyncing = false;
   Timer? _autoThemeTimer;
   Timer? _configRefreshTimer;
   Timer? _mediaDeliveryTimer;
+  Timer? _saveDebounceTimer;
+  Timer? _heavySaveTimer;
+  bool _pendingHeavySave = false;
+  DateTime? _lastCurrentUserCloudRefresh;
+  Timer? _legalPlansRefreshDebounce;
   final Set<String> _disabledSupabaseTables = {};
   final Set<String> _seenRealtimeAnnouncementIds = {};
   final Set<String> _seenRealtimeStoreOrderIds = {};
@@ -4836,6 +4835,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _refreshCurrentUserFromCloud() async {
     if (_currentUser == null || !await ngmyCanReachCloud()) return;
     if (NgmyGameSession.suppressExternalNotifications) return;
+    final now = DateTime.now();
+    if (_lastCurrentUserCloudRefresh != null &&
+        now.difference(_lastCurrentUserCloudRefresh!) < const Duration(seconds: 45)) {
+      return;
+    }
+    _lastCurrentUserCloudRefresh = now;
     try {
       final email = _currentUser!.email.trim();
       if (email.isEmpty) return;
@@ -4882,14 +4887,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try { _configRefreshTimer?.cancel(); } catch (_) {}
     try { _mediaDeliveryTimer?.cancel(); } catch (_) {}
     try { _inAppNoticeEntry?.remove(); } catch (_) {}
-    try { _usersChannel?.unsubscribe(); } catch (_) {}
-    try { _transactionsChannel?.unsubscribe(); } catch (_) {}
-    try { _mediaChannel?.unsubscribe(); } catch (_) {}
-    try { _announcementsChannel?.unsubscribe(); } catch (_) {}
-    try { _configChannel?.unsubscribe(); } catch (_) {}
-    try { _storeListingsChannel?.unsubscribe(); } catch (_) {}
-    try { _storeInquiriesChannel?.unsubscribe(); } catch (_) {}
-    try { _ngmySettingsChannel?.unsubscribe(); } catch (_) {}
+    try { _saveDebounceTimer?.cancel(); } catch (_) {}
+    try { _heavySaveTimer?.cancel(); } catch (_) {}
+    try { _legalPlansRefreshDebounce?.cancel(); } catch (_) {}
+    try { _appSyncChannel?.unsubscribe(); } catch (_) {}
     try { _authSub?.cancel(); } catch (_) {}
     super.dispose();
   }
@@ -4998,7 +4999,26 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _onDataChanged() {
     unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config));
-    unawaited(_saveData());
+    _pendingHeavySave = true;
+    _saveDebounceTimer?.cancel();
+    _saveDebounceTimer = Timer(const Duration(seconds: 4), () {
+      if (!mounted) return;
+      unawaited(_saveData(heavy: false));
+    });
+    _heavySaveTimer?.cancel();
+    _heavySaveTimer = Timer(const Duration(seconds: 90), () {
+      if (!mounted || !_pendingHeavySave) return;
+      _pendingHeavySave = false;
+      unawaited(_saveData(heavy: true));
+    });
+  }
+
+  void _scheduleLegalPlansRefreshFromCloud() {
+    _legalPlansRefreshDebounce?.cancel();
+    _legalPlansRefreshDebounce = Timer(const Duration(seconds: 90), () {
+      if (!mounted) return;
+      unawaited(_refreshLegalAndPlansFromCloud());
+    });
   }
 
   void _applyIncomingApprovedTransaction(AppTransaction t, {required bool isNew}) {
@@ -5137,7 +5157,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _startConfigRefreshLoop() {
     _configRefreshTimer?.cancel();
-    _configRefreshTimer = Timer.periodic(const Duration(seconds: 45), (_) async {
+    // Fallback only — realtime config + debounced saves handle most updates.
+    _configRefreshTimer = Timer.periodic(const Duration(minutes: 8), (_) async {
       if (_isSyncing) return;
       try {
         final cfg = await supabase.from('config').select().maybeSingle();
@@ -5201,28 +5222,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final remoteVideoPopups = (cfgMap['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         next.ngmyPopups = _mergeNgmyPopupsFromRemote(keepPopups, remotePopups, NgmyPopupDefaults.ensurePopups);
         next.ngmyVideoPopups = _mergeNgmyPopupsFromRemote(keepVideoPopups, remoteVideoPopups, NgmyPopupDefaults.ensureVideoPopups);
-        final authPopups = await _fetchAuthoritativeNgmyPopups();
-        if (authPopups.popups.isNotEmpty || authPopups.videos.isNotEmpty) {
-          next.ngmyPopups = NgmyPopupDefaults.ensurePopups(authPopups.popups);
-          next.ngmyVideoPopups = NgmyPopupDefaults.ensureVideoPopups(authPopups.videos);
-        }
-        final plansSigBefore = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
-        final legal = await _fetchAuthoritativeLegalContent();
-        final remotePlans = await _fetchAuthoritativeInvestmentPlans();
-        final terms = (legal['terms'] ?? '').trim();
-        final privacy = (legal['privacy'] ?? '').trim();
-        if (terms.isNotEmpty) next.termsAndConditions = terms;
-        if (privacy.isNotEmpty) next.privacyPolicy = privacy;
-        if (remotePlans.isNotEmpty) {
-          next.investmentPlans = remotePlans;
-          _globalPlans = _investmentPlansFromMaps(remotePlans);
-        } else if (next.investmentPlans.isEmpty && keepPlans.isNotEmpty) {
-          next.investmentPlans = keepPlans;
-        } else if (next.investmentPlans.isNotEmpty) {
+        if (next.investmentPlans.isNotEmpty) {
           _globalPlans = _investmentPlansFromMaps(next.investmentPlans);
+        } else if (keepPlans.isNotEmpty) {
+          next.investmentPlans = keepPlans;
+          _globalPlans = _investmentPlansFromMaps(keepPlans);
         }
-        final plansSigAfter = jsonEncode(_globalPlans.map((e) => e.toJson()).toList());
-        if (_appConfigSig(_config) == _appConfigSig(next) && plansSigBefore == plansSigAfter) return;
+        if (_appConfigSig(_config) == _appConfigSig(next)) return;
         setState(() {
           _config = next;
           _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
@@ -5517,7 +5523,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _startMediaDeliveryLoop() {
     _mediaDeliveryTimer?.cancel();
-    _mediaDeliveryTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+    _mediaDeliveryTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       unawaited(_processMediaDeliveryQueue());
     });
     unawaited(_processMediaDeliveryQueue());
@@ -6008,78 +6014,50 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _subscribeToRealtime() {
     try {
-      _usersChannel = supabase
-          .channel('public:users')
+      _appSyncChannel = supabase
+          .channel('ngmy-app-sync')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'users',
             callback: (payload) => _onUsersChange(payload),
           )
-          .subscribe();
-
-      _transactionsChannel = supabase
-          .channel('public:transactions')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'transactions',
             callback: (payload) => _onTransactionsChange(payload),
           )
-          .subscribe();
-
-      _mediaChannel = supabase
-          .channel('public:media')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'media',
             callback: (payload) => _onMediaChange(payload),
           )
-          .subscribe();
-
-      _announcementsChannel = supabase
-          .channel('public:announcements')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'announcements',
             callback: (payload) => _onAnnouncementsChange(payload),
           )
-          .subscribe();
-
-      _configChannel = supabase
-          .channel('public:config')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'config',
             callback: (payload) => _onConfigChange(payload),
           )
-          .subscribe();
-
-      _storeListingsChannel = supabase
-          .channel('public:store_listings')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'store_listings',
             callback: (payload) => _onStoreListingChange(payload),
           )
-          .subscribe();
-
-      _storeInquiriesChannel = supabase
-          .channel('public:store_inquiries')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'store_inquiries',
             callback: (payload) => _onStoreInquiryChange(payload),
           )
-          .subscribe();
-
-      _ngmySettingsChannel = supabase
-          .channel('public:ngmy_settings')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
@@ -6087,7 +6065,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             callback: (payload) => _onNgmySettingsChange(payload),
           )
           .subscribe();
-      debugPrint('Realtime subscriptions active');
+      debugPrint('Realtime subscription active (single channel)');
     } catch (e) {
       debugPrint('Realtime subscribe error: $e');
     }
@@ -6362,37 +6340,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           }).catchError((_) {});
           unawaited(_processMediaDeliveryQueue());
         }
-        unawaited(() async {
-          final legal = await _fetchAuthoritativeLegalContent();
-          final remotePlans = await _fetchAuthoritativeInvestmentPlans();
-          final terms = (legal['terms'] ?? '').trim();
-          final privacy = (legal['privacy'] ?? '').trim();
-          if (!mounted) return;
-          var changed = false;
-          if (terms.isNotEmpty && _config.termsAndConditions != terms) {
-            _config.termsAndConditions = terms;
-            changed = true;
-          }
-          if (privacy.isNotEmpty && _config.privacyPolicy != privacy) {
-            _config.privacyPolicy = privacy;
-            changed = true;
-          }
-          if (remotePlans.isNotEmpty) {
-            _config.investmentPlans = remotePlans;
-            _globalPlans = _investmentPlansFromMaps(remotePlans);
-            changed = true;
-          } else if (_config.investmentPlans.isEmpty && keepPlans.isNotEmpty) {
-            _config.investmentPlans = keepPlans;
-            changed = true;
-          }
-          if (changed && mounted) {
-            setState(() {});
-            SharedPreferences.getInstance().then((prefs) {
-              prefs.setString('app_config', jsonEncode(_config.toJson()));
-              prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
-            }).catchError((_) {});
-          }
-        }());
+        _scheduleLegalPlansRefreshFromCloud();
       }
     } catch (e) {
       debugPrint('Config realtime apply error: $e');
@@ -6416,10 +6364,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         return;
       }
+      if (key.isNotEmpty) {
+        _scheduleLegalPlansRefreshFromCloud();
+      }
     } catch (e) {
       debugPrint('[ngmy_settings] news closed realtime: $e');
     }
-    unawaited(_refreshLegalAndPlansFromCloud());
   }
 
   void _onStoreInquiryChange(PostgresChangePayload payload) {
@@ -6462,7 +6412,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try {
       final recordId = (payload.newRecord['id'] ?? payload.oldRecord['id'] ?? '').toString();
       if (_isNgmySystemStoreListingId(recordId)) {
-        unawaited(_refreshLegalAndPlansFromCloud());
+        _scheduleLegalPlansRefreshFromCloud();
         return;
       }
       if (payload.eventType == PostgresChangeEvent.delete) {
@@ -6915,7 +6865,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await _refreshLegalAndPlansFromCloud(updateUi: false);
         await _refreshPopupsFromCloud(updateUi: false);
         await _reloadStoreFromSupabase();
-        await _reloadMediaFromSupabase();
       } catch (e) {
         debugPrint("Supabase Load Error: $e. Falling back to local.");
         final uLocal = safeGet('all_users');
@@ -7141,7 +7090,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _allTransactions.removeWhere((t) => ids.contains(t.id));
   }
 
-  Future<void> _saveData() async {
+  Future<void> _saveData({bool heavy = true}) async {
+    if (heavy) {
+      _pendingHeavySave = false;
+      _heavySaveTimer?.cancel();
+    }
     _isSyncing = true;
     _maintainStoreOrders(_config.storeOrders);
     var ordersSnapshot = List<Map<String, dynamic>>.from(
@@ -7198,25 +7151,22 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
       if (online) {
       await ngmyIgnoreTimeout(() async {
-      // Sync all transactions to Supabase
-      if (_allTransactions.isNotEmpty) {
-        await _safeUpsertRows(
-          'transactions',
-          _allTransactions.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
-        );
-      }
+      if (heavy) {
+        if (_allTransactions.isNotEmpty) {
+          await _safeUpsertRows(
+            'transactions',
+            _allTransactions.map((e) => e.toJson()).map((e) => Map<String, dynamic>.from(e)).toList(),
+          );
+        }
 
-      // Sync users without media profile fields — those use dedicated upserts so stale
-      // phones cannot wipe admin-granted followers or profile data.
-      if (_allUsers.isNotEmpty) {
-        final canWriteTrial = _currentUser?.isAdmin == true;
-        await _safeUpsertRows(
-          'users',
-          _allUsers.map((u) => _userRowForBulkSync(u, includeFreeTrial: canWriteTrial)).toList(),
-        );
-      }
+        if (_allUsers.isNotEmpty) {
+          final canWriteTrial = _currentUser?.isAdmin == true;
+          await _safeUpsertRows(
+            'users',
+            _allUsers.map((u) => _userRowForBulkSync(u, includeFreeTrial: canWriteTrial)).toList(),
+          );
+        }
 
-      // Do not bulk-upsert media here — it resurrected deleted posts from stale cache.
         await _pruneStaleMediaAgainstCloud();
 
         await _pruneExpiredAnnouncements(updateUi: false);
@@ -7255,8 +7205,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await _persistNgmyPopupsToCloud(_config.ngmyPopups, _config.ngmyVideoPopups);
         }
         await _safeUpsertRows('config', [configRow]);
-        await _persistCriticalConfigFields(_config);
-      }, timeout: const Duration(seconds: 28));
+      } else if (_currentUser != null) {
+        await _pushUserToCloudFast(_currentUser!);
+      }
+      await _persistCriticalConfigFields(_config);
+      }, timeout: Duration(seconds: heavy ? 28 : 12));
       } else {
         _config.storeOrders = ordersSnapshot;
       }
@@ -8790,7 +8743,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _refreshOnlineStatus();
     _runScheduledPopups();
     WidgetsBinding.instance.addPostFrameCallback((_) => _promptPushNotificationsIfNeeded());
-    _onlineCheck = Timer.periodic(const Duration(seconds: 8), (_) => _refreshOnlineStatus());
+    _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
       _ngmyApplyMidnightClockReset(widget.user);
@@ -10517,7 +10470,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> {
     _liveInvites = widget.config.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
     unawaited(_loadUsernameMap());
     unawaited(_refreshInvites());
-    _invitePoll = Timer.periodic(const Duration(seconds: 2), (_) => _refreshInvites());
+    _invitePoll = Timer.periodic(const Duration(seconds: 15), (_) => _refreshInvites());
   }
 
   Future<void> _refreshInvites() async {
@@ -24823,11 +24776,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _listingsSig = _storeListingsSignature(_listings);
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStoreListingsFromCloud(silent: true));
     _searchC.addListener(() => setState(() => _searchQuery = _searchC.text.trim().toLowerCase()));
-    _liveOrderPollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+    _liveOrderPollTimer = Timer.periodic(const Duration(seconds: 25), (_) {
       if (!mounted) return;
       unawaited(_syncLiveOrders());
     });
-    _storeMessagesPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _storeMessagesPollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted) return;
       unawaited(_refreshStoreMessagesFromCloud(silent: true));
     });
@@ -26024,7 +25977,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         builder: (ctx, setSheet) {
           if (inboxPoll == null) {
             unawaited(refreshInbox(setSheet));
-            inboxPoll = Timer.periodic(const Duration(seconds: 3), (_) => refreshInbox(setSheet));
+            inboxPoll = Timer.periodic(const Duration(seconds: 20), (_) => refreshInbox(setSheet));
           }
           final sheetMessages = _groupedStoreMessageThreads(me);
           final openKey = sheetNav['threadKey'] as String?;
@@ -33044,7 +32997,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       await _cleanupExpiredPosts();
       await _silentRefreshFeed();
     });
-    _mediaSyncTimer = Timer.periodic(const Duration(seconds: 30), (_) => _silentRefreshFeed());
+    _mediaSyncTimer = Timer.periodic(const Duration(minutes: 2), (_) => _silentRefreshFeed());
   }
 
   String _feedSignature() {
@@ -35266,7 +35219,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _loadChatMemory();
     _startChatGateWatcher();
     _subscribeNewsRealtime();
-    _newsPollTimer = Timer.periodic(const Duration(seconds: 12), (_) => unawaited(_pollNewsFromCloud()));
+    _newsPollTimer = Timer.periodic(const Duration(seconds: 60), (_) => unawaited(_pollNewsFromCloud()));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshGeminiKeyFromCloud();
       _refreshUnreadNewsInternal();
@@ -35414,7 +35367,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   void _startChatGateWatcher() {
     _chatGateTimer?.cancel();
-    _chatGateTimer = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(_syncChatClosedFromCloud()));
+    _chatGateTimer = Timer.periodic(const Duration(seconds: 45), (_) => unawaited(_syncChatClosedFromCloud()));
     unawaited(_syncChatClosedFromCloud());
   }
 

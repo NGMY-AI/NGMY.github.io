@@ -13,8 +13,8 @@ const int kNgmyMpLobbyAlignMs = 500;
 /// Shared countdown once both players are in the room.
 const int kNgmyMpCountdownSec = 4;
 
-/// Minimum interval between full cloud invite fetches during match sync.
-const Duration kNgmyInviteCloudRefreshMin = Duration(milliseconds: 120);
+/// Minimum interval between full cloud invite fetches (lobby + match sync).
+const Duration kNgmyInviteCloudRefreshMin = Duration(seconds: 12);
 
 List<Map<String, dynamic>> _inviteCloudCache = [];
 DateTime? _inviteCloudFetchedAt;
@@ -510,7 +510,13 @@ void updateInviteSession(List<Map<String, dynamic>> invites, String id, Map<Stri
   }
 }
 
-Future<List<Map<String, dynamic>>?> ngmyFetchGameInvitesFromCloud() async {
+Future<List<Map<String, dynamic>>?> ngmyFetchGameInvitesFromCloud({bool force = false}) async {
+  if (!force &&
+      _inviteCloudFetchedAt != null &&
+      DateTime.now().difference(_inviteCloudFetchedAt!) < kNgmyInviteCloudRefreshMin &&
+      _inviteCloudCache.isNotEmpty) {
+    return _inviteCloudCache.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
   if (!await ngmyCanReachCloud()) return null;
   try {
     final row = await Supabase.instance.client
@@ -519,7 +525,10 @@ Future<List<Map<String, dynamic>>?> ngmyFetchGameInvitesFromCloud() async {
         .eq('id', _kConfigRowId)
         .maybeSingle();
     if (row == null || row['gameInvites'] is! List) return [];
-    return parseGameInvites(row['gameInvites']);
+    final parsed = parseGameInvites(row['gameInvites']);
+    _inviteCloudCache = parsed;
+    _inviteCloudFetchedAt = DateTime.now();
+    return parsed;
   } catch (e) {
     debugPrint('[gameInvites] fetch: $e');
     return null;
@@ -542,8 +551,7 @@ Future<Map<String, dynamic>?> ngmyFetchInviteByIdMergedOnlyLocal(
 
 /// Pull remote invites, merge with local, optionally push merged list back.
 Future<List<Map<String, dynamic>>?> ngmySyncGameInvites(List<Map<String, dynamic>> localInvites, {bool push = false}) async {
-  final remote = await ngmyFetchGameInvitesFromCloud();
-  if (remote == null) return null;
+  final remote = await _remoteInvitesCached();
   final merged = mergeGameInvites(localInvites, remote);
   localInvites
     ..clear()
