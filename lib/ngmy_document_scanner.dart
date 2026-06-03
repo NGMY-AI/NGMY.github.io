@@ -191,7 +191,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       }
 
       final images = _pages.map((p) => (bytes: p.bytes, mimeType: p.mime)).toList();
-      final reply = await geminiAnalyzeImages(
+      final scan = await geminiAnalyzeImages(
         apiKey: apiKey,
         images: images,
         prompt: ngmyDocumentScanPrompt(userQuestion: _questionC.text, pageCount: _pages.length, languageCode: _responseLanguage),
@@ -200,10 +200,19 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       if (!mounted) return;
       setState(() {
         _analyzing = false;
-        if (reply != null && reply.isNotEmpty) {
-          _result = reply;
+        if (scan.text != null && scan.text!.isNotEmpty) {
+          _result = scan.text;
         } else {
-          _error = 'Could not read this document clearly. Try brighter light or a flatter photo.';
+          final err = (scan.error ?? '').trim();
+          if (err.contains('proxy not deployed') || err.contains('404')) {
+            _error = 'Document Scanner needs the ngmy-ai-chat Supabase function (same as NGMY Helper). Ask admin to deploy it, then reload.';
+          } else if (err.contains('Network') || err.contains('Failed to fetch') || err.contains('CORS')) {
+            _error = 'Network blocked the scan. Reload the page or try again on the NGMY app.';
+          } else if (err.isNotEmpty) {
+            _error = err.length > 220 ? '${err.substring(0, 220)}…' : err;
+          } else {
+            _error = 'Could not read this document. Try again or use a closer, flatter photo.';
+          }
         }
       });
     } catch (e) {

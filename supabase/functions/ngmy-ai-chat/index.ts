@@ -13,7 +13,13 @@ const corsHeaders = {
 
 type Provider = "gemini" | "openai" | "anthropic" | "openaiCompatible";
 
-async function geminiChat(apiKey: string, prompt: string): Promise<string> {
+type GeminiImagePart = { mimeType?: string; data?: string };
+
+async function geminiChat(
+  apiKey: string,
+  prompt: string,
+  images: GeminiImagePart[] = [],
+): Promise<string> {
   const models = [
     "gemini-2.5-flash",
     "gemini-2.0-flash",
@@ -21,6 +27,19 @@ async function geminiChat(apiKey: string, prompt: string): Promise<string> {
     "gemini-1.5-flash-latest",
     "gemini-1.5-flash",
   ];
+  const geminiParts: unknown[] = [];
+  for (const img of images) {
+    const data = String(img?.data ?? "").trim();
+    if (!data) continue;
+    geminiParts.push({
+      inline_data: {
+        mime_type: String(img?.mimeType ?? "image/jpeg").trim() || "image/jpeg",
+        data,
+      },
+    });
+  }
+  geminiParts.push({ text: prompt });
+
   let lastErr = "Gemini request failed";
   for (const model of models) {
     const url =
@@ -29,7 +48,7 @@ async function geminiChat(apiKey: string, prompt: string): Promise<string> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [{ parts: geminiParts }],
       }),
     });
     if (res.ok) {
@@ -107,6 +126,9 @@ serve(async (req) => {
     const openAiBaseUrl = body?.openAiBaseUrl
       ? String(body.openAiBaseUrl).trim()
       : undefined;
+    const images: GeminiImagePart[] = Array.isArray(body?.images)
+      ? body.images
+      : [];
 
     if (!apiKey || !prompt) {
       return new Response(
@@ -135,7 +157,7 @@ serve(async (req) => {
         break;
       case "gemini":
       default:
-        text = await geminiChat(apiKey, prompt);
+        text = await geminiChat(apiKey, prompt, images);
         break;
     }
 

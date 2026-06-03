@@ -1045,8 +1045,8 @@ Future<void> _persistCivicRegistryPins(
   }
 }
 
-/// Civic Registry "king" — crowned by admin; may approve registrars and change states in one state.
-bool _isCivicRegistryKing(UserData user) => user.isCivicRegistryAdmin;
+/// Civic Registry King — crowned by admin; may approve registrars and change states in their state.
+bool _isCivicRegistryKing(UserData user) => user.isCivicRegistryKing;
 
 String _reviewerCivicStateScope(UserData reviewer, AppConfig config) {
   if (reviewer.isAdmin) return '';
@@ -1136,6 +1136,7 @@ Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
     await Supabase.instance.client.from('users').upsert({
       'email': email,
       'isAuthorizedRegistrar': u.isAuthorizedRegistrar,
+      'isCivicRegistryKing': u.isCivicRegistryKing,
       'isCivicRegistryAdmin': u.isCivicRegistryAdmin,
       'civicRegistryStateSwitchesUsed': u.civicRegistryStateSwitchesUsed,
       'civicRegistryAnchorState': u.civicRegistryAnchorState,
@@ -1186,6 +1187,7 @@ NgmyCivicRegistryUserRow _civicRegistryUserRow(UserData u) => NgmyCivicRegistryU
       username: u.username,
       state: u.state,
       isAuthorizedRegistrar: u.isAuthorizedRegistrar,
+      isCivicRegistryKing: u.isCivicRegistryKing,
       isCivicRegistryAdmin: u.isCivicRegistryAdmin,
       stateSwitchesUsed: u.civicRegistryStateSwitchesUsed,
       anchorState: u.civicRegistryAnchorState,
@@ -1468,6 +1470,10 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     'jobPosts': config.jobPosts,
     'jobWorkerApplications': config.jobWorkerApplications,
     'storeSellAccessEmails': config.storeSellAccessEmails,
+    'civicSelfEnrollmentEnabled': config.civicSelfEnrollmentEnabled,
+    'familyTreeCreateFee': config.familyTreeCreateFee,
+    'familyTreePhotoMonthlyFee': config.familyTreePhotoMonthlyFee,
+    'familyTreePhotoAccessUntilByEmail': config.familyTreePhotoAccessUntilByEmail,
   };
   if (shouldWriteRegistrarApps) {
     combined['civicRegistrarApplications'] = registrarApps;
@@ -4365,7 +4371,9 @@ class UserData {
   bool forceLogout; int referralCount; int points;
   String? profilePicturePath;
   bool isAuthorizedRegistrar;
-  /// Civic Registry "king" — may serve any state; does not count toward per-state registrar cap.
+  /// Civic Registry King — approve registrar requests in their state; may change states there.
+  bool isCivicRegistryKing;
+  /// Civic Registry Admin — may serve any state; does not count toward per-state registrar cap.
   bool isCivicRegistryAdmin;
   int civicRegistryStateSwitchesUsed;
   String civicRegistryAnchorState;
@@ -4409,7 +4417,7 @@ class UserData {
   List<String> openedContributionReceiptKeys;
   List<String> dismissedContributionReceiptKeys;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isCivicRegistryAdmin = false, this.civicRegistryStateSwitchesUsed = 0, this.civicRegistryAnchorState = '', this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.todayClockInEarned = 0.0, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.freeTrialActive = false, this.freeTrialDailyAmount = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds,
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isCivicRegistryKing = false, this.isCivicRegistryAdmin = false, this.civicRegistryStateSwitchesUsed = 0, this.civicRegistryAnchorState = '', this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.todayClockInEarned = 0.0, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.freeTrialActive = false, this.freeTrialDailyAmount = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds,
     List<String>? openedContributionReceiptKeys,
     List<String>? dismissedContributionReceiptKeys}) : mediaFollowers = mediaFollowers ?? <String>[], mediaFollowing = mediaFollowing ?? <String>[], mediaHighlights = mediaHighlights ?? <Map<String, dynamic>>[], mediaStories = mediaStories ?? <Map<String, dynamic>>[], readAnnouncementIds = readAnnouncementIds ?? <String>[], openedContributionReceiptKeys = openedContributionReceiptKeys ?? <String>[], dismissedContributionReceiptKeys = dismissedContributionReceiptKeys ?? <String>[];
   bool get isOnFreeTrial => freeTrialActive && freeTrialDailyAmount > 0;
@@ -4461,7 +4469,7 @@ class UserData {
     if (full <= 0) return 0.0;
     return full * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
   }
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isCivicRegistryAdmin': isCivicRegistryAdmin, 'civicRegistryStateSwitchesUsed': civicRegistryStateSwitchesUsed, 'civicRegistryAnchorState': civicRegistryAnchorState, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'todayClockInEarned': todayClockInEarned, 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds, 'openedContributionReceiptKeys': openedContributionReceiptKeys, 'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isCivicRegistryKing': isCivicRegistryKing, 'isCivicRegistryAdmin': isCivicRegistryAdmin, 'civicRegistryStateSwitchesUsed': civicRegistryStateSwitchesUsed, 'civicRegistryAnchorState': civicRegistryAnchorState, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'todayClockInEarned': todayClockInEarned, 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds, 'openedContributionReceiptKeys': openedContributionReceiptKeys, 'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -4499,6 +4507,7 @@ class UserData {
       points: json['points'] ?? 0,
       profilePicturePath: json['profilePicturePath'],
       isAuthorizedRegistrar: json['isAuthorizedRegistrar'] ?? false,
+      isCivicRegistryKing: json['isCivicRegistryKing'] == true,
       isCivicRegistryAdmin: json['isCivicRegistryAdmin'] ?? false,
       civicRegistryStateSwitchesUsed: (json['civicRegistryStateSwitchesUsed'] ?? 0) is int
           ? json['civicRegistryStateSwitchesUsed'] as int
@@ -13691,9 +13700,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 title: const Text('Self-enrollment button', style: TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: const Text('Shows enroll icon on the purple Civic Registry header for members'),
                 value: widget.config.civicSelfEnrollmentEnabled,
-                onChanged: (v) {
+                onChanged: (v) async {
                   setST(() => widget.config.civicSelfEnrollmentEnabled = v);
+                  await ngmyFlushCriticalConfigLocalAndCloud(widget.config);
                   widget.onDataChanged();
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(v ? 'Self-enrollment is ON for all members' : 'Self-enrollment is OFF')),
+                  );
                 },
               ),
               ListTile(
@@ -13753,6 +13767,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     applications: widget.config.civicRegistrarApplications,
                     users: widget.allUsers.map(_civicRegistryUserRow).toList(),
                     readUsers: () => widget.allUsers.map(_civicRegistryUserRow).toList(),
+                    onToggleKing: (email, on) {
+                      final i = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email.toLowerCase().trim());
+                      if (i == -1) return;
+                      widget.allUsers[i].isCivicRegistryKing = on;
+                      if (on) widget.allUsers[i].isAuthorizedRegistrar = true;
+                      unawaited(_pushUserAuthorizedRegistrar(widget.allUsers[i]));
+                      widget.onDataChanged();
+                    },
                     onToggleRegistryAdmin: (email, on) {
                       final i = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email.toLowerCase().trim());
                       if (i == -1) return;
@@ -20340,6 +20362,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   bool _hasRegistrarAccess() {
     if (widget.user.isCivicRegistryAdmin && widget.user.isAuthorizedRegistrar) return true;
+    if (widget.user.isCivicRegistryKing && widget.user.isAuthorizedRegistrar) return true;
     return NgmyCivicRegistrarApplication.hasRegistrarAccess(
       applications: widget.config.civicRegistrarApplications,
       email: widget.user.email,
