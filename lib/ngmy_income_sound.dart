@@ -26,6 +26,7 @@ class NgmyIncomeSound {
 
   static const _candidateFiles = [
     'income_cash.mp3',
+    'YTMP3GG_YouTube_Kaching-sound-effect-sound-sounds-sounde_Media_a7Vue-A0BOY_007_128k.mp3',
     'income_cash.wav',
     'income_cash.ogg',
     'income_cash.m4a',
@@ -35,6 +36,19 @@ class NgmyIncomeSound {
   static void bindSession(String? email) {
     _sessionEmail = email?.toLowerCase().trim();
     if (_sessionEmail != null && _sessionEmail!.isEmpty) _sessionEmail = null;
+    unawaited(preload());
+  }
+
+  /// Warm up the asset so the first payout plays without delay.
+  static Future<void> preload() async {
+    await _resolveAssetOnce();
+    if (_resolvedAsset == null) return;
+    try {
+      await _player.setReleaseMode(ReleaseMode.stop);
+      await _player.setSource(AssetSource(_resolvedAsset!));
+    } catch (e) {
+      debugPrint('[income sound] preload: $e');
+    }
   }
 
   static Future<bool> isEnabled() async {
@@ -89,7 +103,13 @@ class NgmyIncomeSound {
     if (_resolvedAsset != null) {
       try {
         await _player.stop();
-        await _player.play(AssetSource(_resolvedAsset!));
+        await _player.setReleaseMode(ReleaseMode.stop);
+        await _player.setVolume(1.0);
+        if (kIsWeb) {
+          await _player.play(AssetSource(_resolvedAsset!), volume: 1.0);
+        } else {
+          await _player.play(AssetSource(_resolvedAsset!));
+        }
         return;
       } catch (e) {
         debugPrint('[income sound] play error: $e');

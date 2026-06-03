@@ -8901,6 +8901,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     NgmyIncomeSound.bindSession(widget.user.email);
+    unawaited(NgmyIncomeSound.preload());
     NgmyPopupOrchestrator.resolveVideoUrl = _resolveSupabaseStorageUrlResilient;
     _ngmyReconcileClockInSession(widget.user, widget.allTransactions);
     _refreshOnlineStatus();
@@ -8942,6 +8943,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         }
 
         if (completed) {
+          if (earned > 0) {
+            ngmyPlayIncomeSoundForAmount(
+              beneficiaryEmail: widget.user.email,
+              amount: earned,
+            );
+          }
           if (earned > 0 &&
               !_ngmyHasClockInPayoutForDay(widget.user.email, widget.allTransactions, now)) {
             final penaltyNote = widget.user.clockInPenaltyPercent > 0
@@ -8971,7 +8978,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     });
   }
   @override
-  @override void dispose() {
+  void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _t?.cancel();
     _onlineCheck?.cancel();
@@ -9807,6 +9814,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final missedWindow = !onTrial && _ngmyIsPastNoon(now);
     final blocked = !active && !alreadyDone && (weekend || missedWindow);
     final clockMuted = alreadyDone || blocked;
+    final lateInfo = _clockLateInfo();
+    final showLate = !onTrial &&
+        !active &&
+        !alreadyDone &&
+        widget.user.activeInvestment != null &&
+        lateInfo != null;
 
     return GestureDetector(
       onTap: (active || alreadyDone || blocked || (!onTrial && widget.user.activeInvestment == null))
@@ -10104,6 +10117,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
+          if (showLate && lateInfo != null) ...[
+            const SizedBox(height: 5),
+            _LateClockInBanner(
+              message: lateInfo.message,
+              penaltyPercent: lateInfo.penalty,
+              isBlocked: lateInfo.blocked,
+            ),
+          ],
         ],
       ),
     );
