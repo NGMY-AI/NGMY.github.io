@@ -11,8 +11,19 @@ enum _WorksheetTab { projects, cashier, familyTree }
 
 class NgmyWorksheetsScreen extends StatefulWidget {
   final String userEmail;
+  final dynamic user;
+  final dynamic config;
+  final Future<bool> Function(double amount, String description) onChargeWallet;
+  final VoidCallback onDataChanged;
 
-  const NgmyWorksheetsScreen({super.key, required this.userEmail});
+  const NgmyWorksheetsScreen({
+    super.key,
+    required this.userEmail,
+    required this.user,
+    required this.config,
+    required this.onChargeWallet,
+    required this.onDataChanged,
+  });
 
   @override
   State<NgmyWorksheetsScreen> createState() => _NgmyWorksheetsScreenState();
@@ -157,6 +168,13 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> {
                       NgmyFamilyTreeTab(
                         key: ValueKey(_familyTreeVersion),
                         userEmail: widget.userEmail,
+                        user: widget.user,
+                        config: widget.config,
+                        onChargeWallet: widget.onChargeWallet,
+                        onDataChanged: () {
+                          widget.onDataChanged();
+                          setState(() => _familyTreeVersion++);
+                        },
                         onChanged: () => setState(() => _familyTreeVersion++),
                       ),
                   ],

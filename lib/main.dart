@@ -66,6 +66,8 @@ import 'ngmy_civic_registry_stats.dart';
 import 'ngmy_civic_registry_admin.dart';
 import 'ngmy_civic_registry_pins.dart';
 import 'ngmy_civic_registry_gate.dart';
+import 'ngmy_civic_registry_enrollment.dart';
+import 'ngmy_family_tree_payments.dart';
 import 'ngmy_web_viewport.dart';
 import 'ngmy_web_status_bar.dart';
 import 'ngmy_login_logo.dart';
@@ -565,6 +567,9 @@ class AppConfig {
   List<Map<String, dynamic>> civicRegistrarApplications;
   /// When true, members see self-enroll on the Civic Registry header (admin toggle).
   bool civicSelfEnrollmentEnabled;
+  double familyTreeCreateFee;
+  double familyTreePhotoMonthlyFee;
+  Map<String, String> familyTreePhotoAccessUntilByEmail;
   /// Emails allowed to use Sell Item in NGMY Store (admin-granted; persisted in config).
   List<String> storeSellAccessEmails;
 
@@ -617,8 +622,12 @@ class AppConfig {
     this.civicRegistryPin = '',
     List<Map<String, dynamic>>? civicRegistrarApplications,
     this.civicSelfEnrollmentEnabled = false,
+    this.familyTreeCreateFee = NgmyFamilyTreePayments.defaultCreateFee,
+    this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
+    Map<String, String>? familyTreePhotoAccessUntilByEmail,
     List<String>? storeSellAccessEmails,
   })  : loanApplications = loanApplications ?? [],
+        familyTreePhotoAccessUntilByEmail = familyTreePhotoAccessUntilByEmail ?? const {},
         civicRegistryPinsByState = civicRegistryPinsByState ?? const {},
         civicRegistrarApplications = civicRegistrarApplications ?? const [],
         storeSellAccessEmails = storeSellAccessEmails ?? const [],
@@ -678,6 +687,9 @@ class AppConfig {
     'civicRegistryPin': civicRegistryPin,
     'civicRegistrarApplications': civicRegistrarApplications,
     'civicSelfEnrollmentEnabled': civicSelfEnrollmentEnabled,
+    'familyTreeCreateFee': familyTreeCreateFee,
+    'familyTreePhotoMonthlyFee': familyTreePhotoMonthlyFee,
+    'familyTreePhotoAccessUntilByEmail': familyTreePhotoAccessUntilByEmail,
     'storeSellAccessEmails': storeSellAccessEmails,
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
@@ -737,10 +749,52 @@ class AppConfig {
       (json['civicRegistrarApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
     ),
     civicSelfEnrollmentEnabled: json['civicSelfEnrollmentEnabled'] == true,
+    familyTreeCreateFee: (json['familyTreeCreateFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultCreateFee,
+    familyTreePhotoMonthlyFee: (json['familyTreePhotoMonthlyFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
+    familyTreePhotoAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['familyTreePhotoAccessUntilByEmail']),
     storeSellAccessEmails: List<String>.from(
       (json['storeSellAccessEmails'] ?? const []).map((e) => e.toString().toLowerCase().trim()).where((e) => e.isNotEmpty),
     ),
   );
+}
+
+Map<String, String> _familyTreePhotoAccessFromJson(dynamic raw) {
+  final out = <String, String>{};
+  if (raw is Map) {
+    raw.forEach((k, v) {
+      final key = k.toString().toLowerCase().trim();
+      final val = v.toString().trim();
+      if (key.isNotEmpty && val.isNotEmpty) out[key] = val;
+    });
+  }
+  return out;
+}
+
+bool ngmyChargeUserWallet({
+  required UserData user,
+  required List<UserData> allUsers,
+  required double amount,
+  required String description,
+  required void Function(AppTransaction) onAddTransaction,
+}) {
+  if (amount <= 0) return true;
+  final key = user.email.toLowerCase().trim();
+  final idx = allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+  final target = idx >= 0 ? allUsers[idx] : user;
+  if (target.accountBalance + 0.001 < amount) return false;
+  onAddTransaction(
+    AppTransaction(
+      id: 'ngmy-ft-${DateTime.now().microsecondsSinceEpoch}',
+      userEmail: target.email,
+      amount: amount,
+      type: TransactionType.withdrawal,
+      method: PaymentMethod.system,
+      sourceDetails: description,
+      status: TransactionStatus.approved,
+      timestamp: DateTime.now(),
+    ),
+  );
+  return true;
 }
 
 Map<String, String> _civicRegistryPinsFromJson(dynamic raw) {
@@ -1256,6 +1310,25 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     next.civicSelfEnrollmentEnabled = record['civicSelfEnrollmentEnabled'] == true;
   } else {
     next.civicSelfEnrollmentEnabled = keep.civicSelfEnrollmentEnabled;
+  }
+
+  if (record.containsKey('familyTreeCreateFee')) {
+    final v = record['familyTreeCreateFee'];
+    if (v is num && v >= 0) next.familyTreeCreateFee = v.toDouble();
+  } else {
+    next.familyTreeCreateFee = keep.familyTreeCreateFee;
+  }
+  if (record.containsKey('familyTreePhotoMonthlyFee')) {
+    final v = record['familyTreePhotoMonthlyFee'];
+    if (v is num && v >= 0) next.familyTreePhotoMonthlyFee = v.toDouble();
+  } else {
+    next.familyTreePhotoMonthlyFee = keep.familyTreePhotoMonthlyFee;
+  }
+  if (record.containsKey('familyTreePhotoAccessUntilByEmail') && record['familyTreePhotoAccessUntilByEmail'] is Map) {
+    final remote = _familyTreePhotoAccessFromJson(record['familyTreePhotoAccessUntilByEmail']);
+    next.familyTreePhotoAccessUntilByEmail = {...remote, ...keep.familyTreePhotoAccessUntilByEmail};
+  } else if (keep.familyTreePhotoAccessUntilByEmail.isNotEmpty) {
+    next.familyTreePhotoAccessUntilByEmail = Map<String, String>.from(keep.familyTreePhotoAccessUntilByEmail);
   }
 
   if (record.containsKey('jobPosts') && record['jobPosts'] is List) {
@@ -13423,6 +13496,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Loan Center', Icons.handshake_outlined, Colors.teal, () => _showLoanAdmin(isDark), isDark, badgeCount: NgmyAdminMenuCounts.pendingLoanApplications(widget.config.loanApplications)),
             _menuFrame('Announcements', Icons.campaign_outlined, Colors.orange, () => _showAnnouncementAdmin(isDark), isDark),
             _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => _showCivicRegistryAdmin(isDark), isDark, badgeCount: NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications)),
+            _menuFrame('Payments', Icons.payments_outlined, const Color(0xFF0D9488), () => _showPaymentsAdmin(isDark), isDark),
             _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => _showJobApplicationsAdmin(isDark), isDark, badgeCount: NgmyAdminMenuCounts.pendingJobWorkerApplications(widget.config.jobWorkerApplications)),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => _showPopupsAdmin(isDark), isDark),
             _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => _showGamesAdmin(isDark), isDark, badgeCount: NgmyAdminMenuCounts.pendingGameInvites(widget.config.gameInvites)),
@@ -13492,6 +13566,96 @@ class _AdminDashboardState extends State<AdminDashboard> {
         widget.onDataChanged();
       },
     );
+  }
+
+  void _showPaymentsAdmin(bool isDark) {
+    final createC = TextEditingController(text: widget.config.familyTreeCreateFee.toStringAsFixed(2));
+    final photoC = TextEditingController(text: widget.config.familyTreePhotoMonthlyFee.toStringAsFixed(2));
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setST) => Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F111A) : Colors.white,
+                  borderRadius: BorderRadius.circular(26),
+                  border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('Payments', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Family tree fees are charged from each member\'s NGMY wallet balance.',
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: createC,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Fee per new family tree (\$)',
+                        prefixIcon: Icon(Icons.account_tree_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: photoC,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Monthly photo upload fee (\$)',
+                        prefixIcon: Icon(Icons.photo_library_outlined),
+                        helperText: '30 days of member photo uploads per payment',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () {
+                        final create = double.tryParse(createC.text.trim());
+                        final photo = double.tryParse(photoC.text.trim());
+                        if (create == null || create < 0 || photo == null || photo < 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Enter valid dollar amounts (0 or more).')),
+                          );
+                          return;
+                        }
+                        setST(() {
+                          widget.config.familyTreeCreateFee = create;
+                          widget.config.familyTreePhotoMonthlyFee = photo;
+                        });
+                        widget.onDataChanged();
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Family tree payment settings saved.')),
+                        );
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488),
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                      child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    ).whenComplete(() {
+      createC.dispose();
+      photoC.dispose();
+    });
   }
 
   void _showCivicRegistryAdmin(bool isDark) {
@@ -18396,7 +18560,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: InkWell(
           onTap: () => NgmyNavigator.push(
             ctx,
-            NgmyWorksheetsScreen(userEmail: widget.user.email),
+            NgmyWorksheetsScreen(
+              userEmail: widget.user.email,
+              user: widget.user,
+              config: widget.config,
+              onChargeWallet: (amount, description) async => ngmyChargeUserWallet(
+                user: widget.user,
+                allUsers: widget.allUsers,
+                amount: amount,
+                description: description,
+                onAddTransaction: widget.onAddTransaction,
+              ),
+              onDataChanged: widget.onDataChanged,
+            ),
             routeName: 'NgmyWorksheetsScreen',
           ),
           borderRadius: BorderRadius.circular(12),
@@ -20861,6 +21037,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
     if (!widget.config.rooms.contains(room)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please choose a room from Manage Cities & Rooms.')));
+      return;
+    }
+
+    final duplicate = NgmyCivicRegistryEnrollment.findDuplicateEnrolledUser(
+      users: widget.allUsers,
+      fullName: fullName,
+      dob: dob,
+      city: city,
+      excludeEmail: targetUser?.email ?? email,
+    );
+    if (duplicate != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(NgmyCivicRegistryEnrollment.duplicateMessage(duplicate))),
+      );
       return;
     }
 

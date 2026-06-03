@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_family_tree_payments.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_worksheet_dialogs.dart';
 import 'ngmy_worksheet_helpers.dart';
@@ -9,11 +10,19 @@ import 'ngmy_worksheets_storage.dart';
 
 class NgmyFamilyTreeTab extends StatefulWidget {
   final String userEmail;
+  final dynamic user;
+  final dynamic config;
+  final Future<bool> Function(double amount, String description) onChargeWallet;
+  final VoidCallback onDataChanged;
   final VoidCallback onChanged;
 
   const NgmyFamilyTreeTab({
     super.key,
     required this.userEmail,
+    required this.user,
+    required this.config,
+    required this.onChargeWallet,
+    required this.onDataChanged,
     required this.onChanged,
   });
 
@@ -47,6 +56,18 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
     final name = result.name.trim();
     if (name.isEmpty) return;
 
+    final fee = NgmyFamilyTreePayments.createFeeFromConfig(widget.config);
+    final paid = await NgmyFamilyTreePayments.confirmAndCharge(
+      context: context,
+      user: widget.user,
+      config: widget.config,
+      amount: fee,
+      title: 'Create Family Tree',
+      message: 'Each family tree costs \$${fee.toStringAsFixed(2)} (one-time per tree).',
+      onCharge: widget.onChargeWallet,
+    );
+    if (!paid || !mounted) return;
+
     final tree = FamilyTree(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: name.toUpperCase(),
@@ -55,6 +76,7 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
     );
     await upsertFamilyTree(widget.userEmail, tree);
     await _reload();
+    widget.onDataChanged();
     widget.onChanged();
     if (!mounted) return;
     _openTree(tree);
@@ -63,7 +85,14 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
   Future<void> _openTree(FamilyTree tree) async {
     final updated = await NgmyNavigator.push<FamilyTree>(
       context,
-      NgmyFamilyTreeDetailScreen(userEmail: widget.userEmail, tree: tree),
+      NgmyFamilyTreeDetailScreen(
+        userEmail: widget.userEmail,
+        user: widget.user,
+        config: widget.config,
+        onChargeWallet: widget.onChargeWallet,
+        onDataChanged: widget.onDataChanged,
+        tree: tree,
+      ),
       routeName: 'NgmyFamilyTreeDetailScreen',
     );
     if (updated != null) {
@@ -194,11 +223,19 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
 
 class NgmyFamilyTreeDetailScreen extends StatefulWidget {
   final String userEmail;
+  final dynamic user;
+  final dynamic config;
+  final Future<bool> Function(double amount, String description) onChargeWallet;
+  final VoidCallback onDataChanged;
   final FamilyTree tree;
 
   const NgmyFamilyTreeDetailScreen({
     super.key,
     required this.userEmail,
+    required this.user,
+    required this.config,
+    required this.onChargeWallet,
+    required this.onDataChanged,
     required this.tree,
   });
 
@@ -313,6 +350,11 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
         parents: visibleMembers(_tree),
         initialParentId: parentId,
         tree: _tree,
+        userEmail: widget.userEmail,
+        user: widget.user,
+        config: widget.config,
+        onChargeWallet: widget.onChargeWallet,
+        onDataChanged: widget.onDataChanged,
       ),
     );
     if (result == null) return;
@@ -331,6 +373,11 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
         member: member,
         parents: visibleMembers(_tree).where((m) => m.id != member.id).toList(),
         tree: _tree,
+        userEmail: widget.userEmail,
+        user: widget.user,
+        config: widget.config,
+        onChargeWallet: widget.onChargeWallet,
+        onDataChanged: widget.onDataChanged,
       ),
     );
     if (result == null) return;
@@ -1224,9 +1271,19 @@ class _MemberEditorDialog extends StatefulWidget {
   final List<FamilyMember> parents;
   final String? initialParentId;
   final FamilyTree? tree;
+  final String userEmail;
+  final dynamic user;
+  final dynamic config;
+  final Future<bool> Function(double amount, String description) onChargeWallet;
+  final VoidCallback onDataChanged;
 
   const _MemberEditorDialog({
     required this.title,
+    required this.userEmail,
+    required this.user,
+    required this.config,
+    required this.onChargeWallet,
+    required this.onDataChanged,
     this.member,
     this.parents = const [],
     this.initialParentId,
@@ -1280,8 +1337,24 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
   }
 
   Future<void> _pickPhoto() async {
+    if (!NgmyFamilyTreePayments.hasActivePhotoAccess(widget.config, widget.userEmail)) {
+      final fee = NgmyFamilyTreePayments.photoMonthlyFeeFromConfig(widget.config);
+      final paid = await NgmyFamilyTreePayments.confirmAndCharge(
+        context: context,
+        user: widget.user,
+        config: widget.config,
+        amount: fee,
+        title: 'Family Tree Photos',
+        message:
+            'Upload photos on family members for \$${fee.toStringAsFixed(2)} per month (30 days from payment).',
+        onCharge: widget.onChargeWallet,
+      );
+      if (!paid || !mounted) return;
+      NgmyFamilyTreePayments.grantPhotoAccess(widget.config, widget.userEmail);
+      widget.onDataChanged();
+    }
     final img = await ngmyPickImageBase64(maxWidth: 800);
-    if (img != null) setState(() => _photoPath = img);
+    if (img != null && mounted) setState(() => _photoPath = img);
   }
 
   @override
