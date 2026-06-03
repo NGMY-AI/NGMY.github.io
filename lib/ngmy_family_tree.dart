@@ -1357,20 +1357,52 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
     if (img != null && mounted) setState(() => _photoPath = img);
   }
 
+  void _save() {
+    final name = _nameC.text.trim().toUpperCase();
+    if (name.isEmpty) return;
+    Navigator.pop(
+      context,
+      (widget.member ?? FamilyMember(id: DateTime.now().microsecondsSinceEpoch.toString(), name: name)).copyWith(
+        name: name,
+        gender: _gender,
+        parentId: _parentId,
+        spouseId: _spouseId,
+        photoPath: _photoPath,
+        notes: _notesC.text.trim(),
+        birthDate: _birthC.text.trim(),
+        birthPlace: _placeC.text.trim(),
+        occupation: _jobC.text.trim(),
+        birthOrder: _birthOrder,
+        hidden: _hidden,
+        visibleChildrenCap: _visibleChildrenCap,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = WorksheetPalette.of(context);
+    final spouseOptions = widget.parents.where((m) => m.id != widget.member?.id).toList();
+
     return AlertDialog(
       backgroundColor: p.cardBg,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+      contentPadding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+      actionsPadding: EdgeInsets.zero,
+      actions: const [],
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(widget.title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: p.primaryText)),
+              Text(
+                widget.title,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: p.primaryText, letterSpacing: 0.3),
+              ),
               const SizedBox(height: 14),
               Center(
                 child: GestureDetector(
@@ -1396,154 +1428,179 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: _nameC,
-                textCapitalization: TextCapitalization.characters,
-                style: TextStyle(color: p.primaryText),
-                decoration: const InputDecoration(labelText: 'Full name', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<FamilyGender>(
-                initialValue: _gender,
-                decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
-                items: const [
-                  DropdownMenuItem(value: FamilyGender.male, child: Text('Male')),
-                  DropdownMenuItem(value: FamilyGender.female, child: Text('Female')),
-                  DropdownMenuItem(value: FamilyGender.unknown, child: Text('Unknown')),
-                ],
-                onChanged: (v) => setState(() => _gender = v ?? FamilyGender.unknown),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String?>(
-                initialValue: _parentId,
-                decoration: const InputDecoration(labelText: 'Parent (optional)', border: OutlineInputBorder()),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('None (root ancestor)')),
-                  ...widget.parents.map((m) => DropdownMenuItem(value: m.id, child: Text(m.name))),
-                ],
-                onChanged: (v) => setState(() => _parentId = v),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String?>(
-                initialValue: _spouseId,
-                decoration: const InputDecoration(labelText: 'Spouse (optional)', border: OutlineInputBorder()),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('None')),
-                  ...widget.parents
-                      .where((m) => m.id != widget.member?.id)
-                      .map((m) => DropdownMenuItem(value: m.id, child: Text(m.name))),
-                ],
-                onChanged: (v) => setState(() => _spouseId = v),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _birthC,
-                style: TextStyle(color: p.primaryText),
-                decoration: const InputDecoration(labelText: 'Birth date', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _placeC,
-                style: TextStyle(color: p.primaryText),
-                decoration: const InputDecoration(labelText: 'Birth place', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _jobC,
-                style: TextStyle(color: p.primaryText),
-                decoration: const InputDecoration(labelText: 'Occupation', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _notesC,
-                minLines: 3,
-                maxLines: 5,
-                style: TextStyle(color: p.primaryText),
-                decoration: const InputDecoration(labelText: 'Notes', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Child order: #$_birthOrder (${_ordinalLabel(_birthOrder)})',
-                      style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => setState(() => _birthOrder = math.max(1, _birthOrder - 1)),
-                    icon: const Icon(Icons.remove_circle_outline),
-                  ),
-                  IconButton(
-                    onPressed: () => setState(() => _birthOrder += 1),
-                    icon: const Icon(Icons.add_circle_outline),
-                  ),
-                ],
-              ),
-              if (widget.member != null && widget.tree != null && childrenOf(widget.tree!, widget.member!.id).isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Row(
+              const SizedBox(height: 18),
+              _MemberEditorSection(
+                palette: p,
+                label: 'Identity',
+                child: Column(
                   children: [
-                    Expanded(
-                      child: Text(
-                        _visibleChildrenCap == 0
-                            ? 'Show in tree: use tree default'
-                            : 'Show $_visibleChildrenCap in tree, rest in dropdown',
-                        style: TextStyle(color: p.secondaryText, fontSize: 12),
-                      ),
+                    _MemberEditorTextField(
+                      palette: p,
+                      controller: _nameC,
+                      hint: 'Full name',
+                      icon: Icons.badge_outlined,
+                      textCapitalization: TextCapitalization.characters,
                     ),
-                    IconButton(
-                      onPressed: _visibleChildrenCap > 0
-                          ? () => setState(() => _visibleChildrenCap -= 1)
-                          : null,
-                      icon: const Icon(Icons.remove_circle_outline),
-                    ),
-                    IconButton(
-                      onPressed: () => setState(() => _visibleChildrenCap += 1),
-                      icon: const Icon(Icons.add_circle_outline),
+                    const SizedBox(height: 10),
+                    _MemberEditorGenderRow(
+                      palette: p,
+                      value: _gender,
+                      onChanged: (g) => setState(() => _gender = g),
                     ),
                   ],
                 ),
-              ],
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('Hidden member', style: TextStyle(color: p.primaryText)),
-                value: _hidden,
-                onChanged: (v) => setState(() => _hidden = v),
               ),
+              const SizedBox(height: 12),
+              _MemberEditorSection(
+                palette: p,
+                label: 'Family links',
+                child: Column(
+                  children: [
+                    _MemberEditorDropdown<String?>(
+                      palette: p,
+                      value: _parentId,
+                      icon: Icons.account_tree_outlined,
+                      hint: 'Parent',
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('None — root ancestor')),
+                        ...widget.parents.map((m) => DropdownMenuItem(value: m.id, child: Text(m.name))),
+                      ],
+                      onChanged: (v) => setState(() => _parentId = v),
+                    ),
+                    const SizedBox(height: 10),
+                    _MemberEditorDropdown<String?>(
+                      palette: p,
+                      value: _spouseId,
+                      icon: Icons.favorite_border_rounded,
+                      hint: 'Spouse',
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('None')),
+                        ...spouseOptions.map((m) => DropdownMenuItem(value: m.id, child: Text(m.name))),
+                      ],
+                      onChanged: (v) => setState(() => _spouseId = v),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _MemberEditorSection(
+                palette: p,
+                label: 'Life details',
+                child: Column(
+                  children: [
+                    _MemberEditorTextField(
+                      palette: p,
+                      controller: _birthC,
+                      hint: 'Birth date',
+                      icon: Icons.cake_outlined,
+                    ),
+                    const SizedBox(height: 10),
+                    _MemberEditorTextField(
+                      palette: p,
+                      controller: _placeC,
+                      hint: 'Birth place',
+                      icon: Icons.place_outlined,
+                    ),
+                    const SizedBox(height: 10),
+                    _MemberEditorTextField(
+                      palette: p,
+                      controller: _jobC,
+                      hint: 'Occupation',
+                      icon: Icons.work_outline_rounded,
+                    ),
+                    const SizedBox(height: 10),
+                    _MemberEditorTextField(
+                      palette: p,
+                      controller: _notesC,
+                      hint: 'Notes',
+                      icon: Icons.notes_rounded,
+                      minLines: 3,
+                      maxLines: 5,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _MemberEditorStepperCard(
+                palette: p,
+                title: 'Child order',
+                subtitle: _ordinalLabel(_birthOrder),
+                onMinus: () => setState(() => _birthOrder = math.max(1, _birthOrder - 1)),
+                onPlus: () => setState(() => _birthOrder += 1),
+              ),
+              if (widget.member != null && widget.tree != null && childrenOf(widget.tree!, widget.member!.id).isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _MemberEditorStepperCard(
+                  palette: p,
+                  title: 'Visible in tree',
+                  subtitle: _visibleChildrenCap == 0
+                      ? 'Uses tree default'
+                      : 'Show $_visibleChildrenCap, rest in menu',
+                  onMinus: _visibleChildrenCap > 0 ? () => setState(() => _visibleChildrenCap -= 1) : null,
+                  onPlus: () => setState(() => _visibleChildrenCap += 1),
+                ),
+              ],
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: p.mutedSurface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: p.cardBorder),
+                ),
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  activeThumbColor: WorksheetPalette.teal,
+                  title: Text('Hidden member', style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w700, fontSize: 14)),
+                  subtitle: Text('Hide from the tree canvas', style: TextStyle(color: p.secondaryText, fontSize: 11)),
+                  value: _hidden,
+                  onChanged: (v) => setState(() => _hidden = v),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: p.primaryText,
+                        side: BorderSide(color: p.cardBorder),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton(
+                      onPressed: _save,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: WorksheetPalette.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_rounded, size: 20),
+                          SizedBox(width: 8),
+                          Text('Save member', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
             ],
           ),
         ),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton(
-          onPressed: () {
-            final name = _nameC.text.trim().toUpperCase();
-            if (name.isEmpty) return;
-            Navigator.pop(
-              context,
-              (widget.member ?? FamilyMember(id: DateTime.now().microsecondsSinceEpoch.toString(), name: name)).copyWith(
-                name: name,
-                gender: _gender,
-                parentId: _parentId,
-                spouseId: _spouseId,
-                photoPath: _photoPath,
-                notes: _notesC.text.trim(),
-                birthDate: _birthC.text.trim(),
-                birthPlace: _placeC.text.trim(),
-                occupation: _jobC.text.trim(),
-                birthOrder: _birthOrder,
-                hidden: _hidden,
-                visibleChildrenCap: _visibleChildrenCap,
-              ),
-            );
-          },
-          style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
-          child: const Text('Save'),
-        ),
-      ],
     );
   }
 
@@ -1559,5 +1616,265 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
       default:
         return '${n}th child';
     }
+  }
+}
+
+class _MemberEditorSection extends StatelessWidget {
+  const _MemberEditorSection({required this.palette, required this.label, required this.child});
+
+  final WorksheetPalette palette;
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.1,
+              color: palette.secondaryText,
+            ),
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: palette.mutedSurface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: palette.cardBorder),
+          ),
+          child: child,
+        ),
+      ],
+    );
+  }
+}
+
+class _MemberEditorTextField extends StatelessWidget {
+  const _MemberEditorTextField({
+    required this.palette,
+    required this.controller,
+    required this.hint,
+    required this.icon,
+    this.textCapitalization,
+    this.minLines = 1,
+    this.maxLines = 1,
+  });
+
+  final WorksheetPalette palette;
+  final TextEditingController controller;
+  final String hint;
+  final IconData icon;
+  final TextCapitalization? textCapitalization;
+  final int minLines;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.cardBorder.withValues(alpha: 0.85)),
+      ),
+      child: TextField(
+        controller: controller,
+        minLines: minLines,
+        maxLines: maxLines,
+        textCapitalization: textCapitalization ?? TextCapitalization.none,
+        style: TextStyle(color: palette.primaryText, fontSize: 14, fontWeight: FontWeight.w600),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: palette.secondaryText, fontWeight: FontWeight.w500),
+          prefixIcon: Icon(icon, size: 20, color: WorksheetPalette.teal),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        ),
+      ),
+    );
+  }
+}
+
+class _MemberEditorDropdown<T> extends StatelessWidget {
+  const _MemberEditorDropdown({
+    required this.palette,
+    required this.value,
+    required this.icon,
+    required this.hint,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final WorksheetPalette palette;
+  final T? value;
+  final IconData icon;
+  final String hint;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: palette.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.cardBorder.withValues(alpha: 0.85)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          isExpanded: true,
+          value: value,
+          icon: Icon(Icons.expand_more_rounded, color: palette.secondaryText),
+          style: TextStyle(color: palette.primaryText, fontSize: 14, fontWeight: FontWeight.w600),
+          dropdownColor: palette.cardBg,
+          hint: Text(hint, style: TextStyle(color: palette.secondaryText, fontWeight: FontWeight.w500)),
+          items: items,
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+}
+
+class _MemberEditorGenderRow extends StatelessWidget {
+  const _MemberEditorGenderRow({
+    required this.palette,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final WorksheetPalette palette;
+  final FamilyGender value;
+  final ValueChanged<FamilyGender> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget chip(FamilyGender g, String label, IconData icon) {
+      final selected = value == g;
+      return Expanded(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => onChanged(g),
+            borderRadius: BorderRadius.circular(12),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: selected ? WorksheetPalette.teal.withValues(alpha: 0.18) : palette.cardBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: selected ? WorksheetPalette.teal : palette.cardBorder.withValues(alpha: 0.85),
+                  width: selected ? 1.5 : 1,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Icon(icon, size: 18, color: selected ? WorksheetPalette.teal : palette.secondaryText),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: selected ? WorksheetPalette.teal : palette.secondaryText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        chip(FamilyGender.male, 'Male', Icons.male_rounded),
+        const SizedBox(width: 8),
+        chip(FamilyGender.female, 'Female', Icons.female_rounded),
+        const SizedBox(width: 8),
+        chip(FamilyGender.unknown, 'Other', Icons.person_outline_rounded),
+      ],
+    );
+  }
+}
+
+class _MemberEditorStepperCard extends StatelessWidget {
+  const _MemberEditorStepperCard({
+    required this.palette,
+    required this.title,
+    required this.subtitle,
+    required this.onPlus,
+    this.onMinus,
+  });
+
+  final WorksheetPalette palette;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onMinus;
+  final VoidCallback onPlus;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: palette.mutedSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.cardBorder),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(color: palette.primaryText, fontWeight: FontWeight.w800, fontSize: 13)),
+                Text(subtitle, style: TextStyle(color: palette.secondaryText, fontSize: 11)),
+              ],
+            ),
+          ),
+          _StepperIconButton(palette: palette, icon: Icons.remove_rounded, onPressed: onMinus),
+          const SizedBox(width: 6),
+          _StepperIconButton(palette: palette, icon: Icons.add_rounded, onPressed: onPlus),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepperIconButton extends StatelessWidget {
+  const _StepperIconButton({required this.palette, required this.icon, this.onPressed});
+
+  final WorksheetPalette palette;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    return Material(
+      color: enabled ? WorksheetPalette.teal.withValues(alpha: 0.12) : palette.cardBg,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Icon(icon, size: 20, color: enabled ? WorksheetPalette.teal : palette.secondaryText.withValues(alpha: 0.4)),
+        ),
+      ),
+    );
   }
 }
