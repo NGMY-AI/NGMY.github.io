@@ -7,18 +7,6 @@ class NgmySupabaseSyncThrottle {
 
   static Timer? _criticalDebounce;
   static String? _lastCriticalSig;
-  static DateTime? _cloudWriteEchoUntil;
-
-  /// After local writes, ignore our own realtime echoes briefly (admin↔admin loops).
-  static void markCloudWriteBurst([Duration duration = const Duration(seconds: 6)]) {
-    _cloudWriteEchoUntil = DateTime.now().add(duration);
-  }
-
-  static bool get shouldSuppressRealtimeEcho {
-    final until = _cloudWriteEchoUntil;
-    return until != null && DateTime.now().isBefore(until);
-  }
-
   static String criticalConfigSig(dynamic config) => jsonEncode({
         'civicSelfEnrollmentEnabled': (config as dynamic).civicSelfEnrollmentEnabled,
         'familyTreeCreateFee': (config as dynamic).familyTreeCreateFee,
@@ -46,6 +34,5 @@ class NgmySupabaseSyncThrottle {
   static void reset() {
     _criticalDebounce?.cancel();
     _lastCriticalSig = null;
-    _cloudWriteEchoUntil = null;
   }
 }

@@ -1499,6 +1499,40 @@ Future<void> _persistStoreSellAccessEmails(AppConfig config) async {
   }
 }
 
+Timer? _operationalConfigCloudDebounce;
+
+/// Admin menu + user requests (loans, help, store messages, registrar apps) — not the full config blob.
+Future<void> _persistOperationalConfigToCloud(AppConfig config) async {
+  if (!await ngmyCanReachCloud()) return;
+  try {
+    await Supabase.instance.client.from('config').upsert({
+      'id': kNgmyConfigRowId,
+      'storeInquiries': config.storeInquiries,
+      'storeOrders': config.storeOrders,
+      'storeListings': config.storeListings,
+      'loanApplications': config.loanApplications,
+      'helpHelperApplications': config.helpHelperApplications,
+      'helpRequests': config.helpRequests,
+      'helpBusinesses': config.helpBusinesses,
+      'civicRegistrarApplications': config.civicRegistrarApplications,
+      'jobPosts': config.jobPosts,
+      'jobWorkerApplications': config.jobWorkerApplications,
+      'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
+      'cities': config.cities,
+      'rooms': config.rooms,
+    });
+  } catch (e) {
+    debugPrint('[config] operational upsert: $e');
+  }
+}
+
+void _scheduleOperationalConfigCloudPersist(AppConfig config) {
+  _operationalConfigCloudDebounce?.cancel();
+  _operationalConfigCloudDebounce = Timer(const Duration(seconds: 3), () {
+    unawaited(_persistOperationalConfigToCloud(config));
+  });
+}
+
 Future<void> _persistCriticalConfigFields(AppConfig config) async {
   if (!await ngmyCanReachCloud()) return;
   await _mergeCivicRegistryPinsIntoConfig(config);
@@ -1550,7 +1584,6 @@ Future<void> ngmyFlushCriticalConfigLocalAndCloud(AppConfig config, {bool cloud 
 
 Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
   if (!await ngmyCanReachCloud()) return;
-  NgmySupabaseSyncThrottle.markCloudWriteBurst();
   try {
     await Supabase.instance.client.from('transactions').upsert(Map<String, dynamic>.from(t.toJson()));
   } catch (e) {
@@ -1560,7 +1593,6 @@ Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
 
 Future<void> _pushUserToCloudFast(UserData u, {bool includeFreeTrial = false}) async {
   if (!await ngmyCanReachCloud()) return;
-  NgmySupabaseSyncThrottle.markCloudWriteBurst();
   try {
     await Supabase.instance.client.from('users').upsert(_userRowForBulkSync(u, includeFreeTrial: includeFreeTrial));
   } catch (e) {
@@ -4666,7 +4698,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   bool _pendingHeavySave = false;
   final Set<String> _dirtyUserEmails = {};
   final Set<String> _dirtyTransactionIds = {};
-  DateTime? _lastAdminMaintenanceSync;
   DateTime? _lastCurrentUserCloudRefresh;
   Timer? _legalPlansRefreshDebounce;
   final Set<String> _disabledSupabaseTables = {};
@@ -5100,36 +5131,43 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return rows;
   }
 
-  /// Admin maintenance sync — pending users/transactions only, never full config blob.
-  Future<void> _syncAdminDirtyToCloud() async {
+  /// Admin sync — pending requests, operational config (no full-table bulk).
+  Future<void> _syncAdminOperationalToCloud() async {
     if (_currentUser?.isAdmin != true) return;
     if (!await ngmyCanReachCloud()) return;
-    final now = DateTime.now();
-    if (_lastAdminMaintenanceSync != null &&
-        now.difference(_lastAdminMaintenanceSync!) < const Duration(minutes: 2)) {
-      return;
-    }
-    _lastAdminMaintenanceSync = now;
     _isSyncing = true;
-    NgmySupabaseSyncThrottle.markCloudWriteBurst(const Duration(seconds: 8));
     try {
       await _persistLocalOnly();
-      final usersToSync = _allUsers.where(_userNeedsAdminCloudSync).toList();
+      final pendingTx = _allTransactions
+          .where((t) => t.status == TransactionStatus.pending)
+          .map((e) => Map<String, dynamic>.from(e.toJson()))
+          .toList();
+      if (pendingTx.isNotEmpty) {
+        await _safeUpsertRows('transactions', pendingTx);
+      }
+      final txRows = _transactionsForAdminCloudSync();
+      if (txRows.isNotEmpty) {
+        await _safeUpsertRows('transactions', txRows);
+      }
+      final emails = <String>{
+        ..._dirtyUserEmails,
+        ...pendingTx.map((t) => (t['userEmail'] ?? '').toString().toLowerCase().trim()),
+      }..removeWhere((e) => e.isEmpty);
+      final usersToSync = emails.isEmpty
+          ? _allUsers.where(_userNeedsAdminCloudSync).toList()
+          : _allUsers.where((u) => emails.contains(u.email.toLowerCase().trim())).toList();
       if (usersToSync.isNotEmpty) {
         await _safeUpsertRows(
           'users',
           usersToSync.map((u) => _userRowForBulkSync(u, includeFreeTrial: true)).toList(),
         );
       }
-      final txRows = _transactionsForAdminCloudSync();
-      if (txRows.isNotEmpty) {
-        await _safeUpsertRows('transactions', txRows);
-      }
+      await _persistOperationalConfigToCloud(_config);
       _dirtyUserEmails.clear();
       _dirtyTransactionIds.clear();
-      await ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: true);
+      await ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false);
     } catch (e) {
-      debugPrint('[ngmy] admin dirty sync: $e');
+      debugPrint('[ngmy] admin operational sync: $e');
     } finally {
       Future.delayed(const Duration(milliseconds: 200), () => _isSyncing = false);
     }
@@ -5139,21 +5177,24 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _markUserDirty(dirtyUserEmail ?? _currentUser?.email);
     _markTransactionDirty(dirtyTransactionId);
     unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: true));
+    _scheduleOperationalConfigCloudPersist(_config);
     _pendingHeavySave = true;
     _saveDebounceTimer?.cancel();
-    _saveDebounceTimer = Timer(const Duration(seconds: 8), () {
+    _saveDebounceTimer = Timer(const Duration(seconds: 5), () {
       if (!mounted) return;
       unawaited(_persistLocalOnly());
-      if (_currentUser?.isAdmin != true) {
+      if (_currentUser?.isAdmin == true) {
+        unawaited(_syncAdminOperationalToCloud());
+      } else {
         unawaited(_saveData(heavy: false, fullCloud: false));
       }
     });
     _heavySaveTimer?.cancel();
-    _heavySaveTimer = Timer(const Duration(minutes: 15), () {
+    _heavySaveTimer = Timer(const Duration(minutes: 10), () {
       if (!mounted || !_pendingHeavySave) return;
       _pendingHeavySave = false;
       if (_currentUser?.isAdmin == true) {
-        unawaited(_syncAdminDirtyToCloud());
+        unawaited(_syncAdminOperationalToCloud());
       } else {
         unawaited(_saveData(heavy: true, fullCloud: false));
       }
@@ -6393,7 +6434,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _onConfigChange(PostgresChangePayload payload) {
-    if (NgmySupabaseSyncThrottle.shouldSuppressRealtimeEcho) return;
     try {
       if (payload.eventType != PostgresChangeEvent.delete) {
         final keepListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
@@ -6911,6 +6951,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     required UserData? localCurrent,
   }) async {
     try {
+      _disabledSupabaseTables.clear();
       if (!await ngmyCanReachCloud()) {
         debugPrint('[ngmy] offline or slow network — using cached local data');
         if (mounted) setState(() => _appOffline = true);
@@ -7202,7 +7243,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _safeUpsertRows(String table, List<Map<String, dynamic>> rows) async {
     if (rows.isEmpty) return;
     if (_disabledSupabaseTables.contains(table)) return;
-    NgmySupabaseSyncThrottle.markCloudWriteBurst();
 
     final working = rows.map((e) => Map<String, dynamic>.from(e)).toList();
     final removed = <String>{};
@@ -7339,7 +7379,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final userEmail = _currentUser?.email.toLowerCase().trim() ?? '';
 
       if (heavy && fullCloud && isAdmin) {
-        await _syncAdminDirtyToCloud();
+        await _syncAdminOperationalToCloud();
       } else {
         if (_currentUser != null) {
           await _pushUserToCloudFast(_currentUser!);
@@ -7722,10 +7762,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     _allMedia.insert(0, post);
                   });
                   unawaited(() async {
+                    final saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+                    if (!saved) {
+                      debugPrint('[media] onPostMedia cloud upsert failed for ${post.id}');
+                    }
                     await _persistTombstonedMediaIds(_tombstonedMediaIds);
                     await _persistAllMediaLocally();
-                    await Future.delayed(const Duration(seconds: 1));
-                    await _reloadMediaFromSupabase();
                   }());
                 },
                 onRefreshMediaFromCloud: _refreshMediaAndProfilesFromCloud,
@@ -25131,6 +25173,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       widget.config.storeInquiries = merged;
       _ensurePaymentReviewInquiriesFromOrders();
       _ensureStoreThreadsFromOrders();
+      _scheduleOperationalConfigCloudPersist(widget.config);
       await ngmyFlushCriticalConfigLocalAndCloud(widget.config, cloud: false);
       if (!mounted) return;
       if (!silent) {

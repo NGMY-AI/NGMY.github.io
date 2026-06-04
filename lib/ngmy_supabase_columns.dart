@@ -26,8 +26,9 @@ class NgmySupabaseColumns {
 
   static const geminiOnly = 'id,geminiApiKey,gemini_api_key,aiApiKey,ai_api_key';
 
-  /// Media feed without re-downloading large comment blobs on every poll.
+  /// Media table columns (must match public.media — see supabase/media_tables.sql).
   static const mediaFeed =
-      'id,authorEmail,authorUsername,videoUrl,imageUrl,caption,timestamp,likes,'
-      'likedBy,savedBy,views,isStory,storyExpiresAt';
+      'id,userEmail,username,videoUrl,url,contentType,type,caption,timestamp,likes,'
+      'likedBy,savedBy,comments,taggedUsers,mediaAspectRatio,'
+      'externalLink,previewSeconds,continuePrice,watchReward,watchRequiredSeconds,rewardedViewers';
 }
