@@ -17,7 +17,7 @@ Future<void> showNgmyGameCenterAdminSheet({
   required Map<String, int> initialLimits,
   required Map<String, dynamic> initialDice,
   required List<NgmyAdminUserEntry> users,
-  required void Function(Map<String, int> limits, Map<String, dynamic> diceJson) onSave,
+  required Future<void> Function(Map<String, int> limits, Map<String, dynamic> diceJson) onSave,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -38,7 +38,7 @@ class _NgmyGameCenterAdminSheet extends StatefulWidget {
   final Map<String, int> initialLimits;
   final NgmyDiceSettings initialDice;
   final List<NgmyAdminUserEntry> users;
-  final void Function(Map<String, int> limits, Map<String, dynamic> diceJson) onSave;
+  final Future<void> Function(Map<String, int> limits, Map<String, dynamic> diceJson) onSave;
 
   const _NgmyGameCenterAdminSheet({
     required this.isDark,
@@ -368,12 +368,12 @@ class _NgmyGameCenterAdminSheetState extends State<_NgmyGameCenterAdminSheet> wi
                   minimumSize: const Size(double.infinity, 52),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                onPressed: () {
+                onPressed: () async {
                   _applyLimitsFromFields();
                   _applyDiceFromFields();
-                  widget.onSave(_limits, _dice.toJson());
+                  await widget.onSave(_limits, _dice.toJson());
+                  if (!context.mounted) return;
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Game Center settings saved.')));
                 },
                 icon: const Icon(Icons.save_rounded),
                 label: const Text('Save settings', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),

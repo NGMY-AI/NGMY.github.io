@@ -14,7 +14,20 @@ class NgmySupabaseSyncThrottle {
         'familyTreePhotoAccessUntilByEmail': (config as dynamic).familyTreePhotoAccessUntilByEmail,
         'civicRegistryPin': (config as dynamic).civicRegistryPin,
         'civicRegistryPinsByState': (config as dynamic).civicRegistryPinsByState,
+        'gameTimeLimits': (config as dynamic).gameTimeLimits,
+        'diceSettings': (config as dynamic).diceSettings,
+        'gameInvites': (config as dynamic).gameInvites,
       });
+
+  /// Admin/game saves — write immediately instead of waiting on the debounce.
+  static Future<void> persistCriticalConfigNow<T>(
+    T config,
+    Future<void> Function(T config) persist,
+  ) async {
+    _criticalDebounce?.cancel();
+    _lastCriticalSig = criticalConfigSig(config);
+    await persist(config);
+  }
 
   static void scheduleCriticalConfigPersist<T>(
     T config,

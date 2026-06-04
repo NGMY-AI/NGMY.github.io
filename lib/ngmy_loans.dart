@@ -1184,7 +1184,7 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
 
   Widget _thumb(dynamic ref) => SizedBox(width: 48, height: 48, child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NgmyLoanStore.imageWidget(ref)));
 
-  void _approve(String id) {
+  Future<void> _approve(String id) async {
     final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == id);
     if (i < 0) return;
     widget.config.loanApplications[i]['status'] = 'approved';
@@ -1192,7 +1192,8 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
     widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     widget.onDataChanged();
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan approved — user can track payments live.')));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan approved and saved.')));
   }
 
   Future<void> _reject(BuildContext context, String id) async {
@@ -1216,6 +1217,8 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
     widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     widget.onDataChanged();
     setState(() {});
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan rejected and saved.')));
   }
 }
 

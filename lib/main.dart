@@ -34,6 +34,7 @@ import 'ngmy_game_nav.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_games.dart';
 import 'ngmy_game_admin_sheet.dart';
+import 'ngmy_game_center_persist.dart';
 import 'ngmy_game_result_popup.dart';
 import 'ngmy_multiplayer.dart';
 import 'ngmy_supabase_sync_throttle.dart';
@@ -521,6 +522,27 @@ enum TransactionType { deposit, withdrawal, adminAdd, adminRemove, reimbursement
 enum TransactionStatus { pending, approved, rejected }
 enum PaymentMethod { cashApp, bitcoin, system }
 
+/// Wallet deposit/withdraw history — never auto-delete from Supabase.
+const int kNgmyWalletHistoryDisplayMax = 200;
+
+bool ngmyIsWalletDepositOrWithdraw(AppTransaction t) =>
+    t.type == TransactionType.deposit || t.type == TransactionType.withdrawal;
+
+List<AppTransaction> ngmyUserWalletHistoryTransactions(
+  List<AppTransaction> all,
+  String email, {
+  int max = kNgmyWalletHistoryDisplayMax,
+}) {
+  final key = email.toLowerCase().trim();
+  final list = all
+      .where((t) => t.userEmail.toLowerCase().trim() == key)
+      .where(ngmyIsWalletDepositOrWithdraw)
+      .toList()
+    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  if (list.length <= max) return list;
+  return list.take(max).toList();
+}
+
 const String _investmentRequestPrefix = 'INVEST_REQUEST|';
 
 bool isInvestmentRequestDetails(String? details) {
@@ -697,7 +719,9 @@ Future<bool> _verifyTransactionStatusInCloud(AppTransaction t) async {
     if (row == null) return false;
     final remote = row['status'];
     final remoteIdx = remote is num ? remote.toInt() : int.tryParse(remote?.toString() ?? '');
-    return remoteIdx == t.status.index;
+    if (remoteIdx == t.status.index) return true;
+    final remoteName = remote?.toString().toLowerCase().trim();
+    return remoteName == t.status.name;
   } catch (e) {
     debugPrint('[txn] verify status: $e');
     return false;
@@ -1068,7 +1092,7 @@ Map<String, int> _mergeGameTimeLimitsPreferCustom(Map<String, int> local, Map<St
     final localCustom = l != def;
     final remoteCustom = r != def;
     if (remoteCustom && localCustom) {
-      out[id] = r;
+      out[id] = l;
     } else if (remoteCustom) {
       out[id] = r;
     } else if (localCustom) {
@@ -1785,6 +1809,28 @@ Future<void> ngmyFlushCriticalConfigLocalAndCloud(AppConfig config, {bool cloud 
   if (cloud) {
     NgmySupabaseSyncThrottle.scheduleCriticalConfigPersist(config, _persistCriticalConfigFields);
   }
+}
+
+/// Admin applications (loans, jobs, help, registrar) — save immediately, no debounce.
+Future<void> ngmyPersistAdminConfigNow(AppConfig config) async {
+  _operationalConfigCloudDebounce?.cancel();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  await _persistOperationalConfigToCloud(config);
+}
+
+/// Game Center timers/dice — must hit Supabase immediately (admin + players).
+Future<bool> ngmyPersistGameCenterConfigNow(AppConfig config) async {
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  final invites = config.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
+  final ok = await ngmyPersistGameCenterSettings(
+    gameTimeLimits: Map<String, int>.from(config.gameTimeLimits),
+    diceSettings: Map<String, dynamic>.from(config.diceSettings),
+    gameInvites: invites,
+  );
+  if (await ngmyCanReachCloud()) {
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+  }
+  return ok;
 }
 
 Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
@@ -3128,8 +3174,26 @@ double? _ngmyClockInPayoutAmountForDay(String email, List<AppTransaction> txs, D
   return null;
 }
 
+/// No clock-in dialogs, banners, or in-app notifications (penalties still apply silently).
+const bool kNgmySuppressClockInPopups = true;
+
 /// Minutes after midnight before late clock-in UI appears (12:10 AM).
 const int kNgmyLateClockUiStartMinutes = 10;
+
+const kNgmyAdminEmails = <String>[
+  'kbpabloqr@gmail.com',
+  'ngumoyaking@gmail.com',
+  'appbusiness321@gmail.com',
+  'appbusiness84@gmail.com',
+];
+
+bool ngmyEmailIsAdmin(String email) => kNgmyAdminEmails.contains(email.toLowerCase().trim());
+
+/// App sign-up users only — excludes Civic Registry enrollments from admin Users list.
+bool ngmyIsAppSignupUser(UserData u) {
+  if (u.isEnrolledInRegistry) return false;
+  return u.email.trim().isNotEmpty;
+}
 
 int _ngmyMinutesSinceMidnight(DateTime now) {
   return now.difference(_ngmyDateOnly(now)).inMinutes;
@@ -4942,12 +5006,92 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return '${_currentUser?.email ?? ''}|${_allUsers.length}|${_allTransactions.length}|${_allMedia.length}|$annSig|${_config.ngmyChatClosed}';
   }
 
-  static const _kNgmyAdminEmails = [
-    'kbpabloqr@gmail.com',
-    'ngumoyaking@gmail.com',
-    'appbusiness321@gmail.com',
-    'appbusiness84@gmail.com',
-  ];
+  bool _ngmySessionIsAdmin(UserData? user) {
+    if (user == null) return false;
+    final key = user.email.toLowerCase().trim();
+    return user.isAdmin || ngmyEmailIsAdmin(key);
+  }
+
+  List<UserData> _mergeAllUsersWithRemote(
+    Map<String, UserData> localByEmail,
+    List<UserData> remote,
+  ) {
+    final merged = Map<String, UserData>.from(localByEmail);
+    for (final remoteUser in remote) {
+      final key = remoteUser.email.toLowerCase().trim();
+      if (key.isEmpty) continue;
+      final local = merged[key];
+      if (local == null) {
+        merged[key] = remoteUser;
+        if (ngmyEmailIsAdmin(key)) merged[key]!.isAdmin = true;
+        continue;
+      }
+      _preserveLocalSessionState(local, remoteUser);
+      _mergeUserMediaProfileFields(local, remoteUser);
+      merged[key] = remoteUser;
+      if (local.passwordHash.trim().isNotEmpty && merged[key]!.passwordHash.trim().isEmpty) {
+        merged[key]!.passwordHash = local.passwordHash;
+      }
+      _preserveLocalSessionState(local, merged[key]!);
+      if (ngmyEmailIsAdmin(key)) merged[key]!.isAdmin = true;
+    }
+    return merged.values.toList();
+  }
+
+  /// Pull latest users + wallet requests for admin (never wipe local cache on empty cloud).
+  Future<void> _refreshAdminCloudSnapshot() async {
+    if (!_ngmySessionIsAdmin(_currentUser)) return;
+    if (!await ngmyCanReachCloud()) return;
+    final localUsersBeforeFetch = <String, UserData>{
+      for (final u in _allUsers) u.email.toLowerCase().trim(): u,
+    };
+    try {
+      final usersData = await supabase.from('users').select().limit(2500);
+      if (usersData != null) {
+        final remote = (usersData as List).map((e) => UserData.fromJson(e)).toList();
+        if (remote.isNotEmpty) {
+          _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
+        } else {
+          debugPrint('[admin] cloud users empty — keeping ${_allUsers.length} local users');
+        }
+      }
+      final transData = await supabase
+          .from('transactions')
+          .select()
+          .order('timestamp', ascending: false)
+          .limit(400);
+      if (transData != null) {
+        final remoteTransactions =
+            (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
+        if (remoteTransactions.isNotEmpty) {
+          await _refreshWalletDecisionLedger();
+          _allTransactions = _mergeTransactionsWithRemote(
+            _allTransactions,
+            remoteTransactions,
+            walletDecisionLedger: _walletDecisionLedger,
+          );
+          _applyWalletDecisionLedgerToTransactions();
+        } else {
+          debugPrint('[admin] cloud transactions empty — keeping ${_allTransactions.length} local');
+        }
+      }
+      for (final u in _allUsers) {
+        u.accountBalance = ngmyResolveAccountBalance(u.email, u.accountBalance, _allTransactions);
+      }
+      for (final email in kNgmyAdminEmails) {
+        final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+        if (idx >= 0) _allUsers[idx].isAdmin = true;
+      }
+      if (_currentUser != null && _ngmySessionIsAdmin(_currentUser)) {
+        _currentUser!.isAdmin = true;
+      }
+      await _flushLocalWalletDecisionsToCloud();
+      await _persistLocalOnly();
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('[admin] cloud snapshot refresh: $e');
+    }
+  }
 
   /// Completes login after password check (local or Supabase). Always sets [_currentUser].
   Future<void> _completePasswordLogin(String email, String passwordHash) async {
@@ -4957,7 +5101,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     var index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
     if (index >= 0) {
       _allUsers[index].passwordHash = passwordHash;
-      if (_kNgmyAdminEmails.contains(key)) _allUsers[index].isAdmin = true;
+      if (ngmyEmailIsAdmin(key)) _allUsers[index].isAdmin = true;
       _currentUser = _allUsers[index];
     } else {
       UserData user;
@@ -4976,7 +5120,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             email: email,
             username: email.split('@').first,
             passwordHash: passwordHash,
-            isAdmin: _kNgmyAdminEmails.contains(key),
+            isAdmin: ngmyEmailIsAdmin(key),
           );
         }
       } catch (e) {
@@ -4985,10 +5129,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           email: email,
           username: email.split('@').first,
           passwordHash: passwordHash,
-          isAdmin: _kNgmyAdminEmails.contains(key),
+          isAdmin: ngmyEmailIsAdmin(key),
         );
       }
-      if (_kNgmyAdminEmails.contains(key)) user.isAdmin = true;
+      if (ngmyEmailIsAdmin(key)) user.isAdmin = true;
       _allUsers.add(user);
       _currentUser = user;
     }
@@ -5029,8 +5173,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startConfigRefreshLoop();
     _startMediaDeliveryLoop();
     _startAdminPendingTransactionPoll();
-    if (_currentUser?.isAdmin == true) {
+    if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshPendingTransactionsFromCloud());
+      unawaited(_refreshAdminCloudSnapshot());
     }
   }
   Future<void> _seedTransactionNotificationBaseline() async {
@@ -5378,7 +5523,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _refreshWalletDecisionLedger() async {
-    _walletDecisionLedger = await NgmyWalletDecisionLedger.load();
+    _walletDecisionLedger = await NgmyWalletDecisionLedger.loadMerged();
     _applyWalletDecisionLedgerToTransactions();
   }
 
@@ -5408,7 +5553,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _flushLocalWalletDecisionsToCloud() async {
-    if (_currentUser?.isAdmin != true) return;
+    if (!_ngmySessionIsAdmin(_currentUser)) return;
     await _refreshWalletDecisionLedger();
     _applyWalletDecisionLedgerToTransactions();
     if (!await ngmyCanReachCloud()) return;
@@ -5418,10 +5563,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (t.status == TransactionStatus.pending) continue;
       if (t.id.isEmpty) continue;
       final ok = await _pushTransactionDecisionToCloud(t, attempts: 4);
-      if (ok) {
-        await NgmyWalletDecisionLedger.clear(t.id);
-        _walletDecisionLedger.remove(t.id);
-      } else {
+      if (!ok) {
         _markTransactionDirty(t.id);
         debugPrint('[txn] wallet decision still not in cloud: ${t.id} (${t.status.name})');
       }
@@ -5432,15 +5574,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _startAdminPendingTransactionPoll() {
     _adminPendingTxnPoll?.cancel();
-    if (_currentUser?.isAdmin != true) return;
+    if (!_ngmySessionIsAdmin(_currentUser)) return;
     _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 40), (_) {
-      if (!mounted || _currentUser?.isAdmin != true) return;
+      if (!mounted || !_ngmySessionIsAdmin(_currentUser)) return;
       unawaited(_refreshPendingTransactionsFromCloud());
     });
   }
 
   Future<void> _refreshPendingTransactionsFromCloud() async {
-    if (_currentUser?.isAdmin != true) return;
+    if (!_ngmySessionIsAdmin(_currentUser)) return;
     if (!await ngmyCanReachCloud()) return;
     try {
       final rows = await supabase
@@ -5595,7 +5737,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await _persistOperationalConfigToCloud(_config);
       _dirtyUserEmails.clear();
       _dirtyTransactionIds.removeWhere(syncedTxnIds.contains);
-      await ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false);
+      await ngmyPersistGameCenterConfigNow(_config);
     } catch (e) {
       debugPrint('[ngmy] admin operational sync: $e');
     } finally {
@@ -5607,7 +5749,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _markUserDirty(dirtyUserEmail ?? _currentUser?.email);
     _markTransactionDirty(dirtyTransactionId);
     unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: true));
-    _scheduleOperationalConfigCloudPersist(_config);
+    if (_ngmySessionIsAdmin(_currentUser)) {
+      unawaited(ngmyPersistAdminConfigNow(_config));
+    } else {
+      _scheduleOperationalConfigCloudPersist(_config);
+    }
     _pendingHeavySave = true;
     _saveDebounceTimer?.cancel();
     _saveDebounceTimer = Timer(const Duration(seconds: 5), () {
@@ -6392,6 +6538,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }) async {
     if (_currentUser == null) return;
     if (NgmyGameSession.suppressExternalNotifications) return;
+    if (kNgmySuppressClockInPopups) {
+      final blob = '${title.toLowerCase()} ${body.toLowerCase()}';
+      if (blob.contains('clock-in') || blob.contains('clock in') || blob.contains('late clock')) {
+        return;
+      }
+    }
     final dedupeKey = tag ?? '${title.trim()}|${body.trim()}';
     final last = _notificationCooldown[dedupeKey];
     if (last != null && DateTime.now().difference(last) < cooldown) return;
@@ -6575,6 +6727,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _notifyTransactionEvent(AppTransaction t, {bool statusChanged = false}) async {
     if (NgmyGameSession.suppressExternalNotifications) return;
+    if (kNgmySuppressClockInPopups) {
+      final sd = (t.sourceDetails ?? '').toLowerCase();
+      if (sd.contains('clock-in')) return;
+    }
     if (ngmyIsGameRelatedTransaction(sourceDetails: t.sourceDetails)) return;
     if (_shouldSkipTransactionNotification(t, statusChanged: statusChanged)) return;
     final currentEmail = _currentUser?.email.toLowerCase().trim();
@@ -7442,12 +7598,23 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await ngmyIgnoreTimeout(() async {
       try {
         final sessionEmail = (localCurrent?.email ?? '').toLowerCase().trim();
-        final bootstrapAdmin = localCurrent?.isAdmin == true;
+        final bootstrapAdmin = _ngmySessionIsAdmin(localCurrent) || ngmyEmailIsAdmin(sessionEmail);
 
         if (bootstrapAdmin) {
-          final usersData = await supabase.from('users').select();
-          if (usersData != null) {
-            _allUsers = (usersData as List).map((e) => UserData.fromJson(e)).toList();
+          try {
+            final usersData = await supabase.from('users').select().limit(2500);
+            if (usersData != null) {
+              final remote = (usersData as List).map((e) => UserData.fromJson(e)).toList();
+              if (remote.isNotEmpty) {
+                _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
+              } else {
+                debugPrint('[admin] bootstrap users empty — keeping local cache');
+                _allUsers = localUsersBeforeFetch.values.toList();
+              }
+            }
+          } catch (e) {
+            debugPrint('[admin] bootstrap users fetch: $e');
+            _allUsers = localUsersBeforeFetch.values.toList();
           }
         } else if (sessionEmail.isNotEmpty) {
           final row = await supabase.from('users').select().eq('email', sessionEmail).maybeSingle();
@@ -7483,24 +7650,29 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
 
         final transData = bootstrapAdmin || sessionEmail.isEmpty
-            ? await supabase.from('transactions').select().order('timestamp', ascending: false).limit(300)
+            ? await supabase.from('transactions').select().order('timestamp', ascending: false).limit(500)
             : await supabase.from('transactions').select().eq('userEmail', sessionEmail);
         if (transData != null) {
           final remoteTransactions =
               (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
-          await _refreshWalletDecisionLedger();
-          _allTransactions = _mergeTransactionsWithRemote(
-            _allTransactions,
-            remoteTransactions,
-            walletDecisionLedger: _walletDecisionLedger,
-          );
+          if (remoteTransactions.isNotEmpty || !bootstrapAdmin) {
+            await _refreshWalletDecisionLedger();
+            _allTransactions = _mergeTransactionsWithRemote(
+              _allTransactions,
+              remoteTransactions,
+              walletDecisionLedger: _walletDecisionLedger,
+            );
+          } else {
+            debugPrint('[admin] bootstrap transactions empty — keeping local wallet list');
+            _applyWalletDecisionLedgerToTransactions();
+          }
           if (bootstrapAdmin) {
             await _flushLocalWalletDecisionsToCloud();
             final refreshed = await supabase
                 .from('transactions')
                 .select()
                 .order('timestamp', ascending: false)
-                .limit(300);
+                .limit(500);
             if (refreshed != null) {
               final again = (refreshed as List).map((e) => AppTransaction.fromJson(e)).toList();
               _allTransactions = _mergeTransactionsWithRemote(
@@ -7566,6 +7738,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _config.civicRegistrarApplications,
           );
           await _mergeCivicRegistryPinsIntoConfig(_config);
+          await ngmyApplyGameCenterSettingsBackup(
+            apply: (limits, dice, invites) {
+              _config.gameTimeLimits = _mergeGameTimeLimitsPreferCustom(_config.gameTimeLimits, limits);
+              if (dice.isNotEmpty) {
+                _config.diceSettings = _mergeDiceSettingsPreferCustom(_config.diceSettings, dice);
+              }
+              if (invites.isNotEmpty) {
+                _config.gameInvites = mergeGameInvites(_config.gameInvites, invites);
+              }
+            },
+          );
           final registrarEmail = _currentUser?.email ?? '';
           if (registrarEmail.trim().isNotEmpty) {
             final localRegistrarApp = await NgmyCivicRegistrarApplication.load(registrarEmail);
@@ -7679,9 +7862,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
       }
 
-      // Ensure admins are updated
-      final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
-      for (var u in _allUsers) if (admins.contains(u.email.toLowerCase().trim())) u.isAdmin = true;
+      for (var u in _allUsers) {
+        if (ngmyEmailIsAdmin(u.email)) u.isAdmin = true;
+      }
+      if (_currentUser != null && _ngmySessionIsAdmin(_currentUser)) {
+        _currentUser!.isAdmin = true;
+      }
 
       for (final u in _allUsers) {
         NgmyMediaProfile.normalizeUserMediaFields(u);
@@ -7737,6 +7923,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       debugPrint('[ngmy] cloud bootstrap: $e');
     }
     if (!mounted) return;
+    if (_ngmySessionIsAdmin(_currentUser)) {
+      unawaited(_refreshAdminCloudSnapshot());
+    }
+    setState(() {});
     _scheduleDeferredStartupRebuild();
   }
 
@@ -7793,30 +7983,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
   }
 
-  /// Approved deposit/investment requests should only live in Supabase for 24 hours.
-  /// After that, archive them locally (admin device) and delete from Supabase.
+  /// Wallet history stays in the app and Supabase (users need pending/approved/rejected).
   Future<void> _archiveAndPurgeOldApprovedWalletRequests({required bool online}) async {
-    if (_currentUser?.isAdmin != true) return;
-    if (_allTransactions.isEmpty) return;
-
-    final cutoff = DateTime.now().subtract(const Duration(days: 1));
-    final oldApproved = _allTransactions.where((t) {
-      if (t.status != TransactionStatus.approved) return false;
-      if (t.type != TransactionType.deposit && t.type != TransactionType.withdrawal) return false;
-      return t.timestamp.isBefore(cutoff);
-    }).toList();
-
-    if (oldApproved.isEmpty) return;
-
-    // Archive locally first.
-    await NgmyAdminWalletApprovedArchive.addAll(oldApproved);
-
-    // Best-effort delete from cloud (then remove locally so it won't re-sync).
-    final ids = oldApproved.map((e) => e.id).where((e) => e.trim().isNotEmpty).toList();
-    if (online) {
-      await _safeDeleteTransactionsByIds(ids);
-    }
-    _allTransactions.removeWhere((t) => ids.contains(t.id));
+    return;
   }
 
   Future<void> _saveData({bool heavy = true, bool fullCloud = true}) async {
@@ -8120,15 +8289,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     email: email,
                     phone: p,
                     username: u,
-                    isAdmin: _kNgmyAdminEmails.contains(email),
+                    isAdmin: ngmyEmailIsAdmin(email),
                     passwordHash: passwordHash,
                   );
                   setState(() {
                     _currentUser = user;
                     _allUsers.add(user);
                   });
-                  unawaited(_pushUserToCloudFast(_currentUser!, includeFreeTrial: true));
                   await _persistLocalOnly();
+                  for (var i = 0; i < 4; i++) {
+                    await _pushUserToCloudFast(_currentUser!, includeFreeTrial: true);
+                    if (await ngmyCanReachCloud()) break;
+                    await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
+                  }
                   unawaited(_startBackgroundServicesWhenReady());
                 },
               )
@@ -8166,15 +8339,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                         _currentUser = _allUsers[userIdx];
                       }
                     }
-                    final userTrans = _allTransactions.where((tx) => tx.userEmail == t.userEmail).toList();
-                    if (userTrans.length > 30) {
-                      userTrans.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-                      final toRemove = userTrans.take(userTrans.length - 30).toList();
-                      for (var old in toRemove) {
-                        _allTransactions.removeWhere((tx) => tx.id == old.id);
-                        supabase.from('transactions').delete().eq('id', old.id).then((_) {}).catchError((_) {});
-                      }
-                    }
                   });
                   unawaited(_pushTransactionToCloudReliable(t));
                   unawaited(_pushTransactionToCloudFast(t));
@@ -8187,20 +8351,48 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   if (t.status == TransactionStatus.approved && ngmyTransactionCountsAsIncome(t)) {
                     ngmyPlayIncomeSoundForTransaction(t);
                   }
+                  if (t.status == TransactionStatus.pending &&
+                      (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal)) {
+                    unawaited(_notifyAdminAboutPendingTransaction(t));
+                  }
                   _notifyTransactionEvent(t);
                 },
                 onProcessTransaction: (t, approve) async {
                   UserData? syncedUser;
                   final newStatus = approve ? TransactionStatus.approved : TransactionStatus.rejected;
-                  await NgmyWalletDecisionLedger.record(t.id, newStatus.index);
+                  await NgmyWalletDecisionLedger.recordLocalAndCloud(
+                    transactionId: t.id,
+                    statusIndex: newStatus.index,
+                    userEmail: t.userEmail,
+                    amount: t.amount,
+                    typeIndex: t.type.index,
+                  );
                   _walletDecisionLedger[t.id] = newStatus.index;
                   setState(() {
                     t.status = newStatus;
-                    final targetIndex = _allUsers.indexWhere((u) => u.email == t.userEmail);
-                    if (targetIndex == -1) return;
-                    final targetUser = _allUsers[targetIndex];
+                    var targetIndex = _allUsers.indexWhere(
+                      (u) => u.email.toLowerCase().trim() == t.userEmail.toLowerCase().trim(),
+                    );
+                    UserData targetUser;
+                    if (targetIndex == -1) {
+                      targetUser = UserData(
+                        email: t.userEmail,
+                        username: t.userEmail.split('@').first,
+                      );
+                      _allUsers.add(targetUser);
+                      targetIndex = _allUsers.length - 1;
+                    } else {
+                      targetUser = _allUsers[targetIndex];
+                    }
                     final details = t.sourceDetails ?? '';
                     final isInvestmentRequest = t.type == TransactionType.deposit && isInvestmentRequestDetails(details);
+                    if (approve && t.type == TransactionType.withdrawal) {
+                      targetUser.accountBalance = ngmyResolveAccountBalance(
+                        targetUser.email,
+                        targetUser.accountBalance,
+                        _allTransactions,
+                      );
+                    }
                     if (approve) {
                       if (isInvestmentRequest) {
                         final meta = parseInvestmentRequestDetails(details);
@@ -8232,8 +8424,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                             ),
                           );
                         }
-                      } else if (t.type == TransactionType.deposit || t.type == TransactionType.adminAdd || t.type == TransactionType.reimbursement) {
-                        targetUser.accountBalance += t.amount;
                       }
                     } else {
                       if (isInvestmentRequest) {
@@ -8250,27 +8440,41 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       targetUser.accountBalance,
                       _allTransactions,
                     );
-                    if (_currentUser != null && _currentUser!.email == t.userEmail) _currentUser = targetUser;
+                    if (_currentUser != null &&
+                        _currentUser!.email.toLowerCase().trim() == t.userEmail.toLowerCase().trim()) {
+                      _currentUser = targetUser;
+                    }
                   });
                   _markTransactionDirty(t.id);
                   await _persistLocalOnly();
-                  var synced = await _pushTransactionDecisionToCloud(t);
+                  var synced = await _pushTransactionDecisionToCloud(t, attempts: 8);
                   if (!synced) {
                     debugPrint('[txn] approval cloud sync failed for ${t.id} — retrying admin sync');
-                    if (_currentUser?.isAdmin == true) {
+                    if (_ngmySessionIsAdmin(_currentUser)) {
                       await _syncAdminOperationalToCloud();
-                      synced = await _pushTransactionDecisionToCloud(t, attempts: 4);
+                      synced = await _pushTransactionDecisionToCloud(t, attempts: 6);
                     }
                   }
-                  if (synced) {
-                    await NgmyWalletDecisionLedger.clear(t.id);
-                    _walletDecisionLedger.remove(t.id);
-                  }
                   if (syncedUser != null) {
-                    await _pushUserToCloudFast(syncedUser!);
+                    for (var i = 0; i < 4; i++) {
+                      await _pushUserToCloudFast(syncedUser!, includeFreeTrial: true);
+                      if (!await ngmyCanReachCloud()) break;
+                      try {
+                        final row = await supabase
+                            .from('users')
+                            .select('accountBalance')
+                            .eq('email', syncedUser!.email)
+                            .maybeSingle();
+                        if (row != null) {
+                          final remote = (row['accountBalance'] ?? 0.0).toDouble();
+                          if ((remote - syncedUser!.accountBalance).abs() < 0.02) break;
+                        }
+                      } catch (_) {}
+                      await Future.delayed(Duration(milliseconds: 350 * (i + 1)));
+                    }
                     _markUserDirty(syncedUser!.email);
                   }
-                  if (_currentUser?.isAdmin == true) {
+                  if (_ngmySessionIsAdmin(_currentUser)) {
                     await _syncAdminOperationalToCloud();
                   }
                   await _persistLocalOnly();
@@ -8352,6 +8556,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onEnqueueMediaDelivery: _enqueueMediaDelivery,
                 onPromptNotifications: (ctx) => _promptPushNotificationsForUser(ctx, _currentUser!.email),
                 onMarkAnnouncementsRead: (ids) => _markAnnouncementsReadForUser(ids),
+                onRefreshAdminData: _refreshAdminCloudSnapshot,
             ),
       ),
     );
@@ -9331,8 +9536,9 @@ class MainScreen extends StatefulWidget {
   final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueMediaDelivery;
   final Future<void> Function(BuildContext context)? onPromptNotifications;
   final Future<void> Function(List<String> ids)? onMarkAnnouncementsRead;
+  final Future<void> Function()? onRefreshAdminData;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 
@@ -9434,7 +9640,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     required double fullDaily,
     required double todayCap,
   }) async {
-    if (!mounted) return;
+    if (kNgmySuppressClockInPopups || !mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -9448,7 +9654,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _showClockInConfirmedDialog() async {
-    if (!mounted) return;
+    if (kNgmySuppressClockInPopups || !mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -9627,7 +9833,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           );
           return;
         }
-        if (!onTrial && _ngmyIsWeekend(now)) {
+        if (!kNgmySuppressClockInPopups && !onTrial && _ngmyIsWeekend(now)) {
           await NgmyWeekendClockOverlay.show(context);
           return;
         }
@@ -9672,15 +9878,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           status: TransactionStatus.approved,
           timestamp: now,
         ));
-        unawaited(ngmyInAppNotify?.call(
-          title: 'Clock-in started',
-          body: onTrial
-              ? 'Free trial session running — earnings accrue until payout.'
-              : 'Session active until 12:00 PM. Earnings show in Today and Transaction History.',
-          tag: 'clockin_start_$sessionId',
-        ) ?? Future.value());
+        if (!kNgmySuppressClockInPopups) {
+          unawaited(ngmyInAppNotify?.call(
+            title: 'Clock-in started',
+            body: onTrial
+                ? 'Free trial session running — earnings accrue until payout.'
+                : 'Session active until 12:00 PM. Earnings show in Today and Transaction History.',
+            tag: 'clockin_start_$sessionId',
+          ) ?? Future.value());
+        }
         widget.onDataChanged();
-        if (!onTrial) {
+        if (!kNgmySuppressClockInPopups && !onTrial) {
           if (_ngmyShowLateClockUi(now)) {
             await _showLateClockInDialog(
               penalty,
@@ -9692,7 +9900,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             await _showClockInConfirmedDialog();
           }
         }
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData),
       InvestScreen(
         user: widget.user,
         plans: widget.globalPlans,
@@ -9770,7 +9978,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           );
         },
       ),
-      WalletScreen(user: widget.user, transactions: sorted.where((t) => t.userEmail == widget.user.email).take(30).toList(), onAdd: widget.onAddTransaction, config: widget.config, onDataChanged: widget.onDataChanged),
+      WalletScreen(
+        user: widget.user,
+        transactions: ngmyUserWalletHistoryTransactions(sorted, widget.user.email),
+        onAdd: widget.onAddTransaction,
+        config: widget.config,
+        onDataChanged: widget.onDataChanged,
+      ),
       NgmyHubScreen(
         user: widget.user,
         allUsers: widget.allUsers,
@@ -9989,7 +10203,8 @@ class HomeScreen extends StatefulWidget {
   final Future<bool> Function(UserData user)? onSyncAdminUserMedia;
   final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueMediaDelivery;
   final Future<void> Function(List<String> ids)? onMarkAnnouncementsRead;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead});
+  final Future<void> Function()? onRefreshAdminData;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -10098,7 +10313,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               FloatingTitle(
                 title: 'GROWTH INCOME',
-                onTap: widget.user.isAdmin ? () => NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery), routeName: 'AdminDashboard') : null,
+                onTap: widget.user.isAdmin ? () async {
+                  await widget.onRefreshAdminData?.call();
+                  if (!context.mounted) return;
+                  await NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onRefreshAdminData: widget.onRefreshAdminData), routeName: 'AdminDashboard');
+                } : null,
                 leading: InkWell(
                   onTap: () => NgmyNavigator.push(
                     context,
@@ -10754,7 +10973,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
-          if (showLate && lateInfo != null) ...[
+          if (!kNgmySuppressClockInPopups && showLate && lateInfo != null) ...[
             const SizedBox(height: 5),
             _LateClockInBanner(
               message: lateInfo.message,
@@ -13907,7 +14126,8 @@ class AdminDashboard extends StatefulWidget {
   final Future<bool> Function(MediaPost post)? onSyncAdminMediaPost;
   final Future<bool> Function(UserData user)? onSyncAdminUserMedia;
   final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueMediaDelivery;
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery});
+  final Future<void> Function()? onRefreshAdminData;
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onRefreshAdminData});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
@@ -13955,6 +14175,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   int _idx = 0; final _search = TextEditingController(); bool _isSearching = false; String _query = '';
   String? _selectedUserEmail;
   String? _processingTxnId;
+  Timer? _adminRefreshTimer;
+  bool _adminRefreshing = false;
 
   List<AppTransaction> _walletApprovedArchive = const [];
   DateTime? _lastWalletArchiveLoad;
@@ -13964,8 +14186,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
     setState(() => _processingTxnId = t.id);
     try {
       await widget.onProcess(t, approve);
+      if (mounted) setState(() {});
+      await Future.delayed(const Duration(milliseconds: 600));
+      await widget.onRefreshAdminData?.call();
     } finally {
       if (mounted) setState(() => _processingTxnId = null);
+    }
+  }
+
+  Future<void> _pullAdminCloudData() async {
+    if (_adminRefreshing) return;
+    _adminRefreshing = true;
+    try {
+      await widget.onRefreshAdminData?.call();
+    } finally {
+      _adminRefreshing = false;
+      if (mounted) setState(() {});
     }
   }
 
@@ -13973,6 +14209,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void initState() {
     super.initState();
     unawaited(_loadWalletApprovedArchive());
+    unawaited(_pullAdminCloudData());
+    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+      unawaited(_pullAdminCloudData());
+    });
+  }
+
+  @override
+  void dispose() {
+    _adminRefreshTimer?.cancel();
+    _search.dispose();
+    super.dispose();
   }
 
   Future<void> _loadWalletApprovedArchive() async {
@@ -14346,10 +14593,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
       users: widget.allUsers
           .map((u) => NgmyAdminUserEntry(email: u.email, username: u.username))
           .toList(),
-      onSave: (limits, diceJson) {
+      onSave: (limits, diceJson) async {
         widget.config.gameTimeLimits = limits;
         widget.config.diceSettings = diceJson;
         widget.onDataChanged();
+        final saved = await ngmyPersistGameCenterConfigNow(widget.config);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              saved
+                  ? 'Game timers saved — all players will use these times.'
+                  : 'Saved on this device. Connect internet and save again to sync timers to the cloud.',
+            ),
+            backgroundColor: saved ? const Color(0xFF00B25A) : Colors.orange,
+          ),
+        );
       },
     );
   }
@@ -14713,12 +14972,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                         children: [
                                           Expanded(
                                             child: OutlinedButton(
-                                              onPressed: () {
+                                              onPressed: () async {
                                                 app['status'] = 'rejected';
                                                 app['reviewedAt'] = DateTime.now().toIso8601String();
                                                 app['reviewedBy'] = widget.user.email;
                                                 widget.config.jobWorkerApplications = apps;
                                                 widget.onDataChanged();
+                                                await ngmyPersistAdminConfigNow(widget.config);
+                                                if (!context.mounted) return;
                                                 setState(() {});
                                                 setST(() {});
                                               },
@@ -14728,7 +14989,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: ElevatedButton(
-                                              onPressed: () {
+                                              onPressed: () async {
                                                 app['status'] = 'approved';
                                                 app['reviewedAt'] = DateTime.now().toIso8601String();
                                                 app['reviewedBy'] = widget.user.email;
@@ -14738,8 +14999,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                                   widget.allUsers[userIndex].status = 'verified';
                                                 }
                                                 widget.onDataChanged();
+                                                await ngmyPersistAdminConfigNow(widget.config);
+                                                if (!context.mounted) return;
                                                 setState(() {});
                                                 setST(() {});
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(content: Text('Worker application approved and saved.')),
+                                                );
                                               },
                                               child: const Text('Approve'),
                                             ),
@@ -15421,7 +15687,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final cTag = TextEditingController(text: widget.config.officialCashApp);
     final bAddr = TextEditingController(text: widget.config.officialBitcoin);
 
-    final pendingDeposits = widget.allTransactions.where((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending).toList();
+    final pendingDeposits = widget.allTransactions
+        .where((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending)
+        .toList();
     // Approved receipts should not flood the admin view.
     // Show only the latest 3; the rest are available in a dropdown (local archive + overflow).
     final approvedDeposits = widget.allTransactions
@@ -15518,7 +15786,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
           subtitle: Text(
-            'Older approved receipts are stored locally; Supabase keeps only 24h.',
+            'Older approved deposits kept here for quick admin lookup.',
             style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 12),
           ),
           children: [
@@ -15633,7 +15901,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ElevatedButton(
                 onPressed: _processingTxnId == t.id ? null : () => _processWalletRequest(t, true),
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
-                child: Text(_processingTxnId == t.id ? 'SAVING...' : 'APPROVE'),
+                child: Text(_processingTxnId == t.id ? 'SAVING...' : 'APPROVE & SAVE'),
               ),
             ]
           ]),
@@ -15757,7 +16025,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
         Text('Account: ${t.sourceDetails ?? "Unknown"}', style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black54)),
         const SizedBox(height: 15),
         Row(children: [
-          IconButton(icon: Icon(Icons.delete_outline, color: isDark ? Colors.white60 : const Color(0xFF1A1C1E)), onPressed: () { setState(() { widget.allTransactions.remove(t); }); widget.onDataChanged(); }),
+          if (!isPending)
+            IconButton(
+              icon: Icon(Icons.delete_outline, color: isDark ? Colors.white60 : const Color(0xFF1A1C1E)),
+              onPressed: () {
+                setState(() => widget.allTransactions.remove(t));
+                widget.onDataChanged();
+              },
+            ),
           const Spacer(),
           if (isPending) ...[
             TextButton(
@@ -15768,9 +16043,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ElevatedButton(
               onPressed: _processingTxnId == t.id ? null : () => _processWalletRequest(t, true),
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
-              child: Text(_processingTxnId == t.id ? 'SAVING...' : 'APPROVE'),
+              child: Text(_processingTxnId == t.id ? 'SAVING...' : 'APPROVE & SAVE'),
             ),
-          ]
+          ] else
+            Text(
+              t.status == TransactionStatus.approved ? 'Completed' : 'Rejected',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+                color: t.status == TransactionStatus.approved ? Colors.green : Colors.red,
+              ),
+            ),
         ])
       ]),
     );
@@ -16181,7 +16464,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _adminUsers(bool isDark) {
     final q = _query.trim().toLowerCase();
-    final filtered = widget.allUsers.where((u) => _userMatchesQuery(u, q)).toList()
+    final filtered = widget.allUsers
+        .where((u) => ngmyIsAppSignupUser(u) && _userMatchesQuery(u, q))
+        .toList()
       ..sort((a, b) => a.username.compareTo(b.username));
     if (_selectedUserEmail != null) {
       UserData? selected;
@@ -16200,6 +16485,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final pendingApps = workerApps.where((a) => (a['status'] ?? 'pending') == 'pending').toList();
     final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
     return Column(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
+        child: Text(
+          'App sign-ups only (Civic Registry members are not listed here).',
+          style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+        ),
+      ),
       Padding(
         padding: const EdgeInsets.all(15),
         child: TextField(
@@ -16511,7 +16803,7 @@ class _WalletScreenState extends State<WalletScreen> {
       final entries = <MapEntry<AppTransaction, double>>[];
       for (final t in widget.transactions) {
         entries.add(MapEntry(t, rollingBalance));
-        rollingBalance -= _transactionSignedDelta(t);
+        rollingBalance -= _walletHistoryBalanceDelta(t);
       }
       return Container(width: double.infinity, padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 15)]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('TRANSACTION HISTORY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)), const SizedBox(height: 15),
@@ -16545,7 +16837,22 @@ class _WalletScreenState extends State<WalletScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(typeLabel, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                      Row(
+                        children: [
+                          Expanded(child: Text(typeLabel, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              _walletHistoryStatusLabel(t.status),
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: color),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 2),
                       Text(_historyTimestamp(t.timestamp), style: const TextStyle(color: Colors.grey, fontSize: 10)),
                       const SizedBox(height: 2),
@@ -16837,6 +17144,24 @@ class _WalletScreenState extends State<WalletScreen> {
 
   double _transactionSignedDelta(AppTransaction t) {
     return _isIncomingTransaction(t) ? t.amount : -t.amount;
+  }
+
+  /// History balance column — only approved deposits/withdrawals change balance.
+  double _walletHistoryBalanceDelta(AppTransaction t) {
+    if (!ngmyIsWalletDepositOrWithdraw(t)) return _transactionSignedDelta(t);
+    if (t.status != TransactionStatus.approved) return 0;
+    return _transactionSignedDelta(t);
+  }
+
+  String _walletHistoryStatusLabel(TransactionStatus status) {
+    switch (status) {
+      case TransactionStatus.pending:
+        return 'PENDING';
+      case TransactionStatus.approved:
+        return 'APPROVED';
+      case TransactionStatus.rejected:
+        return 'REJECTED';
+    }
   }
 
   String _transactionTypeLabel(AppTransaction t) {

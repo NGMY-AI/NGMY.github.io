@@ -16,7 +16,8 @@ class NgmySupabaseColumns {
       'id,investmentPlans,ngmyChatClosed,civicSelfEnrollmentEnabled,civicRegistryPin,'
       'civicRegistryPinsByState,storeSellAccessEmails,openedContributionReceiptKeys,'
       'dismissedContributionReceiptKeys,familyTreeCreateFee,familyTreePhotoMonthlyFee,'
-      'familyTreePhotoAccessUntilByEmail,geminiApiKey,gemini_api_key,aiApiKey,ai_api_key';
+      'familyTreePhotoAccessUntilByEmail,geminiApiKey,gemini_api_key,aiApiKey,ai_api_key,'
+      'gameTimeLimits,diceSettings,gameInvites';
 
   static const configBootstrapHeavy =
       'storeListings,storeInquiries,storeOrders,helpHelperApplications,helpRequests,'

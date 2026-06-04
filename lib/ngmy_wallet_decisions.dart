@@ -1,13 +1,15 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Durable record of admin approve/reject on deposits & withdrawals.
-/// Survives logout and stale Supabase rows until cloud sync succeeds.
+/// Durable admin approve/reject on deposits & withdrawals (local + Supabase).
 class NgmyWalletDecisionLedger {
   static const String _prefsKey = 'ngmy_wallet_decisions_v1';
+  static const String _cloudSettingsKey = 'wallet_txn_decisions';
 
-  /// transaction id → status index (0 pending, 1 approved, 2 rejected)
+  /// transaction id → status index (1 approved, 2 rejected)
   static Future<Map<String, int>> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -15,19 +17,61 @@ class NgmyWalletDecisionLedger {
       if (raw == null || raw.trim().isEmpty) return {};
       final decoded = jsonDecode(raw);
       if (decoded is! Map) return {};
-      final out = <String, int>{};
-      decoded.forEach((key, value) {
-        final id = key.toString().trim();
-        if (id.isEmpty) return;
-        final idx = value is num ? value.toInt() : int.tryParse(value.toString());
-        if (idx == null || idx < 0 || idx > 2) return;
-        if (idx == 0) return;
-        out[id] = idx;
-      });
-      return out;
+      return _parseStatusMap(decoded);
     } catch (_) {
       return {};
     }
+  }
+
+  static Map<String, int> _parseStatusMap(Map decoded) {
+    final out = <String, int>{};
+    decoded.forEach((key, value) {
+      final id = key.toString().trim();
+      if (id.isEmpty) return;
+      int? idx;
+      if (value is num) {
+        idx = value.toInt();
+      } else if (value is Map) {
+        final s = value['status'];
+        idx = s is num ? s.toInt() : int.tryParse(s?.toString() ?? '');
+      } else {
+        idx = int.tryParse(value.toString());
+      }
+      if (idx == null || idx <= 0 || idx > 2) return;
+      out[id] = idx;
+    });
+    return out;
+  }
+
+  static Future<Map<String, int>> loadFromCloud() async {
+    try {
+      final row = await Supabase.instance.client
+          .from('ngmy_settings')
+          .select()
+          .eq('key', _cloudSettingsKey)
+          .maybeSingle();
+      if (row == null) return {};
+      final value = row['value'];
+      if (value is! Map) return {};
+      return _parseStatusMap(Map<String, dynamic>.from(value));
+    } catch (e) {
+      debugPrint('[wallet-ledger] cloud load: $e');
+      return {};
+    }
+  }
+
+  /// Local + cloud merged (higher status rank wins per id).
+  static Future<Map<String, int>> loadMerged() async {
+    final local = await load();
+    final cloud = await loadFromCloud();
+    final merged = <String, int>{...cloud};
+    for (final e in local.entries) {
+      final existing = merged[e.key];
+      if (existing == null || e.value > existing) {
+        merged[e.key] = e.value;
+      }
+    }
+    return merged;
   }
 
   static Future<void> record(String transactionId, int statusIndex) async {
@@ -40,7 +84,64 @@ class NgmyWalletDecisionLedger {
     } else {
       ledger[id] = statusIndex;
     }
-    await _persist(ledger);
+    await _persistLocal(ledger);
+  }
+
+  static Future<bool> recordCloud({
+    required String transactionId,
+    required int statusIndex,
+    String? userEmail,
+    double? amount,
+    int? typeIndex,
+  }) async {
+    final id = transactionId.trim();
+    if (id.isEmpty || statusIndex <= 0 || statusIndex > 2) return false;
+    try {
+      final row = await Supabase.instance.client
+          .from('ngmy_settings')
+          .select()
+          .eq('key', _cloudSettingsKey)
+          .maybeSingle();
+      final value = <String, dynamic>{};
+      if (row != null && row['value'] is Map) {
+        value.addAll(Map<String, dynamic>.from(row['value'] as Map));
+      }
+      value[id] = {
+        'status': statusIndex,
+        'userEmail': userEmail ?? '',
+        'amount': amount,
+        'type': typeIndex,
+        'at': DateTime.now().toUtc().toIso8601String(),
+      };
+      await Supabase.instance.client.from('ngmy_settings').upsert([
+        {
+          'key': _cloudSettingsKey,
+          'value': value,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        },
+      ]);
+      return true;
+    } catch (e) {
+      debugPrint('[wallet-ledger] cloud record: $e');
+      return false;
+    }
+  }
+
+  static Future<void> recordLocalAndCloud({
+    required String transactionId,
+    required int statusIndex,
+    String? userEmail,
+    double? amount,
+    int? typeIndex,
+  }) async {
+    await record(transactionId, statusIndex);
+    await recordCloud(
+      transactionId: transactionId,
+      statusIndex: statusIndex,
+      userEmail: userEmail,
+      amount: amount,
+      typeIndex: typeIndex,
+    );
   }
 
   static Future<void> clear(String transactionId) async {
@@ -49,10 +150,10 @@ class NgmyWalletDecisionLedger {
     final ledger = await load();
     if (!ledger.containsKey(id)) return;
     ledger.remove(id);
-    await _persist(ledger);
+    await _persistLocal(ledger);
   }
 
-  static Future<void> _persist(Map<String, int> ledger) async {
+  static Future<void> _persistLocal(Map<String, int> ledger) async {
     final prefs = await SharedPreferences.getInstance();
     if (ledger.isEmpty) {
       await prefs.remove(_prefsKey);
