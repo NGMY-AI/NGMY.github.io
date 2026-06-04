@@ -4590,7 +4590,7 @@ class UserData {
       lastClockInDate: parseDate(json['lastClockInDate']),
       lastClockInEarningsDate: parseDate(json['lastClockInEarningsDate']),
       todayClockInEarned: (json['todayClockInEarned'] ?? 0.0).toDouble(),
-      passwordHash: json['passwordHash'] ?? '',
+      passwordHash: (json['passwordHash'] ?? json['password_hash'] ?? '').toString(),
       state: json['state'] ?? 'Georgia',
       helps: json['helps'] ?? 0,
       missed: json['missed'] ?? 0,
@@ -4715,6 +4715,72 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   String _computeAppShellSig() {
     final annSig = _allAnnouncements.map((a) => '${a.id}:${a.message.length}').join('|');
     return '${_currentUser?.email ?? ''}|${_allUsers.length}|${_allTransactions.length}|${_allMedia.length}|$annSig|${_config.ngmyChatClosed}';
+  }
+
+  static const _kNgmyAdminEmails = [
+    'kbpabloqr@gmail.com',
+    'ngumoyaking@gmail.com',
+    'appbusiness321@gmail.com',
+    'appbusiness84@gmail.com',
+  ];
+
+  /// Completes login after password check (local or Supabase). Always sets [_currentUser].
+  Future<void> _completePasswordLogin(String email, String passwordHash) async {
+    final key = email.toLowerCase().trim();
+    if (key.isEmpty) return;
+
+    var index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+    if (index >= 0) {
+      _allUsers[index].passwordHash = passwordHash;
+      if (_kNgmyAdminEmails.contains(key)) _allUsers[index].isAdmin = true;
+      _currentUser = _allUsers[index];
+    } else {
+      UserData user;
+      try {
+        final row = await Supabase.instance.client
+            .from('users')
+            .select(NgmySupabaseColumns.userLogin)
+            .eq('email', email)
+            .maybeSingle()
+            .timeout(const Duration(seconds: 15));
+        if (row != null) {
+          user = UserData.fromJson(Map<String, dynamic>.from(row));
+          user.passwordHash = passwordHash;
+        } else {
+          user = UserData(
+            email: email,
+            username: email.split('@').first,
+            passwordHash: passwordHash,
+            isAdmin: _kNgmyAdminEmails.contains(key),
+          );
+        }
+      } catch (e) {
+        debugPrint('[login] fetch user row: $e');
+        user = UserData(
+          email: email,
+          username: email.split('@').first,
+          passwordHash: passwordHash,
+          isAdmin: _kNgmyAdminEmails.contains(key),
+        );
+      }
+      if (_kNgmyAdminEmails.contains(key)) user.isAdmin = true;
+      _allUsers.add(user);
+      _currentUser = user;
+    }
+
+    if (!mounted) return;
+    setState(() {});
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+      await prefs.setString('ngmy_last_session_email', key);
+      await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+    } catch (e) {
+      debugPrint('[login] local session save: $e');
+    }
+    unawaited(_pushUserToCloudFast(_currentUser!, includeFreeTrial: true));
+    unawaited(_persistLocalOnly());
+    unawaited(_startBackgroundServicesWhenReady());
   }
 
   Future<void> _startBackgroundServicesWhenReady() async {
@@ -7606,26 +7672,25 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   }
                 },
                 onAuthComplete: (e, p, u, passwordHash, isLogin) async {
-                  final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
                   final email = e.toLowerCase().trim();
-
                   if (isLogin) {
-                    final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-                    if (index != -1) {
-                      _allUsers[index].passwordHash = passwordHash;
-                      setState(() => _currentUser = _allUsers[index]);
-                    }
-                  } else {
-                    final user = UserData(email: email, phone: p, username: u, isAdmin: admins.contains(email), passwordHash: passwordHash);
-                    setState(() {
-                      _currentUser = user;
-                      _allUsers.add(user);
-                    });
+                    await _completePasswordLogin(email, passwordHash);
+                    return;
                   }
-                  if (_currentUser != null) {
-                    unawaited(_pushUserToCloudFast(_currentUser!, includeFreeTrial: true));
-                  }
+                  final user = UserData(
+                    email: email,
+                    phone: p,
+                    username: u,
+                    isAdmin: _kNgmyAdminEmails.contains(email),
+                    passwordHash: passwordHash,
+                  );
+                  setState(() {
+                    _currentUser = user;
+                    _allUsers.add(user);
+                  });
+                  unawaited(_pushUserToCloudFast(_currentUser!, includeFreeTrial: true));
                   await _persistLocalOnly();
+                  unawaited(_startBackgroundServicesWhenReady());
                 },
               )
             : MainScreen(
@@ -7816,7 +7881,7 @@ class FloatingTitle extends StatelessWidget {
 class AuthScreen extends StatefulWidget {
   final List<UserData> allUsers;
   final AppConfig config;
-  final Function(String, String, String, String, bool) onAuthComplete;
+  final Future<void> Function(String, String, String, String, bool) onAuthComplete;
   final Future<String?> Function() onGoogleLogin;
   final Future<String?> Function() onGithubLogin;
   final Future<bool> Function(String email, String newPasswordHash) onResetPasswordByEmail;
@@ -7826,12 +7891,13 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
   bool _showPassword = false;
+  bool _authBusy = false;
   final _e = TextEditingController();
   final _p = TextEditingController();
   final _s = TextEditingController();
   final _u = TextEditingController();
 
-  void _submit() {
+  Future<void> _submit() async {
     final email = _e.text.toLowerCase().trim();
     final phone = _p.text.trim();
     final username = _u.text.trim();
@@ -7848,60 +7914,77 @@ class _AuthScreenState extends State<AuthScreen> {
     }
 
     if (_isLogin) {
+      if (_authBusy) return;
       final user = widget.allUsers.firstWhere(
         (u) => u.email.toLowerCase().trim() == email,
-        orElse: () => UserData(email: '')
+        orElse: () => UserData(email: ''),
       );
 
       final enteredHash = _hashPassword(password);
-      debugPrint('[Login] email=$email storedHash=${user.passwordHash.isEmpty ? "(empty)" : "${user.passwordHash.substring(0, 8)}..."} enteredHash=${enteredHash.substring(0, 8)}...');
 
-      // If user exists and hash matches, proceed immediately
       if (user.email.isNotEmpty && user.passwordHash.isNotEmpty && user.passwordHash == enteredHash) {
-        widget.onAuthComplete(email, '', '', enteredHash, true);
+        setState(() => _authBusy = true);
+        try {
+          await widget.onAuthComplete(email, '', '', enteredHash, true);
+        } finally {
+          if (mounted) setState(() => _authBusy = false);
+        }
         return;
       }
 
-      // Fallback: If not found locally or hash mismatch, check Supabase directly
-      // This is crucial after a password reset to ensure we have the absolute latest data.
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Checking credentials...')));
+      setState(() => _authBusy = true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Checking credentials...')),
+        );
+      }
 
-      Supabase.instance.client
-          .from('users')
-          .select()
-          .eq('email', email)
-          .maybeSingle()
-          .then((fresh) {
-            if (fresh == null) {
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account not found. Please Sign Up first.')));
-              return;
-            }
+      try {
+        final fresh = await Supabase.instance.client
+            .from('users')
+            .select(NgmySupabaseColumns.userLogin)
+            .eq('email', email)
+            .maybeSingle()
+            .timeout(const Duration(seconds: 15));
 
-            final dbHash = (fresh['passwordHash'] ?? '').toString();
-            if (dbHash.isNotEmpty && dbHash == enteredHash) {
-              // Password matches Supabase, let's login and update local state
-              widget.onAuthComplete(email, '', '', enteredHash, true);
-            } else {
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incorrect password')));
-            }
-          })
-          .catchError((err) {
-            if (!mounted) return;
-            if (user.email.isNotEmpty && user.passwordHash.isNotEmpty && user.passwordHash == enteredHash) {
-              widget.onAuthComplete(email, '', '', enteredHash, true);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Signed in offline using data saved on this device.')),
-              );
-              return;
-            }
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'No connection. Open the app once online to sign in, or use the same password as your last successful login.',
-                ),
-              ),
-            );
-          });
+        if (!mounted) return;
+
+        if (fresh == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Account not found. Please Sign Up first.')),
+          );
+          return;
+        }
+
+        final row = Map<String, dynamic>.from(fresh);
+        final dbHash = (row['passwordHash'] ?? row['password_hash'] ?? '').toString();
+        if (dbHash.isNotEmpty && dbHash == enteredHash) {
+          await widget.onAuthComplete(email, '', '', enteredHash, true);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Incorrect password')),
+          );
+        }
+      } catch (err) {
+        debugPrint('[Login] cloud check failed: $err');
+        if (!mounted) return;
+        if (user.email.isNotEmpty && user.passwordHash.isNotEmpty && user.passwordHash == enteredHash) {
+          await widget.onAuthComplete(email, '', '', enteredHash, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Signed in offline using data saved on this device.')),
+          );
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not reach the server. Check your internet and try again in a few seconds.',
+            ),
+          ),
+        );
+      } finally {
+        if (mounted) setState(() => _authBusy = false);
+      }
     } else {
       if (username.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a username')));
@@ -8182,9 +8265,11 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
       const SizedBox(height: 35),
       ElevatedButton(
-        onPressed: _submit,
+        onPressed: _authBusy ? null : _submit,
         style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, elevation: 5),
-        child: Text(_isLogin ? 'LOGIN' : 'SIGN UP', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
+        child: _authBusy
+            ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : Text(_isLogin ? 'LOGIN' : 'SIGN UP', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
       if (_isLogin) ...[
         const SizedBox(height: 15),

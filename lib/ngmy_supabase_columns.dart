@@ -26,6 +26,10 @@ class NgmySupabaseColumns {
 
   static const geminiOnly = 'id,geminiApiKey,gemini_api_key,aiApiKey,ai_api_key';
 
+  /// Login probe — small payload, fast on slow networks.
+  static const userLogin =
+      'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance';
+
   /// Media table columns (must match public.media — see supabase/media_tables.sql).
   static const mediaFeed =
       'id,userEmail,username,videoUrl,url,contentType,type,caption,timestamp,likes,'
