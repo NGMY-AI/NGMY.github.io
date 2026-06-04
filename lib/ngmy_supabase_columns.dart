@@ -30,10 +30,9 @@ class NgmySupabaseColumns {
   static const userLogin =
       'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance';
 
-  /// Media feed read — core columns only (extras may live in `data` jsonb).
+  /// Media feed read — matches live Supabase (extras in `data` jsonb).
   static const mediaFeedCore =
-      'id,userEmail,username,videoUrl,url,contentType,type,caption,timestamp,likes,'
-      'likedBy,savedBy,comments';
+      'id,userEmail,videoUrl,url,contentType,type,description,created_at,likedBy,savedBy,data';
 
   /// Full media row when all optional columns exist (see media_optional_columns.sql).
   static const mediaFeed =

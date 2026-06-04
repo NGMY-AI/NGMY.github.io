@@ -625,19 +625,16 @@ class AppTransaction {
 }
 
 Map<String, dynamic> _transactionRowForCloud(AppTransaction t) {
+  // Only camelCase keys — live Supabase rejects snake_case duplicates (PGRST204).
   return {
     'id': t.id,
     'userEmail': t.userEmail,
-    'user_email': t.userEmail,
     'amount': t.amount,
     'type': t.type.index,
     'method': t.method.index,
     'sourceDetails': t.sourceDetails,
-    'source_details': t.sourceDetails,
     'screenshotPath': t.screenshotPath,
-    'screenshot_path': t.screenshotPath,
     'verificationCode': t.verificationCode,
-    'verification_code': t.verificationCode,
     'status': t.status.index,
     'timestamp': t.timestamp.toUtc().toIso8601String(),
   };
@@ -663,11 +660,10 @@ Future<bool> _verifyTransactionStatusInCloud(AppTransaction t) async {
 
 Future<bool> _pushTransactionDecisionToCloud(AppTransaction t, {int attempts = 5}) async {
   if (!await ngmyCanReachCloud()) return false;
-  final row = _transactionRowForCloud(t);
   for (var i = 0; i < attempts; i++) {
+    final ok = await _safeUpsertTransactionRows([_transactionRowForCloud(t)]);
+    if (ok && await _verifyTransactionStatusInCloud(t)) return true;
     try {
-      await Supabase.instance.client.from('transactions').upsert(row).timeout(kNgmyCloudWriteTimeout);
-      if (await _verifyTransactionStatusInCloud(t)) return true;
       await Supabase.instance.client
           .from('transactions')
           .update({'status': t.status.index})
@@ -675,9 +671,31 @@ Future<bool> _pushTransactionDecisionToCloud(AppTransaction t, {int attempts = 5
           .timeout(kNgmyCloudWriteTimeout);
       if (await _verifyTransactionStatusInCloud(t)) return true;
     } catch (e) {
-      debugPrint('[txn] decision push attempt ${i + 1}: $e');
+      debugPrint('[txn] decision status patch attempt ${i + 1}: $e');
     }
     await Future.delayed(Duration(milliseconds: 350 * (i + 1)));
+  }
+  return false;
+}
+
+Future<bool> _safeUpsertTransactionRows(List<Map<String, dynamic>> rows) async {
+  if (rows.isEmpty) return true;
+  var working = rows.map((e) => Map<String, dynamic>.from(e)).toList();
+  for (var i = 0; i < 12; i++) {
+    try {
+      await Supabase.instance.client.from('transactions').upsert(working).timeout(kNgmyCloudWriteTimeout);
+      return true;
+    } catch (e) {
+      final missing = _missingColumnFromPostgrestError(e);
+      if (missing != null && missing.isNotEmpty) {
+        for (final row in working) {
+          row.remove(missing);
+        }
+        continue;
+      }
+      debugPrint('[transactions] upsert error: $e');
+      return false;
+    }
   }
   return false;
 }
@@ -2161,10 +2179,10 @@ class MediaPost {
     return MediaPost(
       id: json['id'] ?? '',
       userEmail: json['userEmail'] ?? json['user_email'] ?? '',
-      username: json['username'] ?? 'User',
-      videoUrl: json['videoUrl'] ?? json['video_url'] ?? '',
+      username: json['username'] ?? (json['data'] is Map ? (json['data'] as Map)['username'] : null) ?? 'User',
+      videoUrl: json['videoUrl'] ?? json['video_url'] ?? json['url'] ?? '',
       contentType: (json['contentType'] ?? json['content_type'] ?? json['type'] ?? 'video').toString(),
-      caption: json['caption'] ?? '',
+      caption: json['caption'] ?? json['description'] ?? '',
       timestamp: DateTime.parse(json['timestamp'] ?? json['created_at'] ?? DateTime.now().toIso8601String()).toLocal(),
       likedBy: likedBy,
       savedBy: savedBy,
@@ -2419,12 +2437,12 @@ Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
     debugPrint('[media] skipped upsert: inline media too large for database.');
     return false;
   }
-  const protected = {'id', 'userEmail', 'videoUrl', 'timestamp'};
+  const protected = {'id', 'userEmail', 'videoUrl', 'url'};
   for (int pass = 0; pass < 2; pass++) {
     for (int i = 0; i < 12; i++) {
       try {
         await Supabase.instance.client.from('media').upsert(working).timeout(kNgmyCloudWriteTimeout);
-        return true;
+        if (await _verifyMediaRowInCloud(working)) return true;
       } catch (e) {
         if (_isMissingTablePostgrestError(e, 'media')) {
           debugPrint('[media] table missing in Supabase.');
@@ -2433,7 +2451,7 @@ Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
         final missing = _missingColumnFromPostgrestError(e);
         if (missing != null && missing.isNotEmpty) {
           if (protected.contains(missing)) {
-            debugPrint('[media] required column missing in Supabase: $missing — run supabase/media_tables.sql');
+            debugPrint('[media] required column missing in Supabase: $missing');
             return false;
           }
           working.remove(missing);
@@ -2454,13 +2472,34 @@ Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
   return false;
 }
 
+Future<bool> _verifyMediaRowInCloud(Map<String, dynamic> row) async {
+  final id = (row['id'] ?? '').toString();
+  if (id.isEmpty) return false;
+  try {
+    final verify = await Supabase.instance.client.from('media').select('id').eq('id', id).maybeSingle();
+    return verify != null;
+  } catch (e) {
+    debugPrint('[media] verify row: $e');
+    return false;
+  }
+}
+
 Future<List<MediaPost>?> _fetchMediaPostsFromSupabase({int limit = 100}) async {
   try {
-    final rows = await Supabase.instance.client
-        .from('media')
-        .select(NgmySupabaseColumns.mediaFeedCore)
-        .order('timestamp', ascending: false)
-        .limit(limit);
+    dynamic rows;
+    try {
+      rows = await Supabase.instance.client
+          .from('media')
+          .select(NgmySupabaseColumns.mediaFeedCore)
+          .order('created_at', ascending: false)
+          .limit(limit);
+    } catch (_) {
+      rows = await Supabase.instance.client
+          .from('media')
+          .select(NgmySupabaseColumns.mediaFeedCore)
+          .order('timestamp', ascending: false)
+          .limit(limit);
+    }
     if (rows == null) return null;
     return (rows as List)
         .map((e) => MediaPost.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -5288,7 +5327,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
         continue;
       }
-      final ok = await _safeUpsertRows('transactions', [_transactionRowForCloud(t)]);
+      final ok = await _safeUpsertTransactionRows([_transactionRowForCloud(t)]);
       if (ok) return true;
       await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
     }
@@ -5436,7 +5475,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           .map((e) => _transactionRowForCloud(AppTransaction.fromJson(e)))
           .toList();
       if (txRows.isNotEmpty) {
-        final ok = await _safeUpsertRows('transactions', txRows);
+        final ok = await _safeUpsertTransactionRows(
+          txRows.map((e) => Map<String, dynamic>.from(e)).toList(),
+        );
         if (ok) {
           syncedTxnIds.addAll(txRows.map((e) => (e['id'] ?? '').toString()).where((e) => e.isNotEmpty));
         }
@@ -7733,7 +7774,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               .map((e) => Map<String, dynamic>.from(e.toJson()))
               .toList();
           if (mine.isNotEmpty) {
-            await _safeUpsertRows('transactions', mine);
+            await _safeUpsertTransactionRows(mine);
           }
         }
       }
@@ -9632,7 +9673,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               systemNavigationBarColor: Colors.transparent,
               systemNavigationBarIconBrightness: Brightness.dark,
             ),
-      child: Scaffold(
+      child: Listener(
+        onPointerDown: (_) => unawaited(NgmyIncomeSound.unlockForWebUserGesture()),
+        child: Scaffold(
         extendBody: true,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Stack(
@@ -9686,6 +9729,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           elevation: 0,
           color: Colors.transparent,
           child: _buildBottomNavBar(),
+        ),
         ),
       ),
     );
