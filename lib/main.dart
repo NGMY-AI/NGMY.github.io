@@ -476,6 +476,9 @@ AppTransaction _pickPreferredTransaction(AppTransaction local, AppTransaction re
   if (localRank != remoteRank) {
     return localRank > remoteRank ? local : remote;
   }
+  if (ngmyIsWalletDepositOrWithdraw(local) || ngmyIsWalletDepositOrWithdraw(remote)) {
+    return local.timestamp.isAfter(remote.timestamp) ? local : remote;
+  }
   return local.timestamp.isAfter(remote.timestamp) ? local : remote;
 }
 
@@ -5038,41 +5041,45 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return merged.values.toList();
   }
 
-  /// Pull latest users + wallet requests for admin (never wipe local cache on empty cloud).
-  Future<void> _refreshAdminCloudSnapshot() async {
+  /// Pull latest wallet requests for admin (never wipe local cache on empty cloud).
+  /// [lightweight] skips heavy user fetch + bulk flush — use when opening admin or polling.
+  Future<void> _refreshAdminCloudSnapshot({bool lightweight = false}) async {
     if (!_ngmySessionIsAdmin(_currentUser)) return;
     if (!await ngmyCanReachCloud()) return;
     final localUsersBeforeFetch = <String, UserData>{
       for (final u in _allUsers) u.email.toLowerCase().trim(): u,
     };
     try {
-      final usersData = await supabase.from('users').select().limit(2500);
-      if (usersData != null) {
-        final remote = (usersData as List).map((e) => UserData.fromJson(e)).toList();
-        if (remote.isNotEmpty) {
-          _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
-        } else {
-          debugPrint('[admin] cloud users empty — keeping ${_allUsers.length} local users');
+      await _refreshWalletDecisionLedger();
+      _applyWalletDecisionLedgerToTransactions();
+
+      if (!lightweight) {
+        final usersData = await supabase.from('users').select().limit(2500);
+        if (usersData != null) {
+          final remote = (usersData as List).map((e) => UserData.fromJson(e)).toList();
+          if (remote.isNotEmpty) {
+            _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
+          } else {
+            debugPrint('[admin] cloud users empty — keeping ${_allUsers.length} local users');
+          }
         }
       }
+
       final transData = await supabase
           .from('transactions')
           .select()
           .order('timestamp', ascending: false)
-          .limit(400);
+          .limit(lightweight ? 150 : 400);
       if (transData != null) {
         final remoteTransactions =
             (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
-        if (remoteTransactions.isNotEmpty) {
-          await _refreshWalletDecisionLedger();
+        if (remoteTransactions.isNotEmpty || !lightweight) {
           _allTransactions = _mergeTransactionsWithRemote(
             _allTransactions,
             remoteTransactions,
             walletDecisionLedger: _walletDecisionLedger,
           );
           _applyWalletDecisionLedgerToTransactions();
-        } else {
-          debugPrint('[admin] cloud transactions empty — keeping ${_allTransactions.length} local');
         }
       }
       for (final u in _allUsers) {
@@ -5085,12 +5092,31 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (_currentUser != null && _ngmySessionIsAdmin(_currentUser)) {
         _currentUser!.isAdmin = true;
       }
-      await _flushLocalWalletDecisionsToCloud();
       await _persistLocalOnly();
       if (mounted) setState(() {});
+      if (lightweight) {
+        unawaited(_flushLocalWalletDecisionsToCloud());
+      } else {
+        await _flushLocalWalletDecisionsToCloud();
+      }
     } catch (e) {
       debugPrint('[admin] cloud snapshot refresh: $e');
     }
+  }
+
+  Future<void> _syncWalletApprovalInBackground(AppTransaction t, UserData? user) async {
+    if (t.status == TransactionStatus.pending) return;
+    var synced = await _pushTransactionDecisionToCloud(t, attempts: 3);
+    if (!synced && _ngmySessionIsAdmin(_currentUser)) {
+      synced = await _pushTransactionDecisionToCloud(t, attempts: 2);
+    }
+    if (user != null) {
+      await _pushUserToCloudFast(user, includeFreeTrial: true);
+      _markUserDirty(user.email);
+    }
+    _markTransactionDirty(t.id);
+    await _persistLocalOnly();
+    if (mounted) setState(() {});
   }
 
   /// Completes login after password check (local or Supabase). Always sets [_currentUser].
@@ -5175,7 +5201,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startAdminPendingTransactionPoll();
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshPendingTransactionsFromCloud());
-      unawaited(_refreshAdminCloudSnapshot());
+      unawaited(_refreshAdminCloudSnapshot(lightweight: true));
     }
   }
   Future<void> _seedTransactionNotificationBaseline() async {
@@ -5570,6 +5596,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
   }
 
+  Timer? _adminConfigPersistDebounce;
+
+  void _scheduleAdminConfigPersist() {
+    _adminConfigPersistDebounce?.cancel();
+    _adminConfigPersistDebounce = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      unawaited(ngmyPersistAdminConfigNow(_config));
+    });
+  }
+
   Timer? _adminPendingTxnPoll;
 
   void _startAdminPendingTransactionPoll() {
@@ -5602,6 +5638,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (idx != -1) {
             final local = _allTransactions[idx];
             if (local.status != TransactionStatus.pending) continue;
+            final decided = _walletDecisionLedger[local.id];
+            if (decided != null && decided > 0) continue;
             if (tx.status == TransactionStatus.pending &&
                 !tx.timestamp.isAfter(local.timestamp)) {
               continue;
@@ -5750,7 +5788,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _markTransactionDirty(dirtyTransactionId);
     unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: true));
     if (_ngmySessionIsAdmin(_currentUser)) {
-      unawaited(ngmyPersistAdminConfigNow(_config));
+      _scheduleAdminConfigPersist();
     } else {
       _scheduleOperationalConfigCloudPersist(_config);
     }
@@ -7924,7 +7962,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     if (_ngmySessionIsAdmin(_currentUser)) {
-      unawaited(_refreshAdminCloudSnapshot());
+      unawaited(_refreshAdminCloudSnapshot(lightweight: true));
     }
     setState(() {});
     _scheduleDeferredStartupRebuild();
@@ -8360,14 +8398,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onProcessTransaction: (t, approve) async {
                   UserData? syncedUser;
                   final newStatus = approve ? TransactionStatus.approved : TransactionStatus.rejected;
-                  await NgmyWalletDecisionLedger.recordLocalAndCloud(
-                    transactionId: t.id,
-                    statusIndex: newStatus.index,
-                    userEmail: t.userEmail,
-                    amount: t.amount,
-                    typeIndex: t.type.index,
-                  );
+                  await NgmyWalletDecisionLedger.record(t.id, newStatus.index);
                   _walletDecisionLedger[t.id] = newStatus.index;
+                  unawaited(
+                    NgmyWalletDecisionLedger.recordCloud(
+                      transactionId: t.id,
+                      statusIndex: newStatus.index,
+                      userEmail: t.userEmail,
+                      amount: t.amount,
+                      typeIndex: t.type.index,
+                    ),
+                  );
                   setState(() {
                     t.status = newStatus;
                     var targetIndex = _allUsers.indexWhere(
@@ -8447,48 +8488,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   });
                   _markTransactionDirty(t.id);
                   await _persistLocalOnly();
-                  var synced = await _pushTransactionDecisionToCloud(t, attempts: 8);
-                  if (!synced) {
-                    debugPrint('[txn] approval cloud sync failed for ${t.id} — retrying admin sync');
-                    if (_ngmySessionIsAdmin(_currentUser)) {
-                      await _syncAdminOperationalToCloud();
-                      synced = await _pushTransactionDecisionToCloud(t, attempts: 6);
-                    }
-                  }
-                  if (syncedUser != null) {
-                    for (var i = 0; i < 4; i++) {
-                      await _pushUserToCloudFast(syncedUser!, includeFreeTrial: true);
-                      if (!await ngmyCanReachCloud()) break;
-                      try {
-                        final row = await supabase
-                            .from('users')
-                            .select('accountBalance')
-                            .eq('email', syncedUser!.email)
-                            .maybeSingle();
-                        if (row != null) {
-                          final remote = (row['accountBalance'] ?? 0.0).toDouble();
-                          if ((remote - syncedUser!.accountBalance).abs() < 0.02) break;
-                        }
-                      } catch (_) {}
-                      await Future.delayed(Duration(milliseconds: 350 * (i + 1)));
-                    }
-                    _markUserDirty(syncedUser!.email);
-                  }
-                  if (_ngmySessionIsAdmin(_currentUser)) {
-                    await _syncAdminOperationalToCloud();
-                  }
-                  await _persistLocalOnly();
+                  final syncedUserCopy = syncedUser;
+                  unawaited(_syncWalletApprovalInBackground(t, syncedUserCopy));
                   if (mounted) {
                     final label = approve ? 'approved' : 'rejected';
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(
-                          synced
-                              ? 'Deposit/withdrawal $label and saved to the database.'
-                              : 'Saved on this device as $label. Database sync is still retrying — keep internet on; it will not ask again after sync succeeds.',
-                        ),
-                        backgroundColor: synced ? const Color(0xFF00B25A) : Colors.orange,
-                        duration: const Duration(seconds: 5),
+                        content: Text('Deposit/withdrawal $label. Saving to database in background.'),
+                        backgroundColor: const Color(0xFF00B25A),
+                        duration: const Duration(seconds: 3),
                       ),
                     );
                   }
@@ -8556,7 +8564,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onEnqueueMediaDelivery: _enqueueMediaDelivery,
                 onPromptNotifications: (ctx) => _promptPushNotificationsForUser(ctx, _currentUser!.email),
                 onMarkAnnouncementsRead: (ids) => _markAnnouncementsReadForUser(ids),
-                onRefreshAdminData: _refreshAdminCloudSnapshot,
+                onRefreshAdminData: () => _refreshAdminCloudSnapshot(lightweight: true),
             ),
       ),
     );
@@ -10313,11 +10321,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               FloatingTitle(
                 title: 'GROWTH INCOME',
-                onTap: widget.user.isAdmin ? () async {
-                  await widget.onRefreshAdminData?.call();
-                  if (!context.mounted) return;
-                  await NgmyNavigator.push(context, AdminDashboard(user: widget.user, allTransactions: widget.allTransactions, onProcess: widget.onProcess, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onRefreshAdminData: widget.onRefreshAdminData), routeName: 'AdminDashboard');
-                } : null,
+                onTap: widget.user.isAdmin
+                    ? () {
+                        unawaited(widget.onRefreshAdminData?.call());
+                        NgmyNavigator.push(
+                          context,
+                          AdminDashboard(
+                            user: widget.user,
+                            allTransactions: widget.allTransactions,
+                            onProcess: widget.onProcess,
+                            allUsers: widget.allUsers,
+                            globalPlans: widget.globalPlans,
+                            onAddPlan: widget.onAddPlan,
+                            onAddTransaction: widget.onAddTransaction,
+                            onDataChanged: widget.onDataChanged,
+                            config: widget.config,
+                            allMedia: widget.allMedia,
+                            allAnnouncements: widget.allAnnouncements,
+                            onAddAnnouncement: widget.onAddAnnouncement,
+                            onDeleteAnnouncement: widget.onDeleteAnnouncement,
+                            onClearAllAnnouncements: widget.onClearAllAnnouncements,
+                            onSaveLegalContent: widget.onSaveLegalContent,
+                            onSavePopups: widget.onSavePopups,
+                            onUploadPopupVideo: widget.onUploadPopupVideo,
+                            onSyncAdminMediaPost: widget.onSyncAdminMediaPost,
+                            onSyncAdminUserMedia: widget.onSyncAdminUserMedia,
+                            onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery,
+                            onRefreshAdminData: widget.onRefreshAdminData,
+                          ),
+                          routeName: 'AdminDashboard',
+                        );
+                      }
+                    : null,
                 leading: InkWell(
                   onTap: () => NgmyNavigator.push(
                     context,
@@ -14187,8 +14222,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     try {
       await widget.onProcess(t, approve);
       if (mounted) setState(() {});
-      await Future.delayed(const Duration(milliseconds: 600));
-      await widget.onRefreshAdminData?.call();
     } finally {
       if (mounted) setState(() => _processingTxnId = null);
     }
@@ -14209,8 +14242,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void initState() {
     super.initState();
     unawaited(_loadWalletApprovedArchive());
-    unawaited(_pullAdminCloudData());
-    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+    Future.microtask(() => unawaited(_pullAdminCloudData()));
+    _adminRefreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
       unawaited(_pullAdminCloudData());
     });
   }
