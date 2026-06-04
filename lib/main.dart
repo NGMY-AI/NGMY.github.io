@@ -47,6 +47,7 @@ import 'ngmy_invoice_signature.dart';
 import 'ngmy_store_location.dart';
 import 'ngmy_local_cache.dart';
 import 'ngmy_media_monetization.dart';
+import 'ngmy_media_cloud.dart';
 import 'ngmy_media_reward_tracker.dart';
 import 'ngmy_offline.dart';
 import 'ngmy_network_resilience.dart';
@@ -395,6 +396,27 @@ double ngmyBalanceFromApprovedTransactions(String email, List<AppTransaction> tr
     }
   }
   return balance;
+}
+
+double ngmyPendingWithdrawalTotal(String email, List<AppTransaction> transactions) {
+  final key = email.toLowerCase().trim();
+  var total = 0.0;
+  for (final t in transactions) {
+    if (t.userEmail.toLowerCase().trim() != key) continue;
+    if (t.status != TransactionStatus.pending || t.type != TransactionType.withdrawal) continue;
+    total += t.amount;
+  }
+  return total;
+}
+
+/// Display balance: approved ledger minus pending withdrawal holds.
+double ngmyResolveAccountBalance(String email, double storedBalance, List<AppTransaction> transactions) {
+  final approved = ngmyBalanceFromApprovedTransactions(email, transactions);
+  final pendingWithdraw = ngmyPendingWithdrawalTotal(email, transactions);
+  final fromLedger = (approved - pendingWithdraw).clamp(0.0, double.infinity);
+  if (pendingWithdraw > 0) return fromLedger;
+  if (approved > storedBalance + 0.001) return approved;
+  return storedBalance;
 }
 
 bool ngmyTransactionCountsAsIncome(AppTransaction t) {
@@ -1585,7 +1607,10 @@ Future<void> ngmyFlushCriticalConfigLocalAndCloud(AppConfig config, {bool cloud 
 Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
   if (!await ngmyCanReachCloud()) return;
   try {
-    await Supabase.instance.client.from('transactions').upsert(Map<String, dynamic>.from(t.toJson()));
+    await Supabase.instance.client
+        .from('transactions')
+        .upsert(Map<String, dynamic>.from(t.toJson()))
+        .timeout(kNgmyCloudWriteTimeout);
   } catch (e) {
     debugPrint('[txn] fast upsert: $e');
   }
@@ -2013,6 +2038,7 @@ class MediaPost {
   }
 
   factory MediaPost.fromJson(Map<String, dynamic> json) {
+    json = ngmyMediaJsonWithData(json);
     final likedBy = _jsonStringList(json['likedBy'] ?? json['liked_by']);
     final savedBy = _jsonStringList(json['savedBy'] ?? json['saved_by']);
     final comments = _jsonMapList(json['comments'] ?? json['media_comments']);
@@ -2271,39 +2297,18 @@ Future<bool> _upsertUserMediaSocialFields(UserData u) async {
 }
 
 Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
-  final working = Map<String, dynamic>.from(row);
-  const protected = {
-    'id',
-    'userEmail',
-    'username',
-    'videoUrl',
-    'url',
-    'comments',
-    'likedBy',
-    'savedBy',
-    'likes',
-    'timestamp',
-    'caption',
-    'contentType',
-    'type',
-  };
-  final mediaType = (working['contentType'] ?? working['content_type'] ?? working['type'] ?? 'video').toString();
-  working['type'] = mediaType;
-  working['contentType'] = mediaType;
-  final url = (working['videoUrl'] ?? working['video_url'] ?? working['url'] ?? '').toString();
+  if (!await ngmyCanReachCloud()) return false;
+  var working = ngmyMediaRowForCloud(row);
+  final url = (working['videoUrl'] ?? '').toString();
   if (url.isEmpty) return false;
-  working['url'] = url;
   if (url.startsWith('data:') && url.length > 120000) {
     debugPrint('[media] skipped upsert: inline media too large for database.');
     return false;
   }
-  final likedBy = working['likedBy'];
-  if (likedBy is List) {
-    working['likes'] = likedBy.length;
-  }
+  const protected = {'id', 'userEmail', 'videoUrl', 'timestamp'};
   for (int i = 0; i < 12; i++) {
     try {
-      await Supabase.instance.client.from('media').upsert([working]).timeout(kNgmyCloudWriteTimeout);
+      await Supabase.instance.client.from('media').upsert(working).timeout(kNgmyCloudWriteTimeout);
       return true;
     } catch (e) {
       if (_isMissingTablePostgrestError(e, 'media')) {
@@ -2317,6 +2322,9 @@ Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
           return false;
         }
         working.remove(missing);
+        if (working['data'] is Map) {
+          (working['data'] as Map).remove(missing);
+        }
         continue;
       }
       debugPrint('[media] upsert error: $e');
@@ -2330,7 +2338,7 @@ Future<List<MediaPost>?> _fetchMediaPostsFromSupabase({int limit = 100}) async {
   try {
     final rows = await Supabase.instance.client
         .from('media')
-        .select(NgmySupabaseColumns.mediaFeed)
+        .select(NgmySupabaseColumns.mediaFeedCore)
         .order('timestamp', ascending: false)
         .limit(limit);
     if (rows == null) return null;
@@ -4803,6 +4811,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _subscribeToAuthState();
     _startConfigRefreshLoop();
     _startMediaDeliveryLoop();
+    _startAdminPendingTransactionPoll();
+    if (_currentUser?.isAdmin == true) {
+      unawaited(_refreshPendingTransactionsFromCloud());
+    }
   }
   Future<void> _seedTransactionNotificationBaseline() async {
     for (final t in _allTransactions) {
@@ -5145,6 +5157,59 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _markTransactionDirty(String? id) {
     final key = id?.trim() ?? '';
     if (key.isNotEmpty) _dirtyTransactionIds.add(key);
+  }
+
+  Future<bool> _pushTransactionToCloudReliable(AppTransaction t, {int attempts = 3}) async {
+    for (var i = 0; i < attempts; i++) {
+      if (!await ngmyCanReachCloud()) {
+        await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
+        continue;
+      }
+      await _safeUpsertRows('transactions', [Map<String, dynamic>.from(t.toJson())]);
+      return true;
+    }
+    return false;
+  }
+
+  Timer? _adminPendingTxnPoll;
+
+  void _startAdminPendingTransactionPoll() {
+    _adminPendingTxnPoll?.cancel();
+    if (_currentUser?.isAdmin != true) return;
+    _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 40), (_) {
+      if (!mounted || _currentUser?.isAdmin != true) return;
+      unawaited(_refreshPendingTransactionsFromCloud());
+    });
+  }
+
+  Future<void> _refreshPendingTransactionsFromCloud() async {
+    if (_currentUser?.isAdmin != true) return;
+    if (!await ngmyCanReachCloud()) return;
+    try {
+      final rows = await supabase
+          .from('transactions')
+          .select()
+          .eq('status', TransactionStatus.pending.index)
+          .order('timestamp', ascending: false)
+          .limit(80)
+          .timeout(kNgmyCloudLoadTimeout);
+      if (rows == null || !mounted) return;
+      var added = 0;
+      setState(() {
+        for (final raw in rows as List) {
+          final tx = AppTransaction.fromJson(Map<String, dynamic>.from(raw as Map));
+          if (_allTransactions.any((t) => t.id == tx.id)) continue;
+          _allTransactions.add(tx);
+          added++;
+          if (tx.status == TransactionStatus.pending) {
+            unawaited(_notifyAdminAboutPendingTransaction(tx));
+          }
+        }
+      });
+      if (added > 0) unawaited(_persistLocalOnly());
+    } catch (e) {
+      debugPrint('[admin] pending txn poll: $e');
+    }
   }
 
   /// Local disk only — use after targeted cloud upserts (approve/deny, fast push).
@@ -7078,7 +7143,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _allTransactions = (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
         }
 
-        final mediaData = await supabase.from('media').select().order('timestamp', ascending: false).limit(100);
+        final mediaData = await supabase
+            .from('media')
+            .select(NgmySupabaseColumns.mediaFeedCore)
+            .order('timestamp', ascending: false)
+            .limit(100);
         if (mediaData != null) {
           final remoteMedia = (mediaData as List).map((e) => MediaPost.fromJson(e)).toList();
           _allMedia = _mergeMediaWithRemote(localMedia, remoteMedia, tombstones: _tombstonedMediaIds);
@@ -7202,8 +7271,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
 
       for (final u in _allUsers) {
-        final computed = ngmyBalanceFromApprovedTransactions(u.email, _allTransactions);
-        if (computed > u.accountBalance + 0.001) u.accountBalance = computed;
+        u.accountBalance = ngmyResolveAccountBalance(u.email, u.accountBalance, _allTransactions);
       }
       _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
       if (_currentUser != null) {
@@ -7716,7 +7784,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     final userKey = t.userEmail.toLowerCase().trim();
                     final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
                     if (userIdx != -1) {
-                      ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], t);
+                      if (t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending) {
+                        _allUsers[userIdx].accountBalance =
+                            (_allUsers[userIdx].accountBalance - t.amount).clamp(0.0, double.infinity);
+                      } else {
+                        ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], t);
+                      }
                       syncedUser = _allUsers[userIdx];
                       if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
                         _currentUser = _allUsers[userIdx];
@@ -7732,6 +7805,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       }
                     }
                   });
+                  unawaited(_pushTransactionToCloudReliable(t));
                   unawaited(_pushTransactionToCloudFast(t));
                   if (syncedUser != null) {
                     unawaited(_pushUserToCloudFast(syncedUser!));
@@ -15854,7 +15928,7 @@ class _WalletScreenState extends State<WalletScreen> {
     _saveWithdrawHandle(handle);
 
     widget.onAdd(AppTransaction(
-      id: DateTime.now().toString(),
+      id: 'wd-${DateTime.now().microsecondsSinceEpoch}',
       userEmail: widget.user.email,
       amount: amount,
       type: TransactionType.withdrawal,
@@ -15862,12 +15936,9 @@ class _WalletScreenState extends State<WalletScreen> {
       sourceDetails: noWithdrawFee
           ? '($handle) - Free trial: no fee - You receive: \$${formatCurrency(receive)}'
           : '($handle) - Fee: \$${formatCurrency(fee)} - You receive: \$${formatCurrency(receive)}',
-      timestamp: DateTime.now()
+      timestamp: DateTime.now(),
     ));
 
-    setState(() {
-      widget.user.accountBalance -= amount;
-    });
     widget.onDataChanged();
 
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(

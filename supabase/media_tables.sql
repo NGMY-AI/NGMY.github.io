@@ -32,6 +32,10 @@ create policy "media_delete" on public.media for delete using (true);
 -- Optional: add url column if your table uses it (app sends videoUrl + url)
 alter table public.media add column if not exists url text;
 alter table public.media add column if not exists type text;
+alter table public.media add column if not exists data jsonb default '{}'::jsonb;
+alter table public.media add column if not exists updated_at timestamptz default now();
+
+-- Run media_optional_columns.sql for monetization / tags / realtime
 
 -- Realtime (required for deletes to disappear on other users' phones immediately):
 -- Supabase Dashboard → Database → Publications → supabase_realtime → enable table "media"

@@ -30,9 +30,14 @@ class NgmySupabaseColumns {
   static const userLogin =
       'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance';
 
-  /// Media table columns (must match public.media — see supabase/media_tables.sql).
+  /// Media feed read — core columns only (extras may live in `data` jsonb).
+  static const mediaFeedCore =
+      'id,userEmail,username,videoUrl,url,contentType,type,caption,timestamp,likes,'
+      'likedBy,savedBy,comments';
+
+  /// Full media row when all optional columns exist (see media_optional_columns.sql).
   static const mediaFeed =
       'id,userEmail,username,videoUrl,url,contentType,type,caption,timestamp,likes,'
-      'likedBy,savedBy,comments,taggedUsers,mediaAspectRatio,'
+      'likedBy,savedBy,comments,data,taggedUsers,mediaAspectRatio,'
       'externalLink,previewSeconds,continuePrice,watchReward,watchRequiredSeconds,rewardedViewers';
 }
