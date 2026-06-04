@@ -1736,25 +1736,41 @@ Timer? _operationalConfigCloudDebounce;
 /// Admin menu + user requests (loans, help, store messages, registrar apps) — not the full config blob.
 Future<void> _persistOperationalConfigToCloud(AppConfig config) async {
   if (!await ngmyCanReachCloud()) return;
-  try {
-    await Supabase.instance.client.from('config').upsert({
-      'id': kNgmyConfigRowId,
-      'storeInquiries': config.storeInquiries,
-      'storeOrders': config.storeOrders,
-      'storeListings': config.storeListings,
-      'loanApplications': config.loanApplications,
-      'helpHelperApplications': config.helpHelperApplications,
-      'helpRequests': config.helpRequests,
-      'helpBusinesses': config.helpBusinesses,
-      'civicRegistrarApplications': config.civicRegistrarApplications,
-      'jobPosts': config.jobPosts,
-      'jobWorkerApplications': config.jobWorkerApplications,
-      'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
-      'cities': config.cities,
-      'rooms': config.rooms,
-    });
-  } catch (e) {
-    debugPrint('[config] operational upsert: $e');
+  var row = <String, dynamic>{
+    'id': kNgmyConfigRowId,
+    'storeInquiries': config.storeInquiries,
+    'storeOrders': config.storeOrders,
+    'storeListings': config.storeListings,
+    'loanApplications': config.loanApplications,
+    'helpHelperApplications': config.helpHelperApplications,
+    'helpRequests': config.helpRequests,
+    'helpBusinesses': config.helpBusinesses,
+    'civicRegistrarApplications': config.civicRegistrarApplications,
+    'jobPosts': config.jobPosts,
+    'jobWorkerApplications': config.jobWorkerApplications,
+    'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
+    'cities': config.cities,
+    'rooms': config.rooms,
+    'termsAndConditions': config.termsAndConditions,
+    'privacyPolicy': config.privacyPolicy,
+    'investmentPlans': config.investmentPlans,
+    'officialCashApp': config.officialCashApp,
+    'officialBitcoin': config.officialBitcoin,
+  };
+  for (var i = 0; i < 12; i++) {
+    try {
+      await Supabase.instance.client.from('config').upsert(row);
+      return;
+    } catch (e) {
+      final missing = _missingColumnFromPostgrestError(e);
+      if (missing != null && missing.isNotEmpty && row.containsKey(missing)) {
+        row = Map<String, dynamic>.from(row)..remove(missing);
+        if (row.length <= 1) return;
+        continue;
+      }
+      debugPrint('[config] operational upsert: $e');
+      return;
+    }
   }
 }
 
@@ -1814,11 +1830,19 @@ Future<void> ngmyFlushCriticalConfigLocalAndCloud(AppConfig config, {bool cloud 
   }
 }
 
-/// Admin applications (loans, jobs, help, registrar) — save immediately, no debounce.
+/// Admin applications (loans, jobs, help, registrar, legal) — save immediately, no debounce.
 Future<void> ngmyPersistAdminConfigNow(AppConfig config) async {
   _operationalConfigCloudDebounce?.cancel();
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   await _persistOperationalConfigToCloud(config);
+  if (config.termsAndConditions.trim().isNotEmpty || config.privacyPolicy.trim().isNotEmpty) {
+    unawaited(
+      _persistLegalContentToCloud(
+        config.termsAndConditions,
+        config.privacyPolicy,
+      ),
+    );
+  }
 }
 
 /// Game Center timers/dice — must hit Supabase immediately (admin + players).
@@ -2786,11 +2810,91 @@ Future<Map<String, String>> _fetchRemoteLegalContent() async {
   }
 }
 
-void _applyRemoteLegalToConfig(AppConfig config, Map<String, dynamic> remoteMap) {
-  final terms = (remoteMap['termsAndConditions'] ?? '').toString().trim();
-  final privacy = (remoteMap['privacyPolicy'] ?? '').toString().trim();
-  if (terms.isNotEmpty) config.termsAndConditions = terms;
-  if (privacy.isNotEmpty) config.privacyPolicy = privacy;
+const String _kNgmyAdminLegalTermsPrefs = 'ngmy_admin_legal_terms';
+const String _kNgmyAdminLegalPrivacyPrefs = 'ngmy_admin_legal_privacy';
+const String _kNgmyAdminLegalSavedAtPrefs = 'ngmy_admin_legal_saved_at';
+
+Future<void> _rememberAdminLegalSave(String terms, String privacy) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyAdminLegalTermsPrefs, terms);
+    await prefs.setString(_kNgmyAdminLegalPrivacyPrefs, privacy);
+    await prefs.setString(_kNgmyAdminLegalSavedAtPrefs, DateTime.now().toUtc().toIso8601String());
+  } catch (e) {
+    debugPrint('[legal] local backup: $e');
+  }
+}
+
+Future<bool> _hasRecentAdminLegalLocalSave() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final at = prefs.getString(_kNgmyAdminLegalSavedAtPrefs);
+    if (at == null || at.trim().isEmpty) return false;
+    final dt = DateTime.tryParse(at);
+    if (dt == null) return false;
+    return DateTime.now().toUtc().difference(dt.toUtc()) < const Duration(days: 365);
+  } catch (_) {
+    return false;
+  }
+}
+
+Future<void> _applyLocalAdminLegalBackupToConfig(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final terms = (prefs.getString(_kNgmyAdminLegalTermsPrefs) ?? '').trim();
+    final privacy = (prefs.getString(_kNgmyAdminLegalPrivacyPrefs) ?? '').trim();
+    if (terms.isNotEmpty) config.termsAndConditions = terms;
+    if (privacy.isNotEmpty) config.privacyPolicy = privacy;
+  } catch (e) {
+    debugPrint('[legal] apply local backup: $e');
+  }
+}
+
+void _mergeLegalFromRemoteRecord(AppConfig config, Map<String, dynamic> remoteMap, AppConfig keep) {
+  if (remoteMap.containsKey('termsAndConditions')) {
+    final terms = (remoteMap['termsAndConditions'] ?? '').toString().trim();
+    if (terms.isNotEmpty) {
+      config.termsAndConditions = terms;
+    } else {
+      config.termsAndConditions = keep.termsAndConditions;
+    }
+  } else {
+    config.termsAndConditions = keep.termsAndConditions;
+  }
+  if (remoteMap.containsKey('privacyPolicy')) {
+    final privacy = (remoteMap['privacyPolicy'] ?? '').toString().trim();
+    if (privacy.isNotEmpty) {
+      config.privacyPolicy = privacy;
+    } else {
+      config.privacyPolicy = keep.privacyPolicy;
+    }
+  } else {
+    config.privacyPolicy = keep.privacyPolicy;
+  }
+}
+
+/// Only overwrites legal text when the remote row actually includes those columns.
+Future<void> _applyRemoteLegalToConfig(
+  AppConfig config,
+  Map<String, dynamic> remoteMap, {
+  AppConfig? keep,
+}) async {
+  if (await _hasRecentAdminLegalLocalSave()) {
+    await _applyLocalAdminLegalBackupToConfig(config);
+    return;
+  }
+  if (keep != null) {
+    _mergeLegalFromRemoteRecord(config, remoteMap, keep);
+    return;
+  }
+  if (remoteMap.containsKey('termsAndConditions')) {
+    final terms = (remoteMap['termsAndConditions'] ?? '').toString().trim();
+    if (terms.isNotEmpty) config.termsAndConditions = terms;
+  }
+  if (remoteMap.containsKey('privacyPolicy')) {
+    final privacy = (remoteMap['privacyPolicy'] ?? '').toString().trim();
+    if (privacy.isNotEmpty) config.privacyPolicy = privacy;
+  }
 }
 
 const _kNgmySettingsTermsKey = 'terms_and_conditions';
@@ -2957,6 +3061,26 @@ Future<Map<String, String>> _fetchAuthoritativeLegalContent() async {
   var privacy = '';
   DateTime? termsAt;
   DateTime? privacyAt;
+
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final savedAt = prefs.getString(_kNgmyAdminLegalSavedAtPrefs);
+    final savedTerms = (prefs.getString(_kNgmyAdminLegalTermsPrefs) ?? '').trim();
+    final savedPrivacy = (prefs.getString(_kNgmyAdminLegalPrivacyPrefs) ?? '').trim();
+    final at = savedAt != null ? DateTime.tryParse(savedAt) : null;
+    if (at != null) {
+      if (savedTerms.isNotEmpty) {
+        terms = savedTerms;
+        termsAt = at;
+      }
+      if (savedPrivacy.isNotEmpty) {
+        privacy = savedPrivacy;
+        privacyAt = at;
+      }
+    }
+  } catch (e) {
+    debugPrint('[legal] prefs authoritative: $e');
+  }
 
   void considerTerms(String content, DateTime? at) {
     final c = content.trim();
@@ -4992,6 +5116,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Map<String, int> _walletDecisionLedger = {};
   DateTime? _lastCurrentUserCloudRefresh;
   Timer? _legalPlansRefreshDebounce;
+  DateTime? _legalCloudRefreshPausedUntil;
   final Set<String> _disabledSupabaseTables = {};
   final Set<String> _seenRealtimeAnnouncementIds = {};
   final Set<String> _seenRealtimeStoreOrderIds = {};
@@ -5816,11 +5941,23 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _scheduleLegalPlansRefreshFromCloud() {
+    if (_legalCloudRefreshPausedUntil != null &&
+        DateTime.now().isBefore(_legalCloudRefreshPausedUntil!)) {
+      return;
+    }
     _legalPlansRefreshDebounce?.cancel();
     _legalPlansRefreshDebounce = Timer(const Duration(seconds: 90), () {
       if (!mounted) return;
+      if (_legalCloudRefreshPausedUntil != null &&
+          DateTime.now().isBefore(_legalCloudRefreshPausedUntil!)) {
+        return;
+      }
       unawaited(_refreshLegalAndPlansFromCloud());
     });
+  }
+
+  void _pauseLegalCloudRefreshForAdminSave() {
+    _legalCloudRefreshPausedUntil = DateTime.now().add(const Duration(minutes: 3));
   }
 
   void _applyIncomingApprovedTransaction(AppTransaction t, {required bool isNew}) {
@@ -5986,7 +6123,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final next = AppConfig.fromJson({..._config.toJson(), ...cfgMap});
         _applyRemoteConfigMerge(next, cfgMap, keepConfig);
         _applyNgmyChatClosedFromRemote(next, cfgMap, localClosed: keepChatClosed);
-        _applyRemoteLegalToConfig(next, cfgMap);
+        await _applyRemoteLegalToConfig(next, cfgMap, keep: keepConfig);
         final remoteGemini = _geminiKeyFromMap(cfgMap);
         if (remoteGemini.isNotEmpty) {
           next.geminiApiKey = remoteGemini;
@@ -6412,14 +6549,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<bool> _saveLegalContentToSupabase(String terms, String privacy) async {
     try {
+      _pauseLegalCloudRefreshForAdminSave();
       setState(() {
         _config.termsAndConditions = terms;
         _config.privacyPolicy = privacy;
       });
-      final saved = await _persistLegalContentToCloud(terms, privacy);
+      await _rememberAdminLegalSave(terms, privacy);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('app_config', jsonEncode(_config.toJson()));
-      return saved;
+      final saved = await _persistLegalContentToCloud(terms, privacy);
+      if (!saved) {
+        debugPrint('[legal] cloud save failed — kept on device; run supabase/ngmy_settings_table.sql');
+      }
+      return saved || terms.isNotEmpty || privacy.isNotEmpty;
     } catch (e) {
       debugPrint('[legal] save error: $e');
       return false;
@@ -6461,6 +6603,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _refreshLegalAndPlansFromCloud({bool updateUi = true}) async {
+    if (_legalCloudRefreshPausedUntil != null &&
+        DateTime.now().isBefore(_legalCloudRefreshPausedUntil!)) {
+      return;
+    }
     try {
       final legal = await _fetchAuthoritativeLegalContent();
       final remotePlans = await _fetchAuthoritativeInvestmentPlans();
@@ -7101,9 +7247,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final remoteGemini = _geminiKeyFromMap(Map<String, dynamic>.from(payload.newRecord));
         final record = Map<String, dynamic>.from(payload.newRecord);
         final keepConfig = AppConfig.fromJson(_config.toJson());
-        final next = AppConfig.fromJson(record);
+        final next = AppConfig.fromJson({..._config.toJson(), ...record});
         _applyRemoteConfigMerge(next, record, keepConfig);
-        _applyRemoteLegalToConfig(next, record);
+        _mergeLegalFromRemoteRecord(next, record, keepConfig);
         _applyNgmyChatClosedFromRemote(next, record, localClosed: _config.ngmyChatClosed);
         if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
         else next.storeOrders = _mergeStoreOrdersLists(keepOrders, next.storeOrders);
@@ -7762,7 +7908,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           (_config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(
             cfgMap['mediaVirtualProfiles'] ?? (_config as dynamic).mediaVirtualProfiles,
           );
-          _applyRemoteLegalToConfig(_config, cfgMap);
+          await _applyRemoteLegalToConfig(_config, cfgMap, keep: localConfigSnapshot);
           _mergeStoreListingsIntoConfig(localStoreListings);
           _mergeStoreInquiriesIntoConfig(localStoreInquiries);
           _config.civicRegistrarApplications = _mergeCivicRegistrarApplications(
