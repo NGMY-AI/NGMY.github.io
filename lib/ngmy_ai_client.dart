@@ -398,7 +398,9 @@ Future<String?> ngmyAiGenerateReply(
   final memoryBlock = memory.isNotEmpty
       ? '\n${NgmyAiMemoryStore.transcriptForPrompt(memory)}\n'
       : '';
-  final prompt = '$systemContext$memoryBlock\nUser: $userQuery';
+  final prompt = '$systemContext$memoryBlock\n'
+      'Answer using the LIVE NGMY APP DATABASE section when the user asks about menus, wallet, pending requests, or current app state.\n'
+      'User: $userQuery';
 
   final result = await ngmyAiGenerateWithCredentials(creds, prompt);
   if (result.text != null) return result.text;

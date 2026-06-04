@@ -23,6 +23,8 @@ import 'ngmy_popups.dart';
 import 'ngmy_media_profile.dart';
 import 'ngmy_ai_memory.dart';
 import 'ngmy_ai_client.dart';
+import 'ngmy_app_knowledge.dart';
+import 'ngmy_wallet_decisions.dart';
 import 'ngmy_news_retention.dart';
 import 'ngmy_weekend_clock_overlay.dart';
 import 'ngmy_nav.dart';
@@ -478,8 +480,9 @@ AppTransaction _pickPreferredTransaction(AppTransaction local, AppTransaction re
 
 List<AppTransaction> _mergeTransactionsWithRemote(
   List<AppTransaction> local,
-  List<AppTransaction> remote,
-) {
+  List<AppTransaction> remote, {
+  Map<String, int>? walletDecisionLedger,
+}) {
   final merged = <String, AppTransaction>{};
   for (final t in remote) {
     if (t.id.isEmpty) continue;
@@ -489,6 +492,14 @@ List<AppTransaction> _mergeTransactionsWithRemote(
     if (t.id.isEmpty) continue;
     final existing = merged[t.id];
     merged[t.id] = existing == null ? t : _pickPreferredTransaction(t, existing);
+  }
+  final ledger = walletDecisionLedger;
+  if (ledger != null && ledger.isNotEmpty) {
+    for (final entry in merged.entries) {
+      final decided = ledger[entry.key];
+      if (decided == null || decided <= 0 || decided > 2) continue;
+      entry.value.status = TransactionStatus.values[decided];
+    }
   }
   return merged.values.toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 }
@@ -640,6 +651,41 @@ Map<String, dynamic> _transactionRowForCloud(AppTransaction t) {
   };
 }
 
+Map<String, dynamic> _transactionRowSnakeForCloud(AppTransaction t) {
+  return {
+    'id': t.id,
+    'user_email': t.userEmail,
+    'amount': t.amount,
+    'type': t.type.index,
+    'method': t.method.index,
+    'source_details': t.sourceDetails,
+    'screenshot_path': t.screenshotPath,
+    'verification_code': t.verificationCode,
+    'status': t.status.index,
+    'timestamp': t.timestamp.toUtc().toIso8601String(),
+  };
+}
+
+Future<bool> _patchTransactionStatusInCloud(AppTransaction t) async {
+  final patches = <Map<String, dynamic>>[
+    {'status': t.status.index},
+    {'status': t.status.name},
+  ];
+  for (final patch in patches) {
+    try {
+      await Supabase.instance.client
+          .from('transactions')
+          .update(patch)
+          .eq('id', t.id)
+          .timeout(kNgmyCloudWriteTimeout);
+      if (await _verifyTransactionStatusInCloud(t)) return true;
+    } catch (e) {
+      debugPrint('[txn] status patch: $e');
+    }
+  }
+  return false;
+}
+
 Future<bool> _verifyTransactionStatusInCloud(AppTransaction t) async {
   try {
     final row = await Supabase.instance.client
@@ -658,36 +704,41 @@ Future<bool> _verifyTransactionStatusInCloud(AppTransaction t) async {
   }
 }
 
-Future<bool> _pushTransactionDecisionToCloud(AppTransaction t, {int attempts = 5}) async {
+Future<bool> _pushTransactionDecisionToCloud(AppTransaction t, {int attempts = 6}) async {
   if (!await ngmyCanReachCloud()) return false;
+  if (t.status == TransactionStatus.pending) return false;
   for (var i = 0; i < attempts; i++) {
-    final ok = await _safeUpsertTransactionRows([_transactionRowForCloud(t)]);
-    if (ok && await _verifyTransactionStatusInCloud(t)) return true;
-    try {
-      await Supabase.instance.client
-          .from('transactions')
-          .update({'status': t.status.index})
-          .eq('id', t.id)
-          .timeout(kNgmyCloudWriteTimeout);
-      if (await _verifyTransactionStatusInCloud(t)) return true;
-    } catch (e) {
-      debugPrint('[txn] decision status patch attempt ${i + 1}: $e');
+    if (await _patchTransactionStatusInCloud(t)) return true;
+    for (final row in [_transactionRowForCloud(t), _transactionRowSnakeForCloud(t)]) {
+      final ok = await _safeUpsertTransactionRows([row], requireStatus: true);
+      if (ok && await _verifyTransactionStatusInCloud(t)) return true;
     }
-    await Future.delayed(Duration(milliseconds: 350 * (i + 1)));
+    await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
   }
   return false;
 }
 
-Future<bool> _safeUpsertTransactionRows(List<Map<String, dynamic>> rows) async {
+Future<bool> _safeUpsertTransactionRows(
+  List<Map<String, dynamic>> rows, {
+  bool requireStatus = false,
+}) async {
   if (rows.isEmpty) return true;
   var working = rows.map((e) => Map<String, dynamic>.from(e)).toList();
   for (var i = 0; i < 12; i++) {
     try {
       await Supabase.instance.client.from('transactions').upsert(working).timeout(kNgmyCloudWriteTimeout);
+      if (requireStatus && working.every((r) => !r.containsKey('status'))) {
+        debugPrint('[transactions] upsert rejected: status column missing in Supabase schema');
+        return false;
+      }
       return true;
     } catch (e) {
       final missing = _missingColumnFromPostgrestError(e);
       if (missing != null && missing.isNotEmpty) {
+        if (requireStatus && missing == 'status') {
+          debugPrint('[transactions] cannot save approval: status column missing in Supabase');
+          return false;
+        }
         for (final row in working) {
           row.remove(missing);
         }
@@ -3216,6 +3267,10 @@ bool _maintainStoreOrders(List<Map<String, dynamic>> orders) {
   return changed;
 }
 
+List<Map<String, dynamic>> _mutableStoreOrdersCopy(List<Map<String, dynamic>> source) {
+  return source.map((e) => Map<String, dynamic>.from(e)).toList();
+}
+
 String ngmyUserDisplayAccountId(UserData u) {
   final reg = (u.registryId ?? '').trim();
   if (reg.isNotEmpty) return reg;
@@ -4528,6 +4583,7 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'Never tell users to configure API keys, Gemini, OpenAI, Claude, or Supabase — admins handle that. '
           'The AI is connected and working — never say you are waiting for an API key or that Gemini is unreachable. '
           'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n'
+          'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n'
       : 'You are the helpful assistant for the NGMY platform (Next Generation - Make Yours). '
           '$founderFacts'
           'NGMY offers investment plans, daily clock-in earnings, loans, NGMY Store, job marketplace, and civic registry. '
@@ -4536,7 +4592,8 @@ String _ngmyHelperSystemContext({required UserData user}) {
           '"NGMY AI:", "As NGMY AI", "I\'m NGMY AI", or similar — just answer naturally.\n'
           'Never tell users to configure API keys, Gemini, OpenAI, Claude, or Supabase — admins handle that. '
           'The AI is connected and working — never say you are waiting for an API key or that Gemini is unreachable. '
-          'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n';
+          'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n'
+          'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n';
 }
 
 Future<String?> _geminiGenerateReply(
@@ -4865,6 +4922,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   bool _pendingHeavySave = false;
   final Set<String> _dirtyUserEmails = {};
   final Set<String> _dirtyTransactionIds = {};
+  Map<String, int> _walletDecisionLedger = {};
   DateTime? _lastCurrentUserCloudRefresh;
   Timer? _legalPlansRefreshDebounce;
   final Set<String> _disabledSupabaseTables = {};
@@ -5065,6 +5123,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   @override void initState() {
     super.initState();
+    unawaited(_refreshWalletDecisionLedger());
     WidgetsBinding.instance.addObserver(this);
     ngmyOnGameWinNotify = (gameTitle, body) async {
       await _pushInAppNotification(
@@ -5318,6 +5377,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (key.isNotEmpty) _dirtyTransactionIds.add(key);
   }
 
+  Future<void> _refreshWalletDecisionLedger() async {
+    _walletDecisionLedger = await NgmyWalletDecisionLedger.load();
+    _applyWalletDecisionLedgerToTransactions();
+  }
+
+  void _applyWalletDecisionLedgerToTransactions() {
+    if (_walletDecisionLedger.isEmpty) return;
+    for (final t in _allTransactions) {
+      final decided = _walletDecisionLedger[t.id];
+      if (decided == null || decided <= 0 || decided > 2) continue;
+      t.status = TransactionStatus.values[decided];
+    }
+  }
+
   Future<bool> _pushTransactionToCloudReliable(AppTransaction t, {int attempts = 3}) async {
     if (t.status != TransactionStatus.pending) {
       return _pushTransactionDecisionToCloud(t, attempts: attempts);
@@ -5336,14 +5409,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _flushLocalWalletDecisionsToCloud() async {
     if (_currentUser?.isAdmin != true) return;
+    await _refreshWalletDecisionLedger();
+    _applyWalletDecisionLedgerToTransactions();
     if (!await ngmyCanReachCloud()) return;
     const walletTypes = {TransactionType.deposit, TransactionType.withdrawal};
     for (final t in _allTransactions) {
       if (!walletTypes.contains(t.type)) continue;
       if (t.status == TransactionStatus.pending) continue;
       if (t.id.isEmpty) continue;
-      final ok = await _pushTransactionDecisionToCloud(t, attempts: 3);
-      if (!ok) {
+      final ok = await _pushTransactionDecisionToCloud(t, attempts: 4);
+      if (ok) {
+        await NgmyWalletDecisionLedger.clear(t.id);
+        _walletDecisionLedger.remove(t.id);
+      } else {
         _markTransactionDirty(t.id);
         debugPrint('[txn] wallet decision still not in cloud: ${t.id} (${t.status.name})');
       }
@@ -5374,6 +5452,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           .timeout(kNgmyCloudLoadTimeout);
       if (rows == null || !mounted) return;
       var added = 0;
+      final newPendingForAdmin = <AppTransaction>[];
       setState(() {
         for (final raw in rows as List) {
           final tx = AppTransaction.fromJson(Map<String, dynamic>.from(raw as Map));
@@ -5391,18 +5470,34 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (tx.status != TransactionStatus.pending) continue;
           _allTransactions.add(tx);
           added++;
-          unawaited(_notifyAdminAboutPendingTransaction(tx));
+          newPendingForAdmin.add(tx);
         }
       });
+      if (newPendingForAdmin.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          for (final tx in newPendingForAdmin) {
+            unawaited(_notifyAdminAboutPendingTransaction(tx));
+          }
+        });
+      }
       if (added > 0) unawaited(_persistLocalOnly());
     } catch (e) {
       debugPrint('[admin] pending txn poll: $e');
     }
   }
 
+  /// [_config.storeOrders] may be an unmodifiable view from bootstrap/json — copy before mutating.
+  bool _maintainConfigStoreOrders() {
+    final orders = _mutableStoreOrdersCopy(_config.storeOrders);
+    final changed = _maintainStoreOrders(orders);
+    _config.storeOrders = orders;
+    return changed;
+  }
+
   /// Local disk only — use after targeted cloud upserts (approve/deny, fast push).
   Future<void> _persistLocalOnly() async {
-    _maintainStoreOrders(_config.storeOrders);
+    _maintainConfigStoreOrders();
     try {
       final prefs = await SharedPreferences.getInstance();
       _allUsers.removeWhere((u) => u.email.trim().isEmpty);
@@ -5722,6 +5817,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
         else next.storeOrders = _mergeStoreOrdersLists(keepOrders, next.storeOrders);
+        next.storeOrders = _mutableStoreOrdersCopy(next.storeOrders);
         if (_maintainStoreOrders(next.storeOrders)) {
           unawaited(_pushStoreOrdersToSupabase(next.storeOrders));
         }
@@ -6345,7 +6441,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }) {
     if (!mounted) return;
     _inAppNoticeEntry?.remove();
-    final overlay = Overlay.of(context, rootOverlay: true);
+    final overlay = NgmyNavigator.root?.overlay;
+    if (overlay == null) {
+      debugPrint('[notice] overlay not ready — skipped: $title');
+      return;
+    }
     final accent = isError ? const Color(0xFFEF4444) : const Color(0xFF22D3EE);
     _inAppNoticeEntry = OverlayEntry(
       builder: (_) => IgnorePointer(
@@ -6410,6 +6510,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _notifyAdminAboutPendingTransaction(AppTransaction tx) async {
     if (_currentUser?.isAdmin != true) return;
     if (tx.status != TransactionStatus.pending) return;
+    if (_notifiedTransactionKeys.contains('admin_pending_${tx.id}')) return;
     if (tx.type == TransactionType.withdrawal) {
       await _notifyAdminPendingRequest(
         title: 'New withdrawal request',
@@ -6422,7 +6523,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         body: '${tx.userEmail} submitted ${formatCurrency(tx.amount)}. Open Admin → Wallet.',
         tag: 'admin_deposit_${tx.id}',
       );
+    } else {
+      return;
     }
+    _notifiedTransactionKeys.add('admin_pending_${tx.id}');
+    unawaited(_persistNotifiedTransactionKeys());
   }
 
   void _notifyAdminOnNewPendingRegistrarApps(AppConfig prev, AppConfig next) {
@@ -6808,6 +6913,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _applyNgmyChatClosedFromRemote(next, record, localClosed: _config.ngmyChatClosed);
         if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
         else next.storeOrders = _mergeStoreOrdersLists(keepOrders, next.storeOrders);
+        next.storeOrders = _mutableStoreOrdersCopy(next.storeOrders);
         _maintainStoreOrders(next.storeOrders);
         if (next.storeListings.isEmpty && keepListings.isNotEmpty) next.storeListings = keepListings;
         if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) {
@@ -7074,6 +7180,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           } else {
             previous = _allTransactions[idx];
             tx = _pickPreferredTransaction(previous!, incoming);
+            final decided = _walletDecisionLedger[tx.id];
+            if (decided != null && decided > 0 && decided <= 2) {
+              tx.status = TransactionStatus.values[decided];
+            }
             _allTransactions[idx] = tx;
           }
         });
@@ -7256,6 +7366,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (tLocalEarly != null) {
         try {
           _allTransactions = (jsonDecode(tLocalEarly) as List).map((e) => AppTransaction.fromJson(e)).toList();
+          _applyWalletDecisionLedgerToTransactions();
         } catch (_) {
           prefs.remove('all_transactions');
         }
@@ -7377,7 +7488,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (transData != null) {
           final remoteTransactions =
               (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
-          _allTransactions = _mergeTransactionsWithRemote(_allTransactions, remoteTransactions);
+          await _refreshWalletDecisionLedger();
+          _allTransactions = _mergeTransactionsWithRemote(
+            _allTransactions,
+            remoteTransactions,
+            walletDecisionLedger: _walletDecisionLedger,
+          );
           if (bootstrapAdmin) {
             await _flushLocalWalletDecisionsToCloud();
             final refreshed = await supabase
@@ -7387,8 +7503,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 .limit(300);
             if (refreshed != null) {
               final again = (refreshed as List).map((e) => AppTransaction.fromJson(e)).toList();
-              _allTransactions = _mergeTransactionsWithRemote(_allTransactions, again);
+              _allTransactions = _mergeTransactionsWithRemote(
+                _allTransactions,
+                again,
+                walletDecisionLedger: _walletDecisionLedger,
+              );
             }
+            _applyWalletDecisionLedgerToTransactions();
           }
         }
 
@@ -7681,7 +7802,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final cutoff = DateTime.now().subtract(const Duration(days: 1));
     final oldApproved = _allTransactions.where((t) {
       if (t.status != TransactionStatus.approved) return false;
-      if (t.type != TransactionType.deposit) return false;
+      if (t.type != TransactionType.deposit && t.type != TransactionType.withdrawal) return false;
       return t.timestamp.isBefore(cutoff);
     }).toList();
 
@@ -7704,7 +7825,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _heavySaveTimer?.cancel();
     }
     _isSyncing = true;
-    _maintainStoreOrders(_config.storeOrders);
+    _maintainConfigStoreOrders();
     var ordersSnapshot = List<Map<String, dynamic>>.from(
       _config.storeOrders.map((e) => Map<String, dynamic>.from(e)),
     );
@@ -8070,8 +8191,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 },
                 onProcessTransaction: (t, approve) async {
                   UserData? syncedUser;
+                  final newStatus = approve ? TransactionStatus.approved : TransactionStatus.rejected;
+                  await NgmyWalletDecisionLedger.record(t.id, newStatus.index);
+                  _walletDecisionLedger[t.id] = newStatus.index;
                   setState(() {
-                    t.status = approve ? TransactionStatus.approved : TransactionStatus.rejected;
+                    t.status = newStatus;
                     final targetIndex = _allUsers.indexWhere((u) => u.email == t.userEmail);
                     if (targetIndex == -1) return;
                     final targetUser = _allUsers[targetIndex];
@@ -8130,9 +8254,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   });
                   _markTransactionDirty(t.id);
                   await _persistLocalOnly();
-                  final synced = await _pushTransactionDecisionToCloud(t);
+                  var synced = await _pushTransactionDecisionToCloud(t);
                   if (!synced) {
                     debugPrint('[txn] approval cloud sync failed for ${t.id} — retrying admin sync');
+                    if (_currentUser?.isAdmin == true) {
+                      await _syncAdminOperationalToCloud();
+                      synced = await _pushTransactionDecisionToCloud(t, attempts: 4);
+                    }
+                  }
+                  if (synced) {
+                    await NgmyWalletDecisionLedger.clear(t.id);
+                    _walletDecisionLedger.remove(t.id);
                   }
                   if (syncedUser != null) {
                     await _pushUserToCloudFast(syncedUser!);
@@ -8142,6 +8274,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     await _syncAdminOperationalToCloud();
                   }
                   await _persistLocalOnly();
+                  if (mounted) {
+                    final label = approve ? 'approved' : 'rejected';
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          synced
+                              ? 'Deposit/withdrawal $label and saved to the database.'
+                              : 'Saved on this device as $label. Database sync is still retrying — keep internet on; it will not ask again after sync succeeds.',
+                        ),
+                        backgroundColor: synced ? const Color(0xFF00B25A) : Colors.orange,
+                        duration: const Duration(seconds: 5),
+                      ),
+                    );
+                  }
                   if (approve) {
                     ngmyPlayIncomeSoundForTransaction(t);
                   }
@@ -9875,6 +10021,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         onPostToNews: widget.onAddAnnouncement,
         onNewsRead: _refreshUnreadNewsBadge,
         onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead,
+        liveAppKnowledge: () => NgmyAppKnowledge.build(
+          viewer: {
+            'email': widget.user.email,
+            'username': widget.user.username,
+            'isAdmin': widget.user.isAdmin,
+            'accountBalance': widget.user.accountBalance,
+          },
+          config: widget.config.toJson(),
+          transactions: widget.allTransactions.take(100).map((e) => e.toJson()).toList(),
+          investmentPlans: widget.globalPlans.map((e) => e.toJson()).toList(),
+          announcements: widget.allAnnouncements.take(10).map((e) {
+            final a = e;
+            return {'id': a.id, 'message': a.message};
+          }).toList(),
+          mediaPostCount: widget.allMedia.length,
+          userCount: widget.allUsers.length,
+        ),
       ),
     );
     await _refreshUnreadNewsBadge();
@@ -25675,6 +25838,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       if (cfg == null || cfg['storeOrders'] is! List) return;
       final remote = (cfg['storeOrders'] as List).map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
       widget.config.storeOrders = _mergeStoreOrdersLists(widget.config.storeOrders, remote);
+      widget.config.storeOrders = _mutableStoreOrdersCopy(widget.config.storeOrders);
       ngmyOnStoreOrdersChanged?.call(prevOrders, widget.config.storeOrders);
       if (_maintainStoreOrders(widget.config.storeOrders)) {
         unawaited(_pushStoreOrdersToSupabase(widget.config.storeOrders));
@@ -35865,6 +36029,7 @@ class AnnouncementScreen extends StatefulWidget {
   final Function(Announcement) onPostToNews;
   final VoidCallback? onNewsRead;
   final Future<void> Function(List<String> ids)? onMarkAnnouncementsRead;
+  final String Function()? liveAppKnowledge;
   const AnnouncementScreen({
     super.key,
     required this.user,
@@ -35874,6 +36039,7 @@ class AnnouncementScreen extends StatefulWidget {
     required this.onPostToNews,
     this.onNewsRead,
     this.onMarkAnnouncementsRead,
+    this.liveAppKnowledge,
   });
 
   @override
@@ -36250,7 +36416,9 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       }
 
       final creds = ngmyParseAiCredentials(apiKey);
+      final liveDb = widget.liveAppKnowledge?.call() ?? '';
       final prompt = '${_ngmyHelperSystemContext(user: widget.user)}'
+          '${liveDb.isNotEmpty ? '\n$liveDb\n' : ''}'
           '${_messages.isNotEmpty ? '\n${NgmyAiMemoryStore.transcriptForPrompt(_messages)}\n' : ''}'
           '\nUser: $text';
       final aiResult = await ngmyAiGenerateWithCredentials(creds, prompt);
