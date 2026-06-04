@@ -456,6 +456,56 @@ void ngmyApplyApprovedTransactionToBalance(UserData user, AppTransaction t) {
   }
 }
 
+int _ngmyTransactionStatusRank(TransactionStatus status) {
+  switch (status) {
+    case TransactionStatus.approved:
+      return 2;
+    case TransactionStatus.rejected:
+      return 1;
+    case TransactionStatus.pending:
+      return 0;
+  }
+}
+
+AppTransaction _pickPreferredTransaction(AppTransaction local, AppTransaction remote) {
+  final localRank = _ngmyTransactionStatusRank(local.status);
+  final remoteRank = _ngmyTransactionStatusRank(remote.status);
+  if (localRank != remoteRank) {
+    return localRank > remoteRank ? local : remote;
+  }
+  return local.timestamp.isAfter(remote.timestamp) ? local : remote;
+}
+
+List<AppTransaction> _mergeTransactionsWithRemote(
+  List<AppTransaction> local,
+  List<AppTransaction> remote,
+) {
+  final merged = <String, AppTransaction>{};
+  for (final t in remote) {
+    if (t.id.isEmpty) continue;
+    merged[t.id] = t;
+  }
+  for (final t in local) {
+    if (t.id.isEmpty) continue;
+    final existing = merged[t.id];
+    merged[t.id] = existing == null ? t : _pickPreferredTransaction(t, existing);
+  }
+  return merged.values.toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+}
+
+/// Apply balance when a transaction becomes approved (avoids double-deduct on withdrawals).
+void _ngmyApplyApprovedTransitionToBalance(
+  UserData user,
+  AppTransaction tx, {
+  required TransactionStatus? previousStatus,
+}) {
+  if (tx.status != TransactionStatus.approved) return;
+  if (tx.type == TransactionType.withdrawal && previousStatus == TransactionStatus.pending) {
+    return;
+  }
+  ngmyApplyApprovedTransactionToBalance(user, tx);
+}
+
 enum TransactionType { deposit, withdrawal, adminAdd, adminRemove, reimbursement, contribution, claim }
 enum TransactionStatus { pending, approved, rejected }
 enum PaymentMethod { cashApp, bitcoin, system }
@@ -537,13 +587,7 @@ class AppTransaction {
     required this.timestamp,
   });
 
-  Map<String, dynamic> toJson() => {
-    'id': id, 'userEmail': userEmail, 'amount': amount,
-    'type': type.index, 'method': method.index,
-    'sourceDetails': sourceDetails, 'screenshotPath': screenshotPath,
-    'verificationCode': verificationCode, 'status': status.index,
-    'timestamp': timestamp.toUtc().toIso8601String(),
-  };
+  Map<String, dynamic> toJson() => _transactionRowForCloud(this);
 
   factory AppTransaction.fromJson(Map<String, dynamic> json) {
     DateTime parseDate(dynamic v) {
@@ -553,19 +597,89 @@ class AppTransaction {
         return d.isUtc ? d.toLocal() : d;
       } catch (_) { return DateTime.now(); }
     }
+    int parseIndex(dynamic v, int max) {
+      if (v == null) return 0;
+      if (v is int) return v.clamp(0, max);
+      if (v is num) return v.toInt().clamp(0, max);
+      final n = int.tryParse(v.toString());
+      if (n != null) return n.clamp(0, max);
+      final lower = v.toString().toLowerCase();
+      if (lower == 'pending') return 0;
+      if (lower == 'approved') return 1;
+      if (lower == 'rejected') return 2;
+      return 0;
+    }
     return AppTransaction(
-      id: json['id'] ?? '',
-      userEmail: json['userEmail'] ?? '',
+      id: (json['id'] ?? '').toString(),
+      userEmail: (json['userEmail'] ?? json['user_email'] ?? '').toString(),
       amount: (json['amount'] ?? 0.0).toDouble(),
-      type: TransactionType.values[(json['type'] ?? 0) as int],
-      method: PaymentMethod.values[(json['method'] ?? 0) as int],
-      sourceDetails: json['sourceDetails'],
-      screenshotPath: json['screenshotPath'],
-      verificationCode: json['verificationCode'],
-      status: TransactionStatus.values[(json['status'] ?? 0) as int],
+      type: TransactionType.values[parseIndex(json['type'], TransactionType.values.length - 1)],
+      method: PaymentMethod.values[parseIndex(json['method'], PaymentMethod.values.length - 1)],
+      sourceDetails: (json['sourceDetails'] ?? json['source_details'])?.toString(),
+      screenshotPath: (json['screenshotPath'] ?? json['screenshot_path'])?.toString(),
+      verificationCode: (json['verificationCode'] ?? json['verification_code'])?.toString(),
+      status: TransactionStatus.values[parseIndex(json['status'], TransactionStatus.values.length - 1)],
       timestamp: parseDate(json['timestamp']),
     );
   }
+}
+
+Map<String, dynamic> _transactionRowForCloud(AppTransaction t) {
+  return {
+    'id': t.id,
+    'userEmail': t.userEmail,
+    'user_email': t.userEmail,
+    'amount': t.amount,
+    'type': t.type.index,
+    'method': t.method.index,
+    'sourceDetails': t.sourceDetails,
+    'source_details': t.sourceDetails,
+    'screenshotPath': t.screenshotPath,
+    'screenshot_path': t.screenshotPath,
+    'verificationCode': t.verificationCode,
+    'verification_code': t.verificationCode,
+    'status': t.status.index,
+    'timestamp': t.timestamp.toUtc().toIso8601String(),
+  };
+}
+
+Future<bool> _verifyTransactionStatusInCloud(AppTransaction t) async {
+  try {
+    final row = await Supabase.instance.client
+        .from('transactions')
+        .select('status')
+        .eq('id', t.id)
+        .maybeSingle()
+        .timeout(kNgmyCloudWriteTimeout);
+    if (row == null) return false;
+    final remote = row['status'];
+    final remoteIdx = remote is num ? remote.toInt() : int.tryParse(remote?.toString() ?? '');
+    return remoteIdx == t.status.index;
+  } catch (e) {
+    debugPrint('[txn] verify status: $e');
+    return false;
+  }
+}
+
+Future<bool> _pushTransactionDecisionToCloud(AppTransaction t, {int attempts = 5}) async {
+  if (!await ngmyCanReachCloud()) return false;
+  final row = _transactionRowForCloud(t);
+  for (var i = 0; i < attempts; i++) {
+    try {
+      await Supabase.instance.client.from('transactions').upsert(row).timeout(kNgmyCloudWriteTimeout);
+      if (await _verifyTransactionStatusInCloud(t)) return true;
+      await Supabase.instance.client
+          .from('transactions')
+          .update({'status': t.status.index})
+          .eq('id', t.id)
+          .timeout(kNgmyCloudWriteTimeout);
+      if (await _verifyTransactionStatusInCloud(t)) return true;
+    } catch (e) {
+      debugPrint('[txn] decision push attempt ${i + 1}: $e');
+    }
+    await Future.delayed(Duration(milliseconds: 350 * (i + 1)));
+  }
+  return false;
 }
 
 class AppConfig {
@@ -1609,7 +1723,7 @@ Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
   try {
     await Supabase.instance.client
         .from('transactions')
-        .upsert(Map<String, dynamic>.from(t.toJson()))
+        .upsert(_transactionRowForCloud(t))
         .timeout(kNgmyCloudWriteTimeout);
   } catch (e) {
     debugPrint('[txn] fast upsert: $e');
@@ -2306,29 +2420,35 @@ Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
     return false;
   }
   const protected = {'id', 'userEmail', 'videoUrl', 'timestamp'};
-  for (int i = 0; i < 12; i++) {
-    try {
-      await Supabase.instance.client.from('media').upsert(working).timeout(kNgmyCloudWriteTimeout);
-      return true;
-    } catch (e) {
-      if (_isMissingTablePostgrestError(e, 'media')) {
-        debugPrint('[media] table missing in Supabase.');
-        return false;
-      }
-      final missing = _missingColumnFromPostgrestError(e);
-      if (missing != null && missing.isNotEmpty) {
-        if (protected.contains(missing)) {
-          debugPrint('[media] required column missing in Supabase: $missing — run supabase/media_tables.sql');
+  for (int pass = 0; pass < 2; pass++) {
+    for (int i = 0; i < 12; i++) {
+      try {
+        await Supabase.instance.client.from('media').upsert(working).timeout(kNgmyCloudWriteTimeout);
+        return true;
+      } catch (e) {
+        if (_isMissingTablePostgrestError(e, 'media')) {
+          debugPrint('[media] table missing in Supabase.');
           return false;
         }
-        working.remove(missing);
-        if (working['data'] is Map) {
-          (working['data'] as Map).remove(missing);
+        final missing = _missingColumnFromPostgrestError(e);
+        if (missing != null && missing.isNotEmpty) {
+          if (protected.contains(missing)) {
+            debugPrint('[media] required column missing in Supabase: $missing — run supabase/media_tables.sql');
+            return false;
+          }
+          working.remove(missing);
+          if (working['data'] is Map) {
+            (working['data'] as Map).remove(missing);
+          }
+          continue;
         }
-        continue;
+        debugPrint('[media] upsert error: $e');
+        break;
       }
-      debugPrint('[media] upsert error: $e');
-      return false;
+    }
+    if (pass == 0) {
+      working = ngmyMediaRowMinimalForCloud(row);
+      debugPrint('[media] retrying upsert with minimal columns');
     }
   }
   return false;
@@ -5160,15 +5280,35 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<bool> _pushTransactionToCloudReliable(AppTransaction t, {int attempts = 3}) async {
+    if (t.status != TransactionStatus.pending) {
+      return _pushTransactionDecisionToCloud(t, attempts: attempts);
+    }
     for (var i = 0; i < attempts; i++) {
       if (!await ngmyCanReachCloud()) {
         await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
         continue;
       }
-      await _safeUpsertRows('transactions', [Map<String, dynamic>.from(t.toJson())]);
-      return true;
+      final ok = await _safeUpsertRows('transactions', [_transactionRowForCloud(t)]);
+      if (ok) return true;
+      await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
     }
     return false;
+  }
+
+  Future<void> _flushLocalWalletDecisionsToCloud() async {
+    if (_currentUser?.isAdmin != true) return;
+    if (!await ngmyCanReachCloud()) return;
+    const walletTypes = {TransactionType.deposit, TransactionType.withdrawal};
+    for (final t in _allTransactions) {
+      if (!walletTypes.contains(t.type)) continue;
+      if (t.status == TransactionStatus.pending) continue;
+      if (t.id.isEmpty) continue;
+      final ok = await _pushTransactionDecisionToCloud(t, attempts: 3);
+      if (!ok) {
+        _markTransactionDirty(t.id);
+        debugPrint('[txn] wallet decision still not in cloud: ${t.id} (${t.status.name})');
+      }
+    }
   }
 
   Timer? _adminPendingTxnPoll;
@@ -5198,12 +5338,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       setState(() {
         for (final raw in rows as List) {
           final tx = AppTransaction.fromJson(Map<String, dynamic>.from(raw as Map));
-          if (_allTransactions.any((t) => t.id == tx.id)) continue;
+          final idx = _allTransactions.indexWhere((t) => t.id == tx.id);
+          if (idx != -1) {
+            final local = _allTransactions[idx];
+            if (local.status != TransactionStatus.pending) continue;
+            if (tx.status == TransactionStatus.pending &&
+                !tx.timestamp.isAfter(local.timestamp)) {
+              continue;
+            }
+            _allTransactions[idx] = _pickPreferredTransaction(local, tx);
+            continue;
+          }
+          if (tx.status != TransactionStatus.pending) continue;
           _allTransactions.add(tx);
           added++;
-          if (tx.status == TransactionStatus.pending) {
-            unawaited(_notifyAdminAboutPendingTransaction(tx));
-          }
+          unawaited(_notifyAdminAboutPendingTransaction(tx));
         }
       });
       if (added > 0) unawaited(_persistLocalOnly());
@@ -5262,28 +5411,42 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return rows;
   }
 
-  /// Admin sync — pending requests, operational config (no full-table bulk).
+  /// Admin sync — finalized wallet decisions first, then pending requests.
   Future<void> _syncAdminOperationalToCloud() async {
     if (_currentUser?.isAdmin != true) return;
     if (!await ngmyCanReachCloud()) return;
     _isSyncing = true;
+    final syncedTxnIds = <String>{};
     try {
       await _persistLocalOnly();
-      final pendingTx = _allTransactions
-          .where((t) => t.status == TransactionStatus.pending)
-          .map((e) => Map<String, dynamic>.from(e.toJson()))
+      const walletTypes = {TransactionType.deposit, TransactionType.withdrawal};
+      final finalized = _allTransactions
+          .where((t) => walletTypes.contains(t.type) && t.status != TransactionStatus.pending)
           .toList();
-      if (pendingTx.isNotEmpty) {
-        await _safeUpsertRows('transactions', pendingTx);
+      for (final t in finalized) {
+        if (t.id.isEmpty) continue;
+        final dirty = _dirtyTransactionIds.contains(t.id);
+        final recent = t.timestamp.isAfter(DateTime.now().subtract(const Duration(days: 7)));
+        if (!dirty && !recent) continue;
+        if (await _pushTransactionDecisionToCloud(t)) {
+          syncedTxnIds.add(t.id);
+        }
       }
-      final txRows = _transactionsForAdminCloudSync();
+      final txRows = _transactionsForAdminCloudSync()
+          .map((e) => _transactionRowForCloud(AppTransaction.fromJson(e)))
+          .toList();
       if (txRows.isNotEmpty) {
-        await _safeUpsertRows('transactions', txRows);
+        final ok = await _safeUpsertRows('transactions', txRows);
+        if (ok) {
+          syncedTxnIds.addAll(txRows.map((e) => (e['id'] ?? '').toString()).where((e) => e.isNotEmpty));
+        }
       }
-      final emails = <String>{
-        ..._dirtyUserEmails,
-        ...pendingTx.map((t) => (t['userEmail'] ?? '').toString().toLowerCase().trim()),
-      }..removeWhere((e) => e.isEmpty);
+      final pendingEmails = _allTransactions
+          .where((t) => t.status == TransactionStatus.pending)
+          .map((t) => t.userEmail.toLowerCase().trim())
+          .where((e) => e.isNotEmpty)
+          .toSet();
+      final emails = <String>{..._dirtyUserEmails, ...pendingEmails};
       final usersToSync = emails.isEmpty
           ? _allUsers.where(_userNeedsAdminCloudSync).toList()
           : _allUsers.where((u) => emails.contains(u.email.toLowerCase().trim())).toList();
@@ -5295,7 +5458,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       await _persistOperationalConfigToCloud(_config);
       _dirtyUserEmails.clear();
-      _dirtyTransactionIds.clear();
+      _dirtyTransactionIds.removeWhere(syncedTxnIds.contains);
       await ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false);
     } catch (e) {
       debugPrint('[ngmy] admin operational sync: $e');
@@ -5846,10 +6009,27 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     unawaited(_processMediaDeliveryQueue());
   }
 
+  Future<void> _resyncLocalMediaMissingFromCloud(List<MediaPost> remote) async {
+    if (!await ngmyCanReachCloud()) return;
+    final remoteIds = remote.map((m) => m.id).where((id) => id.isNotEmpty).toSet();
+    for (final post in List<MediaPost>.from(_allMedia)) {
+      if (post.id.isEmpty || remoteIds.contains(post.id)) continue;
+      if (!_mediaUrlIsCloudSynced(post.videoUrl)) continue;
+      if (await _mediaPostExistsInSupabase(post.id)) continue;
+      final saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+      if (saved) {
+        debugPrint('[media] backfilled missing cloud row for ${post.id}');
+      }
+    }
+  }
+
   Future<void> _reloadMediaFromSupabase() async {
     final remote = await _fetchMediaPostsFromSupabase();
     if (remote == null || !mounted) return;
-    final next = _mergeMediaWithRemote(_allMedia, remote, tombstones: _tombstonedMediaIds);
+    await _resyncLocalMediaMissingFromCloud(remote);
+    final refreshed = await _fetchMediaPostsFromSupabase();
+    final mergedRemote = refreshed ?? remote;
+    final next = _mergeMediaWithRemote(_allMedia, mergedRemote, tombstones: _tombstonedMediaIds);
     setState(() => _allMedia = next);
     await _persistAllMediaLocally();
   }
@@ -6842,14 +7022,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (id.isEmpty) return;
         setState(() => _allTransactions.removeWhere((t) => t.id == id));
       } else {
-        final tx = AppTransaction.fromJson(payload.newRecord);
+        final incoming = AppTransaction.fromJson(payload.newRecord);
         AppTransaction? previous;
+        late AppTransaction tx;
         setState(() {
-          final idx = _allTransactions.indexWhere((t) => t.id == tx.id);
+          final idx = _allTransactions.indexWhere((t) => t.id == incoming.id);
           if (idx == -1) {
-            _allTransactions.add(tx);
+            _allTransactions.add(incoming);
+            tx = incoming;
           } else {
             previous = _allTransactions[idx];
+            tx = _pickPreferredTransaction(previous!, incoming);
             _allTransactions[idx] = tx;
           }
         });
@@ -6864,10 +7047,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
           final shouldApplyBalance = previous == null || previous!.status == TransactionStatus.pending;
           if (userIdx >= 0 && shouldApplyBalance) {
-            ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], tx);
+            _ngmyApplyApprovedTransitionToBalance(
+              _allUsers[userIdx],
+              tx,
+              previousStatus: previous?.status,
+            );
+            _allUsers[userIdx].accountBalance = ngmyResolveAccountBalance(
+              _allUsers[userIdx].email,
+              _allUsers[userIdx].accountBalance,
+              _allTransactions,
+            );
             if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
               _currentUser = _allUsers[userIdx];
             }
+            unawaited(_pushUserToCloudFast(_allUsers[userIdx]));
           } else if (ngmyTransactionCountsAsIncome(tx)) {
             ngmyPlayIncomeSoundForTransaction(tx);
           }
@@ -6875,6 +7068,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (previous == null && tx.status == TransactionStatus.pending) {
           unawaited(_notifyAdminAboutPendingTransaction(tx));
         }
+        unawaited(_persistLocalOnly());
       }
     } catch (e) {
       debugPrint('Transactions realtime apply error: $e');
@@ -7140,7 +7334,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             ? await supabase.from('transactions').select().order('timestamp', ascending: false).limit(300)
             : await supabase.from('transactions').select().eq('userEmail', sessionEmail);
         if (transData != null) {
-          _allTransactions = (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
+          final remoteTransactions =
+              (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
+          _allTransactions = _mergeTransactionsWithRemote(_allTransactions, remoteTransactions);
+          if (bootstrapAdmin) {
+            await _flushLocalWalletDecisionsToCloud();
+            final refreshed = await supabase
+                .from('transactions')
+                .select()
+                .order('timestamp', ascending: false)
+                .limit(300);
+            if (refreshed != null) {
+              final again = (refreshed as List).map((e) => AppTransaction.fromJson(e)).toList();
+              _allTransactions = _mergeTransactionsWithRemote(_allTransactions, again);
+            }
+          }
         }
 
         final mediaData = await supabase
@@ -7374,9 +7582,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return error.toString().contains("Could not find the table 'public.$table'");
   }
 
-  Future<void> _safeUpsertRows(String table, List<Map<String, dynamic>> rows) async {
-    if (rows.isEmpty) return;
-    if (_disabledSupabaseTables.contains(table)) return;
+  Future<bool> _safeUpsertRows(String table, List<Map<String, dynamic>> rows) async {
+    if (rows.isEmpty) return true;
+    if (_disabledSupabaseTables.contains(table)) return false;
 
     final working = rows.map((e) => Map<String, dynamic>.from(e)).toList();
     final removed = <String>{};
@@ -7387,12 +7595,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (removed.isNotEmpty) {
           debugPrint('[$table] synced with removed columns: ${removed.join(', ')}');
         }
-        return;
+        return true;
       } catch (e) {
         if (_isMissingTableError(e, table)) {
           _disabledSupabaseTables.add(table);
           debugPrint('[$table] table missing in Supabase. Local save continues.');
-          return;
+          return false;
         }
         final missing = _missingColumnFromError(e);
         if (missing != null && missing.isNotEmpty) {
@@ -7403,9 +7611,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           continue;
         }
         debugPrint('[$table] sync error: $e');
-        return;
+        return false;
       }
     }
+    return false;
   }
 
   Future<void> _safeDeleteTransactionsByIds(List<String> ids) async {
@@ -7813,70 +8022,85 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   }
                   _markTransactionDirty(t.id);
                   unawaited(_persistLocalOnly());
+                  if (t.status == TransactionStatus.approved && ngmyTransactionCountsAsIncome(t)) {
+                    ngmyPlayIncomeSoundForTransaction(t);
+                  }
                   _notifyTransactionEvent(t);
                 },
-                onProcessTransaction: (t, approve) {
+                onProcessTransaction: (t, approve) async {
                   UserData? syncedUser;
                   setState(() {
-                  t.status = approve ? TransactionStatus.approved : TransactionStatus.rejected;
-                  final targetIndex = _allUsers.indexWhere((u) => u.email == t.userEmail);
-                  if (targetIndex == -1) return;
-                  final targetUser = _allUsers[targetIndex];
-                  final details = t.sourceDetails ?? '';
-                  final isInvestmentRequest = t.type == TransactionType.deposit && isInvestmentRequestDetails(details);
-                  if (approve) {
-                    if (isInvestmentRequest) {
-                      final meta = parseInvestmentRequestDetails(details);
-                      final planName = (meta['plan'] ?? '').trim();
-                      final planAmount = double.tryParse(meta['amount'] ?? '');
-                      final planRoi = double.tryParse(meta['roi'] ?? '');
-                      if (planName.isNotEmpty && planAmount != null && planRoi != null) {
-                        targetUser.activeInvestment = ActiveInvestment(
-                          name: planName,
-                          amount: planAmount,
-                          dailyROI: InvestmentPlan.fixedRoi,
-                          purchaseDate: DateTime.now(),
-                          daysClockedIn: 0,
-                          totalEarned: 0.0,
-                        );
+                    t.status = approve ? TransactionStatus.approved : TransactionStatus.rejected;
+                    final targetIndex = _allUsers.indexWhere((u) => u.email == t.userEmail);
+                    if (targetIndex == -1) return;
+                    final targetUser = _allUsers[targetIndex];
+                    final details = t.sourceDetails ?? '';
+                    final isInvestmentRequest = t.type == TransactionType.deposit && isInvestmentRequestDetails(details);
+                    if (approve) {
+                      if (isInvestmentRequest) {
+                        final meta = parseInvestmentRequestDetails(details);
+                        final planName = (meta['plan'] ?? '').trim();
+                        final planAmount = double.tryParse(meta['amount'] ?? '');
+                        final planRoi = double.tryParse(meta['roi'] ?? '');
+                        if (planName.isNotEmpty && planAmount != null && planRoi != null) {
+                          targetUser.activeInvestment = ActiveInvestment(
+                            name: planName,
+                            amount: planAmount,
+                            dailyROI: InvestmentPlan.fixedRoi,
+                            purchaseDate: DateTime.now(),
+                            daysClockedIn: 0,
+                            totalEarned: 0.0,
+                          );
+                          targetUser.pendingInvestmentName = null;
+                          targetUser.pendingInvestmentAmount = null;
+                          targetUser.pendingInvestmentRoi = null;
+                          _allTransactions.add(
+                            AppTransaction(
+                              id: '${DateTime.now()}-invest',
+                              userEmail: t.userEmail,
+                              amount: t.amount,
+                              type: TransactionType.adminRemove,
+                              method: PaymentMethod.system,
+                              sourceDetails: 'Investment plan purchase/upgrade: $planName',
+                              status: TransactionStatus.approved,
+                              timestamp: DateTime.now(),
+                            ),
+                          );
+                        }
+                      } else if (t.type == TransactionType.deposit || t.type == TransactionType.adminAdd || t.type == TransactionType.reimbursement) {
+                        targetUser.accountBalance += t.amount;
+                      }
+                    } else {
+                      if (isInvestmentRequest) {
                         targetUser.pendingInvestmentName = null;
                         targetUser.pendingInvestmentAmount = null;
                         targetUser.pendingInvestmentRoi = null;
-                        _allTransactions.add(
-                          AppTransaction(
-                            id: '${DateTime.now()}-invest',
-                            userEmail: t.userEmail,
-                            amount: t.amount,
-                            type: TransactionType.adminRemove,
-                            method: PaymentMethod.system,
-                            sourceDetails: 'Investment plan purchase/upgrade: $planName',
-                            status: TransactionStatus.approved,
-                            timestamp: DateTime.now(),
-                          ),
-                        );
+                      } else if (t.type == TransactionType.withdrawal) {
+                        targetUser.accountBalance += t.amount;
                       }
-                    } else if (t.type == TransactionType.deposit || t.type == TransactionType.adminAdd || t.type == TransactionType.reimbursement) {
-                      targetUser.accountBalance += t.amount;
                     }
-                  } else {
-                    if (isInvestmentRequest) {
-                      targetUser.pendingInvestmentName = null;
-                      targetUser.pendingInvestmentAmount = null;
-                      targetUser.pendingInvestmentRoi = null;
-                    } else if (t.type == TransactionType.withdrawal) {
-                      targetUser.accountBalance += t.amount;
-                    }
+                    syncedUser = targetUser;
+                    targetUser.accountBalance = ngmyResolveAccountBalance(
+                      targetUser.email,
+                      targetUser.accountBalance,
+                      _allTransactions,
+                    );
+                    if (_currentUser != null && _currentUser!.email == t.userEmail) _currentUser = targetUser;
+                  });
+                  _markTransactionDirty(t.id);
+                  await _persistLocalOnly();
+                  final synced = await _pushTransactionDecisionToCloud(t);
+                  if (!synced) {
+                    debugPrint('[txn] approval cloud sync failed for ${t.id} — retrying admin sync');
                   }
-                  syncedUser = targetUser;
-                  if (_currentUser != null && _currentUser!.email == t.userEmail) _currentUser = targetUser;
-                });
-                  unawaited(_pushTransactionToCloudFast(t));
                   if (syncedUser != null) {
-                    unawaited(_pushUserToCloudFast(syncedUser!));
+                    await _pushUserToCloudFast(syncedUser!);
                     _markUserDirty(syncedUser!.email);
                   }
-                  _markTransactionDirty(t.id);
-                  unawaited(_persistLocalOnly());
+                  if (_currentUser?.isAdmin == true) {
+                    await _syncAdminOperationalToCloud();
+                  }
+                  await _persistLocalOnly();
                   if (approve) {
                     ngmyPlayIncomeSoundForTransaction(t);
                   }
@@ -7901,9 +8125,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     _allMedia.insert(0, post);
                   });
                   unawaited(() async {
-                    final saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+                    var saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
                     if (!saved) {
-                      debugPrint('[media] onPostMedia cloud upsert failed for ${post.id}');
+                      debugPrint('[media] onPostMedia cloud upsert failed for ${post.id} — retrying');
+                      await Future.delayed(const Duration(seconds: 2));
+                      saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+                    }
+                    if (!saved) {
+                      debugPrint('[media] onPostMedia cloud upsert still failed for ${post.id}');
                     }
                     await _persistTombstonedMediaIds(_tombstonedMediaIds);
                     await _persistAllMediaLocally();
@@ -8899,7 +9128,7 @@ class MainScreen extends StatefulWidget {
   final UserData user; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans;
   final List<MediaPost> allMedia; final List<Announcement> allAnnouncements; final AppConfig config;
   final Function(ThemeMode) onThemeChanged; final ThemeMode currentThemeMode; final VoidCallback onLogout; final VoidCallback onDataChanged;
-  final Function(AppTransaction) onAddTransaction; final Function(AppTransaction, bool) onProcessTransaction; final Function(InvestmentPlan) onAddPlan;
+  final Function(AppTransaction) onAddTransaction; final Future<void> Function(AppTransaction, bool) onProcessTransaction; final Function(InvestmentPlan) onAddPlan;
   final Function(MediaPost) onPostMedia;
   final Future<void> Function()? onRefreshMediaFromCloud;
   final Future<void> Function(MediaPost)? onDeleteMedia;
@@ -9562,7 +9791,7 @@ class HomeScreen extends StatefulWidget {
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
   final VoidCallback onClearAllAnnouncements;
-  final Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
+  final Future<void> Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
   final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
   final Future<bool> Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos)? onSavePopups;
   final Future<String> Function(String localRef)? onUploadPopupVideo;
@@ -11305,6 +11534,10 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> {
         setState(() {
           widget.user.accountBalance += payout;
         });
+        ngmyPlayIncomeSoundForAmount(
+          beneficiaryEmail: widget.user.email,
+          amount: payout,
+        );
         widget.onAddTransaction(
           AppTransaction(
             id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -12651,6 +12884,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       widget.user.accountBalance += payout;
       widget.user.totalProfit += (payout - widget.wager);
     });
+    ngmyPlayIncomeSoundForAmount(
+      beneficiaryEmail: widget.user.email,
+      amount: payout,
+    );
     widget.onAddTransaction(
       AppTransaction(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -12796,6 +13033,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       // Profit: solo profit component only (keeps same solo economics).
       widget.user.totalProfit += (soloPayout - widget.wager * yourRatio);
     });
+    ngmyPlayIncomeSoundForAmount(
+      beneficiaryEmail: widget.user.email,
+      amount: totalPayout,
+    );
 
     widget.onAddTransaction(
       AppTransaction(
@@ -12839,6 +13080,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       widget.user.accountBalance += payout;
       widget.user.totalProfit += (payout - widget.wager * ratio);
     });
+    ngmyPlayIncomeSoundForAmount(
+      beneficiaryEmail: widget.user.email,
+      amount: payout,
+    );
     widget.onAddTransaction(
       AppTransaction(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -13447,7 +13692,7 @@ class AdminDashboard extends StatefulWidget {
   final Function(Announcement) onAddAnnouncement;
   final Function(String) onDeleteAnnouncement;
   final VoidCallback onClearAllAnnouncements;
-  final Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
+  final Future<void> Function(AppTransaction, bool) onProcess; final Function(InvestmentPlan) onAddPlan; final Function(AppTransaction) onAddTransaction; final VoidCallback onDataChanged;
 
   final Future<bool> Function(String terms, String privacy)? onSaveLegalContent;
   final Future<bool> Function(List<Map<String, dynamic>> popups, List<Map<String, dynamic>> videos)? onSavePopups;
@@ -13502,9 +13747,20 @@ class NgmyAdminWalletApprovedArchive {
 class _AdminDashboardState extends State<AdminDashboard> {
   int _idx = 0; final _search = TextEditingController(); bool _isSearching = false; String _query = '';
   String? _selectedUserEmail;
+  String? _processingTxnId;
 
   List<AppTransaction> _walletApprovedArchive = const [];
   DateTime? _lastWalletArchiveLoad;
+
+  Future<void> _processWalletRequest(AppTransaction t, bool approve) async {
+    if (_processingTxnId == t.id) return;
+    setState(() => _processingTxnId = t.id);
+    try {
+      await widget.onProcess(t, approve);
+    } finally {
+      if (mounted) setState(() => _processingTxnId = null);
+    }
+  }
 
   @override
   void initState() {
@@ -15162,9 +15418,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
               const SizedBox(width: 40),
             const Spacer(),
             if (isPending) ...[
-              TextButton(onPressed: () { widget.onProcess(t, false); setState(() {}); }, child: const Text('REJECT', style: TextStyle(color: Colors.red))),
+              TextButton(
+                onPressed: _processingTxnId == t.id ? null : () => _processWalletRequest(t, false),
+                child: Text(_processingTxnId == t.id ? 'SAVING...' : 'REJECT', style: const TextStyle(color: Colors.red)),
+              ),
               const SizedBox(width: 10),
-              ElevatedButton(onPressed: () { widget.onProcess(t, true); setState(() {}); }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white), child: const Text('APPROVE')),
+              ElevatedButton(
+                onPressed: _processingTxnId == t.id ? null : () => _processWalletRequest(t, true),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
+                child: Text(_processingTxnId == t.id ? 'SAVING...' : 'APPROVE'),
+              ),
             ]
           ]),
         ])),
@@ -15290,9 +15553,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
           IconButton(icon: Icon(Icons.delete_outline, color: isDark ? Colors.white60 : const Color(0xFF1A1C1E)), onPressed: () { setState(() { widget.allTransactions.remove(t); }); widget.onDataChanged(); }),
           const Spacer(),
           if (isPending) ...[
-            TextButton(onPressed: () { widget.onProcess(t, false); setState(() {}); }, child: const Text('REJECT', style: TextStyle(color: Colors.red))),
+            TextButton(
+              onPressed: _processingTxnId == t.id ? null : () => _processWalletRequest(t, false),
+              child: Text(_processingTxnId == t.id ? 'SAVING...' : 'REJECT', style: const TextStyle(color: Colors.red)),
+            ),
             const SizedBox(width: 10),
-            ElevatedButton(onPressed: () { widget.onProcess(t, true); setState(() {}); }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white), child: const Text('APPROVE')),
+            ElevatedButton(
+              onPressed: _processingTxnId == t.id ? null : () => _processWalletRequest(t, true),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
+              child: Text(_processingTxnId == t.id ? 'SAVING...' : 'APPROVE'),
+            ),
           ]
         ])
       ]),
@@ -18177,6 +18447,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       widget.user.points -= convertedPoints;
       widget.user.accountBalance += dollars;
     });
+    ngmyPlayIncomeSoundForAmount(
+      beneficiaryEmail: widget.user.email,
+      amount: dollars,
+    );
     widget.onAddTransaction(
       AppTransaction(
         id: now.microsecondsSinceEpoch.toString(),
@@ -33591,6 +33865,10 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
 
     widget.allUsers[creatorIdx].accountBalance -= mon.watchReward;
     widget.allUsers[viewerIdx].accountBalance += mon.watchReward;
+    ngmyPlayIncomeSoundForAmount(
+      beneficiaryEmail: viewerEmail,
+      amount: mon.watchReward,
+    );
     if (!post.rewardedViewers.contains(viewerEmail)) {
       post.rewardedViewers.add(viewerEmail);
     }
@@ -33742,7 +34020,11 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       );
       post.applyMonetization(monetization);
 
-      final saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+      var saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+      if (!saved) {
+        await Future.delayed(const Duration(seconds: 2));
+        saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+      }
       if (!saved && mounted) {
         _showGlassNotice(
           'Sync warning',

@@ -1,3 +1,26 @@
+/// Guaranteed columns from `supabase/media_tables.sql` — last-resort upsert payload.
+Map<String, dynamic> ngmyMediaRowMinimalForCloud(Map<String, dynamic> raw) {
+  final mediaType =
+      (raw['contentType'] ?? raw['content_type'] ?? raw['type'] ?? 'video').toString();
+  final url = (raw['videoUrl'] ?? raw['video_url'] ?? raw['url'] ?? '').toString();
+  final likedBy = raw['likedBy'] ?? raw['liked_by'];
+  final savedBy = raw['savedBy'] ?? raw['saved_by'];
+  final comments = raw['comments'] ?? const [];
+  return {
+    'id': (raw['id'] ?? '').toString(),
+    'userEmail': (raw['userEmail'] ?? raw['user_email'] ?? '').toString(),
+    'username': (raw['username'] ?? 'User').toString(),
+    'videoUrl': url,
+    'contentType': mediaType,
+    'caption': (raw['caption'] ?? '').toString(),
+    'timestamp': (raw['timestamp'] ?? DateTime.now().toUtc().toIso8601String()).toString(),
+    'likes': likedBy is List ? likedBy.length : (raw['likes'] as num?)?.toInt() ?? 0,
+    'likedBy': likedBy is List ? likedBy : const [],
+    'savedBy': savedBy is List ? savedBy : const [],
+    'comments': comments is List ? comments : const [],
+  };
+}
+
 /// Builds Supabase `media` rows — core columns first, extras in `data` jsonb when present.
 Map<String, dynamic> ngmyMediaRowForCloud(Map<String, dynamic> raw) {
   final mediaType =
