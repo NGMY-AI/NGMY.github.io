@@ -412,26 +412,32 @@ double ngmyPendingWithdrawalTotal(String email, List<AppTransaction> transaction
   return total;
 }
 
-/// Display balance: approved ledger minus pending withdrawal holds.
+/// Only bumps balance UP when approved ledger exceeds stored (missed deposit credit).
+/// Never reduces balance here — withdrawals use explicit holds in onAdd / wallet decisions.
 double ngmyResolveAccountBalance(String email, double storedBalance, List<AppTransaction> transactions) {
   final approved = ngmyBalanceFromApprovedTransactions(email, transactions);
-  final pendingWithdraw = ngmyPendingWithdrawalTotal(email, transactions);
-  final fromLedger = (approved - pendingWithdraw).clamp(0.0, double.infinity);
-  if (pendingWithdraw > 0) {
-    var stored = storedBalance;
-    // Cloud user row may still be pre-hold; apply pending hold once when gross >= ledger + pending.
-    if (stored >= approved + pendingWithdraw - 0.01) {
-      stored = (stored - pendingWithdraw).clamp(0.0, double.infinity);
-    }
-    // Never crush earnings-only balances down to ledger-only when hold was already applied locally.
-    return math.max(fromLedger, stored);
+  if (approved > storedBalance + 0.01) {
+    return approved;
   }
-  // Keep the higher value so approved deposits are never dropped when storedBalance is stale.
-  return math.max(fromLedger, storedBalance);
+  return storedBalance;
 }
 
 void ngmyReconcileUserAccountBalance(UserData user, List<AppTransaction> transactions) {
   user.accountBalance = ngmyResolveAccountBalance(user.email, user.accountBalance, transactions);
+}
+
+void ngmyApplyPendingWithdrawalHold(UserData user, AppTransaction t, Set<String> appliedHoldIds) {
+  if (t.type != TransactionType.withdrawal || t.status != TransactionStatus.pending) return;
+  if (t.id.isEmpty || appliedHoldIds.contains(t.id)) return;
+  appliedHoldIds.add(t.id);
+  user.accountBalance = (user.accountBalance - t.amount).clamp(0.0, double.infinity);
+}
+
+void ngmyReleasePendingWithdrawalHold(UserData user, AppTransaction t, Set<String> appliedHoldIds) {
+  if (t.type != TransactionType.withdrawal) return;
+  if (t.id.isEmpty || !appliedHoldIds.contains(t.id)) return;
+  appliedHoldIds.remove(t.id);
+  user.accountBalance += t.amount;
 }
 
 /// After admin approves/rejects a wallet txn, sync user balance from ledger + any prior balance.
@@ -448,9 +454,6 @@ void ngmySyncUserBalanceAfterWalletDecision(
         justDecided,
         previousStatus: previousStatus,
       );
-    } else if (justDecided.status == TransactionStatus.rejected &&
-        justDecided.type == TransactionType.withdrawal) {
-      user.accountBalance += justDecided.amount;
     }
   }
   user.accountBalance = ngmyResolveAccountBalance(
@@ -5179,6 +5182,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   final Set<String> _dirtyUserEmails = {};
   final Set<String> _dirtyTransactionIds = {};
   Map<String, int> _walletDecisionLedger = {};
+  final Set<String> _withdrawalHoldTxnIds = {};
   DateTime? _lastCurrentUserCloudRefresh;
   Timer? _legalPlansRefreshDebounce;
   DateTime? _legalCloudRefreshPausedUntil;
@@ -5455,6 +5459,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _currentUser = b.currentUser;
     if (b.users.isNotEmpty) _allUsers = List<UserData>.from(b.users);
     if (b.transactions.isNotEmpty) _allTransactions = List<AppTransaction>.from(b.transactions);
+    _seedWithdrawalHoldTxnIds();
     if (b.media.isNotEmpty) _allMedia = List<MediaPost>.from(b.media);
     if (b.announcements.isNotEmpty) _allAnnouncements = List<Announcement>.from(b.announcements);
     if (b.config != null) _config = b.config!;
@@ -5596,8 +5601,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         remote.canSellOnStore = _canSellOnStoreForEmail(_config, key);
         _preserveLocalSessionState(_currentUser!, remote);
         _ngmyReconcileClockInSession(remote, _allTransactions);
+        final sessionBalance = _currentUser!.accountBalance;
         _currentUser = remote;
-        _reconcileAllUserBalances();
+        _currentUser!.accountBalance = sessionBalance;
+        if (idx >= 0) _allUsers[idx].accountBalance = sessionBalance;
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
@@ -5748,7 +5755,33 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     for (final t in _allTransactions) {
       final decided = _walletDecisionLedger[t.id];
       if (decided == null || decided <= 0 || decided > 2) continue;
-      t.status = TransactionStatus.values[decided];
+      final newStatus = TransactionStatus.values[decided];
+      if (t.status == newStatus) continue;
+      if (!ngmyIsWalletDepositOrWithdraw(t)) {
+        t.status = newStatus;
+        continue;
+      }
+      final previousStatus = t.status;
+      t.status = newStatus;
+      final userKey = t.userEmail.toLowerCase().trim();
+      final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
+      if (userIdx < 0) continue;
+      if (previousStatus == TransactionStatus.pending) {
+        if (newStatus == TransactionStatus.rejected && t.type == TransactionType.withdrawal) {
+          ngmyReleasePendingWithdrawalHold(_allUsers[userIdx], t, _withdrawalHoldTxnIds);
+        } else {
+          ngmySyncUserBalanceAfterWalletDecision(
+            _allUsers[userIdx],
+            _allTransactions,
+            justDecided: t,
+            previousStatus: previousStatus,
+          );
+        }
+        if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
+          _currentUser = _allUsers[userIdx];
+        }
+        unawaited(_pushUserToCloudFast(_allUsers[userIdx]));
+      }
     }
   }
 
@@ -6430,7 +6463,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _preserveLocalSessionState(_currentUser!, remote);
           _currentUser = remote;
         }
-        _reconcileAllUserBalances();
       });
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -7563,7 +7595,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               _currentUser = updatedUser;
             }
           }
-          _reconcileAllUserBalances();
         });
         unawaited(NgmyAnnouncementReads.saveLocal(email, updatedUser.readAnnouncementIds.toSet()));
         SharedPreferences.getInstance().then((prefs) {
@@ -7611,28 +7642,31 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             (previous == null || previous!.status != TransactionStatus.approved);
         final userKey = tx.userEmail.toLowerCase().trim();
         final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
-        if (becameApproved) {
-          final shouldApplyBalance = previous == null || previous!.status == TransactionStatus.pending;
-          if (userIdx >= 0 && shouldApplyBalance) {
+        if (userIdx >= 0 && ngmyIsWalletDepositOrWithdraw(tx)) {
+          if (tx.type == TransactionType.withdrawal &&
+              tx.status == TransactionStatus.pending &&
+              (previous == null || previous!.status != TransactionStatus.pending)) {
+            ngmyApplyPendingWithdrawalHold(_allUsers[userIdx], tx, _withdrawalHoldTxnIds);
+          } else if (tx.type == TransactionType.withdrawal &&
+              tx.status == TransactionStatus.rejected &&
+              previous?.status == TransactionStatus.pending) {
+            ngmyReleasePendingWithdrawalHold(_allUsers[userIdx], tx, _withdrawalHoldTxnIds);
+          } else if (becameApproved && previous?.status == TransactionStatus.pending) {
             ngmySyncUserBalanceAfterWalletDecision(
               _allUsers[userIdx],
               _allTransactions,
               justDecided: tx,
-              previousStatus: previous?.status,
+              previousStatus: previous!.status,
             );
-            if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
-              _currentUser = _allUsers[userIdx];
-            }
-            unawaited(_pushUserToCloudFast(_allUsers[userIdx]));
-          } else if (ngmyTransactionCountsAsIncome(tx)) {
-            ngmyPlayIncomeSoundForTransaction(tx);
           }
-        } else if (userIdx >= 0 &&
-            (tx.type == TransactionType.deposit || tx.type == TransactionType.withdrawal)) {
-          ngmyReconcileUserAccountBalance(_allUsers[userIdx], _allTransactions);
           if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
             _currentUser = _allUsers[userIdx];
           }
+          if (becameApproved && previous?.status == TransactionStatus.pending) {
+            unawaited(_pushUserToCloudFast(_allUsers[userIdx]));
+          }
+        } else if (becameApproved && ngmyTransactionCountsAsIncome(tx)) {
+          ngmyPlayIncomeSoundForTransaction(tx);
         }
         if (tx.status == TransactionStatus.pending &&
             (tx.type == TransactionType.deposit || tx.type == TransactionType.withdrawal) &&
@@ -7695,13 +7729,27 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
     if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) remote.isAuthorizedRegistrar = true;
     _preserveRegistryEnrollmentFromLocal(local, remote);
-    final pending = ngmyPendingWithdrawalTotal(local.email, _allTransactions);
-    if (pending > 0) {
-      if (local.accountBalance < remote.accountBalance - 0.001) {
-        remote.accountBalance = local.accountBalance;
-      }
+    final key = local.email.toLowerCase().trim();
+    final isSessionUser =
+        _currentUser != null && _currentUser!.email.toLowerCase().trim() == key;
+    final hasWalletActivity = _allTransactions.any((t) =>
+        t.userEmail.toLowerCase().trim() == key &&
+        ngmyIsWalletDepositOrWithdraw(t) &&
+        t.status != TransactionStatus.rejected);
+    if (isSessionUser || hasWalletActivity) {
+      remote.accountBalance = local.accountBalance;
     } else if (local.accountBalance > remote.accountBalance + 0.001) {
       remote.accountBalance = local.accountBalance;
+    }
+  }
+
+  void _seedWithdrawalHoldTxnIds() {
+    for (final t in _allTransactions) {
+      if (t.type == TransactionType.withdrawal &&
+          t.status == TransactionStatus.pending &&
+          t.id.isNotEmpty) {
+        _withdrawalHoldTxnIds.add(t.id);
+      }
     }
   }
 
@@ -7806,6 +7854,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         try {
           _allTransactions = (jsonDecode(tLocalEarly) as List).map((e) => AppTransaction.fromJson(e)).toList();
           _applyWalletDecisionLedgerToTransactions();
+          _seedWithdrawalHoldTxnIds();
         } catch (_) {
           prefs.remove('all_transactions');
         }
@@ -8613,7 +8662,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     final userKey = t.userEmail.toLowerCase().trim();
                     final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
                     if (userIdx != -1) {
-                      if (t.status == TransactionStatus.approved) {
+                      if (t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending) {
+                        ngmyApplyPendingWithdrawalHold(_allUsers[userIdx], t, _withdrawalHoldTxnIds);
+                      } else if (t.status == TransactionStatus.approved) {
                         ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], t);
                       }
                       ngmyReconcileUserAccountBalance(_allUsers[userIdx], _allTransactions);
@@ -8713,12 +8764,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       }
                     }
                     syncedUser = targetUser;
-                    ngmySyncUserBalanceAfterWalletDecision(
-                      targetUser,
-                      _allTransactions,
-                      justDecided: t,
-                      previousStatus: previousStatus,
-                    );
+                    if (!approve && t.type == TransactionType.withdrawal) {
+                      ngmyReleasePendingWithdrawalHold(targetUser, t, _withdrawalHoldTxnIds);
+                    } else {
+                      if (approve && t.type == TransactionType.withdrawal) {
+                        _withdrawalHoldTxnIds.remove(t.id);
+                      }
+                      ngmySyncUserBalanceAfterWalletDecision(
+                        targetUser,
+                        _allTransactions,
+                        justDecided: t,
+                        previousStatus: previousStatus,
+                      );
+                    }
                     if (_currentUser != null &&
                         _currentUser!.email.toLowerCase().trim() == t.userEmail.toLowerCase().trim()) {
                       _currentUser = targetUser;
