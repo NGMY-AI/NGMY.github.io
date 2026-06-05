@@ -871,6 +871,7 @@ class NgmyMediaAdminPanel extends StatefulWidget {
   final void Function(List<Map<String, dynamic>> profiles) onVirtualProfilesChanged;
   final Future<String> Function(String rawUrl) resolveMediaUrl;
   final Future<String> Function(String localRef)? uploadMediaRef;
+  final Future<void> Function(dynamic post)? onDeleteMedia;
 
   const NgmyMediaAdminPanel({
     super.key,
@@ -887,6 +888,7 @@ class NgmyMediaAdminPanel extends StatefulWidget {
     required this.onVirtualProfilesChanged,
     required this.resolveMediaUrl,
     this.uploadMediaRef,
+    this.onDeleteMedia,
   });
 
   @override
@@ -959,6 +961,7 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                 onDataChanged: widget.onDataChanged,
                 persistPost: widget.persistPost,
                 onEnqueueDelivery: widget.onEnqueueDelivery,
+                onDeleteMedia: widget.onDeleteMedia,
                 virtualProfiles: _profiles,
                 pickVirtualProfile: _pickVirtualProfile,
                 resolveMediaUrl: widget.resolveMediaUrl,
@@ -1553,6 +1556,7 @@ class _AdminPostCard extends StatefulWidget {
   final VoidCallback onDataChanged;
   final Future<bool> Function(dynamic post) persistPost;
   final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueDelivery;
+  final Future<void> Function(dynamic post)? onDeleteMedia;
   final List<Map<String, dynamic>> virtualProfiles;
   final Map<String, dynamic> Function() pickVirtualProfile;
   final Future<String> Function(String rawUrl) resolveMediaUrl;
@@ -1564,6 +1568,7 @@ class _AdminPostCard extends StatefulWidget {
     required this.onDataChanged,
     required this.persistPost,
     this.onEnqueueDelivery,
+    this.onDeleteMedia,
     required this.virtualProfiles,
     required this.pickVirtualProfile,
     required this.resolveMediaUrl,
@@ -2075,6 +2080,40 @@ class _AdminPostCardState extends State<_AdminPostCard> {
             ),
           ),
           const SizedBox(height: 14),
+          if (widget.onDeleteMedia != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (c) => AlertDialog(
+                        title: const Text('Delete post globally?'),
+                        content: const Text('This removes the post from Supabase and all users will stop seeing it.'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                          TextButton(
+                            onPressed: () => Navigator.pop(c, true),
+                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (ok != true) return;
+                    await widget.onDeleteMedia!(widget.post);
+                    widget.onDataChanged();
+                    if (!context.mounted) return;
+                    Navigator.of(context).pop();
+                    _snack('Post deleted from all devices.');
+                  },
+                  icon: const Icon(Icons.delete_forever_rounded, color: Colors.red),
+                  label: const Text('Delete post globally', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
+                  style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
+                ),
+              ),
+            ),
         ],
       ),
     );

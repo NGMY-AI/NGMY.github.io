@@ -57,12 +57,14 @@ class NgmyLoanServicesScreen extends StatefulWidget {
     required this.username,
     required this.config,
     required this.onDataChanged,
+    this.onPersistNow,
   });
 
   final String userEmail;
   final String username;
   final NgmyLoanConfigBridge config;
   final VoidCallback onDataChanged;
+  final Future<void> Function()? onPersistNow;
 
   @override
   State<NgmyLoanServicesScreen> createState() => _NgmyLoanServicesScreenState();
@@ -223,6 +225,7 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> {
                       config: widget.config,
                       onDataChanged: widget.onDataChanged,
                       isAdmin: false,
+                      onPersistNow: widget.onPersistNow,
                     ),
                   ),
                 )
@@ -261,18 +264,19 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> {
     }
     final ok = await Navigator.push<bool>(
       context,
-      MaterialPageRoute<bool>(builder: (_) => NgmyLoanApplicationScreen(userEmail: widget.userEmail, username: widget.username, config: widget.config, onDataChanged: widget.onDataChanged)),
+      MaterialPageRoute<bool>(builder: (_) => NgmyLoanApplicationScreen(userEmail: widget.userEmail, username: widget.username, config: widget.config, onDataChanged: widget.onDataChanged, onPersistNow: widget.onPersistNow)),
     );
     if (ok == true && mounted) setState(() {});
   }
 }
 
 class NgmyLoanApplicationScreen extends StatefulWidget {
-  const NgmyLoanApplicationScreen({super.key, required this.userEmail, required this.username, required this.config, required this.onDataChanged});
+  const NgmyLoanApplicationScreen({super.key, required this.userEmail, required this.username, required this.config, required this.onDataChanged, this.onPersistNow});
   final String userEmail;
   final String username;
   final NgmyLoanConfigBridge config;
   final VoidCallback onDataChanged;
+  final Future<void> Function()? onPersistNow;
 
   @override
   State<NgmyLoanApplicationScreen> createState() => _NgmyLoanApplicationScreenState();
@@ -576,6 +580,7 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
         'payments': payments,
       });
       widget.onDataChanged();
+      await widget.onPersistNow?.call();
       if (!mounted) return;
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan application submitted. Admin will review soon.')));
@@ -828,12 +833,13 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
 }
 
 class NgmyLoanTrackingScreen extends StatefulWidget {
-  const NgmyLoanTrackingScreen({super.key, required this.loanId, required this.config, required this.onDataChanged, required this.isAdmin});
+  const NgmyLoanTrackingScreen({super.key, required this.loanId, required this.config, required this.onDataChanged, required this.isAdmin, this.onPersistNow});
 
   final String loanId;
   final NgmyLoanConfigBridge config;
   final VoidCallback onDataChanged;
   final bool isAdmin;
+  final Future<void> Function()? onPersistNow;
 
   @override
   State<NgmyLoanTrackingScreen> createState() => _NgmyLoanTrackingScreenState();
@@ -846,12 +852,14 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> {
     return widget.config.loanApplications[i];
   }
 
-  void _mutateLoan(void Function(Map<String, dynamic> loan) fn) {
+  Future<void> _mutateLoan(void Function(Map<String, dynamic> loan) fn) async {
     final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == widget.loanId);
     if (i < 0) return;
     fn(widget.config.loanApplications[i]);
     widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     widget.onDataChanged();
+    await widget.onPersistNow?.call();
+    if (!mounted) return;
     setState(() {});
   }
 
@@ -887,7 +895,7 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> {
     if (ok != true) return;
     final received = double.tryParse(amountC.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? dueAmt;
     final payId = (payment['id'] ?? '').toString();
-    _mutateLoan((loan) {
+    await _mutateLoan((loan) {
       final payments = (loan['payments'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
       final idx = payments.indexWhere((p) => (p['id'] ?? '').toString() == payId);
       if (idx < 0) return;
@@ -1047,6 +1055,7 @@ void showNgmyLoanAdminSheet(
   required VoidCallback onDataChanged,
   required bool isDark,
   VoidCallback? onEditSettings,
+  Future<void> Function()? onPersistNow,
 }) {
   showModalBottomSheet(
     context: context,
@@ -1062,6 +1071,7 @@ void showNgmyLoanAdminSheet(
         isDark: isDark,
         scrollController: scroll,
         onEditSettings: onEditSettings,
+        onPersistNow: onPersistNow,
       ),
     ),
   );
@@ -1074,12 +1084,14 @@ class _NgmyLoanAdminPanel extends StatefulWidget {
     required this.isDark,
     required this.scrollController,
     this.onEditSettings,
+    this.onPersistNow,
   });
   final NgmyLoanConfigBridge config;
   final VoidCallback onDataChanged;
   final bool isDark;
   final ScrollController scrollController;
   final VoidCallback? onEditSettings;
+  final Future<void> Function()? onPersistNow;
 
   @override
   State<_NgmyLoanAdminPanel> createState() => _NgmyLoanAdminPanelState();
@@ -1170,6 +1182,7 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
                       config: widget.config,
                       onDataChanged: widget.onDataChanged,
                       isAdmin: true,
+                      onPersistNow: widget.onPersistNow,
                     ),
                   ),
                 ),
@@ -1191,9 +1204,10 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
     widget.config.loanApplications[i]['approvedAt'] = DateTime.now().toUtc().toIso8601String();
     widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     widget.onDataChanged();
-    setState(() {});
+    await widget.onPersistNow?.call();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan approved and saved.')));
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan approved and saved for all devices.')));
   }
 
   Future<void> _reject(BuildContext context, String id) async {
@@ -1216,9 +1230,10 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
     widget.config.loanApplications[i]['rejectionReason'] = reasonC.text.trim();
     widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     widget.onDataChanged();
-    setState(() {});
+    await widget.onPersistNow?.call();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan rejected and saved.')));
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan rejected and saved for all devices.')));
   }
 }
 

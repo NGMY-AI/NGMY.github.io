@@ -6709,11 +6709,23 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _persistAllMediaLocally();
   }
 
+  void _purgeMediaDeliveryQueueForPost(String postId) {
+    if (postId.isEmpty) return;
+    final before = _config.mediaDeliveryQueue.length;
+    _config.mediaDeliveryQueue = _config.mediaDeliveryQueue
+        .where((e) => (e['postId'] ?? '').toString() != postId)
+        .toList();
+    if (_config.mediaDeliveryQueue.length != before) {
+      unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: true));
+    }
+  }
+
   Future<void> _deleteMediaPostGlobally(MediaPost post) async {
     final id = post.id;
     if (id.isEmpty) return;
     _tombstonedMediaIds.add(id);
     await _persistTombstonedMediaIds(_tombstonedMediaIds);
+    _purgeMediaDeliveryQueueForPost(id);
     final deleted = await _deleteMediaRowFromSupabase(id);
     if (!deleted) {
       debugPrint('[media] database delete failed for $id');
@@ -6729,6 +6741,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() => _allMedia.removeWhere((m) => m.id == id));
     await _persistAllMediaLocally();
+    if (mounted && !deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Post removed on this device. Run supabase/media_tables.sql if it still appears for others.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   Future<bool> _saveLegalContentToSupabase(String terms, String privacy) async {
@@ -7629,6 +7649,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         return;
       }
       final incoming = MediaPost.fromJson(payload.newRecord);
+      if (_tombstonedMediaIds.contains(incoming.id)) return;
       if (!mounted) return;
       setState(() {
         final idx = _allMedia.indexWhere((m) => m.id == incoming.id);
@@ -8964,6 +8985,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onPromptNotifications: (ctx) => _promptPushNotificationsForUser(ctx, _currentUser!.email),
                 onMarkAnnouncementsRead: (ids) => _markAnnouncementsReadForUser(ids),
                 onRefreshAdminData: () => _refreshAdminCloudSnapshot(lightweight: true),
+                onPushUserToCloud: (u) => _pushUserToCloudFast(u, includeFreeTrial: true),
             ),
       ),
     );
@@ -9944,8 +9966,9 @@ class MainScreen extends StatefulWidget {
   final Future<void> Function(BuildContext context)? onPromptNotifications;
   final Future<void> Function(List<String> ids)? onMarkAnnouncementsRead;
   final Future<void> Function()? onRefreshAdminData;
+  final Future<void> Function(UserData user)? onPushUserToCloud;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 
@@ -10307,7 +10330,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             await _showClockInConfirmedDialog();
           }
         }
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData, onDeleteMedia: widget.onDeleteMedia, onPushUserToCloud: widget.onPushUserToCloud),
       InvestScreen(
         user: widget.user,
         plans: widget.globalPlans,
@@ -10612,7 +10635,9 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueMediaDelivery;
   final Future<void> Function(List<String> ids)? onMarkAnnouncementsRead;
   final Future<void> Function()? onRefreshAdminData;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData});
+  final Future<void> Function(MediaPost post)? onDeleteMedia;
+  final Future<void> Function(UserData user)? onPushUserToCloud;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -10748,6 +10773,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             onSyncAdminUserMedia: widget.onSyncAdminUserMedia,
                             onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery,
                             onRefreshAdminData: widget.onRefreshAdminData,
+                            onDeleteMedia: widget.onDeleteMedia,
+                            onPushUserToCloud: widget.onPushUserToCloud,
                           ),
                           routeName: 'AdminDashboard',
                         );
@@ -14562,7 +14589,9 @@ class AdminDashboard extends StatefulWidget {
   final Future<bool> Function(UserData user)? onSyncAdminUserMedia;
   final Future<void> Function(List<Map<String, dynamic>> items)? onEnqueueMediaDelivery;
   final Future<void> Function()? onRefreshAdminData;
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onRefreshAdminData});
+  final Future<void> Function(MediaPost post)? onDeleteMedia;
+  final Future<void> Function(UserData user)? onPushUserToCloud;
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
@@ -15457,6 +15486,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                                 if (userIndex != -1) {
                                                   widget.allUsers[userIndex].isApprovedWorker = true;
                                                   widget.allUsers[userIndex].status = 'verified';
+                                                  unawaited(widget.onPushUserToCloud?.call(widget.allUsers[userIndex]));
                                                 }
                                                 widget.onDataChanged();
                                                 await ngmyPersistAdminConfigNow(widget.config);
@@ -15615,6 +15645,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       context,
       config: ngmyLoanConfigBridge(widget.config),
       onDataChanged: widget.onDataChanged,
+      onPersistNow: () => ngmyPersistAdminConfigNow(widget.config),
       isDark: isDark,
       onEditSettings: () => _showLoanSettingsEditor(isDark),
     );
@@ -15676,7 +15707,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         const SizedBox(height: 15),
         TextField(controller: lHow, maxLines: 5, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Loan - How It Works Text', isDark: isDark)),
         const SizedBox(height: 20),
-        ElevatedButton(onPressed: () {
+        ElevatedButton(onPressed: () async {
           setState(() {
             widget.config.officialCashApp = cTag.text.trim();
             widget.config.officialBitcoin = bAddr.text.trim();
@@ -15685,7 +15716,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
             widget.config.loanHowItWorks = lHow.text.trim();
           });
           widget.onDataChanged();
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Settings Updated')));
+          await ngmyPersistAdminConfigNow(widget.config);
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan settings saved for all users.')));
         }, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white), child: const Text('SAVE ALL SETTINGS'))
       ]),
     );
@@ -15772,6 +15805,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
               widget.onDataChanged();
             },
             resolveMediaUrl: _resolveSupabaseStorageUrlResilient,
+            onDeleteMedia: widget.onDeleteMedia == null
+                ? null
+                : (p) async {
+                    final post = p is MediaPost ? p : MediaPost.fromJson(Map<String, dynamic>.from((p as dynamic).toJson()));
+                    await widget.onDeleteMedia!(post);
+                  },
             uploadMediaRef: _adminUploadVirtualProfilePic,
           ),
         ],
@@ -17001,26 +17040,31 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       Row(
                         children: [
                           ElevatedButton(
-                            onPressed: () {
+                            onPressed: () async {
                               app['status'] = 'approved';
                               app['reviewedAt'] = DateTime.now().toIso8601String();
                               widget.config.jobWorkerApplications = workerApps;
                               if (userIndex != -1) {
                                 widget.allUsers[userIndex].isApprovedWorker = true;
                                 widget.allUsers[userIndex].status = 'verified';
+                                unawaited(widget.onPushUserToCloud?.call(widget.allUsers[userIndex]));
                               }
                               widget.onDataChanged();
+                              await ngmyPersistAdminConfigNow(widget.config);
+                              if (!context.mounted) return;
                               setState(() {});
                             },
                             child: const Text('Approve'),
                           ),
                           const SizedBox(width: 8),
                           OutlinedButton(
-                            onPressed: () {
+                            onPressed: () async {
                               app['status'] = 'rejected';
                               app['reviewedAt'] = DateTime.now().toIso8601String();
                               widget.config.jobWorkerApplications = workerApps;
                               widget.onDataChanged();
+                              await ngmyPersistAdminConfigNow(widget.config);
+                              if (!context.mounted) return;
                               setState(() {});
                             },
                             child: const Text('Reject'),
@@ -17967,6 +18011,7 @@ class LoanServiceScreen extends StatelessWidget {
       username: user.username,
       config: ngmyLoanConfigBridge(config),
       onDataChanged: onDataChanged,
+      onPersistNow: () => ngmyPersistAdminConfigNow(config),
     );
   }
 }
@@ -33273,6 +33318,7 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
 
   void _saveJobs() {
     widget.onDataChanged();
+    unawaited(ngmyPersistAdminConfigNow(widget.config));
     setState(() {});
   }
 
@@ -33293,6 +33339,7 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     final userIndex = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
     if (userIndex >= 0) {
       widget.allUsers[userIndex].isApprovedWorker = approve;
+      if (approve) widget.allUsers[userIndex].status = 'verified';
     }
     _saveJobs();
   }
@@ -36722,7 +36769,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
                         value: 'save',
                         child: Text(_saved ? 'Unsave' : 'Save post'),
                       ),
-                      if (_isOwner) const PopupMenuItem(value: 'delete', child: Text('Delete post')),
+                      if (_isOwner || widget.currentUser.isAdmin) const PopupMenuItem(value: 'delete', child: Text('Delete post')),
                     ],
                   ),
                 ),
