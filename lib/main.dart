@@ -389,10 +389,14 @@ bool _ngmyTxnIncreasesBalance(AppTransaction t) {
 }
 
 double ngmyBalanceFromApprovedTransactions(String email, List<AppTransaction> transactions) {
-  final key = email.toLowerCase().trim();
+  final key = ngmyNormalizeEmail(email);
   var balance = 0.0;
   for (final t in transactions) {
-    if (t.userEmail.toLowerCase().trim() != key) continue;
+    if (ngmyNormalizeEmail(t.userEmail) != key) continue;
+    if (t.status == TransactionStatus.pending && t.type == TransactionType.withdrawal) {
+      balance -= t.amount;
+      continue;
+    }
     if (t.status != TransactionStatus.approved) continue;
     if (_ngmyTxnIncreasesBalance(t)) {
       balance += t.amount;
@@ -400,7 +404,7 @@ double ngmyBalanceFromApprovedTransactions(String email, List<AppTransaction> tr
       balance -= t.amount;
     }
   }
-  return balance;
+  return balance.clamp(0.0, double.infinity);
 }
 
 double ngmyPendingWithdrawalTotal(String email, List<AppTransaction> transactions) {
@@ -414,14 +418,9 @@ double ngmyPendingWithdrawalTotal(String email, List<AppTransaction> transaction
   return total;
 }
 
-/// Only bumps balance UP when approved ledger exceeds stored (missed deposit credit).
-/// Never reduces balance here — withdrawals use explicit holds in onAdd / wallet decisions.
+/// Authoritative balance from the transaction ledger (approved credits/debits + pending withdrawal holds).
 double ngmyResolveAccountBalance(String email, double storedBalance, List<AppTransaction> transactions) {
-  final approved = ngmyBalanceFromApprovedTransactions(email, transactions);
-  if (approved > storedBalance + 0.01) {
-    return approved;
-  }
-  return storedBalance;
+  return ngmyBalanceFromApprovedTransactions(email, transactions);
 }
 
 void ngmyReconcileUserAccountBalance(UserData user, List<AppTransaction> transactions) {
@@ -1155,6 +1154,7 @@ Map<String, String> _civicRegistryPinsFromJson(dynamic raw) {
   return {};
 }
 
+/// Admin cloud timers always win so every player uses the same seconds.
 Map<String, int> _mergeGameTimeLimitsPreferCustom(Map<String, int> local, Map<String, int> remote) {
   final defaults = ngmyDefaultGameTimeLimits();
   final out = <String, int>{};
@@ -1162,13 +1162,10 @@ Map<String, int> _mergeGameTimeLimitsPreferCustom(Map<String, int> local, Map<St
     final def = defaults[id]!;
     final l = local[id] ?? def;
     final r = remote[id] ?? def;
-    final localCustom = l != def;
     final remoteCustom = r != def;
-    if (remoteCustom && localCustom) {
-      out[id] = l;
-    } else if (remoteCustom) {
+    if (remoteCustom) {
       out[id] = r;
-    } else if (localCustom) {
+    } else if (l != def) {
       out[id] = l;
     } else {
       out[id] = def;
@@ -1180,7 +1177,6 @@ Map<String, int> _mergeGameTimeLimitsPreferCustom(Map<String, int> local, Map<St
 int _pickCustomInt(int local, int remote, int def) {
   final localCustom = local != def;
   final remoteCustom = remote != def;
-  if (remoteCustom && localCustom) return remote;
   if (remoteCustom) return remote;
   if (localCustom) return local;
   return def;
@@ -5177,6 +5173,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   bool _isSyncing = false;
   Timer? _autoThemeTimer;
   Timer? _configRefreshTimer;
+  Timer? _gameSettingsRefreshTimer;
   Timer? _mediaDeliveryTimer;
   Timer? _saveDebounceTimer;
   Timer? _heavySaveTimer;
@@ -5395,6 +5392,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _subscribeToRealtime();
     _subscribeToAuthState();
     _startConfigRefreshLoop();
+    _startGameSettingsRefreshLoop();
     _startMediaDeliveryLoop();
     _startAdminPendingTransactionPoll();
     _startUserTransactionSync();
@@ -5635,11 +5633,39 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   @override
+  Future<void> _refreshGameCenterSettingsFromCloud() async {
+    if (!mounted || !await ngmyCanReachCloud()) return;
+    await ngmyApplyGameCenterSettingsBackup(
+      apply: (limits, dice, invites) {
+        if (!mounted) return;
+        final nextLimits = _mergeGameTimeLimitsPreferCustom(_config.gameTimeLimits, limits);
+        final nextDice = dice.isNotEmpty
+            ? _mergeDiceSettingsPreferCustom(_config.diceSettings, dice)
+            : _config.diceSettings;
+        final nextInvites = invites.isNotEmpty
+            ? mergeGameInvites(_config.gameInvites, invites)
+            : _config.gameInvites;
+        final limitsSig = jsonEncode(nextLimits);
+        final oldLimitsSig = jsonEncode(_config.gameTimeLimits);
+        final diceSig = jsonEncode(nextDice);
+        final oldDiceSig = jsonEncode(_config.diceSettings);
+        if (limitsSig == oldLimitsSig && diceSig == oldDiceSig) return;
+        setState(() {
+          _config.gameTimeLimits = nextLimits;
+          _config.diceSettings = nextDice;
+          _config.gameInvites = nextInvites;
+        });
+        unawaited(_persistLocalOnly());
+      },
+    );
+  }
+
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       if (_currentUser != null) {
         _ngmyReconcileClockInSession(_currentUser!, _allTransactions);
       }
+      unawaited(_refreshGameCenterSettingsFromCloud());
       unawaited(_refreshCurrentUserFromCloud());
       unawaited(_refreshUserTransactionsFromCloud(force: true));
       if (_allowConfigDiffNotifications) {
@@ -5683,10 +5709,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         remote.canSellOnStore = _canSellOnStoreForEmail(_config, key);
         _preserveLocalSessionState(_currentUser!, remote);
         _ngmyReconcileClockInSession(remote, _allTransactions);
-        final sessionBalance = _currentUser!.accountBalance;
+        ngmyReconcileUserAccountBalance(remote, _allTransactions);
         _currentUser = remote;
-        _currentUser!.accountBalance = sessionBalance;
-        if (idx >= 0) _allUsers[idx].accountBalance = sessionBalance;
+        if (idx >= 0) _allUsers[idx] = remote;
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
@@ -5704,6 +5729,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try { _startupRebuildDebounce?.cancel(); } catch (_) {}
     try { _autoThemeTimer?.cancel(); } catch (_) {}
     try { _configRefreshTimer?.cancel(); } catch (_) {}
+    try { _gameSettingsRefreshTimer?.cancel(); } catch (_) {}
     try { _mediaDeliveryTimer?.cancel(); } catch (_) {}
     try { _inAppNoticeEntry?.remove(); } catch (_) {}
     try { _saveDebounceTimer?.cancel(); } catch (_) {}
@@ -6275,6 +6301,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
   }
 
+  void _startGameSettingsRefreshLoop() {
+    _gameSettingsRefreshTimer?.cancel();
+    unawaited(_refreshGameCenterSettingsFromCloud());
+    _gameSettingsRefreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      if (!mounted) return;
+      unawaited(_refreshGameCenterSettingsFromCloud());
+    });
+  }
+
   void _startConfigRefreshLoop() {
     _configRefreshTimer?.cancel();
     // Fallback only — realtime config + debounced saves handle most updates.
@@ -6349,6 +6384,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           next.investmentPlans = keepPlans;
           _globalPlans = _investmentPlansFromMaps(keepPlans);
         }
+        await ngmyApplyGameCenterSettingsBackup(
+          apply: (limits, dice, invites) {
+            next.gameTimeLimits = _mergeGameTimeLimitsPreferCustom(next.gameTimeLimits, limits);
+            if (dice.isNotEmpty) {
+              next.diceSettings = _mergeDiceSettingsPreferCustom(next.diceSettings, dice);
+            }
+            if (invites.isNotEmpty) {
+              next.gameInvites = mergeGameInvites(next.gameInvites, invites);
+            }
+          },
+        );
         if (_appConfigSig(_config) == _appConfigSig(next)) return;
         setState(() {
           _config = next;
@@ -7845,18 +7891,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
     if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) remote.isAuthorizedRegistrar = true;
     _preserveRegistryEnrollmentFromLocal(local, remote);
-    final key = local.email.toLowerCase().trim();
-    final isSessionUser =
-        _currentUser != null && _currentUser!.email.toLowerCase().trim() == key;
-    final hasWalletActivity = _allTransactions.any((t) =>
-        t.userEmail.toLowerCase().trim() == key &&
-        ngmyIsWalletDepositOrWithdraw(t) &&
-        t.status != TransactionStatus.rejected);
-    if (isSessionUser || hasWalletActivity) {
-      remote.accountBalance = local.accountBalance;
-    } else if (local.accountBalance > remote.accountBalance + 0.001) {
-      remote.accountBalance = local.accountBalance;
-    }
   }
 
   void _seedWithdrawalHoldTxnIds() {
@@ -8783,17 +8817,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   UserData? syncedUser;
                   setState(() {
                     _allTransactions.add(t);
-                    final userKey = t.userEmail.toLowerCase().trim();
-                    final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
+                    final userKey = ngmyNormalizeEmail(t.userEmail);
+                    final userIdx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == userKey);
                     if (userIdx != -1) {
-                      if (t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending) {
-                        ngmyApplyPendingWithdrawalHold(_allUsers[userIdx], t, _withdrawalHoldTxnIds);
-                      } else if (t.status == TransactionStatus.approved) {
-                        ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], t);
-                      }
                       ngmyReconcileUserAccountBalance(_allUsers[userIdx], _allTransactions);
                       syncedUser = _allUsers[userIdx];
-                      if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
+                      if (_currentUser != null && ngmyNormalizeEmail(_currentUser!.email) == userKey) {
                         _currentUser = _allUsers[userIdx];
                       }
                     }
@@ -12398,7 +12427,6 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> {
       },
       onChargeBet: (bet, note) {
         if (widget.user.accountBalance < bet) return false;
-        setState(() => widget.user.accountBalance -= bet);
         widget.user.points += 20;
         unawaited(_pushUserToCloudFast(widget.user));
         // Every successful roll/bet counts as a game (+20 points each time).
@@ -12419,9 +12447,6 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> {
         return true;
       },
       onPayout: (payout, note, {double bonus = 0}) {
-        setState(() {
-          widget.user.accountBalance += payout;
-        });
         ngmyPlayIncomeSoundForAmount(
           beneficiaryEmail: widget.user.email,
           amount: payout,
@@ -12510,7 +12535,6 @@ class _GameBetScreenState extends State<GameBetScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Insufficient balance for this bet.')));
       return;
     }
-    setState(() => widget.user.accountBalance -= wager);
     widget.user.points += 20;
     widget.onGameStarted();
     unawaited(_pushUserToCloudFast(widget.user));
@@ -12881,6 +12905,17 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       default:
         if (_pro != null) return _pro!.progressTotal(widget.gameId);
         return 1;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant GamePlayScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_won || _mpWaiting) return;
+    final nextLimit = ngmyGameTimeLimitSeconds(widget.gameId, widget.config.gameTimeLimits);
+    final oldLimit = ngmyGameTimeLimitSeconds(oldWidget.gameId, oldWidget.config.gameTimeLimits);
+    if (nextLimit != oldLimit && mounted) {
+      setState(() => _secondsLeft = nextLimit);
     }
   }
 
@@ -13769,7 +13804,6 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     _miniTicker?.cancel();
     final payout = widget.wager * 1.46;
     setState(() {
-      widget.user.accountBalance += payout;
       widget.user.totalProfit += (payout - widget.wager);
     });
     ngmyPlayIncomeSoundForAmount(
@@ -13917,7 +13951,6 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     final soloPayout = widget.wager * 1.46 * yourRatio;
     final totalPayout = soloPayout + bonus;
     setState(() {
-      widget.user.accountBalance += totalPayout;
       // Profit: solo profit component only (keeps same solo economics).
       widget.user.totalProfit += (soloPayout - widget.wager * yourRatio);
     });
@@ -13965,7 +13998,6 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     _miniTicker?.cancel();
     final payout = widget.wager * 1.46 * ratio;
     setState(() {
-      widget.user.accountBalance += payout;
       widget.user.totalProfit += (payout - widget.wager * ratio);
     });
     ngmyPlayIncomeSoundForAmount(
@@ -19502,7 +19534,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final now = DateTime.now();
     setState(() {
       widget.user.points -= convertedPoints;
-      widget.user.accountBalance += dollars;
     });
     ngmyPlayIncomeSoundForAmount(
       beneficiaryEmail: widget.user.email,
@@ -34923,8 +34954,6 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
       return false;
     }
 
-    widget.allUsers[creatorIdx].accountBalance -= mon.watchReward;
-    widget.allUsers[viewerIdx].accountBalance += mon.watchReward;
     ngmyPlayIncomeSoundForAmount(
       beneficiaryEmail: viewerEmail,
       amount: mon.watchReward,
