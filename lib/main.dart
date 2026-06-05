@@ -379,6 +379,8 @@ String formatCurrency(double amount) {
   return parts.join('.');
 }
 
+String ngmyNormalizeEmail(String email) => email.toLowerCase().trim();
+
 bool _ngmyTxnIncreasesBalance(AppTransaction t) {
   return t.type == TransactionType.deposit ||
       t.type == TransactionType.adminAdd ||
@@ -567,7 +569,7 @@ enum TransactionStatus { pending, approved, rejected }
 enum PaymentMethod { cashApp, bitcoin, system }
 
 /// Wallet deposit/withdraw history — never auto-delete from Supabase.
-const int kNgmyWalletHistoryDisplayMax = 200;
+const int kNgmyWalletHistoryDisplayMax = 500;
 
 bool ngmyIsWalletDepositOrWithdraw(AppTransaction t) =>
     t.type == TransactionType.deposit || t.type == TransactionType.withdrawal;
@@ -715,7 +717,7 @@ class AppTransaction {
     }
     return AppTransaction(
       id: (json['id'] ?? '').toString(),
-      userEmail: (json['userEmail'] ?? json['user_email'] ?? '').toString(),
+      userEmail: ngmyNormalizeEmail((json['userEmail'] ?? json['user_email'] ?? '').toString()),
       amount: (json['amount'] ?? 0.0).toDouble(),
       type: TransactionType.values[parseIndex(json['type'], TransactionType.values.length - 1)],
       method: PaymentMethod.values[parseIndex(json['method'], PaymentMethod.values.length - 1)],
@@ -732,7 +734,7 @@ Map<String, dynamic> _transactionRowForCloud(AppTransaction t) {
   // Only camelCase keys — live Supabase rejects snake_case duplicates (PGRST204).
   return {
     'id': t.id,
-    'userEmail': t.userEmail,
+    'userEmail': ngmyNormalizeEmail(t.userEmail),
     'amount': t.amount,
     'type': t.type.index,
     'method': t.method.index,
@@ -5184,6 +5186,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Map<String, int> _walletDecisionLedger = {};
   final Set<String> _withdrawalHoldTxnIds = {};
   DateTime? _lastCurrentUserCloudRefresh;
+  DateTime? _lastUserTxnCloudRefresh;
+  Timer? _userTxnSyncTimer;
   Timer? _legalPlansRefreshDebounce;
   DateTime? _legalCloudRefreshPausedUntil;
   final Set<String> _disabledSupabaseTables = {};
@@ -5369,6 +5373,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     unawaited(_pushUserToCloudFast(_currentUser!, includeFreeTrial: true));
     unawaited(_persistLocalOnly());
     unawaited(_startBackgroundServicesWhenReady());
+    unawaited(_refreshUserTransactionsFromCloud(force: true));
   }
 
   Future<void> _startBackgroundServicesWhenReady() async {
@@ -5392,9 +5397,85 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startConfigRefreshLoop();
     _startMediaDeliveryLoop();
     _startAdminPendingTransactionPoll();
+    _startUserTransactionSync();
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshPendingTransactionsFromCloud());
       unawaited(_refreshAdminCloudSnapshot(lightweight: true));
+    }
+  }
+
+  void _startUserTransactionSync() {
+    _userTxnSyncTimer?.cancel();
+    if (_currentUser == null) return;
+    unawaited(_refreshUserTransactionsFromCloud(force: true));
+    _userTxnSyncTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted || _currentUser == null) return;
+      unawaited(_refreshUserTransactionsFromCloud());
+    });
+  }
+
+  Future<List<AppTransaction>> _fetchCloudTransactionsForEmail(String email) async {
+    final raw = email.trim();
+    final key = ngmyNormalizeEmail(raw);
+    if (key.isEmpty) return [];
+    dynamic transData;
+    try {
+      transData = await supabase
+          .from('transactions')
+          .select()
+          .ilike('userEmail', key)
+          .order('timestamp', ascending: false)
+          .limit(500)
+          .timeout(kNgmyCloudLoadTimeout);
+    } catch (e) {
+      debugPrint('[user] txn ilike fetch: $e');
+      transData = await supabase
+          .from('transactions')
+          .select()
+          .eq('userEmail', raw)
+          .order('timestamp', ascending: false)
+          .limit(500)
+          .timeout(kNgmyCloudLoadTimeout);
+    }
+    if (transData == null) return [];
+    return (transData as List)
+        .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e as Map)))
+        .where((t) => ngmyNormalizeEmail(t.userEmail) == key)
+        .toList();
+  }
+
+  Future<void> _refreshUserTransactionsFromCloud({bool force = false}) async {
+    if (_currentUser == null || !await ngmyCanReachCloud()) return;
+    final now = DateTime.now();
+    if (!force &&
+        _lastUserTxnCloudRefresh != null &&
+        now.difference(_lastUserTxnCloudRefresh!) < const Duration(seconds: 10)) {
+      return;
+    }
+    _lastUserTxnCloudRefresh = now;
+    try {
+      final remote = await _fetchCloudTransactionsForEmail(_currentUser!.email);
+      if (!mounted) return;
+      await _refreshWalletDecisionLedger();
+      setState(() {
+        _allTransactions = _mergeTransactionsWithRemote(
+          _allTransactions,
+          remote,
+          walletDecisionLedger: _walletDecisionLedger,
+        );
+        _applyWalletDecisionLedgerToTransactions();
+        _seedWithdrawalHoldTxnIds();
+        if (!_ngmySessionIsAdmin(_currentUser)) {
+          final key = ngmyNormalizeEmail(_currentUser!.email);
+          _allTransactions = _allTransactions
+              .where((t) => ngmyNormalizeEmail(t.userEmail) == key)
+              .toList();
+        }
+        _reconcileAllUserBalances();
+      });
+      unawaited(_persistLocalOnly());
+    } catch (e) {
+      debugPrint('[user] transactions refresh: $e');
     }
   }
   Future<void> _seedTransactionNotificationBaseline() async {
@@ -5560,6 +5641,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _ngmyReconcileClockInSession(_currentUser!, _allTransactions);
       }
       unawaited(_refreshCurrentUserFromCloud());
+      unawaited(_refreshUserTransactionsFromCloud(force: true));
       if (_allowConfigDiffNotifications) {
         unawaited(_notifyStoreMarketDayListings());
       }
@@ -5626,6 +5708,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try { _inAppNoticeEntry?.remove(); } catch (_) {}
     try { _saveDebounceTimer?.cancel(); } catch (_) {}
     try { _heavySaveTimer?.cancel(); } catch (_) {}
+    try { _userTxnSyncTimer?.cancel(); } catch (_) {}
     NgmySupabaseSyncThrottle.reset();
     try { _legalPlansRefreshDebounce?.cancel(); } catch (_) {}
     try { _appSyncChannel?.unsubscribe(); } catch (_) {}
@@ -7611,6 +7694,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _onTransactionsChange(PostgresChangePayload payload) {
     try {
+      if (!_ngmySessionIsAdmin(_currentUser) && _currentUser != null) {
+        final sessionKey = ngmyNormalizeEmail(_currentUser!.email);
+        if (payload.eventType != PostgresChangeEvent.delete) {
+          final row = payload.newRecord;
+          final txEmail = ngmyNormalizeEmail((row['userEmail'] ?? row['user_email'] ?? '').toString());
+          if (txEmail.isNotEmpty && txEmail != sessionKey) return;
+        } else {
+          final row = payload.oldRecord;
+          final txEmail = ngmyNormalizeEmail((row['userEmail'] ?? row['user_email'] ?? '').toString());
+          if (txEmail.isNotEmpty && txEmail != sessionKey) return;
+        }
+      }
       if (payload.eventType == PostgresChangeEvent.delete) {
         final id = (payload.oldRecord['id'] ?? '').toString();
         if (id.isEmpty) return;
@@ -7984,23 +8079,26 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           NgmyMediaProfile.normalizeUserMediaFields(u);
         }
 
-        final transData = bootstrapAdmin || sessionEmail.isEmpty
-            ? await supabase.from('transactions').select().order('timestamp', ascending: false).limit(500)
-            : await supabase.from('transactions').select().eq('userEmail', sessionEmail);
-        if (transData != null) {
-          final remoteTransactions =
-              (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
-          if (remoteTransactions.isNotEmpty || !bootstrapAdmin) {
-            await _refreshWalletDecisionLedger();
-            _allTransactions = _mergeTransactionsWithRemote(
-              _allTransactions,
-              remoteTransactions,
-              walletDecisionLedger: _walletDecisionLedger,
-            );
-          } else {
-            debugPrint('[admin] bootstrap transactions empty — keeping local wallet list');
-            _applyWalletDecisionLedgerToTransactions();
-          }
+        final List<AppTransaction> remoteTransactions;
+        if (bootstrapAdmin || sessionEmail.isEmpty) {
+          final transData = await supabase
+              .from('transactions')
+              .select()
+              .order('timestamp', ascending: false)
+              .limit(500);
+          remoteTransactions = transData == null
+              ? <AppTransaction>[]
+              : (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
+        } else {
+          remoteTransactions = await _fetchCloudTransactionsForEmail(sessionEmail);
+        }
+        if (remoteTransactions.isNotEmpty || !bootstrapAdmin) {
+          await _refreshWalletDecisionLedger();
+          _allTransactions = _mergeTransactionsWithRemote(
+            _allTransactions,
+            remoteTransactions,
+            walletDecisionLedger: _walletDecisionLedger,
+          );
           if (bootstrapAdmin) {
             await _flushLocalWalletDecisionsToCloud();
             final refreshed = await supabase
@@ -8017,7 +8115,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               );
             }
             _applyWalletDecisionLedgerToTransactions();
+          } else {
+            _applyWalletDecisionLedgerToTransactions();
           }
+        } else {
+          debugPrint('[admin] bootstrap transactions empty — keeping local wallet list');
+          _applyWalletDecisionLedgerToTransactions();
         }
 
         final mediaData = await supabase
