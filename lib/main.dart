@@ -418,8 +418,34 @@ double ngmyResolveAccountBalance(String email, double storedBalance, List<AppTra
   final pendingWithdraw = ngmyPendingWithdrawalTotal(email, transactions);
   final fromLedger = (approved - pendingWithdraw).clamp(0.0, double.infinity);
   if (pendingWithdraw > 0) return fromLedger;
-  if (approved > storedBalance + 0.001) return approved;
-  return storedBalance;
+  // Keep the higher value so approved deposits are never dropped when storedBalance is stale.
+  return math.max(fromLedger, storedBalance);
+}
+
+/// After admin approves/rejects a wallet txn, sync user balance from ledger + any prior balance.
+void ngmySyncUserBalanceAfterWalletDecision(
+  UserData user,
+  List<AppTransaction> transactions, {
+  AppTransaction? justDecided,
+  TransactionStatus? previousStatus,
+}) {
+  if (justDecided != null && previousStatus == TransactionStatus.pending) {
+    if (justDecided.status == TransactionStatus.approved) {
+      _ngmyApplyApprovedTransitionToBalance(
+        user,
+        justDecided,
+        previousStatus: previousStatus,
+      );
+    } else if (justDecided.status == TransactionStatus.rejected &&
+        justDecided.type == TransactionType.withdrawal) {
+      user.accountBalance += justDecided.amount;
+    }
+  }
+  user.accountBalance = ngmyResolveAccountBalance(
+    user.email,
+    user.accountBalance,
+    transactions,
+  );
 }
 
 bool ngmyTransactionCountsAsIncome(AppTransaction t) {
@@ -7538,15 +7564,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
           final shouldApplyBalance = previous == null || previous!.status == TransactionStatus.pending;
           if (userIdx >= 0 && shouldApplyBalance) {
-            _ngmyApplyApprovedTransitionToBalance(
+            ngmySyncUserBalanceAfterWalletDecision(
               _allUsers[userIdx],
-              tx,
-              previousStatus: previous?.status,
-            );
-            _allUsers[userIdx].accountBalance = ngmyResolveAccountBalance(
-              _allUsers[userIdx].email,
-              _allUsers[userIdx].accountBalance,
               _allTransactions,
+              justDecided: tx,
+              previousStatus: previous?.status,
             );
             if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
               _currentUser = _allUsers[userIdx];
@@ -8543,6 +8565,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 },
                 onProcessTransaction: (t, approve) async {
                   UserData? syncedUser;
+                  final previousStatus = t.status;
                   final newStatus = approve ? TransactionStatus.approved : TransactionStatus.rejected;
                   await NgmyWalletDecisionLedger.record(t.id, newStatus.index);
                   _walletDecisionLedger[t.id] = newStatus.index;
@@ -8573,13 +8596,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     }
                     final details = t.sourceDetails ?? '';
                     final isInvestmentRequest = t.type == TransactionType.deposit && isInvestmentRequestDetails(details);
-                    if (approve && t.type == TransactionType.withdrawal) {
-                      targetUser.accountBalance = ngmyResolveAccountBalance(
-                        targetUser.email,
-                        targetUser.accountBalance,
-                        _allTransactions,
-                      );
-                    }
                     if (approve) {
                       if (isInvestmentRequest) {
                         final meta = parseInvestmentRequestDetails(details);
@@ -8617,15 +8633,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                         targetUser.pendingInvestmentName = null;
                         targetUser.pendingInvestmentAmount = null;
                         targetUser.pendingInvestmentRoi = null;
-                      } else if (t.type == TransactionType.withdrawal) {
-                        targetUser.accountBalance += t.amount;
                       }
                     }
                     syncedUser = targetUser;
-                    targetUser.accountBalance = ngmyResolveAccountBalance(
-                      targetUser.email,
-                      targetUser.accountBalance,
+                    ngmySyncUserBalanceAfterWalletDecision(
+                      targetUser,
                       _allTransactions,
+                      justDecided: t,
+                      previousStatus: previousStatus,
                     );
                     if (_currentUser != null &&
                         _currentUser!.email.toLowerCase().trim() == t.userEmail.toLowerCase().trim()) {
