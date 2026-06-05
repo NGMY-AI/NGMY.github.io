@@ -417,9 +417,21 @@ double ngmyResolveAccountBalance(String email, double storedBalance, List<AppTra
   final approved = ngmyBalanceFromApprovedTransactions(email, transactions);
   final pendingWithdraw = ngmyPendingWithdrawalTotal(email, transactions);
   final fromLedger = (approved - pendingWithdraw).clamp(0.0, double.infinity);
-  if (pendingWithdraw > 0) return fromLedger;
+  if (pendingWithdraw > 0) {
+    var stored = storedBalance;
+    // Cloud user row may still be pre-hold; apply pending hold once when gross >= ledger + pending.
+    if (stored >= approved + pendingWithdraw - 0.01) {
+      stored = (stored - pendingWithdraw).clamp(0.0, double.infinity);
+    }
+    // Never crush earnings-only balances down to ledger-only when hold was already applied locally.
+    return math.max(fromLedger, stored);
+  }
   // Keep the higher value so approved deposits are never dropped when storedBalance is stale.
   return math.max(fromLedger, storedBalance);
+}
+
+void ngmyReconcileUserAccountBalance(UserData user, List<AppTransaction> transactions) {
+  user.accountBalance = ngmyResolveAccountBalance(user.email, user.accountBalance, transactions);
 }
 
 /// After admin approves/rejects a wallet txn, sync user balance from ledger + any prior balance.
@@ -5237,6 +5249,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final remote = (usersData as List).map((e) => UserData.fromJson(e)).toList();
           if (remote.isNotEmpty) {
             _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
+            _reconcileAllUserBalances();
           } else {
             debugPrint('[admin] cloud users empty — keeping ${_allUsers.length} local users');
           }
@@ -5260,9 +5273,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _applyWalletDecisionLedgerToTransactions();
         }
       }
-      for (final u in _allUsers) {
-        u.accountBalance = ngmyResolveAccountBalance(u.email, u.accountBalance, _allTransactions);
-      }
+      _reconcileAllUserBalances();
       for (final email in kNgmyAdminEmails) {
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
         if (idx >= 0) _allUsers[idx].isAdmin = true;
@@ -5555,7 +5566,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (NgmyGameSession.suppressExternalNotifications) return;
     final now = DateTime.now();
     if (_lastCurrentUserCloudRefresh != null &&
-        now.difference(_lastCurrentUserCloudRefresh!) < const Duration(seconds: 45)) {
+        now.difference(_lastCurrentUserCloudRefresh!) < const Duration(seconds: 8)) {
       return;
     }
     _lastCurrentUserCloudRefresh = now;
@@ -5586,6 +5597,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _preserveLocalSessionState(_currentUser!, remote);
         _ngmyReconcileClockInSession(remote, _allTransactions);
         _currentUser = remote;
+        _reconcileAllUserBalances();
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
@@ -5972,7 +5984,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     _pendingHeavySave = true;
     _saveDebounceTimer?.cancel();
-    _saveDebounceTimer = Timer(const Duration(seconds: 5), () {
+    _saveDebounceTimer = Timer(const Duration(seconds: 1), () {
       if (!mounted) return;
       unawaited(_persistLocalOnly());
       if (_currentUser?.isAdmin == true) {
@@ -6418,10 +6430,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _preserveLocalSessionState(_currentUser!, remote);
           _currentUser = remote;
         }
+        _reconcileAllUserBalances();
       });
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+        if (_currentUser != null) {
+          await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+        }
       } catch (_) {}
     } catch (e) {
       debugPrint('[users media] reload error: $e');
@@ -7547,6 +7563,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               _currentUser = updatedUser;
             }
           }
+          _reconcileAllUserBalances();
         });
         unawaited(NgmyAnnouncementReads.saveLocal(email, updatedUser.readAnnouncementIds.toSet()));
         SharedPreferences.getInstance().then((prefs) {
@@ -7592,9 +7609,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         final becameApproved = tx.status == TransactionStatus.approved &&
             (previous == null || previous!.status != TransactionStatus.approved);
+        final userKey = tx.userEmail.toLowerCase().trim();
+        final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
         if (becameApproved) {
-          final userKey = tx.userEmail.toLowerCase().trim();
-          final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
           final shouldApplyBalance = previous == null || previous!.status == TransactionStatus.pending;
           if (userIdx >= 0 && shouldApplyBalance) {
             ngmySyncUserBalanceAfterWalletDecision(
@@ -7609,6 +7626,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             unawaited(_pushUserToCloudFast(_allUsers[userIdx]));
           } else if (ngmyTransactionCountsAsIncome(tx)) {
             ngmyPlayIncomeSoundForTransaction(tx);
+          }
+        } else if (userIdx >= 0 &&
+            (tx.type == TransactionType.deposit || tx.type == TransactionType.withdrawal)) {
+          ngmyReconcileUserAccountBalance(_allUsers[userIdx], _allTransactions);
+          if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
+            _currentUser = _allUsers[userIdx];
           }
         }
         if (tx.status == TransactionStatus.pending &&
@@ -7672,6 +7695,25 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
     if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) remote.isAuthorizedRegistrar = true;
     _preserveRegistryEnrollmentFromLocal(local, remote);
+    final pending = ngmyPendingWithdrawalTotal(local.email, _allTransactions);
+    if (pending > 0) {
+      if (local.accountBalance < remote.accountBalance - 0.001) {
+        remote.accountBalance = local.accountBalance;
+      }
+    } else if (local.accountBalance > remote.accountBalance + 0.001) {
+      remote.accountBalance = local.accountBalance;
+    }
+  }
+
+  void _reconcileAllUserBalances() {
+    for (final u in _allUsers) {
+      ngmyReconcileUserAccountBalance(u, _allTransactions);
+    }
+    if (_currentUser != null) {
+      final key = _currentUser!.email.toLowerCase().trim();
+      final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+      if (idx >= 0) _currentUser = _allUsers[idx];
+    }
   }
 
   Future<void> _persistLocalSnapshot() async {
@@ -7785,6 +7827,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           }
         } catch (_) {}
       }
+      _reconcileAllUserBalances();
 
       final annLocalEarly = safeGet('all_announcements');
       if (annLocalEarly != null) {
@@ -7848,6 +7891,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               final remote = (usersData as List).map((e) => UserData.fromJson(e)).toList();
               if (remote.isNotEmpty) {
                 _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
+                _reconcileAllUserBalances();
               } else {
                 debugPrint('[admin] bootstrap users empty — keeping local cache');
                 _allUsers = localUsersBeforeFetch.values.toList();
@@ -7868,6 +7912,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             } else {
               _allUsers.add(remote);
             }
+            _reconcileAllUserBalances();
           }
         }
         for (final u in _allUsers) {
@@ -8064,9 +8109,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         } catch (_) {}
       }
 
-      for (final u in _allUsers) {
-        u.accountBalance = ngmyResolveAccountBalance(u.email, u.accountBalance, _allTransactions);
-      }
+      _reconcileAllUserBalances();
       _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
       if (_currentUser != null) {
         final registrarEmail = _currentUser!.email;
@@ -8265,6 +8308,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       if (_currentUser != null) NgmyMediaProfile.normalizeUserMediaFields(_currentUser);
       NgmyMediaProfile.pruneExpiredStoriesAllUsers(_allUsers);
+      _reconcileAllUserBalances();
 
       await _archiveAndPurgeOldApprovedWalletRequests(online: online);
 
@@ -8569,12 +8613,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     final userKey = t.userEmail.toLowerCase().trim();
                     final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
                     if (userIdx != -1) {
-                      if (t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending) {
-                        _allUsers[userIdx].accountBalance =
-                            (_allUsers[userIdx].accountBalance - t.amount).clamp(0.0, double.infinity);
-                      } else {
+                      if (t.status == TransactionStatus.approved) {
                         ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], t);
                       }
+                      ngmyReconcileUserAccountBalance(_allUsers[userIdx], _allTransactions);
                       syncedUser = _allUsers[userIdx];
                       if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
                         _currentUser = _allUsers[userIdx];
@@ -16493,7 +16535,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 final amt = double.tryParse(val) ?? 0;
                 if (amt <= 0) return;
                 widget.onAddTransaction(AppTransaction(id: DateTime.now().toString(), userEmail: u.email, amount: amt, type: TransactionType.adminRemove, method: PaymentMethod.system, sourceDetails: 'Admin debit', status: TransactionStatus.approved, timestamp: DateTime.now()));
-                u.accountBalance = (u.accountBalance - amt).clamp(0.0, double.infinity);
                 widget.onDataChanged();
                 setState(() {});
               })),
@@ -16550,7 +16591,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 final amt = double.tryParse(val) ?? 0;
                 if (amt <= 0) return;
                 widget.onAddTransaction(AppTransaction(id: DateTime.now().toString(), userEmail: u.email, amount: amt, type: TransactionType.reimbursement, method: PaymentMethod.system, sourceDetails: 'Admin reimbursement', status: TransactionStatus.approved, timestamp: DateTime.now()));
-                u.accountBalance += amt;
                 widget.onDataChanged();
                 setState(() {});
               })),
