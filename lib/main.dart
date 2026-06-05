@@ -572,6 +572,33 @@ List<AppTransaction> ngmyUserWalletHistoryTransactions(
   return list.take(max).toList();
 }
 
+/// Wallet-only balance from deposit/withdraw rows (matches history math, not clock-in earnings).
+double ngmyWalletHistoryBalance(List<AppTransaction> walletTxns, String email) {
+  final key = email.toLowerCase().trim();
+  var balance = 0.0;
+  for (final t in walletTxns) {
+    if (t.userEmail.toLowerCase().trim() != key) continue;
+    if (t.status == TransactionStatus.pending && t.type == TransactionType.withdrawal) {
+      balance -= t.amount;
+      continue;
+    }
+    if (t.status != TransactionStatus.approved) continue;
+    if (t.type == TransactionType.deposit) {
+      balance += t.amount;
+    } else if (t.type == TransactionType.withdrawal) {
+      balance -= t.amount;
+    }
+  }
+  return balance.clamp(0.0, double.infinity);
+}
+
+double ngmyWalletHistoryDelta(AppTransaction t) {
+  if (t.status != TransactionStatus.approved) return 0;
+  if (t.type == TransactionType.deposit) return t.amount;
+  if (t.type == TransactionType.withdrawal) return -t.amount;
+  return 0;
+}
+
 const String _investmentRequestPrefix = 'INVEST_REQUEST|';
 
 bool isInvestmentRequestDetails(String? details) {
@@ -6870,26 +6897,32 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _notifyAdminAboutPendingTransaction(AppTransaction tx) async {
-    if (_currentUser?.isAdmin != true) return;
     if (tx.status != TransactionStatus.pending) return;
+    if (tx.type != TransactionType.deposit && tx.type != TransactionType.withdrawal) return;
     if (_notifiedTransactionKeys.contains('admin_pending_${tx.id}')) return;
-    if (tx.type == TransactionType.withdrawal) {
-      await _notifyAdminPendingRequest(
-        title: 'New withdrawal request',
-        body: '${tx.userEmail} requested ${formatCurrency(tx.amount)}. Open Admin → Wallet.',
-        tag: 'admin_withdraw_${tx.id}',
-      );
-    } else if (tx.type == TransactionType.deposit) {
-      await _notifyAdminPendingRequest(
-        title: 'New deposit request',
-        body: '${tx.userEmail} submitted ${formatCurrency(tx.amount)}. Open Admin → Wallet.',
-        tag: 'admin_deposit_${tx.id}',
-      );
-    } else {
-      return;
-    }
     _notifiedTransactionKeys.add('admin_pending_${tx.id}');
     unawaited(_persistNotifiedTransactionKeys());
+
+    if (_ngmySessionIsAdmin(_currentUser) && mounted) {
+      final label = tx.type == TransactionType.withdrawal ? 'Withdrawal' : 'Deposit';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('New $label request: ${tx.userEmail} — \$${formatCurrency(tx.amount)}'),
+          backgroundColor: const Color(0xFF7C3AED),
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'Wallet',
+            textColor: Colors.white,
+            onPressed: () {},
+          ),
+        ),
+      );
+      await _notifyAdminPendingRequest(
+        title: tx.type == TransactionType.withdrawal ? 'New withdrawal request' : 'New deposit request',
+        body: '${tx.userEmail} — \$${formatCurrency(tx.amount)}. Open Admin → Wallet.',
+        tag: 'admin_${tx.type.name}_${tx.id}',
+      );
+    }
   }
 
   void _notifyAdminOnNewPendingRegistrarApps(AppConfig prev, AppConfig next) {
@@ -7578,7 +7611,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             ngmyPlayIncomeSoundForTransaction(tx);
           }
         }
-        if (previous == null && tx.status == TransactionStatus.pending) {
+        if (tx.status == TransactionStatus.pending &&
+            (tx.type == TransactionType.deposit || tx.type == TransactionType.withdrawal) &&
+            (previous == null || previous!.status != TransactionStatus.pending)) {
           unawaited(_notifyAdminAboutPendingTransaction(tx));
         }
         unawaited(_persistLocalOnly());
@@ -10150,6 +10185,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       WalletScreen(
         user: widget.user,
         transactions: ngmyUserWalletHistoryTransactions(sorted, widget.user.email),
+        allTransactions: sorted,
         onAdd: widget.onAddTransaction,
         config: widget.config,
         onDataChanged: widget.onDataChanged,
@@ -14373,9 +14409,35 @@ class _AdminDashboardState extends State<AdminDashboard> {
   String? _processingTxnId;
   Timer? _adminRefreshTimer;
   bool _adminRefreshing = false;
+  int _lastSeenPendingWalletCount = 0;
 
   List<AppTransaction> _walletApprovedArchive = const [];
   DateTime? _lastWalletArchiveLoad;
+
+  int _pendingWalletRequestCount() {
+    return widget.allTransactions
+        .where((t) =>
+            (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal) &&
+            t.status == TransactionStatus.pending)
+        .length;
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final pending = _pendingWalletRequestCount();
+    if (pending > _lastSeenPendingWalletCount && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('New wallet request ($pending pending). Open Wallet tab to approve.'),
+          backgroundColor: const Color(0xFF7C3AED),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+    _lastSeenPendingWalletCount = pending;
+    setState(() {});
+  }
 
   Future<void> _processWalletRequest(AppTransaction t, bool approve) async {
     if (_processingTxnId == t.id) return;
@@ -14403,8 +14465,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void initState() {
     super.initState();
     unawaited(_loadWalletApprovedArchive());
+    _lastSeenPendingWalletCount = _pendingWalletRequestCount();
     Future.microtask(() => unawaited(_pullAdminCloudData()));
-    _adminRefreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       unawaited(_pullAdminCloudData());
     });
   }
@@ -16813,8 +16876,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
 // --- STANDARD SCREENS ---
 
 class WalletScreen extends StatefulWidget {
-  final UserData user; final List<AppTransaction> transactions; final Function(AppTransaction) onAdd; final AppConfig config; final VoidCallback onDataChanged;
-  const WalletScreen({super.key, required this.user, required this.transactions, required this.onAdd, required this.config, required this.onDataChanged});
+  final UserData user;
+  final List<AppTransaction> transactions;
+  final List<AppTransaction> allTransactions;
+  final Function(AppTransaction) onAdd;
+  final AppConfig config;
+  final VoidCallback onDataChanged;
+  const WalletScreen({
+    super.key,
+    required this.user,
+    required this.transactions,
+    required this.allTransactions,
+    required this.onAdd,
+    required this.config,
+    required this.onDataChanged,
+  });
   @override State<WalletScreen> createState() => _WalletScreenState();
 }
 class _WalletScreenState extends State<WalletScreen> {
@@ -16825,6 +16901,15 @@ class _WalletScreenState extends State<WalletScreen> {
   void initState() {
     super.initState();
     _applySavedWithdrawHandle();
+  }
+
+  @override
+  void didUpdateWidget(covariant WalletScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user.accountBalance != widget.user.accountBalance ||
+        oldWidget.transactions.length != widget.transactions.length) {
+      setState(() {});
+    }
   }
 
   @override
@@ -16993,11 +17078,11 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Widget _walletBody() {
     if (_view == 2) {
-      double rollingBalance = widget.user.accountBalance;
+      double rollingBalance = ngmyWalletHistoryBalance(widget.allTransactions, widget.user.email);
       final entries = <MapEntry<AppTransaction, double>>[];
       for (final t in widget.transactions) {
         entries.add(MapEntry(t, rollingBalance));
-        rollingBalance -= _walletHistoryBalanceDelta(t);
+        rollingBalance -= ngmyWalletHistoryDelta(t);
       }
       return Container(width: double.infinity, padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 15)]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('TRANSACTION HISTORY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)), const SizedBox(height: 15),
@@ -17059,7 +17144,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text('${incoming ? '+' : '-'}\$${formatCurrency(t.amount)}', style: TextStyle(fontWeight: FontWeight.bold, color: incoming ? Colors.green : Colors.red)),
-                    Text('Balance: \$${formatCurrency(balanceAfter)}', style: const TextStyle(color: Colors.grey, fontSize: 9)),
+                    Text('Wallet total: \$${formatCurrency(balanceAfter)}', style: const TextStyle(color: Colors.grey, fontSize: 9)),
                   ],
                 )
               ],
