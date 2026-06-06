@@ -2767,15 +2767,65 @@ Future<List<MediaPost>?> _fetchMediaPostsFromSupabase({int limit = 300}) async {
   }
 }
 
-Future<bool> _deleteMediaRowFromSupabase(String id) async {
+Future<bool> _deleteMediaRowFromSupabase(String id, {int attempts = 3}) async {
   if (id.isEmpty) return false;
-  try {
-    await Supabase.instance.client.from('media').delete().eq('id', id);
-    return true;
-  } catch (e) {
-    debugPrint('[media] delete error: $e');
-    return false;
+  for (var attempt = 0; attempt < attempts; attempt++) {
+    try {
+      await Supabase.instance.client.from('media').delete().eq('id', id);
+      final row = await Supabase.instance.client.from('media').select('id').eq('id', id).maybeSingle();
+      if (row == null) return true;
+    } catch (e) {
+      debugPrint('[media] delete attempt ${attempt + 1} for $id: $e');
+    }
+    if (attempt < attempts - 1) {
+      await Future.delayed(Duration(milliseconds: 350 * (attempt + 1)));
+    }
   }
+  return false;
+}
+
+Future<void> _removeMediaStorageFile(MediaPost post) async {
+  final client = Supabase.instance.client;
+  final ref = _parseSupabaseStorageRef(post.videoUrl);
+  if (ref != null) {
+    try {
+      await client.storage.from(ref.bucket).remove([ref.path]);
+    } catch (e) {
+      debugPrint('[media] storage remove warning: $e');
+    }
+    return;
+  }
+  final url = post.videoUrl.trim();
+  if (!url.startsWith('http')) return;
+  try {
+    final uri = Uri.parse(url);
+    final marker = '/storage/v1/object/public/';
+    final idx = uri.path.indexOf(marker);
+    if (idx < 0) return;
+    final rest = uri.path.substring(idx + marker.length);
+    final slash = rest.indexOf('/');
+    if (slash <= 0) return;
+    final bucket = rest.substring(0, slash);
+    final path = rest.substring(slash + 1);
+    if (bucket.isNotEmpty && path.isNotEmpty) {
+      await client.storage.from(bucket).remove([path]);
+    }
+  } catch (e) {
+    debugPrint('[media] http storage remove warning: $e');
+  }
+}
+
+List<MediaPost> _visibleMediaPosts(
+  List<MediaPost> posts, {
+  Set<String> tombstones = const {},
+  bool Function(MediaPost post)? extraFilter,
+}) {
+  return posts.where((m) {
+    if (m.id.isEmpty || tombstones.contains(m.id)) return false;
+    if (!NgmyMediaProfile.postHasSource(m)) return false;
+    if (extraFilter != null && !extraFilter(m)) return false;
+    return true;
+  }).toList();
 }
 
 Future<bool> _mediaPostExistsInSupabase(String id) async {
@@ -6921,7 +6971,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final remoteIds = remote.map((m) => m.id).where((id) => id.isNotEmpty).toSet();
     for (final post in List<MediaPost>.from(_allMedia)) {
       if (post.id.isEmpty || remoteIds.contains(post.id)) continue;
+      if (_tombstonedMediaIds.contains(post.id)) continue;
       if (!_mediaUrlIsCloudSynced(post.videoUrl)) continue;
+      if (DateTime.now().difference(post.timestamp).inMinutes > 15) continue;
       if (await _mediaPostExistsInSupabase(post.id)) continue;
       final saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
       if (saved) {
@@ -6931,14 +6983,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _reloadMediaFromSupabase() async {
+    await _hydrateMediaTombstonesFromCloud(_tombstonedMediaIds);
     final remote = await _fetchMediaPostsFromSupabase();
     if (remote == null || !mounted) return;
     await _resyncLocalMediaMissingFromCloud(remote);
     final refreshed = await _fetchMediaPostsFromSupabase();
     final mergedRemote = refreshed ?? remote;
     final next = _mergeMediaWithRemote(_allMedia, mergedRemote, tombstones: _tombstonedMediaIds);
+    if (!mounted) return;
     setState(() => _allMedia = next);
     await _persistAllMediaLocally();
+    await _pruneStaleMediaAgainstCloud();
     await _purgeGhostAndBrokenMedia(verifyUrls: true);
   }
 
@@ -6946,15 +7001,27 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (_adminMediaProtectUntil != null && DateTime.now().isBefore(_adminMediaProtectUntil!)) {
       return;
     }
+    await _hydrateMediaTombstonesFromCloud(_tombstonedMediaIds);
     final remote = await _fetchMediaPostsFromSupabase();
     if (remote == null || !mounted) return;
-    final next = _mergeMediaWithRemote(_allMedia, remote, tombstones: _tombstonedMediaIds);
-    final before = jsonEncode(_allMedia.map((e) => e.toJson()).toList());
-    final after = jsonEncode(next.map((e) => e.toJson()).toList());
-    if (before != after) {
-      setState(() => _allMedia = next);
-      await _persistAllMediaLocally();
+    final remoteIds = remote.map((m) => m.id).where((id) => id.isNotEmpty).toSet();
+    final removeIds = <String>{};
+    for (final m in _allMedia) {
+      if (m.id.isEmpty) continue;
+      if (_tombstonedMediaIds.contains(m.id)) {
+        removeIds.add(m.id);
+        continue;
+      }
+      if (_mediaUrlIsCloudSynced(m.videoUrl) && !remoteIds.contains(m.id)) {
+        removeIds.add(m.id);
+      }
     }
+    if (removeIds.isEmpty) return;
+    await _persistDeletedMediaIdsBatchAuthoritative(removeIds, _tombstonedMediaIds);
+    _allMedia.removeWhere((m) => removeIds.contains(m.id) || m.id.isEmpty);
+    if (!mounted) return;
+    setState(() {});
+    await _persistAllMediaLocally();
   }
 
   bool _mediaListsSameIds(List<MediaPost> a, List<MediaPost> b) {
@@ -6966,10 +7033,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _pruneDeletedMediaPost(MediaPost post) async {
     if (post.id.isEmpty) return;
+    if (_tombstonedMediaIds.contains(post.id)) {
+      if (!mounted) return;
+      setState(() => _allMedia.removeWhere((m) => m.id == post.id));
+      await _persistAllMediaLocally();
+      return;
+    }
     final exists = await _mediaPostExistsInSupabase(post.id);
     if (exists) return;
-    _tombstonedMediaIds.add(post.id);
-    await _persistTombstonedMediaIds(_tombstonedMediaIds);
+    await _persistDeletedMediaIdAuthoritative(post.id, _tombstonedMediaIds);
     if (!mounted) return;
     setState(() => _allMedia.removeWhere((m) => m.id == post.id));
     await _persistAllMediaLocally();
@@ -6978,6 +7050,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   /// Removes empty, tombstoned, orphaned, and broken (404) media for all users.
   Future<int> _purgeGhostAndBrokenMedia({bool verifyUrls = false}) async {
     if (!mounted) return 0;
+    await _hydrateMediaTombstonesFromCloud(_tombstonedMediaIds);
     final removeIds = <String>{};
 
     for (final m in _allMedia) {
@@ -7021,8 +7094,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
     if (removeIds.isEmpty) return 0;
 
+    await _persistDeletedMediaIdsBatchAuthoritative(removeIds, _tombstonedMediaIds);
     for (final id in removeIds) {
-      _tombstonedMediaIds.add(id);
       _purgeMediaDeliveryQueueForPost(id);
       await _deleteMediaRowFromSupabase(id);
       MediaPost? post;
@@ -7033,17 +7106,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
       }
       if (post != null) {
-        final ref = _parseSupabaseStorageRef(post.videoUrl);
-        if (ref != null) {
-          try {
-            await supabase.storage.from(ref.bucket).remove([ref.path]);
-          } catch (_) {}
-        }
+        await _removeMediaStorageFile(post);
       }
     }
 
     _allMedia.removeWhere((m) => removeIds.contains(m.id) || m.id.isEmpty);
-    await _persistTombstonedMediaIds(_tombstonedMediaIds);
     await _persistAllMediaLocally();
     if (mounted) setState(() {});
     return removeIds.length;
@@ -7063,28 +7130,25 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _deleteMediaPostGlobally(MediaPost post) async {
     final id = post.id;
     if (id.isEmpty) return;
-    _tombstonedMediaIds.add(id);
-    await _persistTombstonedMediaIds(_tombstonedMediaIds);
     _purgeMediaDeliveryQueueForPost(id);
+    await _persistDeletedMediaIdAuthoritative(id, _tombstonedMediaIds);
+    if (mounted) {
+      setState(() => _allMedia.removeWhere((m) => m.id == id));
+    } else {
+      _allMedia.removeWhere((m) => m.id == id);
+    }
+    await _persistAllMediaLocally();
     final deleted = await _deleteMediaRowFromSupabase(id);
     if (!deleted) {
-      debugPrint('[media] database delete failed for $id');
+      debugPrint('[media] database delete failed for $id — hidden via global tombstone');
     }
-    final ref = _parseSupabaseStorageRef(post.videoUrl);
-    if (ref != null) {
-      try {
-        await supabase.storage.from(ref.bucket).remove([ref.path]);
-      } catch (e) {
-        debugPrint('[media] storage remove warning: $e');
-      }
-    }
+    await _removeMediaStorageFile(post);
     if (!mounted) return;
-    setState(() => _allMedia.removeWhere((m) => m.id == id));
-    await _persistAllMediaLocally();
+    setState(() {});
     if (mounted && !deleted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Post removed on this device. Run supabase/media_tables.sql if it still appears for others.'),
+          content: Text('Post hidden for everyone. Database cleanup will retry in the background.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -7906,6 +7970,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         return;
       }
+      if (key == _kNgmyDeletedMediaSettingsKey) {
+        final value = payload.newRecord['value'];
+        if (value is Map) {
+          _applyDeletedMediaIdsPayload(_tombstonedMediaIds, Map<String, dynamic>.from(value));
+          if (!mounted) return;
+          setState(() => _allMedia.removeWhere((m) => _tombstonedMediaIds.contains(m.id)));
+          unawaited(_persistTombstonedMediaIds(_tombstonedMediaIds));
+          unawaited(_persistAllMediaLocally());
+        }
+        return;
+      }
       if (key == _kNgmySettingsTermsKey || key == _kNgmySettingsPrivacyKey) {
         final value = payload.newRecord['value'];
         if (value is Map) {
@@ -8051,10 +8126,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final id = (payload.oldRecord['id'] ?? payload.newRecord['id'] ?? '').toString();
         if (id.isEmpty) return;
         if (!mounted) return;
-        _tombstonedMediaIds.add(id);
-        _persistTombstonedMediaIds(_tombstonedMediaIds);
+        unawaited(_persistDeletedMediaIdAuthoritative(id, _tombstonedMediaIds));
         setState(() => _allMedia.removeWhere((m) => m.id == id));
-        _persistAllMediaLocally();
+        unawaited(_persistAllMediaLocally());
         return;
       }
       final incoming = MediaPost.fromJson(payload.newRecord);
@@ -8324,6 +8398,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
 
       _tombstonedMediaIds = await _loadTombstonedMediaIds();
+      await _hydrateMediaTombstonesFromCloud(_tombstonedMediaIds);
 
       // 1. Load Local Config & Plans First
       final plansJson = safeGet('investment_plans');
@@ -8572,6 +8647,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (mediaData != null) {
           final remoteMedia = (mediaData as List).map((e) => MediaPost.fromJson(e)).toList();
           _allMedia = _mergeMediaWithRemote(localMedia, remoteMedia, tombstones: _tombstonedMediaIds);
+          _allMedia.removeWhere((m) => _tombstonedMediaIds.contains(m.id));
           await _persistAllMediaLocally();
           unawaited(_purgeGhostAndBrokenMedia(verifyUrls: true));
         }
@@ -35484,10 +35560,10 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final topInset = MediaQuery.paddingOf(context).top + 68;
-    final mediaFeed = widget.allMedia
-        .where((m) => !_isExpired(m) && NgmyMediaProfile.postHasSource(m))
-        .toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final mediaFeed = _visibleMediaPosts(
+      widget.allMedia,
+      extraFilter: (m) => !_isExpired(m),
+    )..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF080B16) : const Color(0xFFF3F7FF),
       body: Stack(

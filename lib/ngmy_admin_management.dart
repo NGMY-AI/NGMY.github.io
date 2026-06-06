@@ -3,6 +3,66 @@ part of 'main.dart';
 const String _kNgmyManagementListsCloudKey = 'management_operational_lists';
 const String _kNgmyManagementListsPrefsKey = 'ngmy_management_operational_lists_v1';
 const String _kNgmyStoreSellAccessSettingsKey = 'store_sell_access_emails';
+const String _kNgmyDeletedMediaSettingsKey = 'deleted_media_ids';
+
+Future<Set<String>> _fetchDeletedMediaIdsFromCloud() async {
+  final row = await _fetchNgmySettingSafe(_kNgmyDeletedMediaSettingsKey);
+  if (row == null) return {};
+  final raw = row['ids'];
+  if (raw is! List) return {};
+  return raw.map((e) => e.toString()).where((id) => id.isNotEmpty).toSet();
+}
+
+Future<void> _hydrateMediaTombstonesFromCloud(Set<String> tombstones) async {
+  if (!await ngmyCanReachCloud()) return;
+  final cloud = await _fetchDeletedMediaIdsFromCloud();
+  if (cloud.isEmpty) return;
+  tombstones.addAll(cloud);
+  await _persistTombstonedMediaIds(tombstones);
+}
+
+Future<bool> _persistDeletedMediaIdAuthoritative(String id, Set<String> tombstones) async {
+  if (id.isEmpty) return false;
+  tombstones.add(id);
+  await _persistTombstonedMediaIds(tombstones);
+  if (!await ngmyCanReachCloud()) return false;
+  try {
+    final merged = {...await _fetchDeletedMediaIdsFromCloud(), id};
+    return await _upsertNgmySettingSafe(_kNgmyDeletedMediaSettingsKey, {
+      'ids': merged.toList()..sort(),
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+    });
+  } catch (e) {
+    debugPrint('[media] tombstone cloud save: $e');
+    return false;
+  }
+}
+
+Future<bool> _persistDeletedMediaIdsBatchAuthoritative(Set<String> ids, Set<String> tombstones) async {
+  if (ids.isEmpty) return false;
+  tombstones.addAll(ids);
+  await _persistTombstonedMediaIds(tombstones);
+  if (!await ngmyCanReachCloud()) return false;
+  try {
+    final merged = {...await _fetchDeletedMediaIdsFromCloud(), ...ids};
+    return await _upsertNgmySettingSafe(_kNgmyDeletedMediaSettingsKey, {
+      'ids': merged.toList()..sort(),
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+    });
+  } catch (e) {
+    debugPrint('[media] tombstone batch cloud save: $e');
+    return false;
+  }
+}
+
+void _applyDeletedMediaIdsPayload(Set<String> tombstones, Map<String, dynamic> value) {
+  final raw = value['ids'];
+  if (raw is! List) return;
+  for (final id in raw) {
+    final s = id.toString();
+    if (s.isNotEmpty) tombstones.add(s);
+  }
+}
 
 List<Map<String, dynamic>> _managementListFromPayload(dynamic raw) {
   if (raw is! List) return const [];
