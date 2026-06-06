@@ -7867,6 +7867,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (_isSyncing) return;
     try {
       final key = (payload.newRecord['key'] ?? '').toString();
+      if (key == 'management_operational_lists') {
+        final value = payload.newRecord['value'];
+        if (value is Map) {
+          final keep = AppConfig.fromJson(_config.toJson());
+          _applyManagementOperationalListsPayload(_config, Map<String, dynamic>.from(value));
+          _mergeOperationalManagementListsIntoConfig(_config, keep);
+          setState(() {});
+          unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
+        }
+        return;
+      }
       if (key == _kNgmySettingsChatClosedKey) {
         final value = payload.newRecord['value'];
         if (value is Map) {
@@ -8265,6 +8276,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             pinBackup.byState,
             _config.civicRegistryPinsByState,
           );
+          await ngmyHydrateManagementListsFromAllBackups(_config);
         } catch (_) {}
       }
       final localMediaJson = safeGet('all_media');
@@ -8514,6 +8526,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _applyRemoteConfigMerge(next, cfgMap, localConfigSnapshot);
           _mergeOperationalManagementListsIntoConfig(next, localConfigSnapshot);
           _config = next;
+          await ngmyHydrateManagementListsFromAllBackups(_config);
+          _mergeOperationalManagementListsIntoConfig(_config, localConfigSnapshot);
           (_config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(
             cfgMap['mediaVirtualProfiles'] ?? (_config as dynamic).mediaVirtualProfiles,
           );
@@ -33169,8 +33183,18 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
 
   Future<void> _saveJobs() async {
     widget.onDataChanged();
-    await ngmyPersistAdminConfigNow(widget.config);
-    if (mounted) setState(() {});
+    final cloudOk = await ngmyAdminPersistManagementConfig(widget.config);
+    if (mounted) {
+      setState(() {});
+      if (!cloudOk && await ngmyCanReachCloud()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Saved on this device — retry when online to sync job data.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
   }
 
   void _processWorkerApplication(Map<String, dynamic> app, {required bool approve}) {
@@ -33808,12 +33832,12 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () {
+                            onPressed: () async {
                               if (fullNameC.text.trim().isEmpty || phoneC.text.trim().isEmpty || skillsC.text.trim().isEmpty || roleC.text.trim().isEmpty || noteC.text.trim().isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all required fields.')));
                                 return;
                               }
-                              widget.config.jobWorkerApplications.add({
+                              final application = {
                                 'id': DateTime.now().microsecondsSinceEpoch.toString(),
                                 'userEmail': widget.user.email,
                                 'username': widget.user.username,
@@ -33828,10 +33852,26 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
                                 'note': noteC.text.trim(),
                                 'status': 'pending',
                                 'createdAt': DateTime.now().toIso8601String(),
-                              });
-                              _saveJobs();
+                              };
+                              widget.config.jobWorkerApplications = _mergeJobWorkerApplicationsLists(
+                                widget.config.jobWorkerApplications,
+                                [application],
+                              );
+                              await _saveJobs();
+                              if (!ctx.mounted) return;
                               Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Application sent to admin for review.')));
+                              if (!context.mounted) return;
+                              final online = await ngmyCanReachCloud();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    online
+                                        ? 'Application sent to admin and saved to database.'
+                                        : 'Application saved on this device — will sync when online.',
+                                  ),
+                                  backgroundColor: online ? const Color(0xFF00B25A) : Colors.orange,
+                                ),
+                              );
                             },
                             child: const Text('Submit Application'),
                           ),
