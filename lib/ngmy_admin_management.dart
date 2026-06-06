@@ -4,8 +4,17 @@ part of 'main.dart';
 Future<bool> ngmyAdminPersistManagementConfig(AppConfig config) async {
   _operationalConfigCloudDebounce?.cancel();
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
-  await _persistOperationalConfigToCloud(config);
-  await _persistCriticalConfigFields(config);
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    for (var attempt = 0; attempt < 3 && !cloudOk; attempt++) {
+      final operationalOk = await _persistOperationalConfigToCloud(config);
+      await _persistCriticalConfigFields(config);
+      cloudOk = operationalOk;
+      if (!cloudOk && attempt < 2) {
+        await Future.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+      }
+    }
+  }
   if (config.termsAndConditions.trim().isNotEmpty || config.privacyPolicy.trim().isNotEmpty) {
     unawaited(
       _persistLegalContentToCloud(
@@ -14,7 +23,8 @@ Future<bool> ngmyAdminPersistManagementConfig(AppConfig config) async {
       ),
     );
   }
-  return await ngmyCanReachCloud();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
 }
 
 void ngmyAdminShowCloudSaveSnackBar(
@@ -48,7 +58,9 @@ Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
     }
     if (cfgMap.isEmpty) return;
     _applyRemoteConfigMerge(config, cfgMap, snapshot);
+    _mergeOperationalManagementListsIntoConfig(config, snapshot);
     await _refreshPopupsFromCloudStatic(config);
+    await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   } catch (e) {
     debugPrint('[admin mgmt] refresh: $e');
   }

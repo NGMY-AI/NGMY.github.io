@@ -1603,6 +1603,75 @@ List<Map<String, dynamic>> _mergeJobWorkerApplicationsLists(
   return _mergeCivicRegistrarApplications(local, remote);
 }
 
+List<Map<String, dynamic>> _mergeLoanApplicationsLists(
+  List<Map<String, dynamic>> local,
+  List<Map<String, dynamic>> remote,
+) {
+  if (remote.isEmpty) return local.map((e) => Map<String, dynamic>.from(e)).toList();
+  if (local.isEmpty) return remote.map((e) => Map<String, dynamic>.from(e)).toList();
+  final byId = <String, Map<String, dynamic>>{};
+  for (final a in local) {
+    final id = (a['id'] ?? '').toString();
+    if (id.isNotEmpty) byId[id] = Map<String, dynamic>.from(a);
+  }
+  for (final a in remote) {
+    final id = (a['id'] ?? '').toString();
+    if (id.isEmpty) continue;
+    final r = Map<String, dynamic>.from(a);
+    final existing = byId[id];
+    if (existing == null) {
+      byId[id] = r;
+    } else {
+      final lu = (existing['updatedAt'] ?? '').toString();
+      final ru = (r['updatedAt'] ?? '').toString();
+      byId[id] = ru.compareTo(lu) >= 0 ? r : existing;
+    }
+  }
+  return byId.values.toList()
+    ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+}
+
+/// Never drop local admin decisions when cloud config poll/bootstrap is stale.
+void _mergeOperationalManagementListsIntoConfig(AppConfig next, AppConfig keep) {
+  final keepLoans = keep.loanApplications.map((e) => Map<String, dynamic>.from(e)).toList();
+  final keepJobPosts = keep.jobPosts.map((e) => Map<String, dynamic>.from(e)).toList();
+  final keepJobWorkerApps = keep.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)).toList();
+  final keepHelpApps = keep.helpHelperApplications.map((e) => Map<String, dynamic>.from(e)).toList();
+  final keepHelpReqs = keep.helpRequests.map((e) => Map<String, dynamic>.from(e)).toList();
+  final keepHelpBiz = keep.helpBusinesses.map((e) => Map<String, dynamic>.from(e)).toList();
+
+  if (next.loanApplications.isEmpty && keepLoans.isNotEmpty) {
+    next.loanApplications = keepLoans;
+  } else {
+    next.loanApplications = _mergeLoanApplicationsLists(keepLoans, next.loanApplications);
+  }
+  if (next.jobPosts.isEmpty && keepJobPosts.isNotEmpty) {
+    next.jobPosts = keepJobPosts;
+  } else {
+    next.jobPosts = _mergeJobPostsLists(keepJobPosts, next.jobPosts);
+  }
+  if (next.jobWorkerApplications.isEmpty && keepJobWorkerApps.isNotEmpty) {
+    next.jobWorkerApplications = keepJobWorkerApps;
+  } else {
+    next.jobWorkerApplications = _mergeJobWorkerApplicationsLists(keepJobWorkerApps, next.jobWorkerApplications);
+  }
+  if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) {
+    next.helpHelperApplications = keepHelpApps;
+  } else if (keepHelpApps.isNotEmpty || next.helpHelperApplications.isNotEmpty) {
+    next.helpHelperApplications = _mergeJobWorkerApplicationsLists(keepHelpApps, next.helpHelperApplications);
+  }
+  if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) {
+    next.helpRequests = keepHelpReqs;
+  } else if (keepHelpReqs.isNotEmpty || next.helpRequests.isNotEmpty) {
+    next.helpRequests = _mergeJobWorkerApplicationsLists(keepHelpReqs, next.helpRequests);
+  }
+  if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) {
+    next.helpBusinesses = keepHelpBiz;
+  } else if (keepHelpBiz.isNotEmpty || next.helpBusinesses.isNotEmpty) {
+    next.helpBusinesses = _mergeJobWorkerApplicationsLists(keepHelpBiz, next.helpBusinesses);
+  }
+}
+
 /// Keeps local civic/game admin settings when Supabase row is missing jsonb columns.
 void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppConfig keep) {
   if (record.containsKey('gameTimeLimits') && record['gameTimeLimits'] is Map) {
@@ -1804,8 +1873,8 @@ Future<void> _persistStoreSellAccessEmails(AppConfig config) async {
 Timer? _operationalConfigCloudDebounce;
 
 /// Admin menu + user requests (loans, help, store messages, registrar apps) — not the full config blob.
-Future<void> _persistOperationalConfigToCloud(AppConfig config) async {
-  if (!await ngmyCanReachCloud()) return;
+Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
+  if (!await ngmyCanReachCloud()) return false;
   var row = <String, dynamic>{
     'id': kNgmyConfigRowId,
     'storeInquiries': config.storeInquiries,
@@ -1833,18 +1902,19 @@ Future<void> _persistOperationalConfigToCloud(AppConfig config) async {
   for (var i = 0; i < 12; i++) {
     try {
       await Supabase.instance.client.from('config').upsert(row);
-      return;
+      return true;
     } catch (e) {
       final missing = _missingColumnFromPostgrestError(e);
       if (missing != null && missing.isNotEmpty && row.containsKey(missing)) {
         row = Map<String, dynamic>.from(row)..remove(missing);
-        if (row.length <= 1) return;
+        if (row.length <= 1) return false;
         continue;
       }
       debugPrint('[config] operational upsert: $e');
-      return;
+      return false;
     }
   }
+  return false;
 }
 
 void _scheduleOperationalConfigCloudPersist(AppConfig config) {
@@ -5358,8 +5428,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _syncWalletApprovalInBackground(AppTransaction t, UserData? user) async {
-    if (t.status == TransactionStatus.pending) return;
+  Future<bool> _syncWalletApprovalInBackground(AppTransaction t, UserData? user) async {
+    if (t.status == TransactionStatus.pending) return false;
     var synced = await _pushTransactionDecisionToCloud(t, attempts: 3);
     if (!synced && _ngmySessionIsAdmin(_currentUser)) {
       synced = await _pushTransactionDecisionToCloud(t, attempts: 2);
@@ -5371,6 +5441,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _markTransactionDirty(t.id);
     await _persistLocalOnly();
     if (mounted) setState(() {});
+    return synced;
   }
 
   Future<bool> _saveAdminWalletPayments(String cashApp, String bitcoin) async {
@@ -6104,6 +6175,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (!_ngmySessionIsAdmin(_currentUser)) return;
     if (!await ngmyCanReachCloud()) return;
     try {
+      await _refreshWalletDecisionLedger();
+      _applyWalletDecisionLedgerToTransactions();
       final rows = await supabase
           .from('transactions')
           .select()
@@ -6117,12 +6190,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       setState(() {
         for (final raw in rows as List) {
           final tx = AppTransaction.fromJson(Map<String, dynamic>.from(raw as Map));
+          final decided = _walletDecisionLedger[tx.id];
+          if (decided != null && decided > 0 && decided <= 2) continue;
           final idx = _allTransactions.indexWhere((t) => t.id == tx.id);
           if (idx != -1) {
             final local = _allTransactions[idx];
             if (local.status != TransactionStatus.pending) continue;
-            final decided = _walletDecisionLedger[local.id];
-            if (decided != null && decided > 0) continue;
             if (tx.status == TransactionStatus.pending &&
                 !tx.timestamp.isAfter(local.timestamp)) {
               continue;
@@ -6136,6 +6209,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           newPendingForAdmin.add(tx);
         }
       });
+      _applyWalletDecisionLedgerToTransactions();
       if (newPendingForAdmin.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
@@ -6424,34 +6498,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  List<Map<String, dynamic>> _mergeLoanApplicationsLists(
-    List<Map<String, dynamic>> local,
-    List<Map<String, dynamic>> remote,
-  ) {
-    if (remote.isEmpty) return local;
-    if (local.isEmpty) return remote;
-    final byId = <String, Map<String, dynamic>>{};
-    for (final a in local) {
-      final id = (a['id'] ?? '').toString();
-      if (id.isNotEmpty) byId[id] = Map<String, dynamic>.from(a);
-    }
-    for (final a in remote) {
-      final id = (a['id'] ?? '').toString();
-      if (id.isEmpty) continue;
-      final r = Map<String, dynamic>.from(a);
-      final existing = byId[id];
-      if (existing == null) {
-        byId[id] = r;
-      } else {
-        final lu = (existing['updatedAt'] ?? '').toString();
-        final ru = (r['updatedAt'] ?? '').toString();
-        byId[id] = ru.compareTo(lu) >= 0 ? r : existing;
-      }
-    }
-    return byId.values.toList()
-      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
-  }
-
   void _startGameSettingsRefreshLoop() {
     _gameSettingsRefreshTimer?.cancel();
     unawaited(_refreshGameCenterSettingsFromCloud());
@@ -6525,6 +6571,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             next.civicRegistrarApplications,
           );
         }
+        _mergeOperationalManagementListsIntoConfig(next, keepConfig);
         final remotePopups = (cfgMap['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         final remoteVideoPopups = (cfgMap['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         next.ngmyPopups = _mergeNgmyPopupsFromRemote(keepPopups, remotePopups, NgmyPopupDefaults.ensurePopups);
@@ -7775,6 +7822,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             next.civicRegistrarApplications,
           );
         }
+        _mergeOperationalManagementListsIntoConfig(next, keepConfig);
         final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
         final remotePopups = (record['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -8242,6 +8290,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
       }
       final tLocalEarly = safeGet('all_transactions');
+      await _refreshWalletDecisionLedger();
       if (tLocalEarly != null) {
         try {
           _allTransactions = (jsonDecode(tLocalEarly) as List).map((e) => AppTransaction.fromJson(e)).toList();
@@ -8463,6 +8512,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (cfgMap.isNotEmpty) {
           final next = AppConfig.fromJson({..._config.toJson(), ...cfgMap});
           _applyRemoteConfigMerge(next, cfgMap, localConfigSnapshot);
+          _mergeOperationalManagementListsIntoConfig(next, localConfigSnapshot);
           _config = next;
           (_config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(
             cfgMap['mediaVirtualProfiles'] ?? (_config as dynamic).mediaVirtualProfiles,
@@ -9101,14 +9151,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   final newStatus = approve ? TransactionStatus.approved : TransactionStatus.rejected;
                   await NgmyWalletDecisionLedger.record(t.id, newStatus.index);
                   _walletDecisionLedger[t.id] = newStatus.index;
-                  unawaited(
-                    NgmyWalletDecisionLedger.recordCloud(
-                      transactionId: t.id,
-                      statusIndex: newStatus.index,
-                      userEmail: t.userEmail,
-                      amount: t.amount,
-                      typeIndex: t.type.index,
-                    ),
+                  await NgmyWalletDecisionLedger.recordCloud(
+                    transactionId: t.id,
+                    statusIndex: newStatus.index,
+                    userEmail: t.userEmail,
+                    amount: t.amount,
+                    typeIndex: t.type.index,
                   );
                   setState(() {
                     t.status = newStatus;
@@ -9189,13 +9237,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   _markTransactionDirty(t.id);
                   await _persistLocalOnly();
                   final syncedUserCopy = syncedUser;
-                  unawaited(_syncWalletApprovalInBackground(t, syncedUserCopy));
+                  final cloudSynced = await _syncWalletApprovalInBackground(t, syncedUserCopy);
                   if (mounted) {
                     final label = approve ? 'approved' : 'rejected';
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Deposit/withdrawal $label. Saving to database in background.'),
-                        backgroundColor: const Color(0xFF00B25A),
+                        content: Text(
+                          cloudSynced
+                              ? 'Deposit/withdrawal $label and saved to database.'
+                              : 'Decision saved on this device — will sync when connection allows.',
+                        ),
+                        backgroundColor: cloudSynced ? const Color(0xFF00B25A) : Colors.orange,
                         duration: const Duration(seconds: 3),
                       ),
                     );
@@ -33115,10 +33167,10 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     return null;
   }
 
-  void _saveJobs() {
+  Future<void> _saveJobs() async {
     widget.onDataChanged();
-    unawaited(ngmyPersistAdminConfigNow(widget.config));
-    setState(() {});
+    await ngmyPersistAdminConfigNow(widget.config);
+    if (mounted) setState(() {});
   }
 
   void _processWorkerApplication(Map<String, dynamic> app, {required bool approve}) {
