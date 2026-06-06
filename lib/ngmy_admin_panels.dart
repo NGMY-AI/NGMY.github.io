@@ -499,7 +499,13 @@ class _NgmyAdminInvestTabState extends State<NgmyAdminInvestTab> {
                   if (mounted) {
                     setState(() => _busyPlanKey = null);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(ok ? 'Plan saved to cloud for all users.' : 'Saved locally — retry when online.'), backgroundColor: ok ? const Color(0xFF00B25A) : Colors.orange),
+                      SnackBar(
+                        content: Text(ok
+                            ? 'Plan saved to cloud for all users.'
+                            : ngmySupabaseSaveFailureMessage(_ngmyLastSupabasePersistError)),
+                        backgroundColor: ok ? const Color(0xFF00B25A) : Colors.orange,
+                        duration: Duration(seconds: ok ? 3 : 8),
+                      ),
                     );
                   }
                 },
@@ -614,6 +620,168 @@ class _NgmyAdminInvestTabState extends State<NgmyAdminInvestTab> {
                 ),
         ),
       ],
+    );
+  }
+}
+
+/// Admin Creator tab — Terms & Conditions and Privacy Policy editor.
+class NgmyAdminLegalTab extends StatefulWidget {
+  const NgmyAdminLegalTab({
+    super.key,
+    required this.isDark,
+    required this.terms,
+    required this.privacy,
+    required this.onSave,
+  });
+
+  final bool isDark;
+  final String terms;
+  final String privacy;
+  final Future<bool> Function(String terms, String privacy) onSave;
+
+  @override
+  State<NgmyAdminLegalTab> createState() => _NgmyAdminLegalTabState();
+}
+
+class _NgmyAdminLegalTabState extends State<NgmyAdminLegalTab> {
+  late final TextEditingController _termsC;
+  late final TextEditingController _privacyC;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _termsC = TextEditingController(text: widget.terms);
+    _privacyC = TextEditingController(text: widget.privacy);
+  }
+
+  @override
+  void didUpdateWidget(covariant NgmyAdminLegalTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.terms != widget.terms && _termsC.text != widget.terms) {
+      _termsC.text = widget.terms;
+    }
+    if (oldWidget.privacy != widget.privacy && _privacyC.text != widget.privacy) {
+      _privacyC.text = widget.privacy;
+    }
+  }
+
+  @override
+  void dispose() {
+    _termsC.dispose();
+    _privacyC.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    final terms = _termsC.text.trim();
+    final privacy = _privacyC.text.trim();
+    setState(() => _saving = true);
+    try {
+      final saved = await widget.onSave(terms, privacy);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(saved
+              ? 'Terms & Privacy saved to database for all users.'
+              : ngmySupabaseSaveFailureMessage(_ngmyLastSupabasePersistError)),
+          backgroundColor: saved ? const Color(0xFF00B25A) : Colors.orange,
+          duration: const Duration(seconds: 8),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _editorBox(String label, TextEditingController controller) {
+    final isDark = widget.isDark;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF121726) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.22 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+              color: isDark ? Colors.white70 : const Color(0xFF334155),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: controller,
+            maxLines: 6,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: isDark ? const Color(0xFF0F111A) : Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+                borderSide: BorderSide(color: Color(0xFF3B82F6), width: 1.4),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Legal Content Editor',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isDark ? Colors.white : Colors.black),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Changes sync to Supabase so every user sees updated Terms & Privacy in Profile.',
+            style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54),
+          ),
+          const SizedBox(height: 20),
+          _editorBox('Terms & Conditions', _termsC),
+          const SizedBox(height: 20),
+          _editorBox('Privacy Policy', _privacyC),
+          const SizedBox(height: 30),
+          ElevatedButton(
+            onPressed: _saving ? null : _save,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00B25A),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 55),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+            child: _saving
+                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('SAVE ALL CHANGES'),
+          ),
+        ],
+      ),
     );
   }
 }

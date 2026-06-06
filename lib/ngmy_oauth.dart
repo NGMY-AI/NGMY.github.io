@@ -5,13 +5,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_oauth_nav_stub.dart' if (dart.library.html) 'ngmy_oauth_nav_web.dart';
+import 'ngmy_supabase_config.dart';
 
 /// Canonical GitHub Pages URL — must be in Supabase Auth → Redirect URLs.
 const String kNgmyOAuthRedirectUrl = 'https://ngmy-ai.github.io/NGMY.github.io/';
-
-const String _kSupabaseUrl = 'https://gvufllqqxjnpicmkxzcg.supabase.co';
-const String _kSupabaseAnonKey =
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2dWZsbHFxeGpucGljbWt4emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA1OTksImV4cCI6MjA5NTM5NjU5OX0.NoJnis6t_RLSJOHu5iLdjGaCTxVj5ZAFnG3gBZ3XYbM';
 
 String? _cachedGoogleClientId;
 
@@ -43,15 +40,15 @@ Future<String?> _fetchGoogleClientIdFromSupabase() async {
     return _cachedGoogleClientId;
   }
   try {
-    final uri = Uri.parse('$_kSupabaseUrl/auth/v1/authorize').replace(
+    final uri = Uri.parse('$kNgmySupabaseUrl/auth/v1/authorize').replace(
       queryParameters: {
         'provider': 'google',
         'redirect_to': kNgmyOAuthRedirectUrl,
       },
     );
     final request = http.Request('GET', uri)
-      ..headers['apikey'] = _kSupabaseAnonKey
-      ..headers['Authorization'] = 'Bearer $_kSupabaseAnonKey'
+      ..headers['apikey'] = kNgmySupabaseAnonKey
+      ..headers['Authorization'] = 'Bearer $kNgmySupabaseAnonKey'
       ..followRedirects = false;
     final response = await http.Client().send(request).then(http.Response.fromStream);
     final location = response.headers['location'] ?? response.headers['Location'];

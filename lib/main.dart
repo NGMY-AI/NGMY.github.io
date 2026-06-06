@@ -39,6 +39,8 @@ import 'ngmy_game_result_popup.dart';
 import 'ngmy_multiplayer.dart';
 import 'ngmy_supabase_sync_throttle.dart';
 import 'ngmy_supabase_columns.dart';
+import 'ngmy_supabase_config.dart';
+import 'ngmy_supabase_health.dart';
 import 'ngmy_income_sound.dart';
 import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
@@ -295,9 +297,8 @@ void main() async {
   unawaited(ngmyIgnoreTimeout(() async {
     try {
       await Supabase.initialize(
-        url: 'https://gvufllqqxjnpicmkxzcg.supabase.co',
-        anonKey:
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2dWZsbHFxeGpucGljbWt4emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA1OTksImV4cCI6MjA5NTM5NjU5OX0.NoJnis6t_RLSJOHu5iLdjGaCTxVj5ZAFnG3gBZ3XYbM',
+        url: kNgmySupabaseUrl,
+        anonKey: kNgmySupabaseAnonKey,
         authOptions: const FlutterAuthClientOptions(
           authFlowType: AuthFlowType.pkce,
           detectSessionInUri: true,
@@ -3089,6 +3090,41 @@ const _kStoreSystemTermsId = 'ngmy:system:terms';
 const _kStoreSystemPrivacyId = 'ngmy:system:privacy';
 const _kStoreSystemPlansId = 'ngmy:system:investment_plans';
 
+Object? _ngmyLastSupabasePersistError;
+
+void _rememberSupabasePersistError(Object? error) {
+  if (error != null) _ngmyLastSupabasePersistError = error;
+}
+
+Future<bool> _upsertConfigAdminLegalAndPlans({
+  String? terms,
+  String? privacy,
+  List<Map<String, dynamic>>? plans,
+}) async {
+  final row = <String, dynamic>{'id': kNgmyConfigRowId};
+  if (terms != null) row['termsAndConditions'] = terms;
+  if (privacy != null) row['privacyPolicy'] = privacy;
+  if (plans != null) row['investmentPlans'] = plans;
+  if (row.length <= 1) return false;
+  for (int i = 0; i < 8; i++) {
+    try {
+      await Supabase.instance.client.from('config').upsert(row, onConflict: 'id');
+      return true;
+    } catch (e) {
+      _rememberSupabasePersistError(e);
+      final missing = _missingColumnFromPostgrestError(e);
+      if (missing != null && missing.isNotEmpty) {
+        row.remove(missing);
+        if (row.length <= 1) return false;
+        continue;
+      }
+      debugPrint('[config] admin legal/plans upsert error: $e');
+      return false;
+    }
+  }
+  return false;
+}
+
 bool _isNgmySystemStoreListingId(String id) => id.startsWith('ngmy:system:');
 
 DateTime? _parseSettingUpdatedAt(Object? raw) => DateTime.tryParse((raw ?? '').toString());
@@ -3101,9 +3137,10 @@ Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) asyn
   };
   for (int i = 0; i < 8; i++) {
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([row]);
+      await Supabase.instance.client.from('ngmy_settings').upsert([row], onConflict: 'key');
       return true;
     } catch (e) {
+      _rememberSupabasePersistError(e);
       if (_isMissingTablePostgrestError(e, 'ngmy_settings')) {
         debugPrint('[ngmy_settings] table missing — run supabase/ngmy_settings_table.sql');
         return false;
@@ -3143,9 +3180,10 @@ Future<bool> _upsertConfigLegalColumns(String terms, String privacy) async {
   };
   for (int i = 0; i < 8; i++) {
     try {
-      await Supabase.instance.client.from('config').upsert([row]);
+      await Supabase.instance.client.from('config').upsert([row], onConflict: 'id');
       return true;
     } catch (e) {
+      _rememberSupabasePersistError(e);
       final missing = _missingColumnFromPostgrestError(e);
       if (missing != null && missing.isNotEmpty) {
         row.remove(missing);
@@ -3163,9 +3201,10 @@ Future<bool> _upsertConfigInvestmentPlansColumn(List<Map<String, dynamic>> plans
   final row = <String, dynamic>{'id': kNgmyConfigRowId, 'investmentPlans': plans};
   for (int i = 0; i < 8; i++) {
     try {
-      await Supabase.instance.client.from('config').upsert([row]);
+      await Supabase.instance.client.from('config').upsert([row], onConflict: 'id');
       return true;
     } catch (e) {
+      _rememberSupabasePersistError(e);
       final missing = _missingColumnFromPostgrestError(e);
       if (missing != null && missing.isNotEmpty) {
         row.remove(missing);
@@ -3330,21 +3369,29 @@ Future<List<Map<String, dynamic>>> _fetchAuthoritativeInvestmentPlans() async {
 }
 
 Future<bool> _persistLegalContentToCloud(String terms, String privacy) async {
+  _ngmyLastSupabasePersistError = null;
   final now = DateTime.now().toUtc().toIso8601String();
   var ok = false;
   ok = await _upsertNgmySettingSafe(_kNgmySettingsTermsKey, {'content': terms, 'updatedAt': now}) || ok;
   ok = await _upsertNgmySettingSafe(_kNgmySettingsPrivacyKey, {'content': privacy, 'updatedAt': now}) || ok;
   ok = await _upsertConfigLegalColumns(terms, privacy) || ok;
   ok = await _persistLegalViaStoreListing(terms, privacy) || ok;
+  if (!ok) {
+    ok = await _upsertConfigAdminLegalAndPlans(terms: terms, privacy: privacy) || ok;
+  }
   return ok;
 }
 
 Future<bool> _persistInvestmentPlansToCloud(List<Map<String, dynamic>> plans) async {
+  _ngmyLastSupabasePersistError = null;
   final now = DateTime.now().toUtc().toIso8601String();
   var ok = false;
   ok = await _upsertNgmySettingSafe(_kNgmySettingsPlansKey, {'plans': plans, 'updatedAt': now}) || ok;
   ok = await _upsertConfigInvestmentPlansColumn(plans) || ok;
   ok = await _persistPlansViaStoreListing(plans) || ok;
+  if (!ok) {
+    ok = await _upsertConfigAdminLegalAndPlans(plans: plans) || ok;
+  }
   return ok;
 }
 
@@ -5567,8 +5614,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _globalPlans.sort((a, b) => a.price.compareTo(b.price));
       _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
     });
-    final ok = await _persistInvestmentPlansToCloud(_config.investmentPlans);
+    var ok = await _persistInvestmentPlansToCloud(_config.investmentPlans);
+    if (!ok) {
+      ok = await _upsertConfigAdminLegalAndPlans(plans: _config.investmentPlans);
+    }
     await _persistLocalOnly();
+    if (mounted) setState(() {});
     return ok;
   }
 
@@ -6630,6 +6681,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     // Fallback only — realtime config + debounced saves handle most updates.
     _configRefreshTimer = Timer.periodic(const Duration(minutes: 8), (_) async {
       if (_isSyncing) return;
+      await _refreshLegalAndPlansFromCloud();
       try {
         final cfg = await _fetchNgmyConfigRow(columns: NgmySupabaseColumns.configPoll);
         if (cfg == null) return;
@@ -7224,10 +7276,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await prefs.setString('app_config', jsonEncode(_config.toJson()));
       final saved = await _persistLegalContentToCloud(terms, privacy);
       if (!saved) {
-        debugPrint('[legal] cloud save failed — kept on device; run supabase/ngmy_settings_table.sql');
+        debugPrint('[legal] cloud save failed: $_ngmyLastSupabasePersistError');
       }
-      return saved || terms.isNotEmpty || privacy.isNotEmpty;
+      return saved;
     } catch (e) {
+      _rememberSupabasePersistError(e);
       debugPrint('[legal] save error: $e');
       return false;
     }
@@ -9547,6 +9600,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onUpsertInvestmentPlan: _upsertAdminInvestmentPlan,
                 onRemoveInvestmentPlan: _removeAdminInvestmentPlan,
                 onRefreshInvestmentPlans: _refreshAdminInvestmentPlans,
+                onRefreshLegalAndPlans: () => _refreshLegalAndPlansFromCloud(),
                 onArchiveWalletTransaction: _archiveAdminWalletTransaction,
                 onPersistManagementConfig: _saveAdminManagementConfigNow,
                 onRefreshManagementData: _refreshAdminManagementFromCloud,
@@ -10537,13 +10591,14 @@ class MainScreen extends StatefulWidget {
   final Future<bool> Function(InvestmentPlan plan, {InvestmentPlan? replace})? onUpsertInvestmentPlan;
   final Future<bool> Function(InvestmentPlan plan)? onRemoveInvestmentPlan;
   final Future<void> Function()? onRefreshInvestmentPlans;
+  final Future<void> Function()? onRefreshLegalAndPlans;
   final Future<void> Function(AppTransaction t)? onArchiveWalletTransaction;
   final Future<bool> Function()? onPersistManagementConfig;
   final Future<void> Function()? onRefreshManagementData;
   final Future<void> Function()? onRefreshAdminMedia;
   final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onRefreshLegalAndPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 
@@ -10553,6 +10608,13 @@ String _announcementsSig(List<Announcement> items) {
   final latest = sorted.first;
   return '${items.length}:${latest.id}:${latest.timestamp.millisecondsSinceEpoch}';
 }
+
+String _investmentPlansSig(List<InvestmentPlan> plans) =>
+    jsonEncode(plans.map((e) => e.toJson()).toList());
+
+String _legalContentSig(AppConfig config) =>
+    '${config.termsAndConditions.length}:${config.privacyPolicy.length}:'
+    '${config.termsAndConditions.hashCode}:${config.privacyPolicy.hashCode}';
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
@@ -10822,7 +10884,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     final cacheKey =
         '${widget.user.email}|$invSig|${widget.user.accountBalance.toStringAsFixed(2)}|'
         '${widget.user.pendingInvestmentName}|${widget.allMedia.length}|'
-        '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight';
+        '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight|'
+        '${_investmentPlansSig(widget.globalPlans)}|${_legalContentSig(widget.config)}';
     if (_tabPages != null && _tabPagesKey == cacheKey) return _tabPages!;
     _tabPagesKey = cacheKey;
     _tabPages = [
@@ -11015,7 +11078,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onSyncUserMedia: widget.onSyncAdminUserMedia,
       ),
       StatsScreen(user: widget.user, transactions: sorted),
-      ProfileScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onThemeChanged: widget.onThemeChanged, currentThemeMode: widget.currentThemeMode, onLogout: widget.onLogout, onDataChanged: widget.onDataChanged, onAddTransaction: widget.onAddTransaction),
+      ProfileScreen(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        config: widget.config,
+        onThemeChanged: widget.onThemeChanged,
+        currentThemeMode: widget.currentThemeMode,
+        onLogout: widget.onLogout,
+        onDataChanged: widget.onDataChanged,
+        onAddTransaction: widget.onAddTransaction,
+        onRefreshLegalContent: widget.onRefreshLegalAndPlans,
+      ),
     ];
     return _tabPages!;
   }
@@ -11131,6 +11204,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           child: InkWell(
             onTap: () {
               setState(() => _idx = i);
+              if (i == 1 || i == 6) unawaited(widget.onRefreshLegalAndPlans?.call());
               if (i == 4) unawaited(widget.onRefreshMediaFromCloud?.call());
             },
             customBorder: const CircleBorder(),
@@ -16516,88 +16590,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _adminLegal(bool isDark) {
-    final tCtrl = TextEditingController(text: widget.config.termsAndConditions);
-    final pCtrl = TextEditingController(text: widget.config.privacyPolicy);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Legal Content Editor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isDark ? Colors.white : Colors.black)),
-          const SizedBox(height: 20),
-          _editorBox('Terms & Conditions', tCtrl, isDark),
-          const SizedBox(height: 20),
-          _editorBox('Privacy Policy', pCtrl, isDark),
-          const SizedBox(height: 30),
-          ElevatedButton(
-            onPressed: () async {
-              final terms = tCtrl.text.trim();
-              final privacy = pCtrl.text.trim();
-              setState(() {
-                widget.config.termsAndConditions = terms;
-                widget.config.privacyPolicy = privacy;
-              });
-              final saved = widget.onSaveLegalContent != null
-                  ? await widget.onSaveLegalContent!(terms, privacy)
-                  : false;
-              if (!saved) widget.onDataChanged();
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(saved
-                      ? 'Terms & Privacy saved to database for all users.'
-                      : 'Could not sync to cloud. Run supabase/ngmy_settings_table.sql in Supabase SQL Editor, then save again.'),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-            child: const Text('SAVE ALL CHANGES'),
-          ),
-        ],
-      ),
-    );
-  }
-  Widget _editorBox(String l, TextEditingController c, bool isDark) => Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: isDark ? const Color(0xFF121726) : const Color(0xFFF8FAFC),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(isDark ? 0.22 : 0.05),
-          blurRadius: 10,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(l, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF334155))),
-        const SizedBox(height: 10),
-        TextField(
-          controller: c,
-          maxLines: 6,
-          style: TextStyle(color: isDark ? Colors.white : Colors.black),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: isDark ? const Color(0xFF0F111A) : Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
-            ),
-            focusedBorder: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(12)),
-              borderSide: BorderSide(color: Color(0xFF3B82F6), width: 1.4),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
+  Widget _adminLegal(bool isDark) => NgmyAdminLegalTab(
+        isDark: isDark,
+        terms: widget.config.termsAndConditions,
+        privacy: widget.config.privacyPolicy,
+        onSave: (terms, privacy) async {
+          setState(() {
+            widget.config.termsAndConditions = terms;
+            widget.config.privacyPolicy = privacy;
+          });
+          if (widget.onSaveLegalContent != null) {
+            return widget.onSaveLegalContent!(terms, privacy);
+          }
+          widget.onDataChanged();
+          return false;
+        },
+      );
 
   Widget _adminInvest(bool isDark) => NgmyAdminInvestTab(
         isDark: isDark,
@@ -19539,7 +19547,8 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
 
 class ProfileScreen extends StatefulWidget {
   final UserData user; final List<UserData> allUsers; final AppConfig config; final Function(ThemeMode) onThemeChanged; final ThemeMode currentThemeMode; final VoidCallback onLogout; final VoidCallback onDataChanged; final Function(AppTransaction) onAddTransaction;
-  const ProfileScreen({super.key, required this.user, required this.allUsers, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction});
+  final Future<void> Function()? onRefreshLegalContent;
+  const ProfileScreen({super.key, required this.user, required this.allUsers, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, this.onRefreshLegalContent});
 
   @override State<ProfileScreen> createState() => _ProfileScreenState();
 }
@@ -20282,14 +20291,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Icons.description_outlined,
                 title: 'Terms & Conditions',
                 iconBg: const Color(0xFF3B82F6),
-                onTap: () => _showLegal(context, 'Terms & Conditions', widget.config.termsAndConditions),
+                onTap: () async {
+                  await widget.onRefreshLegalContent?.call();
+                  if (!ctx.mounted) return;
+                  _showLegal(ctx, 'Terms & Conditions', widget.config.termsAndConditions);
+                },
               ),
               const SizedBox(height: 10),
               _legalTile(
                 icon: Icons.privacy_tip_outlined,
                 title: 'Privacy Policy',
                 iconBg: const Color(0xFF8B5CF6),
-                onTap: () => _showLegal(context, 'Privacy Policy', widget.config.privacyPolicy),
+                onTap: () async {
+                  await widget.onRefreshLegalContent?.call();
+                  if (!ctx.mounted) return;
+                  _showLegal(ctx, 'Privacy Policy', widget.config.privacyPolicy);
+                },
               ),
             ],
           ),
