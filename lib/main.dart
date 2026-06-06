@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -84,6 +84,8 @@ import 'ngmy_push_notifications.dart';
 import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_platform_graphics.dart';
+
+part 'ngmy_admin_panels.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -5313,6 +5315,68 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (mounted) setState(() {});
   }
 
+  Future<bool> _saveAdminWalletPayments(String cashApp, String bitcoin) async {
+    setState(() {
+      _config.officialCashApp = cashApp.trim();
+      _config.officialBitcoin = bitcoin.trim();
+    });
+    await ngmyPersistAdminConfigNow(_config);
+    await _persistLocalOnly();
+    return await ngmyCanReachCloud();
+  }
+
+  Future<bool> _upsertAdminInvestmentPlan(InvestmentPlan plan, {InvestmentPlan? replace}) async {
+    setState(() {
+      if (replace != null) {
+        final idx = _globalPlans.indexWhere((p) => p.name == replace.name && (p.price - replace.price).abs() < 0.001);
+        if (idx >= 0) {
+          _globalPlans[idx] = plan;
+        } else {
+          _globalPlans.add(plan);
+        }
+      } else if (!_globalPlans.any((p) => p.name == plan.name && (p.price - plan.price).abs() < 0.001)) {
+        _globalPlans.add(plan);
+      }
+      plan.applyFixedRoi();
+      _globalPlans.sort((a, b) => a.price.compareTo(b.price));
+      _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
+    });
+    final ok = await _persistInvestmentPlansToCloud(_config.investmentPlans);
+    await _persistLocalOnly();
+    return ok;
+  }
+
+  Future<bool> _removeAdminInvestmentPlan(InvestmentPlan plan) async {
+    setState(() {
+      _globalPlans.removeWhere((p) => p.name == plan.name && (p.price - plan.price).abs() < 0.001);
+      _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
+    });
+    final ok = await _persistInvestmentPlansToCloud(_config.investmentPlans);
+    await _persistLocalOnly();
+    return ok;
+  }
+
+  Future<void> _refreshAdminInvestmentPlans() async {
+    if (!await ngmyCanReachCloud()) return;
+    final remote = await _fetchAuthoritativeInvestmentPlans();
+    if (remote.isEmpty) return;
+    if (!mounted) return;
+    setState(() {
+      _globalPlans = _investmentPlansFromMaps(remote);
+      _config.investmentPlans = remote;
+    });
+    await _persistLocalOnly();
+  }
+
+  Future<void> _archiveAdminWalletTransaction(AppTransaction t) async {
+    if (t.status == TransactionStatus.approved) {
+      await NgmyAdminWalletApprovedArchive.addAll([t]);
+    }
+    setState(() => _allTransactions.removeWhere((x) => x.id == t.id));
+    unawaited(_safeDeleteTransactionsByIds([t.id]));
+    await _persistLocalOnly();
+  }
+
   /// Completes login after password check (local or Supabase). Always sets [_currentUser].
   Future<void> _completePasswordLogin(String email, String passwordHash) async {
     final key = email.toLowerCase().trim();
@@ -9015,6 +9079,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onMarkAnnouncementsRead: (ids) => _markAnnouncementsReadForUser(ids),
                 onRefreshAdminData: () => _refreshAdminCloudSnapshot(lightweight: true),
                 onPushUserToCloud: (u) => _pushUserToCloudFast(u, includeFreeTrial: true),
+                onSaveWalletPayments: _saveAdminWalletPayments,
+                onUpsertInvestmentPlan: _upsertAdminInvestmentPlan,
+                onRemoveInvestmentPlan: _removeAdminInvestmentPlan,
+                onRefreshInvestmentPlans: _refreshAdminInvestmentPlans,
+                onArchiveWalletTransaction: _archiveAdminWalletTransaction,
             ),
       ),
     );
@@ -9996,8 +10065,13 @@ class MainScreen extends StatefulWidget {
   final Future<void> Function(List<String> ids)? onMarkAnnouncementsRead;
   final Future<void> Function()? onRefreshAdminData;
   final Future<void> Function(UserData user)? onPushUserToCloud;
+  final Future<bool> Function(String cashApp, String bitcoin)? onSaveWalletPayments;
+  final Future<bool> Function(InvestmentPlan plan, {InvestmentPlan? replace})? onUpsertInvestmentPlan;
+  final Future<bool> Function(InvestmentPlan plan)? onRemoveInvestmentPlan;
+  final Future<void> Function()? onRefreshInvestmentPlans;
+  final Future<void> Function(AppTransaction t)? onArchiveWalletTransaction;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 
@@ -10359,7 +10433,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             await _showClockInConfirmedDialog();
           }
         }
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData, onDeleteMedia: widget.onDeleteMedia, onPushUserToCloud: widget.onPushUserToCloud),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData, onDeleteMedia: widget.onDeleteMedia, onPushUserToCloud: widget.onPushUserToCloud, onSaveWalletPayments: widget.onSaveWalletPayments, onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan, onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan, onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans, onArchiveWalletTransaction: widget.onArchiveWalletTransaction),
       InvestScreen(
         user: widget.user,
         plans: widget.globalPlans,
@@ -10666,7 +10740,12 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function()? onRefreshAdminData;
   final Future<void> Function(MediaPost post)? onDeleteMedia;
   final Future<void> Function(UserData user)? onPushUserToCloud;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud});
+  final Future<bool> Function(String cashApp, String bitcoin)? onSaveWalletPayments;
+  final Future<bool> Function(InvestmentPlan plan, {InvestmentPlan? replace})? onUpsertInvestmentPlan;
+  final Future<bool> Function(InvestmentPlan plan)? onRemoveInvestmentPlan;
+  final Future<void> Function()? onRefreshInvestmentPlans;
+  final Future<void> Function(AppTransaction t)? onArchiveWalletTransaction;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -10804,6 +10883,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             onRefreshAdminData: widget.onRefreshAdminData,
                             onDeleteMedia: widget.onDeleteMedia,
                             onPushUserToCloud: widget.onPushUserToCloud,
+                            onSaveWalletPayments: widget.onSaveWalletPayments,
+                            onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan,
+                            onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan,
+                            onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans,
+                            onArchiveWalletTransaction: widget.onArchiveWalletTransaction,
                           ),
                           routeName: 'AdminDashboard',
                         );
@@ -14623,7 +14707,12 @@ class AdminDashboard extends StatefulWidget {
   final Future<void> Function()? onRefreshAdminData;
   final Future<void> Function(MediaPost post)? onDeleteMedia;
   final Future<void> Function(UserData user)? onPushUserToCloud;
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud});
+  final Future<bool> Function(String cashApp, String bitcoin)? onSaveWalletPayments;
+  final Future<bool> Function(InvestmentPlan plan, {InvestmentPlan? replace})? onUpsertInvestmentPlan;
+  final Future<bool> Function(InvestmentPlan plan)? onRemoveInvestmentPlan;
+  final Future<void> Function()? onRefreshInvestmentPlans;
+  final Future<void> Function(AppTransaction t)? onArchiveWalletTransaction;
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
@@ -15933,674 +16022,68 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ),
   );
 
-  Widget _planCalcTile(String label, String value, bool isDark, {bool highlight = false}) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0F111A) : const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.black54)),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: highlight ? 14 : 12,
-                fontWeight: FontWeight.w800,
-                color: isDark ? Colors.white : const Color(0xFF111827),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showPlanEditor({InvestmentPlan? existing}) {
-    final isEdit = existing != null;
-    final nameC = TextEditingController(text: existing?.name ?? '');
-    final priceC = TextEditingController(text: existing != null ? existing.price.toString() : '');
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final panelBg = isDark ? const Color(0xFF121726) : Colors.white;
-    final panelBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
-
-    showDialog(
-      context: context,
-      barrierColor: Colors.black54,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlg) {
-          double parsedPrice = 0;
-          try {
-            parsedPrice = double.parse(priceC.text.trim());
-          } catch (_) {}
-          if (parsedPrice < 0) parsedPrice = 0;
-          final daily = parsedPrice * InvestmentPlan.fixedRoi;
-          final total = daily * InvestmentPlan.workDays;
-
-          return Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 520),
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
-              decoration: BoxDecoration(
-                color: panelBg,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: panelBorder, width: 2),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 18, offset: const Offset(0, 8))],
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(isEdit ? Icons.edit_note_rounded : Icons.add_chart_rounded, color: const Color(0xFF00B25A)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            isEdit ? 'Edit Investment Plan' : 'Create New Plan',
-                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : Colors.black),
-                          ),
-                        ),
-                        IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'ROI is fixed at 2.86% for every plan. Daily and total are auto-calculated for 261 work days.',
-                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: nameC,
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                      decoration: _adminInputDecoration(label: 'Plan Name', isDark: isDark),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: priceC,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (_) => setDlg(() {}),
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                      decoration: _adminInputDecoration(label: 'Plan Price (\$)', isDark: isDark),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F111A) : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: panelBorder),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.percent_rounded, color: Color(0xFF00B25A), size: 18),
-                          const SizedBox(width: 8),
-                          Text('Daily ROI (Fixed)', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black)),
-                          const Spacer(),
-                          Text('2.86%', style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF111827))),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        _planCalcTile('Daily Income', '\$${formatCurrency(daily)}', isDark),
-                        const SizedBox(width: 8),
-                        _planCalcTile('Total (261d)', '\$${formatCurrency(total)}', isDark, highlight: true),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('Cancel'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
-                            onPressed: () {
-                              final name = nameC.text.trim();
-                              final priceText = priceC.text.trim();
-                              if (name.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Plan name is required.')));
-                                return;
-                              }
-                              final price = double.tryParse(priceText);
-                              if (price == null || price <= 0) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid plan price.')));
-                                return;
-                              }
-                              if (isEdit) {
-                                setState(() {
-                                  existing!.name = name;
-                                  existing.price = price;
-                                  existing.applyFixedRoi();
-                                  widget.globalPlans.sort((a, b) => a.price.compareTo(b.price));
-                                });
-                                widget.onDataChanged();
-                              } else {
-                                widget.onAddPlan(InvestmentPlan(name: name, price: price));
-                              }
-                              Navigator.pop(ctx);
-                            },
-                            child: Text(isEdit ? 'Save Plan' : 'Add Plan'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
+  Widget _adminInvest(bool isDark) => NgmyAdminInvestTab(
+        isDark: isDark,
+        globalPlans: widget.globalPlans,
+        allTransactions: widget.allTransactions,
+        onUpsertPlan: (plan, {replace}) async {
+          if (widget.onUpsertInvestmentPlan != null) {
+            return widget.onUpsertInvestmentPlan!(plan, replace: replace);
+          }
+          if (replace != null) {
+            final idx = widget.globalPlans.indexWhere((p) => p.name == replace.name && (p.price - replace.price).abs() < 0.001);
+            if (idx >= 0) widget.globalPlans[idx] = plan;
+          } else {
+            widget.onAddPlan(plan);
+          }
+          widget.onDataChanged();
+          return true;
         },
-      ),
-    );
-  }
-
-  Widget _adminInvest(bool isDark) {
-    final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF121726) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: frameBorder, width: 2),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, color: Color(0xFF00B25A), size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'All plans use 2.86% daily ROI. Total = daily income x 261 work days.',
-                    style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : Colors.black54),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('CREATE NEW PLAN'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00B25A),
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 52),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              onPressed: () => _showPlanEditor(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: ListView(
-              children: widget.globalPlans.map((pl) {
-                pl.applyFixedRoi();
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: frameBorder, width: 1.8),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
-                    title: Text(pl.name, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Price: \$${formatCurrency(pl.price)}', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87)),
-                          Text('ROI: 2.86% (fixed)', style: TextStyle(color: isDark ? Colors.white60 : Colors.black54, fontSize: 12)),
-                          Text('Daily: \$${formatCurrency(pl.dailyIncome)}', style: TextStyle(color: isDark ? Colors.white60 : Colors.black54, fontSize: 12)),
-                          Text('Total (261 days): \$${formatCurrency(pl.totalReturn)}', style: const TextStyle(color: Color(0xFF00B25A), fontWeight: FontWeight.w700, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.edit_rounded, size: 20, color: isDark ? Colors.white70 : Colors.blueGrey),
-                          onPressed: () => _showPlanEditor(existing: pl),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Colors.red),
-                          onPressed: () {
-                            setState(() => widget.globalPlans.remove(pl));
-                            widget.onDataChanged();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Plan removed for all users.')),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _adminWallet(bool isDark) {
-    final now = DateTime.now();
-    if (_lastWalletArchiveLoad == null || now.difference(_lastWalletArchiveLoad!).inSeconds > 10) {
-      unawaited(_loadWalletApprovedArchive());
-    }
-    final cTag = TextEditingController(text: widget.config.officialCashApp);
-    final bAddr = TextEditingController(text: widget.config.officialBitcoin);
-
-    final pendingDeposits = widget.allTransactions
-        .where((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending)
-        .toList();
-    // Approved receipts should not flood the admin view.
-    // Show only the latest 3; the rest are available in a dropdown (local archive + overflow).
-    final approvedDeposits = widget.allTransactions
-        .where((t) => (t.type == TransactionType.deposit || t.type == TransactionType.adminAdd) && t.status == TransactionStatus.approved)
-        .toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    final visibleApprovedDeposits = approvedDeposits.take(3).toList();
-    final overflowApprovedDeposits = approvedDeposits.length > 3 ? approvedDeposits.sublist(3) : <AppTransaction>[];
-    final pendingWithdrawals = widget.allTransactions.where((t) => t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending).toList();
-    final approvedWithdrawals = widget.allTransactions.where((t) => t.type == TransactionType.withdrawal && t.status == TransactionStatus.approved).toList();
-
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        // Payment Settings Frame
-        Container(
-          padding: const EdgeInsets.all(20),
-          margin: const EdgeInsets.only(bottom: 30),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('PAYMENT CONTROLS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
-              const SizedBox(height: 15),
-              TextField(controller: cTag, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Admin Cash App Tag', isDark: isDark)),
-              const SizedBox(height: 15),
-              TextField(controller: bAddr, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Admin Bitcoin Address', isDark: isDark)),
-              const SizedBox(height: 15),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    widget.config.officialCashApp = cTag.text.trim();
-                    widget.config.officialBitcoin = bAddr.text.trim();
-                  });
-                  widget.onDataChanged();
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment Settings Updated')));
-                },
-                style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
-                child: const Text('SAVE PAYMENT SETTINGS')
-              )
-            ],
-          ),
-        ),
-
-        _sectionHeader(Icons.attach_money_rounded, 'Deposit & Investment Requests', pendingDeposits.length, isDark),
-        ...pendingDeposits.map((t) => _depositCard(t, isDark)),
-        ...visibleApprovedDeposits.map((t) => _depositCard(t, isDark)),
-        if (overflowApprovedDeposits.isNotEmpty || _walletApprovedArchive.isNotEmpty)
-          _approvedReceiptsDropdown(
-            isDark: isDark,
-            title: 'Approved receipts (dropdown)',
-            overflow: overflowApprovedDeposits,
-            archived: _walletApprovedArchive.where((t) => t.type == TransactionType.deposit || t.type == TransactionType.adminAdd).toList(),
-          ),
-
-        const SizedBox(height: 30),
-        _sectionHeader(Icons.outbox_rounded, 'Withdrawal Requests', pendingWithdrawals.length, isDark, iconColor: Colors.blue),
-        ...pendingWithdrawals.map((t) => _withdrawalCard(t, isDark)),
-        ...approvedWithdrawals.map((t) => _withdrawalCard(t, isDark)),
-      ],
-    );
-  }
-
-  Widget _approvedReceiptsDropdown({
-    required bool isDark,
-    required String title,
-    required List<AppTransaction> overflow,
-    required List<AppTransaction> archived,
-  }) {
-    final items = <AppTransaction>[
-      ...overflow,
-      ...archived.where((t) => overflow.every((o) => o.id != t.id)),
-    ]..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: false,
-          title: Text(
-            '$title • ${items.length}',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              color: isDark ? Colors.white : const Color(0xFF111827),
-            ),
-          ),
-          subtitle: Text(
-            'Older approved deposits kept here for quick admin lookup.',
-            style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 12),
-          ),
-          children: [
-            if (items.isEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Text('No archived receipts yet.', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),
-              )
-            else
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: Column(
-                  children: items.map((t) => _depositCard(t, isDark, allowLocalRemove: false)).toList(),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _sectionHeader(IconData icon, String title, int pendingCount, bool isDark, {Color iconColor = const Color(0xFF00B25A)}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(children: [
-          Icon(icon, color: iconColor, size: 24),
-          const SizedBox(width: 10),
-          Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isDark ? Colors.white : const Color(0xFF1A1C1E))),
-        ]),
-        const SizedBox(height: 5),
-        Text('Pending: $pendingCount', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontSize: 12)),
-        const SizedBox(height: 15),
-      ],
-    );
-  }
-
-  Widget _depositCard(AppTransaction t, bool isDark, {bool allowLocalRemove = true}) {
-    final user = widget.allUsers.firstWhere((u) => u.email == t.userEmail, orElse: () => UserData(email: t.userEmail));
-    final isInvestmentRequest = isInvestmentRequestDetails(t.sourceDetails);
-    final investmentMeta = parseInvestmentRequestDetails(t.sourceDetails);
-    final payerHandle = isInvestmentRequest ? (investmentMeta['payer'] ?? 'N/A') : (t.sourceDetails ?? 'N/A');
-    bool isPending = t.status == TransactionStatus.pending;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(color: isDark ? const Color(0xFF1C1F2E) : Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
-      child: Column(children: [
-        Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: t.status == TransactionStatus.approved ? const Color(0xFF00B25A) : (t.status == TransactionStatus.rejected ? Colors.redAccent : const Color(0xFF00B25A)),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Row(children: [
-            CircleAvatar(backgroundColor: Colors.white24, child: Text(user.username.isNotEmpty ? user.username[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white))),
-            const SizedBox(width: 12),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('@${user.username}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              Text('ID: NGMY/USR/${user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}', style: const TextStyle(color: Colors.white70, fontSize: 10)),
-            ]),
-            const Spacer(),
-            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text('\$${formatCurrency(t.amount)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(5)), child: Text(t.status.name.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold))),
-            ]),
-          ]),
-        ),
-        Padding(padding: const EdgeInsets.all(15), child: Column(children: [
-          Row(children: [
-            Expanded(child: _detailBox('Payment Method', t.method.name.toUpperCase(), isDark, color: isDark ? Colors.blue.withOpacity(0.1) : const Color(0xFFE8F0FF))),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _detailBox(
-                isInvestmentRequest ? 'Payer Handle' : 'Cash App Tag',
-                payerHandle,
-                isDark,
-                color: isDark ? Colors.green.withOpacity(0.1) : const Color(0xFFE8FDF2),
-              ),
-            ),
-          ]),
-          if (isInvestmentRequest) ...[
-            const SizedBox(height: 10),
-            _detailBox(
-              'Investment Plan',
-              '${investmentMeta['plan'] ?? 'N/A'} (\$${investmentMeta['amount'] ?? '0'})',
-              isDark,
-              color: isDark ? Colors.orange.withOpacity(0.1) : const Color(0xFFFFF3E8),
-            ),
-          ],
-          if (t.verificationCode != null) ...[const SizedBox(height: 10), _detailBox('Verification Code', t.verificationCode!, isDark, color: isDark ? Colors.purple.withOpacity(0.1) : const Color(0xFFF5E8FF), center: true, bigText: true)],
-          const SizedBox(height: 10),
-          _screenshotBox(t, isDark),
-          const SizedBox(height: 10),
-          Row(children: [
-            if (allowLocalRemove)
-              IconButton(
-                icon: Icon(Icons.delete_outline, color: isDark ? Colors.white60 : const Color(0xFF1A1C1E)),
-                onPressed: () {
-                  setState(() { widget.allTransactions.remove(t); });
-                  widget.onDataChanged();
-                },
-              )
-            else
-              const SizedBox(width: 40),
-            const Spacer(),
-            if (isPending) ...[
-              TextButton(
-                onPressed: _processingTxnId == t.id ? null : () => _processWalletRequest(t, false),
-                child: Text(_processingTxnId == t.id ? 'SAVING...' : 'REJECT', style: const TextStyle(color: Colors.red)),
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton(
-                onPressed: _processingTxnId == t.id ? null : () => _processWalletRequest(t, true),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
-                child: Text(_processingTxnId == t.id ? 'SAVING...' : 'APPROVE & SAVE'),
-              ),
-            ]
-          ]),
-        ])),
-      ]),
-    );
-  }
-
-  Widget _screenshotBox(AppTransaction t, bool isDark) => Container(
-    width: double.infinity,
-    decoration: BoxDecoration(border: Border.all(color: isDark ? Colors.white10 : Colors.grey.withOpacity(0.2)), borderRadius: BorderRadius.circular(10)),
-    child: Column(children: [
-      Container(width: double.infinity, padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFF1A1C1E).withOpacity(0.8), borderRadius: const BorderRadius.vertical(top: Radius.circular(9))), child: Text('Payment Screenshot', style: TextStyle(color: isDark ? Colors.white70 : Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
-      if (t.screenshotPath != null)
-        GestureDetector(
-          onTap: () => _openScreenshotViewer(t.screenshotPath!),
-          child: Container(
-            height: 120,
-            alignment: Alignment.center,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.image, size: 40, color: isDark ? Colors.white24 : Colors.grey),
-                Text('View Screenshot (Tap to zoom)', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontSize: 12)),
-              ],
-            ),
-          ),
-        )
-      else Container(height: 120, alignment: Alignment.center, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text('Transaction details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isDark ? Colors.white : Colors.black)), const SizedBox(height: 10), Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.check, color: Colors.green, size: 16), const SizedBox(width: 5), Text('Complete', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white70 : Colors.black87))]), Text('Payment sent successfully', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontSize: 11))])),
-    ]),
-  );
-
-  void _openScreenshotViewer(String screenshotPath) {
-    showDialog(
-      context: context,
-      builder: (c) => Dialog(
-        insetPadding: const EdgeInsets.all(16),
-        child: Container(
-          width: double.infinity,
-          height: MediaQuery.of(context).size.height * 0.8,
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  const Expanded(child: Text('Payment Screenshot', style: TextStyle(fontWeight: FontWeight.bold))),
-                  IconButton(onPressed: () => Navigator.pop(c), icon: const Icon(Icons.close)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Expanded(
-                child: InteractiveViewer(
-                  minScale: 0.6,
-                  maxScale: 6.0,
-                  child: Center(child: _screenshotImage(screenshotPath)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _screenshotImage(String screenshotPath) {
-    if (screenshotPath.startsWith('data:image')) {
-      final comma = screenshotPath.indexOf(',');
-      if (comma > -1 && comma < screenshotPath.length - 1) {
-        try {
-          final bytes = base64Decode(screenshotPath.substring(comma + 1));
-          return Image.memory(bytes, fit: BoxFit.contain);
-        } catch (_) {
-          return const Text('Invalid screenshot data.');
-        }
-      }
-    }
-    if (screenshotPath.startsWith('http://') || screenshotPath.startsWith('https://')) {
-      return Image.network(
-        screenshotPath,
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => const Text('Unable to load screenshot URL.'),
+        onRemovePlan: (plan) async {
+          if (widget.onRemoveInvestmentPlan != null) {
+            return widget.onRemoveInvestmentPlan!(plan);
+          }
+          widget.globalPlans.remove(plan);
+          widget.onDataChanged();
+          return true;
+        },
+        onRefreshPlans: () async {
+          await widget.onRefreshInvestmentPlans?.call();
+          await widget.onRefreshAdminData?.call();
+        },
       );
-    }
-    if (kIsWeb) {
-      return const Text('Screenshot preview unavailable in this browser session.');
-    }
-    return Image.file(File(screenshotPath), fit: BoxFit.contain);
-  }
 
-  Widget _withdrawalCard(AppTransaction t, bool isDark) {
-    final user = widget.allUsers.firstWhere((u) => u.email == t.userEmail, orElse: () => UserData(email: t.userEmail));
-    final trialWithdraw = user.isOnFreeTrial || (t.sourceDetails ?? '').contains('Free trial: no fee');
-    final feeRate = trialWithdraw ? 0.0 : 0.15;
-    bool isPending = t.status == TransactionStatus.pending;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20), padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: isDark ? const Color(0xFF1C1F2E) : Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          CircleAvatar(backgroundColor: Colors.blue.withOpacity(0.1), child: Text(user.username.isNotEmpty ? user.username[0].toUpperCase() : '?', style: const TextStyle(color: Colors.blue))),
-          const SizedBox(width: 12),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('@${user.username}', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-            Text('ID: NGMY/USR/${user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontSize: 10)),
-            Text(user.email, style: const TextStyle(color: Colors.blue, fontSize: 10)),
-          ]),
-          const Spacer(),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('\$${formatCurrency(t.amount)}', style: const TextStyle(color: Color(0xFF00B25A), fontWeight: FontWeight.bold, fontSize: 18)),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: t.status == TransactionStatus.approved ? Colors.green.withOpacity(0.1) : (t.status == TransactionStatus.rejected ? Colors.red.withOpacity(0.1) : Colors.grey.withOpacity(0.1)), borderRadius: BorderRadius.circular(10)), child: Text(t.status.name.toUpperCase(), style: TextStyle(color: t.status == TransactionStatus.approved ? Colors.green : (t.status == TransactionStatus.rejected ? Colors.red : (isDark ? Colors.white60 : Colors.grey)), fontSize: 9, fontWeight: FontWeight.bold))),
-          ]),
-        ]),
-        const SizedBox(height: 15),
-        Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.03) : const Color(0xFFFFF9E7), borderRadius: BorderRadius.circular(15), border: Border.all(color: isDark ? Colors.white10 : Colors.orange.withOpacity(0.1))), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          _subDetail('Requested', '\$${formatCurrency(t.amount)}', isDark),
-          _subDetail(trialWithdraw ? 'Fee (0%)' : 'Fee (15%)', trialWithdraw ? '\$0.00' : '-\$${formatCurrency(t.amount * feeRate)}', isDark, valueColor: Colors.red),
-          _subDetail('Send to User', '\$${formatCurrency(t.amount * (1 - feeRate))}', isDark, valueColor: Colors.green),
-        ])),
-        const SizedBox(height: 15),
-        Text('Method: ${t.method.name}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.black)),
-        Text('Account: ${t.sourceDetails ?? "Unknown"}', style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black54)),
-        const SizedBox(height: 15),
-        Row(children: [
-          if (!isPending)
-            IconButton(
-              icon: Icon(Icons.delete_outline, color: isDark ? Colors.white60 : const Color(0xFF1A1C1E)),
-              onPressed: () {
-                setState(() => widget.allTransactions.remove(t));
-                widget.onDataChanged();
-              },
-            ),
-          const Spacer(),
-          if (isPending) ...[
-            TextButton(
-              onPressed: _processingTxnId == t.id ? null : () => _processWalletRequest(t, false),
-              child: Text(_processingTxnId == t.id ? 'SAVING...' : 'REJECT', style: const TextStyle(color: Colors.red)),
-            ),
-            const SizedBox(width: 10),
-            ElevatedButton(
-              onPressed: _processingTxnId == t.id ? null : () => _processWalletRequest(t, true),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
-              child: Text(_processingTxnId == t.id ? 'SAVING...' : 'APPROVE & SAVE'),
-            ),
-          ] else
-            Text(
-              t.status == TransactionStatus.approved ? 'Completed' : 'Rejected',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 11,
-                color: t.status == TransactionStatus.approved ? Colors.green : Colors.red,
-              ),
-            ),
-        ])
-      ]),
-    );
-  }
-
-  Widget _subDetail(String l, String v, bool isDark, {Color valueColor = Colors.black}) => Column(children: [Text(l, style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontSize: 10)), const SizedBox(height: 4), Text(v, style: TextStyle(color: isDark && valueColor == Colors.black ? Colors.white : valueColor, fontWeight: FontWeight.bold, fontSize: 12))]);
-
-  Widget _detailBox(String label, String value, bool isDark, {Color color = Colors.grey, bool center = false, bool bigText = false}) => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
-    child: Column(crossAxisAlignment: center ? CrossAxisAlignment.center : CrossAxisAlignment.start, children: [
-      Text(label, style: TextStyle(color: isDark ? Colors.blueAccent : Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 4),
-      Text(value, style: TextStyle(color: bigText ? (isDark ? Colors.purpleAccent : Colors.purple) : (isDark ? Colors.white : Colors.black87), fontWeight: FontWeight.bold, fontSize: bigText ? 24 : 14)),
-    ]),
-  );
+  Widget _adminWallet(bool isDark) => NgmyAdminWalletTab(
+        isDark: isDark,
+        config: widget.config,
+        allTransactions: widget.allTransactions,
+        allUsers: widget.allUsers,
+        onProcess: _processWalletRequest,
+        onDataChanged: widget.onDataChanged,
+        onRefresh: () async {
+          await widget.onRefreshAdminData?.call();
+          if (mounted) setState(() {});
+        },
+        onSavePayments: (cash, btc) async {
+          if (widget.onSaveWalletPayments != null) {
+            return widget.onSaveWalletPayments!(cash, btc);
+          }
+          widget.config.officialCashApp = cash;
+          widget.config.officialBitcoin = btc;
+          widget.onDataChanged();
+          return false;
+        },
+        onArchiveRemove: (t) async {
+          if (widget.onArchiveWalletTransaction != null) {
+            await widget.onArchiveWalletTransaction!(t);
+          } else {
+            await NgmyAdminWalletApprovedArchive.addAll([t]);
+            widget.allTransactions.removeWhere((x) => x.id == t.id);
+            widget.onDataChanged();
+          }
+          if (mounted) setState(() {});
+        },
+      );
 
   bool _userMatchesQuery(UserData u, String q) {
     if (q.isEmpty) return true;
