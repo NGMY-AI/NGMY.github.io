@@ -5361,7 +5361,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startUserTransactionSync();
     _startAdminPendingTransactionPoll();
     if (_ngmySessionIsAdmin(_currentUser)) {
-      unawaited(_refreshAdminCloudSnapshot(lightweight: true));
+      unawaited(_refreshAdminDashboardFromCloud());
       unawaited(_refreshPendingTransactionsFromCloud());
     }
   }
@@ -5513,10 +5513,31 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return ok;
   }
 
-  Future<void> _refreshAdminManagementFromCloud() async {
-    await ngmyAdminRefreshManagementConfig(_config);
+  void _applyRemoteInvestmentPlansToApp(List<Map<String, dynamic>> plans) {
+    if (plans.isEmpty) return;
+    _config.investmentPlans = plans.map((e) => Map<String, dynamic>.from(e)).toList();
+    _globalPlans = _investmentPlansFromMaps(_config.investmentPlans);
+  }
+
+  Future<void> _refreshAdminDashboardFromCloud() async {
+    if (!_ngmySessionIsAdmin(_currentUser)) return;
+    await _refreshAdminCloudSnapshot(lightweight: false);
+    await _refreshAdminInvestmentPlans();
+    await ngmyHydrateManagementListsFromAllBackups(_config);
+    await ngmyApplyStoreSellAccessFromSettings(_config);
+    _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
     await _persistLocalOnly();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _refreshAdminManagementFromCloud() async {
+    await ngmyAdminRefreshManagementConfigLight(_config);
+    await _persistLocalOnly();
+    if (mounted) setState(() {});
+    unawaited(ngmyAdminRefreshManagementConfig(_config).then((_) async {
+      await _persistLocalOnly();
+      if (mounted) setState(() {});
+    }));
   }
 
   /// Completes login after password check (local or Supabase). Always sets [_currentUser].
@@ -5606,7 +5627,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startUserTransactionSync();
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshPendingTransactionsFromCloud());
-      unawaited(_refreshAdminCloudSnapshot(lightweight: true));
+      unawaited(_refreshAdminDashboardFromCloud());
     }
   }
 
@@ -7823,6 +7844,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           );
         }
         _mergeOperationalManagementListsIntoConfig(next, keepConfig);
+        if (next.investmentPlans.isNotEmpty) {
+          _globalPlans = _investmentPlansFromMaps(next.investmentPlans);
+        } else if (keepPlans.isNotEmpty) {
+          next.investmentPlans = keepPlans;
+          _globalPlans = _investmentPlansFromMaps(keepPlans);
+        }
         final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
         final remotePopups = (record['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -7850,6 +7877,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           SharedPreferences.getInstance().then((prefs) {
             prefs.setString('app_config', jsonEncode(_config.toJson()));
             prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+            prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
             if (_currentUser != null) {
               prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
             }
@@ -7875,6 +7903,54 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _mergeOperationalManagementListsIntoConfig(_config, keep);
           setState(() {});
           unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
+        }
+        return;
+      }
+      if (key == _kNgmySettingsTermsKey || key == _kNgmySettingsPrivacyKey) {
+        final value = payload.newRecord['value'];
+        if (value is Map) {
+          final content = (value['content'] ?? '').toString();
+          if (content.isNotEmpty) {
+            setState(() {
+              if (key == _kNgmySettingsTermsKey) {
+                _config.termsAndConditions = content;
+              } else {
+                _config.privacyPolicy = content;
+              }
+            });
+            unawaited(_persistLocalOnly());
+          }
+        }
+        return;
+      }
+      if (key == _kNgmySettingsPlansKey) {
+        final value = payload.newRecord['value'];
+        if (value is Map) {
+          final raw = value['plans'];
+          if (raw is List) {
+            final plans = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+            _applyRemoteInvestmentPlansToApp(plans);
+            setState(() {});
+            unawaited(_persistLocalOnly());
+          }
+        }
+        return;
+      }
+      if (key == _kNgmyStoreSellAccessSettingsKey) {
+        final value = payload.newRecord['value'];
+        if (value is Map) {
+          final raw = value['emails'];
+          if (raw is List) {
+            _config.storeSellAccessEmails = raw
+                .map((e) => e.toString().toLowerCase().trim())
+                .where((e) => e.isNotEmpty)
+                .toSet()
+                .toList()
+              ..sort();
+            _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
+            setState(() {});
+            unawaited(_persistLocalOnly());
+          }
         }
         return;
       }
@@ -8528,6 +8604,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _config = next;
           await ngmyHydrateManagementListsFromAllBackups(_config);
           _mergeOperationalManagementListsIntoConfig(_config, localConfigSnapshot);
+          await ngmyApplyStoreSellAccessFromSettings(_config);
+          _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
           (_config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(
             cfgMap['mediaVirtualProfiles'] ?? (_config as dynamic).mediaVirtualProfiles,
           );
@@ -8729,7 +8807,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     if (_ngmySessionIsAdmin(_currentUser)) {
-      unawaited(_refreshAdminCloudSnapshot(lightweight: true));
+      unawaited(_refreshAdminDashboardFromCloud());
     }
     setState(() {});
     _scheduleDeferredStartupRebuild();
@@ -9330,7 +9408,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onEnqueueMediaDelivery: _enqueueMediaDelivery,
                 onPromptNotifications: (ctx) => _promptPushNotificationsForUser(ctx, _currentUser!.email),
                 onMarkAnnouncementsRead: (ids) => _markAnnouncementsReadForUser(ids),
-                onRefreshAdminData: () => _refreshAdminCloudSnapshot(lightweight: true),
+                onRefreshAdminData: _refreshAdminDashboardFromCloud,
                 onPushUserToCloud: (u) => _pushUserToCloudFast(u, includeFreeTrial: true),
                 onSaveWalletPayments: _saveAdminWalletPayments,
                 onUpsertInvestmentPlan: _upsertAdminInvestmentPlan,
@@ -15093,7 +15171,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     unawaited(_loadWalletApprovedArchive());
     _lastSeenPendingWalletCount = _pendingWalletRequestCount();
     Future.microtask(() => unawaited(_pullAdminCloudData()));
-    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       unawaited(_pullAdminCloudData());
     });
   }
@@ -15206,6 +15284,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _refreshManagementBeforeOpen() async {
+    unawaited(_refreshManagementInBackground());
+  }
+
+  Future<void> _refreshManagementInBackground() async {
     await widget.onRefreshManagementData?.call();
     if (mounted) setState(() {});
   }
@@ -15217,7 +15299,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => setState(() => _idx = i),
+          onTap: () {
+            setState(() => _idx = i);
+            if (i == 1) unawaited(_pullAdminCloudData());
+          },
           borderRadius: BorderRadius.circular(12),
           child: Stack(
             clipBehavior: Clip.none,
@@ -15385,15 +15470,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       : Switch(
                           value: u.canSellOnStore,
                           activeColor: const Color(0xFF7C3AED),
-                          onChanged: (on) {
+                          onChanged: (on) async {
                             _updateStoreSellAccessGrant(widget.config, u, on);
                             widget.onDataChanged();
                             setState(() {});
-                            unawaited(_persistStoreSellAccessEmails(widget.config));
+                            final ok = await ngmyPersistStoreSellAccessAuthoritative(widget.config);
                             unawaited(_pushUserCanSellOnStore(u));
                             unawaited(_pushUserToCloudFast(u));
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(on ? '${u.username} can now use Sell Item in NGMY Store.' : 'Sell Item removed for ${u.username}.')),
+                              SnackBar(
+                                content: Text(
+                                  ok
+                                      ? (on
+                                          ? '${u.username} can now use Sell Item in NGMY Store.'
+                                          : 'Sell Item removed for ${u.username}.')
+                                      : 'Saved on this device — retry when online to sync store access.',
+                                ),
+                                backgroundColor: ok ? const Color(0xFF00B25A) : Colors.orange,
+                              ),
                             );
                           },
                         ),
@@ -15463,9 +15558,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   );
 
   Future<void> _openPopupsAdmin(bool isDark) async {
-    await _refreshManagementBeforeOpen();
-    if (!mounted) return;
     _showPopupsAdmin(isDark);
+    unawaited(_refreshManagementInBackground());
   }
 
   void _showPopupsAdmin(bool isDark) {
@@ -15497,9 +15591,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _openGamesAdmin(bool isDark) async {
-    await _refreshManagementBeforeOpen();
-    if (!mounted) return;
     _showGamesAdmin(isDark);
+    unawaited(_refreshManagementInBackground());
   }
 
   void _showGamesAdmin(bool isDark) {
@@ -15529,9 +15622,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _openPaymentsAdmin(bool isDark) async {
-    await _refreshManagementBeforeOpen();
-    if (!mounted) return;
     _showPaymentsAdmin(isDark);
+    unawaited(_refreshManagementInBackground());
   }
 
   void _showPaymentsAdmin(bool isDark) {
@@ -15628,9 +15720,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _openCivicRegistryAdmin(bool isDark) async {
-    await _refreshManagementBeforeOpen();
-    if (!mounted) return;
     _showCivicRegistryAdmin(isDark);
+    unawaited(_refreshManagementInBackground());
   }
 
   void _showCivicRegistryAdmin(bool isDark) {
@@ -15793,9 +15884,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _openJobApplicationsAdmin(bool isDark) async {
-    await _refreshManagementBeforeOpen();
-    if (!mounted) return;
     _showJobApplicationsAdmin(isDark);
+    unawaited(_refreshManagementInBackground());
   }
 
   void _showJobApplicationsAdmin(bool isDark) {
@@ -15969,9 +16059,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _openAnnouncementAdmin(bool isDark) async {
-    await _refreshManagementBeforeOpen();
-    if (!mounted) return;
     _showAnnouncementAdmin(isDark);
+    unawaited(_refreshManagementInBackground());
   }
 
   void _showAnnouncementAdmin(bool isDark) {
@@ -16098,9 +16187,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   );
 
   Future<void> _openLoanAdmin(bool isDark) async {
-    await _refreshManagementBeforeOpen();
-    if (!mounted) return;
     _showLoanAdmin(isDark);
+    unawaited(_refreshManagementInBackground());
   }
 
   void _showLoanAdmin(bool isDark) {
@@ -16226,13 +16314,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final val = int.tryParse(limitC.text.trim()) ?? 3;
                     setState(() {
                       widget.config.maxMediaPostsPerWeek = val;
                     });
+                    final ok = await ngmyAdminPersistManagementConfig(widget.config);
                     widget.onDataChanged();
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Media limit updated.')));
+                    if (!context.mounted) return;
+                    ngmyAdminShowCloudSaveSnackBar(
+                      context,
+                      cloudOk: ok,
+                      success: 'Media limit saved for all users.',
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 50),
@@ -16849,7 +16943,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       Padding(
         padding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
         child: Text(
-          'App sign-ups only (Civic Registry members are not listed here).',
+          'App sign-ups only (${filtered.length} users). Civic Registry members are not listed here.',
           style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
         ),
       ),
