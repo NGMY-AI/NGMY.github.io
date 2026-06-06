@@ -87,6 +87,7 @@ import 'ngmy_announcement_reads.dart';
 import 'ngmy_platform_graphics.dart';
 
 part 'ngmy_admin_panels.dart';
+part 'ngmy_admin_management.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -1825,6 +1826,9 @@ Future<void> _persistOperationalConfigToCloud(AppConfig config) async {
     'investmentPlans': config.investmentPlans,
     'officialCashApp': config.officialCashApp,
     'officialBitcoin': config.officialBitcoin,
+    'loanPhone': config.loanPhone,
+    'loanHowItWorks': config.loanHowItWorks,
+    'loanCompanyZelle': config.loanCompanyZelle,
   };
   for (var i = 0; i < 12; i++) {
     try {
@@ -1901,17 +1905,7 @@ Future<void> ngmyFlushCriticalConfigLocalAndCloud(AppConfig config, {bool cloud 
 
 /// Admin applications (loans, jobs, help, registrar, legal) — save immediately, no debounce.
 Future<void> ngmyPersistAdminConfigNow(AppConfig config) async {
-  _operationalConfigCloudDebounce?.cancel();
-  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
-  await _persistOperationalConfigToCloud(config);
-  if (config.termsAndConditions.trim().isNotEmpty || config.privacyPolicy.trim().isNotEmpty) {
-    unawaited(
-      _persistLegalContentToCloud(
-        config.termsAndConditions,
-        config.privacyPolicy,
-      ),
-    );
-  }
+  await ngmyAdminPersistManagementConfig(config);
 }
 
 /// Game Center timers/dice — must hit Supabase immediately (admin + players).
@@ -5439,6 +5433,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     setState(() => _allTransactions.removeWhere((x) => x.id == t.id));
     unawaited(_safeDeleteTransactionsByIds([t.id]));
     await _persistLocalOnly();
+  }
+
+  Future<bool> _saveAdminManagementConfigNow() async {
+    final ok = await ngmyAdminPersistManagementConfig(_config);
+    await _persistLocalOnly();
+    if (mounted) setState(() {});
+    return ok;
+  }
+
+  Future<void> _refreshAdminManagementFromCloud() async {
+    await ngmyAdminRefreshManagementConfig(_config);
+    await _persistLocalOnly();
+    if (mounted) setState(() {});
   }
 
   /// Completes login after password check (local or Supabase). Always sets [_currentUser].
@@ -9188,6 +9195,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onRemoveInvestmentPlan: _removeAdminInvestmentPlan,
                 onRefreshInvestmentPlans: _refreshAdminInvestmentPlans,
                 onArchiveWalletTransaction: _archiveAdminWalletTransaction,
+                onPersistManagementConfig: _saveAdminManagementConfigNow,
+                onRefreshManagementData: _refreshAdminManagementFromCloud,
             ),
       ),
     );
@@ -10174,8 +10183,10 @@ class MainScreen extends StatefulWidget {
   final Future<bool> Function(InvestmentPlan plan)? onRemoveInvestmentPlan;
   final Future<void> Function()? onRefreshInvestmentPlans;
   final Future<void> Function(AppTransaction t)? onArchiveWalletTransaction;
+  final Future<bool> Function()? onPersistManagementConfig;
+  final Future<void> Function()? onRefreshManagementData;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 
@@ -10537,7 +10548,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             await _showClockInConfirmedDialog();
           }
         }
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData, onDeleteMedia: widget.onDeleteMedia, onPushUserToCloud: widget.onPushUserToCloud, onSaveWalletPayments: widget.onSaveWalletPayments, onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan, onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan, onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans, onArchiveWalletTransaction: widget.onArchiveWalletTransaction),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData, onDeleteMedia: widget.onDeleteMedia, onPushUserToCloud: widget.onPushUserToCloud, onSaveWalletPayments: widget.onSaveWalletPayments, onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan, onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan, onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans, onArchiveWalletTransaction: widget.onArchiveWalletTransaction, onPersistManagementConfig: widget.onPersistManagementConfig, onRefreshManagementData: widget.onRefreshManagementData),
       InvestScreen(
         user: widget.user,
         plans: widget.globalPlans,
@@ -10849,7 +10860,9 @@ class HomeScreen extends StatefulWidget {
   final Future<bool> Function(InvestmentPlan plan)? onRemoveInvestmentPlan;
   final Future<void> Function()? onRefreshInvestmentPlans;
   final Future<void> Function(AppTransaction t)? onArchiveWalletTransaction;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction});
+  final Future<bool> Function()? onPersistManagementConfig;
+  final Future<void> Function()? onRefreshManagementData;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -10992,6 +11005,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan,
                             onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans,
                             onArchiveWalletTransaction: widget.onArchiveWalletTransaction,
+                            onPersistManagementConfig: widget.onPersistManagementConfig,
+                            onRefreshManagementData: widget.onRefreshManagementData,
                           ),
                           routeName: 'AdminDashboard',
                         );
@@ -14816,7 +14831,9 @@ class AdminDashboard extends StatefulWidget {
   final Future<bool> Function(InvestmentPlan plan)? onRemoveInvestmentPlan;
   final Future<void> Function()? onRefreshInvestmentPlans;
   final Future<void> Function(AppTransaction t)? onArchiveWalletTransaction;
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction});
+  final Future<bool> Function()? onPersistManagementConfig;
+  final Future<void> Function()? onRefreshManagementData;
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
@@ -15025,6 +15042,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
       pendingDeposits: pendingDeposits,
       pendingWithdrawals: pendingWithdrawals,
     );
+  }
+
+  Future<bool> _persistManagementConfig() async {
+    widget.onDataChanged();
+    if (widget.onPersistManagementConfig != null) {
+      return widget.onPersistManagementConfig!();
+    }
+    await ngmyPersistAdminConfigNow(widget.config);
+    return await ngmyCanReachCloud();
+  }
+
+  Future<void> _refreshManagementBeforeOpen() async {
+    await widget.onRefreshManagementData?.call();
+    if (mounted) setState(() {});
   }
 
   Widget _navItem(int i, IconData icon, String label, bool isDark, Color frameBg, Color frameBorder, {int badgeCount = 0}) {
@@ -15240,13 +15271,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
           crossAxisSpacing: 15,
           childAspectRatio: 1.1,
           children: [
-            _menuFrame('Loan Center', Icons.handshake_outlined, Colors.teal, () => _showLoanAdmin(isDark), isDark, badgeCount: NgmyAdminMenuCounts.pendingLoanApplications(widget.config.loanApplications)),
-            _menuFrame('Announcements', Icons.campaign_outlined, Colors.orange, () => _showAnnouncementAdmin(isDark), isDark),
-            _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => _showCivicRegistryAdmin(isDark), isDark, badgeCount: NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications)),
-            _menuFrame('Payments', Icons.payments_outlined, const Color(0xFF0D9488), () => _showPaymentsAdmin(isDark), isDark),
-            _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => _showJobApplicationsAdmin(isDark), isDark, badgeCount: NgmyAdminMenuCounts.pendingJobWorkerApplications(widget.config.jobWorkerApplications)),
-            _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => _showPopupsAdmin(isDark), isDark),
-            _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => _showGamesAdmin(isDark), isDark, badgeCount: NgmyAdminMenuCounts.pendingGameInvites(widget.config.gameInvites)),
+            _menuFrame('Loan Center', Icons.handshake_outlined, Colors.teal, () => unawaited(_openLoanAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingLoanApplications(widget.config.loanApplications)),
+            _menuFrame('Announcements', Icons.campaign_outlined, Colors.orange, () => unawaited(_openAnnouncementAdmin(isDark)), isDark),
+            _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => unawaited(_openCivicRegistryAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications)),
+            _menuFrame('Payments', Icons.payments_outlined, const Color(0xFF0D9488), () => unawaited(_openPaymentsAdmin(isDark)), isDark),
+            _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => unawaited(_openJobApplicationsAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingJobWorkerApplications(widget.config.jobWorkerApplications)),
+            _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => unawaited(_openPopupsAdmin(isDark)), isDark),
+            _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => unawaited(_openGamesAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingGameInvites(widget.config.gameInvites)),
           ],
         ),
         const SizedBox(height: 28),
@@ -15279,6 +15310,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ),
   );
 
+  Future<void> _openPopupsAdmin(bool isDark) async {
+    await _refreshManagementBeforeOpen();
+    if (!mounted) return;
+    _showPopupsAdmin(isDark);
+  }
+
   void _showPopupsAdmin(bool isDark) {
     showNgmyPopupsAdminSheet(
       context: context,
@@ -15290,12 +15327,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
         widget.config.ngmyPopups = popups;
         widget.config.ngmyVideoPopups = videos;
         if (widget.onSavePopups != null) {
-          return widget.onSavePopups!(popups, videos);
+          final ok = await widget.onSavePopups!(popups, videos);
+          if (!context.mounted) return ok;
+          ngmyAdminShowCloudSaveSnackBar(
+            context,
+            cloudOk: ok,
+            success: 'Pop-ups saved to cloud for all users.',
+          );
+          return ok;
         }
-        widget.onDataChanged();
-        return true;
+        final ok = await _persistManagementConfig();
+        if (!context.mounted) return ok;
+        ngmyAdminShowCloudSaveSnackBar(context, cloudOk: ok);
+        return ok;
       },
     );
+  }
+
+  Future<void> _openGamesAdmin(bool isDark) async {
+    await _refreshManagementBeforeOpen();
+    if (!mounted) return;
+    _showGamesAdmin(isDark);
   }
 
   void _showGamesAdmin(bool isDark) {
@@ -15312,19 +15364,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
         widget.config.diceSettings = diceJson;
         widget.onDataChanged();
         final saved = await ngmyPersistGameCenterConfigNow(widget.config);
+        await _persistManagementConfig();
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              saved
-                  ? 'Game timers saved — all players will use these times.'
-                  : 'Saved on this device. Connect internet and save again to sync timers to the cloud.',
-            ),
-            backgroundColor: saved ? const Color(0xFF00B25A) : Colors.orange,
-          ),
+        ngmyAdminShowCloudSaveSnackBar(
+          context,
+          cloudOk: saved,
+          success: 'Game timers saved — all players will use these times.',
+          offline: 'Saved on this device. Connect internet and save again to sync timers to the cloud.',
         );
       },
     );
+  }
+
+  Future<void> _openPaymentsAdmin(bool isDark) async {
+    await _refreshManagementBeforeOpen();
+    if (!mounted) return;
+    _showPaymentsAdmin(isDark);
   }
 
   void _showPaymentsAdmin(bool isDark) {
@@ -15379,7 +15434,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ),
                     const SizedBox(height: 16),
                     FilledButton(
-                      onPressed: () {
+                      onPressed: () async {
                         final create = double.tryParse(createC.text.trim());
                         final photo = double.tryParse(photoC.text.trim());
                         if (create == null || create < 0 || photo == null || photo < 0) {
@@ -15392,10 +15447,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           widget.config.familyTreeCreateFee = create;
                           widget.config.familyTreePhotoMonthlyFee = photo;
                         });
-                        widget.onDataChanged();
+                        final ok = await _persistManagementConfig();
+                        if (!context.mounted) return;
                         Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Family tree payment settings saved.')),
+                        ngmyAdminShowCloudSaveSnackBar(
+                          context,
+                          cloudOk: ok,
+                          success: 'Family tree payment settings saved for all users.',
                         );
                       },
                       style: FilledButton.styleFrom(
@@ -15415,6 +15473,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
       createC.dispose();
       photoC.dispose();
     });
+  }
+
+  Future<void> _openCivicRegistryAdmin(bool isDark) async {
+    await _refreshManagementBeforeOpen();
+    if (!mounted) return;
+    _showCivicRegistryAdmin(isDark);
   }
 
   void _showCivicRegistryAdmin(bool isDark) {
@@ -15452,11 +15516,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 value: widget.config.civicSelfEnrollmentEnabled,
                 onChanged: (v) async {
                   setST(() => widget.config.civicSelfEnrollmentEnabled = v);
-                  await ngmyFlushCriticalConfigLocalAndCloud(widget.config);
+                  final ok = await _persistManagementConfig();
                   widget.onDataChanged();
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(v ? 'Self-enrollment is ON for all members' : 'Self-enrollment is OFF')),
+                  ngmyAdminShowCloudSaveSnackBar(
+                    context,
+                    cloudOk: ok,
+                    success: v ? 'Self-enrollment is ON for all members' : 'Self-enrollment is OFF for all members',
                   );
                 },
               ),
@@ -15572,6 +15638,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
         );
       },
     );
+  }
+
+  Future<void> _openJobApplicationsAdmin(bool isDark) async {
+    await _refreshManagementBeforeOpen();
+    if (!mounted) return;
+    _showJobApplicationsAdmin(isDark);
   }
 
   void _showJobApplicationsAdmin(bool isDark) {
@@ -15691,11 +15763,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                                 app['reviewedAt'] = DateTime.now().toIso8601String();
                                                 app['reviewedBy'] = widget.user.email;
                                                 widget.config.jobWorkerApplications = apps;
-                                                widget.onDataChanged();
-                                                await ngmyPersistAdminConfigNow(widget.config);
+                                                final ok = await _persistManagementConfig();
                                                 if (!context.mounted) return;
                                                 setState(() {});
                                                 setST(() {});
+                                                ngmyAdminShowCloudSaveSnackBar(context, cloudOk: ok, success: 'Application rejected and saved.');
                                               },
                                               child: const Text('Reject'),
                                             ),
@@ -15713,13 +15785,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                                   widget.allUsers[userIndex].status = 'verified';
                                                   unawaited(widget.onPushUserToCloud?.call(widget.allUsers[userIndex]));
                                                 }
-                                                widget.onDataChanged();
-                                                await ngmyPersistAdminConfigNow(widget.config);
+                                                final ok = await _persistManagementConfig();
                                                 if (!context.mounted) return;
                                                 setState(() {});
                                                 setST(() {});
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text('Worker application approved and saved.')),
+                                                ngmyAdminShowCloudSaveSnackBar(
+                                                  context,
+                                                  cloudOk: ok,
+                                                  success: 'Worker application approved and saved for all users.',
                                                 );
                                               },
                                               child: const Text('Approve'),
@@ -15743,6 +15816,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  Future<void> _openAnnouncementAdmin(bool isDark) async {
+    await _refreshManagementBeforeOpen();
+    if (!mounted) return;
+    _showAnnouncementAdmin(isDark);
+  }
+
   void _showAnnouncementAdmin(bool isDark) {
     showModalBottomSheet(
       context: context,
@@ -15758,6 +15837,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         onClearAllAnnouncements: widget.onClearAllAnnouncements,
         onDataChanged: widget.onDataChanged,
         persistGeminiKey: _persistGeminiApiKeyToSupabase,
+        onPersistManagement: _persistManagementConfig,
         adminInputDecoration: _adminInputDecoration,
       ),
     );
@@ -15865,12 +15945,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ),
   );
 
+  Future<void> _openLoanAdmin(bool isDark) async {
+    await _refreshManagementBeforeOpen();
+    if (!mounted) return;
+    _showLoanAdmin(isDark);
+  }
+
   void _showLoanAdmin(bool isDark) {
     showNgmyLoanAdminSheet(
       context,
       config: ngmyLoanConfigBridge(widget.config),
       onDataChanged: widget.onDataChanged,
-      onPersistNow: () => ngmyPersistAdminConfigNow(widget.config),
+      onPersistNow: () async {
+        await _persistManagementConfig();
+      },
       isDark: isDark,
       onEditSettings: () => _showLoanSettingsEditor(isDark),
     );
@@ -15940,10 +16028,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
             widget.config.loanPhone = lPhone.text.trim();
             widget.config.loanHowItWorks = lHow.text.trim();
           });
-          widget.onDataChanged();
-          await ngmyPersistAdminConfigNow(widget.config);
+          final ok = await _persistManagementConfig();
           if (!context.mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan settings saved for all users.')));
+          ngmyAdminShowCloudSaveSnackBar(
+            context,
+            cloudOk: ok,
+            success: 'Loan settings saved for all users.',
+          );
         }, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white), child: const Text('SAVE ALL SETTINGS'))
       ]),
     );
@@ -16669,7 +16760,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                 unawaited(widget.onPushUserToCloud?.call(widget.allUsers[userIndex]));
                               }
                               widget.onDataChanged();
-                              await ngmyPersistAdminConfigNow(widget.config);
+                              await _persistManagementConfig();
                               if (!context.mounted) return;
                               setState(() {});
                             },
@@ -16681,8 +16772,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               app['status'] = 'rejected';
                               app['reviewedAt'] = DateTime.now().toIso8601String();
                               widget.config.jobWorkerApplications = workerApps;
-                              widget.onDataChanged();
-                              await ngmyPersistAdminConfigNow(widget.config);
+                              await _persistManagementConfig();
                               if (!context.mounted) return;
                               setState(() {});
                             },
@@ -18536,6 +18626,7 @@ class _AnnouncementManagementSheet extends StatefulWidget {
   final VoidCallback onClearAllAnnouncements;
   final VoidCallback onDataChanged;
   final Future<bool> Function(String apiKey) persistGeminiKey;
+  final Future<bool> Function()? onPersistManagement;
   final InputDecoration Function({required String label, required bool isDark, String? hint}) adminInputDecoration;
 
   const _AnnouncementManagementSheet({
@@ -18548,6 +18639,7 @@ class _AnnouncementManagementSheet extends StatefulWidget {
     required this.onClearAllAnnouncements,
     required this.onDataChanged,
     required this.persistGeminiKey,
+    this.onPersistManagement,
     required this.adminInputDecoration,
   });
 
@@ -18895,6 +18987,7 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                                 setState(() => _pendingLogoBytes = null);
                               }
                               widget.onDataChanged();
+                              final mgmtOk = await widget.onPersistManagement?.call() ?? await ngmyAdminPersistManagementConfig(widget.config);
                               if (!mounted) return;
                               final detected = ngmyAiProviderLabel(
                                 ngmyParseAiCredentials(widget.config.geminiApiKey).provider,
@@ -18902,11 +18995,11 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    geminiSynced
-                                        ? 'Global settings saved ($detected).'
-                                        : 'Saved locally. Supabase sync failed — run supabase/ai_api_key_columns.sql',
+                                    geminiSynced && mgmtOk
+                                        ? 'Global settings saved to cloud ($detected).'
+                                        : 'Saved locally. Supabase sync failed — check connection.',
                                   ),
-                                  backgroundColor: geminiSynced ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
+                                  backgroundColor: geminiSynced && mgmtOk ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
                                 ),
                               );
                               setState(() {});
