@@ -24,6 +24,10 @@ class NgmyLocalCache {
       await prefs.setString('investment_plans', jsonEncode(investmentPlans));
       if (currentUser != null) {
         await prefs.setString('current_user', jsonEncode(currentUser));
+        final email = (currentUser['email'] ?? '').toString().toLowerCase().trim();
+        if (email.isNotEmpty) {
+          await prefs.setString('ngmy_last_session_email', email);
+        }
       }
     } catch (e) {
       debugPrint('[NgmyLocalCache] persist error: $e');

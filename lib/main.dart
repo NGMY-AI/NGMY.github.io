@@ -78,6 +78,7 @@ import 'ngmy_family_tree_payments.dart';
 import 'ngmy_web_viewport.dart';
 import 'ngmy_web_status_bar.dart';
 import 'ngmy_login_logo.dart';
+import 'ngmy_web_lifecycle_stub.dart' if (dart.library.html) 'ngmy_web_lifecycle_web.dart';
 import 'ngmy_media_delivery.dart';
 import 'ngmy_push_notification_prompt.dart';
 import 'ngmy_push_notifications.dart';
@@ -5238,6 +5239,69 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return merged.values.toList();
   }
 
+  /// Flush debounced saves immediately — call on pause/close and after login.
+  Future<void> _persistSessionImmediately() async {
+    _saveDebounceTimer?.cancel();
+    _heavySaveTimer?.cancel();
+    _pendingHeavySave = false;
+    await _persistLocalOnly();
+  }
+
+  Future<void> _restoreSessionFromLocalCache({SharedPreferences? prefs}) async {
+    if (_currentUser != null) return;
+    final p = prefs ?? await SharedPreferences.getInstance();
+    final userJson = _ngmyPrefsJson(p, 'current_user');
+    if (userJson != null) {
+      try {
+        final map = jsonDecode(userJson);
+        if (map is Map<String, dynamic>) {
+          final localUser = UserData.fromJson(map);
+          final index = _allUsers.indexWhere(
+            (u) => u.email.toLowerCase().trim() == localUser.email.toLowerCase().trim(),
+          );
+          _currentUser = index != -1 ? _allUsers[index] : localUser;
+          if (mounted) setState(() {});
+          return;
+        }
+      } catch (_) {}
+    }
+    final lastEmail = (p.getString('ngmy_last_session_email') ?? '').toLowerCase().trim();
+    if (lastEmail.isEmpty) return;
+    final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == lastEmail);
+    if (index == -1) return;
+    _currentUser = _allUsers[index];
+    if (mounted) setState(() {});
+    unawaited(_persistSessionImmediately());
+  }
+
+  Future<void> _tryRestoreSessionFromSupabaseAuth() async {
+    if (_currentUser != null) return;
+    try {
+      final authUser = supabase.auth.currentUser;
+      final email = authUser?.email?.toLowerCase().trim();
+      if (email == null || email.isEmpty) return;
+      final fullName = (authUser?.userMetadata?['full_name'] ?? '').toString().trim();
+      await _signInOrCreateFromGoogle(email, fullName: fullName);
+      await _persistSessionImmediately();
+    } catch (e) {
+      debugPrint('[session] supabase auth restore: $e');
+    }
+  }
+
+  void _restartSyncLoopsForCurrentUser() {
+    if (_currentUser == null) return;
+    if (!_realtimeStarted) {
+      unawaited(_startBackgroundServicesWhenReady());
+      return;
+    }
+    _startUserTransactionSync();
+    _startAdminPendingTransactionPoll();
+    if (_ngmySessionIsAdmin(_currentUser)) {
+      unawaited(_refreshAdminCloudSnapshot(lightweight: true));
+      unawaited(_refreshPendingTransactionsFromCloud());
+    }
+  }
+
   /// Pull latest wallet requests for admin (never wipe local cache on empty cloud).
   /// [lightweight] skips heavy user fetch + bulk flush — use when opening admin or polling.
   Future<void> _refreshAdminCloudSnapshot({bool lightweight = false}) async {
@@ -5431,9 +5495,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('[login] local session save: $e');
     }
+    await _persistSessionImmediately();
     unawaited(_pushUserToCloudFast(_currentUser!, includeFreeTrial: true));
-    unawaited(_persistLocalOnly());
-    unawaited(_startBackgroundServicesWhenReady());
+    _restartSyncLoopsForCurrentUser();
     unawaited(_refreshUserTransactionsFromCloud(force: true));
   }
 
@@ -5447,6 +5511,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
     }
     if (!mounted) return;
+    await _tryRestoreSessionFromSupabaseAuth();
+    await _restoreSessionFromLocalCache();
     _startBackgroundServices();
   }
 
@@ -5470,7 +5536,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _userTxnSyncTimer?.cancel();
     if (_currentUser == null) return;
     unawaited(_refreshUserTransactionsFromCloud(force: true));
-    _userTxnSyncTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+    _userTxnSyncTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       if (!mounted || _currentUser == null) return;
       unawaited(_refreshUserTransactionsFromCloud());
     });
@@ -5659,6 +5725,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     });
     unawaited(_loadData());
     unawaited(_probeOfflineAtLaunch());
+    ngmyRegisterPageHiddenHandler(() {
+      unawaited(_persistSessionImmediately());
+    });
   }
 
   Future<void> _probeOfflineAtLaunch() async {
@@ -5724,14 +5793,25 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     );
   }
 
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      unawaited(_persistSessionImmediately());
+    }
     if (state == AppLifecycleState.resumed) {
+      unawaited(_restoreSessionFromLocalCache());
       if (_currentUser != null) {
         _ngmyReconcileClockInSession(_currentUser!, _allTransactions);
       }
       unawaited(_refreshGameCenterSettingsFromCloud());
       unawaited(_refreshCurrentUserFromCloud());
       unawaited(_refreshUserTransactionsFromCloud(force: true));
+      if (_ngmySessionIsAdmin(_currentUser)) {
+        unawaited(_refreshPendingTransactionsFromCloud());
+      }
       if (_allowConfigDiffNotifications) {
         unawaited(_notifyStoreMarketDayListings());
       }
@@ -6007,7 +6087,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _startAdminPendingTransactionPoll() {
     _adminPendingTxnPoll?.cancel();
     if (!_ngmySessionIsAdmin(_currentUser)) return;
-    _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 40), (_) {
+    _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 15), (_) {
       if (!mounted || !_ngmySessionIsAdmin(_currentUser)) return;
       unawaited(_refreshPendingTransactionsFromCloud());
     });
@@ -7148,7 +7228,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     required String body,
     required String tag,
   }) async {
-    if (_currentUser?.isAdmin != true) return;
+    if (!_ngmySessionIsAdmin(_currentUser)) return;
     await _pushInAppNotification(
       title: title,
       body: body,
@@ -7313,6 +7393,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
     });
     await _saveData();
+    await _persistSessionImmediately();
+    _restartSyncLoopsForCurrentUser();
   }
 
   void _subscribeToRealtime() {
@@ -7802,13 +7884,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           }
           if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == email) {
             if (updatedUser.forceLogout) {
+              updatedUser.forceLogout = false;
+              final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+              if (idx >= 0) _allUsers[idx].forceLogout = false;
+              unawaited(_pushUserToCloudFast(updatedUser));
               _currentUser = null;
+              unawaited(_persistSessionImmediately());
             } else {
               updatedUser.canSellOnStore = _canSellOnStoreForEmail(_config, email);
               _preserveLocalSessionState(_currentUser!, updatedUser);
+              ngmyReconcileUserAccountBalance(updatedUser, _allTransactions);
               _currentUser = updatedUser;
             }
           }
+          ngmyReconcileUserAccountBalance(updatedUser, _allTransactions);
         });
         unawaited(NgmyAnnouncementReads.saveLocal(email, updatedUser.readAnnouncementIds.toSet()));
         SharedPreferences.getInstance().then((prefs) {
@@ -7892,8 +7981,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             unawaited(_pushUserToCloudFast(_allUsers[userIdx]));
           }
         } else if (becameApproved && ngmyTransactionCountsAsIncome(tx)) {
+          if (userIdx >= 0) {
+            ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], tx);
+            if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
+              _currentUser = _allUsers[userIdx];
+            }
+          }
           ngmyPlayIncomeSoundForTransaction(tx);
         }
+        _reconcileAllUserBalances();
         if (tx.status == TransactionStatus.pending &&
             (tx.type == TransactionType.deposit || tx.type == TransactionType.withdrawal) &&
             (previous == null || previous!.status != TransactionStatus.pending)) {
@@ -8089,6 +8185,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _currentUser = index != -1 ? _allUsers[index] : localUser;
           }
         } catch (_) {}
+      }
+      if (_currentUser == null) {
+        final lastEmail = (prefs.getString('ngmy_last_session_email') ?? '').toLowerCase().trim();
+        if (lastEmail.isNotEmpty) {
+          final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == lastEmail);
+          if (index >= 0) _currentUser = _allUsers[index];
+        }
       }
       _reconcileAllUserBalances();
 
@@ -8872,6 +8975,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   try {
                     final p = await SharedPreferences.getInstance();
                     await p.remove('current_user');
+                    await p.remove('ngmy_last_session_email');
                   } catch (_) {}
                   setState(() => _currentUser = null);
                 },
