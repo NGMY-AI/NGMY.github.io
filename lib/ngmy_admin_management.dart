@@ -243,9 +243,8 @@ Future<void> ngmyApplyStoreSellAccessFromSettings(AppConfig config) async {
   if (raw is! List) return;
   final remote = raw.map((e) => e.toString().toLowerCase().trim()).where((e) => e.isNotEmpty).toSet();
   if (remote.isEmpty && config.storeSellAccessEmails.isEmpty) return;
-  if (remote.isNotEmpty) {
-    config.storeSellAccessEmails = remote.toList()..sort();
-  }
+  final merged = {..._storeSellAccessEmailSet(config), ...remote};
+  config.storeSellAccessEmails = merged.toList()..sort();
 }
 
 /// Fast path — local + ngmy_settings only (opens management panels instantly).

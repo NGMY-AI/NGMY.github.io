@@ -1838,6 +1838,14 @@ void _applyStoreSellAccessEmailsToUsers(AppConfig config, List<UserData> users, 
 bool _canSellOnStoreForEmail(AppConfig config, String email) =>
     _storeSellAccessEmailSet(config).contains(email.toLowerCase().trim());
 
+/// True when this user may post in NGMY Store (admin, config grant list, or user row flag).
+bool ngmyUserCanSellOnStore(UserData user, AppConfig config) {
+  if (user.isAdmin) return true;
+  final key = user.email.toLowerCase().trim();
+  if (key.isEmpty) return false;
+  return user.canSellOnStore || _canSellOnStoreForEmail(config, key);
+}
+
 void _updateStoreSellAccessGrant(AppConfig config, UserData u, bool on) {
   if (u.isAdmin) return;
   final email = u.email.toLowerCase().trim();
@@ -3579,6 +3587,15 @@ bool _ngmyIsClockInWindowOpen(DateTime now, {bool allowFreeTrialOnWeekend = fals
   return true;
 }
 
+/// Progress from clock-in to full daily earnings after 60 seconds (free trial).
+double _ngmyClockInProgressOneMinute(DateTime? clockInStart) {
+  if (clockInStart == null) return 0.0;
+  const windowMs = 60000;
+  final elapsedMs = DateTime.now().difference(clockInStart).inMilliseconds;
+  if (elapsedMs <= 0) return 0.0;
+  return (elapsedMs / windowMs).clamp(0.0, 1.0);
+}
+
 /// Progress from clock-in toward full daily earnings at 12:00 PM (0.0–1.0).
 /// Midnight clock-in → fills steadily over 12 hours. Later clock-ins → shorter window, faster fill.
 double _ngmyClockInProgressToNoon(DateTime? clockInStart) {
@@ -5199,9 +5216,27 @@ class UserData {
     if (!isClockedIn || clockInStartTime == null) return 0.0;
     final goal = todayDailyGoal;
     if (goal <= 0) return 0.0;
-    final progress = _ngmyClockInProgressToNoon(clockInStartTime);
+    final progress = isOnFreeTrial
+        ? _ngmyClockInProgressOneMinute(clockInStartTime)
+        : _ngmyClockInProgressToNoon(clockInStartTime);
     final earnings = goal * progress;
     return earnings > goal ? goal : earnings;
+  }
+
+  /// Balance sheet invested/pending amount for admin user detail.
+  double get adminDisplayInvestedAmount {
+    if (activeInvestment != null && activeInvestment!.daysLeft > 0) {
+      return activeInvestment!.amount;
+    }
+    final pending = pendingInvestmentAmount ?? 0;
+    if (pending > 0) return pending;
+    return 0.0;
+  }
+
+  String get adminDisplayInvestedLabel {
+    if (activeInvestment != null && activeInvestment!.daysLeft > 0) return 'Invested';
+    if ((pendingInvestmentAmount ?? 0) > 0) return 'Pending invest.';
+    return 'Invested';
   }
 
   /// Today tile: live earnings while clocked in; after deposit keeps today's total until midnight.
@@ -5539,7 +5574,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           .from('transactions')
           .select()
           .order('timestamp', ascending: false)
-          .limit(lightweight ? 150 : 400);
+          .limit(lightweight ? 200 : 2000);
       if (transData != null) {
         final remoteTransactions =
             (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
@@ -5553,6 +5588,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
       }
       _reconcileAllUserBalances();
+      _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
       for (final email in kNgmyAdminEmails) {
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
         if (idx >= 0) _allUsers[idx].isAdmin = true;
@@ -6080,24 +6116,23 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final row = await supabase.from('users').select().eq('email', email).maybeSingle().timeout(kNgmyCloudLoadTimeout);
       if (row == null || !mounted) return;
       final rowMap = Map<String, dynamic>.from(row);
-      final hadCanSellKey = rowMap.containsKey('canSellOnStore') || rowMap.containsKey('can_sell_on_store');
       final remote = UserData.fromJson(rowMap);
       final key = email.toLowerCase().trim();
       setState(() {
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
         if (idx >= 0) {
           final local = _allUsers[idx];
-          remote.canSellOnStore = _canSellOnStoreForEmail(_config, key);
-          if (hadCanSellKey && !remote.canSellOnStore) {
-            // Stale user row had sell=true but config grant list says no — push correction.
-            unawaited(_pushUserCanSellOnStore(remote));
-          }
+          final grant = _canSellOnStoreForEmail(_config, key);
+          remote.canSellOnStore = grant || remote.canSellOnStore;
+          if (grant && !remote.canSellOnStore) remote.canSellOnStore = true;
           _preserveLocalSessionState(local, remote);
           _mergeUserMediaProfileFields(local, remote);
           _ngmyReconcileClockInSession(remote, _allTransactions);
           _allUsers[idx] = remote;
         }
-        remote.canSellOnStore = _canSellOnStoreForEmail(_config, key);
+        final grant = _canSellOnStoreForEmail(_config, key);
+        remote.canSellOnStore = grant || remote.canSellOnStore;
+        if (grant && !remote.canSellOnStore) remote.canSellOnStore = true;
         _preserveLocalSessionState(_currentUser!, remote);
         _ngmyReconcileClockInSession(remote, _allTransactions);
         ngmyReconcileUserAccountBalance(remote, _allTransactions);
@@ -8267,18 +8302,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         setState(() => _allUsers.removeWhere((u) => u.email.toLowerCase().trim() == email));
       } else {
         final newRow = Map<String, dynamic>.from(payload.newRecord);
-        final hadCanSellKey = newRow.containsKey('canSellOnStore') || newRow.containsKey('can_sell_on_store');
         final updatedUser = UserData.fromJson(newRow);
         final email = updatedUser.email.toLowerCase().trim();
         if (email.isEmpty) return;
+        final grant = _canSellOnStoreForEmail(_config, email);
+        updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
         setState(() {
           final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
           if (idx == -1) {
-            updatedUser.canSellOnStore = _canSellOnStoreForEmail(_config, email);
             _allUsers.add(updatedUser);
           } else {
             final local = _allUsers[idx];
-            updatedUser.canSellOnStore = _canSellOnStoreForEmail(_config, email);
+            updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore || local.canSellOnStore;
             _preserveLocalSessionState(local, updatedUser);
             _mergeUserMediaProfileFields(local, updatedUser);
             _allUsers[idx] = updatedUser;
@@ -8292,7 +8327,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               _currentUser = null;
               unawaited(_persistSessionImmediately());
             } else {
-              updatedUser.canSellOnStore = _canSellOnStoreForEmail(_config, email);
+              updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
               _preserveLocalSessionState(_currentUser!, updatedUser);
               ngmyReconcileUserAccountBalance(updatedUser, _allTransactions);
               _currentUser = updatedUser;
@@ -15684,7 +15719,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             setState(() {});
                             final ok = await ngmyPersistStoreSellAccessAuthoritative(widget.config);
                             unawaited(_pushUserCanSellOnStore(u));
-                            unawaited(_pushUserToCloudFast(u));
+                            unawaited(_pushUserToCloudFast(u, includeFreeTrial: true));
+                            _applyStoreSellAccessEmailsToUsers(widget.config, widget.allUsers, currentUser: widget.user);
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -16723,6 +16759,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   );
 
   Widget _adminUserDetail(UserData u, bool isDark) {
+    ngmyReconcileUserAccountBalance(u, widget.allTransactions);
     final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
     final border = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
     final statusColor = u.status == 'active'
@@ -16797,9 +16834,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         decoration: BoxDecoration(color: isDark ? Colors.black26 : const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12)),
                         child: Column(
                           children: [
-                            Text('Invested', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white54 : Colors.black45)),
+                            Text(u.adminDisplayInvestedLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white54 : Colors.black45)),
                             const SizedBox(height: 4),
-                            Text('\$${formatCurrency(u.totalInvestmentAmount)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : Colors.black87)),
+                            Text('\$${formatCurrency(u.adminDisplayInvestedAmount)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : Colors.black87)),
                           ],
                         ),
                       ),
@@ -16990,6 +17027,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           u.freeTrialActive = true;
                           widget.onDataChanged();
                           unawaited(_pushUserFreeTrialToCloud(u));
+                          if (u.email.toLowerCase().trim() == widget.user.email.toLowerCase().trim()) {
+                            widget.user.freeTrialActive = true;
+                            widget.user.freeTrialDailyAmount = amt;
+                          }
                           setState(() {});
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Free trial enabled for ${u.username}: \$${formatCurrency(amt)}/day.')));
                         }),
@@ -17190,7 +17231,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
               margin: const EdgeInsets.only(bottom: 10),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               child: ListTile(
-                onTap: () => setState(() => _selectedUserEmail = u.email),
+                onTap: () {
+                  ngmyReconcileUserAccountBalance(u, widget.allTransactions);
+                  setState(() => _selectedUserEmail = u.email);
+                },
                 leading: _adminUserAvatar(u, fallback: statusColor),
                 title: Text(u.username, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white : Colors.black)),
                 subtitle: Column(
@@ -26574,7 +26618,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   int _trackingReplayToken = 0;
   final Set<String> _storePaymentDecisionLocks = {};
 
-  bool get _canSell => widget.user.isAdmin || widget.user.canSellOnStore;
+  bool get _canSell => ngmyUserCanSellOnStore(widget.user, widget.config);
 
   @override
   void initState() {
@@ -26607,6 +26651,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     }
     _purgeExpiredSoldListingsLocal();
     _listingsSig = _storeListingsSignature(_listings);
+    _applyStoreSellAccessEmailsToUsers(widget.config, widget.allUsers, currentUser: widget.user);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStoreSellAccessFromCloud());
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStoreListingsFromCloud(silent: true));
     _searchC.addListener(() => setState(() => _searchQuery = _searchC.text.trim().toLowerCase()));
     _liveOrderPollTimer = Timer.periodic(const Duration(seconds: 25), (_) {
@@ -26636,8 +26682,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   @override
   void didUpdateWidget(NgmyStoreScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final oldCanSell = oldWidget.user.isAdmin || oldWidget.user.canSellOnStore;
-    final newCanSell = widget.user.isAdmin || widget.user.canSellOnStore;
+    final oldCanSell = ngmyUserCanSellOnStore(oldWidget.user, oldWidget.config);
+    final newCanSell = ngmyUserCanSellOnStore(widget.user, widget.config);
     if (oldCanSell != newCanSell) {
       final idx = _tabCtrl.index;
       _tabCtrl.dispose();
@@ -26846,6 +26892,17 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       byId[id] = existing == null ? local : _pickNewerListing(existing, local);
     }
     widget.config.storeListings = byId.values.toList();
+  }
+
+  Future<void> _refreshStoreSellAccessFromCloud() async {
+    try {
+      await ngmyApplyStoreSellAccessFromSettings(widget.config);
+      _applyStoreSellAccessEmailsToUsers(widget.config, widget.allUsers, currentUser: widget.user);
+      if (!mounted) return;
+      setState(() {});
+    } catch (e) {
+      debugPrint('[store] sell access refresh: $e');
+    }
   }
 
   Future<void> _refreshStoreListingsFromCloud({bool silent = false, bool force = false}) async {
