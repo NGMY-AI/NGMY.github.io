@@ -2671,7 +2671,7 @@ Future<bool> _verifyMediaRowInCloud(Map<String, dynamic> row) async {
   }
 }
 
-Future<List<MediaPost>?> _fetchMediaPostsFromSupabase({int limit = 100}) async {
+Future<List<MediaPost>?> _fetchMediaPostsFromSupabase({int limit = 300}) async {
   try {
     dynamic rows;
     try {
@@ -6871,6 +6871,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final next = _mergeMediaWithRemote(_allMedia, mergedRemote, tombstones: _tombstonedMediaIds);
     setState(() => _allMedia = next);
     await _persistAllMediaLocally();
+    await _purgeGhostAndBrokenMedia(verifyUrls: true);
   }
 
   Future<void> _pruneStaleMediaAgainstCloud() async {
@@ -6904,6 +6905,80 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() => _allMedia.removeWhere((m) => m.id == post.id));
     await _persistAllMediaLocally();
+  }
+
+  /// Removes empty, tombstoned, orphaned, and broken (404) media for all users.
+  Future<int> _purgeGhostAndBrokenMedia({bool verifyUrls = false}) async {
+    if (!mounted) return 0;
+    final removeIds = <String>{};
+
+    for (final m in _allMedia) {
+      if (m.id.isEmpty) continue;
+      if (_tombstonedMediaIds.contains(m.id) || !NgmyMediaProfile.postHasSource(m)) {
+        removeIds.add(m.id);
+      }
+    }
+
+    if (await ngmyCanReachCloud()) {
+      final remote = await _fetchMediaPostsFromSupabase(limit: 300);
+      if (remote != null) {
+        final remoteIds = remote.map((m) => m.id).where((id) => id.isNotEmpty).toSet();
+        for (final m in _allMedia) {
+          if (m.id.isEmpty || removeIds.contains(m.id)) continue;
+          if (_tombstonedMediaIds.contains(m.id)) {
+            removeIds.add(m.id);
+            continue;
+          }
+          if (_mediaUrlIsCloudSynced(m.videoUrl) && !remoteIds.contains(m.id)) {
+            removeIds.add(m.id);
+          }
+        }
+      }
+    }
+
+    if (verifyUrls && await ngmyCanReachCloud()) {
+      for (final m in List<MediaPost>.from(_allMedia)) {
+        if (removeIds.contains(m.id)) continue;
+        if (m.contentType != 'image') continue;
+        try {
+          final resolved = await _resolveSupabaseStorageUrlResilient(m.videoUrl);
+          if (!resolved.startsWith('http')) continue;
+          final resp = await http.head(Uri.parse(resolved)).timeout(const Duration(seconds: 6));
+          if (resp.statusCode == 404 || resp.statusCode == 410) {
+            removeIds.add(m.id);
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (removeIds.isEmpty) return 0;
+
+    for (final id in removeIds) {
+      _tombstonedMediaIds.add(id);
+      _purgeMediaDeliveryQueueForPost(id);
+      await _deleteMediaRowFromSupabase(id);
+      MediaPost? post;
+      for (final m in _allMedia) {
+        if (m.id == id) {
+          post = m;
+          break;
+        }
+      }
+      if (post != null) {
+        final ref = _parseSupabaseStorageRef(post.videoUrl);
+        if (ref != null) {
+          try {
+            await supabase.storage.from(ref.bucket).remove([ref.path]);
+          } catch (_) {}
+        }
+      }
+    }
+
+    _allMedia.removeWhere((m) => removeIds.contains(m.id) || m.id.isEmpty);
+    await _persistTombstonedMediaIds(_tombstonedMediaIds);
+    await _persistAllMediaLocally();
+    if (mounted) setState(() {});
+    return removeIds.length;
   }
 
   void _purgeMediaDeliveryQueueForPost(String postId) {
@@ -8361,6 +8436,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final remoteMedia = (mediaData as List).map((e) => MediaPost.fromJson(e)).toList();
           _allMedia = _mergeMediaWithRemote(localMedia, remoteMedia, tombstones: _tombstonedMediaIds);
           await _persistAllMediaLocally();
+          unawaited(_purgeGhostAndBrokenMedia(verifyUrls: true));
         }
 
         final annData = await supabase.from('announcements').select();
@@ -9197,6 +9273,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onArchiveWalletTransaction: _archiveAdminWalletTransaction,
                 onPersistManagementConfig: _saveAdminManagementConfigNow,
                 onRefreshManagementData: _refreshAdminManagementFromCloud,
+                onRefreshAdminMedia: _reloadMediaFromSupabase,
+                onPurgeBrokenMedia: ({bool verifyUrls = false}) => _purgeGhostAndBrokenMedia(verifyUrls: verifyUrls),
             ),
       ),
     );
@@ -10185,8 +10263,10 @@ class MainScreen extends StatefulWidget {
   final Future<void> Function(AppTransaction t)? onArchiveWalletTransaction;
   final Future<bool> Function()? onPersistManagementConfig;
   final Future<void> Function()? onRefreshManagementData;
+  final Future<void> Function()? onRefreshAdminMedia;
+  final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 
@@ -10548,7 +10628,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             await _showClockInConfirmedDialog();
           }
         }
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData, onDeleteMedia: widget.onDeleteMedia, onPushUserToCloud: widget.onPushUserToCloud, onSaveWalletPayments: widget.onSaveWalletPayments, onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan, onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan, onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans, onArchiveWalletTransaction: widget.onArchiveWalletTransaction, onPersistManagementConfig: widget.onPersistManagementConfig, onRefreshManagementData: widget.onRefreshManagementData),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData, onDeleteMedia: widget.onDeleteMedia, onPushUserToCloud: widget.onPushUserToCloud, onSaveWalletPayments: widget.onSaveWalletPayments, onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan, onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan, onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans, onArchiveWalletTransaction: widget.onArchiveWalletTransaction, onPersistManagementConfig: widget.onPersistManagementConfig, onRefreshManagementData: widget.onRefreshManagementData, onRefreshAdminMedia: widget.onRefreshAdminMedia, onPurgeBrokenMedia: widget.onPurgeBrokenMedia),
       InvestScreen(
         user: widget.user,
         plans: widget.globalPlans,
@@ -10862,7 +10942,9 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function(AppTransaction t)? onArchiveWalletTransaction;
   final Future<bool> Function()? onPersistManagementConfig;
   final Future<void> Function()? onRefreshManagementData;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData});
+  final Future<void> Function()? onRefreshAdminMedia;
+  final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -11007,6 +11089,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             onArchiveWalletTransaction: widget.onArchiveWalletTransaction,
                             onPersistManagementConfig: widget.onPersistManagementConfig,
                             onRefreshManagementData: widget.onRefreshManagementData,
+                            onRefreshAdminMedia: widget.onRefreshAdminMedia,
+                            onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
                           ),
                           routeName: 'AdminDashboard',
                         );
@@ -14833,7 +14917,9 @@ class AdminDashboard extends StatefulWidget {
   final Future<void> Function(AppTransaction t)? onArchiveWalletTransaction;
   final Future<bool> Function()? onPersistManagementConfig;
   final Future<void> Function()? onRefreshManagementData;
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData});
+  final Future<void> Function()? onRefreshAdminMedia;
+  final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
@@ -16128,6 +16214,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     await widget.onDeleteMedia!(post);
                   },
             uploadMediaRef: _adminUploadVirtualProfilePic,
+            onRefreshMedia: widget.onRefreshAdminMedia,
+            onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
           ),
         ],
       ),
@@ -35210,7 +35298,9 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final topInset = MediaQuery.paddingOf(context).top + 68;
-    final mediaFeed = widget.allMedia.where((m) => !_isExpired(m)).toList()
+    final mediaFeed = widget.allMedia
+        .where((m) => !_isExpired(m) && NgmyMediaProfile.postHasSource(m))
+        .toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF080B16) : const Color(0xFFF3F7FF),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -19,6 +20,17 @@ class NgmyMediaProfile {
   }
 
   static bool hasActiveStory(dynamic user) => activeStories(user).isNotEmpty;
+
+  static bool postHasSource(dynamic post, {String? resolvedUrl}) {
+    final raw = ((post as dynamic).videoUrl ?? (post as dynamic).url ?? '').toString().trim();
+    final u = (resolvedUrl ?? raw).trim();
+    if (u.isEmpty) return false;
+    if (u.startsWith('data:image')) return true;
+    if (u.startsWith('supabase://')) return true;
+    if (u.startsWith('http://') || u.startsWith('https://')) return true;
+    if (!kIsWeb && u.isNotEmpty) return true;
+    return false;
+  }
 
   static List<Map<String, dynamic>> asMapList(dynamic raw) {
     if (raw == null) return <Map<String, dynamic>>[];
@@ -872,6 +884,8 @@ class NgmyMediaAdminPanel extends StatefulWidget {
   final Future<String> Function(String rawUrl) resolveMediaUrl;
   final Future<String> Function(String localRef)? uploadMediaRef;
   final Future<void> Function(dynamic post)? onDeleteMedia;
+  final Future<void> Function()? onRefreshMedia;
+  final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
 
   const NgmyMediaAdminPanel({
     super.key,
@@ -889,6 +903,8 @@ class NgmyMediaAdminPanel extends StatefulWidget {
     required this.resolveMediaUrl,
     this.uploadMediaRef,
     this.onDeleteMedia,
+    this.onRefreshMedia,
+    this.onPurgeBrokenMedia,
   });
 
   @override
@@ -900,7 +916,47 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
   final _picker = ImagePicker();
   final _rng = Random();
   bool _postSearchOpen = false;
+  bool _purging = false;
+  bool _refreshing = false;
 
+  Future<void> _refreshMedia() async {
+    if (_refreshing || widget.onRefreshMedia == null) return;
+    setState(() => _refreshing = true);
+    try {
+      await widget.onRefreshMedia!();
+      if (widget.onPurgeBrokenMedia != null) {
+        await widget.onPurgeBrokenMedia!(verifyUrls: true);
+      }
+      widget.onDataChanged();
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+  }
+
+  Future<void> _purgeBroken() async {
+    if (_purging || widget.onPurgeBrokenMedia == null) return;
+    setState(() => _purging = true);
+    try {
+      final removed = await widget.onPurgeBrokenMedia!(verifyUrls: true);
+      widget.onDataChanged();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(removed > 0 ? 'Removed $removed broken or deleted post(s) for all users.' : 'No broken posts found.'),
+          backgroundColor: removed > 0 ? const Color(0xFF00B25A) : null,
+        ),
+      );
+      setState(() {});
+    } finally {
+      if (mounted) setState(() => _purging = false);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_refreshMedia()));
+  }
   @override
   void dispose() {
     _postSearch.dispose();
@@ -1271,7 +1327,11 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final allPosts = widget.allMedia.where((m) => !widget.isPostExpired(m)).toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final allPosts = widget.allMedia
+        .where((m) => !widget.isPostExpired(m))
+        .where((m) => NgmyMediaProfile.postHasSource(m))
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     final posts = _filteredPosts(allPosts);
     final profiles = _profiles;
     final accent = const Color(0xFF7C3AED);
@@ -1318,6 +1378,21 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                     color: widget.isDark ? const Color(0xFF1C1F2E) : Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     child: InkWell(
+                      onTap: _refreshing ? null : () => unawaited(_refreshMedia()),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: _refreshing
+                            ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: accent))
+                            : Icon(Icons.cloud_sync_rounded, size: 20, color: accent),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Material(
+                    color: widget.isDark ? const Color(0xFF1C1F2E) : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
                       onTap: () => setState(() => _postSearchOpen = !_postSearchOpen),
                       borderRadius: BorderRadius.circular(10),
                       child: Padding(
@@ -1332,6 +1407,19 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                   ),
                 ],
               ),
+              if (widget.onPurgeBrokenMedia != null) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _purging ? null : () => unawaited(_purgeBroken()),
+                    icon: _purging
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.cleaning_services_outlined, size: 18),
+                    label: Text(_purging ? 'Cleaning…' : 'Remove broken & deleted posts'),
+                  ),
+                ),
+              ],
               if (_postSearchOpen) ...[
                 const SizedBox(height: 12),
                 TextField(
@@ -2147,25 +2235,65 @@ class _AdminPostCardState extends State<_AdminPostCard> {
   }
 }
 
-class _PostPreviewThumb extends StatelessWidget {
+class _PostPreviewThumb extends StatefulWidget {
   final dynamic post;
   final Future<String> Function(String rawUrl) resolveMediaUrl;
 
   const _PostPreviewThumb({required this.post, required this.resolveMediaUrl});
 
   @override
+  State<_PostPreviewThumb> createState() => _PostPreviewThumbState();
+}
+
+class _PostPreviewThumbState extends State<_PostPreviewThumb> {
+  bool _broken = false;
+
+  Widget _brokenTile() {
+    return Container(
+      color: const Color(0xFF1A1A1A),
+      child: const Center(
+        child: Icon(Icons.broken_image_outlined, color: Color(0xFFEF4444), size: 28),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_broken || !NgmyMediaProfile.postHasSource(widget.post)) {
+      return _brokenTile();
+    }
     return FutureBuilder<String>(
-      future: resolveMediaUrl(post.videoUrl.toString()),
+      future: widget.resolveMediaUrl(widget.post.videoUrl.toString()),
       builder: (_, snap) {
-        final url = snap.data ?? post.videoUrl.toString();
+        final url = snap.data ?? widget.post.videoUrl.toString();
+        if (!NgmyMediaProfile.postHasSource(widget.post, resolvedUrl: url)) {
+          return _brokenTile();
+        }
         if (url.startsWith('data:image')) {
           try {
             return Image.memory(base64Decode(url.split(',').last), fit: BoxFit.cover);
-          } catch (_) {}
+          } catch (_) {
+            return _brokenTile();
+          }
         }
-        if (post.contentType == 'image' && url.startsWith('http')) return Image.network(url, fit: BoxFit.cover);
-        return Container(color: const Color(0xFF262626), child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white70)));
+        if (widget.post.contentType == 'image' && url.startsWith('http')) {
+          return Image.network(
+            url,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) {
+              if (!_broken) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() => _broken = true);
+                });
+              }
+              return _brokenTile();
+            },
+          );
+        }
+        return Container(
+          color: const Color(0xFF262626),
+          child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white70)),
+        );
       },
     );
   }
