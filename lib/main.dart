@@ -4376,24 +4376,71 @@ Future<List<Map<String, dynamic>>> _fetchHelpTableFromSupabase(String table) asy
   return (bucket: withoutScheme.substring(0, slashIdx), path: withoutScheme.substring(slashIdx + 1));
 }
 
+String _supabaseStorageCacheKey(String bucket, String path) => '$bucket/$path';
+
+final Set<String> _ngmyMissingStoragePaths = {};
+final Set<String> _ngmyLoggedMissingStoragePaths = {};
+
+bool _isStorageNotFoundError(Object error) {
+  final msg = error.toString().toLowerCase();
+  return msg.contains('not_found') ||
+      msg.contains('object not found') ||
+      msg.contains('statuscode: 404') ||
+      msg.contains('404');
+}
+
+Future<bool> _supabaseStorageObjectExists(String bucket, String path) async {
+  final key = _supabaseStorageCacheKey(bucket, path);
+  if (_ngmyMissingStoragePaths.contains(key)) return false;
+  if (!await ngmyCanReachCloud()) return true;
+  try {
+    await Supabase.instance.client.storage
+        .from(bucket)
+        .createSignedUrl(path, 60)
+        .timeout(const Duration(seconds: 8));
+    return true;
+  } catch (e) {
+    if (_isStorageNotFoundError(e)) {
+      _ngmyMissingStoragePaths.add(key);
+      if (_ngmyLoggedMissingStoragePaths.add(key)) {
+        debugPrint('[media] storage missing — will remove ghost post: $key');
+      }
+      return false;
+    }
+    return true;
+  }
+}
+
 Future<String> _resolveSupabaseStorageUrlResilient(String rawUrl) async {
   if (!rawUrl.startsWith('supabase://')) return rawUrl;
   final ref = _parseSupabaseStorageRef(rawUrl);
   if (ref == null) return rawUrl;
-  
+
+  final cacheKey = _supabaseStorageCacheKey(ref.bucket, ref.path);
+  if (_ngmyMissingStoragePaths.contains(cacheKey)) return '';
+
   final storage = Supabase.instance.client.storage.from(ref.bucket);
   final publicUrl = storage.getPublicUrl(ref.path);
   if (!await ngmyDeviceIsOnline()) return publicUrl;
-  
+
   try {
     final signed = await storage
         .createSignedUrl(ref.path, 60 * 60 * 24 * 30)
         .timeout(const Duration(seconds: 8));
     if (signed.isNotEmpty) return signed;
   } catch (e) {
-    debugPrint('[storage] signed url error for ${ref.path}: $e');
+    if (_isStorageNotFoundError(e)) {
+      _ngmyMissingStoragePaths.add(cacheKey);
+      if (_ngmyLoggedMissingStoragePaths.add(cacheKey)) {
+        debugPrint('[media] storage missing — will remove ghost post: $cacheKey');
+      }
+      return '';
+    }
+    if (_ngmyLoggedMissingStoragePaths.add('$cacheKey:signed')) {
+      debugPrint('[storage] signed url error for ${ref.path}: $e');
+    }
   }
-  
+
   return publicUrl;
 }
 
@@ -7073,6 +7120,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (_mediaUrlIsCloudSynced(m.videoUrl) && !remoteIds.contains(m.id)) {
             removeIds.add(m.id);
           }
+        }
+      }
+    }
+
+    if (await ngmyCanReachCloud()) {
+      for (final m in List<MediaPost>.from(_allMedia)) {
+        if (m.id.isEmpty || removeIds.contains(m.id)) continue;
+        final ref = _parseSupabaseStorageRef(m.videoUrl);
+        if (ref != null && !await _supabaseStorageObjectExists(ref.bucket, ref.path)) {
+          removeIds.add(m.id);
         }
       }
     }
@@ -10953,6 +11010,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onRefreshFromCloud: widget.onRefreshMediaFromCloud,
         onDeleteMedia: widget.onDeleteMedia,
         onPruneMedia: widget.onPruneMedia,
+        onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
         onSyncMediaPost: widget.onSyncAdminMediaPost,
         onSyncUserMedia: widget.onSyncAdminUserMedia,
       ),
@@ -34748,6 +34806,7 @@ class MediaHubScreen extends StatefulWidget {
   final Future<void> Function()? onRefreshFromCloud;
   final Future<void> Function(MediaPost)? onDeleteMedia;
   final Future<void> Function(MediaPost)? onPruneMedia;
+  final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
   final Future<bool> Function(MediaPost post)? onSyncMediaPost;
   final Future<bool> Function(UserData user)? onSyncUserMedia;
 
@@ -34763,6 +34822,7 @@ class MediaHubScreen extends StatefulWidget {
     this.onRefreshFromCloud,
     this.onDeleteMedia,
     this.onPruneMedia,
+    this.onPurgeBrokenMedia,
     this.onSyncMediaPost,
     this.onSyncUserMedia,
   });
@@ -34782,6 +34842,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await widget.onPurgeBrokenMedia?.call();
       await _cleanupExpiredPosts();
       await _silentRefreshFeed();
     });
@@ -34811,6 +34872,16 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     if (sig == _lastFeedSig) return;
     _lastFeedSig = sig;
     setState(() {});
+  }
+
+  Future<void> _removeBrokenPost(MediaPost post) async {
+    if (widget.onDeleteMedia != null) {
+      await widget.onDeleteMedia!(post);
+    } else {
+      await widget.onPruneMedia?.call(post);
+    }
+    widget.onDataChanged();
+    if (mounted) setState(() {});
   }
 
   bool _isExpired(MediaPost post) {
@@ -35605,6 +35676,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                       onChanged: widget.onDataChanged,
                       onSyncPost: widget.onSyncMediaPost,
                       onDelete: () => _deletePost(mediaFeed[index]),
+                      onMissingStorage: _removeBrokenPost,
                       onOpenProfile: _openMediaProfile,
                       onPayoutWatchReward: _payoutWatchReward,
                     ),
@@ -35888,6 +35960,7 @@ class VideoPostWidget extends StatefulWidget {
   final void Function(String userEmail)? onOpenProfile;
   final Future<bool> Function(MediaPost post)? onPayoutWatchReward;
   final Future<bool> Function(MediaPost post)? onSyncPost;
+  final Future<void> Function(MediaPost post)? onMissingStorage;
   const VideoPostWidget({
     super.key,
     required this.post,
@@ -35898,6 +35971,7 @@ class VideoPostWidget extends StatefulWidget {
     this.onOpenProfile,
     this.onPayoutWatchReward,
     this.onSyncPost,
+    this.onMissingStorage,
   });
 
   @override
@@ -35983,9 +36057,17 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
       final avatar = await _profileImageProviderForEmail(widget.post.userEmail);
       if (mounted) setState(() => _authorImage = avatar);
 
-      // 1. Try to resolve URL from storage
       final resolved = await _resolveSupabaseStorageUrlResilient(widget.post.videoUrl);
       if (!mounted) return;
+      if (resolved.isEmpty && widget.post.videoUrl.startsWith('supabase://')) {
+        unawaited(widget.onMissingStorage?.call(widget.post));
+        setState(() {
+          _hasError = true;
+          _loadingMedia = false;
+          _errorText = 'This post was removed.';
+        });
+        return;
+      }
       _resolvedMediaUrl = resolved;
 
       if (_isImagePost) {

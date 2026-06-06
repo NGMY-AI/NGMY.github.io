@@ -22,6 +22,7 @@ class NgmyMediaProfile {
   static bool hasActiveStory(dynamic user) => activeStories(user).isNotEmpty;
 
   static bool postHasSource(dynamic post, {String? resolvedUrl}) {
+    if (resolvedUrl != null && resolvedUrl.trim().isEmpty) return false;
     final raw = ((post as dynamic).videoUrl ?? (post as dynamic).url ?? '').toString().trim();
     final u = (resolvedUrl ?? raw).trim();
     if (u.isEmpty) return false;
