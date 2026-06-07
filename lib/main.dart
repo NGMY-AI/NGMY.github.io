@@ -19,6 +19,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import 'ngmy_platform_stats.dart';
 import 'ngmy_popups.dart';
 import 'ngmy_media_profile.dart';
 import 'ngmy_ai_memory.dart';
@@ -17967,12 +17968,6 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
           ] else ...[
             const SizedBox(height: 16),
-            Text(
-              'Minimum withdrawal: \$${formatCurrency(kNgmyMinimumWithdrawalAmount)}',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF64748B), fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 10),
             Text('Choose Withdrawal Method', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
             Row(
@@ -19055,7 +19050,11 @@ class StatsScreen extends StatefulWidget {
 
 class _StatsScreenState extends State<StatsScreen> {
   Timer? _ticker;
+  Timer? _platformPoll;
+  RealtimeChannel? _platformChannel;
   DateTime _now = DateTime.now();
+  NgmyPlatformLiveStats? _platform;
+  bool _platformLoading = true;
 
   @override
   void initState() {
@@ -19064,11 +19063,56 @@ class _StatsScreenState extends State<StatsScreen> {
       if (!mounted) return;
       setState(() => _now = DateTime.now());
     });
+    unawaited(_refreshPlatformStats(force: true));
+    _platformPoll = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted) return;
+      unawaited(_refreshPlatformStats());
+    });
+    _subscribePlatformStatsRealtime();
+  }
+
+  Future<void> _refreshPlatformStats({bool force = false}) async {
+    final next = await ngmyFetchPlatformLiveStats(forceRefresh: force);
+    if (!mounted) return;
+    setState(() {
+      _platform = next;
+      _platformLoading = false;
+    });
+  }
+
+  void _subscribePlatformStatsRealtime() {
+    try {
+      _platformChannel = Supabase.instance.client
+          .channel('ngmy-platform-live-stats')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'ngmy_settings',
+            callback: (_) => unawaited(_refreshPlatformStats()),
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'transactions',
+            callback: (_) => unawaited(_refreshPlatformStats(force: true)),
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'users',
+            callback: (_) => unawaited(_refreshPlatformStats(force: true)),
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('[platform_stats] realtime: $e');
+    }
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    _platformPoll?.cancel();
+    unawaited(_platformChannel?.unsubscribe());
     super.dispose();
   }
 
@@ -19096,10 +19140,12 @@ class _StatsScreenState extends State<StatsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final approved = widget.transactions.where((t) => t.status == TransactionStatus.approved);
-    final totalVol = approved.where((t) => t.type == TransactionType.deposit).fold(0.0, (s, t) => s + t.amount);
-    final totalPay = approved.where((t) => t.type == TransactionType.withdrawal).fold(0.0, (s, t) => s + t.amount);
-    final platformProfit = widget.allUsers.fold(0.0, (s, u) => s + u.totalProfit);
-    final platformUsers = widget.allUsers.length;
+    final p = _platform;
+    final totalVol = p?.totalVolume ?? 0.0;
+    final totalPay = p?.totalPayout ?? 0.0;
+    final platformProfit = p?.totalProfit ?? 0.0;
+    final platformUsers = p?.platformUsers ?? 0;
+    final statsLive = p != null && DateTime.now().difference(p.updatedAt) < const Duration(seconds: 20);
     final totalUsersInFlow = widget.transactions.map((t) => t.userEmail.toLowerCase().trim()).toSet().length;
     final totalDepositsCount = widget.transactions.where((t) => t.type == TransactionType.deposit).length;
     final totalWithdrawalsCount = widget.transactions.where((t) => t.type == TransactionType.withdrawal).length;
@@ -19139,6 +19185,11 @@ class _StatsScreenState extends State<StatsScreen> {
           child: Column(
             children: [
               const FloatingTitle(title: 'PLATFORM STATS'),
+              if (_platformLoading && p == null)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text('Syncing live platform data…', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),
+                ),
               const SizedBox(height: 22),
               GridView.count(
                 shrinkWrap: true,
@@ -19148,10 +19199,10 @@ class _StatsScreenState extends State<StatsScreen> {
                 crossAxisSpacing: 12,
                 childAspectRatio: 1.42,
                 children: [
-                  _sTile(context, 'Total Volume', '\$${formatCurrency(totalVol)}', Icons.account_balance, Colors.blue),
-                  _sTile(context, 'Total Profit', '\$${formatCurrency(platformProfit)}', Icons.auto_graph, Colors.purple),
-                  _sTile(context, 'Total Payout', '\$${formatCurrency(totalPay)}', Icons.payments, Colors.green),
-                  _sTile(context, 'Platform Users', '$platformUsers', Icons.public, Colors.orange),
+                  _sTile(context, 'Total Volume', '\$${formatCurrency(totalVol)}', Icons.account_balance, Colors.blue, live: statsLive),
+                  _sTile(context, 'Total Profit', '\$${formatCurrency(platformProfit)}', Icons.auto_graph, Colors.purple, live: statsLive),
+                  _sTile(context, 'Total Payout', '\$${formatCurrency(totalPay)}', Icons.payments, Colors.green, live: statsLive),
+                  _sTile(context, 'Platform Users', '$platformUsers', Icons.public, Colors.orange, live: statsLive),
                 ],
               ),
               Transform.translate(
@@ -19263,7 +19314,7 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  Widget _sTile(BuildContext ctx, String l, String v, IconData i, Color c) {
+  Widget _sTile(BuildContext ctx, String l, String v, IconData i, Color c, {bool live = false}) {
     final isDark = Theme.of(ctx).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(15),
@@ -19271,14 +19322,23 @@ class _StatsScreenState extends State<StatsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: c.withOpacity(isDark ? 0.18 : 0.12),
-              shape: BoxShape.circle,
-              border: Border.all(color: c.withOpacity(0.35), width: 1.2),
-            ),
-            child: Icon(i, color: c, size: 22),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: c.withOpacity(isDark ? 0.18 : 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: c.withOpacity(0.35), width: 1.2),
+                ),
+                child: Icon(i, color: c, size: 22),
+              ),
+              if (live) ...[
+                const SizedBox(width: 6),
+                _livePulseDot(),
+              ],
+            ],
           ),
           const SizedBox(height: 8),
           Text(l, style: TextStyle(fontSize: 10, color: isDark ? Colors.white60 : Colors.grey, fontWeight: FontWeight.bold)),
