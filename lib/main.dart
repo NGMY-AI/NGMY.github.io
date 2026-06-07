@@ -1246,9 +1246,58 @@ Map<String, dynamic> _pickRegistrarApplicationRow(
   final ar = _registrarStatusRank(as);
   final br = _registrarStatusRank(bs);
   if (ar != br) return ar > br ? a : b;
-  final ac = (a['reviewedAt'] ?? a['createdAt'] ?? '').toString();
-  final bc = (b['reviewedAt'] ?? b['createdAt'] ?? '').toString();
+  final ac = (a['reviewedAt'] ?? a['updatedAt'] ?? a['createdAt'] ?? '').toString();
+  final bc = (b['reviewedAt'] ?? b['updatedAt'] ?? b['createdAt'] ?? '').toString();
   return ac.compareTo(bc) >= 0 ? a : b;
+}
+
+void _stampJobWorkerApplicationDecision(
+  Map<String, dynamic> app, {
+  required bool approve,
+  required String reviewerEmail,
+  String? rejectionReason,
+}) {
+  final now = DateTime.now().toUtc().toIso8601String();
+  app['status'] = approve ? 'approved' : 'rejected';
+  app['reviewedAt'] = now;
+  app['updatedAt'] = now;
+  app['reviewedBy'] = reviewerEmail;
+  if (approve) {
+    app.remove('rejectionReason');
+  } else {
+    app['rejectionReason'] = (rejectionReason ?? '').trim();
+  }
+}
+
+List<Map<String, dynamic>> _replaceJobWorkerApplicationInList(
+  List<Map<String, dynamic>> apps,
+  Map<String, dynamic> updated,
+) {
+  final id = (updated['id'] ?? '').toString();
+  if (id.isEmpty) return apps.map((e) => Map<String, dynamic>.from(e)).toList();
+  var found = false;
+  final next = apps.map((e) {
+    if ((e['id'] ?? '').toString() != id) return Map<String, dynamic>.from(e);
+    found = true;
+    return Map<String, dynamic>.from({...Map<String, dynamic>.from(e), ...updated});
+  }).toList();
+  if (!found) next.add(Map<String, dynamic>.from(updated));
+  return next;
+}
+
+Map<String, dynamic>? _jobWorkerApplicationForEmail(
+  List<Map<String, dynamic>> apps,
+  String email,
+) {
+  final key = email.toLowerCase().trim();
+  if (key.isEmpty) return null;
+  Map<String, dynamic>? best;
+  for (final raw in apps) {
+    if ((raw['userEmail'] ?? '').toString().toLowerCase().trim() != key) continue;
+    final row = Map<String, dynamic>.from(raw);
+    best = best == null ? row : _pickRegistrarApplicationRow(best, row);
+  }
+  return best;
 }
 
 List<Map<String, dynamic>> _mergeCivicRegistrarApplications(
@@ -16169,6 +16218,73 @@ class _AdminDashboardState extends State<AdminDashboard> {
     unawaited(_refreshManagementInBackground());
   }
 
+  Future<String?> _promptJobApplicationRejectionReason(BuildContext ctx) async {
+    final ctrl = TextEditingController();
+    return showDialog<String?>(
+      context: ctx,
+      builder: (c) => AlertDialog(
+        title: const Text('Rejection reason'),
+        content: TextField(
+          controller: ctrl,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Reason (required)',
+            hintText: 'The applicant will see this message in Job Marketplace.',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () {
+              final reason = ctrl.text.trim();
+              if (reason.isEmpty) {
+                ScaffoldMessenger.of(c).showSnackBar(
+                  const SnackBar(content: Text('Enter a reason before rejecting.')),
+                );
+                return;
+              }
+              Navigator.pop(c, reason);
+            },
+            child: const Text('Reject application'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _decideJobWorkerApplication({
+    required Map<String, dynamic> app,
+    required bool approve,
+    String? rejectionReason,
+    VoidCallback? onLocalUiUpdate,
+  }) async {
+    _stampJobWorkerApplicationDecision(
+      app,
+      approve: approve,
+      reviewerEmail: widget.user.email,
+      rejectionReason: rejectionReason,
+    );
+    widget.config.jobWorkerApplications = _replaceJobWorkerApplicationInList(
+      widget.config.jobWorkerApplications,
+      app,
+    );
+
+    final email = (app['userEmail'] ?? '').toString().toLowerCase().trim();
+    final userIndex = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+    if (userIndex >= 0) {
+      widget.allUsers[userIndex].isApprovedWorker = approve;
+      if (approve) widget.allUsers[userIndex].status = 'verified';
+      unawaited(widget.onPushUserToCloud?.call(widget.allUsers[userIndex]));
+    }
+
+    widget.onDataChanged();
+    final ok = await _persistManagementConfig();
+    onLocalUiUpdate?.call();
+    if (mounted) setState(() {});
+    return ok;
+  }
+
   void _showJobApplicationsAdmin(bool isDark) {
     showModalBottomSheet(
       context: context,
@@ -16237,8 +16353,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                   : status == 'rejected'
                                       ? Colors.red
                                       : Colors.orange;
-                              final email = (app['userEmail'] ?? '').toString().toLowerCase().trim();
-                              final userIndex = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 10),
                                 padding: const EdgeInsets.all(12),
@@ -16273,6 +16387,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                     if ((app['skills'] ?? '').toString().trim().isNotEmpty) Text('Skills: ${app['skills']}'),
                                     if ((app['availability'] ?? '').toString().trim().isNotEmpty) Text('Availability: ${app['availability']}'),
                                     if ((app['note'] ?? '').toString().trim().isNotEmpty) Text('Statement: ${app['note']}'),
+                                    if (status == 'rejected' &&
+                                        (app['rejectionReason'] ?? '').toString().trim().isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 6),
+                                        child: Text(
+                                          'Rejection reason: ${app['rejectionReason']}',
+                                          style: TextStyle(color: Colors.red.shade300, fontSize: 12),
+                                        ),
+                                      ),
                                     const SizedBox(height: 4),
                                     Text('Submitted: ${fmt((app['createdAt'] ?? '').toString())}', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 11)),
                                     if (status == 'pending') ...[
@@ -16282,15 +16405,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                           Expanded(
                                             child: OutlinedButton(
                                               onPressed: () async {
-                                                app['status'] = 'rejected';
-                                                app['reviewedAt'] = DateTime.now().toIso8601String();
-                                                app['reviewedBy'] = widget.user.email;
-                                                widget.config.jobWorkerApplications = apps;
-                                                final ok = await _persistManagementConfig();
+                                                final reason = await _promptJobApplicationRejectionReason(ctx);
+                                                if (reason == null || reason.trim().isEmpty) return;
+                                                final ok = await _decideJobWorkerApplication(
+                                                  app: app,
+                                                  approve: false,
+                                                  rejectionReason: reason,
+                                                  onLocalUiUpdate: () => setST(() {}),
+                                                );
                                                 if (!context.mounted) return;
-                                                setState(() {});
-                                                setST(() {});
-                                                ngmyAdminShowCloudSaveSnackBar(context, cloudOk: ok, success: 'Application rejected and saved.');
+                                                ngmyAdminShowCloudSaveSnackBar(
+                                                  context,
+                                                  cloudOk: ok,
+                                                  success: 'Application rejected and saved for all users.',
+                                                  offline: 'Rejected on this device — connect and save again to sync.',
+                                                );
                                               },
                                               child: const Text('Reject'),
                                             ),
@@ -16299,23 +16428,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                           Expanded(
                                             child: ElevatedButton(
                                               onPressed: () async {
-                                                app['status'] = 'approved';
-                                                app['reviewedAt'] = DateTime.now().toIso8601String();
-                                                app['reviewedBy'] = widget.user.email;
-                                                widget.config.jobWorkerApplications = apps;
-                                                if (userIndex != -1) {
-                                                  widget.allUsers[userIndex].isApprovedWorker = true;
-                                                  widget.allUsers[userIndex].status = 'verified';
-                                                  unawaited(widget.onPushUserToCloud?.call(widget.allUsers[userIndex]));
-                                                }
-                                                final ok = await _persistManagementConfig();
+                                                final ok = await _decideJobWorkerApplication(
+                                                  app: app,
+                                                  approve: true,
+                                                  onLocalUiUpdate: () => setST(() {}),
+                                                );
                                                 if (!context.mounted) return;
-                                                setState(() {});
-                                                setST(() {});
                                                 ngmyAdminShowCloudSaveSnackBar(
                                                   context,
                                                   cloudOk: ok,
                                                   success: 'Worker application approved and saved for all users.',
+                                                  offline: 'Approved on this device — connect and save again to sync.',
                                                 );
                                               },
                                               child: const Text('Approve'),
@@ -17154,10 +17277,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       if (selected != null) return _adminUserDetail(selected, isDark);
       _selectedUserEmail = null;
     }
-    final workerApps = List<Map<String, dynamic>>.from(
-      widget.config.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)),
-    );
-    final pendingApps = workerApps.where((a) => (a['status'] ?? 'pending') == 'pending').toList();
     final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
     return Column(children: [
       Padding(
@@ -17183,78 +17302,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           onChanged: (v) => setState(() => _query = v.toLowerCase()),
         ),
       ),
-      if (pendingApps.isNotEmpty)
-        Container(
-          margin: const EdgeInsets.fromLTRB(15, 0, 15, 10),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: panelBg,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Worker Applications', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              ...pendingApps.map((app) {
-                final email = (app['userEmail'] ?? '').toString().toLowerCase().trim();
-                final userIndex = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.black26 : const Color(0xFFF7FAFF),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${app['username'] ?? 'User'} • ${app['userEmail'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                      if ((app['note'] ?? '').toString().trim().isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text((app['note'] ?? '').toString()),
-                      ],
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          ElevatedButton(
-                            onPressed: () async {
-                              app['status'] = 'approved';
-                              app['reviewedAt'] = DateTime.now().toIso8601String();
-                              widget.config.jobWorkerApplications = workerApps;
-                              if (userIndex != -1) {
-                                widget.allUsers[userIndex].isApprovedWorker = true;
-                                widget.allUsers[userIndex].status = 'verified';
-                                unawaited(widget.onPushUserToCloud?.call(widget.allUsers[userIndex]));
-                              }
-                              widget.onDataChanged();
-                              await _persistManagementConfig();
-                              if (!context.mounted) return;
-                              setState(() {});
-                            },
-                            child: const Text('Approve'),
-                          ),
-                          const SizedBox(width: 8),
-                          OutlinedButton(
-                            onPressed: () async {
-                              app['status'] = 'rejected';
-                              app['reviewedAt'] = DateTime.now().toIso8601String();
-                              widget.config.jobWorkerApplications = workerApps;
-                              await _persistManagementConfig();
-                              if (!context.mounted) return;
-                              setState(() {});
-                            },
-                            child: const Text('Reject'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
-        ),
       Expanded(
         child: ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -33536,20 +33583,21 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     }
   }
 
-  void _processWorkerApplication(Map<String, dynamic> app, {required bool approve}) {
+  void _processWorkerApplication(Map<String, dynamic> app, {required bool approve, String? rejectionReason}) {
     final appId = (app['id'] ?? '').toString();
     if (appId.isEmpty) return;
-    final apps = List<Map<String, dynamic>>.from(
-      widget.config.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)),
+    _stampJobWorkerApplicationDecision(
+      app,
+      approve: approve,
+      reviewerEmail: widget.user.email,
+      rejectionReason: rejectionReason,
     );
-    final idx = apps.indexWhere((a) => (a['id'] ?? '').toString() == appId);
-    if (idx < 0) return;
-    apps[idx]['status'] = approve ? 'approved' : 'rejected';
-    apps[idx]['reviewedAt'] = DateTime.now().toIso8601String();
-    apps[idx]['reviewedBy'] = widget.user.email;
-    widget.config.jobWorkerApplications = apps;
+    widget.config.jobWorkerApplications = _replaceJobWorkerApplicationInList(
+      widget.config.jobWorkerApplications,
+      app,
+    );
 
-    final email = (apps[idx]['userEmail'] ?? '').toString().toLowerCase().trim();
+    final email = (app['userEmail'] ?? '').toString().toLowerCase().trim();
     final userIndex = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
     if (userIndex >= 0) {
       widget.allUsers[userIndex].isApprovedWorker = approve;
@@ -34077,6 +34125,37 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
   }
 
   Future<void> _showWorkerApplicationDialog() async {
+    final existing = _jobWorkerApplicationForEmail(_workerApplications, widget.user.email);
+    final existingStatus = (existing?['status'] ?? '').toString().toLowerCase();
+    if (existingStatus == 'pending') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You already have a pending worker application.')),
+      );
+      return;
+    }
+    if (_isApprovedWorker || existingStatus == 'approved') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are already approved as a worker.')));
+      return;
+    }
+    if (existingStatus == 'rejected') {
+      final reason = (existing?['rejectionReason'] ?? '').toString().trim();
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Previous application rejected'),
+          content: Text(
+            reason.isNotEmpty
+                ? 'Reason: $reason\n\nYou can submit a new application.'
+                : 'Your previous application was rejected. You can submit a new one.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Apply again')),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
     final fullNameC = TextEditingController(text: widget.user.fullName ?? widget.user.username);
     final phoneC = TextEditingController(text: widget.user.phone);
     final cityC = TextEditingController(text: widget.user.city ?? '');
@@ -34086,17 +34165,6 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     final portfolioC = TextEditingController();
     final noteC = TextEditingController();
     String availability = 'Full-time';
-    final hasPending = widget.config.jobWorkerApplications.any(
-      (a) => (a['userEmail'] ?? '').toString().toLowerCase().trim() == widget.user.email.toLowerCase().trim() && (a['status'] ?? '') == 'pending',
-    );
-    if (hasPending) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You already have a pending worker application.')));
-      return;
-    }
-    if (_isApprovedWorker) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are already approved as a worker.')));
-      return;
-    }
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -34190,7 +34258,8 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
                                 'portfolio': portfolioC.text.trim(),
                                 'note': noteC.text.trim(),
                                 'status': 'pending',
-                                'createdAt': DateTime.now().toIso8601String(),
+                                'createdAt': DateTime.now().toUtc().toIso8601String(),
+                                'updatedAt': DateTime.now().toUtc().toIso8601String(),
                               };
                               widget.config.jobWorkerApplications = _mergeJobWorkerApplicationsLists(
                                 widget.config.jobWorkerApplications,
@@ -34505,6 +34574,41 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     );
   }
 
+  Future<String?> _promptJobMarketplaceRejectionReason() async {
+    final ctrl = TextEditingController();
+    return showDialog<String?>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Rejection reason'),
+        content: TextField(
+          controller: ctrl,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Reason (required)',
+            hintText: 'The applicant will see this in Job Marketplace.',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () {
+              final reason = ctrl.text.trim();
+              if (reason.isEmpty) {
+                ScaffoldMessenger.of(c).showSnackBar(
+                  const SnackBar(content: Text('Enter a reason before rejecting.')),
+                );
+                return;
+              }
+              Navigator.pop(c, reason);
+            },
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _workerApplicationCard(Map<String, dynamic> app, {required bool isDark, required bool adminView}) {
     final status = (app['status'] ?? 'pending').toString();
     final accent = _appStatusColor(status);
@@ -34554,7 +34658,11 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _processWorkerApplication(app, approve: false),
+                    onPressed: () async {
+                      final reason = await _promptJobMarketplaceRejectionReason();
+                      if (reason == null || reason.trim().isEmpty) return;
+                      _processWorkerApplication(app, approve: false, rejectionReason: reason);
+                    },
                     icon: const Icon(Icons.close_rounded, size: 16),
                     label: const Text('Reject'),
                   ),
@@ -34570,6 +34678,14 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
               ],
             ),
           ],
+          if (status == 'rejected' && (app['rejectionReason'] ?? '').toString().trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Rejection reason: ${app['rejectionReason']}',
+                style: TextStyle(color: Colors.red.shade400, fontSize: 12),
+              ),
+            ),
         ],
       ),
     );
@@ -34736,6 +34852,60 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
     );
   }
 
+  Widget? _myWorkerApplicationStatusCard(bool isDark) {
+    final app = _jobWorkerApplicationForEmail(_workerApplications, widget.user.email);
+    if (app == null) return null;
+    final status = (app['status'] ?? 'pending').toString().toLowerCase();
+    final color = _appStatusColor(status);
+    final reason = (app['rejectionReason'] ?? '').toString().trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.assignment_ind_outlined, color: color, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Worker application: ${_appStatusLabel(status)}',
+                  style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87),
+                ),
+              ),
+              _chip(status.toUpperCase(), color),
+            ],
+          ),
+          if (status == 'rejected' && reason.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Admin reason: $reason',
+              style: TextStyle(color: Colors.red.shade400, fontSize: 13, height: 1.35),
+            ),
+          ] else if (status == 'pending') ...[
+            const SizedBox(height: 6),
+            Text(
+              'Your application is waiting for admin review in Management → Job Apps.',
+              style: TextStyle(color: isDark ? Colors.white60 : Colors.black54, fontSize: 12),
+            ),
+          ] else if (status == 'approved') ...[
+            const SizedBox(height: 6),
+            Text(
+              'You can claim jobs and send offers in the marketplace.',
+              style: TextStyle(color: isDark ? Colors.white60 : Colors.black54, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
@@ -34751,6 +34921,7 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
       return status == 'done' && claimed == myEmail;
     }).toList();
     final tabJobs = _activeTab == 0 ? findJobs : (_activeTab == 1 ? myJobs : claimedJobs);
+    final workerStatusCard = _myWorkerApplicationStatusCard(isDark);
 
     return NgmyTabBackScope(
       activeTab: _activeTab,
@@ -34805,6 +34976,8 @@ class _JobMarketplaceScreenState extends State<JobMarketplaceScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+            if (workerStatusCard != null) workerStatusCard,
             const SizedBox(height: 25),
 
             // Tabs Bar
