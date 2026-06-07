@@ -437,6 +437,16 @@ class _NgmyAdminInvestTabState extends State<NgmyAdminInvestTab> {
   bool _refreshing = false;
   String? _busyPlanKey;
 
+  @override
+  void didUpdateWidget(covariant NgmyAdminInvestTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldKeys = oldWidget.globalPlans.map((p) => '${p.name}|${p.price}').join(';');
+    final newKeys = widget.globalPlans.map((p) => '${p.name}|${p.price}').join(';');
+    if (oldKeys != newKeys || oldWidget.allTransactions.length != widget.allTransactions.length) {
+      setState(() {});
+    }
+  }
+
   int get _pendingInvestDeposits => widget.allTransactions
       .where((t) =>
           t.type == TransactionType.deposit &&

@@ -5477,10 +5477,27 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   List<Announcement> _allAnnouncements = [];
   Set<String> _tombstonedMediaIds = {};
 
+  void _markAdminConfigMutation() {
+    _adminConfigMutationAt = DateTime.now();
+    NgmyAdminLiveRefresh.notify();
+  }
+
+  bool _shouldDeferRemoteConfigOverwrite() {
+    final t = _adminConfigMutationAt;
+    if (t == null) return false;
+    return DateTime.now().difference(t) < const Duration(seconds: 8);
+  }
+
+  void _invalidateMainTabCache() {
+    // MainScreen tab cache lives on child; config/plan updates still propagate via setState.
+    NgmyAdminLiveRefresh.notify();
+  }
+
   /// Single realtime channel (all tables) — avoids 8 separate subscriptions per client.
   RealtimeChannel? _appSyncChannel;
   StreamSubscription<AuthState>? _authSub;
   bool _isSyncing = false;
+  DateTime? _adminConfigMutationAt;
   Timer? _autoThemeTimer;
   Timer? _configRefreshTimer;
   Timer? _gameSettingsRefreshTimer;
@@ -5703,16 +5720,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (replace != null) {
         final idx = _globalPlans.indexWhere((p) => p.name == replace.name && (p.price - replace.price).abs() < 0.001);
         if (idx >= 0) {
-          _globalPlans[idx] = plan;
+          _globalPlans = List<InvestmentPlan>.from(_globalPlans)..[idx] = plan;
         } else {
-          _globalPlans.add(plan);
+          _globalPlans = [..._globalPlans, plan];
         }
       } else if (!_globalPlans.any((p) => p.name == plan.name && (p.price - plan.price).abs() < 0.001)) {
-        _globalPlans.add(plan);
+        _globalPlans = [..._globalPlans, plan];
       }
       plan.applyFixedRoi();
-      _globalPlans.sort((a, b) => a.price.compareTo(b.price));
+      _globalPlans = List<InvestmentPlan>.from(_globalPlans)..sort((a, b) => a.price.compareTo(b.price));
       _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
+      _markAdminConfigMutation();
     });
     var ok = await _persistInvestmentPlansToCloud(_config.investmentPlans);
     if (!ok) {
@@ -5725,15 +5743,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<bool> _removeAdminInvestmentPlan(InvestmentPlan plan) async {
     setState(() {
-      _globalPlans.removeWhere((p) => p.name == plan.name && (p.price - plan.price).abs() < 0.001);
+      _globalPlans = _globalPlans
+          .where((p) => !(p.name == plan.name && (p.price - plan.price).abs() < 0.001))
+          .toList();
       _config.investmentPlans = _investmentPlansToMaps(_globalPlans);
+      _markAdminConfigMutation();
     });
     final ok = await _persistInvestmentPlansToCloud(_config.investmentPlans);
     await _persistLocalOnly();
+    if (mounted) setState(() {});
     return ok;
   }
 
   Future<void> _refreshAdminInvestmentPlans() async {
+    if (_shouldDeferRemoteConfigOverwrite()) return;
     if (!await ngmyCanReachCloud()) return;
     final remote = await _fetchAuthoritativeInvestmentPlans();
     if (remote.isEmpty) return;
@@ -5755,6 +5778,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<bool> _saveAdminManagementConfigNow() async {
+    _markAdminConfigMutation();
     final ok = await ngmyAdminPersistManagementConfig(_config);
     await _persistLocalOnly();
     if (mounted) setState(() {});
@@ -5775,16 +5799,27 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyApplyStoreSellAccessFromSettings(_config);
     _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
     await _persistLocalOnly();
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      NgmyAdminLiveRefresh.notify();
+    }
   }
 
   Future<void> _refreshAdminManagementFromCloud() async {
+    if (_shouldDeferRemoteConfigOverwrite()) return;
     await ngmyAdminRefreshManagementConfigLight(_config);
     await _persistLocalOnly();
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      NgmyAdminLiveRefresh.notify();
+    }
     unawaited(ngmyAdminRefreshManagementConfig(_config).then((_) async {
+      if (_shouldDeferRemoteConfigOverwrite()) return;
       await _persistLocalOnly();
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+        NgmyAdminLiveRefresh.notify();
+      }
     }));
   }
 
@@ -7348,6 +7383,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _persistDeletedMediaIdAuthoritative(id, _tombstonedMediaIds);
     if (mounted) {
       setState(() => _allMedia.removeWhere((m) => m.id == id));
+      NgmyAdminLiveRefresh.notify();
     } else {
       _allMedia.removeWhere((m) => m.id == id);
     }
@@ -7375,6 +7411,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       setState(() {
         _config.termsAndConditions = terms;
         _config.privacyPolicy = privacy;
+        _markAdminConfigMutation();
       });
       await _rememberAdminLegalSave(terms, privacy);
       final prefs = await SharedPreferences.getInstance();
@@ -7907,6 +7944,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final id = (payload.oldRecord['id'] ?? '').toString();
         if (id.isEmpty) return;
         setState(() => _allAnnouncements.removeWhere((a) => a.id == id));
+        NgmyAdminLiveRefresh.notify();
       } else {
         final ann = Announcement.fromJson(payload.newRecord);
         bool isNew = false;
@@ -7928,6 +7966,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             tag: 'announcement_${ann.id}',
           ));
         }
+        NgmyAdminLiveRefresh.notify();
       }
     } catch (e) {
       debugPrint('Announcements realtime apply error: $e');
@@ -8080,6 +8119,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _onConfigChange(PostgresChangePayload payload) {
     try {
       if (payload.eventType != PostgresChangeEvent.delete) {
+        if (_shouldDeferRemoteConfigOverwrite()) return;
         final keepListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
         final keepInquiries = List<Map<String, dynamic>>.from(_config.storeInquiries.map((e) => Map<String, dynamic>.from(e)));
         final keepHelpApps = List<Map<String, dynamic>>.from(_config.helpHelperApplications.map((e) => Map<String, dynamic>.from(e)));
@@ -8139,8 +8179,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           );
         }
         _mergeOperationalManagementListsIntoConfig(next, keepConfig);
-        if (next.investmentPlans.isNotEmpty) {
-          _globalPlans = _investmentPlansFromMaps(next.investmentPlans);
+        if (record.containsKey('investmentPlans')) {
+          final raw = record['investmentPlans'];
+          final remotePlans = raw is List
+              ? raw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+              : <Map<String, dynamic>>[];
+          next.investmentPlans = remotePlans;
+          _globalPlans = _investmentPlansFromMaps(remotePlans);
         } else if (keepPlans.isNotEmpty) {
           next.investmentPlans = keepPlans;
           _globalPlans = _investmentPlansFromMaps(keepPlans);
@@ -8169,6 +8214,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
             _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
           });
+          NgmyAdminLiveRefresh.notify();
           SharedPreferences.getInstance().then((prefs) {
             prefs.setString('app_config', jsonEncode(_config.toJson()));
             prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
@@ -8187,16 +8233,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _onNgmySettingsChange(PostgresChangePayload payload) {
-    if (_isSyncing) return;
+    if (_isSyncing && _shouldDeferRemoteConfigOverwrite()) return;
     try {
       final key = (payload.newRecord['key'] ?? '').toString();
       if (key == 'management_operational_lists') {
         final value = payload.newRecord['value'];
         if (value is Map) {
+          if (_shouldDeferRemoteConfigOverwrite()) return;
           final keep = AppConfig.fromJson(_config.toJson());
           _applyManagementOperationalListsPayload(_config, Map<String, dynamic>.from(value));
           _mergeOperationalManagementListsIntoConfig(_config, keep);
           setState(() {});
+          NgmyAdminLiveRefresh.notify();
           unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
         }
         return;
@@ -8360,6 +8408,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         unawaited(_persistDeletedMediaIdAuthoritative(id, _tombstonedMediaIds));
         setState(() => _allMedia.removeWhere((m) => m.id == id));
         unawaited(_persistAllMediaLocally());
+        NgmyAdminLiveRefresh.notify();
         return;
       }
       final incoming = MediaPost.fromJson(payload.newRecord);
@@ -8375,6 +8424,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _allMedia.sort((a, b) => b.timestamp.compareTo(a.timestamp));
       });
       unawaited(_persistAllMediaLocally());
+      NgmyAdminLiveRefresh.notify();
     } catch (e) {
       debugPrint('Media realtime apply error: $e');
     }
@@ -8386,6 +8436,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final email = (payload.oldRecord['email'] ?? '').toString().toLowerCase().trim();
         if (email.isEmpty) return;
         setState(() => _allUsers.removeWhere((u) => u.email.toLowerCase().trim() == email));
+        NgmyAdminLiveRefresh.notify();
       } else {
         final newRow = Map<String, dynamic>.from(payload.newRecord);
         final updatedUser = UserData.fromJson(newRow);
@@ -8428,6 +8479,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
           }
         }).catchError((_) {});
+        NgmyAdminLiveRefresh.notify();
       }
     } catch (e) {
       debugPrint('Users realtime apply error: $e');
@@ -8452,6 +8504,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final id = (payload.oldRecord['id'] ?? '').toString();
         if (id.isEmpty) return;
         setState(() => _allTransactions.removeWhere((t) => t.id == id));
+        NgmyAdminLiveRefresh.notify();
       } else {
         final incoming = AppTransaction.fromJson(payload.newRecord);
         AppTransaction? previous;
@@ -8518,6 +8571,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           unawaited(_notifyAdminAboutPendingTransaction(tx));
         }
         unawaited(_persistLocalOnly());
+        NgmyAdminLiveRefresh.notify();
       }
     } catch (e) {
       debugPrint('Transactions realtime apply error: $e');
@@ -9638,6 +9692,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       _currentUser = targetUser;
                     }
                   });
+                  NgmyAdminLiveRefresh.notify();
                   _markTransactionDirty(t.id);
                   await _persistLocalOnly();
                   final syncedUserCopy = syncedUser;
@@ -9679,6 +9734,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     _allMedia.removeWhere((m) => m.id == post.id);
                     _allMedia.insert(0, post);
                   });
+                  NgmyAdminLiveRefresh.notify();
                   unawaited(() async {
                     var saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
                     if (!saved) {
@@ -9701,12 +9757,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onUploadPopupVideo: _uploadPopupVideoRef,
                 onAddAnnouncement: (ann) {
                   setState(() => _allAnnouncements.add(ann));
+                  NgmyAdminLiveRefresh.notify();
                   unawaited(_upsertAnnouncement(ann));
                   unawaited(_persistAnnouncementsLocally());
                   unawaited(_persistLocalOnly());
                 },
               onDeleteAnnouncement: (id) {
                 setState(() => _allAnnouncements.removeWhere((a) => a.id == id));
+                NgmyAdminLiveRefresh.notify();
                 _deleteAnnouncementById(id);
                 unawaited(_persistLocalOnly());
               },
@@ -10737,6 +10795,23 @@ String _legalContentSig(AppConfig config) =>
     '${config.termsAndConditions.length}:${config.privacyPolicy.length}:'
     '${config.termsAndConditions.hashCode}:${config.privacyPolicy.hashCode}';
 
+/// Admin dashboard is on a pushed route — notify it when shared config/transactions mutate.
+class NgmyAdminLiveRefresh {
+  NgmyAdminLiveRefresh._();
+  static final Set<VoidCallback> _listeners = {};
+
+  static void addListener(VoidCallback listener) => _listeners.add(listener);
+  static void removeListener(VoidCallback listener) => _listeners.remove(listener);
+
+  static void notify() {
+    for (final listener in _listeners.toList()) {
+      try {
+        listener();
+      } catch (_) {}
+    }
+  }
+}
+
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
   bool _offline = false;
@@ -10908,9 +10983,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     }
   }
 
+  void _onAdminLiveRefresh() {
+    if (!mounted) return;
+    _tabPages = null;
+    _tabPagesKey = null;
+    setState(() {});
+  }
+
   @override void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
     NgmyIncomeSound.bindSession(widget.user.email);
     unawaited(NgmyIncomeSound.preload());
     NgmyPopupOrchestrator.resolveVideoUrl = _resolveSupabaseStorageUrlResilient;
@@ -10991,6 +11074,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    NgmyAdminLiveRefresh.removeListener(_onAdminLiveRefresh);
     _t?.cancel();
     _onlineCheck?.cancel();
     NgmyIncomeSound.bindSession(null);
@@ -15494,19 +15578,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
+  void _onAdminLiveRefresh() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
+    NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
     unawaited(_loadWalletApprovedArchive());
     _lastSeenPendingWalletCount = _pendingWalletRequestCount();
     Future.microtask(() => unawaited(_pullAdminCloudData()));
-    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 90), (_) {
       unawaited(_pullAdminCloudData());
     });
   }
 
   @override
   void dispose() {
+    NgmyAdminLiveRefresh.removeListener(_onAdminLiveRefresh);
     _adminRefreshTimer?.cancel();
     _search.dispose();
     super.dispose();
@@ -16215,7 +16305,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _openJobApplicationsAdmin(bool isDark) async {
     _showJobApplicationsAdmin(isDark);
-    unawaited(_refreshManagementInBackground());
   }
 
   Future<String?> _promptJobApplicationRejectionReason(BuildContext ctx) async {
@@ -16803,9 +16892,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
         },
       );
 
-  Widget _adminInvest(bool isDark) => NgmyAdminInvestTab(
+  Widget _adminInvest(bool isDark) {
+    final plans = _investmentPlansFromMaps(widget.config.investmentPlans);
+    return NgmyAdminInvestTab(
         isDark: isDark,
-        globalPlans: widget.globalPlans,
+        globalPlans: plans,
         allTransactions: widget.allTransactions,
         onUpsertPlan: (plan, {replace}) async {
           if (widget.onUpsertInvestmentPlan != null) {
@@ -16833,6 +16924,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           await widget.onRefreshAdminData?.call();
         },
       );
+  }
 
   Widget _adminWallet(bool isDark) => NgmyAdminWalletTab(
         isDark: isDark,
