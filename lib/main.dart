@@ -11314,7 +11314,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onSyncMediaPost: widget.onSyncAdminMediaPost,
         onSyncUserMedia: widget.onSyncAdminUserMedia,
       ),
-      StatsScreen(user: widget.user, transactions: sorted),
+      StatsScreen(user: widget.user, transactions: sorted, allUsers: widget.allUsers),
       ProfileScreen(
         user: widget.user,
         allUsers: widget.allUsers,
@@ -11783,17 +11783,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     Positioned(
                       top: 12,
                       left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00B25A),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          widget.user.username.toUpperCase(),
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
-                        ),
-                      ),
+                      child: _clockInNameTag(isLight),
                     ),
                     Align(
                       alignment: Alignment.center,
@@ -12025,6 +12015,124 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         pointsEarned: pointsEarned,
         totalPoints: widget.user.points,
       ),
+    );
+  }
+
+  Widget _clockInNameTag(bool isLight) {
+    final name = widget.user.username.trim().isEmpty ? 'MEMBER' : widget.user.username.toUpperCase();
+    final useGlassBlur = !ngmyPreferLightGraphics;
+
+    Widget glassCore(double shimmer) {
+      final tag = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(9),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color.lerp(const Color(0xFF6EE7B7), const Color(0xFF34D399), shimmer)!.withOpacity(0.78),
+              const Color(0xFF059669).withOpacity(0.62),
+              const Color(0xFF047857).withOpacity(0.72),
+            ],
+            stops: const [0, 0.55, 1],
+          ),
+          border: Border.all(color: Colors.white.withOpacity(0.42 + shimmer * 0.28), width: 1.15),
+          boxShadow: [
+            BoxShadow(color: const Color(0xFF22C55E).withOpacity(0.28 + shimmer * 0.22), blurRadius: 14, offset: const Offset(0, 4)),
+            BoxShadow(color: Colors.white.withOpacity(0.18), blurRadius: 3, offset: const Offset(-1, -1)),
+            BoxShadow(color: const Color(0xFF064E3B).withOpacity(0.25), blurRadius: 6, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: 2,
+              right: 2,
+              top: 0,
+              height: 11,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.white.withOpacity(0.42 + shimmer * 0.18), Colors.white.withOpacity(0.0)],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: -6 + (shimmer * 14),
+              top: 1,
+              child: Transform.rotate(
+                angle: -0.35,
+                child: Container(
+                  width: 14,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    gradient: LinearGradient(
+                      colors: [Colors.white.withOpacity(0.0), Colors.white.withOpacity(0.28 + shimmer * 0.12), Colors.white.withOpacity(0.0)],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Text(
+              name,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.98),
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                letterSpacing: 0.9,
+                shadows: [Shadow(color: const Color(0xFF064E3B).withOpacity(0.55), blurRadius: 2, offset: const Offset(0, 1))],
+              ),
+            ),
+          ],
+        ),
+      );
+      if (!useGlassBlur) return tag;
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(9),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: tag,
+        ),
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _smokeCtrl,
+      builder: (context, _) {
+        final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
+        final pulse = 1.0 + shimmer * 0.035;
+        return Transform.scale(
+          scale: pulse,
+          alignment: Alignment.centerLeft,
+          child: Container(
+            padding: const EdgeInsets.all(1.6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(11),
+              gradient: SweepGradient(
+                colors: [
+                  const Color(0xFF86EFAC).withOpacity(0.05),
+                  const Color(0xFFBBF7D0).withOpacity(0.55 + shimmer * 0.25),
+                  const Color(0xFF22C55E).withOpacity(0.75),
+                  const Color(0xFF6EE7B7).withOpacity(0.35 + shimmer * 0.2),
+                  const Color(0xFF86EFAC).withOpacity(0.05),
+                ],
+                transform: GradientRotation(_smokeCtrl.value * 2 * math.pi),
+              ),
+              boxShadow: [
+                BoxShadow(color: const Color(0xFF34D399).withOpacity(0.18 + shimmer * 0.12), blurRadius: 10, spreadRadius: 0.5),
+              ],
+            ),
+            child: glassCore(shimmer),
+          ),
+        );
+      },
     );
   }
 
@@ -18915,7 +19023,8 @@ class _InvestScreenState extends State<InvestScreen> {
 class StatsScreen extends StatefulWidget {
   final UserData user;
   final List<AppTransaction> transactions;
-  const StatsScreen({super.key, required this.user, required this.transactions});
+  final List<UserData> allUsers;
+  const StatsScreen({super.key, required this.user, required this.transactions, required this.allUsers});
 
   @override
   State<StatsScreen> createState() => _StatsScreenState();
@@ -18966,6 +19075,8 @@ class _StatsScreenState extends State<StatsScreen> {
     final approved = widget.transactions.where((t) => t.status == TransactionStatus.approved);
     final totalVol = approved.where((t) => t.type == TransactionType.deposit).fold(0.0, (s, t) => s + t.amount);
     final totalPay = approved.where((t) => t.type == TransactionType.withdrawal).fold(0.0, (s, t) => s + t.amount);
+    final platformProfit = widget.allUsers.fold(0.0, (s, u) => s + u.totalProfit);
+    final platformUsers = widget.allUsers.length;
     final totalUsersInFlow = widget.transactions.map((t) => t.userEmail.toLowerCase().trim()).toSet().length;
     final totalDepositsCount = widget.transactions.where((t) => t.type == TransactionType.deposit).length;
     final totalWithdrawalsCount = widget.transactions.where((t) => t.type == TransactionType.withdrawal).length;
@@ -19015,9 +19126,9 @@ class _StatsScreenState extends State<StatsScreen> {
                 childAspectRatio: 1.42,
                 children: [
                   _sTile(context, 'Total Volume', '\$${formatCurrency(totalVol)}', Icons.account_balance, Colors.blue),
-                  _sTile(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit)}', Icons.auto_graph, Colors.purple),
+                  _sTile(context, 'Total Profit', '\$${formatCurrency(platformProfit)}', Icons.auto_graph, Colors.purple),
                   _sTile(context, 'Total Payout', '\$${formatCurrency(totalPay)}', Icons.payments, Colors.green),
-                  _sTile(context, 'Global Rank', '#1', Icons.public, Colors.orange),
+                  _sTile(context, 'Platform Users', '$platformUsers', Icons.public, Colors.orange),
                 ],
               ),
               Transform.translate(
