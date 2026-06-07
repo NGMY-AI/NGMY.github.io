@@ -1243,65 +1243,63 @@ class _NgmyInvoiceTemplatePickerState extends State<NgmyInvoiceTemplatePicker> {
             ],
           );
         }),
-        // Luxury — collapsible dropdown on the left
+        // Luxury — classic templates always visible; Essential Luxury via dropdown below
+        Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 8),
+          child: Row(
+            children: [
+              Icon(catIcon(kNgmyInvoiceLuxuryCategory), size: 16, color: catColor(kNgmyInvoiceLuxuryCategory)),
+              const SizedBox(width: 6),
+              Text('Luxury', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: catColor(kNgmyInvoiceLuxuryCategory))),
+            ],
+          ),
+        ),
+        categoryRows(classicLuxury, isLuxury: true),
+        const SizedBox(height: 8),
         InkWell(
           onTap: () => setState(() => _luxuryExpanded = !_luxuryExpanded),
           borderRadius: BorderRadius.circular(8),
           child: Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            padding: const EdgeInsets.symmetric(vertical: 6),
             child: Row(
               children: [
                 Container(
-                  width: 28,
-                  height: 28,
+                  width: 26,
+                  height: 26,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFD4AF37).withOpacity(0.15),
+                    color: const Color(0xFFD4AF37).withOpacity(0.12),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.45)),
+                    border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.4)),
                   ),
                   child: Icon(
                     _luxuryExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                    size: 20,
+                    size: 18,
                     color: const Color(0xFFD4AF37),
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.diamond_rounded, size: 16, color: Color(0xFFD4AF37)),
-                const SizedBox(width: 6),
-                const Text('Luxury', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFFD4AF37))),
-                const SizedBox(width: 8),
-                if (selectedEssential && !_luxuryExpanded)
+                Text(
+                  _luxuryExpanded ? 'Hide Essential Luxury templates' : 'Essential Luxury templates (with your photo)',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: hintColor),
+                ),
+                if (selectedEssential && !_luxuryExpanded) ...[
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       '· ${ngmyInvoiceTemplateById(widget.selectedId)?.label ?? ''}',
-                      style: TextStyle(fontSize: 11, color: hintColor),
+                      style: TextStyle(fontSize: 10, color: hintColor),
                       overflow: TextOverflow.ellipsis,
                     ),
-                  )
-                else if (!_luxuryExpanded)
-                  Text(
-                    'Tap to browse Essential templates',
-                    style: TextStyle(fontSize: 11, color: hintColor),
                   ),
+                ],
               ],
             ),
           ),
         ),
         if (_luxuryExpanded) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              'Essential Luxury — broadcast-style layouts with your photo',
-              style: TextStyle(fontSize: 10, color: hintColor, fontWeight: FontWeight.w600),
-            ),
-          ),
+          const SizedBox(height: 4),
           categoryRows(essential, isLuxury: true),
-          if (classicLuxury.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text('Classic Luxury', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: hintColor)),
-            const SizedBox(height: 6),
-            categoryRows(classicLuxury, isLuxury: true),
-          ],
+          const SizedBox(height: 10),
         ],
       ],
     );

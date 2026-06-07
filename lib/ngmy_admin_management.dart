@@ -4,6 +4,8 @@ const String _kNgmyManagementListsCloudKey = 'management_operational_lists';
 const String _kNgmyManagementListsPrefsKey = 'ngmy_management_operational_lists_v1';
 const String _kNgmyStoreSellAccessSettingsKey = 'store_sell_access_emails';
 const String _kNgmyDeletedMediaSettingsKey = 'deleted_media_ids';
+const String _kNgmyFamilyTreePaymentSettingsKey = 'family_tree_payment_settings';
+const String _kNgmyFamilyTreePaymentPrefsKey = 'ngmy_family_tree_payment_settings_v1';
 
 Future<Set<String>> _fetchDeletedMediaIdsFromCloud() async {
   final row = await _fetchNgmySettingSafe(_kNgmyDeletedMediaSettingsKey);
@@ -247,6 +249,90 @@ Future<void> ngmyApplyStoreSellAccessFromSettings(AppConfig config) async {
   config.storeSellAccessEmails = merged.toList()..sort();
 }
 
+Map<String, dynamic> _familyTreePaymentPayload(AppConfig config) => {
+      'familyTreeCreateFee': config.familyTreeCreateFee,
+      'familyTreePhotoMonthlyFee': config.familyTreePhotoMonthlyFee,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyFamilyTreePaymentPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+  final create = payload['familyTreeCreateFee'];
+  if (create is num && create >= 0) config.familyTreeCreateFee = create.toDouble();
+  final photo = payload['familyTreePhotoMonthlyFee'];
+  if (photo is num && photo >= 0) config.familyTreePhotoMonthlyFee = photo.toDouble();
+}
+
+Future<void> _persistFamilyTreePaymentSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyFamilyTreePaymentPrefsKey, jsonEncode(_familyTreePaymentPayload(config)));
+  } catch (e) {
+    debugPrint('[admin payments] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateFamilyTreePaymentsFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyFamilyTreePaymentPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyFamilyTreePaymentPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[admin payments] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyFamilyTreePaymentSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      _applyFamilyTreePaymentPayload(config, row);
+    }
+  }
+}
+
+/// Authoritative save for Admin → Management → Payments (family tree fees).
+Future<bool> ngmyPersistFamilyTreePaymentSettings(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  await _persistFamilyTreePaymentSettingsLocal(config);
+
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _familyTreePaymentPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyFamilyTreePaymentSettingsKey, payload);
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+    try {
+      var row = <String, dynamic>{
+        'id': kNgmyConfigRowId,
+        'familyTreeCreateFee': config.familyTreeCreateFee,
+        'familyTreePhotoMonthlyFee': config.familyTreePhotoMonthlyFee,
+      };
+      for (var i = 0; i < 6; i++) {
+        try {
+          await Supabase.instance.client.from('config').upsert(row);
+          cloudOk = true;
+          break;
+        } catch (e) {
+          final missing = _missingColumnFromPostgrestError(e);
+          if (missing != null && missing.isNotEmpty && row.containsKey(missing)) {
+            row = Map<String, dynamic>.from(row)..remove(missing);
+            if (row.length <= 1) break;
+            continue;
+          }
+          debugPrint('[admin payments] config upsert: $e');
+          break;
+        }
+      }
+    } catch (e) {
+      debugPrint('[admin payments] config save: $e');
+    }
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
 /// Fast path — local + ngmy_settings only (opens management panels instantly).
 Future<void> ngmyAdminRefreshManagementConfigLight(AppConfig config) async {
   await ngmyHydrateManagementListsFromAllBackups(config);
@@ -301,7 +387,9 @@ void ngmyAdminShowCloudSaveSnackBar(
 
 /// Background refresh when a management panel is already open.
 Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
   await ngmyHydrateManagementListsFromAllBackups(config);
+  await ngmyHydrateFamilyTreePaymentsFromAllBackups(config);
   final snapshot = AppConfig.fromJson(config.toJson());
 
   if (await ngmyCanReachCloud()) {

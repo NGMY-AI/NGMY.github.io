@@ -1797,14 +1797,22 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
   }
 
   if (record.containsKey('familyTreeCreateFee')) {
-    final v = record['familyTreeCreateFee'];
-    if (v is num && v >= 0) next.familyTreeCreateFee = v.toDouble();
+    if (ngmyShouldDeferRemoteConfigOverwrite()) {
+      next.familyTreeCreateFee = keep.familyTreeCreateFee;
+    } else {
+      final v = record['familyTreeCreateFee'];
+      if (v is num && v >= 0) next.familyTreeCreateFee = v.toDouble();
+    }
   } else {
     next.familyTreeCreateFee = keep.familyTreeCreateFee;
   }
   if (record.containsKey('familyTreePhotoMonthlyFee')) {
-    final v = record['familyTreePhotoMonthlyFee'];
-    if (v is num && v >= 0) next.familyTreePhotoMonthlyFee = v.toDouble();
+    if (ngmyShouldDeferRemoteConfigOverwrite()) {
+      next.familyTreePhotoMonthlyFee = keep.familyTreePhotoMonthlyFee;
+    } else {
+      final v = record['familyTreePhotoMonthlyFee'];
+      if (v is num && v >= 0) next.familyTreePhotoMonthlyFee = v.toDouble();
+    }
   } else {
     next.familyTreePhotoMonthlyFee = keep.familyTreePhotoMonthlyFee;
   }
@@ -1965,6 +1973,8 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
     'investmentPlans': config.investmentPlans,
     'officialCashApp': config.officialCashApp,
     'officialBitcoin': config.officialBitcoin,
+    'familyTreeCreateFee': config.familyTreeCreateFee,
+    'familyTreePhotoMonthlyFee': config.familyTreePhotoMonthlyFee,
     'loanPhone': config.loanPhone,
     'loanHowItWorks': config.loanHowItWorks,
     'loanCompanyZelle': config.loanCompanyZelle,
@@ -5448,6 +5458,14 @@ List<Map<String, dynamic>> _jsonMapList(dynamic raw) {
 
 // --- MAIN APP ---
 
+DateTime? ngmyAdminConfigMutationAt;
+
+bool ngmyShouldDeferRemoteConfigOverwrite() {
+  final t = ngmyAdminConfigMutationAt;
+  if (t == null) return false;
+  return DateTime.now().difference(t) < const Duration(seconds: 12);
+}
+
 class NGMYApp extends StatefulWidget {
   const NGMYApp({super.key, required this.launchBootstrap});
 
@@ -5479,13 +5497,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _markAdminConfigMutation() {
     _adminConfigMutationAt = DateTime.now();
+    ngmyAdminConfigMutationAt = _adminConfigMutationAt;
     NgmyAdminLiveRefresh.notify();
   }
 
   bool _shouldDeferRemoteConfigOverwrite() {
-    final t = _adminConfigMutationAt;
+    final t = ngmyAdminConfigMutationAt ?? _adminConfigMutationAt;
     if (t == null) return false;
-    return DateTime.now().difference(t) < const Duration(seconds: 8);
+    return DateTime.now().difference(t) < const Duration(seconds: 12);
   }
 
   void _invalidateMainTabCache() {
@@ -5796,6 +5815,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _refreshAdminCloudSnapshot(lightweight: false);
     await _refreshAdminInvestmentPlans();
     await ngmyHydrateManagementListsFromAllBackups(_config);
+    await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
     await ngmyApplyStoreSellAccessFromSettings(_config);
     _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
     await _persistLocalOnly();
@@ -8308,6 +8328,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         return;
       }
+      if (key == _kNgmyFamilyTreePaymentSettingsKey) {
+        final value = payload.newRecord['value'];
+        if (value is Map) {
+          if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+          setState(() => _applyFamilyTreePaymentPayload(_config, Map<String, dynamic>.from(value)));
+          unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
+          NgmyAdminLiveRefresh.notify();
+        }
+        return;
+      }
       if (key == _kNgmySettingsChatClosedKey) {
         final value = payload.newRecord['value'];
         if (value is Map) {
@@ -8714,6 +8744,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _config.civicRegistryPinsByState,
           );
           await ngmyHydrateManagementListsFromAllBackups(_config);
+          await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
         } catch (_) {}
       }
       final localMediaJson = safeGet('all_media');
@@ -8966,6 +8997,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _mergeOperationalManagementListsIntoConfig(next, localConfigSnapshot);
           _config = next;
           await ngmyHydrateManagementListsFromAllBackups(_config);
+          await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
           _mergeOperationalManagementListsIntoConfig(_config, localConfigSnapshot);
           await ngmyApplyStoreSellAccessFromSettings(_config);
           _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
@@ -16043,7 +16075,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _openPaymentsAdmin(bool isDark) async {
     _showPaymentsAdmin(isDark);
-    unawaited(_refreshManagementInBackground());
   }
 
   void _showPaymentsAdmin(bool isDark) {
@@ -16111,9 +16142,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           widget.config.familyTreeCreateFee = create;
                           widget.config.familyTreePhotoMonthlyFee = photo;
                         });
-                        final ok = await _persistManagementConfig();
+                        widget.onDataChanged();
+                        final ok = await ngmyPersistFamilyTreePaymentSettings(widget.config);
                         if (!context.mounted) return;
                         Navigator.pop(ctx);
+                        setState(() {});
                         ngmyAdminShowCloudSaveSnackBar(
                           context,
                           cloudOk: ok,
