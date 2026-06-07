@@ -254,6 +254,15 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
       }
     }
 
+    for (final u in users) {
+      ngmyReconcileUserAccountBalance(u, transactions);
+    }
+    if (currentUser != null) {
+      final key = currentUser!.email.toLowerCase().trim();
+      final idx = users.indexWhere((u) => u.email.toLowerCase().trim() == key);
+      if (idx >= 0) currentUser = users[idx];
+    }
+
     return NgmyLaunchBootstrap(
       themeMode: themeMode,
       currentUser: currentUser,
@@ -3545,6 +3554,9 @@ double? _ngmyClockInPayoutAmountForDay(String email, List<AppTransaction> txs, D
 /// No clock-in dialogs, banners, or in-app notifications (penalties still apply silently).
 const bool kNgmySuppressClockInPopups = true;
 
+/// No deposit/withdrawal banner popups (requests still save; check Wallet / History).
+const bool kNgmySuppressWalletTransactionPopups = true;
+
 /// Minutes after midnight before late clock-in UI appears (12:10 AM).
 const int kNgmyLateClockUiStartMinutes = 10;
 
@@ -5962,6 +5974,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (id.isNotEmpty) _seenRealtimeStoreOrderIds.add(id);
     }
     _appShellSig = _computeAppShellSig();
+    _reconcileAllUserBalances();
     _launchCacheHydrated = true;
   }
 
@@ -6088,8 +6101,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _ngmyReconcileClockInSession(_currentUser!, _allTransactions);
       }
       unawaited(_refreshGameCenterSettingsFromCloud());
-      unawaited(_refreshCurrentUserFromCloud());
-      unawaited(_refreshUserTransactionsFromCloud(force: true));
+      unawaited(_refreshSessionFromCloudOnResume());
       if (_ngmySessionIsAdmin(_currentUser)) {
         unawaited(_refreshPendingTransactionsFromCloud());
       }
@@ -6097,6 +6109,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         unawaited(_notifyStoreMarketDayListings());
       }
     }
+  }
+
+  /// Transactions first, then user row — avoids balance flashing stale cloud amounts.
+  Future<void> _refreshSessionFromCloudOnResume() async {
+    await _refreshUserTransactionsFromCloud(force: true);
+    await _refreshCurrentUserFromCloud();
+    if (!mounted) return;
+    setState(() {
+      _reconcileAllUserBalances();
+    });
+    unawaited(_persistLocalOnly());
   }
 
   Future<void> _refreshCurrentUserFromCloud() async {
@@ -7470,9 +7493,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     required String body,
     String? tag,
     Duration cooldown = const Duration(seconds: 50),
+    bool showInAppBanner = true,
   }) async {
     if (_currentUser == null) return;
     if (NgmyGameSession.suppressExternalNotifications) return;
+    if (kNgmySuppressWalletTransactionPopups) {
+      final blob = '${title.toLowerCase()} ${body.toLowerCase()}';
+      if (blob.contains('deposit request') ||
+          blob.contains('withdrawal request') ||
+          blob.contains('withdraw request')) {
+        return;
+      }
+    }
     if (kNgmySuppressClockInPopups) {
       final blob = '${title.toLowerCase()} ${body.toLowerCase()}';
       if (blob.contains('clock-in') || blob.contains('clock in') || blob.contains('late clock')) {
@@ -7518,7 +7550,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
     }
 
-    _showModernInAppNotice(title: title, body: body);
+    if (showInAppBanner) {
+      _showModernInAppNotice(title: title, body: body);
+    }
   }
 
   void _showModernInAppNotice({
@@ -7668,6 +7702,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _notifyTransactionEvent(AppTransaction t, {bool statusChanged = false}) async {
     if (NgmyGameSession.suppressExternalNotifications) return;
+    if (kNgmySuppressWalletTransactionPopups &&
+        (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal)) {
+      return;
+    }
     if (kNgmySuppressClockInPopups) {
       final sd = (t.sourceDetails ?? '').toLowerCase();
       if (sd.contains('clock-in')) return;
@@ -7682,6 +7720,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       title: _notificationTitleForTransaction(t, statusChanged: statusChanged),
       body: _notificationBodyForTransaction(t, statusChanged: statusChanged),
       tag: 'txn_${t.id}',
+      showInAppBanner: false,
     );
   }
 
@@ -8485,6 +8524,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
     if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) remote.isAuthorizedRegistrar = true;
     _preserveRegistryEnrollmentFromLocal(local, remote);
+    ngmyReconcileUserAccountBalance(remote, _allTransactions);
   }
 
   void _seedWithdrawalHoldTxnIds() {
@@ -8781,6 +8821,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           debugPrint('[admin] bootstrap transactions empty — keeping local wallet list');
           _applyWalletDecisionLedgerToTransactions();
         }
+        _reconcileAllUserBalances();
 
         final mediaData = await supabase
             .from('media')
@@ -9454,7 +9495,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal)) {
                     unawaited(_notifyAdminAboutPendingTransaction(t));
                   }
-                  _notifyTransactionEvent(t);
+                  if (!kNgmySuppressWalletTransactionPopups ||
+                      (t.type != TransactionType.deposit && t.type != TransactionType.withdrawal)) {
+                    unawaited(_notifyTransactionEvent(t));
+                  }
                 },
                 onProcessTransaction: (t, approve) async {
                   UserData? syncedUser;
