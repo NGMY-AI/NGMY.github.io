@@ -1,6 +1,12 @@
 part of 'ngmy_invoice_templates.dart';
 
-/// Shared invoice fields + reusable blocks for Essential Luxury variants.
+const _luxGold = Color(0xFFD4AF37);
+const _luxGoldLight = Color(0xFFF5E6B8);
+const _luxGoldDark = Color(0xFF8B6914);
+const _luxIvory = Color(0xFFF8F4EA);
+const _luxBlack = Color(0xFF080808);
+
+/// Shared royal/presidential invoice chrome for Essential Luxury variants.
 class _EssentialLuxuryCtx {
   _EssentialLuxuryCtx(this.data, this.template);
 
@@ -8,178 +14,411 @@ class _EssentialLuxuryCtx {
   final NgmyInvoiceTemplate template;
 
   NgmyInvoiceTemplate get t => template;
-  String get biz => data.businessName.isEmpty ? 'YOUR BRAND' : data.businessName.toUpperCase();
+  Color get accent => t.accent;
+  Color get accent2 => t.accent2;
+
+  String get biz => data.businessName.isEmpty ? 'YOUR EXCELLENCY' : data.businessName.toUpperCase();
   String get invNo => data.invoiceNo.isEmpty ? '1' : data.invoiceNo;
   String get issued => data.issuedDate.isEmpty ? '--/--/----' : data.issuedDate;
   String get due => data.dueDate.isEmpty ? '—' : data.dueDate;
-  String get client => data.clientName.isEmpty ? 'Client Name' : data.clientName;
-  String get item => data.itemName.isEmpty ? 'Service' : data.itemName;
+  String get client => data.clientName.isEmpty ? 'Distinguished Client' : data.clientName;
+  String get item => data.itemName.isEmpty ? 'Premium Service' : data.itemName;
   String get qty => data.itemQty.isEmpty ? '1' : data.itemQty;
   String get total => data.subtotal.toStringAsFixed(2);
-  String get headline => data.itemName.isEmpty ? 'Professional Services Invoice' : data.itemName;
+  String get headline => data.itemName.isEmpty ? 'Executive Services Invoice' : data.itemName;
   String get summary => data.itemDesc.trim().isNotEmpty
       ? data.itemDesc.trim()
-      : (data.paymentInfo.trim().isNotEmpty ? data.paymentInfo.trim() : 'Thank you for choosing our services.');
+      : (data.paymentInfo.trim().isNotEmpty ? data.paymentInfo.trim() : 'With highest regard for your patronage and trust.');
   String get quote => data.paymentInfo.trim().isNotEmpty
       ? data.paymentInfo.trim()
-      : 'We appreciate your business and look forward to serving you again.';
+      : 'It is our honor to serve you with distinction and excellence.';
 
-  BoxDecoration shellDecoration({BorderRadius? radius}) => BoxDecoration(
-        gradient: LinearGradient(colors: t.gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: radius ?? BorderRadius.circular(14),
-        border: Border.all(color: t.accent.withOpacity(0.35)),
-        boxShadow: [BoxShadow(color: t.accent.withOpacity(0.22), blurRadius: 18, spreadRadius: 1)],
-      );
+  Widget royalShell({required Widget body, Widget? topBand, CustomPainter? overlay, bool showCrownBand = true}) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color.lerp(t.gradient.first, _luxBlack, 0.08)!,
+            Color.lerp(t.gradient.last, _luxBlack, 0.22)!,
+            Color.lerp(t.gradient.first, _luxBlack, 0.35)!,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _luxGold, width: 2.8),
+        boxShadow: [
+          BoxShadow(color: accent.withOpacity(0.42), blurRadius: 28, spreadRadius: 2),
+          BoxShadow(color: _luxGold.withOpacity(0.18), blurRadius: 12, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withOpacity(0.55), blurRadius: 16, offset: const Offset(0, 8)),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: Stack(
+          children: [
+            Positioned.fill(child: CustomPaint(painter: _DamaskPainter(accent.withOpacity(0.08), _luxGold.withOpacity(0.05)))),
+            Positioned.fill(child: CustomPaint(painter: _LinenPainter(_luxGold.withOpacity(0.025)))),
+            if (overlay != null) Positioned.fill(child: CustomPaint(painter: overlay)),
+            Positioned.fill(child: CustomPaint(painter: _CornerFlourishPainter(_luxGold.withOpacity(0.82)))),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: Transform.rotate(
+                    angle: -0.18,
+                    child: Text(
+                      'ROYAL EXCHEQUER',
+                      style: TextStyle(
+                        color: _luxGold.withOpacity(0.045),
+                        fontSize: 42,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 6,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.all(9),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: _luxGold.withOpacity(0.55), width: 1.2),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: _luxGold.withOpacity(0.22), width: 0.8),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (topBand != null) topBand else if (showCrownBand) crownBand(),
+                Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 14), child: body),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-  Widget poweredBy() => Center(
-        child: Text(
-          'POWERED BY: NGMY',
-          style: TextStyle(color: Colors.white.withOpacity(0.5), letterSpacing: 1.4, fontWeight: FontWeight.w800, fontSize: 8),
+  Widget crownBand() => Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [_luxGoldDark, _luxGold, _luxGoldLight, _luxGold, _luxGoldDark],
+            stops: const [0, 0.25, 0.5, 0.75, 1],
+          ),
+          border: Border(bottom: BorderSide(color: _luxGoldLight.withOpacity(0.6), width: 1)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.workspace_premium_rounded, color: _luxBlack.withOpacity(0.75), size: 16),
+            const SizedBox(width: 8),
+            Text(
+              'BY ROYAL APPOINTMENT · OFFICIAL INVOICE',
+              style: TextStyle(color: _luxBlack.withOpacity(0.88), fontWeight: FontWeight.w900, fontSize: 8, letterSpacing: 2.2),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.workspace_premium_rounded, color: _luxBlack.withOpacity(0.75), size: 16),
+          ],
         ),
       );
 
-  Widget photoCircle({double size = 100, double border = 3}) => _photoFrame(
-        width: size,
-        height: size,
-        shape: BoxShape.circle,
-        borderWidth: border,
+  Widget goldRule({double pad = 8}) => Padding(
+        padding: EdgeInsets.symmetric(vertical: pad),
+        child: Row(
+          children: [
+            Expanded(child: Container(height: 1, color: _luxGold.withOpacity(0.55))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Icon(Icons.diamond_rounded, size: 10, color: _luxGold),
+            ),
+            Expanded(child: Container(height: 1, color: _luxGold.withOpacity(0.55))),
+          ],
+        ),
       );
 
-  Widget photoSquare({double size = 96}) => _photoFrame(
-        width: size,
-        height: size,
-        shape: BoxShape.rectangle,
-        borderRadius: BorderRadius.circular(10),
-        borderWidth: 2,
+  Widget royalTitle(String text, {double size = 20, Color? color}) => ShaderMask(
+        shaderCallback: (r) => LinearGradient(colors: [_luxGoldLight, _luxGold, _luxGoldDark]).createShader(r),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: size, letterSpacing: 2.5, height: 1.05),
+        ),
       );
 
-  Widget photoOval({double w = 88, double h = 112}) => _photoFrame(
-        width: w,
-        height: h,
-        shape: BoxShape.rectangle,
-        borderRadius: BorderRadius.circular(999),
-        borderWidth: 2,
+  Widget subtitle(String text) => Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(color: _luxIvory.withOpacity(0.72), fontSize: 9, letterSpacing: 1.6, fontWeight: FontWeight.w600),
       );
 
-  Widget photoHex({double size = 96}) => ClipPath(
-        clipper: _HexClipper(),
-        child: _photoFrame(width: size, height: size, shape: BoxShape.rectangle, borderWidth: 0, innerOnly: true),
+  Widget photo({double size = 92, BoxShape shape = BoxShape.circle, BorderRadius? radius}) {
+    final bytes = data.providerPhotoBytes;
+    Widget img;
+    if (bytes != null && bytes.isNotEmpty) {
+      img = Image.memory(bytes, fit: BoxFit.cover, width: size, height: size);
+    } else {
+      img = Container(
+        color: const Color(0xFF141010),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.person_rounded, size: size * 0.38, color: _luxGold.withOpacity(0.75)),
+            Text('PORTRAIT', style: TextStyle(color: _luxGold.withOpacity(0.55), fontSize: 7, letterSpacing: 1.2, fontWeight: FontWeight.w800)),
+          ],
+        ),
       );
-
-  Widget _photoFrame({
-    required double width,
-    required double height,
-    required BoxShape shape,
-    BorderRadius? borderRadius,
-    double borderWidth = 3,
-    bool innerOnly = false,
-  }) {
-    final child = _photoImage(width, height);
-    if (innerOnly) {
-      return SizedBox(width: width, height: height, child: child);
     }
     return Container(
-      width: width,
-      height: height,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: shape,
-        borderRadius: shape == BoxShape.rectangle ? borderRadius : null,
-        border: Border.all(color: t.accent, width: borderWidth),
-        boxShadow: [BoxShadow(color: t.accent.withOpacity(0.3), blurRadius: 10)],
+        borderRadius: shape == BoxShape.rectangle ? (radius ?? BorderRadius.circular(8)) : null,
+        border: Border.all(color: _luxGold, width: 2.5),
+        boxShadow: [
+          BoxShadow(color: _luxGold.withOpacity(0.45), blurRadius: 14),
+          BoxShadow(color: accent.withOpacity(0.25), blurRadius: 6),
+        ],
       ),
       child: ClipRRect(
-        borderRadius: shape == BoxShape.circle
-            ? BorderRadius.circular(width)
-            : (borderRadius ?? BorderRadius.circular(8)),
-        child: child,
+        borderRadius: shape == BoxShape.circle ? BorderRadius.circular(size) : (radius ?? BorderRadius.circular(6)),
+        child: img,
       ),
     );
   }
 
-  Widget _photoImage(double w, double h) {
-    final bytes = data.providerPhotoBytes;
-    if (bytes != null && bytes.isNotEmpty) {
-      return Image.memory(bytes, fit: BoxFit.cover, width: w, height: h);
-    }
-    return Container(
-      color: const Color(0xFF141414),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.person_rounded, size: w * 0.35, color: t.accent.withOpacity(0.65)),
-          const SizedBox(height: 4),
-          Text('YOUR PHOTO', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 7, fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
+  Widget metaChip(String label, String value) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.35),
+            border: Border.all(color: _luxGold.withOpacity(0.35)),
+          ),
+          child: Column(
+            children: [
+              Text(label, style: TextStyle(color: _luxGold, fontSize: 7, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
+              const SizedBox(height: 3),
+              Text(value, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w800, fontSize: 10)),
+            ],
+          ),
+        ),
+      );
+
+  Widget luxeTable() => Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: _luxGold.withOpacity(0.5)),
+          color: Colors.black.withOpacity(0.28),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [_luxGoldDark, _luxGold, _luxGoldDark]),
+              ),
+              child: Row(
+                children: const [
+                  Expanded(child: Text('DESCRIPTION', style: TextStyle(color: _luxBlack, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1))),
+                  SizedBox(width: 36, child: Text('QTY', textAlign: TextAlign.center, style: TextStyle(color: _luxBlack, fontSize: 8, fontWeight: FontWeight.w900))),
+                  SizedBox(width: 58, child: Text('AMOUNT', textAlign: TextAlign.right, style: TextStyle(color: _luxBlack, fontSize: 8, fontWeight: FontWeight.w900))),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(child: Text(item, style: const TextStyle(color: _luxIvory, fontSize: 11, fontWeight: FontWeight.w700))),
+                  SizedBox(width: 36, child: Text(qty, textAlign: TextAlign.center, style: TextStyle(color: _luxIvory.withOpacity(0.9), fontSize: 10))),
+                  SizedBox(width: 58, child: Text('\$$total', textAlign: TextAlign.right, style: const TextStyle(color: _luxGoldLight, fontSize: 11, fontWeight: FontWeight.w900))),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget totalPlaque({String label = 'TOTAL DUE'}) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [_luxGoldDark, _luxGold, _luxGoldLight, _luxGold]),
+          borderRadius: BorderRadius.circular(4),
+          boxShadow: [BoxShadow(color: _luxGold.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 3))],
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.workspace_premium_rounded, color: _luxBlack.withOpacity(0.7), size: 18),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(color: _luxBlack.withOpacity(0.85), fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2)),
+            const Spacer(),
+            Text('\$$total', style: const TextStyle(color: _luxBlack, fontWeight: FontWeight.w900, fontSize: 22, height: 1)),
+          ],
+        ),
+      );
 
   Widget sigRow() => Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: _sig('PROVIDER', data.providerSignature)),
+          Expanded(child: _sig('AUTHORIZED SIGNATURE', data.providerSignature)),
           const SizedBox(width: 8),
-          Expanded(child: _sig('CLIENT', data.clientSignature)),
+          Expanded(child: _sig('CLIENT SIGNATURE', data.clientSignature)),
         ],
       );
 
   Widget _sig(String label, List<Offset?> points) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: t.accent, fontSize: 7, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
-          const SizedBox(height: 3),
+          Text(label, style: TextStyle(color: _luxGold, fontSize: 7, fontWeight: FontWeight.w900, letterSpacing: 0.9)),
+          const SizedBox(height: 4),
           Container(
-            height: 34,
+            height: 38,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.96),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: t.accent.withOpacity(0.35)),
+              color: _luxIvory,
+              border: Border.all(color: _luxGold.withOpacity(0.65)),
+              borderRadius: BorderRadius.circular(2),
             ),
-            child: previewSignature(points, height: 34, color: const Color(0xFF0F172A)),
+            child: previewSignature(points, height: 38, color: const Color(0xFF1A1208)),
           ),
         ],
       );
 
-  Widget itemTable({bool compact = false}) => Column(
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: compact ? 5 : 7),
-            decoration: BoxDecoration(
-              color: t.accent.withOpacity(0.15),
-              border: Border(left: BorderSide(color: t.accent, width: 3)),
-            ),
-            child: Row(
-              children: [
-                Expanded(child: Text('DESCRIPTION', style: TextStyle(color: t.accent, fontSize: 7, fontWeight: FontWeight.w900))),
-                SizedBox(width: 40, child: Text('QTY', textAlign: TextAlign.center, style: TextStyle(color: t.accent, fontSize: 7, fontWeight: FontWeight.w900))),
-                SizedBox(width: 52, child: Text('AMOUNT', textAlign: TextAlign.right, style: TextStyle(color: t.accent, fontSize: 7, fontWeight: FontWeight.w900))),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Row(
-              children: [
-                Expanded(child: Text(item, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700))),
-                SizedBox(width: 40, child: Text(qty, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.88), fontSize: 10))),
-                SizedBox(width: 52, child: Text('\$$total', textAlign: TextAlign.right, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800))),
-              ],
-            ),
-          ),
-        ],
-      );
-
-  Widget totalBar({String? label}) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+  Widget royalSeal() => Container(
+        width: 52,
+        height: 52,
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [t.accent, t.accent2]),
+          shape: BoxShape.circle,
+          border: Border.all(color: _luxGold, width: 2.5),
+          gradient: RadialGradient(
+            colors: [_luxGold.withOpacity(0.25), Colors.black.withOpacity(0.65)],
+          ),
+          boxShadow: [BoxShadow(color: _luxGold.withOpacity(0.3), blurRadius: 8)],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.verified_rounded, color: _luxGoldLight, size: 18),
+            Text('OFFICIAL', style: TextStyle(color: _luxGold, fontSize: 5, fontWeight: FontWeight.w900, letterSpacing: 0.6)),
+            Text('SEAL', style: TextStyle(color: _luxGold.withOpacity(0.7), fontSize: 4, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+          ],
+        ),
+      );
+
+  Widget bottomBar() => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          prestigeStrip(),
+          goldRule(pad: 6),
+          luxeTable(),
+          const SizedBox(height: 8),
+          totalPlaque(),
+          const SizedBox(height: 8),
+          if (data.paymentInfo.trim().isNotEmpty) paymentHonorBlock(),
+          if (data.paymentInfo.trim().isNotEmpty) const SizedBox(height: 8),
+          sigRow(),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              royalSeal(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      biz,
+                      style: TextStyle(color: _luxGoldLight, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1.4),
+                    ),
+                    const SizedBox(height: 2),
+                    Text('Invoice #$invNo · Issued $issued · Due $due', style: TextStyle(color: _luxIvory.withOpacity(0.58), fontSize: 8)),
+                    Text('This document constitutes a binding executive agreement.', style: TextStyle(color: _luxIvory.withOpacity(0.42), fontSize: 7, fontStyle: FontStyle.italic)),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('POWERED BY NGMY', style: TextStyle(color: _luxGold.withOpacity(0.72), fontSize: 7, letterSpacing: 1.4, fontWeight: FontWeight.w900)),
+                  Text('PREMIUM INVOICE SUITE', style: TextStyle(color: _luxIvory.withOpacity(0.35), fontSize: 6, letterSpacing: 0.8)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 3,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [_luxGoldDark, _luxGold, _luxGoldLight, _luxGold, _luxGoldDark]),
+            ),
+          ),
+        ],
+      );
+
+  Widget prestigeStrip() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.38),
+          border: Border.all(color: _luxGold.withOpacity(0.4)),
         ),
         child: Row(
           children: [
-            Text(label ?? 'TOTAL DUE', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1)),
-            const Spacer(),
-            Text('\$$total', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+            Icon(Icons.account_balance_rounded, color: _luxGold, size: 14),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Prepared exclusively for $client',
+                style: TextStyle(color: _luxIvory.withOpacity(0.82), fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.4),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                border: Border.all(color: _luxGold.withOpacity(0.65)),
+                color: accent.withOpacity(0.15),
+              ),
+              child: Text('INV-$invNo', style: TextStyle(color: _luxGoldLight, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
+            ),
+          ],
+        ),
+      );
+
+  Widget paymentHonorBlock() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [accent.withOpacity(0.08), Colors.black.withOpacity(0.35)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border(left: BorderSide(color: _luxGold, width: 3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('PAYMENT & TERMS', style: TextStyle(color: _luxGold, fontSize: 7, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+            const SizedBox(height: 4),
+            Text(data.paymentInfo.trim(), style: TextStyle(color: _luxIvory.withOpacity(0.78), fontSize: 9, height: 1.35)),
           ],
         ),
       );
@@ -193,840 +432,595 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ctx = _EssentialLuxuryCtx(data, template);
+    final c = _EssentialLuxuryCtx(data, template);
     return switch (template.layout) {
-      NgmyInvoiceLayout.essentialHerald => _buildHerald(ctx),
-      NgmyInvoiceLayout.essentialBulletin => _buildBulletin(ctx),
-      NgmyInvoiceLayout.essentialChronicle => _buildChronicle(ctx),
-      NgmyInvoiceLayout.essentialGazette => _buildGazette(ctx),
-      NgmyInvoiceLayout.essentialWire => _buildWire(ctx),
-      NgmyInvoiceLayout.essentialFlash => _buildFlash(ctx),
-      NgmyInvoiceLayout.essentialDispatch => _buildDispatch(ctx),
-      NgmyInvoiceLayout.essentialRose => _buildRose(ctx),
-      NgmyInvoiceLayout.essentialMidnight => _buildMidnight(ctx),
-      _ => _buildBroadcast(ctx),
+      NgmyInvoiceLayout.essentialHerald => _herald(c),
+      NgmyInvoiceLayout.essentialBulletin => _bulletin(c),
+      NgmyInvoiceLayout.essentialChronicle => _chronicle(c),
+      NgmyInvoiceLayout.essentialGazette => _gazette(c),
+      NgmyInvoiceLayout.essentialWire => _wire(c),
+      NgmyInvoiceLayout.essentialFlash => _flash(c),
+      NgmyInvoiceLayout.essentialDispatch => _dispatch(c),
+      NgmyInvoiceLayout.essentialRose => _rose(c),
+      NgmyInvoiceLayout.essentialMidnight => _midnight(c),
+      _ => _broadcast(c),
     };
   }
 
-  /// 1 — NGMY NEWS broadcast (photo right, quote box, key details).
-  Widget _buildBroadcast(_EssentialLuxuryCtx c) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 620),
-      decoration: c.shellDecoration(),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Stack(
-          children: [
-            Positioned(right: -30, top: 60, child: Icon(Icons.public, size: 160, color: Colors.white.withOpacity(0.04))),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: Text(c.biz, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15))),
-                      _dotGrid(),
-                    ],
-                  ),
-                  Text('INVOICE · STAY PROFESSIONAL. STAY AHEAD.', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 7)),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _badge(c, 'BREAKING INVOICE'),
-                            const SizedBox(height: 8),
-                            Text(c.headline.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
-                            const SizedBox(height: 6),
-                            Text(c.summary, style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: 10, height: 1.35)),
-                            const SizedBox(height: 10),
-                            _bullet(c, Icons.person_outline, 'Bill To: ${c.client}'),
-                            _bullet(c, Icons.receipt_long, 'Invoice #${c.invNo} · \$${c.total}'),
-                            Text('Issued ${c.issued} · Due ${c.due}', style: TextStyle(color: Colors.white54, fontSize: 9)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          children: [
-                            c.photoCircle(size: 104),
-                            const SizedBox(height: 8),
-                            _quoteBox(c),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  c.itemTable(),
-                  const SizedBox(height: 8),
-                  c.sigRow(),
-                  const SizedBox(height: 8),
-                  _triFooter(c),
-                  const SizedBox(height: 6),
-                  c.poweredBy(),
-                ],
-              ),
-            ),
+  /// 1 Crimson — Imperial decree broadcast.
+  Widget _broadcast(_EssentialLuxuryCtx c) {
+    return c.royalShell(
+      showCrownBand: false,
+      topBand: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [c.accent, c.accent2]),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.campaign_rounded, color: Colors.white, size: 14),
+            SizedBox(width: 6),
+            Text('IMPERIAL INVOICE BULLETIN', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 2)),
           ],
         ),
       ),
-    );
-  }
-
-  /// 2 — Heraldic crest: centered hex photo, symmetrical columns.
-  Widget _buildHerald(_EssentialLuxuryCtx c) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 640),
-      decoration: c.shellDecoration(),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [c.t.accent.withOpacity(0.35), Colors.transparent]),
-                border: Border(bottom: BorderSide(color: c.t.accent, width: 2)),
-              ),
-              child: Column(
-                children: [
-                  Icon(Icons.shield_rounded, size: 28, color: c.t.accent),
-                  const SizedBox(height: 6),
-                  c.photoHex(size: 88),
-                  const SizedBox(height: 8),
-                  Text(c.biz, style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 2)),
-                  Text('OFFICIAL INVOICE HERALD', style: TextStyle(color: Colors.white54, fontSize: 8, letterSpacing: 1.2)),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: _crestPanel(c, 'CLIENT', c.client, c.data.clientEmail)),
-                      const SizedBox(width: 10),
-                      Expanded(child: _crestPanel(c, 'INVOICE', '#${c.invNo}', 'Due ${c.due}')),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(c.headline, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
-                  const SizedBox(height: 8),
-                  c.itemTable(compact: true),
-                  const SizedBox(height: 10),
-                  c.totalBar(label: 'ROYAL TOTAL'),
-                  const SizedBox(height: 8),
-                  c.sigRow(),
-                  const SizedBox(height: 6),
-                  c.poweredBy(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 3 — Bulletin: bold left stripe, photo top-left square, stacked content.
-  Widget _buildBulletin(_EssentialLuxuryCtx c) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 620),
-      decoration: c.shellDecoration(radius: BorderRadius.circular(4)),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(width: 8, color: c.t.accent),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          c.photoSquare(size: 78),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('BULLETIN', style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: 3, height: 1)),
-                                Text(c.biz, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
-                                Text('#${c.invNo} · ${c.issued}', style: TextStyle(color: Colors.white54, fontSize: 9)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(10),
-                        color: c.t.accent.withOpacity(0.12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('TO: ${c.client}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
-                            if (c.data.clientEmail.isNotEmpty) Text(c.data.clientEmail, style: TextStyle(color: Colors.white70, fontSize: 9)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(c.headline, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
-                      const SizedBox(height: 6),
-                      Text(c.summary, style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 10, height: 1.4)),
-                      const SizedBox(height: 10),
-                      c.itemTable(),
-                      const SizedBox(height: 8),
-                      Align(alignment: Alignment.centerRight, child: Text('\$$c.total', style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w900, fontSize: 22))),
-                      const SizedBox(height: 8),
-                      c.sigRow(),
-                      const SizedBox(height: 6),
-                      c.poweredBy(),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 4 — Chronicle: three stat cards + newspaper columns.
-  Widget _buildChronicle(_EssentialLuxuryCtx c) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 630),
-      decoration: c.shellDecoration(),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Text('THE CHRONICLE', style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.5)),
-                  const Spacer(),
-                  c.photoCircle(size: 56, border: 2),
-                ],
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    c.royalTitle(c.biz, size: 16),
+                    c.subtitle('BY APPOINTMENT TO DISTINGUISHED CLIENTELE'),
+                    const SizedBox(height: 10),
+                    Text(c.headline.toUpperCase(), style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w900, fontSize: 15, height: 1.12)),
+                    const SizedBox(height: 6),
+                    Text(c.summary, style: TextStyle(color: _luxIvory.withOpacity(0.78), fontSize: 10, height: 1.35)),
+                    const SizedBox(height: 8),
+                    _detailLine(Icons.person_outline_rounded, 'Honored Client: ${c.client}'),
+                    if (c.data.clientEmail.isNotEmpty) _detailLine(Icons.mail_outline_rounded, c.data.clientEmail),
+                  ],
+                ),
               ),
-              Text(c.biz, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 9)),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _statCard(c, 'CLIENT', c.client)),
-                  const SizedBox(width: 6),
-                  Expanded(child: _statCard(c, 'DUE DATE', c.due)),
-                  const SizedBox(width: 6),
-                  Expanded(child: _statCard(c, 'TOTAL', '\$$c.total')),
-                ],
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  children: [
+                    c.photo(size: 98),
+                    const SizedBox(height: 8),
+                    _quotePanel(c),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              Container(
-                height: 1,
-                color: c.t.accent.withOpacity(0.4),
-                margin: const EdgeInsets.symmetric(vertical: 8),
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(c.summary, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 9, height: 1.45)),
-                  ),
-                  Container(width: 1, height: 80, color: Colors.white24, margin: const EdgeInsets.symmetric(horizontal: 10)),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(c.headline, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
-                        const SizedBox(height: 6),
-                        Text('Invoice #${c.invNo}', style: TextStyle(color: c.t.accent, fontSize: 9)),
-                        Text('Issued ${c.issued}', style: TextStyle(color: Colors.white54, fontSize: 8)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              c.itemTable(compact: true),
-              const SizedBox(height: 8),
-              c.sigRow(),
-              const SizedBox(height: 6),
-              c.poweredBy(),
             ],
           ),
-        ),
+          c.bottomBar(),
+        ],
       ),
     );
   }
 
-  /// 5 — Gazette: full-width photo banner header, card body.
-  Widget _buildGazette(_EssentialLuxuryCtx c) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 650),
-      decoration: c.shellDecoration(),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Stack(
-              alignment: Alignment.bottomLeft,
-              children: [
-                SizedBox(
-                  height: 130,
-                  width: double.infinity,
-                  child: c.data.providerPhotoBytes != null && c.data.providerPhotoBytes!.isNotEmpty
-                      ? Image.memory(c.data.providerPhotoBytes!, fit: BoxFit.cover, width: double.infinity, height: 130)
-                      : Container(
-                          color: c.t.accent2,
-                          child: Center(child: Icon(Icons.photo_camera_front_outlined, size: 40, color: Colors.white24)),
-                        ),
-                ),
-                Container(
-                  height: 130,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, c.t.gradient.first.withOpacity(0.95)],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('GAZETTE', style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: 4)),
-                      Text(c.biz, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.06),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: c.t.accent.withOpacity(0.25)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Bill To: ${c.client}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-                        Text('Invoice #${c.invNo} · ${c.issued}', style: TextStyle(color: Colors.white60, fontSize: 9)),
-                        const SizedBox(height: 8),
-                        Text(c.headline, style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w700, fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  c.itemTable(),
-                  const SizedBox(height: 8),
-                  c.totalBar(),
-                  const SizedBox(height: 8),
-                  c.sigRow(),
-                  const SizedBox(height: 6),
-                  c.poweredBy(),
-                ],
-              ),
-            ),
-          ],
-        ),
+  /// 2 Gold — Royal herald crest.
+  Widget _herald(_EssentialLuxuryCtx c) {
+    return c.royalShell(
+      overlay: _CrestPainter(c.accent.withOpacity(0.08)),
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.shield_moon_rounded, color: _luxGold, size: 32),
+          const SizedBox(height: 6),
+          c.photo(size: 86),
+          const SizedBox(height: 8),
+          c.royalTitle('ROYAL HERALD', size: 18),
+          Text(c.biz, style: TextStyle(color: _luxGoldLight, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 2)),
+          c.goldRule(),
+          Row(
+            children: [
+              c.metaChip('CLIENT', c.client),
+              const SizedBox(width: 6),
+              c.metaChip('INVOICE', '#${c.invNo}'),
+              const SizedBox(width: 6),
+              c.metaChip('DUE', c.due),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(c.headline, textAlign: TextAlign.center, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w700, fontSize: 13)),
+          c.bottomBar(),
+        ],
       ),
     );
   }
 
-  /// 6 — Wire: dense ticker / terminal style, inline small photo.
-  Widget _buildWire(_EssentialLuxuryCtx c) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 580),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A0C10),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: c.t.accent.withOpacity(0.5)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(width: 8, height: 8, decoration: BoxDecoration(color: c.t.accent, shape: BoxShape.circle)),
-                const SizedBox(width: 6),
-                Text('PLATINUM WIRE · LIVE INVOICE', style: TextStyle(color: c.t.accent, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-                const Spacer(),
-                Text('${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}', style: TextStyle(color: Colors.white38, fontSize: 8)),
-              ],
+  /// 3 Sapphire — Presidential letterhead.
+  Widget _bulletin(_EssentialLuxuryCtx c) {
+    return c.royalShell(
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.4),
+              border: Border(bottom: BorderSide(color: _luxGold, width: 2)),
             ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                c.photoSquare(size: 52),
-                const SizedBox(width: 10),
+                c.photo(size: 68, shape: BoxShape.rectangle, radius: BorderRadius.circular(4)),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(c.biz, style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w800, fontSize: 11, fontFamily: 'monospace')),
-                      Text('INV_${c.invNo}  CLIENT=${c.client.toUpperCase()}', style: const TextStyle(color: Colors.white70, fontSize: 8, fontFamily: 'monospace')),
-                      Text('AMT=\$$c.total  DUE=${c.due}', style: TextStyle(color: c.t.accent.withOpacity(0.9), fontSize: 9, fontFamily: 'monospace', fontWeight: FontWeight.w700)),
+                      c.royalTitle('PRESIDENTIAL OFFICE', size: 14),
+                      Text(c.biz, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w800, fontSize: 11)),
+                      Text('Executive Invoice · #${c.invNo}', style: TextStyle(color: c.accent, fontSize: 9, fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            ...List.generate(4, (i) {
-              final lines = ['▸ ${c.headline}', '▸ Issued ${c.issued}', '▸ ${c.summary}', '▸ Status: AWAITING PAYMENT'];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 3),
-                child: Text(lines[i], style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 9, fontFamily: 'monospace', height: 1.3)),
-              );
-            }),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              color: c.t.accent.withOpacity(0.1),
-              child: Row(
-                children: [
-                  Expanded(child: Text(c.item, style: const TextStyle(color: Colors.white, fontSize: 9))),
-                  Text('x$c.qty', style: TextStyle(color: Colors.white54, fontSize: 9)),
-                  const SizedBox(width: 12),
-                  Text('\$$c.total', style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w900, fontSize: 12)),
-                ],
-              ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            color: c.accent.withOpacity(0.12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('TO: ${c.client}', style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w900, fontSize: 12)),
+                Text(c.summary, style: TextStyle(color: _luxIvory.withOpacity(0.75), fontSize: 10, height: 1.35)),
+              ],
             ),
-            const SizedBox(height: 8),
-            c.sigRow(),
-            const SizedBox(height: 6),
-            c.poweredBy(),
-          ],
-        ),
+          ),
+          c.bottomBar(),
+        ],
       ),
     );
   }
 
-  /// 7 — Flash: diagonal split layout.
-  Widget _buildFlash(_EssentialLuxuryCtx c) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 620),
-      decoration: c.shellDecoration(),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: CustomPaint(painter: _DiagonalFlashPainter(c.t.accent.withOpacity(0.55))),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: Transform.rotate(
-                      angle: -0.08,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        color: c.t.accent,
-                        child: const Text('FLASH INVOICE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.5)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(c.biz, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-                  Text(c.headline.toUpperCase(), style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w800, fontSize: 14)),
-                  const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      c.photoCircle(size: 110, border: 4),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('${c.client}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-                            Text('#${c.invNo} · Due ${c.due}', style: TextStyle(color: Colors.white70, fontSize: 9)),
-                            const SizedBox(height: 8),
-                            Text('\$$c.total', style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w900, fontSize: 28, height: 1)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  c.itemTable(compact: true),
-                  const SizedBox(height: 8),
-                  c.sigRow(),
-                  const SizedBox(height: 6),
-                  c.poweredBy(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 8 — Dispatch: wave header, nautical double-ring photo.
-  Widget _buildDispatch(_EssentialLuxuryCtx c) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 630),
-      decoration: c.shellDecoration(),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Column(
-          children: [
-            ClipPath(
-              clipper: _WaveTopClipper(),
-              child: Container(
-                height: 72,
-                width: double.infinity,
-                color: c.t.accent,
-                alignment: Alignment.center,
-                child: Text('OCEAN DISPATCH', style: TextStyle(color: Colors.white.withOpacity(0.95), fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 3)),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(c.biz, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-                            Text('Port of Invoice #${c.invNo}', style: TextStyle(color: c.t.accent, fontSize: 9)),
-                            const SizedBox(height: 8),
-                            Text('Captain: ${c.client}', style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 10)),
-                            Text('Sailed ${c.issued} · Arrives ${c.due}', style: TextStyle(color: Colors.white54, fontSize: 8)),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: c.t.accent2, width: 3),
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: c.t.accent, width: 2),
-                          ),
-                          child: c.photoCircle(size: 72, border: 0),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: c.t.accent.withOpacity(0.4)),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(c.summary, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10, fontStyle: FontStyle.italic)),
-                  ),
-                  const SizedBox(height: 10),
-                  c.itemTable(),
-                  const SizedBox(height: 8),
-                  c.totalBar(label: 'CARGO TOTAL'),
-                  const SizedBox(height: 8),
-                  c.sigRow(),
-                  const SizedBox(height: 6),
-                  c.poweredBy(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 9 — Rose: ornate corners, oval photo, elegant frame.
-  Widget _buildRose(_EssentialLuxuryCtx c) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 640),
-      decoration: c.shellDecoration(),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Stack(
-          children: [
-            Positioned.fill(child: CustomPaint(painter: _OrnateCornerPainter(c.t.accent.withOpacity(0.6)))),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Text('✦', style: TextStyle(color: c.t.accent, fontSize: 16)),
-                  Text(c.biz, style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w400, fontSize: 14, letterSpacing: 3, fontStyle: FontStyle.italic)),
-                  const Text('INVOICE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w300, fontSize: 22, letterSpacing: 8)),
-                  const SizedBox(height: 12),
-                  c.photoOval(w: 80, h: 100),
-                  const SizedBox(height: 12),
-                  Text('Dear ${c.client},', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 11, fontStyle: FontStyle.italic)),
-                  const SizedBox(height: 6),
-                  Text(c.headline, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
-                  const SizedBox(height: 8),
-                  Text(c.quote.length > 100 ? '${c.quote.substring(0, 97)}...' : c.quote, textAlign: TextAlign.center, style: TextStyle(color: Colors.white60, fontSize: 9, fontStyle: FontStyle.italic, height: 1.4)),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('No. ${c.invNo}', style: TextStyle(color: c.t.accent, fontSize: 9)),
-                      Text('  ·  ', style: TextStyle(color: Colors.white38, fontSize: 9)),
-                      Text('\$$c.total', style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w800, fontSize: 14)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  c.itemTable(compact: true),
-                  const SizedBox(height: 8),
-                  c.sigRow(),
-                  const SizedBox(height: 6),
-                  c.poweredBy(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 10 — Midnight: split panel cinematic layout.
-  Widget _buildMidnight(_EssentialLuxuryCtx c) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 620),
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: c.t.accent.withOpacity(0.5)),
-        boxShadow: [BoxShadow(color: c.t.accent.withOpacity(0.2), blurRadius: 24)],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+  /// 4 Emerald — Royal chronicle ledger.
+  Widget _chronicle(_EssentialLuxuryCtx c) {
+    return c.royalShell(
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Expanded(
-                flex: 2,
-                child: Container(
-                  color: const Color(0xFF050505),
-                  padding: const EdgeInsets.all(14),
+              Expanded(child: c.royalTitle('THE CHRONICLE', size: 17)),
+              c.photo(size: 54),
+            ],
+          ),
+          Text(c.biz, style: TextStyle(color: _luxIvory.withOpacity(0.65), fontSize: 9, letterSpacing: 1.2)),
+          const SizedBox(height: 8),
+          Row(children: [c.metaChip('CLIENT', c.client), const SizedBox(width: 6), c.metaChip('ISSUED', c.issued), const SizedBox(width: 6), c.metaChip('TOTAL', '\$${c.total}')]),
+          const SizedBox(height: 10),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: Text(c.summary, style: TextStyle(color: _luxIvory.withOpacity(0.8), fontSize: 10, height: 1.4))),
+                Container(width: 1, margin: const EdgeInsets.symmetric(horizontal: 10), color: _luxGold.withOpacity(0.4)),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('MIDNIGHT', style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w900, fontSize: 20, letterSpacing: 2)),
-                      Text('NEWS INVOICE', style: TextStyle(color: Colors.white38, fontSize: 8, letterSpacing: 2)),
-                      const SizedBox(height: 16),
-                      Center(child: c.photoCircle(size: 100)),
-                      const SizedBox(height: 12),
-                      Text(c.client, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-                      if (c.data.clientEmail.isNotEmpty) Text(c.data.clientEmail, style: TextStyle(color: Colors.white54, fontSize: 8)),
-                      const Spacer(),
-                      Text('#${c.invNo}', style: TextStyle(color: c.t.accent, fontSize: 10, fontWeight: FontWeight.w700)),
-                      Text('${c.issued}', style: TextStyle(color: Colors.white38, fontSize: 8)),
+                      Text(c.headline, style: TextStyle(color: c.accent, fontWeight: FontWeight.w800, fontSize: 12)),
+                      Text('Due ${c.due}', style: TextStyle(color: _luxIvory.withOpacity(0.55), fontSize: 9)),
                     ],
                   ),
                 ),
-              ),
-              Container(width: 2, color: c.t.accent),
-              Expanded(
-                flex: 3,
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [c.t.gradient.last, c.t.gradient.first],
-                      begin: Alignment.topRight,
-                      end: Alignment.bottomLeft,
+              ],
+            ),
+          ),
+          c.bottomBar(),
+        ],
+      ),
+    );
+  }
+
+  /// 5 Violet — Luxury gazette cover.
+  Widget _gazette(_EssentialLuxuryCtx c) {
+    final bytes = c.data.providerPhotoBytes;
+    return c.royalShell(
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox(
+              height: 118,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (bytes != null && bytes.isNotEmpty)
+                    Image.memory(bytes, fit: BoxFit.cover)
+                  else
+                    Container(
+                      decoration: BoxDecoration(gradient: LinearGradient(colors: [c.accent2, c.accent.withOpacity(0.4)])),
+                      child: Icon(Icons.photo_camera_front_outlined, size: 36, color: _luxGold.withOpacity(0.35)),
+                    ),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black.withOpacity(0.88)],
+                      ),
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(c.biz, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
-                      const SizedBox(height: 8),
-                      Text(c.headline.toUpperCase(), style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w900, fontSize: 15, height: 1.15)),
-                      const SizedBox(height: 8),
-                      Text(c.summary, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 9, height: 1.35)),
-                      const SizedBox(height: 12),
-                      c.itemTable(compact: true),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          border: Border(top: BorderSide(color: c.t.accent, width: 2)),
-                        ),
-                        child: Row(
-                          children: [
-                            Text('TOTAL', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700)),
-                            const Spacer(),
-                            Text('\$$c.total', style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w900, fontSize: 20)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      c.sigRow(),
-                      const SizedBox(height: 4),
-                      c.poweredBy(),
-                    ],
+                  Positioned(
+                    left: 12,
+                    bottom: 10,
+                    right: 12,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        c.royalTitle('GAZETTE', size: 22),
+                        Text(c.biz, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w800, fontSize: 11)),
+                      ],
+                    ),
                   ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text('Prepared for ${c.client}', style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w800, fontSize: 12)),
+          Text(c.headline, style: TextStyle(color: c.accent, fontWeight: FontWeight.w700, fontSize: 11)),
+          c.bottomBar(),
+        ],
+      ),
+    );
+  }
+
+  /// 6 Platinum — Executive wire ledger (luxury, not terminal).
+  Widget _wire(_EssentialLuxuryCtx c) {
+    return c.royalShell(
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(width: 10, height: 10, decoration: BoxDecoration(color: _luxGold, shape: BoxShape.circle)),
+              const SizedBox(width: 8),
+              Text('PLATINUM EXECUTIVE WIRE', style: TextStyle(color: _luxGold, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.5)),
+            ],
+          ),
+          c.goldRule(pad: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              c.photo(size: 64, shape: BoxShape.rectangle),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(c.biz, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w900, fontSize: 12)),
+                    _ledgerLine('Reference', 'INV-${c.invNo}'),
+                    _ledgerLine('Beneficiary', c.client),
+                    _ledgerLine('Settlement', '\$${c.total} USD'),
+                    _ledgerLine('Maturity', c.due),
+                  ],
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Text(c.headline, style: TextStyle(color: c.accent, fontWeight: FontWeight.w700, fontSize: 11)),
+          c.bottomBar(),
+        ],
+      ),
+    );
+  }
+
+  /// 7 Amber — Imperial flash decree.
+  Widget _flash(_EssentialLuxuryCtx c) {
+    return c.royalShell(
+      overlay: _DiagonalFlashPainter(c.accent.withOpacity(0.22)),
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [c.accent, c.accent2]),
+                border: Border.all(color: _luxGold, width: 1),
+              ),
+              child: const Text('URGENT ROYAL NOTICE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 8, letterSpacing: 1.3)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          c.royalTitle(c.biz, size: 17),
+          Text(c.headline.toUpperCase(), style: TextStyle(color: _luxGoldLight, fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.8)),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              c.photo(size: 96),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(c.client, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w900, fontSize: 13)),
+                    Text('Invoice #${c.invNo} · Due ${c.due}', style: TextStyle(color: _luxIvory.withOpacity(0.6), fontSize: 9)),
+                    const SizedBox(height: 6),
+                    Text(c.summary, style: TextStyle(color: _luxIvory.withOpacity(0.72), fontSize: 9, height: 1.35, fontStyle: FontStyle.italic)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          c.bottomBar(),
+        ],
+      ),
+    );
+  }
+
+  /// 8 Ocean — Maritime royal dispatch.
+  Widget _dispatch(_EssentialLuxuryCtx c) {
+    return c.royalShell(
+      showCrownBand: false,
+      topBand: ClipPath(
+        clipper: _WaveTopClipper(),
+        child: Container(
+          height: 56,
+          width: double.infinity,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(gradient: LinearGradient(colors: [c.accent, c.accent2])),
+          child: const Text('ROYAL DISPATCH', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 3)),
+        ),
+      ),
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(c.biz, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w900, fontSize: 12)),
+                    _detailLine(Icons.anchor_rounded, 'Manifest #${c.invNo}'),
+                    _detailLine(Icons.person_rounded, 'Commander: ${c.client}'),
+                    _detailLine(Icons.schedule_rounded, '${c.issued} → ${c.due}'),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: _luxGold, width: 2)),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: c.accent, width: 2)),
+                  child: c.photo(size: 70),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(c.summary, style: TextStyle(color: _luxIvory.withOpacity(0.78), fontSize: 10, fontStyle: FontStyle.italic, height: 1.35)),
+          c.bottomBar(),
+        ],
+      ),
+    );
+  }
+
+  /// 9 Rose — Victorian royal invitation.
+  Widget _rose(_EssentialLuxuryCtx c) {
+    return c.royalShell(
+      overlay: _OrnateCornerPainter(_luxGold.withOpacity(0.75)),
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('✦  ✦  ✦', style: TextStyle(color: _luxGold, fontSize: 12, letterSpacing: 6)),
+          c.royalTitle('ROYAL INVITATION TO PAY', size: 15),
+          Text(c.biz, style: TextStyle(color: _luxIvory.withOpacity(0.8), fontSize: 10, letterSpacing: 2, fontStyle: FontStyle.italic)),
+          const SizedBox(height: 10),
+          c.photo(size: 78, shape: BoxShape.rectangle, radius: BorderRadius.circular(40)),
+          const SizedBox(height: 10),
+          Text('Dear ${c.client},', style: TextStyle(color: _luxIvory.withOpacity(0.9), fontSize: 11, fontStyle: FontStyle.italic)),
+          const SizedBox(height: 6),
+          Text(c.headline, textAlign: TextAlign.center, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w600, fontSize: 12)),
+          const SizedBox(height: 6),
+          Text(
+            c.quote.length > 110 ? '${c.quote.substring(0, 107)}...' : c.quote,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: _luxIvory.withOpacity(0.62), fontSize: 9, fontStyle: FontStyle.italic, height: 1.4),
+          ),
+          c.bottomBar(),
+        ],
+      ),
+    );
+  }
+
+  /// 10 Midnight — Boardroom presidential split.
+  Widget _midnight(_EssentialLuxuryCtx c) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_luxBlack, c.t.gradient.first, _luxBlack],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _luxGold, width: 2.8),
+        boxShadow: [
+          BoxShadow(color: c.accent.withOpacity(0.32), blurRadius: 24, spreadRadius: 1),
+          BoxShadow(color: _luxGold.withOpacity(0.15), blurRadius: 10),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: Stack(
+          children: [
+            Positioned.fill(child: CustomPaint(painter: _CornerFlourishPainter(_luxGold.withOpacity(0.75)))),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [_luxBlack, c.t.gradient.first.withOpacity(0.85)]),
+                        border: Border(right: BorderSide(color: _luxGold.withOpacity(0.45), width: 1)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          c.crownBand(),
+                          const SizedBox(height: 12),
+                          c.royalTitle('MIDNIGHT', size: 16),
+                          c.subtitle('EXECUTIVE CHAMBERS'),
+                          const SizedBox(height: 12),
+                          Center(child: c.photo(size: 88)),
+                          const SizedBox(height: 10),
+                          Text(c.client, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w900, fontSize: 12)),
+                          if (c.data.clientEmail.isNotEmpty) Text(c.data.clientEmail, style: TextStyle(color: _luxIvory.withOpacity(0.5), fontSize: 8)),
+                          const SizedBox(height: 10),
+                          Text('#${c.invNo}', style: TextStyle(color: _luxGold, fontWeight: FontWeight.w800, fontSize: 10)),
+                          Text(c.issued, style: TextStyle(color: _luxIvory.withOpacity(0.45), fontSize: 8)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(width: 2, color: _luxGold),
+                  Expanded(
+                    flex: 3,
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(c.biz, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w900, fontSize: 11)),
+                          const SizedBox(height: 6),
+                          Text(c.headline.toUpperCase(), style: TextStyle(color: c.accent, fontWeight: FontWeight.w900, fontSize: 13, height: 1.15)),
+                          const SizedBox(height: 6),
+                          Text(c.summary, style: TextStyle(color: _luxIvory.withOpacity(0.75), fontSize: 9, height: 1.35)),
+                          const SizedBox(height: 8),
+                          c.prestigeStrip(),
+                          const SizedBox(height: 8),
+                          c.luxeTable(),
+                          const SizedBox(height: 8),
+                          c.totalPlaque(label: 'EXECUTIVE TOTAL'),
+                          const SizedBox(height: 8),
+                          c.sigRow(),
+                          const SizedBox(height: 8),
+                          Row(children: [c.royalSeal(), const SizedBox(width: 8), Expanded(child: Text('POWERED BY NGMY · PREMIUM INVOICE SUITE', style: TextStyle(color: _luxGold.withOpacity(0.55), fontSize: 7, letterSpacing: 1.2)))]),
+                          const SizedBox(height: 6),
+                          Container(height: 3, decoration: BoxDecoration(gradient: LinearGradient(colors: [_luxGoldDark, _luxGold, _luxGoldLight, _luxGold, _luxGoldDark]))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _badge(_EssentialLuxuryCtx c, String text) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(color: c.t.accent, borderRadius: BorderRadius.circular(4)),
-        child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 8, letterSpacing: 1.1)),
-      );
-
-  Widget _bullet(_EssentialLuxuryCtx c, IconData icon, String text) => Padding(
+  Widget _detailLine(IconData icon, String text) => Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: Row(
           children: [
-            Icon(icon, size: 11, color: c.t.accent),
-            const SizedBox(width: 5),
-            Expanded(child: Text(text, style: TextStyle(color: Colors.white.withOpacity(0.88), fontSize: 9))),
+            Icon(icon, size: 12, color: _luxGold),
+            const SizedBox(width: 6),
+            Expanded(child: Text(text, style: TextStyle(color: _luxIvory.withOpacity(0.88), fontSize: 9, height: 1.2))),
           ],
         ),
       );
 
-  Widget _quoteBox(_EssentialLuxuryCtx c) => Container(
+  Widget _ledgerLine(String k, String v) => Padding(
+        padding: const EdgeInsets.only(bottom: 3),
+        child: Row(
+          children: [
+            SizedBox(width: 72, child: Text(k.toUpperCase(), style: TextStyle(color: _luxGold.withOpacity(0.75), fontSize: 7, letterSpacing: 0.8))),
+            Expanded(child: Text(v, style: const TextStyle(color: _luxIvory, fontSize: 9, fontWeight: FontWeight.w700))),
+          ],
+        ),
+      );
+
+  Widget _quotePanel(_EssentialLuxuryCtx c) => Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.white30),
-          borderRadius: BorderRadius.circular(8),
+          color: Colors.black.withOpacity(0.35),
+          border: Border.all(color: _luxGold.withOpacity(0.55)),
+          borderRadius: BorderRadius.circular(4),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('"', style: TextStyle(color: c.t.accent, fontSize: 24, height: 0.7, fontWeight: FontWeight.w900)),
+            Text('"', style: TextStyle(color: _luxGold, fontSize: 26, height: 0.7, fontWeight: FontWeight.w900)),
             Text(
-              c.quote.length > 90 ? '${c.quote.substring(0, 87)}...' : c.quote,
-              style: TextStyle(color: Colors.white.withOpacity(0.88), fontSize: 8, fontStyle: FontStyle.italic, height: 1.35),
+              c.quote.length > 85 ? '${c.quote.substring(0, 82)}...' : c.quote,
+              style: TextStyle(color: _luxIvory.withOpacity(0.88), fontSize: 8, fontStyle: FontStyle.italic, height: 1.35),
             ),
             const SizedBox(height: 4),
-            Text('— ${c.client}', style: TextStyle(color: c.t.accent, fontSize: 7, fontWeight: FontWeight.w700)),
+            Text('— ${c.client}', style: TextStyle(color: _luxGold, fontSize: 7, fontWeight: FontWeight.w800)),
           ],
-        ),
-      );
-
-  Widget _triFooter(_EssentialLuxuryCtx c) => Row(
-        children: [
-          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), color: c.t.accent, child: Text(c.biz.length > 12 ? '${c.biz.substring(0, 12)}…' : c.biz, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 7))),
-          Expanded(child: Container(padding: const EdgeInsets.symmetric(vertical: 6), color: Colors.black, child: Text('TOTAL \$${c.total}', textAlign: TextAlign.center, style: TextStyle(color: c.t.accent, fontWeight: FontWeight.w900, fontSize: 10)))),
-          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), color: c.t.accent2, child: Text('#${c.invNo}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 7))),
-        ],
-      );
-
-  Widget _crestPanel(_EssentialLuxuryCtx c, String title, String line1, String line2) => Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          border: Border.all(color: c.t.accent.withOpacity(0.45)),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: TextStyle(color: c.t.accent, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
-            const SizedBox(height: 4),
-            Text(line1, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
-            Text(line2, style: TextStyle(color: Colors.white60, fontSize: 8)),
-          ],
-        ),
-      );
-
-  Widget _statCard(_EssentialLuxuryCtx c, String label, String value) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          border: Border(top: BorderSide(color: c.t.accent, width: 2)),
-        ),
-        child: Column(
-          children: [
-            Text(label, style: TextStyle(color: c.t.accent, fontSize: 7, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 4),
-            Text(value, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10)),
-          ],
-        ),
-      );
-
-  Widget _dotGrid() => SizedBox(
-        width: 32,
-        height: 32,
-        child: GridView.count(
-          crossAxisCount: 3,
-          mainAxisSpacing: 2,
-          crossAxisSpacing: 2,
-          physics: const NeverScrollableScrollPhysics(),
-          children: List.generate(9, (_) => Container(decoration: BoxDecoration(color: Colors.white.withOpacity(0.22), shape: BoxShape.circle))),
         ),
       );
 }
 
-class _HexClipper extends CustomClipper<Path> {
+class _DamaskPainter extends CustomPainter {
+  _DamaskPainter(this.c1, this.c2);
+  final Color c1;
+  final Color c2;
+
   @override
-  Path getClip(Size size) {
-    final path = Path();
-    final w = size.width;
-    final h = size.height;
-    path.moveTo(w * 0.5, 0);
-    path.lineTo(w, h * 0.25);
-    path.lineTo(w, h * 0.75);
-    path.lineTo(w * 0.5, h);
-    path.lineTo(0, h * 0.75);
-    path.lineTo(0, h * 0.25);
-    path.close();
-    return path;
+  void paint(Canvas canvas, Size size) {
+    final p1 = Paint()..color = c1;
+    final p2 = Paint()..color = c2;
+    for (var x = 0.0; x < size.width; x += 24) {
+      for (var y = 0.0; y < size.height; y += 24) {
+        canvas.drawCircle(Offset(x + 6, y + 6), 1.2, (x + y).toInt() % 48 == 0 ? p2 : p1);
+      }
+    }
   }
 
   @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+  bool shouldRepaint(covariant _DamaskPainter oldDelegate) => false;
+}
+
+class _CrestPainter extends CustomPainter {
+  _CrestPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 1;
+    canvas.drawCircle(Offset(size.width / 2, size.height * 0.22), 80, paint);
+    canvas.drawCircle(Offset(size.width / 2, size.height * 0.22), 60, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CrestPainter oldDelegate) => false;
 }
 
 class _DiagonalFlashPainter extends CustomPainter {
@@ -1038,10 +1032,10 @@ class _DiagonalFlashPainter extends CustomPainter {
     final paint = Paint()..color = color;
     canvas.drawPath(
       Path()
-        ..moveTo(0, size.height * 0.35)
+        ..moveTo(0, size.height * 0.28)
         ..lineTo(size.width, 0)
-        ..lineTo(size.width, size.height * 0.55)
-        ..lineTo(0, size.height * 0.9)
+        ..lineTo(size.width, size.height * 0.42)
+        ..lineTo(0, size.height * 0.72)
         ..close(),
       paint,
     );
@@ -1054,9 +1048,9 @@ class _DiagonalFlashPainter extends CustomPainter {
 class _WaveTopClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
-    final path = Path()..lineTo(0, size.height - 12);
+    final path = Path()..lineTo(0, size.height - 10);
     path.quadraticBezierTo(size.width * 0.25, size.height, size.width * 0.5, size.height - 8);
-    path.quadraticBezierTo(size.width * 0.75, size.height - 16, size.width, size.height - 6);
+    path.quadraticBezierTo(size.width * 0.75, size.height - 14, size.width, size.height - 4);
     path.lineTo(size.width, 0);
     path.close();
     return path;
@@ -1072,19 +1066,74 @@ class _OrnateCornerPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    const len = 28.0;
+    final paint = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 2;
+    const len = 36.0;
     for (final origin in [Offset.zero, Offset(size.width, 0), Offset(0, size.height), Offset(size.width, size.height)]) {
       final sx = origin.dx == 0 ? 1.0 : -1.0;
       final sy = origin.dy == 0 ? 1.0 : -1.0;
       canvas.drawLine(origin, origin + Offset(len * sx, 0), paint);
       canvas.drawLine(origin, origin + Offset(0, len * sy), paint);
+      canvas.drawLine(origin, origin + Offset(len * sx * 0.7, len * sy * 0.7), paint);
     }
   }
 
   @override
   bool shouldRepaint(covariant _OrnateCornerPainter oldDelegate) => oldDelegate.color != color;
+}
+
+class _CornerFlourishPainter extends CustomPainter {
+  _CornerFlourishPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6;
+    const len = 48.0;
+    const inset = 6.0;
+    final corners = [
+      Offset(inset, inset),
+      Offset(size.width - inset, inset),
+      Offset(inset, size.height - inset),
+      Offset(size.width - inset, size.height - inset),
+    ];
+    for (final origin in corners) {
+      final sx = origin.dx < size.width / 2 ? 1.0 : -1.0;
+      final sy = origin.dy < size.height / 2 ? 1.0 : -1.0;
+      canvas.drawLine(origin, origin + Offset(len * sx, 0), paint);
+      canvas.drawLine(origin, origin + Offset(0, len * sy), paint);
+      final arcPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2;
+      canvas.drawArc(
+        Rect.fromCircle(center: origin + Offset(12 * sx, 12 * sy), radius: 10),
+        sx > 0 ? (sy > 0 ? 3.14 : 1.57) : (sy > 0 ? 4.71 : 0),
+        1.57,
+        false,
+        arcPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CornerFlourishPainter oldDelegate) => oldDelegate.color != color;
+}
+
+class _LinenPainter extends CustomPainter {
+  _LinenPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color..strokeWidth = 0.5;
+    for (var y = 0.0; y < size.height; y += 5) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LinenPainter oldDelegate) => false;
 }
