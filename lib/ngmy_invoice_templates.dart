@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'ngmy_invoice_signature.dart';
 
@@ -24,6 +25,7 @@ enum NgmyInvoiceLayout {
   goldFoil,
   marble,
   diamond,
+  editorialLuxury,
 }
 
 class NgmyInvoiceTemplate {
@@ -35,6 +37,7 @@ class NgmyInvoiceTemplate {
   final Color accent;
   final Color accent2;
   final bool lightBackground;
+  final bool essentialLuxury;
 
   const NgmyInvoiceTemplate({
     required this.id,
@@ -45,6 +48,7 @@ class NgmyInvoiceTemplate {
     required this.accent,
     this.accent2 = Colors.black,
     this.lightBackground = false,
+    this.essentialLuxury = false,
   });
 
   Color get headerText => lightBackground ? const Color(0xFF1E293B) : Colors.white;
@@ -53,6 +57,12 @@ class NgmyInvoiceTemplate {
 const kNgmyInvoiceStandardCategory = 'Standard';
 const kNgmyInvoicePremiumCategory = 'Premium';
 const kNgmyInvoiceLuxuryCategory = 'Luxury';
+
+bool ngmyIsEssentialLuxuryTemplate(String id) =>
+    ngmyInvoiceTemplateById(id)?.essentialLuxury == true;
+
+List<NgmyInvoiceTemplate> ngmyEssentialLuxuryTemplates() =>
+    ngmyInvoiceTemplates().where((t) => t.essentialLuxury).toList();
 
 List<NgmyInvoiceTemplate> ngmyInvoiceTemplates() => const [
   // Standard — redesigned classics
@@ -84,6 +94,17 @@ List<NgmyInvoiceTemplate> ngmyInvoiceTemplates() => const [
   NgmyInvoiceTemplate(id: 'emerald_fang', label: 'Emerald Fang', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.rubyExecutive, gradient: [Color(0xFF022C22), Color(0xFF064E3B)], accent: Color(0xFF10B981), accent2: Color(0xFFD4AF37)),
   NgmyInvoiceTemplate(id: 'royal_carbon', label: 'Royal Carbon', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.corporateStripe, gradient: [Color(0xFF0A0A0A), Color(0xFF171717)], accent: Color(0xFFD4AF37), accent2: Color(0xFF525252)),
   NgmyInvoiceTemplate(id: 'platinum_strike', label: 'Platinum Strike', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.crimsonEdge, gradient: [Color(0xFF111827), Color(0xFF1F2937)], accent: Color(0xFFE5E7EB), accent2: Color(0xFF9CA3AF)),
+  // Essential Luxury — editorial broadcast style (dropdown in picker)
+  NgmyInvoiceTemplate(id: 'essential_crimson', label: 'Crimson Broadcast', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.editorialLuxury, gradient: [Color(0xFF050505), Color(0xFF121212)], accent: Color(0xFFDC2626), accent2: Color(0xFF991B1B), essentialLuxury: true),
+  NgmyInvoiceTemplate(id: 'essential_gold', label: 'Gold Herald', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.editorialLuxury, gradient: [Color(0xFF0A0806), Color(0xFF1A1510)], accent: Color(0xFFD4AF37), accent2: Color(0xFF92400E), essentialLuxury: true),
+  NgmyInvoiceTemplate(id: 'essential_sapphire', label: 'Sapphire Bulletin', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.editorialLuxury, gradient: [Color(0xFF030712), Color(0xFF0F172A)], accent: Color(0xFF2563EB), accent2: Color(0xFF1D4ED8), essentialLuxury: true),
+  NgmyInvoiceTemplate(id: 'essential_emerald', label: 'Emerald Chronicle', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.editorialLuxury, gradient: [Color(0xFF02140F), Color(0xFF052E24)], accent: Color(0xFF059669), accent2: Color(0xFF047857), essentialLuxury: true),
+  NgmyInvoiceTemplate(id: 'essential_violet', label: 'Violet Gazette', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.editorialLuxury, gradient: [Color(0xFF0C0618), Color(0xFF1E1033)], accent: Color(0xFF7C3AED), accent2: Color(0xFF6D28D9), essentialLuxury: true),
+  NgmyInvoiceTemplate(id: 'essential_platinum', label: 'Platinum Wire', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.editorialLuxury, gradient: [Color(0xFF0B0D10), Color(0xFF1F2937)], accent: Color(0xFFCBD5E1), accent2: Color(0xFF64748B), essentialLuxury: true),
+  NgmyInvoiceTemplate(id: 'essential_amber', label: 'Amber Flash', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.editorialLuxury, gradient: [Color(0xFF120A02), Color(0xFF271A06)], accent: Color(0xFFF59E0B), accent2: Color(0xFFD97706), essentialLuxury: true),
+  NgmyInvoiceTemplate(id: 'essential_ocean', label: 'Ocean Dispatch', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.editorialLuxury, gradient: [Color(0xFF021018), Color(0xFF0C2D3A)], accent: Color(0xFF0891B2), accent2: Color(0xFF0E7490), essentialLuxury: true),
+  NgmyInvoiceTemplate(id: 'essential_rose', label: 'Rose Edition', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.editorialLuxury, gradient: [Color(0xFF12060A), Color(0xFF2A0A14)], accent: Color(0xFFE11D48), accent2: Color(0xFFBE123C), essentialLuxury: true),
+  NgmyInvoiceTemplate(id: 'essential_midnight', label: 'Midnight News', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.editorialLuxury, gradient: [Color(0xFF000000), Color(0xFF0A0A0A)], accent: Color(0xFFEF4444), accent2: Color(0xFFB91C1C), essentialLuxury: true),
 ];
 
 NgmyInvoiceTemplate? ngmyInvoiceTemplateById(String id) {
@@ -140,6 +161,7 @@ class NgmyInvoicePreviewData {
   final double subtotal;
   final List<Offset?> providerSignature;
   final List<Offset?> clientSignature;
+  final Uint8List? providerPhotoBytes;
 
   const NgmyInvoicePreviewData({
     required this.templateId,
@@ -161,6 +183,7 @@ class NgmyInvoicePreviewData {
     required this.subtotal,
     required this.providerSignature,
     required this.clientSignature,
+    this.providerPhotoBytes,
   });
 }
 
@@ -172,6 +195,9 @@ class NgmyInvoicePreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ngmyInvoiceTemplateById(data.templateId)!;
+    if (t.layout == NgmyInvoiceLayout.editorialLuxury) {
+      return _NgmyEditorialLuxuryInvoice(data: data, template: t);
+    }
     final c = t.headerText;
     final panel = t.lightBackground ? Colors.black.withOpacity(0.04) : Colors.white.withOpacity(0.07);
     final panelBorder = t.lightBackground ? Colors.black.withOpacity(0.08) : Colors.white.withOpacity(0.18);
@@ -581,6 +607,316 @@ class NgmyInvoicePreview extends StatelessWidget {
   double _num(String v) => double.tryParse(v.trim()) ?? 0;
 }
 
+/// Magazine / broadcast-style Essential Luxury invoice (NGMY NEWS inspired).
+class _NgmyEditorialLuxuryInvoice extends StatelessWidget {
+  final NgmyInvoicePreviewData data;
+  final NgmyInvoiceTemplate template;
+
+  const _NgmyEditorialLuxuryInvoice({required this.data, required this.template});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = template;
+    final biz = data.businessName.isEmpty ? 'YOUR BRAND' : data.businessName.toUpperCase();
+    final invNo = data.invoiceNo.isEmpty ? '1' : data.invoiceNo;
+    final issued = data.issuedDate.isEmpty ? '--/--/----' : data.issuedDate;
+    final due = data.dueDate.isEmpty ? '—' : data.dueDate;
+    final client = data.clientName.isEmpty ? 'Client Name' : data.clientName;
+    final headline = data.itemName.isEmpty ? 'Professional Services Invoice' : data.itemName;
+    final summary = data.itemDesc.trim().isNotEmpty
+        ? data.itemDesc.trim()
+        : (data.paymentInfo.trim().isNotEmpty ? data.paymentInfo.trim() : 'Thank you for choosing our services.');
+    final quote = data.paymentInfo.trim().isNotEmpty
+        ? data.paymentInfo.trim()
+        : 'We appreciate your business and look forward to serving you again.';
+
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 620),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: t.gradient, begin: Alignment.topCenter, end: Alignment.bottomCenter),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: t.accent.withOpacity(0.35)),
+        boxShadow: [BoxShadow(color: t.accent.withOpacity(0.25), blurRadius: 20, spreadRadius: 1)],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -40,
+              top: 80,
+              child: Icon(Icons.public, size: 180, color: Colors.white.withOpacity(0.04)),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 6,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [t.accent, t.accent2]),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(biz, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.5)),
+                            Text('INVOICE · STAY PROFESSIONAL. STAY AHEAD.', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 7, letterSpacing: 0.8)),
+                          ],
+                        ),
+                      ),
+                      _dotGrid(),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(color: t.accent, borderRadius: BorderRadius.circular(4)),
+                              child: const Text('INVOICE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1.2)),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              headline.toUpperCase(),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, height: 1.15),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(summary, style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: 10, height: 1.35)),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(Icons.calendar_today_rounded, size: 11, color: t.accent),
+                                const SizedBox(width: 4),
+                                Text('Issued $issued · Due $due', style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 9)),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text('KEY DETAILS', style: TextStyle(color: t.accent, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1)),
+                            const SizedBox(height: 6),
+                            _highlightRow(t, Icons.person_outline_rounded, 'Bill To: $client'),
+                            if (data.clientEmail.trim().isNotEmpty)
+                              _highlightRow(t, Icons.email_outlined, data.clientEmail.trim()),
+                            _highlightRow(t, Icons.receipt_long_outlined, 'Invoice #$invNo · Total \$${data.subtotal.toStringAsFixed(2)}'),
+                            if (data.bizPhone.trim().isNotEmpty)
+                              _highlightRow(t, Icons.phone_outlined, data.bizPhone.trim()),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          children: [
+                            Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Container(
+                                  width: 108,
+                                  height: 108,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: t.accent, width: 3),
+                                    boxShadow: [BoxShadow(color: t.accent.withOpacity(0.35), blurRadius: 12)],
+                                  ),
+                                  child: ClipOval(child: _photoWidget()),
+                                ),
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(color: t.accent, shape: BoxShape.circle, border: Border.all(color: Colors.black, width: 2)),
+                                    child: const Icon(Icons.verified_rounded, color: Colors.white, size: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.white.withOpacity(0.35)),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('"', style: TextStyle(color: t.accent, fontSize: 28, height: 0.8, fontWeight: FontWeight.w900)),
+                                  Text(
+                                    quote.length > 120 ? '${quote.substring(0, 117)}...' : quote,
+                                    style: TextStyle(color: Colors.white.withOpacity(0.88), fontSize: 9, fontStyle: FontStyle.italic, height: 1.35),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text('— $client', style: TextStyle(color: t.accent, fontSize: 8, fontWeight: FontWeight.w700)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text('ITEM', style: TextStyle(color: t.accent, fontSize: 8, fontWeight: FontWeight.w800))),
+                        SizedBox(width: 48, child: Text('QTY', textAlign: TextAlign.center, style: TextStyle(color: t.accent, fontSize: 8, fontWeight: FontWeight.w800))),
+                        SizedBox(width: 56, child: Text('TOTAL', textAlign: TextAlign.right, style: TextStyle(color: t.accent, fontSize: 8, fontWeight: FontWeight.w800))),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(data.itemName.isEmpty ? 'Service' : data.itemName, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700))),
+                        SizedBox(width: 48, child: Text(data.itemQty.isEmpty ? '1' : data.itemQty, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 10))),
+                        SizedBox(width: 56, child: Text('\$${data.subtotal.toStringAsFixed(2)}', textAlign: TextAlign.right, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800))),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _sigMini('PROVIDER', data.providerSignature, t)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _sigMini('CLIENT', data.clientSignature, t)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        color: t.accent,
+                        child: Text(biz.length > 14 ? '${biz.substring(0, 14)}…' : biz, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 8)),
+                      ),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          color: Colors.black,
+                          child: Text('TOTAL DUE  \$${data.subtotal.toStringAsFixed(2)}', textAlign: TextAlign.center, style: TextStyle(color: t.accent, fontWeight: FontWeight.w900, fontSize: 11)),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        color: t.accent2,
+                        child: Text('INV #$invNo', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 8)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Text('POWERED BY: NGMY', style: TextStyle(color: Colors.white.withOpacity(0.55), letterSpacing: 1.4, fontWeight: FontWeight.w800, fontSize: 8)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _photoWidget() {
+    final bytes = data.providerPhotoBytes;
+    if (bytes != null && bytes.isNotEmpty) {
+      return Image.memory(bytes, fit: BoxFit.cover, width: 108, height: 108);
+    }
+    return Container(
+      color: const Color(0xFF1A1A1A),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.person_rounded, size: 36, color: template.accent.withOpacity(0.7)),
+          const SizedBox(height: 4),
+          Text('YOUR PHOTO', style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 7, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  Widget _dotGrid() {
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: GridView.count(
+        crossAxisCount: 3,
+        mainAxisSpacing: 3,
+        crossAxisSpacing: 3,
+        physics: const NeverScrollableScrollPhysics(),
+        children: List.generate(9, (_) => Container(decoration: BoxDecoration(color: Colors.white.withOpacity(0.25), shape: BoxShape.circle))),
+      ),
+    );
+  }
+
+  Widget _highlightRow(NgmyInvoiceTemplate t, IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(color: t.accent, shape: BoxShape.circle),
+            child: Icon(icon, size: 10, color: Colors.white),
+          ),
+          const SizedBox(width: 6),
+          Expanded(child: Text(text, style: TextStyle(color: Colors.white.withOpacity(0.88), fontSize: 9, height: 1.25))),
+        ],
+      ),
+    );
+  }
+
+  Widget _sigMini(String label, List<Offset?> points, NgmyInvoiceTemplate t) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: t.accent, fontSize: 7, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+        const SizedBox(height: 3),
+        Container(
+          height: 36,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.96),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: t.accent.withOpacity(0.4)),
+          ),
+          child: previewSignature(points, height: 36, color: const Color(0xFF0F172A)),
+        ),
+      ],
+    );
+  }
+}
+
 class _InvoiceWatermarks extends StatelessWidget {
   final bool lightBackground;
 
@@ -773,88 +1109,122 @@ class _LayoutDecorationPainter extends CustomPainter {
   bool shouldRepaint(covariant _LayoutDecorationPainter oldDelegate) => oldDelegate.layout != layout;
 }
 
-/// Template picker — always **3 templates per row** (Standard, Premium, Luxury).
+/// Template picker — Standard & Premium always visible; Luxury expands via dropdown.
 Widget ngmyInvoiceTemplatePicker({
   required BuildContext context,
   required String selectedId,
   required ValueChanged<String> onSelect,
 }) {
-  final all = ngmyInvoiceTemplates();
-  const categories = [kNgmyInvoiceStandardCategory, kNgmyInvoicePremiumCategory, kNgmyInvoiceLuxuryCategory];
-  const gap = 6.0;
+  return NgmyInvoiceTemplatePicker(
+    selectedId: selectedId,
+    onSelect: onSelect,
+  );
+}
 
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      Widget templateChip(NgmyInvoiceTemplate t, bool isLuxury) {
-        final selected = selectedId == t.id;
-        return GestureDetector(
-          onTap: () => onSelect(t.id),
-          child: Container(
-            height: 52,
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: t.gradient),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: selected ? (t.lightBackground ? Colors.black : Colors.white) : Colors.white24,
-                width: selected ? 2 : 1,
-              ),
-              boxShadow: isLuxury ? [BoxShadow(color: t.accent.withValues(alpha: 0.35), blurRadius: 8)] : null,
+class NgmyInvoiceTemplatePicker extends StatefulWidget {
+  final String selectedId;
+  final ValueChanged<String> onSelect;
+
+  const NgmyInvoiceTemplatePicker({
+    super.key,
+    required this.selectedId,
+    required this.onSelect,
+  });
+
+  @override
+  State<NgmyInvoiceTemplatePicker> createState() => _NgmyInvoiceTemplatePickerState();
+}
+
+class _NgmyInvoiceTemplatePickerState extends State<NgmyInvoiceTemplatePicker> {
+  bool _luxuryExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final all = ngmyInvoiceTemplates();
+    const categories = [kNgmyInvoiceStandardCategory, kNgmyInvoicePremiumCategory];
+    const gap = 6.0;
+
+    Widget templateChip(NgmyInvoiceTemplate t, {bool isLuxury = false}) {
+      final selected = widget.selectedId == t.id;
+      return GestureDetector(
+        onTap: () => widget.onSelect(t.id),
+        child: Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: t.gradient),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected ? (t.lightBackground ? Colors.black : Colors.white) : Colors.white24,
+              width: selected ? 2 : 1,
             ),
-            alignment: Alignment.center,
-            child: Text(
-              t.label,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: t.lightBackground ? Colors.black87 : Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 10,
-                height: 1.1,
-              ),
+            boxShadow: isLuxury || t.essentialLuxury
+                ? [BoxShadow(color: t.accent.withValues(alpha: 0.35), blurRadius: 8)]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            t.label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: t.lightBackground ? Colors.black87 : Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 10,
+              height: 1.1,
             ),
           ),
-        );
-      }
+        ),
+      );
+    }
 
-      Widget rowOfThree(List<NgmyInvoiceTemplate> rowItems, bool isLuxury) {
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var i = 0; i < 3; i++) ...[
-              if (i > 0) SizedBox(width: gap),
-              Expanded(
-                child: i < rowItems.length ? templateChip(rowItems[i], isLuxury) : const SizedBox(height: 52),
-              ),
-            ],
-          ],
-        );
-      }
-
-      IconData catIcon(String cat) => switch (cat) {
-            kNgmyInvoiceLuxuryCategory => Icons.diamond_rounded,
-            kNgmyInvoicePremiumCategory => Icons.workspace_premium_rounded,
-            _ => Icons.palette_outlined,
-          };
-
-      Color catColor(String cat) => switch (cat) {
-            kNgmyInvoiceLuxuryCategory => const Color(0xFFD4AF37),
-            kNgmyInvoicePremiumCategory => const Color(0xFF7C3AED),
-            _ => const Color(0xFF64748B),
-          };
-
-      return Column(
+    Widget rowOfThree(List<NgmyInvoiceTemplate> rowItems, {bool isLuxury = false}) {
+      return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: categories.map((cat) {
+        children: [
+          for (var i = 0; i < 3; i++) ...[
+            if (i > 0) SizedBox(width: gap),
+            Expanded(
+              child: i < rowItems.length ? templateChip(rowItems[i], isLuxury: isLuxury) : const SizedBox(height: 52),
+            ),
+          ],
+        ],
+      );
+    }
+
+    Widget categoryRows(List<NgmyInvoiceTemplate> items, {bool isLuxury = false}) {
+      final rows = <Widget>[];
+      for (var i = 0; i < items.length; i += 3) {
+        final chunk = items.sublist(i, math.min(i + 3, items.length));
+        rows.add(rowOfThree(chunk, isLuxury: isLuxury));
+        if (i + 3 < items.length) rows.add(SizedBox(height: gap));
+      }
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
+    }
+
+    IconData catIcon(String cat) => switch (cat) {
+          kNgmyInvoiceLuxuryCategory => Icons.diamond_rounded,
+          kNgmyInvoicePremiumCategory => Icons.workspace_premium_rounded,
+          _ => Icons.palette_outlined,
+        };
+
+    Color catColor(String cat) => switch (cat) {
+          kNgmyInvoiceLuxuryCategory => const Color(0xFFD4AF37),
+          kNgmyInvoicePremiumCategory => const Color(0xFF7C3AED),
+          _ => const Color(0xFF64748B),
+        };
+
+    final essential = ngmyEssentialLuxuryTemplates();
+    final classicLuxury = all.where((t) => t.category == kNgmyInvoiceLuxuryCategory && !t.essentialLuxury).toList();
+    final selectedEssential = ngmyIsEssentialLuxuryTemplate(widget.selectedId);
+    final hintColor = Theme.of(context).brightness == Brightness.dark ? Colors.white54 : Colors.black54;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...categories.map((cat) {
           final items = all.where((t) => t.category == cat).toList();
-          final isLuxury = cat == kNgmyInvoiceLuxuryCategory || cat == kNgmyInvoicePremiumCategory;
-          final rows = <Widget>[];
-          for (var i = 0; i < items.length; i += 3) {
-            final chunk = items.sublist(i, math.min(i + 3, items.length));
-            rows.add(rowOfThree(chunk, isLuxury));
-            if (i + 3 < items.length) rows.add(SizedBox(height: gap));
-          }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -868,14 +1238,74 @@ Widget ngmyInvoiceTemplatePicker({
                   ],
                 ),
               ),
-              ...rows,
+              categoryRows(items),
               const SizedBox(height: 10),
             ],
           );
-        }).toList(),
-      );
-    },
-  );
+        }),
+        // Luxury — collapsible dropdown on the left
+        InkWell(
+          onTap: () => setState(() => _luxuryExpanded = !_luxuryExpanded),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4AF37).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.45)),
+                  ),
+                  child: Icon(
+                    _luxuryExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                    color: const Color(0xFFD4AF37),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.diamond_rounded, size: 16, color: Color(0xFFD4AF37)),
+                const SizedBox(width: 6),
+                const Text('Luxury', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFFD4AF37))),
+                const SizedBox(width: 8),
+                if (selectedEssential && !_luxuryExpanded)
+                  Expanded(
+                    child: Text(
+                      '· ${ngmyInvoiceTemplateById(widget.selectedId)?.label ?? ''}',
+                      style: TextStyle(fontSize: 11, color: hintColor),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  )
+                else if (!_luxuryExpanded)
+                  Text(
+                    'Tap to browse Essential templates',
+                    style: TextStyle(fontSize: 11, color: hintColor),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (_luxuryExpanded) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              'Essential Luxury — broadcast-style layouts with your photo',
+              style: TextStyle(fontSize: 10, color: hintColor, fontWeight: FontWeight.w600),
+            ),
+          ),
+          categoryRows(essential, isLuxury: true),
+          if (classicLuxury.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text('Classic Luxury', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: hintColor)),
+            const SizedBox(height: 6),
+            categoryRows(classicLuxury, isLuxury: true),
+          ],
+        ],
+      ],
+    );
+  }
 }
 
 /// Small swatch for saved invoice list.

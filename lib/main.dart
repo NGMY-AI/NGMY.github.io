@@ -20733,6 +20733,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   double _discount = 0;
   String _invoiceTemplate = 'modern';
   bool _invoicePaid = false;
+  Uint8List? _invoiceProviderPhotoBytes;
   final List<Offset?> _providerSignaturePoints = [];
   final List<Offset?> _clientSignaturePoints = [];
 
@@ -20787,6 +20788,12 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       _bizCityStateZipC.text = profile['cityStateZip'] ?? _bizCityStateZipC.text;
       _bizPhoneC.text = profile['phone'] ?? _bizPhoneC.text;
       _paymentInfoC.text = profile['paymentInfo'] ?? _paymentInfoC.text;
+      final photoB64 = profile['photoBase64'] ?? '';
+      if (photoB64.isNotEmpty) {
+        try {
+          _invoiceProviderPhotoBytes = base64Decode(photoB64);
+        } catch (_) {}
+      }
     }
     _loadingInvoiceProvider = false;
   }
@@ -20799,7 +20806,35 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       'cityStateZip': _bizCityStateZipC.text.trim(),
       'phone': _bizPhoneC.text.trim(),
       'paymentInfo': _paymentInfoC.text.trim(),
+      'photoBase64': (_invoiceProviderPhotoBytes != null && _invoiceProviderPhotoBytes!.isNotEmpty)
+          ? base64Encode(_invoiceProviderPhotoBytes!)
+          : '',
     });
+  }
+
+  Future<void> _pickInvoiceProviderPhoto(VoidCallback refresh) async {
+    try {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800, maxHeight: 800, imageQuality: 85);
+      if (file == null) return;
+      final bytes = await _readMediaPickerBytes(file);
+      if (!mounted) return;
+      setState(() => _invoiceProviderPhotoBytes = bytes);
+      _persistInvoiceProviderProfile();
+      refresh();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not load photo: $e')),
+        );
+      }
+    }
+  }
+
+  void _clearInvoiceProviderPhoto(VoidCallback refresh) {
+    setState(() => _invoiceProviderPhotoBytes = null);
+    _persistInvoiceProviderProfile();
+    refresh();
   }
 
   @override
@@ -21078,6 +21113,8 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       'createdAt': now,
       'providerSignature': _serializeSignature(_providerSignaturePoints),
       'clientSignature': _serializeSignature(_clientSignaturePoints),
+      if (_invoiceProviderPhotoBytes != null && _invoiceProviderPhotoBytes!.isNotEmpty)
+        'photoBase64': base64Encode(_invoiceProviderPhotoBytes!),
     };
   }
 
@@ -21105,6 +21142,16 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     _clientSignaturePoints
       ..clear()
       ..addAll(_deserializeSignature(entry['clientSignature']));
+    final photoB64 = (entry['photoBase64'] ?? '').toString();
+    if (photoB64.isNotEmpty) {
+      try {
+        _invoiceProviderPhotoBytes = base64Decode(photoB64);
+      } catch (_) {
+        _invoiceProviderPhotoBytes = null;
+      }
+    } else {
+      _invoiceProviderPhotoBytes = null;
+    }
     refresh();
   }
 
@@ -21796,6 +21843,60 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       selectedId: _invoiceTemplate,
                       onSelect: (id) => setDialog(() => _invoiceTemplate = id),
                     ),
+                    if (ngmyIsEssentialLuxuryTemplate(_invoiceTemplate)) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF121726) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.35)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFFD4AF37), width: 2),
+                                image: _invoiceProviderPhotoBytes != null
+                                    ? DecorationImage(image: MemoryImage(_invoiceProviderPhotoBytes!), fit: BoxFit.cover)
+                                    : null,
+                                color: const Color(0xFF1A1A1A),
+                              ),
+                              child: _invoiceProviderPhotoBytes == null
+                                  ? const Icon(Icons.person_rounded, color: Colors.white54)
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Your photo', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                                  Text(
+                                    'Appears on Essential Luxury templates (broadcast style).',
+                                    style: TextStyle(fontSize: 10, color: isDark ? Colors.white60 : Colors.black54),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: () => _pickInvoiceProviderPhoto(() => setDialog(() {})),
+                              icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+                              label: const Text('Add'),
+                            ),
+                            if (_invoiceProviderPhotoBytes != null)
+                              IconButton(
+                                tooltip: 'Remove photo',
+                                onPressed: () => _clearInvoiceProviderPhoto(() => setDialog(() {})),
+                                icon: const Icon(Icons.close_rounded, size: 18),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -21904,6 +22005,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                           subtotal: subtotal,
                           providerSignature: _providerSignaturePoints,
                           clientSignature: _clientSignaturePoints,
+                          providerPhotoBytes: _invoiceProviderPhotoBytes,
                         ),
                       ),
                     ),
