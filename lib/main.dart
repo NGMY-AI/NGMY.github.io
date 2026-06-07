@@ -3616,6 +3616,9 @@ const bool kNgmySuppressClockInPopups = true;
 /// No deposit/withdrawal banner popups (requests still save; check Wallet / History).
 const bool kNgmySuppressWalletTransactionPopups = true;
 
+/// Minimum balance and withdrawal amount (USD).
+const double kNgmyMinimumWithdrawalAmount = 10.0;
+
 /// Minutes after midnight before late clock-in UI appears (12:10 AM).
 const int kNgmyLateClockUiStartMinutes = 10;
 
@@ -17658,6 +17661,20 @@ class _WalletScreenState extends State<WalletScreen> {
     final amount = double.tryParse(_amt.text) ?? 0;
     if (amount <= 0) return;
 
+    if (widget.user.accountBalance < kNgmyMinimumWithdrawalAmount) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You need at least \$${formatCurrency(kNgmyMinimumWithdrawalAmount)} in your account to withdraw.')),
+      );
+      return;
+    }
+
+    if (amount < kNgmyMinimumWithdrawalAmount) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Minimum withdrawal is \$${formatCurrency(kNgmyMinimumWithdrawalAmount)}.')),
+      );
+      return;
+    }
+
     if (amount > widget.user.accountBalance) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Insufficient balance. You have \$${formatCurrency(widget.user.accountBalance)}'))
@@ -17950,6 +17967,12 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
           ] else ...[
             const SizedBox(height: 16),
+            Text(
+              'Minimum withdrawal: \$${formatCurrency(kNgmyMinimumWithdrawalAmount)}',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF64748B), fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 10),
             Text('Choose Withdrawal Method', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
             Row(
@@ -18059,8 +18082,8 @@ class _WalletScreenState extends State<WalletScreen> {
                     TextSpan(text: 'Note: ', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF9A3412))),
                     TextSpan(
                       text: widget.user.isOnFreeTrial
-                          ? 'Your free trial includes no withdrawal fees. Requests are processed within 24 hours after verification.'
-                          : 'A 15% processing fee applies to all withdrawals. Withdrawal requests are processed within 24 hours after verification.',
+                          ? 'Your free trial includes no withdrawal fees. Minimum withdrawal is \$${formatCurrency(kNgmyMinimumWithdrawalAmount)}. Requests are processed within 24 hours after verification.'
+                          : 'A 15% processing fee applies to all withdrawals. Minimum withdrawal is \$${formatCurrency(kNgmyMinimumWithdrawalAmount)}. Requests are processed within 24 hours after verification.',
                       style: const TextStyle(color: Color(0xFF9A3412)),
                     ),
                   ],
