@@ -29,7 +29,7 @@ class NgmySupabaseColumns {
 
   /// Login probe — small payload, fast on slow networks.
   static const userLogin =
-      'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore,can_sell_on_store,freeTrialActive,freeTrialDailyAmount';
+      'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore,freeTrialActive,freeTrialDailyAmount';
 
   /// Media feed read — matches live Supabase (extras in `data` jsonb).
   static const mediaFeedCore =

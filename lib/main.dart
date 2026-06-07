@@ -40,6 +40,7 @@ import 'ngmy_multiplayer.dart';
 import 'ngmy_supabase_sync_throttle.dart';
 import 'ngmy_supabase_columns.dart';
 import 'ngmy_supabase_config.dart';
+import 'ngmy_supabase_auth.dart';
 import 'ngmy_supabase_health.dart';
 import 'ngmy_income_sound.dart';
 import 'ngmy_pro_games.dart';
@@ -307,6 +308,8 @@ void main() async {
       await ngmyRecoverOAuthSessionIfNeeded();
     } catch (e) {
       debugPrint('Supabase init failed (app still starts): $e');
+    } finally {
+      ngmyMarkSupabaseReady();
     }
   }, timeout: const Duration(seconds: 12)));
 }
@@ -5737,14 +5740,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     } else {
       UserData user;
       try {
-        final row = await Supabase.instance.client
-            .from('users')
-            .select(NgmySupabaseColumns.userLogin)
-            .eq('email', email)
-            .maybeSingle()
-            .timeout(const Duration(seconds: 15));
+        final row = await ngmyFetchUserLoginRow(Supabase.instance.client, email);
         if (row != null) {
-          user = UserData.fromJson(Map<String, dynamic>.from(row));
+          user = UserData.fromJson(row);
           user.passwordHash = passwordHash;
         } else {
           user = UserData(
@@ -9719,12 +9717,11 @@ class _AuthScreenState extends State<AuthScreen> {
       }
 
       try {
-        final fresh = await Supabase.instance.client
-            .from('users')
-            .select(NgmySupabaseColumns.userLogin)
-            .eq('email', email)
-            .maybeSingle()
-            .timeout(const Duration(seconds: 15));
+        await ngmyWaitForSupabaseReady();
+        final fresh = await ngmyFetchUserLoginRow(
+          Supabase.instance.client,
+          email,
+        );
 
         if (!mounted) return;
 
@@ -9735,7 +9732,7 @@ class _AuthScreenState extends State<AuthScreen> {
           return;
         }
 
-        final row = Map<String, dynamic>.from(fresh);
+        final row = fresh;
         final dbHash = (row['passwordHash'] ?? row['password_hash'] ?? '').toString();
         if (dbHash.isNotEmpty && dbHash == enteredHash) {
           await widget.onAuthComplete(email, '', '', enteredHash, true);
@@ -9755,11 +9752,7 @@ class _AuthScreenState extends State<AuthScreen> {
           return;
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Could not reach the server. Check your internet and try again in a few seconds.',
-            ),
-          ),
+          SnackBar(content: Text(ngmyAuthReachabilityMessage(err))),
         );
       } finally {
         if (mounted) setState(() => _authBusy = false);
