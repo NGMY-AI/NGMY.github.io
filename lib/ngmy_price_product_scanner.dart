@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'ngmy_barcode_lookup.dart';
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
 import 'ngmy_nav.dart';
+import 'ngmy_product_qr_actions.dart';
 import 'ngmy_product_qr_widget.dart';
 import 'ngmy_product_scanner_storage.dart';
 
@@ -59,6 +60,8 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
   final _stockC = TextEditingController(text: '1');
   final _descC = TextEditingController();
   String? _editingId;
+  final GlobalKey _storeQrCaptureKey = GlobalKey();
+  bool _qrBusy = false;
 
   @override
   void initState() {
@@ -332,6 +335,54 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
       _editingId = record.id;
       _local = record;
     });
+  }
+
+  Future<void> _runQrAction(Future<String> Function() action) async {
+    if (_qrBusy) return;
+    setState(() => _qrBusy = true);
+    try {
+      final msg = await action();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('QR action failed: $e')));
+    } finally {
+      if (mounted) setState(() => _qrBusy = false);
+    }
+  }
+
+  Future<void> _downloadStoreQr(NgmyLocalProductRecord record) async {
+    await _runQrAction(() => downloadNgmyStoreProductQr(
+          context,
+          record: record,
+          visibleCaptureKey: _previewRecord?.id == record.id ? _storeQrCaptureKey : null,
+        ));
+  }
+
+  Future<void> _saveStoreQr(NgmyLocalProductRecord record) async {
+    if (_qrBusy) return;
+    setState(() => _qrBusy = true);
+    try {
+      await saveNgmyStoreProductQrToLibrary(record);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('QR saved on this device — ${record.name}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Save failed: $e')));
+    } finally {
+      if (mounted) setState(() => _qrBusy = false);
+    }
+  }
+
+  Future<void> _shareStoreQr(NgmyLocalProductRecord record) async {
+    await _runQrAction(() => shareNgmyStoreProductQr(
+          context,
+          record: record,
+          visibleCaptureKey: _previewRecord?.id == record.id ? _storeQrCaptureKey : null,
+        ));
   }
 
   Future<void> _deleteProduct(String id) async {
@@ -711,14 +762,50 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
           Text('Price in center · NGMY logo · gold corner rings', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11)),
           const SizedBox(height: 12),
           Center(
-            child: NgmyStoreProductQrWidget(
-              data: preview.qrPayload,
-              price: preview.price,
-              large: true,
+            child: RepaintBoundary(
+              key: _storeQrCaptureKey,
+              child: NgmyStoreProductQrWidget(
+                data: preview.qrPayload,
+                price: preview.price,
+                large: true,
+              ),
             ),
           ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _qrBusy ? null : () => _downloadStoreQr(preview),
+                  icon: _qrBusy
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.download_rounded, size: 18),
+                  label: const Text('Download'),
+                  style: OutlinedButton.styleFrom(foregroundColor: _accent, side: BorderSide(color: _accent.withOpacity(0.55))),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _qrBusy ? null : () => _saveStoreQr(preview),
+                  icon: const Icon(Icons.bookmark_rounded, size: 18),
+                  label: const Text('Save'),
+                  style: FilledButton.styleFrom(backgroundColor: _accent),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _qrBusy ? null : () => _shareStoreQr(preview),
+                  icon: const Icon(Icons.ios_share_rounded, size: 18),
+                  label: const Text('Share'),
+                  style: OutlinedButton.styleFrom(foregroundColor: _scanPurple, side: BorderSide(color: _scanPurple.withOpacity(0.55))),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
-          Text('Stock on QR: ${preview.stock} — scan to sell & track inventory.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 10)),
+          Text('Stock on QR: ${preview.stock} — download, save, or share this code.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 10)),
         ],
         const SizedBox(height: 20),
         Text('MY ITEMS (${_catalog.length})', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
@@ -741,10 +828,16 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
                   icon: const Icon(Icons.more_vert, color: Colors.white54),
                   onSelected: (v) {
                     if (v == 'edit') _prefillEditor(record: p);
+                    if (v == 'download') _downloadStoreQr(p);
+                    if (v == 'save_qr') _saveStoreQr(p);
+                    if (v == 'share') _shareStoreQr(p);
                     if (v == 'delete') _deleteProduct(p.id);
                   },
                   itemBuilder: (_) => const [
                     PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    PopupMenuItem(value: 'download', child: Text('Download QR')),
+                    PopupMenuItem(value: 'save_qr', child: Text('Save QR on device')),
+                    PopupMenuItem(value: 'share', child: Text('Share QR')),
                     PopupMenuItem(value: 'delete', child: Text('Delete')),
                   ],
                 ),
