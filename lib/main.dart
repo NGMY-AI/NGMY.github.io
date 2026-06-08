@@ -52,6 +52,7 @@ import 'ngmy_typing_game.dart';
 import 'ngmy_dice_config.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_invoice_storage.dart';
+import 'ngmy_helper_ai_limit.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_store_location.dart';
@@ -596,6 +597,14 @@ const int kNgmyWalletHistoryDisplayMax = 500;
 bool ngmyIsWalletDepositOrWithdraw(AppTransaction t) =>
     t.type == TransactionType.deposit || t.type == TransactionType.withdrawal;
 
+bool ngmyIsClockInHistoryTransaction(AppTransaction t) {
+  if (t.type != TransactionType.reimbursement) return false;
+  return (t.sourceDetails ?? '').toLowerCase().contains('clock-in');
+}
+
+bool ngmyIsWalletHistoryTransaction(AppTransaction t) =>
+    ngmyIsWalletDepositOrWithdraw(t) || ngmyIsClockInHistoryTransaction(t);
+
 List<AppTransaction> ngmyUserWalletHistoryTransactions(
   List<AppTransaction> all,
   String email, {
@@ -604,7 +613,7 @@ List<AppTransaction> ngmyUserWalletHistoryTransactions(
   final key = email.toLowerCase().trim();
   final list = all
       .where((t) => t.userEmail.toLowerCase().trim() == key)
-      .where(ngmyIsWalletDepositOrWithdraw)
+      .where(ngmyIsWalletHistoryTransaction)
       .toList()
     ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
   if (list.length <= max) return list;
@@ -942,6 +951,8 @@ class AppConfig {
   List<Map<String, dynamic>> helpRequests;
   List<Map<String, dynamic>> helpBusinesses;
   int maxMediaPostsPerWeek;
+  /// Max NGMY Helper AI user messages per rolling 24h (0 = unlimited).
+  int ngmyHelperDailyMessageLimit;
   List<Map<String, dynamic>> investmentPlans;
   Map<String, int> gameTimeLimits;
   Map<String, dynamic> diceSettings;
@@ -1013,6 +1024,7 @@ class AppConfig {
     this.helpRequests = const [],
     this.helpBusinesses = const [],
     this.maxMediaPostsPerWeek = 3,
+    this.ngmyHelperDailyMessageLimit = kNgmyHelperDefaultDailyMessageLimit,
     this.investmentPlans = const [],
     Map<String, int>? gameTimeLimits,
     Map<String, dynamic>? diceSettings,
@@ -1098,6 +1110,7 @@ class AppConfig {
     'helpRequests': helpRequests,
     'helpBusinesses': helpBusinesses,
     'maxMediaPostsPerWeek': maxMediaPostsPerWeek,
+    'ngmyHelperDailyMessageLimit': ngmyHelperDailyMessageLimit,
     'investmentPlans': investmentPlans,
     'gameTimeLimits': gameTimeLimits,
     'diceSettings': diceSettings,
@@ -1174,6 +1187,7 @@ class AppConfig {
     helpRequests: List<Map<String, dynamic>>.from((json['helpRequests'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     helpBusinesses: List<Map<String, dynamic>>.from((json['helpBusinesses'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     maxMediaPostsPerWeek: json['maxMediaPostsPerWeek'] ?? 3,
+    ngmyHelperDailyMessageLimit: (json['ngmyHelperDailyMessageLimit'] as num?)?.toInt() ?? kNgmyHelperDefaultDailyMessageLimit,
     investmentPlans: List<Map<String, dynamic>>.from((json['investmentPlans'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     gameTimeLimits: ngmyParseGameTimeLimits(json['gameTimeLimits']),
     diceSettings: NgmyDiceSettings.fromJson(json['diceSettings']).toJson(),
@@ -17911,7 +17925,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
 // --- STANDARD SCREENS ---
 
-enum _WalletHistoryFilter { all, deposit, withdrawal }
+enum _WalletHistoryFilter { all, deposit, withdrawal, clockIn }
 
 class WalletScreen extends StatefulWidget {
   final UserData user;
@@ -18142,6 +18156,8 @@ class _WalletScreenState extends State<WalletScreen> {
             return t.type == TransactionType.deposit;
           case _WalletHistoryFilter.withdrawal:
             return t.type == TransactionType.withdrawal;
+          case _WalletHistoryFilter.clockIn:
+            return ngmyIsClockInHistoryTransaction(t);
           case _WalletHistoryFilter.all:
             return true;
         }
@@ -18175,6 +18191,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     _historyFilterMenuItem(_WalletHistoryFilter.all, 'All transactions'),
                     _historyFilterMenuItem(_WalletHistoryFilter.deposit, 'Deposits only'),
                     _historyFilterMenuItem(_WalletHistoryFilter.withdrawal, 'Withdrawals only'),
+                    _historyFilterMenuItem(_WalletHistoryFilter.clockIn, 'Clock-in only'),
                   ],
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -18198,7 +18215,12 @@ class _WalletScreenState extends State<WalletScreen> {
             if (_historyFilter != _WalletHistoryFilter.all) ...[
               const SizedBox(height: 8),
               Text(
-                _historyFilter == _WalletHistoryFilter.deposit ? 'Showing deposits' : 'Showing withdrawals',
+                switch (_historyFilter) {
+                  _WalletHistoryFilter.deposit => 'Showing deposits',
+                  _WalletHistoryFilter.withdrawal => 'Showing withdrawals',
+                  _WalletHistoryFilter.clockIn => 'Showing clock-in earnings',
+                  _WalletHistoryFilter.all => '',
+                },
                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white54 : Colors.black45),
               ),
             ],
@@ -18206,7 +18228,14 @@ class _WalletScreenState extends State<WalletScreen> {
             if (filteredTransactions.isEmpty)
               Center(
                 child: Text(
-                  widget.transactions.isEmpty ? 'Empty' : 'No ${_historyFilter == _WalletHistoryFilter.deposit ? 'deposits' : _historyFilter == _WalletHistoryFilter.withdrawal ? 'withdrawals' : 'transactions'}',
+                  widget.transactions.isEmpty
+                      ? 'Empty'
+                      : 'No ${switch (_historyFilter) {
+                          _WalletHistoryFilter.deposit => 'deposits',
+                          _WalletHistoryFilter.withdrawal => 'withdrawals',
+                          _WalletHistoryFilter.clockIn => 'clock-in transactions',
+                          _WalletHistoryFilter.all => 'transactions',
+                        }}',
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               )
@@ -19905,6 +19934,7 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
   late final TextEditingController _msgC;
   late final TextEditingController _attachImgC;
   late final TextEditingController _apiC;
+  late final TextEditingController _helperLimitC;
   late final TextEditingController _logoC;
   late final TextEditingController _adminNameC;
   final ImagePicker _picker = ImagePicker();
@@ -19919,6 +19949,7 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
     _msgC = TextEditingController();
     _attachImgC = TextEditingController();
     _apiC = TextEditingController(text: widget.config.geminiApiKey);
+    _helperLimitC = TextEditingController(text: widget.config.ngmyHelperDailyMessageLimit.toString());
     _logoC = TextEditingController(text: widget.config.logoUrl);
     _adminNameC = TextEditingController(
       text: widget.config.adminAnnouncementName.isNotEmpty
@@ -19935,6 +19966,7 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
     _msgC.dispose();
     _attachImgC.dispose();
     _apiC.dispose();
+    _helperLimitC.dispose();
     _logoC.dispose();
     _adminNameC.dispose();
     super.dispose();
@@ -20225,6 +20257,22 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                             'For other APIs: compat:https://api.example.com/v1|your-key',
                             style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
                           ),
+                          const SizedBox(height: 14),
+                          TextField(
+                            controller: _helperLimitC,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            decoration: widget.adminInputDecoration(
+                              label: 'NGMY Helper messages per 24 hours',
+                              hint: '0 = unlimited',
+                              isDark: isDark,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'How many messages each user can send to NGMY Helper AI in a rolling 24-hour window. Admins are not limited.',
+                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
+                          ),
                           const SizedBox(height: 15),
                           ElevatedButton(
                             onPressed: _logoUploading
@@ -20232,6 +20280,15 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                                 : () async {
                               widget.config.logoUrl = await _resolveLogoForSave();
                               widget.config.geminiApiKey = _apiC.text.trim();
+                              final helperLimit = int.tryParse(_helperLimitC.text.trim());
+                              if (helperLimit == null || helperLimit < 0) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Enter a valid daily message limit (0 or more).')),
+                                );
+                                return;
+                              }
+                              widget.config.ngmyHelperDailyMessageLimit = helperLimit;
                               var geminiSynced = true;
                               if (widget.config.geminiApiKey.isNotEmpty) {
                                 geminiSynced = await widget.persistGeminiKey(widget.config.geminiApiKey);
@@ -38057,6 +38114,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   bool _isTyping = false;
   bool _memoryLoaded = false;
   bool _chatClosedForUsers = false;
+  int _helperRemaining = -1;
   Timer? _chatGateTimer;
   Timer? _newsPollTimer;
   int _unreadNewsInternal = 0;
@@ -38105,9 +38163,24 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _newsPollTimer = Timer.periodic(const Duration(minutes: 3), (_) => unawaited(_pollNewsFromCloud()));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshGeminiKeyFromCloud();
+      _refreshHelperQuota();
       _refreshUnreadNewsInternal();
       if (_activeTab == 1) _scrollNewsToBottom(jump: true);
     });
+  }
+
+  Future<void> _refreshHelperQuota() async {
+    if (widget.user.isAdmin) {
+      if (mounted) setState(() => _helperRemaining = -1);
+      return;
+    }
+    final limit = widget.config.ngmyHelperDailyMessageLimit;
+    if (limit <= 0) {
+      if (mounted) setState(() => _helperRemaining = -1);
+      return;
+    }
+    final remaining = await NgmyHelperAiLimit.remaining(widget.user.email, limit);
+    if (mounted) setState(() => _helperRemaining = remaining);
   }
 
   void _subscribeNewsRealtime() {
@@ -38382,6 +38455,24 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   Future<void> _sendMessage() async {
     final text = _chatController.text.trim();
     if (text.isEmpty) return;
+
+    if (!widget.user.isAdmin) {
+      final limit = widget.config.ngmyHelperDailyMessageLimit;
+      if (limit > 0) {
+        final allowed = await NgmyHelperAiLimit.tryConsume(widget.user.email, limit);
+        if (!allowed) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Daily NGMY Helper limit reached ($limit messages per 24 hours). Try again later.'),
+            ),
+          );
+          await _refreshHelperQuota();
+          return;
+        }
+        await _refreshHelperQuota();
+      }
+    }
 
     setState(() {
       _messages.add({
@@ -38719,6 +38810,23 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                           ),
                         ),
                       if (_memoryLoaded && _messages.length <= 1) const SizedBox(height: 8),
+                      if (!widget.user.isAdmin && _helperRemaining >= 0)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _helperRemaining == 0
+                                  ? 'No Helper messages left in the next 24 hours'
+                                  : '$_helperRemaining Helper message${_helperRemaining == 1 ? '' : 's'} left today',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: _helperRemaining <= 3 ? Colors.orangeAccent : (isDark ? Colors.white54 : Colors.black54),
+                              ),
+                            ),
+                          ),
+                        ),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
