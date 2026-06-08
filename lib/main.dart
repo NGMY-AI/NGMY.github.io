@@ -3617,6 +3617,10 @@ const bool kNgmySuppressClockInPopups = true;
 /// No deposit/withdrawal banner popups (requests still save; check Wallet / History).
 const bool kNgmySuppressWalletTransactionPopups = true;
 
+/// No top overlay banners (New sale, New announcement, store orders, jobs, etc.).
+/// Realtime sync still runs — users see updates in the relevant screens only.
+const bool kNgmySuppressInAppBannerPopups = true;
+
 /// Minimum balance and withdrawal amount (USD).
 const double kNgmyMinimumWithdrawalAmount = 10.0;
 
@@ -7605,6 +7609,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     Duration cooldown = const Duration(seconds: 50),
     bool showInAppBanner = true,
   }) async {
+    if (kNgmySuppressInAppBannerPopups) return;
     if (_currentUser == null) return;
     if (NgmyGameSession.suppressExternalNotifications) return;
     if (kNgmySuppressWalletTransactionPopups) {
@@ -7670,6 +7675,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     required String body,
     bool isError = false,
   }) {
+    if (kNgmySuppressInAppBannerPopups) return;
     if (!mounted) return;
     _inAppNoticeEntry?.remove();
     final overlay = NgmyNavigator.root?.overlay;
@@ -37913,6 +37919,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   Future<void> _notifyNewsMessage(Announcement ann) async {
+    if (kNgmySuppressInAppBannerPopups) return;
     if (!mounted) return;
     final preview = ann.message.trim().isNotEmpty
         ? ann.message.trim()
