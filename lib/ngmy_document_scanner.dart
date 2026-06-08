@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_gemini_vision.dart';
-import 'ngmy_speech_bubble_icon.dart';
 
 /// N-Services — document scanner (tap **N** in NGMY Services).
 void showNgmyDocumentScanner(
@@ -616,9 +615,9 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   }
 
   Widget _modernChatPrefix() {
-    return const Padding(
-      padding: EdgeInsets.only(left: 10, right: 6),
-      child: NgmySpeechBubbleIcon(size: 26),
+    return Padding(
+      padding: const EdgeInsets.only(left: 10, right: 6),
+      child: Icon(Icons.chat_bubble_rounded, size: 22, color: Colors.white.withValues(alpha: 0.72)),
     );
   }
 

@@ -634,6 +634,42 @@ double ngmyWalletHistoryDelta(AppTransaction t) {
   return 0;
 }
 
+/// Signed balance change when a transaction is applied (matches [ngmyBalanceFromApprovedTransactions]).
+double ngmyTransactionLedgerEffect(AppTransaction t) {
+  if (t.status == TransactionStatus.pending && t.type == TransactionType.withdrawal) {
+    return -t.amount;
+  }
+  if (t.status != TransactionStatus.approved) return 0;
+  if (_ngmyTxnIncreasesBalance(t)) return t.amount;
+  if (t.type == TransactionType.withdrawal ||
+      t.type == TransactionType.adminRemove ||
+      t.type == TransactionType.contribution) {
+    return -t.amount;
+  }
+  return 0;
+}
+
+/// Balance immediately after each transaction (newest row matches [currentBalance] when it is the latest affecting txn).
+Map<String, double> ngmyBalanceAfterTransactionById({
+  required String email,
+  required List<AppTransaction> allTransactions,
+  required double currentBalance,
+}) {
+  final key = ngmyNormalizeEmail(email);
+  final chronological = allTransactions
+      .where((t) => ngmyNormalizeEmail(t.userEmail) == key)
+      .toList()
+    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+  var rolling = currentBalance;
+  final map = <String, double>{};
+  for (final t in chronological) {
+    if (t.id.isNotEmpty) map[t.id] = rolling;
+    rolling -= ngmyTransactionLedgerEffect(t);
+  }
+  return map;
+}
+
 const String _investmentRequestPrefix = 'INVEST_REQUEST|';
 
 bool isInvestmentRequestDetails(String? details) {
@@ -17808,18 +17844,16 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Widget _walletBody() {
     if (_view == 2) {
-      double rollingBalance = ngmyWalletHistoryBalance(widget.allTransactions, widget.user.email);
-      final entries = <MapEntry<AppTransaction, double>>[];
-      for (final t in widget.transactions) {
-        entries.add(MapEntry(t, rollingBalance));
-        rollingBalance -= ngmyWalletHistoryDelta(t);
-      }
+      final balanceAfterById = ngmyBalanceAfterTransactionById(
+        email: widget.user.email,
+        allTransactions: widget.allTransactions,
+        currentBalance: widget.user.accountBalance,
+      );
       return Container(width: double.infinity, padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 15)]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('TRANSACTION HISTORY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)), const SizedBox(height: 15),
         if (widget.transactions.isEmpty) const Center(child: Text('Empty', style: TextStyle(color: Colors.grey, fontSize: 12)))
-        else ...entries.map((entry) {
-          final t = entry.key;
-          final balanceAfter = entry.value;
+        else ...widget.transactions.map((t) {
+          final balanceAfter = balanceAfterById[t.id] ?? widget.user.accountBalance;
           final incoming = _isIncomingTransaction(t);
           final icon = incoming ? Icons.arrow_downward : Icons.arrow_upward;
           final color = t.status == TransactionStatus.approved ? Colors.green : (t.status == TransactionStatus.pending ? Colors.orange : Colors.red);
