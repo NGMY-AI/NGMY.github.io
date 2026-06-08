@@ -12331,6 +12331,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final clockMuted = alreadyDone || blocked;
     final lateInfo = _clockLateInfo();
     final showLate = !onTrial &&
+        !active &&
         !alreadyDone &&
         widget.user.activeInvestment != null &&
         lateInfo != null;
@@ -17910,6 +17911,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
 // --- STANDARD SCREENS ---
 
+enum _WalletHistoryFilter { all, deposit, withdrawal }
+
 class WalletScreen extends StatefulWidget {
   final UserData user;
   final List<AppTransaction> transactions;
@@ -17931,6 +17934,7 @@ class WalletScreen extends StatefulWidget {
 class _WalletScreenState extends State<WalletScreen> {
   final _amt = TextEditingController(); final _handle = TextEditingController(); PaymentMethod _method = PaymentMethod.cashApp;
   int _view = 0; // 0: Deposit, 1: Withdraw, 2: History
+  _WalletHistoryFilter _historyFilter = _WalletHistoryFilter.all;
 
   @override
   void initState() {
@@ -18132,10 +18136,82 @@ class _WalletScreenState extends State<WalletScreen> {
         allTransactions: widget.allTransactions,
         currentBalance: widget.user.accountBalance,
       );
-      return Container(width: double.infinity, padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 15)]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('TRANSACTION HISTORY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)), const SizedBox(height: 15),
-        if (widget.transactions.isEmpty) const Center(child: Text('Empty', style: TextStyle(color: Colors.grey, fontSize: 12)))
-        else ...widget.transactions.map((t) {
+      final filteredTransactions = widget.transactions.where((t) {
+        switch (_historyFilter) {
+          case _WalletHistoryFilter.deposit:
+            return t.type == TransactionType.deposit;
+          case _WalletHistoryFilter.withdrawal:
+            return t.type == TransactionType.withdrawal;
+          case _WalletHistoryFilter.all:
+            return true;
+        }
+      }).toList();
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 15)],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'TRANSACTION HISTORY',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+                  ),
+                ),
+                PopupMenuButton<_WalletHistoryFilter>(
+                  tooltip: 'Filter transactions',
+                  offset: const Offset(0, 36),
+                  initialValue: _historyFilter,
+                  onSelected: (v) => setState(() => _historyFilter = v),
+                  itemBuilder: (ctx) => [
+                    _historyFilterMenuItem(_WalletHistoryFilter.all, 'All transactions'),
+                    _historyFilterMenuItem(_WalletHistoryFilter.deposit, 'Deposits only'),
+                    _historyFilterMenuItem(_WalletHistoryFilter.withdrawal, 'Withdrawals only'),
+                  ],
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.filter_list_rounded, size: 16, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+                        const SizedBox(width: 4),
+                        Icon(Icons.arrow_drop_down_rounded, size: 18, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_historyFilter != _WalletHistoryFilter.all) ...[
+              const SizedBox(height: 8),
+              Text(
+                _historyFilter == _WalletHistoryFilter.deposit ? 'Showing deposits' : 'Showing withdrawals',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white54 : Colors.black45),
+              ),
+            ],
+            const SizedBox(height: 15),
+            if (filteredTransactions.isEmpty)
+              Center(
+                child: Text(
+                  widget.transactions.isEmpty ? 'Empty' : 'No ${_historyFilter == _WalletHistoryFilter.deposit ? 'deposits' : _historyFilter == _WalletHistoryFilter.withdrawal ? 'withdrawals' : 'transactions'}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              )
+            else
+              ...filteredTransactions.map((t) {
           final balanceAfter = balanceAfterById[t.id] ?? widget.user.accountBalance;
           final incoming = _isIncomingTransaction(t);
           final icon = incoming ? Icons.arrow_downward : Icons.arrow_upward;
@@ -18197,8 +18273,10 @@ class _WalletScreenState extends State<WalletScreen> {
               ],
             ),
           );
-        }).toList()
-      ]));
+        }),
+          ],
+        ),
+      );
     }
     bool isDep = _view == 0;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -18457,6 +18535,20 @@ class _WalletScreenState extends State<WalletScreen> {
             Text(label, style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
           ],
         ),
+      ),
+    );
+  }
+
+  PopupMenuItem<_WalletHistoryFilter> _historyFilterMenuItem(_WalletHistoryFilter value, String label) {
+    final selected = _historyFilter == value;
+    return PopupMenuItem(
+      value: value,
+      child: Row(
+        children: [
+          Icon(selected ? Icons.check_rounded : Icons.circle_outlined, size: 16, color: selected ? const Color(0xFF22C55E) : Colors.grey),
+          const SizedBox(width: 10),
+          Text(label, style: TextStyle(fontWeight: selected ? FontWeight.w800 : FontWeight.w500)),
+        ],
       ),
     );
   }
