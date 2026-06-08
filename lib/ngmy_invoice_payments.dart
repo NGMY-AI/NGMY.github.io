@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_invoice_templates.dart';
+import 'ngmy_wallet_payment_ui.dart';
 
 enum NgmyInvoicePaymentTier { premium, luxury }
 
@@ -15,6 +16,9 @@ class NgmyInvoicePayments {
   static const double defaultLuxuryMonthly = 24.99;
 
   static String _key(String email) => email.toLowerCase().trim();
+
+  static NgmyWalletPaymentTheme _themeFor(NgmyInvoicePaymentTier tier) =>
+      tier == NgmyInvoicePaymentTier.premium ? NgmyWalletPaymentTheme.premium : NgmyWalletPaymentTheme.luxury;
 
   static NgmyInvoicePaymentTier? tierForTemplate(String templateId) {
     final t = ngmyInvoiceTemplateById(templateId);
@@ -31,9 +35,6 @@ class NgmyInvoicePayments {
   }
 
   static bool tierMonetizationEnabled(dynamic config, NgmyInvoicePaymentTier tier) {
-    if (tier == NgmyInvoicePaymentTier.premium) {
-      return _allowOneTime(config, tier) || _allowMonthly(config, tier);
-    }
     return _allowOneTime(config, tier) || _allowMonthly(config, tier);
   }
 
@@ -135,34 +136,68 @@ class NgmyInvoicePayments {
     BuildContext context,
     dynamic config,
     NgmyInvoicePaymentTier tier,
-  ) async {
+  ) {
     final one = _allowOneTime(config, tier);
     final month = _allowMonthly(config, tier);
     if (one && month) {
-      return showDialog<NgmyInvoicePaymentPlan>(
+      return _showPlanPicker(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(tier == NgmyInvoicePaymentTier.premium ? 'Premium invoices' : 'Luxury invoices'),
-          content: Text(
-            'Choose how you want to unlock ${tier == NgmyInvoicePaymentTier.premium ? 'Premium' : 'Luxury'} templates on this device.',
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, NgmyInvoicePaymentPlan.oneTime),
-              child: Text('One-time \$${oneTimeFee(config, tier).toStringAsFixed(2)}'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, NgmyInvoicePaymentPlan.monthly),
-              child: Text('Monthly \$${monthlyFee(config, tier).toStringAsFixed(2)}'),
-            ),
-          ],
-        ),
+        tier: tier,
+        oneTimeFee: oneTimeFee(config, tier),
+        monthlyFee: monthlyFee(config, tier),
       );
     }
-    if (one) return NgmyInvoicePaymentPlan.oneTime;
-    if (month) return NgmyInvoicePaymentPlan.monthly;
-    return null;
+    if (one) return Future.value(NgmyInvoicePaymentPlan.oneTime);
+    if (month) return Future.value(NgmyInvoicePaymentPlan.monthly);
+    return Future.value(null);
+  }
+
+  static Future<NgmyInvoicePaymentPlan?> _showPlanPicker({
+    required BuildContext context,
+    required NgmyInvoicePaymentTier tier,
+    required double oneTimeFee,
+    required double monthlyFee,
+  }) {
+    final theme = _themeFor(tier);
+    final data = NgmyWalletPaymentThemeData.forTheme(theme);
+    final tierLabel = tier == NgmyInvoicePaymentTier.premium ? 'Premium' : 'Luxury';
+
+    return showDialog<NgmyInvoicePaymentPlan>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.72),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 28),
+        child: NgmyPaymentShell(
+          themeData: data,
+          title: '$tierLabel Invoice Access',
+          subtitle: 'Choose how you want to unlock $tierLabel templates on this device.',
+          child: Column(
+            children: [
+              NgmyPlanOptionCard(
+                themeData: data,
+                label: 'One-time unlock',
+                price: oneTimeFee,
+                hint: 'Lifetime access on this account',
+                icon: Icons.all_inclusive_rounded,
+                onTap: () => Navigator.pop(ctx, NgmyInvoicePaymentPlan.oneTime),
+              ),
+              const SizedBox(height: 10),
+              NgmyPlanOptionCard(
+                themeData: data,
+                label: 'Monthly access',
+                price: monthlyFee,
+                hint: '30 days — renew anytime',
+                icon: Icons.calendar_month_rounded,
+                onTap: () => Navigator.pop(ctx, NgmyInvoicePaymentPlan.monthly),
+              ),
+              const SizedBox(height: 14),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Not now')),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   static Future<bool> requestAccess({
@@ -179,6 +214,7 @@ class NgmyInvoicePayments {
     final tier = tierForTemplate(templateId)!;
     final plan = await pickPlan(context, config, tier);
     if (plan == null) return false;
+    if (!context.mounted) return false;
 
     final amount = plan == NgmyInvoicePaymentPlan.oneTime ? oneTimeFee(config, tier) : monthlyFee(config, tier);
     final tierLabel = tier == NgmyInvoicePaymentTier.premium ? 'Premium' : 'Luxury';
@@ -190,7 +226,8 @@ class NgmyInvoicePayments {
       config: config,
       amount: amount,
       title: 'Invoice $tierLabel Templates',
-      message: 'Unlock $tierLabel invoice templates ($planLabel) for \$${amount.toStringAsFixed(2)}.',
+      message: 'Unlock $tierLabel invoice templates ($planLabel) from your NGMY wallet.',
+      theme: _themeFor(tier),
       onCharge: onCharge,
     );
     if (!paid) return false;
@@ -201,6 +238,17 @@ class NgmyInvoicePayments {
       grantMonthly(config, (user as dynamic).email as String, tier);
     }
     onGranted?.call();
+
+    if (context.mounted) {
+      final tierLabel = tier == NgmyInvoicePaymentTier.premium ? 'Premium' : 'Luxury';
+      final planSubtitle = plan == NgmyInvoicePaymentPlan.oneTime ? 'Unlocked forever' : 'Active for 30 days';
+      await showNgmyUnlockCelebration(
+        context: context,
+        theme: _themeFor(tier),
+        headline: '$tierLabel Unlocked',
+        subtitle: planSubtitle,
+      );
+    }
     return true;
   }
 }
