@@ -12331,7 +12331,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final clockMuted = alreadyDone || blocked;
     final lateInfo = _clockLateInfo();
     final showLate = !onTrial &&
-        !active &&
         !alreadyDone &&
         widget.user.activeInvestment != null &&
         lateInfo != null;
@@ -12632,7 +12631,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
-          if (!kNgmySuppressClockInPopups && showLate && lateInfo != null) ...[
+          if (showLate && lateInfo != null) ...[
             const SizedBox(height: 5),
             _LateClockInBanner(
               message: lateInfo.message,
@@ -16380,6 +16379,73 @@ class _AdminDashboardState extends State<AdminDashboard> {
     var premMoOn = widget.config.invoicePremiumAllowMonthly;
     var luxOneOn = widget.config.invoiceLuxuryAllowOneTime;
     var luxMoOn = widget.config.invoiceLuxuryAllowMonthly;
+    var familyExpanded = true;
+    var invoicesExpanded = false;
+
+    Widget categoryShell({
+      required String title,
+      required String subtitle,
+      required IconData icon,
+      required Color accent,
+      required bool expanded,
+      required VoidCallback onToggle,
+      required List<Widget> children,
+    }) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF151922) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: accent.withValues(alpha: expanded ? 0.45 : 0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onToggle,
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(icon, color: accent, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+                            const SizedBox(height: 2),
+                            Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3)),
+                          ],
+                        ),
+                      ),
+                      Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: isDark ? Colors.white54 : Colors.black45),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (expanded)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+              ),
+          ],
+        ),
+      );
+    }
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -16403,85 +16469,128 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text('Payments', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+                      const Text('Payment Categories', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
                       const SizedBox(height: 8),
                       Text(
-                        'Set wallet fees for Family Tree and Invoice templates. Users pay from NGMY balance.',
+                        'Manage wallet fees by category. Users pay from NGMY balance.',
                         style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
                       ),
                       const SizedBox(height: 16),
-                      Text('Family Tree', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: createC,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(labelText: 'Fee per new family tree (\$)', prefixIcon: Icon(Icons.account_tree_outlined)),
+                      categoryShell(
+                        title: 'Family Tree',
+                        subtitle: 'New tree creation and monthly photo uploads',
+                        icon: Icons.account_tree_outlined,
+                        accent: const Color(0xFF0D9488),
+                        expanded: familyExpanded,
+                        onToggle: () => setST(() {
+                          familyExpanded = !familyExpanded;
+                          if (familyExpanded) invoicesExpanded = false;
+                        }),
+                        children: [
+                          TextField(
+                            controller: createC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(labelText: 'Fee per new family tree (\$)', prefixIcon: Icon(Icons.account_tree_outlined)),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: photoC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Monthly photo upload fee (\$)',
+                              prefixIcon: Icon(Icons.photo_library_outlined),
+                              helperText: '30 days of member photo uploads per payment',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: () async {
+                              final create = double.tryParse(createC.text.trim());
+                              final photo = double.tryParse(photoC.text.trim());
+                              if (create == null || photo == null || create < 0 || photo < 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid dollar amounts (0 or more).')));
+                                return;
+                              }
+                              setST(() {
+                                widget.config.familyTreeCreateFee = create;
+                                widget.config.familyTreePhotoMonthlyFee = photo;
+                              });
+                              widget.onDataChanged();
+                              final ok = await ngmyPersistFamilyTreePaymentSettings(widget.config);
+                              if (!context.mounted) return;
+                              setState(() {});
+                              ngmyAdminShowCloudSaveSnackBar(
+                                context,
+                                cloudOk: ok,
+                                success: 'Family Tree payment settings saved.',
+                              );
+                            },
+                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0D9488), minimumSize: const Size(double.infinity, 44)),
+                            child: const Text('Save Family Tree', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: photoC,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: 'Monthly photo upload fee (\$)',
-                          prefixIcon: Icon(Icons.photo_library_outlined),
-                          helperText: '30 days of member photo uploads per payment',
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Text('Invoices — Premium', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
-                      const SizedBox(height: 8),
-                      TextField(controller: premOneC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Premium one-time unlock (\$)')),
-                      const SizedBox(height: 8),
-                      TextField(controller: premMoC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Premium monthly access (\$)')),
-                      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Allow one-time payment'), value: premOneOn, onChanged: (v) => setST(() => premOneOn = v)),
-                      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Allow monthly payment'), value: premMoOn, onChanged: (v) => setST(() => premMoOn = v)),
-                      const SizedBox(height: 12),
-                      Text('Invoices — Luxury & Essential Luxury', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
-                      const SizedBox(height: 8),
-                      TextField(controller: luxOneC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Luxury one-time unlock (\$)')),
-                      const SizedBox(height: 8),
-                      TextField(controller: luxMoC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Luxury monthly access (\$)')),
-                      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Allow one-time payment'), value: luxOneOn, onChanged: (v) => setST(() => luxOneOn = v)),
-                      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Allow monthly payment'), value: luxMoOn, onChanged: (v) => setST(() => luxMoOn = v)),
-                      const SizedBox(height: 16),
-                      FilledButton(
-                        onPressed: () async {
-                          final create = double.tryParse(createC.text.trim());
-                          final photo = double.tryParse(photoC.text.trim());
-                          final p1 = double.tryParse(premOneC.text.trim());
-                          final p2 = double.tryParse(premMoC.text.trim());
-                          final l1 = double.tryParse(luxOneC.text.trim());
-                          final l2 = double.tryParse(luxMoC.text.trim());
-                          if ([create, photo, p1, p2, l1, l2].any((v) => v == null || v < 0)) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid dollar amounts (0 or more).')));
-                            return;
-                          }
-                          setST(() {
-                            widget.config.familyTreeCreateFee = create!;
-                            widget.config.familyTreePhotoMonthlyFee = photo!;
-                            widget.config.invoicePremiumOneTimeFee = p1!;
-                            widget.config.invoicePremiumMonthlyFee = p2!;
-                            widget.config.invoiceLuxuryOneTimeFee = l1!;
-                            widget.config.invoiceLuxuryMonthlyFee = l2!;
-                            widget.config.invoicePremiumAllowOneTime = premOneOn;
-                            widget.config.invoicePremiumAllowMonthly = premMoOn;
-                            widget.config.invoiceLuxuryAllowOneTime = luxOneOn;
-                            widget.config.invoiceLuxuryAllowMonthly = luxMoOn;
-                          });
-                          widget.onDataChanged();
-                          final ftOk = await ngmyPersistFamilyTreePaymentSettings(widget.config);
-                          final invOk = await ngmyPersistInvoicePaymentSettings(widget.config);
-                          if (!context.mounted) return;
-                          Navigator.pop(ctx);
-                          setState(() {});
-                          ngmyAdminShowCloudSaveSnackBar(
-                            context,
-                            cloudOk: ftOk && invOk,
-                            success: 'Payment settings saved for Family Tree and Invoices.',
-                          );
-                        },
-                        style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0D9488), minimumSize: const Size(double.infinity, 48)),
-                        child: const Text('Save all payment settings', style: TextStyle(fontWeight: FontWeight.w800)),
+                      categoryShell(
+                        title: 'Invoices',
+                        subtitle: 'Premium and Luxury / Essential Luxury templates',
+                        icon: Icons.receipt_long_outlined,
+                        accent: const Color(0xFF7C3AED),
+                        expanded: invoicesExpanded,
+                        onToggle: () => setST(() {
+                          invoicesExpanded = !invoicesExpanded;
+                          if (invoicesExpanded) familyExpanded = false;
+                        }),
+                        children: [
+                          Text('Premium', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                          const SizedBox(height: 8),
+                          TextField(controller: premOneC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Premium one-time unlock (\$)')),
+                          const SizedBox(height: 8),
+                          TextField(controller: premMoC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Premium monthly access (\$)')),
+                          SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Allow one-time payment'), value: premOneOn, onChanged: (v) => setST(() => premOneOn = v)),
+                          SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Allow monthly payment'), value: premMoOn, onChanged: (v) => setST(() => premMoOn = v)),
+                          const SizedBox(height: 12),
+                          Text('Luxury & Essential Luxury', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                          const SizedBox(height: 8),
+                          TextField(controller: luxOneC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Luxury one-time unlock (\$)')),
+                          const SizedBox(height: 8),
+                          TextField(controller: luxMoC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Luxury monthly access (\$)')),
+                          SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Allow one-time payment'), value: luxOneOn, onChanged: (v) => setST(() => luxOneOn = v)),
+                          SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Allow monthly payment'), value: luxMoOn, onChanged: (v) => setST(() => luxMoOn = v)),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: () async {
+                              final p1 = double.tryParse(premOneC.text.trim());
+                              final p2 = double.tryParse(premMoC.text.trim());
+                              final l1 = double.tryParse(luxOneC.text.trim());
+                              final l2 = double.tryParse(luxMoC.text.trim());
+                              if ([p1, p2, l1, l2].any((v) => v == null || v < 0)) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid dollar amounts (0 or more).')));
+                                return;
+                              }
+                              setST(() {
+                                widget.config.invoicePremiumOneTimeFee = p1!;
+                                widget.config.invoicePremiumMonthlyFee = p2!;
+                                widget.config.invoiceLuxuryOneTimeFee = l1!;
+                                widget.config.invoiceLuxuryMonthlyFee = l2!;
+                                widget.config.invoicePremiumAllowOneTime = premOneOn;
+                                widget.config.invoicePremiumAllowMonthly = premMoOn;
+                                widget.config.invoiceLuxuryAllowOneTime = luxOneOn;
+                                widget.config.invoiceLuxuryAllowMonthly = luxMoOn;
+                              });
+                              widget.onDataChanged();
+                              final ok = await ngmyPersistInvoicePaymentSettings(widget.config);
+                              if (!context.mounted) return;
+                              setState(() {});
+                              ngmyAdminShowCloudSaveSnackBar(
+                                context,
+                                cloudOk: ok,
+                                success: 'Invoice payment settings saved.',
+                              );
+                            },
+                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF7C3AED), minimumSize: const Size(double.infinity, 44)),
+                            child: const Text('Save Invoices', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ],
                       ),
                     ],
                   ),
