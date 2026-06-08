@@ -615,9 +615,17 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   }
 
   Widget _modernChatPrefix() {
-    return const Padding(
-      padding: EdgeInsets.only(left: 8, right: 4),
-      child: _NgmyMessengerOutlineIcon(size: 26, color: Color(0xFFE2E8F0)),
+    return Padding(
+      padding: const EdgeInsets.only(left: 10, right: 6),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.asset(
+          'assets/images/ngmy_document_ask_icon.png',
+          width: 28,
+          height: 28,
+          fit: BoxFit.cover,
+        ),
+      ),
     );
   }
 
@@ -975,48 +983,6 @@ class _ScanCornerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ScanCornerPainter old) => old.progress != progress;
-}
-
-/// Modern messenger-style outline (circle + tail) — no filled box.
-class _NgmyMessengerOutlineIcon extends StatelessWidget {
-  const _NgmyMessengerOutlineIcon({required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(size: Size(size, size), painter: _NgmyMessengerOutlinePainter(color: color));
-  }
-}
-
-class _NgmyMessengerOutlinePainter extends CustomPainter {
-  _NgmyMessengerOutlinePainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = size.width * 0.07
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final cx = size.width * 0.48;
-    final cy = size.height * 0.4;
-    final r = size.width * 0.28;
-    canvas.drawCircle(Offset(cx, cy), r, paint);
-
-    final tail = Path()
-      ..moveTo(cx - r * 0.55, cy + r * 0.62)
-      ..quadraticBezierTo(cx - r * 1.05, cy + r * 1.05, cx - r * 0.15, cy + r * 0.88);
-    canvas.drawPath(tail, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _NgmyMessengerOutlinePainter old) => old.color != color;
 }
 
 class _HoloGridPainter extends CustomPainter {

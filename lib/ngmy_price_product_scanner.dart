@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import 'ngmy_barcode_lookup.dart';
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
 import 'ngmy_nav.dart';
+import 'ngmy_product_qr_widget.dart';
 import 'ngmy_product_scanner_storage.dart';
 
 typedef NgmyPriceScanApply = void Function(String name, double price, String productType);
@@ -29,6 +29,8 @@ class NgmyPriceProductScannerPage extends StatefulWidget {
 class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPage> with SingleTickerProviderStateMixin {
   static const _accent = Color(0xFF10B981);
   static const _scanPurple = Color(0xFF7C3AED);
+  static const _gold = Color(0xFFFFD54F);
+  static const _billGreen = Color(0xFF1B5E20);
 
   late TabController _tabs;
   final MobileScannerController _camera = MobileScannerController(
@@ -40,7 +42,7 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
   bool _handling = false;
   bool _torchOn = false;
   bool _loading = false;
-  bool _fromCatalog = false;
+  bool _markingSold = false;
   String? _lastCode;
   String? _lastFormat;
   String? _error;
@@ -54,6 +56,7 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
   final _typeC = TextEditingController();
   final _brandC = TextEditingController();
   final _priceC = TextEditingController();
+  final _stockC = TextEditingController(text: '1');
   final _descC = TextEditingController();
   String? _editingId;
 
@@ -79,12 +82,20 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
       _brandC.text = _local?.brand ?? _online?.brand ?? '';
     }
     if (_priceC.text.trim().isEmpty && _displayPrice > 0) _priceC.text = _displayPrice.toStringAsFixed(2);
+    if (_stockC.text.trim().isEmpty && _local != null) _stockC.text = '${_local!.stock}';
   }
 
   Future<void> _reloadCatalog() async {
     final list = await loadNgmyLocalProducts();
     if (!mounted) return;
     setState(() => _catalog = list);
+    if (_local != null) {
+      final fresh = list.cast<NgmyLocalProductRecord?>().firstWhere(
+            (r) => r?.id == _local!.id,
+            orElse: () => null,
+          );
+      if (fresh != null) setState(() => _local = fresh);
+    }
   }
 
   @override
@@ -97,9 +108,14 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
     _typeC.dispose();
     _brandC.dispose();
     _priceC.dispose();
+    _stockC.dispose();
     _descC.dispose();
     super.dispose();
   }
+
+  bool get _isEnrolledItem => _local != null && _catalog.any((r) => r.id == _local!.id);
+
+  bool get _canMarkSold => _isEnrolledItem && (_local?.stock ?? 0) > 0;
 
   void _showLocalHit(NgmyLocalProductRecord local, String raw) {
     setState(() {
@@ -107,7 +123,6 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
       _handling = false;
       _local = local;
       _online = null;
-      _fromCatalog = true;
       _lastCode = raw.trim();
       _error = null;
     });
@@ -132,7 +147,6 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
       _error = null;
       _online = null;
       _local = null;
-      _fromCatalog = false;
     });
 
     try {
@@ -149,20 +163,36 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
         _loading = false;
         _online = online;
         _local = null;
-        _fromCatalog = false;
         _error = online == null
-            ? 'Code read: $trimmed\nNot in your catalog yet. Enroll it in My Catalog with your price.'
+            ? 'Code ${ngmyShortItemCode(trimmed)} not in your store yet.\nEnroll it in My Catalog with your price.'
             : null;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Lookup failed. Code: $trimmed';
+        _error = 'Lookup failed for ${ngmyShortItemCode(trimmed)}.';
       });
     } finally {
       _handling = false;
     }
+  }
+
+  Future<void> _markAsSold() async {
+    final id = _local?.id;
+    if (id == null || !_canMarkSold || _markingSold) return;
+    setState(() => _markingSold = true);
+    final updated = await markNgmyLocalProductSold(id);
+    await _reloadCatalog();
+    if (!mounted) return;
+    setState(() {
+      _markingSold = false;
+      if (updated != null) _local = updated;
+    });
+    final msg = (updated?.stock ?? 0) > 0
+        ? 'Sold! ${updated!.stock} left in stock.'
+        : 'Sold out — item removes from My Items in 10 hours.';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -206,7 +236,6 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
         _lastCode = null;
         _lastFormat = null;
         _error = null;
-        _fromCatalog = false;
         _handling = false;
         _loading = false;
       });
@@ -220,6 +249,23 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
   }
 
   double get _displayPrice => _local?.price ?? 0;
+
+  NgmyLocalProductRecord? get _previewRecord {
+    final name = _nameC.text.trim();
+    final barcode = _barcodeC.text.trim();
+    if (name.isEmpty || barcode.isEmpty) return null;
+    return NgmyLocalProductRecord(
+      id: _editingId ?? 'preview',
+      barcode: barcode,
+      name: name,
+      productType: _typeC.text.trim().isEmpty ? 'General' : _typeC.text.trim(),
+      brand: _brandC.text.trim(),
+      price: double.tryParse(_priceC.text.trim()) ?? 0,
+      description: _descC.text.trim(),
+      savedAt: DateTime.now().toUtc().toIso8601String(),
+      stock: int.tryParse(_stockC.text.trim()) ?? 1,
+    );
+  }
 
   void _applyToCalculator() {
     final name = _displayName;
@@ -242,6 +288,7 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
     _typeC.text = record?.productType ?? _displayType;
     _brandC.text = record?.brand ?? online?.brand ?? '';
     _priceC.text = record != null && record.price > 0 ? record.price.toStringAsFixed(2) : '';
+    _stockC.text = '${record?.stock ?? 1}';
     _descC.text = record?.description ?? online?.description ?? '';
     _tabs.animateTo(1);
     setState(() {});
@@ -252,6 +299,7 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
     final barcode = _barcodeC.text.trim();
     final type = _typeC.text.trim();
     final price = double.tryParse(_priceC.text.trim()) ?? 0;
+    final stock = (int.tryParse(_stockC.text.trim()) ?? 1).clamp(1, 9999);
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a product name.')));
       return;
@@ -260,6 +308,9 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter or scan a barcode.')));
       return;
     }
+    final existing = _editingId != null
+        ? _catalog.cast<NgmyLocalProductRecord?>().firstWhere((r) => r?.id == _editingId, orElse: () => null)
+        : null;
     final record = NgmyLocalProductRecord(
       id: _editingId ?? 'prod-${DateTime.now().microsecondsSinceEpoch}',
       barcode: barcode,
@@ -268,8 +319,10 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
       brand: _brandC.text.trim(),
       price: price,
       description: _descC.text.trim(),
-      imageUrl: _online?.imageUrl,
-      savedAt: DateTime.now().toUtc().toIso8601String(),
+      imageUrl: existing?.imageUrl ?? _online?.imageUrl,
+      savedAt: existing?.savedAt ?? DateTime.now().toUtc().toIso8601String(),
+      stock: stock,
+      pendingDeleteAt: stock > 0 ? null : existing?.pendingDeleteAt,
     );
     await saveNgmyLocalProduct(record);
     await _reloadCatalog();
@@ -291,9 +344,21 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
       _typeC.clear();
       _brandC.clear();
       _priceC.clear();
+      _stockC.text = '1';
       _descC.clear();
     }
     if (mounted) setState(() {});
+  }
+
+  String? _purgeCountdownLabel(NgmyLocalProductRecord? r) {
+    if (r?.pendingDeleteAt == null) return null;
+    final at = DateTime.tryParse(r!.pendingDeleteAt!);
+    if (at == null) return null;
+    final left = at.difference(DateTime.now().toUtc());
+    if (left.isNegative) return 'Removing soon…';
+    final h = left.inHours;
+    final m = left.inMinutes % 60;
+    return h > 0 ? 'Removes in ${h}h ${m}m' : 'Removes in ${m}m';
   }
 
   @override
@@ -417,13 +482,74 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
     );
   }
 
+  Widget _moneyPriceFrame(double price) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2E7D32), Color(0xFF1B5E20), Color(0xFF14532D), Color(0xFF1B5E20)],
+          stops: [0.0, 0.35, 0.7, 1.0],
+        ),
+        border: Border.all(color: _gold, width: 3),
+        boxShadow: [
+          BoxShadow(color: _billGreen.withOpacity(0.55), blurRadius: 16, offset: const Offset(0, 6)),
+          BoxShadow(color: _gold.withOpacity(0.2), blurRadius: 8),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(top: 6, left: 12, child: Text('\$', style: TextStyle(color: _gold.withOpacity(0.18), fontSize: 48, fontWeight: FontWeight.w900))),
+          Positioned(bottom: 4, right: 14, child: Text('\$', style: TextStyle(color: _gold.withOpacity(0.12), fontSize: 36, fontWeight: FontWeight.w900))),
+          Column(
+            children: [
+              Text('PRICE', style: TextStyle(color: _gold.withOpacity(0.85), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 3)),
+              const SizedBox(height: 6),
+              Text(
+                price > 0 ? '\$${price.toStringAsFixed(2)}' : '—',
+                style: const TextStyle(
+                  color: _gold,
+                  fontSize: 42,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                  shadows: [Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 2))],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text('USD', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 2)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildScanResult(bool isDark) {
     if (_loading) {
-      return const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(color: _accent), SizedBox(height: 10), Text('Looking up product…', style: TextStyle(color: Colors.white70))]));
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: _accent),
+            SizedBox(height: 10),
+            Text('Looking up product…', style: TextStyle(color: Colors.white70)),
+          ],
+        ),
+      );
     }
     final hasData = _local != null || _online != null;
     if (!hasData && _error == null) {
-      return Center(child: Text('Scan to see product type, details, and your saved price.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.5))));
+      return Center(
+        child: Text(
+          'Scan to see product type, details, and price.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white.withOpacity(0.5)),
+        ),
+      );
     }
     if (_error != null && !hasData) {
       return ListView(
@@ -431,53 +557,74 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
         children: [
           Text(_error!, style: const TextStyle(color: Colors.white70)),
           const SizedBox(height: 12),
-          FilledButton(onPressed: () => _prefillEditor(barcode: _lastCode), style: FilledButton.styleFrom(backgroundColor: _accent), child: const Text('Enroll in My Catalog')),
+          FilledButton(
+            onPressed: () => _prefillEditor(barcode: _lastCode),
+            style: FilledButton.styleFrom(backgroundColor: _accent),
+            child: const Text('Enroll in My Catalog'),
+          ),
         ],
       );
     }
 
     final image = _local?.imageUrl ?? _online?.imageUrl;
+    final stock = _local?.stock;
+    final purgeLabel = _purgeCountdownLabel(_local);
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (_fromCatalog && _local != null)
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: _accent.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _accent),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.inventory_2_rounded, color: _accent, size: 22),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'From your catalog — \$${_displayPrice.toStringAsFixed(2)}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
-                  ),
-                ),
+        if (_displayPrice > 0) _moneyPriceFrame(_displayPrice),
+        if (_local != null && _isEnrolledItem) ...[
+          Row(
+            children: [
+              Icon(Icons.inventory_2_outlined, color: Colors.white.withOpacity(0.6), size: 16),
+              const SizedBox(width: 6),
+              Text(
+                (_local!.stock) > 0 ? 'In stock: ${_local!.stock}' : 'Sold out',
+                style: TextStyle(color: (_local!.stock) > 0 ? _accent : Colors.orangeAccent, fontWeight: FontWeight.w800, fontSize: 13),
+              ),
+              if (purgeLabel != null) ...[
+                const SizedBox(width: 8),
+                Text(purgeLabel, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11)),
               ],
-            ),
+            ],
           ),
+          const SizedBox(height: 10),
+        ],
         if (image != null && image.startsWith('http'))
-          ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(image, height: 120, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.network(image, height: 100, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+          ),
         const SizedBox(height: 10),
         Text(_displayName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
         if (_lastCode != null) ...[
           const SizedBox(height: 4),
-          Text('Code: $_lastCode', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
+          Text('Code ${ngmyShortItemCode(_lastCode!)}', style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 12, fontWeight: FontWeight.w600)),
         ],
         const SizedBox(height: 8),
         _infoRow('Type', _displayType.isEmpty ? '—' : _displayType),
         if ((_local?.brand ?? _online?.brand ?? '').isNotEmpty) _infoRow('Brand', _local?.brand ?? _online?.brand ?? ''),
-        _infoRow('Your price', _displayPrice > 0 ? '\$${_displayPrice.toStringAsFixed(2)}' : 'Not set — save in catalog'),
-        if (_local != null) _infoRow('Storage', _fromCatalog ? 'Your enrolled item (this device)' : 'Scanned product QR'),
         if (_local?.description.isNotEmpty == true) _infoRow('Notes', _local!.description),
         if (_online != null && _local == null) _infoRow('Source', _online!.source),
+        if (_canMarkSold) ...[
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _markingSold ? null : _markAsSold,
+            icon: _markingSold
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.point_of_sale_rounded),
+            label: Text(_markingSold ? 'Recording sale…' : 'Mark as sold'),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFD97706), minimumSize: const Size(double.infinity, 48)),
+          ),
+        ],
+        if (_local != null && _isEnrolledItem && (stock ?? 0) <= 0) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Last unit sold. Item stays in My Items for 10 hours, then removes automatically.',
+            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+          ),
+        ],
         const SizedBox(height: 12),
         if (widget.onApplyPrice != null && _displayPrice > 0)
           FilledButton.icon(
@@ -510,17 +657,17 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
       );
 
   Widget _buildCatalogTab(bool isDark) {
-    final editing = _editingId != null || _nameC.text.isNotEmpty || _barcodeC.text.isNotEmpty;
+    final preview = _previewRecord;
     return ListView(
       padding: const EdgeInsets.all(14),
       children: [
         Text('Create & QR designer', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
         const SizedBox(height: 8),
-        _field('Product name', _nameC),
+        _field('Product name', _nameC, onChanged: (_) => setState(() {})),
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(child: _field('Barcode / UPC', _barcodeC)),
+            Expanded(child: _field('Barcode / UPC', _barcodeC, onChanged: (_) => setState(() {}))),
             const SizedBox(width: 8),
             IconButton.filled(
               style: IconButton.styleFrom(backgroundColor: _scanPurple),
@@ -535,15 +682,21 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(child: _field('Product type', _typeC, hint: 'e.g. Grocery, Electronics')),
+            Expanded(child: _field('Product type', _typeC, hint: 'e.g. Grocery, Electronics', onChanged: (_) => setState(() {}))),
             const SizedBox(width: 8),
-            Expanded(child: _field('Price (\$)', _priceC, keyboard: TextInputType.number)),
+            Expanded(child: _field('Price (\$)', _priceC, keyboard: TextInputType.number, onChanged: (_) => setState(() {}))),
           ],
         ),
         const SizedBox(height: 8),
-        _field('Brand (optional)', _brandC),
+        Row(
+          children: [
+            Expanded(child: _field('Stock qty', _stockC, keyboard: TextInputType.number, hint: 'How many in store', onChanged: (_) => setState(() {}))),
+            const SizedBox(width: 8),
+            Expanded(child: _field('Brand (optional)', _brandC, onChanged: (_) => setState(() {}))),
+          ],
+        ),
         const SizedBox(height: 8),
-        _field('Notes', _descC, maxLines: 2),
+        _field('Notes', _descC, maxLines: 2, onChanged: (_) => setState(() {})),
         const SizedBox(height: 12),
         FilledButton.icon(
           onPressed: _saveProduct,
@@ -551,37 +704,21 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
           label: Text(_editingId == null ? 'Save to device' : 'Update on device'),
           style: FilledButton.styleFrom(backgroundColor: _accent, minimumSize: const Size(double.infinity, 44)),
         ),
-        if (editing && _nameC.text.trim().isNotEmpty && _barcodeC.text.trim().isNotEmpty) ...[
-          const SizedBox(height: 16),
-          const Text('Product QR code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
+        if (preview != null) ...[
+          const SizedBox(height: 20),
+          const Text('Store QR code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+          const SizedBox(height: 4),
+          Text('Price in center · NGMY logo · gold corner rings', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11)),
+          const SizedBox(height: 12),
           Center(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _accent.withOpacity(0.5)),
-              ),
-              child: QrImageView(
-                data: NgmyLocalProductRecord(
-                  id: _editingId ?? 'preview',
-                  barcode: _barcodeC.text.trim(),
-                  name: _nameC.text.trim(),
-                  productType: _typeC.text.trim().isEmpty ? 'General' : _typeC.text.trim(),
-                  brand: _brandC.text.trim(),
-                  price: double.tryParse(_priceC.text.trim()) ?? 0,
-                  description: _descC.text.trim(),
-                  savedAt: DateTime.now().toUtc().toIso8601String(),
-                ).qrPayload,
-                version: QrVersions.auto,
-                size: 160,
-                backgroundColor: Colors.white,
-              ),
+            child: NgmyStoreProductQrWidget(
+              data: preview.qrPayload,
+              price: preview.price,
+              large: true,
             ),
           ),
-          const SizedBox(height: 6),
-          Text('Print or share this QR — scans open product details on this device.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 10)),
+          const SizedBox(height: 8),
+          Text('Stock on QR: ${preview.stock} — scan to sell & track inventory.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 10)),
         ],
         const SizedBox(height: 20),
         Text('MY ITEMS (${_catalog.length})', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
@@ -589,35 +726,42 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
         if (_catalog.isEmpty)
           Text('No items yet. Scan a product or create one above.', style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 12))
         else
-          ..._catalog.map((p) => Card(
-                color: const Color(0xFF0F2744),
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  title: Text(p.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                  subtitle: Text('${p.productType} · \$${p.price.toStringAsFixed(2)} · ${p.barcode}', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11)),
-                  trailing: PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, color: Colors.white54),
-                    onSelected: (v) {
-                      if (v == 'edit') _prefillEditor(record: p);
-                      if (v == 'delete') _deleteProduct(p.id);
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      PopupMenuItem(value: 'delete', child: Text('Delete')),
-                    ],
-                  ),
-                  onTap: () => _prefillEditor(record: p),
+          ..._catalog.map((p) {
+            final purge = _purgeCountdownLabel(p);
+            return Card(
+              color: const Color(0xFF0F2744),
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                title: Text(p.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                subtitle: Text(
+                  '${p.productType} · \$${p.price.toStringAsFixed(2)} · ${ngmyShortBarcodeLabel(p.barcode)} · stock ${p.stock}${purge != null ? ' · $purge' : ''}',
+                  style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11),
                 ),
-              )),
+                trailing: PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.white54),
+                  onSelected: (v) {
+                    if (v == 'edit') _prefillEditor(record: p);
+                    if (v == 'delete') _deleteProduct(p.id);
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    PopupMenuItem(value: 'delete', child: Text('Delete')),
+                  ],
+                ),
+                onTap: () => _prefillEditor(record: p),
+              ),
+            );
+          }),
       ],
     );
   }
 
-  Widget _field(String label, TextEditingController c, {String? hint, TextInputType? keyboard, int maxLines = 1}) {
+  Widget _field(String label, TextEditingController c, {String? hint, TextInputType? keyboard, int maxLines = 1, ValueChanged<String>? onChanged}) {
     return TextField(
       controller: c,
       keyboardType: keyboard,
       maxLines: maxLines,
+      onChanged: onChanged,
       style: const TextStyle(color: Colors.white, fontSize: 13),
       decoration: InputDecoration(
         labelText: label,

@@ -2,7 +2,10 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_barcode_lookup.dart';
+
 const String _kLocalProductsKey = 'ngmy_local_products_v1';
+const Duration kNgmySoldProductPurgeDelay = Duration(hours: 10);
 
 /// Product catalog entry — device local only (never Supabase).
 class NgmyLocalProductRecord {
@@ -15,6 +18,8 @@ class NgmyLocalProductRecord {
   final String description;
   final String? imageUrl;
   final String savedAt;
+  final int stock;
+  final String? pendingDeleteAt;
 
   const NgmyLocalProductRecord({
     required this.id,
@@ -26,7 +31,40 @@ class NgmyLocalProductRecord {
     this.description = '',
     this.imageUrl,
     required this.savedAt,
+    this.stock = 1,
+    this.pendingDeleteAt,
   });
+
+  bool get isSoldOut => stock <= 0;
+
+  NgmyLocalProductRecord copyWith({
+    String? id,
+    String? barcode,
+    String? name,
+    String? productType,
+    String? brand,
+    double? price,
+    String? description,
+    String? imageUrl,
+    String? savedAt,
+    int? stock,
+    String? pendingDeleteAt,
+    bool clearPendingDelete = false,
+  }) {
+    return NgmyLocalProductRecord(
+      id: id ?? this.id,
+      barcode: barcode ?? this.barcode,
+      name: name ?? this.name,
+      productType: productType ?? this.productType,
+      brand: brand ?? this.brand,
+      price: price ?? this.price,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
+      savedAt: savedAt ?? this.savedAt,
+      stock: stock ?? this.stock,
+      pendingDeleteAt: clearPendingDelete ? null : (pendingDeleteAt ?? this.pendingDeleteAt),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -38,6 +76,8 @@ class NgmyLocalProductRecord {
         'description': description,
         'imageUrl': imageUrl,
         'savedAt': savedAt,
+        'stock': stock,
+        'pendingDeleteAt': pendingDeleteAt,
       };
 
   factory NgmyLocalProductRecord.fromJson(Map<String, dynamic> json) {
@@ -51,18 +91,21 @@ class NgmyLocalProductRecord {
       description: (json['description'] ?? '').toString(),
       imageUrl: (json['imageUrl'] ?? '').toString().trim().isEmpty ? null : (json['imageUrl'] ?? '').toString(),
       savedAt: (json['savedAt'] ?? '').toString(),
+      stock: json['stock'] is int ? json['stock'] as int : int.tryParse('${json['stock']}') ?? 1,
+      pendingDeleteAt: (json['pendingDeleteAt'] ?? '').toString().trim().isEmpty ? null : (json['pendingDeleteAt'] ?? '').toString(),
     );
   }
 
   String get qrPayload => jsonEncode({
         'ngmy': 'product',
-        'v': 1,
+        'v': 2,
         'id': id,
         'barcode': barcode,
         'name': name,
         'type': productType,
         'brand': brand,
         'price': price,
+        'stock': stock,
         'description': description,
       });
 
@@ -82,12 +125,44 @@ class NgmyLocalProductRecord {
         brand: (data['brand'] ?? '').toString(),
         price: (data['price'] ?? 0).toDouble(),
         description: (data['description'] ?? '').toString(),
+        stock: data['stock'] is int ? data['stock'] as int : int.tryParse('${data['stock']}') ?? 1,
         savedAt: DateTime.now().toUtc().toIso8601String(),
       );
     } catch (_) {
       return null;
     }
   }
+}
+
+String ngmyShortItemCode(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return '—';
+  final fromQr = NgmyLocalProductRecord.fromQrPayload(trimmed);
+  if (fromQr != null) {
+    final tail = fromQr.id.length > 6 ? fromQr.id.substring(fromQr.id.length - 6) : fromQr.id;
+    return 'QR-$tail';
+  }
+  final digits = ngmyNormalizeBarcodeDigits(trimmed);
+  if (digits.length >= 6) return digits.substring(digits.length - 6);
+  if (trimmed.length > 12) return '${trimmed.substring(0, 5)}…';
+  return trimmed;
+}
+
+String ngmyShortBarcodeLabel(String barcode) {
+  final digits = ngmyNormalizeBarcodeDigits(barcode);
+  if (digits.length >= 6) return digits.substring(digits.length - 6);
+  if (barcode.length > 10) return '${barcode.substring(0, 4)}…';
+  return barcode;
+}
+
+Future<void> _purgeExpiredProducts(List<NgmyLocalProductRecord> list) async {
+  final now = DateTime.now().toUtc();
+  list.removeWhere((r) {
+    if (r.pendingDeleteAt == null) return false;
+    final at = DateTime.tryParse(r.pendingDeleteAt!);
+    if (at == null) return false;
+    return !now.isBefore(at);
+  });
 }
 
 Future<List<NgmyLocalProductRecord>> loadNgmyLocalProducts() async {
@@ -97,11 +172,17 @@ Future<List<NgmyLocalProductRecord>> loadNgmyLocalProducts() async {
   try {
     final list = jsonDecode(raw);
     if (list is! List) return [];
-    return list
+    final parsed = list
         .whereType<Map>()
         .map((e) => NgmyLocalProductRecord.fromJson(Map<String, dynamic>.from(e)))
         .where((r) => r.id.isNotEmpty)
         .toList();
+    final before = parsed.length;
+    await _purgeExpiredProducts(parsed);
+    if (parsed.length != before) {
+      await persistNgmyLocalProducts(parsed);
+    }
+    return parsed;
   } catch (_) {
     return [];
   }
@@ -130,9 +211,26 @@ Future<void> deleteNgmyLocalProduct(String id) async {
   await persistNgmyLocalProducts(list);
 }
 
-String ngmyNormalizeBarcodeDigits(String raw) => raw.replaceAll(RegExp(r'\D'), '');
+Future<NgmyLocalProductRecord?> markNgmyLocalProductSold(String id) async {
+  final list = await loadNgmyLocalProducts();
+  final idx = list.indexWhere((r) => r.id == id);
+  if (idx < 0) return null;
+  final r = list[idx];
+  if (r.stock <= 0) return r;
 
-/// UPC-A (12) ↔ EAN-13 leading zero, etc.
+  final newStock = r.stock - 1;
+  NgmyLocalProductRecord updated;
+  if (newStock > 0) {
+    updated = r.copyWith(stock: newStock, clearPendingDelete: true);
+  } else {
+    final deleteAt = DateTime.now().toUtc().add(kNgmySoldProductPurgeDelay).toIso8601String();
+    updated = r.copyWith(stock: 0, pendingDeleteAt: deleteAt);
+  }
+  list[idx] = updated;
+  await persistNgmyLocalProducts(list);
+  return updated;
+}
+
 Set<String> ngmyBarcodeMatchKeys(String raw) {
   final trimmed = raw.trim();
   final digits = ngmyNormalizeBarcodeDigits(trimmed);
