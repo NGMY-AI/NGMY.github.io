@@ -31,6 +31,7 @@ import 'ngmy_weekend_clock_overlay.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_back_scope.dart';
 import 'ngmy_barcode_lookup.dart';
+import 'ngmy_price_product_scanner.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_games.dart';
@@ -21814,6 +21815,32 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                               const SizedBox(width: 6),
                               const Text('Price Calculator', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 14)),
                               const Spacer(),
+                              GestureDetector(
+                                onTap: () => openNgmyPriceProductScanner(
+                                  ctx,
+                                  onApplyPrice: (name, price, type) {
+                                    if (name.isNotEmpty) _calcServiceC.text = name;
+                                    if (type.isNotEmpty && _calcServiceC.text.trim().isEmpty) {
+                                      _calcServiceC.text = type;
+                                    }
+                                    if (price > 0) {
+                                      _myPriceC.text = price.toStringAsFixed(2);
+                                    }
+                                    refresh();
+                                  },
+                                ),
+                                child: Container(
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF7C3AED).withOpacity(0.22),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFF7C3AED)),
+                                  ),
+                                  child: const Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF7C3AED), size: 20),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
                               GestureDetector(
                                 onTap: () => _openInvoiceFromGDialog(ctx),
                                 child: Container(
