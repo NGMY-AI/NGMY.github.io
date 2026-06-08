@@ -8,6 +8,8 @@ const String _kNgmyFamilyTreePaymentSettingsKey = 'family_tree_payment_settings'
 const String _kNgmyFamilyTreePaymentPrefsKey = 'ngmy_family_tree_payment_settings_v1';
 const String _kNgmyInvoicePaymentSettingsKey = 'invoice_payment_settings';
 const String _kNgmyInvoicePaymentPrefsKey = 'ngmy_invoice_payment_settings_v1';
+const String _kNgmyHelperAiSettingsKey = 'ngmy_helper_ai_settings';
+const String _kNgmyHelperAiPrefsKey = 'ngmy_helper_ai_settings_v1';
 
 Future<Set<String>> _fetchDeletedMediaIdsFromCloud() async {
   final row = await _fetchNgmySettingSafe(_kNgmyDeletedMediaSettingsKey);
@@ -410,6 +412,84 @@ Future<bool> ngmyPersistFamilyTreePaymentSettings(AppConfig config) async {
       }
     } catch (e) {
       debugPrint('[admin payments] config save: $e');
+    }
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
+Map<String, dynamic> _helperAiSettingsPayload(AppConfig config) => {
+      'ngmyHelperDailyMessageLimit': config.ngmyHelperDailyMessageLimit,
+      'maxMediaPostsPerWeek': config.maxMediaPostsPerWeek,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyHelperAiSettingsPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+  final helper = payload['ngmyHelperDailyMessageLimit'];
+  if (helper is num && helper >= 0) config.ngmyHelperDailyMessageLimit = helper.toInt();
+  final media = payload['maxMediaPostsPerWeek'];
+  if (media is num && media >= 0) config.maxMediaPostsPerWeek = media.toInt();
+}
+
+Future<void> _persistHelperAiSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyHelperAiPrefsKey, jsonEncode(_helperAiSettingsPayload(config)));
+  } catch (e) {
+    debugPrint('[admin helper ai] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateHelperAiSettingsFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyHelperAiPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyHelperAiSettingsPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[admin helper ai] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyHelperAiSettingsKey);
+    if (row != null) _applyHelperAiSettingsPayload(config, row);
+  }
+}
+
+Future<bool> ngmyPersistHelperAiSettings(AppConfig config) async {
+  await _persistHelperAiSettingsLocal(config);
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _helperAiSettingsPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyHelperAiSettingsKey, payload);
+    try {
+      var row = <String, dynamic>{
+        'id': kNgmyConfigRowId,
+        'ngmyHelperDailyMessageLimit': config.ngmyHelperDailyMessageLimit,
+        'maxMediaPostsPerWeek': config.maxMediaPostsPerWeek,
+      };
+      for (var i = 0; i < 6; i++) {
+        try {
+          await Supabase.instance.client.from('config').upsert(row);
+          cloudOk = true;
+          break;
+        } catch (e) {
+          final missing = _missingColumnFromPostgrestError(e);
+          if (missing != null && missing.isNotEmpty && row.containsKey(missing)) {
+            row = Map<String, dynamic>.from(row)..remove(missing);
+            if (row.length <= 1) break;
+            continue;
+          }
+          debugPrint('[admin helper ai] config upsert: $e');
+          break;
+        }
+      }
+    } catch (e) {
+      debugPrint('[admin helper ai] config save: $e');
     }
   }
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);

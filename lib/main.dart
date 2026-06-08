@@ -2062,6 +2062,19 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
       NgmyCivicReadState.mergeSets(keep.dismissedContributionReceiptKeys, next.dismissedContributionReceiptKeys),
     );
   }
+
+  if (record.containsKey('ngmyHelperDailyMessageLimit')) {
+    final v = record['ngmyHelperDailyMessageLimit'];
+    if (v is num && v >= 0) next.ngmyHelperDailyMessageLimit = v.toInt();
+  } else {
+    next.ngmyHelperDailyMessageLimit = keep.ngmyHelperDailyMessageLimit;
+  }
+  if (record.containsKey('maxMediaPostsPerWeek')) {
+    final v = record['maxMediaPostsPerWeek'];
+    if (v is num && v >= 0) next.maxMediaPostsPerWeek = v.toInt();
+  } else {
+    next.maxMediaPostsPerWeek = keep.maxMediaPostsPerWeek;
+  }
 }
 
 Set<String> _storeSellAccessEmailSet(AppConfig config) => config.storeSellAccessEmails
@@ -2154,6 +2167,8 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
     'loanPhone': config.loanPhone,
     'loanHowItWorks': config.loanHowItWorks,
     'loanCompanyZelle': config.loanCompanyZelle,
+    'maxMediaPostsPerWeek': config.maxMediaPostsPerWeek,
+    'ngmyHelperDailyMessageLimit': config.ngmyHelperDailyMessageLimit,
   };
   for (var i = 0; i < 12; i++) {
     try {
@@ -3788,6 +3803,8 @@ double? _ngmyClockInPayoutAmountForDay(String email, List<AppTransaction> txs, D
 
 /// No clock-in dialogs, banners, or in-app notifications (penalties still apply silently).
 const bool kNgmySuppressClockInPopups = true;
+/// Show the clock-in confirmation dialog after a successful clock-in.
+const bool kNgmyShowClockInConfirmDialog = true;
 
 /// No deposit/withdrawal banner popups (requests still save; check Wallet / History).
 const bool kNgmySuppressWalletTransactionPopups = true;
@@ -6000,6 +6017,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateManagementListsFromAllBackups(_config);
     await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
     await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+    await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
     await ngmyApplyStoreSellAccessFromSettings(_config);
     _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
     await _persistLocalOnly();
@@ -8941,7 +8959,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           );
           await ngmyHydrateManagementListsFromAllBackups(_config);
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
-    await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+          await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+          await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
         } catch (_) {}
       }
       final localMediaJson = safeGet('all_media');
@@ -9195,7 +9214,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _config = next;
           await ngmyHydrateManagementListsFromAllBackups(_config);
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
-    await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+          await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+          await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
           _mergeOperationalManagementListsIntoConfig(_config, localConfigSnapshot);
           await ngmyApplyStoreSellAccessFromSettings(_config);
           _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
@@ -10951,6 +10971,12 @@ class _LateClockInDialogState extends State<_LateClockInDialog> with SingleTicke
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 12),
                   ),
+                const SizedBox(height: 12),
+                Text(
+                  'Daily earnings reach 100% by 12:00 PM. The later you clock in, the faster your battery fills.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white.withOpacity(0.72), fontSize: 12, height: 1.35),
+                ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
@@ -11133,7 +11159,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     required double fullDaily,
     required double todayCap,
   }) async {
-    if (kNgmySuppressClockInPopups || !mounted) return;
+    if (!kNgmyShowClockInConfirmDialog || !mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -11147,7 +11173,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _showClockInConfirmedDialog() async {
-    if (kNgmySuppressClockInPopups || !mounted) return;
+    if (!kNgmyShowClockInConfirmDialog || !mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -11173,6 +11199,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               const Text(
                 'Clock-In Confirmed',
                 style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Daily earnings reach 100% by 12:00 PM. The later you clock in, the faster your battery fills.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 12, height: 1.35),
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -11391,8 +11423,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           ) ?? Future.value());
         }
         widget.onDataChanged();
-        if (!kNgmySuppressClockInPopups && !onTrial) {
-          if (_ngmyShowLateClockUi(now)) {
+        if (kNgmyShowClockInConfirmDialog) {
+          if (!onTrial && _ngmyShowLateClockUi(now)) {
             await _showLateClockInDialog(
               penalty,
               now,
@@ -17299,11 +17331,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       widget.config.maxMediaPostsPerWeek = val;
                     });
                     final ok = await ngmyAdminPersistManagementConfig(widget.config);
+                    final helperOk = await ngmyPersistHelperAiSettings(widget.config);
                     widget.onDataChanged();
                     if (!context.mounted) return;
                     ngmyAdminShowCloudSaveSnackBar(
                       context,
-                      cloudOk: ok,
+                      cloudOk: ok && helperOk,
                       success: 'Media limit saved for all users.',
                     );
                   },
@@ -18271,17 +18304,18 @@ class _WalletScreenState extends State<WalletScreen> {
                       Row(
                         children: [
                           Expanded(child: Text(typeLabel, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(6),
+                          if (_walletHistoryShowsStatus(t))
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: color.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                _walletHistoryStatusLabel(t.status),
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: color),
+                              ),
                             ),
-                            child: Text(
-                              _walletHistoryStatusLabel(t.status),
-                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: color),
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 2),
@@ -18599,6 +18633,9 @@ class _WalletScreenState extends State<WalletScreen> {
     if (t.status != TransactionStatus.approved) return 0;
     return _transactionSignedDelta(t);
   }
+
+  bool _walletHistoryShowsStatus(AppTransaction t) =>
+      t.type == TransactionType.deposit || t.type == TransactionType.withdrawal;
 
   String _walletHistoryStatusLabel(TransactionStatus status) {
     switch (status) {
@@ -20293,6 +20330,8 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                               if (widget.config.geminiApiKey.isNotEmpty) {
                                 geminiSynced = await widget.persistGeminiKey(widget.config.geminiApiKey);
                               }
+                              await ngmyFlushCriticalConfigLocalAndCloud(widget.config, cloud: false);
+                              final helperOk = await ngmyPersistHelperAiSettings(widget.config);
                               if (mounted) {
                                 setState(() => _pendingLogoBytes = null);
                               }
@@ -20305,11 +20344,11 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    geminiSynced && mgmtOk
+                                    geminiSynced && mgmtOk && helperOk
                                         ? 'Global settings saved to cloud ($detected).'
                                         : 'Saved locally. Supabase sync failed — check connection.',
                                   ),
-                                  backgroundColor: geminiSynced && mgmtOk ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
+                                  backgroundColor: geminiSynced && mgmtOk && helperOk ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
                                 ),
                               );
                               setState(() {});
