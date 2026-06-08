@@ -246,6 +246,8 @@ class NgmyMediaProfileScreen extends StatefulWidget {
   final VoidCallback onDataChanged;
   final bool Function(dynamic post) isPostExpired;
   final Future<String> Function(String localRef)? uploadMediaRef;
+  final VoidCallback? onCreatePost;
+  final bool isPosting;
 
   const NgmyMediaProfileScreen({
     super.key,
@@ -260,6 +262,8 @@ class NgmyMediaProfileScreen extends StatefulWidget {
     required this.onDataChanged,
     required this.isPostExpired,
     this.uploadMediaRef,
+    this.onCreatePost,
+    this.isPosting = false,
   });
 
   @override
@@ -613,8 +617,6 @@ class _NgmyMediaProfileScreenState extends State<NgmyMediaProfileScreen> {
         elevation: 0,
         title: Text(_target.username, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
         actions: [
-          if (_isOwn)
-            IconButton(icon: const Icon(Icons.add_box_outlined), onPressed: _addStory, tooltip: 'Add story'),
           IconButton(icon: const Icon(Icons.more_horiz), onPressed: () {}),
         ],
       ),
@@ -711,21 +713,36 @@ class _NgmyMediaProfileScreenState extends State<NgmyMediaProfileScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
                 children: [
-                  if (_isOwn)
+                  if (_isOwn && widget.onCreatePost != null)
                     Padding(
                       padding: const EdgeInsets.only(right: 14),
                       child: GestureDetector(
-                        onTap: _addHighlight,
+                        onTap: widget.isPosting ? null : widget.onCreatePost,
                         child: Column(
                           children: [
                             Container(
                               width: 64,
                               height: 64,
-                              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white24), color: const Color(0xFF121212)),
-                              child: const Icon(Icons.add, color: Colors.white),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF7C3AED),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF7C3AED).withOpacity(0.45),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: widget.isPosting
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(18),
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Icon(Icons.add_rounded, color: Colors.white, size: 30),
                             ),
                             const SizedBox(height: 6),
-                            const Text('New', style: TextStyle(color: Colors.white, fontSize: 11)),
+                            const Text('Post', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11)),
                           ],
                         ),
                       ),
@@ -2298,4 +2315,162 @@ class _PostPreviewThumbState extends State<_PostPreviewThumb> {
       },
     );
   }
+}
+
+Future<void> showNgmyMediaSearch({
+  required BuildContext context,
+  required List<dynamic> allUsers,
+  required List<dynamic> allMedia,
+  required void Function(String email) onOpenProfile,
+  required bool Function(dynamic post) isPostExpired,
+}) {
+  final queryCtrl = TextEditingController();
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setSheet) {
+          final q = queryCtrl.text.trim().toLowerCase();
+          final tag = q.startsWith('#') ? q.substring(1) : q;
+
+          List<dynamic> matchedUsers = [];
+          List<dynamic> matchedPosts = [];
+
+          if (q.isNotEmpty) {
+            matchedUsers = allUsers.where((u) {
+              final username = (u.username ?? '').toString().toLowerCase();
+              final email = (u.email ?? '').toString().toLowerCase();
+              final name = (u.fullName ?? '').toString().toLowerCase();
+              return username.contains(q) || email.contains(q) || name.contains(q);
+            }).take(20).toList();
+
+            matchedPosts = allMedia.where((m) {
+              if (isPostExpired(m)) return false;
+              final caption = (m.caption ?? '').toString().toLowerCase();
+              final tags = NgmyMediaProfile.asStringList((m as dynamic).taggedUsers);
+              final tagHit = tag.isNotEmpty &&
+                  (caption.contains('#$tag') ||
+                      tags.any((t) => t.toLowerCase().contains(q.replaceAll('@', ''))));
+              final userHit = (m.username ?? '').toString().toLowerCase().contains(q);
+              return tagHit || caption.contains(q) || userHit;
+            }).take(30).toList();
+          }
+
+          final bottom = MediaQuery.viewInsetsOf(ctx).bottom;
+          return Padding(
+            padding: EdgeInsets.only(bottom: bottom),
+            child: DraggableScrollableSheet(
+              initialChildSize: 0.88,
+              minChildSize: 0.45,
+              maxChildSize: 0.95,
+              builder: (_, scrollCtrl) => Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0A0A0A),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+                ),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(99))),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: queryCtrl,
+                              autofocus: true,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                hintText: 'Search users or #tags',
+                                hintStyle: const TextStyle(color: Colors.white38),
+                                prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54),
+                                filled: true,
+                                fillColor: const Color(0xFF1A1A1A),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                              ),
+                              onChanged: (_) => setSheet(() {}),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: q.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'Find people by username or posts by hashtag',
+                                style: TextStyle(color: Colors.white38, fontSize: 13),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : ListView(
+                              controller: scrollCtrl,
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                              children: [
+                                if (matchedUsers.isNotEmpty) ...[
+                                  const Text('People', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+                                  const SizedBox(height: 8),
+                                  ...matchedUsers.map((u) {
+                                    return ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: const CircleAvatar(
+                                        backgroundColor: Color(0xFF262626),
+                                        child: Icon(Icons.person, color: Colors.white54),
+                                      ),
+                                      title: Text((u.username ?? 'User').toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                                      subtitle: Text((u.email ?? '').toString(), style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                      onTap: () {
+                                        Navigator.pop(ctx);
+                                        onOpenProfile(u.email.toString());
+                                      },
+                                    );
+                                  }),
+                                  const SizedBox(height: 16),
+                                ],
+                                if (matchedPosts.isNotEmpty) ...[
+                                  const Text('Posts', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+                                  const SizedBox(height: 8),
+                                  ...matchedPosts.map((m) {
+                                    final caption = (m.caption ?? '').toString();
+                                    return ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: const Icon(Icons.tag_rounded, color: Color(0xFF7C3AED)),
+                                      title: Text(
+                                        caption.isEmpty ? 'Media post' : caption,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                                      ),
+                                      subtitle: Text('@${(m.username ?? '').toString()}', style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                      onTap: () {
+                                        Navigator.pop(ctx);
+                                        onOpenProfile(m.userEmail.toString());
+                                      },
+                                    );
+                                  }),
+                                ],
+                                if (matchedUsers.isEmpty && matchedPosts.isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 40),
+                                    child: Center(child: Text('No results', style: TextStyle(color: Colors.white38))),
+                                  ),
+                              ],
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  ).whenComplete(queryCtrl.dispose);
 }

@@ -11000,6 +11000,195 @@ class _LateClockInDialogState extends State<_LateClockInDialog> with SingleTicke
   }
 }
 
+/// Modern dialog when the user missed today's clock-in window (after 12:00 PM).
+class _ClockInWindowClosedDialog extends StatefulWidget {
+  const _ClockInWindowClosedDialog();
+
+  static Future<void> show(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.72),
+      builder: (ctx) => const _ClockInWindowClosedDialog(),
+    );
+  }
+
+  @override
+  State<_ClockInWindowClosedDialog> createState() => _ClockInWindowClosedDialogState();
+}
+
+class _ClockInWindowClosedDialogState extends State<_ClockInWindowClosedDialog> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseCtrl;
+  Timer? _countdownTimer;
+  Duration _untilMidnight = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..repeat(reverse: true);
+    _tickCountdown();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) => _tickCountdown());
+  }
+
+  void _tickCountdown() {
+    if (!mounted) return;
+    final now = DateTime.now();
+    final nextMidnight = _ngmyDateOnly(now).add(const Duration(days: 1));
+    setState(() => _untilMidnight = nextMidnight.difference(now));
+  }
+
+  String _formatCountdown(Duration d) {
+    if (d.isNegative) return '00:00:00';
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60);
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFFF59E0B);
+    const accentSoft = Color(0xFFFBBF24);
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: AnimatedBuilder(
+        animation: _pulseCtrl,
+        builder: (context, _) {
+          final glow = 0.28 + (_pulseCtrl.value * 0.32);
+          return Container(
+            padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF0B1220), Color(0xFF1E1B4B), Color(0xFF312E81)],
+              ),
+              boxShadow: [
+                BoxShadow(color: accent.withOpacity(glow), blurRadius: 32, spreadRadius: 1),
+                BoxShadow(color: Colors.black.withOpacity(0.45), blurRadius: 24, offset: const Offset(0, 12)),
+              ],
+              border: Border.all(color: Colors.white.withOpacity(0.14)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [accent.withOpacity(0.35 + glow * 0.2), Colors.transparent]),
+                    border: Border.all(color: accentSoft.withOpacity(0.85), width: 2),
+                  ),
+                  child: const Icon(Icons.lock_clock_rounded, color: Colors.white, size: 34),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Today\'s Window Closed',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900, letterSpacing: 0.2),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'You missed today\'s clock-in. Check in before 12:00 PM each weekday to earn your daily payout.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 13, height: 1.45, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.28),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: accent.withOpacity(0.42)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.schedule_rounded, size: 16, color: accentSoft.withOpacity(0.95)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Opens again at midnight',
+                            style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        _formatCountdown(_untilMidnight),
+                        style: const TextStyle(
+                          color: accentSoft,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'hours · minutes · seconds',
+                        style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 18, color: Colors.white.withOpacity(0.55)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Clock in between midnight and 12:00 PM. The earlier you start, the more you can earn before payout.',
+                          style: TextStyle(color: Colors.white.withOpacity(0.62), fontSize: 11.5, height: 1.35),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: accent,
+                      foregroundColor: const Color(0xFF1C1917),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 0,
+                    ),
+                    child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class MainScreen extends StatefulWidget {
   final UserData user; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans;
   final List<MediaPost> allMedia; final List<Announcement> allAnnouncements; final AppConfig config;
@@ -11389,11 +11578,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           return;
         }
         if (!onTrial && !_ngmyIsClockInWindowOpen(now)) {
-          _showOfficialNotice(
-            title: 'Clock-In Window Closed',
-            message: 'You must clock in before 12:00 PM (midday). The window opens again at midnight.',
-            isError: true,
-          );
+          await _ClockInWindowClosedDialog.show(context);
           return;
         }
         final penalty = onTrial ? 0.0 : _ngmyClockInLatePenaltyPercent(now);
@@ -12393,10 +12578,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             } else if (weekend && !alreadyDone && !active) {
               NgmyWeekendClockOverlay.show(context);
             } else if (missedWindow && !alreadyDone && !active) {
-              _showOfficialNotice(
-                'Window Closed',
-                'You must clock in before 12:00 PM. Opens again at midnight.',
-              );
+              _ClockInWindowClosedDialog.show(context);
             }
           }
         : widget.onClockIn,
@@ -36695,6 +36877,16 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     }
   }
 
+  void _openMediaSearch() {
+    showNgmyMediaSearch(
+      context: context,
+      allUsers: widget.allUsers,
+      allMedia: widget.allMedia,
+      isPostExpired: (m) => _isExpired(m as MediaPost),
+      onOpenProfile: _openMediaProfile,
+    );
+  }
+
   void _openMediaProfile(String email) {
     final target = NgmyMediaProfile.userByEmail(widget.allUsers, email) ??
         UserData(email: email, username: email.split('@').first);
@@ -36721,6 +36913,8 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
         isPostExpired: (m) => _isExpired(m as MediaPost),
         uploadMediaRef: _uploadProfileMediaRef,
         persistUser: widget.onSyncUserMedia == null ? null : (u) => widget.onSyncUserMedia!(u is UserData ? u : UserData.fromJson(Map<String, dynamic>.from((u as dynamic).toJson()))),
+        onCreatePost: target.email.toLowerCase().trim() == widget.user.email.toLowerCase().trim() ? _showPostDialog : null,
+        isPosting: _isPosting,
       ),
       routeName: 'MediaProfile',
     );
@@ -36757,7 +36951,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                           const SizedBox(height: 12),
                           const Text('No media posted yet', style: TextStyle(fontWeight: FontWeight.w700)),
                           const SizedBox(height: 4),
-                          const Text('Tap Post to upload a photo or video.', style: TextStyle(color: Colors.grey)),
+                          const Text('Tap your profile, then Post, to upload a photo or video.', style: TextStyle(color: Colors.grey)),
                         ],
                       ),
                     ),
@@ -36817,11 +37011,11 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                               shape: const CircleBorder(),
                               child: InkWell(
                                 customBorder: const CircleBorder(),
-                                onTap: () => showNgmyVideoStudio(context),
+                                onTap: _openMediaSearch,
                                 child: Padding(
                                   padding: const EdgeInsets.all(8),
                                   child: Icon(
-                                    Icons.auto_fix_high_rounded,
+                                    Icons.search_rounded,
                                     color: isDark ? Colors.white : Colors.black87,
                                     size: 20,
                                   ),
@@ -36843,7 +37037,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.only(right: 4),
+                            padding: const EdgeInsets.only(right: 6),
                             child: Material(
                               color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB),
                               shape: const CircleBorder(),
@@ -36853,27 +37047,6 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                                 child: Padding(
                                   padding: const EdgeInsets.all(8),
                                   child: Icon(Icons.person_rounded, color: isDark ? Colors.white : Colors.black87, size: 20),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Material(
-                              color: const Color(0xFF7C3AED),
-                              borderRadius: BorderRadius.circular(20),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: _isPosting ? null : _showPostDialog,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(9),
-                                  child: _isPosting
-                                      ? const SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                        )
-                                      : const Icon(Icons.add_rounded, color: Colors.white, size: 22),
                                 ),
                               ),
                             ),
