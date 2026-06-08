@@ -1,86 +1,60 @@
 import 'package:flutter/material.dart';
 
-/// Compact modern message icon for input prefixes (not legacy Material chat icons).
+/// Minimal message glyph — no background box, modern outline only.
 class NgmyModernChatPrefixIcon extends StatelessWidget {
-  const NgmyModernChatPrefixIcon({super.key, this.size = 26});
+  const NgmyModernChatPrefixIcon({super.key, this.size = 22});
 
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(size * 0.32),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFEC4899)],
-          ),
-          boxShadow: [
-            BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45), blurRadius: 6, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: CustomPaint(painter: _NgmyModernBubbleGlyphPainter(strokeWidth: size * 0.07)),
-      ),
+    return CustomPaint(
+      size: Size(size, size),
+      painter: const _MinimalMessageStrokePainter(),
     );
   }
 }
 
-class _NgmyModernBubbleGlyphPainter extends CustomPainter {
-  _NgmyModernBubbleGlyphPainter({required this.strokeWidth});
-
-  final double strokeWidth;
+class _MinimalMessageStrokePainter extends CustomPainter {
+  const _MinimalMessageStrokePainter();
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
 
-    final shine = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(-0.6, -0.7),
-        radius: 0.55,
-        colors: [Colors.white.withValues(alpha: 0.35), Colors.transparent],
-      ).createShader(Rect.fromLTWH(0, 0, w, h));
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, w, h), Radius.circular(w * 0.32)),
-      shine,
-    );
-
     final body = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(w * 0.5, h * 0.42), width: w * 0.52, height: h * 0.36),
-      Radius.circular(h * 0.12),
+      Rect.fromCenter(center: Offset(w * 0.52, h * 0.44), width: w * 0.72, height: h * 0.48),
+      Radius.circular(h * 0.14),
     );
     final bubble = Path()..addRRect(body);
     final tail = Path()
-      ..moveTo(w * 0.34, h * 0.56)
-      ..quadraticBezierTo(w * 0.22, h * 0.72, w * 0.4, h * 0.68)
-      ..lineTo(w * 0.46, h * 0.56)
+      ..moveTo(w * 0.28, h * 0.62)
+      ..quadraticBezierTo(w * 0.12, h * 0.82, w * 0.34, h * 0.78)
+      ..quadraticBezierTo(w * 0.38, h * 0.66, w * 0.4, h * 0.62)
       ..close();
     final shape = Path.combine(PathOperation.union, bubble, tail);
 
     canvas.drawPath(
       shape,
       Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.fill,
-    );
-    canvas.drawPath(
-      shape,
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.55)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth * 0.35,
+        ..strokeWidth = w * 0.085
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF67E8F9), Color(0xFFA78BFA), Color(0xFFF472B6)],
+        ).createShader(Rect.fromLTWH(0, 0, w, h)),
     );
 
-    canvas.drawCircle(Offset(w * 0.44, h * 0.42), w * 0.028, Paint()..color = const Color(0xFF8B5CF6).withValues(alpha: 0.85));
-    canvas.drawCircle(Offset(w * 0.52, h * 0.42), w * 0.028, Paint()..color = const Color(0xFF8B5CF6).withValues(alpha: 0.85));
-    canvas.drawCircle(Offset(w * 0.6, h * 0.42), w * 0.028, Paint()..color = const Color(0xFF8B5CF6).withValues(alpha: 0.85));
+    final dotPaint = Paint()..color = const Color(0xFF67E8F9).withValues(alpha: 0.95);
+    canvas.drawCircle(Offset(w * 0.42, h * 0.44), w * 0.028, dotPaint);
+    canvas.drawCircle(Offset(w * 0.52, h * 0.44), w * 0.028, dotPaint);
+    canvas.drawCircle(Offset(w * 0.62, h * 0.44), w * 0.028, dotPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _NgmyModernBubbleGlyphPainter old) => false;
+  bool shouldRepaint(covariant _MinimalMessageStrokePainter old) => false;
 }

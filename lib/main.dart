@@ -82,6 +82,8 @@ import 'ngmy_civic_registry_pins.dart';
 import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_family_tree_payments.dart';
+import 'ngmy_invoice_payments.dart';
+import 'ngmy_invoice_protected_preview.dart';
 import 'ngmy_web_viewport.dart';
 import 'ngmy_web_status_bar.dart';
 import 'ngmy_login_logo.dart';
@@ -961,6 +963,18 @@ class AppConfig {
   double familyTreeCreateFee;
   double familyTreePhotoMonthlyFee;
   Map<String, String> familyTreePhotoAccessUntilByEmail;
+  double invoicePremiumOneTimeFee;
+  double invoicePremiumMonthlyFee;
+  double invoiceLuxuryOneTimeFee;
+  double invoiceLuxuryMonthlyFee;
+  bool invoicePremiumAllowOneTime;
+  bool invoicePremiumAllowMonthly;
+  bool invoiceLuxuryAllowOneTime;
+  bool invoiceLuxuryAllowMonthly;
+  Map<String, String> invoicePremiumAccessUntilByEmail;
+  Map<String, String> invoiceLuxuryAccessUntilByEmail;
+  List<String> invoicePremiumLifetimeEmails;
+  List<String> invoiceLuxuryLifetimeEmails;
   /// Emails allowed to use Sell Item in NGMY Store (admin-granted; persisted in config).
   List<String> storeSellAccessEmails;
 
@@ -1017,6 +1031,18 @@ class AppConfig {
     this.familyTreeCreateFee = NgmyFamilyTreePayments.defaultCreateFee,
     this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
     Map<String, String>? familyTreePhotoAccessUntilByEmail,
+    this.invoicePremiumOneTimeFee = NgmyInvoicePayments.defaultPremiumOneTime,
+    this.invoicePremiumMonthlyFee = NgmyInvoicePayments.defaultPremiumMonthly,
+    this.invoiceLuxuryOneTimeFee = NgmyInvoicePayments.defaultLuxuryOneTime,
+    this.invoiceLuxuryMonthlyFee = NgmyInvoicePayments.defaultLuxuryMonthly,
+    this.invoicePremiumAllowOneTime = true,
+    this.invoicePremiumAllowMonthly = true,
+    this.invoiceLuxuryAllowOneTime = true,
+    this.invoiceLuxuryAllowMonthly = true,
+    Map<String, String>? invoicePremiumAccessUntilByEmail,
+    Map<String, String>? invoiceLuxuryAccessUntilByEmail,
+    List<String>? invoicePremiumLifetimeEmails,
+    List<String>? invoiceLuxuryLifetimeEmails,
     List<String>? storeSellAccessEmails,
   })  : civicCitiesByState = NgmyCivicRegistryStats.migrateLegacyCities(
           civicCitiesByState: civicCitiesByState ?? const {},
@@ -1024,6 +1050,10 @@ class AppConfig {
         ),
         loanApplications = loanApplications ?? [],
         familyTreePhotoAccessUntilByEmail = familyTreePhotoAccessUntilByEmail ?? const {},
+        invoicePremiumAccessUntilByEmail = invoicePremiumAccessUntilByEmail ?? const {},
+        invoiceLuxuryAccessUntilByEmail = invoiceLuxuryAccessUntilByEmail ?? const {},
+        invoicePremiumLifetimeEmails = invoicePremiumLifetimeEmails ?? const [],
+        invoiceLuxuryLifetimeEmails = invoiceLuxuryLifetimeEmails ?? const [],
         civicRegistryPinsByState = civicRegistryPinsByState ?? const {},
         civicRegistrarApplications = civicRegistrarApplications ?? const [],
         storeSellAccessEmails = storeSellAccessEmails ?? const [],
@@ -1086,6 +1116,18 @@ class AppConfig {
     'familyTreeCreateFee': familyTreeCreateFee,
     'familyTreePhotoMonthlyFee': familyTreePhotoMonthlyFee,
     'familyTreePhotoAccessUntilByEmail': familyTreePhotoAccessUntilByEmail,
+    'invoicePremiumOneTimeFee': invoicePremiumOneTimeFee,
+    'invoicePremiumMonthlyFee': invoicePremiumMonthlyFee,
+    'invoiceLuxuryOneTimeFee': invoiceLuxuryOneTimeFee,
+    'invoiceLuxuryMonthlyFee': invoiceLuxuryMonthlyFee,
+    'invoicePremiumAllowOneTime': invoicePremiumAllowOneTime,
+    'invoicePremiumAllowMonthly': invoicePremiumAllowMonthly,
+    'invoiceLuxuryAllowOneTime': invoiceLuxuryAllowOneTime,
+    'invoiceLuxuryAllowMonthly': invoiceLuxuryAllowMonthly,
+    'invoicePremiumAccessUntilByEmail': invoicePremiumAccessUntilByEmail,
+    'invoiceLuxuryAccessUntilByEmail': invoiceLuxuryAccessUntilByEmail,
+    'invoicePremiumLifetimeEmails': invoicePremiumLifetimeEmails,
+    'invoiceLuxuryLifetimeEmails': invoiceLuxuryLifetimeEmails,
     'storeSellAccessEmails': storeSellAccessEmails,
     'civicCitiesByState': civicCitiesByState.map((k, v) => MapEntry(k, v)),
   };
@@ -1158,6 +1200,18 @@ class AppConfig {
     familyTreeCreateFee: (json['familyTreeCreateFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultCreateFee,
     familyTreePhotoMonthlyFee: (json['familyTreePhotoMonthlyFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
     familyTreePhotoAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['familyTreePhotoAccessUntilByEmail']),
+    invoicePremiumOneTimeFee: (json['invoicePremiumOneTimeFee'] as num?)?.toDouble() ?? NgmyInvoicePayments.defaultPremiumOneTime,
+    invoicePremiumMonthlyFee: (json['invoicePremiumMonthlyFee'] as num?)?.toDouble() ?? NgmyInvoicePayments.defaultPremiumMonthly,
+    invoiceLuxuryOneTimeFee: (json['invoiceLuxuryOneTimeFee'] as num?)?.toDouble() ?? NgmyInvoicePayments.defaultLuxuryOneTime,
+    invoiceLuxuryMonthlyFee: (json['invoiceLuxuryMonthlyFee'] as num?)?.toDouble() ?? NgmyInvoicePayments.defaultLuxuryMonthly,
+    invoicePremiumAllowOneTime: json['invoicePremiumAllowOneTime'] != false,
+    invoicePremiumAllowMonthly: json['invoicePremiumAllowMonthly'] != false,
+    invoiceLuxuryAllowOneTime: json['invoiceLuxuryAllowOneTime'] != false,
+    invoiceLuxuryAllowMonthly: json['invoiceLuxuryAllowMonthly'] != false,
+    invoicePremiumAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['invoicePremiumAccessUntilByEmail']),
+    invoiceLuxuryAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['invoiceLuxuryAccessUntilByEmail']),
+    invoicePremiumLifetimeEmails: _emailListFromJson(json['invoicePremiumLifetimeEmails']),
+    invoiceLuxuryLifetimeEmails: _emailListFromJson(json['invoiceLuxuryLifetimeEmails']),
     storeSellAccessEmails: List<String>.from(
       (json['storeSellAccessEmails'] ?? const []).map((e) => e.toString().toLowerCase().trim()).where((e) => e.isNotEmpty),
     ),
@@ -1175,6 +1229,11 @@ Map<String, String> _familyTreePhotoAccessFromJson(dynamic raw) {
     });
   }
   return out;
+}
+
+List<String> _emailListFromJson(dynamic raw) {
+  if (raw is! List) return [];
+  return raw.map((e) => e.toString().toLowerCase().trim()).where((e) => e.isNotEmpty).toList();
 }
 
 bool ngmyChargeUserWallet({
@@ -1861,6 +1920,69 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     next.familyTreePhotoAccessUntilByEmail = {...remote, ...keep.familyTreePhotoAccessUntilByEmail};
   } else if (keep.familyTreePhotoAccessUntilByEmail.isNotEmpty) {
     next.familyTreePhotoAccessUntilByEmail = Map<String, String>.from(keep.familyTreePhotoAccessUntilByEmail);
+  }
+
+  if (record.containsKey('invoicePremiumOneTimeFee') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['invoicePremiumOneTimeFee'];
+    if (v is num && v >= 0) next.invoicePremiumOneTimeFee = v.toDouble();
+  } else {
+    next.invoicePremiumOneTimeFee = keep.invoicePremiumOneTimeFee;
+  }
+  if (record.containsKey('invoicePremiumMonthlyFee') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['invoicePremiumMonthlyFee'];
+    if (v is num && v >= 0) next.invoicePremiumMonthlyFee = v.toDouble();
+  } else {
+    next.invoicePremiumMonthlyFee = keep.invoicePremiumMonthlyFee;
+  }
+  if (record.containsKey('invoiceLuxuryOneTimeFee') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['invoiceLuxuryOneTimeFee'];
+    if (v is num && v >= 0) next.invoiceLuxuryOneTimeFee = v.toDouble();
+  } else {
+    next.invoiceLuxuryOneTimeFee = keep.invoiceLuxuryOneTimeFee;
+  }
+  if (record.containsKey('invoiceLuxuryMonthlyFee') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['invoiceLuxuryMonthlyFee'];
+    if (v is num && v >= 0) next.invoiceLuxuryMonthlyFee = v.toDouble();
+  } else {
+    next.invoiceLuxuryMonthlyFee = keep.invoiceLuxuryMonthlyFee;
+  }
+  if (record.containsKey('invoicePremiumAllowOneTime')) {
+    next.invoicePremiumAllowOneTime = record['invoicePremiumAllowOneTime'] != false;
+  }
+  if (record.containsKey('invoicePremiumAllowMonthly')) {
+    next.invoicePremiumAllowMonthly = record['invoicePremiumAllowMonthly'] != false;
+  }
+  if (record.containsKey('invoiceLuxuryAllowOneTime')) {
+    next.invoiceLuxuryAllowOneTime = record['invoiceLuxuryAllowOneTime'] != false;
+  }
+  if (record.containsKey('invoiceLuxuryAllowMonthly')) {
+    next.invoiceLuxuryAllowMonthly = record['invoiceLuxuryAllowMonthly'] != false;
+  }
+  if (record.containsKey('invoicePremiumAccessUntilByEmail') && record['invoicePremiumAccessUntilByEmail'] is Map) {
+    next.invoicePremiumAccessUntilByEmail = {
+      ..._familyTreePhotoAccessFromJson(record['invoicePremiumAccessUntilByEmail']),
+      ...keep.invoicePremiumAccessUntilByEmail,
+    };
+  } else if (keep.invoicePremiumAccessUntilByEmail.isNotEmpty) {
+    next.invoicePremiumAccessUntilByEmail = Map<String, String>.from(keep.invoicePremiumAccessUntilByEmail);
+  }
+  if (record.containsKey('invoiceLuxuryAccessUntilByEmail') && record['invoiceLuxuryAccessUntilByEmail'] is Map) {
+    next.invoiceLuxuryAccessUntilByEmail = {
+      ..._familyTreePhotoAccessFromJson(record['invoiceLuxuryAccessUntilByEmail']),
+      ...keep.invoiceLuxuryAccessUntilByEmail,
+    };
+  } else if (keep.invoiceLuxuryAccessUntilByEmail.isNotEmpty) {
+    next.invoiceLuxuryAccessUntilByEmail = Map<String, String>.from(keep.invoiceLuxuryAccessUntilByEmail);
+  }
+  if (record.containsKey('invoicePremiumLifetimeEmails') && record['invoicePremiumLifetimeEmails'] is List) {
+    next.invoicePremiumLifetimeEmails = _emailListFromJson(record['invoicePremiumLifetimeEmails']);
+  } else if (keep.invoicePremiumLifetimeEmails.isNotEmpty) {
+    next.invoicePremiumLifetimeEmails = List<String>.from(keep.invoicePremiumLifetimeEmails);
+  }
+  if (record.containsKey('invoiceLuxuryLifetimeEmails') && record['invoiceLuxuryLifetimeEmails'] is List) {
+    next.invoiceLuxuryLifetimeEmails = _emailListFromJson(record['invoiceLuxuryLifetimeEmails']);
+  } else if (keep.invoiceLuxuryLifetimeEmails.isNotEmpty) {
+    next.invoiceLuxuryLifetimeEmails = List<String>.from(keep.invoiceLuxuryLifetimeEmails);
   }
 
   if (record.containsKey('jobPosts') && record['jobPosts'] is List) {
@@ -5863,6 +5985,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _refreshAdminInvestmentPlans();
     await ngmyHydrateManagementListsFromAllBackups(_config);
     await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
+    await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
     await ngmyApplyStoreSellAccessFromSettings(_config);
     _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
     await _persistLocalOnly();
@@ -8387,6 +8510,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         return;
       }
+      if (key == _kNgmyInvoicePaymentSettingsKey) {
+        final value = payload.newRecord['value'];
+        if (value is Map) {
+          if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+          setState(() => _applyInvoicePaymentPayload(_config, Map<String, dynamic>.from(value)));
+          unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
+          NgmyAdminLiveRefresh.notify();
+        }
+        return;
+      }
       if (key == _kNgmySettingsChatClosedKey) {
         final value = payload.newRecord['value'];
         if (value is Map) {
@@ -8794,6 +8927,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           );
           await ngmyHydrateManagementListsFromAllBackups(_config);
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
+    await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
         } catch (_) {}
       }
       final localMediaJson = safeGet('all_media');
@@ -9047,6 +9181,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _config = next;
           await ngmyHydrateManagementListsFromAllBackups(_config);
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
+    await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
           _mergeOperationalManagementListsIntoConfig(_config, localConfigSnapshot);
           await ngmyApplyStoreSellAccessFromSettings(_config);
           _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
@@ -16237,6 +16372,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void _showPaymentsAdmin(bool isDark) {
     final createC = TextEditingController(text: widget.config.familyTreeCreateFee.toStringAsFixed(2));
     final photoC = TextEditingController(text: widget.config.familyTreePhotoMonthlyFee.toStringAsFixed(2));
+    final premOneC = TextEditingController(text: widget.config.invoicePremiumOneTimeFee.toStringAsFixed(2));
+    final premMoC = TextEditingController(text: widget.config.invoicePremiumMonthlyFee.toStringAsFixed(2));
+    final luxOneC = TextEditingController(text: widget.config.invoiceLuxuryOneTimeFee.toStringAsFixed(2));
+    final luxMoC = TextEditingController(text: widget.config.invoiceLuxuryMonthlyFee.toStringAsFixed(2));
+    var premOneOn = widget.config.invoicePremiumAllowOneTime;
+    var premMoOn = widget.config.invoicePremiumAllowMonthly;
+    var luxOneOn = widget.config.invoiceLuxuryAllowOneTime;
+    var luxMoOn = widget.config.invoiceLuxuryAllowMonthly;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -16248,6 +16391,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             child: Align(
               alignment: Alignment.bottomCenter,
               child: Container(
+                constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.88),
                 margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
                 decoration: BoxDecoration(
@@ -16255,68 +16399,92 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   borderRadius: BorderRadius.circular(26),
                   border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text('Payments', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Family tree fees are charged from each member\'s NGMY wallet balance.',
-                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: createC,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Fee per new family tree (\$)',
-                        prefixIcon: Icon(Icons.account_tree_outlined),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text('Payments', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Set wallet fees for Family Tree and Invoice templates. Users pay from NGMY balance.',
+                        style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: photoC,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Monthly photo upload fee (\$)',
-                        prefixIcon: Icon(Icons.photo_library_outlined),
-                        helperText: '30 days of member photo uploads per payment',
+                      const SizedBox(height: 16),
+                      Text('Family Tree', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: createC,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(labelText: 'Fee per new family tree (\$)', prefixIcon: Icon(Icons.account_tree_outlined)),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: () async {
-                        final create = double.tryParse(createC.text.trim());
-                        final photo = double.tryParse(photoC.text.trim());
-                        if (create == null || create < 0 || photo == null || photo < 0) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Enter valid dollar amounts (0 or more).')),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: photoC,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Monthly photo upload fee (\$)',
+                          prefixIcon: Icon(Icons.photo_library_outlined),
+                          helperText: '30 days of member photo uploads per payment',
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text('Invoices — Premium', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                      const SizedBox(height: 8),
+                      TextField(controller: premOneC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Premium one-time unlock (\$)')),
+                      const SizedBox(height: 8),
+                      TextField(controller: premMoC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Premium monthly access (\$)')),
+                      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Allow one-time payment'), value: premOneOn, onChanged: (v) => setST(() => premOneOn = v)),
+                      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Allow monthly payment'), value: premMoOn, onChanged: (v) => setST(() => premMoOn = v)),
+                      const SizedBox(height: 12),
+                      Text('Invoices — Luxury & Essential Luxury', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                      const SizedBox(height: 8),
+                      TextField(controller: luxOneC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Luxury one-time unlock (\$)')),
+                      const SizedBox(height: 8),
+                      TextField(controller: luxMoC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Luxury monthly access (\$)')),
+                      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Allow one-time payment'), value: luxOneOn, onChanged: (v) => setST(() => luxOneOn = v)),
+                      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Allow monthly payment'), value: luxMoOn, onChanged: (v) => setST(() => luxMoOn = v)),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: () async {
+                          final create = double.tryParse(createC.text.trim());
+                          final photo = double.tryParse(photoC.text.trim());
+                          final p1 = double.tryParse(premOneC.text.trim());
+                          final p2 = double.tryParse(premMoC.text.trim());
+                          final l1 = double.tryParse(luxOneC.text.trim());
+                          final l2 = double.tryParse(luxMoC.text.trim());
+                          if ([create, photo, p1, p2, l1, l2].any((v) => v == null || v < 0)) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid dollar amounts (0 or more).')));
+                            return;
+                          }
+                          setST(() {
+                            widget.config.familyTreeCreateFee = create!;
+                            widget.config.familyTreePhotoMonthlyFee = photo!;
+                            widget.config.invoicePremiumOneTimeFee = p1!;
+                            widget.config.invoicePremiumMonthlyFee = p2!;
+                            widget.config.invoiceLuxuryOneTimeFee = l1!;
+                            widget.config.invoiceLuxuryMonthlyFee = l2!;
+                            widget.config.invoicePremiumAllowOneTime = premOneOn;
+                            widget.config.invoicePremiumAllowMonthly = premMoOn;
+                            widget.config.invoiceLuxuryAllowOneTime = luxOneOn;
+                            widget.config.invoiceLuxuryAllowMonthly = luxMoOn;
+                          });
+                          widget.onDataChanged();
+                          final ftOk = await ngmyPersistFamilyTreePaymentSettings(widget.config);
+                          final invOk = await ngmyPersistInvoicePaymentSettings(widget.config);
+                          if (!context.mounted) return;
+                          Navigator.pop(ctx);
+                          setState(() {});
+                          ngmyAdminShowCloudSaveSnackBar(
+                            context,
+                            cloudOk: ftOk && invOk,
+                            success: 'Payment settings saved for Family Tree and Invoices.',
                           );
-                          return;
-                        }
-                        setST(() {
-                          widget.config.familyTreeCreateFee = create;
-                          widget.config.familyTreePhotoMonthlyFee = photo;
-                        });
-                        widget.onDataChanged();
-                        final ok = await ngmyPersistFamilyTreePaymentSettings(widget.config);
-                        if (!context.mounted) return;
-                        Navigator.pop(ctx);
-                        setState(() {});
-                        ngmyAdminShowCloudSaveSnackBar(
-                          context,
-                          cloudOk: ok,
-                          success: 'Family tree payment settings saved for all users.',
-                        );
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF0D9488),
-                        minimumSize: const Size(double.infinity, 48),
+                        },
+                        style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0D9488), minimumSize: const Size(double.infinity, 48)),
+                        child: const Text('Save all payment settings', style: TextStyle(fontWeight: FontWeight.w800)),
                       ),
-                      child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -16326,6 +16494,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ).whenComplete(() {
       createC.dispose();
       photoC.dispose();
+      premOneC.dispose();
+      premMoC.dispose();
+      luxOneC.dispose();
+      luxMoC.dispose();
     });
   }
 
@@ -21612,6 +21784,25 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                                       Expanded(
                                         child: OutlinedButton.icon(
                                           onPressed: () async {
+                                            final tpl = ngmyNormalizeInvoiceTemplateId((inv['template'] ?? 'modern').toString());
+                                            if (NgmyInvoicePayments.requiresPayment(tpl, widget.config) &&
+                                                !NgmyInvoicePayments.hasAccess(widget.config, widget.user.email, tpl)) {
+                                              final ok = await NgmyInvoicePayments.requestAccess(
+                                                context: context,
+                                                user: widget.user,
+                                                config: widget.config,
+                                                templateId: tpl,
+                                                onCharge: (amount, description) async => ngmyChargeUserWallet(
+                                                  user: widget.user,
+                                                  allUsers: widget.allUsers,
+                                                  amount: amount,
+                                                  description: description,
+                                                  onAddTransaction: widget.onAddTransaction,
+                                                ),
+                                                onGranted: widget.onDataChanged,
+                                              );
+                                              if (!ok) return;
+                                            }
                                             _applyInvoiceEntryToForm(inv, refreshParent);
                                             await Future.delayed(const Duration(milliseconds: 250));
                                             if (context.mounted) {
@@ -21782,6 +21973,43 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     );
   }
 
+  bool _invoiceContentLocked() =>
+      NgmyInvoicePayments.requiresPayment(_invoiceTemplate, widget.config) &&
+      !NgmyInvoicePayments.hasAccess(widget.config, widget.user.email, _invoiceTemplate);
+
+  Future<bool> _ensureInvoiceTemplatePaid(BuildContext ctx, VoidCallback refresh) {
+    return NgmyInvoicePayments.requestAccess(
+      context: ctx,
+      user: widget.user,
+      config: widget.config,
+      templateId: _invoiceTemplate,
+      onCharge: (amount, description) async => ngmyChargeUserWallet(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        amount: amount,
+        description: description,
+        onAddTransaction: widget.onAddTransaction,
+      ),
+      onGranted: widget.onDataChanged,
+    ).then((ok) {
+      if (ok) refresh();
+      return ok;
+    });
+  }
+
+  InputDecoration _invoiceFieldDec(String label, {bool locked = false}) => InputDecoration(
+        labelText: label,
+        suffixIcon: locked ? const Icon(Icons.lock_outline_rounded, size: 18) : null,
+      );
+
+  Widget _invoiceLockedWrap({required BuildContext ctx, required VoidCallback refresh, required Widget child}) {
+    if (!_invoiceContentLocked()) return child;
+    return GestureDetector(
+      onTap: () => _ensureInvoiceTemplatePaid(ctx, refresh),
+      child: AbsorbPointer(child: child),
+    );
+  }
+
   void _openInvoiceGenerator() async {
     _providerSignaturePoints.clear();
     _clientSignaturePoints.clear();
@@ -21822,6 +22050,9 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
               savedCount = await savedInvoiceCount();
               setDialog(() {});
             }
+
+            final invoiceLocked = _invoiceContentLocked();
+            void refreshAll() => setDialog(() {});
 
             return Dialog(
               insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
@@ -21915,115 +22146,186 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         ),
                       ),
                     ],
+                    if (invoiceLocked) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7C3AED).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.45)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.lock_rounded, color: Color(0xFFA78BFA), size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Premium/Luxury preview — pay to fill business details, save, or download. Photo upload is still allowed.',
+                                style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : Colors.black87, height: 1.35),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => _ensureInvoiceTemplatePaid(ctx, refreshAll),
+                              child: const Text('Unlock'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _invoiceNoC, decoration: const InputDecoration(labelText: 'Invoice #'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: _issuedDateC, decoration: const InputDecoration(labelText: 'Issued Date'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: _dueDateC, decoration: const InputDecoration(labelText: 'Due Date'))),
-                      ],
+                    _invoiceLockedWrap(
+                      ctx: ctx,
+                      refresh: refreshAll,
+                      child: Row(
+                        children: [
+                          Expanded(child: TextField(controller: _invoiceNoC, decoration: _invoiceFieldDec('Invoice #', locked: invoiceLocked))),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _issuedDateC, decoration: _invoiceFieldDec('Issued Date', locked: invoiceLocked))),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _dueDateC, decoration: _invoiceFieldDec('Due Date', locked: invoiceLocked))),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 10),
-                    TextField(controller: _bizNameC, decoration: const InputDecoration(labelText: 'Your Business Name (auto-saved)')),
+                    _invoiceLockedWrap(
+                      ctx: ctx,
+                      refresh: refreshAll,
+                      child: TextField(controller: _bizNameC, decoration: _invoiceFieldDec('Your Business Name (auto-saved)', locked: invoiceLocked)),
+                    ),
                     const SizedBox(height: 8),
-                    TextField(controller: _bizStreetC, decoration: const InputDecoration(labelText: 'Street Address (auto-saved)')),
+                    _invoiceLockedWrap(
+                      ctx: ctx,
+                      refresh: refreshAll,
+                      child: TextField(controller: _bizStreetC, decoration: _invoiceFieldDec('Street Address (auto-saved)', locked: invoiceLocked)),
+                    ),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _bizCityStateZipC, decoration: const InputDecoration(labelText: 'City, State ZIP (auto-saved)'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: _bizPhoneC, decoration: const InputDecoration(labelText: 'Phone Number (auto-saved)'))),
-                      ],
+                    _invoiceLockedWrap(
+                      ctx: ctx,
+                      refresh: refreshAll,
+                      child: Row(
+                        children: [
+                          Expanded(child: TextField(controller: _bizCityStateZipC, decoration: _invoiceFieldDec('City, State ZIP (auto-saved)', locked: invoiceLocked))),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _bizPhoneC, decoration: _invoiceFieldDec('Phone Number (auto-saved)', locked: invoiceLocked))),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _clientNameC, decoration: const InputDecoration(labelText: 'Bill To (Client Name)'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: _clientEmailC, decoration: const InputDecoration(labelText: 'Client Email'))),
-                      ],
+                    _invoiceLockedWrap(
+                      ctx: ctx,
+                      refresh: refreshAll,
+                      child: Row(
+                        children: [
+                          Expanded(child: TextField(controller: _clientNameC, decoration: _invoiceFieldDec('Bill To (Client Name)', locked: invoiceLocked))),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _clientEmailC, decoration: _invoiceFieldDec('Client Email', locked: invoiceLocked))),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _itemNameC, decoration: const InputDecoration(labelText: 'Item name'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: _itemPriceC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: _itemQtyC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Qty'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: _itemDiscountC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Discount %'))),
-                      ],
+                    _invoiceLockedWrap(
+                      ctx: ctx,
+                      refresh: refreshAll,
+                      child: Row(
+                        children: [
+                          Expanded(child: TextField(controller: _itemNameC, decoration: _invoiceFieldDec('Item name', locked: invoiceLocked))),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _itemPriceC, keyboardType: TextInputType.number, decoration: _invoiceFieldDec('Price', locked: invoiceLocked))),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _itemQtyC, keyboardType: TextInputType.number, decoration: _invoiceFieldDec('Qty', locked: invoiceLocked))),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _itemDiscountC, keyboardType: TextInputType.number, decoration: _invoiceFieldDec('Discount %', locked: invoiceLocked))),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    TextField(controller: _itemDescC, decoration: const InputDecoration(labelText: 'Description')),
+                    _invoiceLockedWrap(
+                      ctx: ctx,
+                      refresh: refreshAll,
+                      child: TextField(controller: _itemDescC, decoration: _invoiceFieldDec('Description', locked: invoiceLocked)),
+                    ),
                     const SizedBox(height: 8),
-                    TextField(controller: _paymentInfoC, maxLines: 2, decoration: const InputDecoration(labelText: 'Notes & Payment Instructions (auto-saved)')),
+                    _invoiceLockedWrap(
+                      ctx: ctx,
+                      refresh: refreshAll,
+                      child: TextField(controller: _paymentInfoC, maxLines: 2, decoration: _invoiceFieldDec('Notes & Payment Instructions (auto-saved)', locked: invoiceLocked)),
+                    ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: NgmyInvoiceSignaturePad(
-                            title: 'Service Provider Signature',
-                            points: _providerSignaturePoints,
-                            onChanged: () => setDialog(() {}),
-                            onClear: () => setDialog(() => _providerSignaturePoints.clear()),
-                            onFullscreen: () => openFullscreenSignature(
+                    _invoiceLockedWrap(
+                      ctx: ctx,
+                      refresh: refreshAll,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: NgmyInvoiceSignaturePad(
                               title: 'Service Provider Signature',
-                              target: _providerSignaturePoints,
+                              points: _providerSignaturePoints,
+                              onChanged: () => setDialog(() {}),
+                              onClear: () => setDialog(() => _providerSignaturePoints.clear()),
+                              onFullscreen: () => openFullscreenSignature(
+                                title: 'Service Provider Signature',
+                                target: _providerSignaturePoints,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: NgmyInvoiceSignaturePad(
-                            title: 'Client Signature',
-                            points: _clientSignaturePoints,
-                            onChanged: () => setDialog(() {}),
-                            onClear: () => setDialog(() => _clientSignaturePoints.clear()),
-                            onFullscreen: () => openFullscreenSignature(
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: NgmyInvoiceSignaturePad(
                               title: 'Client Signature',
-                              target: _clientSignaturePoints,
+                              points: _clientSignaturePoints,
+                              onChanged: () => setDialog(() {}),
+                              onClear: () => setDialog(() => _clientSignaturePoints.clear()),
+                              onFullscreen: () => openFullscreenSignature(
+                                title: 'Client Signature',
+                                target: _clientSignaturePoints,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    SwitchListTile(
-                      value: _invoicePaid,
-                      onChanged: (v) => setDialog(() => _invoicePaid = v),
-                      title: const Text('Mark invoice as paid'),
-                      subtitle: const Text('Paid invoices auto-delete from local saves after 5 days.'),
-                      contentPadding: EdgeInsets.zero,
+                    _invoiceLockedWrap(
+                      ctx: ctx,
+                      refresh: refreshAll,
+                      child: SwitchListTile(
+                        value: _invoicePaid,
+                        onChanged: (v) => setDialog(() => _invoicePaid = v),
+                        title: const Text('Mark invoice as paid'),
+                        subtitle: const Text('Paid invoices auto-delete from local saves after 5 days.'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    RepaintBoundary(
-                      key: localPreviewKey,
-                      child: NgmyInvoicePreview(
-                        data: NgmyInvoicePreviewData(
-                          templateId: _invoiceTemplate,
-                          businessName: _bizNameC.text,
-                          bizStreet: _bizStreetC.text,
-                          bizCityStateZip: _bizCityStateZipC.text,
-                          bizPhone: _bizPhoneC.text,
-                          invoiceNo: _invoiceNoC.text,
-                          issuedDate: _issuedDateC.text,
-                          dueDate: _dueDateC.text,
-                          clientName: _clientNameC.text,
-                          clientEmail: _clientEmailC.text,
-                          itemName: _itemNameC.text,
-                          itemPrice: _itemPriceC.text,
-                          itemQty: _itemQtyC.text,
-                          itemDiscount: _itemDiscountC.text,
-                          itemDesc: _itemDescC.text,
-                          paymentInfo: _paymentInfoC.text,
-                          subtotal: subtotal,
-                          providerSignature: _providerSignaturePoints,
-                          clientSignature: _clientSignaturePoints,
-                          providerPhotoBytes: _invoiceProviderPhotoBytes,
+                    NgmyInvoiceProtectedPreview(
+                      locked: invoiceLocked,
+                      child: RepaintBoundary(
+                        key: localPreviewKey,
+                        child: NgmyInvoicePreview(
+                          data: NgmyInvoicePreviewData(
+                            templateId: _invoiceTemplate,
+                            businessName: _bizNameC.text,
+                            bizStreet: _bizStreetC.text,
+                            bizCityStateZip: _bizCityStateZipC.text,
+                            bizPhone: _bizPhoneC.text,
+                            invoiceNo: _invoiceNoC.text,
+                            issuedDate: _issuedDateC.text,
+                            dueDate: _dueDateC.text,
+                            clientName: _clientNameC.text,
+                            clientEmail: _clientEmailC.text,
+                            itemName: _itemNameC.text,
+                            itemPrice: _itemPriceC.text,
+                            itemQty: _itemQtyC.text,
+                            itemDiscount: _itemDiscountC.text,
+                            itemDesc: _itemDescC.text,
+                            paymentInfo: _paymentInfoC.text,
+                            subtotal: subtotal,
+                            providerSignature: _providerSignaturePoints,
+                            clientSignature: _clientSignaturePoints,
+                            providerPhotoBytes: _invoiceProviderPhotoBytes,
+                          ),
                         ),
                       ),
                     ),
@@ -22035,6 +22337,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () async {
+                              if (!await _ensureInvoiceTemplatePaid(ctx, refreshAll)) return;
                               final count = await _saveInvoiceLocally(ctx, subtotal);
                               setDialog(() => savedCount = count);
                             },
@@ -22045,7 +22348,10 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         const SizedBox(width: 8),
                         Expanded(
                           child: FilledButton.icon(
-                            onPressed: () => _downloadInvoiceImage(ctx, localPreviewKey),
+                            onPressed: () async {
+                              if (!await _ensureInvoiceTemplatePaid(ctx, refreshAll)) return;
+                              await _downloadInvoiceImage(ctx, localPreviewKey);
+                            },
                             icon: const Icon(Icons.download_rounded),
                             label: const Text('Download'),
                           ),

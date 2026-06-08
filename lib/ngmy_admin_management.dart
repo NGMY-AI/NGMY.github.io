@@ -6,6 +6,8 @@ const String _kNgmyStoreSellAccessSettingsKey = 'store_sell_access_emails';
 const String _kNgmyDeletedMediaSettingsKey = 'deleted_media_ids';
 const String _kNgmyFamilyTreePaymentSettingsKey = 'family_tree_payment_settings';
 const String _kNgmyFamilyTreePaymentPrefsKey = 'ngmy_family_tree_payment_settings_v1';
+const String _kNgmyInvoicePaymentSettingsKey = 'invoice_payment_settings';
+const String _kNgmyInvoicePaymentPrefsKey = 'ngmy_invoice_payment_settings_v1';
 
 Future<Set<String>> _fetchDeletedMediaIdsFromCloud() async {
   final row = await _fetchNgmySettingSafe(_kNgmyDeletedMediaSettingsKey);
@@ -263,6 +265,87 @@ void _applyFamilyTreePaymentPayload(AppConfig config, Map<String, dynamic> paylo
   if (photo is num && photo >= 0) config.familyTreePhotoMonthlyFee = photo.toDouble();
 }
 
+Map<String, dynamic> _invoicePaymentPayload(AppConfig config) => {
+      'invoicePremiumOneTimeFee': config.invoicePremiumOneTimeFee,
+      'invoicePremiumMonthlyFee': config.invoicePremiumMonthlyFee,
+      'invoiceLuxuryOneTimeFee': config.invoiceLuxuryOneTimeFee,
+      'invoiceLuxuryMonthlyFee': config.invoiceLuxuryMonthlyFee,
+      'invoicePremiumAllowOneTime': config.invoicePremiumAllowOneTime,
+      'invoicePremiumAllowMonthly': config.invoicePremiumAllowMonthly,
+      'invoiceLuxuryAllowOneTime': config.invoiceLuxuryAllowOneTime,
+      'invoiceLuxuryAllowMonthly': config.invoiceLuxuryAllowMonthly,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyInvoicePaymentPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+  void fee(String k, void Function(double v) set, double fallback) {
+    final v = payload[k];
+    if (v is num && v >= 0) set(v.toDouble());
+  }
+
+  fee('invoicePremiumOneTimeFee', (v) => config.invoicePremiumOneTimeFee = v, NgmyInvoicePayments.defaultPremiumOneTime);
+  fee('invoicePremiumMonthlyFee', (v) => config.invoicePremiumMonthlyFee = v, NgmyInvoicePayments.defaultPremiumMonthly);
+  fee('invoiceLuxuryOneTimeFee', (v) => config.invoiceLuxuryOneTimeFee = v, NgmyInvoicePayments.defaultLuxuryOneTime);
+  fee('invoiceLuxuryMonthlyFee', (v) => config.invoiceLuxuryMonthlyFee = v, NgmyInvoicePayments.defaultLuxuryMonthly);
+  if (payload.containsKey('invoicePremiumAllowOneTime')) {
+    config.invoicePremiumAllowOneTime = payload['invoicePremiumAllowOneTime'] == true;
+  }
+  if (payload.containsKey('invoicePremiumAllowMonthly')) {
+    config.invoicePremiumAllowMonthly = payload['invoicePremiumAllowMonthly'] == true;
+  }
+  if (payload.containsKey('invoiceLuxuryAllowOneTime')) {
+    config.invoiceLuxuryAllowOneTime = payload['invoiceLuxuryAllowOneTime'] == true;
+  }
+  if (payload.containsKey('invoiceLuxuryAllowMonthly')) {
+    config.invoiceLuxuryAllowMonthly = payload['invoiceLuxuryAllowMonthly'] == true;
+  }
+}
+
+Future<void> _persistInvoicePaymentSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyInvoicePaymentPrefsKey, jsonEncode(_invoicePaymentPayload(config)));
+  } catch (e) {
+    debugPrint('[admin invoice payments] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateInvoicePaymentsFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyInvoicePaymentPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyInvoicePaymentPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[admin invoice payments] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyInvoicePaymentSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      _applyInvoicePaymentPayload(config, row);
+    }
+  }
+}
+
+Future<bool> ngmyPersistInvoicePaymentSettings(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  await _persistInvoicePaymentSettingsLocal(config);
+
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _invoicePaymentPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyInvoicePaymentSettingsKey, payload);
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
 Future<void> _persistFamilyTreePaymentSettingsLocal(AppConfig config) async {
   try {
     final prefs = await SharedPreferences.getInstance();
@@ -390,6 +473,7 @@ Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
   if (ngmyShouldDeferRemoteConfigOverwrite()) return;
   await ngmyHydrateManagementListsFromAllBackups(config);
   await ngmyHydrateFamilyTreePaymentsFromAllBackups(config);
+  await ngmyHydrateInvoicePaymentsFromAllBackups(config);
   final snapshot = AppConfig.fromJson(config.toJson());
 
   if (await ngmyCanReachCloud()) {
