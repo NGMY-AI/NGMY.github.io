@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_gemini_vision.dart';
+import 'ngmy_modern_chat_prefix.dart';
 
 /// N-Services — document scanner (tap **N** in NGMY Services).
 void showNgmyDocumentScanner(
@@ -615,9 +616,9 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   }
 
   Widget _modernChatPrefix() {
-    return Padding(
-      padding: const EdgeInsets.only(left: 10, right: 6),
-      child: Icon(Icons.chat_bubble_rounded, size: 22, color: Colors.white.withValues(alpha: 0.72)),
+    return const Padding(
+      padding: EdgeInsets.only(left: 10, right: 6),
+      child: NgmyModernChatPrefixIcon(size: 26),
     );
   }
 

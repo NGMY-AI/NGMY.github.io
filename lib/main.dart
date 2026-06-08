@@ -32,6 +32,8 @@ import 'ngmy_nav.dart';
 import 'ngmy_back_scope.dart';
 import 'ngmy_barcode_lookup.dart';
 import 'ngmy_price_product_scanner.dart';
+import 'ngmy_iron_triangle_panel.dart';
+import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_games.dart';
@@ -21692,78 +21694,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
           final service = _calcServiceC.text.trim();
           final showPriceResult = mine > 0 || others > 0;
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          final dialogW = MediaQuery.of(ctx).size.width > 480 ? 380.0 : MediaQuery.of(ctx).size.width - 28;
-          const chrome = [Color(0xFF252A32), Color(0xFF0A0D14)];
-
-          InputDecoration calcDec(String hint) => InputDecoration(
-                hintText: hint,
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 13),
-                filled: true,
-                fillColor: Colors.black.withOpacity(0.25),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withOpacity(0.12))),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF10B981))),
-              );
-
-          Widget triRow({
-            required String keyName,
-            required String label,
-            required bool active,
-            required Color labelColor,
-            required Color trackColor,
-          }) {
-            return Container(
-              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.07))),
-              ),
-              child: Row(
-                children: [
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: labelColor, shape: BoxShape.circle)),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: active ? labelColor : Colors.white38,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  const Spacer(),
-                  Transform.scale(
-                    scale: 0.78,
-                    child: Switch(
-                      value: active,
-                      activeTrackColor: trackColor.withOpacity(0.55),
-                      activeThumbColor: trackColor,
-                      onChanged: (v) {
-                        _setTriangleOption(keyName, v);
-                        setDialog(() {});
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          Widget rivet(Alignment align) {
-            return Align(
-              alignment: align,
-              child: Container(
-                width: 7,
-                height: 7,
-                margin: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.18),
-                  border: Border.all(color: Colors.black54),
-                ),
-              ),
-            );
-          }
+          final dialogW = MediaQuery.of(ctx).size.width > 480 ? 400.0 : MediaQuery.of(ctx).size.width - 28;
 
           return Dialog(
             insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
@@ -21778,275 +21709,68 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.bolt, size: 16, color: Colors.white),
-                        const SizedBox(width: 6),
-                        const Text('Pick Two', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: Colors.white)),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            gradient: const LinearGradient(colors: [Color(0xFF9CA3AF), Color(0xFF4B5563), Color(0xFF1F2937)]),
+                          ),
+                          child: const Icon(Icons.change_history_rounded, color: Colors.white, size: 16),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('Pick Two', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white, letterSpacing: 0.3)),
                         const Spacer(),
                         IconButton(
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                           onPressed: () => Navigator.pop(ctx),
-                          icon: const Icon(Icons.close, color: Colors.white70, size: 20),
+                          icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 6),
-                    Stack(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: chrome, begin: Alignment.topLeft, end: Alignment.bottomRight),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFF4B5563)),
-                          ),
-                          child: Column(
-                            children: [
-                              const SizedBox(height: 10),
-                              Text(
-                                'THE IRON TRIANGLE',
-                                style: TextStyle(color: Colors.white.withOpacity(0.55), letterSpacing: 3, fontSize: 9, fontWeight: FontWeight.w800),
-                              ),
-                              const SizedBox(height: 4),
-                              triRow(keyName: 'fast', label: 'FAST', active: _triFast, labelColor: const Color(0xFFF97316), trackColor: const Color(0xFFF97316)),
-                              triRow(keyName: 'cheap', label: 'CHEAP', active: _triCheap, labelColor: const Color(0xFF34D399), trackColor: const Color(0xFF34D399)),
-                              triRow(keyName: 'good', label: 'GOOD', active: _triGood, labelColor: const Color(0xFF94A3B8), trackColor: const Color(0xFF60A5FA)),
-                              const SizedBox(height: 6),
-                            ],
-                          ),
-                        ),
-                        rivet(Alignment.topLeft),
-                        rivet(Alignment.topRight),
-                        rivet(Alignment.bottomLeft),
-                        rivet(Alignment.bottomRight),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F2744),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.45)),
-                      ),
-                      child: Text(_triangleResult(), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 11, height: 1.35)),
                     ),
                     const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [Color(0xFF0A3A46), Color(0xFF0A2D4F)]),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.55)),
+                    NgmyIronTrianglePanel(
+                      triFast: _triFast,
+                      triCheap: _triCheap,
+                      triGood: _triGood,
+                      resultText: _triangleResult(),
+                      onToggle: (key, v) {
+                        _setTriangleOption(key, v);
+                        setDialog(() {});
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    NgmyPriceCalculatorPanel(
+                      cityController: _calcCityC,
+                      serviceController: _calcServiceC,
+                      othersPriceController: _othersPriceC,
+                      myPriceController: _myPriceC,
+                      discount: _discount,
+                      onDiscountChanged: (v) => setDialog(() => _discount = v),
+                      onFieldChanged: refresh,
+                      city: city,
+                      service: service,
+                      others: others,
+                      mine: mine,
+                      netMine: netMine,
+                      discountAmt: discountAmt,
+                      belowMarket: belowMarket,
+                      showPriceResult: showPriceResult,
+                      onScanTap: () => openNgmyPriceProductScanner(
+                        ctx,
+                        onApplyPrice: (name, price, type) {
+                          if (name.isNotEmpty) _calcServiceC.text = name;
+                          if (type.isNotEmpty && _calcServiceC.text.trim().isEmpty) {
+                            _calcServiceC.text = type;
+                          }
+                          if (price > 0) {
+                            _myPriceC.text = price.toStringAsFixed(2);
+                          }
+                          refresh();
+                        },
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Text('💰', style: TextStyle(fontSize: 14)),
-                              const SizedBox(width: 6),
-                              const Text('Price Calculator', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 14)),
-                              const Spacer(),
-                              GestureDetector(
-                                onTap: () => openNgmyPriceProductScanner(
-                                  ctx,
-                                  onApplyPrice: (name, price, type) {
-                                    if (name.isNotEmpty) _calcServiceC.text = name;
-                                    if (type.isNotEmpty && _calcServiceC.text.trim().isEmpty) {
-                                      _calcServiceC.text = type;
-                                    }
-                                    if (price > 0) {
-                                      _myPriceC.text = price.toStringAsFixed(2);
-                                    }
-                                    refresh();
-                                  },
-                                ),
-                                child: Container(
-                                  width: 34,
-                                  height: 34,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF7C3AED).withOpacity(0.22),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFF7C3AED)),
-                                  ),
-                                  child: const Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF7C3AED), size: 20),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              GestureDetector(
-                                onTap: () => _openInvoiceFromGDialog(ctx),
-                                child: Container(
-                                  width: 34,
-                                  height: 34,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(Icons.attach_money_rounded, color: Colors.white, size: 20),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                                  controller: _calcCityC,
-                                  onChanged: (_) => refresh(),
-                                  decoration: calcDec('City (e.g., Macon)'),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: TextField(
-                                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                                  controller: _calcServiceC,
-                                  onChanged: (_) => refresh(),
-                                  decoration: calcDec('Service name'),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                                  controller: _othersPriceC,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  onChanged: (_) => refresh(),
-                                  decoration: calcDec('Others charge (\$)'),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: TextField(
-                                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                                  controller: _myPriceC,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  onChanged: (_) => refresh(),
-                                  decoration: calcDec('My price (\$)'),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              const Text('Discount', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                              Expanded(
-                                child: Slider(
-                                  value: _discount,
-                                  min: 0,
-                                  max: 20,
-                                  divisions: 20,
-                                  activeColor: const Color(0xFF10B981),
-                                  onChanged: (v) => setDialog(() => _discount = v),
-                                ),
-                              ),
-                              Text('${_discount.toStringAsFixed(0)}%', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                            ],
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('0%', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10)),
-                              Text('Max 20%', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10)),
-                            ],
-                          ),
-                          if (showPriceResult) ...[
-                            const SizedBox(height: 10),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.22),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFF10B981)),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    service.isNotEmpty && city.isNotEmpty
-                                        ? '$service in $city'
-                                        : service.isNotEmpty
-                                            ? service
-                                            : city.isNotEmpty
-                                                ? city
-                                                : 'Your quote',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
-                                  ),
-                                  if (others > 0) ...[
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      'Market rate: \$${others.toStringAsFixed(2)}',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 12),
-                                    ),
-                                  ],
-                                  if (mine > 0) ...[
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      'YOUR PRICE',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1),
-                                    ),
-                                    Text(
-                                      '\$${netMine.toStringAsFixed(2)}',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 32, height: 1.05),
-                                    ),
-                                    if (discountAmt > 0.009) ...[
-                                      const SizedBox(height: 6),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            '\$${mine.toStringAsFixed(2)}',
-                                            style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 13, decoration: TextDecoration.lineThrough),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF10B981).withOpacity(0.2),
-                                              borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
-                                            ),
-                                            child: Text('Save \$${discountAmt.toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFF34D399), fontSize: 11, fontWeight: FontWeight.w800)),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
-                                  if (others > 0 && mine > 0 && belowMarket > 0.009) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      '✓ \$${belowMarket.toStringAsFixed(2)} below market rate!',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w700, fontSize: 12),
-                                    ),
-                                  ] else if (others > 0 && mine > 0 && belowMarket < -0.009) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Above market by \$${(-belowMarket).toStringAsFixed(2)}',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(color: Color(0xFFF97316), fontWeight: FontWeight.w700, fontSize: 12),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                      onInvoiceTap: () => _openInvoiceFromGDialog(ctx),
                     ),
                   ],
                 ),
