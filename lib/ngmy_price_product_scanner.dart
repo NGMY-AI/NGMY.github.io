@@ -32,19 +32,22 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
 
   late TabController _tabs;
   final MobileScannerController _camera = MobileScannerController(
-    detectionSpeed: DetectionSpeed.normal,
+    detectionSpeed: DetectionSpeed.unrestricted,
     facing: CameraFacing.back,
-    formats: const [BarcodeFormat.all],
+    formats: ngmyScannerBarcodeFormats,
   );
 
   bool _handling = false;
   bool _torchOn = false;
   bool _loading = false;
+  bool _fromCatalog = false;
   String? _lastCode;
+  String? _lastFormat;
   String? _error;
   NgmyBarcodeProduct? _online;
   NgmyLocalProductRecord? _local;
   List<NgmyLocalProductRecord> _catalog = [];
+  DateTime? _lastDetectAt;
 
   final _nameC = TextEditingController();
   final _barcodeC = TextEditingController();
@@ -60,6 +63,11 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
     _tabs = TabController(length: 2, vsync: this);
     _tabs.addListener(_onTabChanged);
     _reloadCatalog();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await _camera.start();
+      } catch (_) {}
+    });
   }
 
   void _onTabChanged() {
@@ -93,51 +101,64 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
     super.dispose();
   }
 
+  void _showLocalHit(NgmyLocalProductRecord local, String raw) {
+    setState(() {
+      _loading = false;
+      _handling = false;
+      _local = local;
+      _online = null;
+      _fromCatalog = true;
+      _lastCode = raw.trim();
+      _error = null;
+    });
+  }
+
   Future<void> _resolveCode(String raw) async {
-    if (_handling || raw.trim().isEmpty) return;
-    if (raw == _lastCode && (_online != null || _local != null || _loading)) return;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty || _handling) return;
+
+    final enrolled = matchNgmyLocalProductInList(trimmed, _catalog);
+    if (enrolled != null) {
+      _showLocalHit(enrolled, trimmed);
+      return;
+    }
+
+    if (trimmed == _lastCode && _loading) return;
+
     _handling = true;
-    _lastCode = raw.trim();
+    _lastCode = trimmed;
     setState(() {
       _loading = true;
       _error = null;
       _online = null;
       _local = null;
+      _fromCatalog = false;
     });
 
     try {
-      final qrProduct = NgmyLocalProductRecord.fromQrPayload(raw.trim());
-      if (qrProduct != null) {
-        final saved = await findNgmyLocalProductByBarcode(qrProduct.barcode);
+      final local = await findNgmyLocalProductByBarcode(trimmed);
+      if (local != null) {
         if (!mounted) return;
-        setState(() {
-          _loading = false;
-          _local = saved ?? qrProduct;
-          _online = null;
-        });
-        _handling = false;
+        _showLocalHit(local, trimmed);
         return;
       }
 
-      final local = await findNgmyLocalProductByBarcode(raw);
-      NgmyBarcodeProduct? online;
-      if (local == null) {
-        online = await lookupBarcodeProduct(raw);
-      }
+      final online = await lookupBarcodeProduct(trimmed);
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _local = local;
         _online = online;
-        _error = local == null && online == null
-            ? 'No product found. Enroll this item in My Catalog with a price.'
+        _local = null;
+        _fromCatalog = false;
+        _error = online == null
+            ? 'Code read: $trimmed\nNot in your catalog yet. Enroll it in My Catalog with your price.'
             : null;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Lookup failed. Check your connection.';
+        _error = 'Lookup failed. Code: $trimmed';
       });
     } finally {
       _handling = false;
@@ -145,11 +166,18 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
   }
 
   void _onDetect(BarcodeCapture capture) {
-    final barcodes = capture.barcodes;
-    if (barcodes.isEmpty) return;
-    final raw = barcodes.first.rawValue;
-    if (raw == null || raw.trim().isEmpty) return;
-    _resolveCode(raw.trim());
+    final now = DateTime.now();
+    if (_lastDetectAt != null && now.difference(_lastDetectAt!) < const Duration(milliseconds: 350)) return;
+
+    for (final barcode in capture.barcodes) {
+      final raw = ngmyExtractBarcodeValue(barcode);
+      if (raw == null || raw.isEmpty) continue;
+      _lastDetectAt = now;
+      _lastFormat = barcode.format.name;
+      setState(() {});
+      _resolveCode(raw);
+      return;
+    }
   }
 
   Future<void> _enterManually() async {
@@ -176,7 +204,11 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
         _online = null;
         _local = null;
         _lastCode = null;
+        _lastFormat = null;
         _error = null;
+        _fromCatalog = false;
+        _handling = false;
+        _loading = false;
       });
 
   String get _displayName => _local?.name ?? _online?.title ?? '';
@@ -305,13 +337,17 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
             child: Stack(
               fit: StackFit.expand,
               children: [
-                MobileScanner(controller: _camera, onDetect: _onDetect),
+                MobileScanner(
+                  controller: _camera,
+                  onDetect: _onDetect,
+                  fit: BoxFit.cover,
+                ),
                 Center(
                   child: Container(
-                    width: 260,
-                    height: 140,
+                    width: 280,
+                    height: 160,
                     decoration: BoxDecoration(
-                      border: Border.all(color: _scanPurple, width: 3),
+                      border: Border.all(color: _local != null ? _accent : _scanPurple, width: 3),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -321,7 +357,7 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
                   right: 0,
                   bottom: 10,
                   child: Text(
-                    'Scan barcode or your product QR',
+                    _lastFormat != null ? 'Detected $_lastFormat — hold steady' : 'Scan any barcode or QR code',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white.withOpacity(0.92), fontSize: 12, fontWeight: FontWeight.w600),
                   ),
@@ -404,6 +440,29 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (_fromCatalog && _local != null)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: _accent.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _accent),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.inventory_2_rounded, color: _accent, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'From your catalog — \$${_displayPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (image != null && image.startsWith('http'))
           ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(image, height: 120, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink())),
         const SizedBox(height: 10),
@@ -416,7 +475,8 @@ class _NgmyPriceProductScannerPageState extends State<NgmyPriceProductScannerPag
         _infoRow('Type', _displayType.isEmpty ? '—' : _displayType),
         if ((_local?.brand ?? _online?.brand ?? '').isNotEmpty) _infoRow('Brand', _local?.brand ?? _online?.brand ?? ''),
         _infoRow('Your price', _displayPrice > 0 ? '\$${_displayPrice.toStringAsFixed(2)}' : 'Not set — save in catalog'),
-        if (_local != null) _infoRow('Storage', 'Saved on this device'),
+        if (_local != null) _infoRow('Storage', _fromCatalog ? 'Your enrolled item (this device)' : 'Scanned product QR'),
+        if (_local?.description.isNotEmpty == true) _infoRow('Notes', _local!.description),
         if (_online != null && _local == null) _infoRow('Source', _online!.source),
         const SizedBox(height: 12),
         if (widget.onApplyPrice != null && _displayPrice > 0)

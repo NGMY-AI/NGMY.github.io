@@ -130,13 +130,44 @@ Future<void> deleteNgmyLocalProduct(String id) async {
   await persistNgmyLocalProducts(list);
 }
 
-Future<NgmyLocalProductRecord?> findNgmyLocalProductByBarcode(String barcode) async {
-  final code = barcode.replaceAll(RegExp(r'\D'), '');
-  if (code.isEmpty) return null;
-  final list = await loadNgmyLocalProducts();
+String ngmyNormalizeBarcodeDigits(String raw) => raw.replaceAll(RegExp(r'\D'), '');
+
+/// UPC-A (12) ↔ EAN-13 leading zero, etc.
+Set<String> ngmyBarcodeMatchKeys(String raw) {
+  final trimmed = raw.trim();
+  final digits = ngmyNormalizeBarcodeDigits(trimmed);
+  final keys = <String>{trimmed, digits};
+  if (digits.length == 12) keys.add('0$digits');
+  if (digits.length == 13 && digits.startsWith('0')) keys.add(digits.substring(1));
+  if (digits.length > 13) keys.add(digits.substring(digits.length - 13));
+  if (digits.length > 12) keys.add(digits.substring(digits.length - 12));
+  return keys.where((k) => k.isNotEmpty).toSet();
+}
+
+NgmyLocalProductRecord? matchNgmyLocalProductInList(String raw, List<NgmyLocalProductRecord> list) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return null;
+
+  final fromQr = NgmyLocalProductRecord.fromQrPayload(trimmed);
+  if (fromQr != null) {
+    for (final r in list) {
+      if (r.id == fromQr.id) return r;
+      final keys = ngmyBarcodeMatchKeys(r.barcode);
+      if (keys.intersection(ngmyBarcodeMatchKeys(fromQr.barcode)).isNotEmpty) return r;
+    }
+    return fromQr;
+  }
+
+  final scanKeys = ngmyBarcodeMatchKeys(trimmed);
   for (final r in list) {
-    final local = r.barcode.replaceAll(RegExp(r'\D'), '');
-    if (local == code) return r;
+    if (r.id == trimmed) return r;
+    final itemKeys = ngmyBarcodeMatchKeys(r.barcode);
+    if (scanKeys.intersection(itemKeys).isNotEmpty) return r;
   }
   return null;
+}
+
+Future<NgmyLocalProductRecord?> findNgmyLocalProductByBarcode(String barcode) async {
+  final list = await loadNgmyLocalProducts();
+  return matchNgmyLocalProductInList(barcode, list);
 }

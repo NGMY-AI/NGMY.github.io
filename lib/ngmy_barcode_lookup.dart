@@ -10,6 +10,31 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'ngmy_nav.dart';
 
+/// All common retail + QR symbologies (explicit list scans more reliably than [BarcodeFormat.all] on some devices).
+const List<BarcodeFormat> ngmyScannerBarcodeFormats = [
+  BarcodeFormat.qrCode,
+  BarcodeFormat.ean13,
+  BarcodeFormat.ean8,
+  BarcodeFormat.upcA,
+  BarcodeFormat.upcE,
+  BarcodeFormat.code128,
+  BarcodeFormat.code39,
+  BarcodeFormat.code93,
+  BarcodeFormat.codabar,
+  BarcodeFormat.itf,
+  BarcodeFormat.dataMatrix,
+  BarcodeFormat.pdf417,
+  BarcodeFormat.aztec,
+];
+
+String? ngmyExtractBarcodeValue(Barcode barcode) {
+  final raw = barcode.rawValue?.trim();
+  if (raw != null && raw.isNotEmpty) return raw;
+  final display = barcode.displayValue?.trim();
+  if (display != null && display.isNotEmpty) return display;
+  return null;
+}
+
 /// Result of looking up a barcode on public product databases.
 class NgmyBarcodeProduct {
   final String barcode;
@@ -29,21 +54,31 @@ class NgmyBarcodeProduct {
   });
 }
 
-String _normalizeBarcode(String raw) {
-  final digits = raw.replaceAll(RegExp(r'\D'), '');
-  return digits;
+String ngmyNormalizeBarcodeDigits(String raw) => raw.replaceAll(RegExp(r'\D'), '');
+
+List<String> ngmyBarcodeLookupVariants(String rawCode) {
+  final trimmed = rawCode.trim();
+  final digits = ngmyNormalizeBarcodeDigits(trimmed);
+  final variants = <String>{trimmed};
+  if (digits.isNotEmpty) {
+    variants.add(digits);
+    if (digits.length == 12) variants.add('0$digits');
+    if (digits.length == 13 && digits.startsWith('0')) variants.add(digits.substring(1));
+  }
+  return variants.where((v) => ngmyNormalizeBarcodeDigits(v).length >= 6 || v.length >= 4).toList();
 }
 
 Future<NgmyBarcodeProduct?> lookupBarcodeProduct(String rawCode) async {
-  final code = _normalizeBarcode(rawCode);
-  if (code.length < 8) return null;
+  for (final variant in ngmyBarcodeLookupVariants(rawCode)) {
+    final code = ngmyNormalizeBarcodeDigits(variant);
+    if (code.length < 6 && variant.trim().length < 4) continue;
 
-  final off = await _lookupOpenFoodFacts(code);
-  if (off != null) return off;
+    final off = await _lookupOpenFoodFacts(code.isNotEmpty ? code : variant);
+    if (off != null) return off;
 
-  final upc = await _lookupUpcItemDb(code);
-  if (upc != null) return upc;
-
+    final upc = await _lookupUpcItemDb(code.isNotEmpty ? code : variant);
+    if (upc != null) return upc;
+  }
   return null;
 }
 
@@ -129,9 +164,9 @@ class _NgmyBarcodeScannerPageState extends State<NgmyBarcodeScannerPage> {
   static const Color _accent = Color(0xFF7C3AED);
 
   final MobileScannerController _camera = MobileScannerController(
-    detectionSpeed: DetectionSpeed.normal,
+    detectionSpeed: DetectionSpeed.unrestricted,
     facing: CameraFacing.back,
-    formats: const [BarcodeFormat.all],
+    formats: ngmyScannerBarcodeFormats,
   );
 
   bool _handling = false;
@@ -177,11 +212,13 @@ class _NgmyBarcodeScannerPageState extends State<NgmyBarcodeScannerPage> {
   }
 
   void _onDetect(BarcodeCapture capture) {
-    final barcodes = capture.barcodes;
-    if (barcodes.isEmpty) return;
-    final raw = barcodes.first.rawValue;
-    if (raw == null || raw.trim().isEmpty) return;
-    _lookupCode(raw.trim());
+    for (final barcode in capture.barcodes) {
+      final raw = ngmyExtractBarcodeValue(barcode);
+      if (raw != null && raw.isNotEmpty) {
+        _lookupCode(raw);
+        return;
+      }
+    }
   }
 
   Future<void> _enterBarcodeManually() async {
