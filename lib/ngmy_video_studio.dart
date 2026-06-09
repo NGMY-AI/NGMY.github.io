@@ -88,6 +88,30 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     _loadTemplate(_templateId, resetMedia: true);
   }
 
+  Future<void> _disposeAllMedia() async {
+    for (final m in _slotMedia.values) {
+      try {
+        await m.dispose();
+      } catch (e) {
+        debugPrint('[studio] dispose media: $e');
+      }
+    }
+  }
+
+  Future<void> _closeStudio() async {
+    if (_exporting) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please wait for export to finish.')),
+        );
+      }
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    await _disposeAllMedia();
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   void dispose() {
     for (final m in _slotMedia.values) {
@@ -428,11 +452,27 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width > 760;
-    return Scaffold(
+    return PopScope(
+      canPop: !_picking && !_exporting,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_picking || _exporting) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_exporting ? 'Export in progress…' : 'Loading video…'),
+            ),
+          );
+        }
+      },
+      child: Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
         backgroundColor: _panel,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: _closeStudio,
+        ),
         title: const Row(
           children: [
             Icon(Icons.live_tv_rounded, color: _accent, size: 22),
@@ -462,7 +502,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
               label: Text(_exporting ? (_exportStatus.isNotEmpty ? _exportStatus : 'Saving…') : 'Download'),
             ),
           ),
-          IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(context)),
+          IconButton(icon: const Icon(Icons.close_rounded), onPressed: _closeStudio),
         ],
       ),
       body: wide
@@ -485,6 +525,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                 ..._controlSections(),
               ],
             ),
+      ),
     );
   }
 

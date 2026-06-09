@@ -12328,6 +12328,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               Container(
                 width: double.infinity,
                 height: 272,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(25),
@@ -12335,6 +12336,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
                 ),
                 child: Stack(
+                  clipBehavior: Clip.hardEdge,
                   children: [
                     Positioned(
                       top: 12,
@@ -12342,7 +12344,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       child: _clockInNameTag(isLight),
                     ),
                     Align(
-                      alignment: Alignment.center,
+                      alignment: const Alignment(0, 0.14),
                       child: _clock(context),
                     ),
                   ],
@@ -12758,19 +12760,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             animation: _smokeCtrl,
             builder: (context, child) {
               final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
-              final glowPulse = readyToClockIn ? (0.14 + shimmer * 0.22) : (active ? 0.08 : 0.04);
+              final glowPulse = readyToClockIn ? (0.12 + shimmer * 0.16) : (active ? 0.08 : 0.04);
               return Transform.rotate(
                 angle: active ? _smokeRot.value : (readyToClockIn ? _smokeRot.value * 0.35 : 0),
                 child: Container(
-                  width: 206, height: 206,
+                  width: 184, height: 184,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: ringAccent.withOpacity(readyToClockIn ? 0.06 : 0.03),
                     boxShadow: [
                       BoxShadow(
                         color: ringAccent.withOpacity(glowPulse),
-                        blurRadius: readyToClockIn ? (38 + shimmer * 18) : (active ? (30 + shimmer * 10) : 30),
-                        spreadRadius: readyToClockIn ? 4 : 2,
+                        blurRadius: readyToClockIn ? (26 + shimmer * 10) : (active ? (24 + shimmer * 8) : 24),
+                        spreadRadius: readyToClockIn ? 2 : 1,
                       )
                     ],
                   ),
@@ -12784,19 +12786,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               builder: (context, _) {
                 final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
                 return Container(
-                  width: 188,
-                  height: 188,
+                  width: 168,
+                  height: 168,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: Color.lerp(const Color(0xFFFDE68A), const Color(0xFFF59E0B), shimmer)!.withOpacity(0.55 + shimmer * 0.35),
-                      width: 3,
+                      width: 2.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFFBBF24).withOpacity(0.28 + shimmer * 0.2),
-                        blurRadius: 22,
-                        spreadRadius: 1,
+                        color: const Color(0xFFFBBF24).withOpacity(0.22 + shimmer * 0.14),
+                        blurRadius: 16,
+                        spreadRadius: 0,
                       ),
                     ],
                   ),
@@ -12811,7 +12813,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               builder: (context, child) {
                 double currentAngle = active ? (angle + _smokeRot.value) : angle;
                 return Transform.translate(
-                  offset: Offset(math.cos(currentAngle) * 90, math.sin(currentAngle) * 90),
+                  offset: Offset(math.cos(currentAngle) * 80, math.sin(currentAngle) * 80),
                   child: Icon(
                     Icons.wb_sunny_rounded,
                     size: readyToClockIn ? 8 : 6,
@@ -12824,15 +12826,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           }),
           // Outer ring
           Container(
-            width: 170, height: 170,
+            width: 152, height: 152,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: ringAccent.withOpacity(readyToClockIn ? 0.35 : 0.12), width: 12),
+              border: Border.all(color: ringAccent.withOpacity(readyToClockIn ? 0.35 : 0.12), width: 10),
             ),
           ),
           // Main inner circle
           Container(
-            width: 136, height: 136,
+            width: 122, height: 122,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(

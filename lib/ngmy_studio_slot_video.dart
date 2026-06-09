@@ -1,10 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
-import 'ngmy_studio_html_video.dart' if (dart.library.io) 'ngmy_studio_html_video_stub.dart' as html_vid;
 import 'ngmy_studio_slot_video_io.dart' if (dart.library.html) 'ngmy_studio_slot_video_stub.dart' as slot_io;
 
 /// Local video preview for a studio frame — play, pause, replay before download.
@@ -23,24 +21,16 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
   int _generation = 0;
   bool _playing = false;
 
-  bool get _useWebHtml {
-    if (!kIsWeb) return false;
-    final s = widget.source?.trim() ?? '';
-    return s.startsWith('blob:') || s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:');
-  }
-
   @override
   void initState() {
     super.initState();
-    if (!_useWebHtml) {
-      unawaited(_load());
-    }
+    unawaited(_load());
   }
 
   @override
   void didUpdateWidget(covariant NgmyStudioSlotVideo oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.source != widget.source && !_useWebHtml) {
+    if (oldWidget.source != widget.source) {
       unawaited(_load());
     }
   }
@@ -256,10 +246,6 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
     final src = widget.source?.trim() ?? '';
     if (src.isEmpty) return const SizedBox.shrink();
 
-    if (_useWebHtml) {
-      return html_vid.NgmyStudioHtmlVideo(key: ValueKey(src), source: src);
-    }
-
-    return _nativePlayer();
+    return ClipRect(child: _nativePlayer());
   }
 }
