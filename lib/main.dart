@@ -51,6 +51,7 @@ import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
 import 'ngmy_dice_config.dart';
 import 'ngmy_fun_games.dart';
+import 'ngmy_fun_games_popups.dart';
 import 'ngmy_invoice_storage.dart';
 import 'ngmy_helper_ai_limit.dart';
 import 'ngmy_helper_kb.dart';
@@ -11286,6 +11287,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _runScheduledPopups();
       _promptPushNotificationsIfNeeded();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(ngmyMaybeShowConfidenceResumePopup(context));
+      });
     }
   }
 

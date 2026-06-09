@@ -2,7 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'generated/ngmy_confidence_quotes.g.dart';
+import 'generated/ngmy_fortune.g.dart';
+import 'generated/ngmy_riddles.g.dart';
 import 'ngmy_fun_games_cache.dart';
+import 'ngmy_fun_games_limits.dart';
+import 'ngmy_fun_games_popups.dart';
 import 'ngmy_love_content.dart';
 import 'ngmy_love_popups.dart';
 
@@ -42,7 +47,27 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
   int _ideaIndex = 0;
   bool _pulseBtn = false;
 
+  // Confidence
+  int _confCycleIndex = 0;
+  bool _confCanViewToday = true;
+  String? _confTodayQuote;
+  int _confTodayIndex = -1;
+  String? _confDisplayQuote;
+
+  // Brain
+  int _riddleIndex = 0;
+  int _riddlesRemaining = 15;
+  bool _riddleAnswerVisible = false;
+
+  // Fortune
+  int _fortuneIndex = 0;
+  int _fortunesRemaining = 5;
+  NgmyFortuneItem? _currentFortune;
+  bool _fortuneRevealed = false;
+
   late final AnimationController _heartCtrl;
+  late final AnimationController _orbCtrl;
+  late final AnimationController _brainCtrl;
   final _rng = math.Random();
 
   static const _categories = [
@@ -56,7 +81,29 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
   void initState() {
     super.initState();
     _heartCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat();
+    _orbCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
+    _brainCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat();
     _loadCache();
+    _loadLimits();
+  }
+
+  Future<void> _loadLimits() async {
+    final conf = await NgmyFunGamesLimits.confidenceState();
+    final riddles = await NgmyFunGamesLimits.riddleState();
+    final fortune = await NgmyFunGamesLimits.fortuneState();
+    if (!mounted) return;
+    setState(() {
+      _confCycleIndex = conf.cycleIndex;
+      _confCanViewToday = conf.canViewToday;
+      _confTodayQuote = conf.todayQuote;
+      _confTodayIndex = conf.todayIndex;
+      _confDisplayQuote = conf.todayQuote ?? NgmyConfidenceQuotes.at(conf.cycleIndex);
+      _riddleIndex = riddles.index;
+      _riddlesRemaining = riddles.remaining;
+      _riddleAnswerVisible = false;
+      _fortuneIndex = fortune.index;
+      _fortunesRemaining = fortune.remaining;
+    });
   }
 
   Future<void> _loadCache() async {
@@ -71,6 +118,8 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
   @override
   void dispose() {
     _heartCtrl.dispose();
+    _orbCtrl.dispose();
+    _brainCtrl.dispose();
     _yourNameC.dispose();
     _theirNameC.dispose();
     super.dispose();
@@ -183,8 +232,12 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                       _loveSubTabs(),
                       const SizedBox(height: 16),
                       _loveContent(),
-                    ] else
-                      _placeholderCategory(),
+                    ] else if (_category == 1)
+                      _confidenceContent()
+                    else if (_category == 2)
+                      _brainContent()
+                    else
+                      _fortuneContent(),
                   ],
                 ),
               ),
@@ -264,8 +317,11 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                   _matchScore = null;
                   _matchMessage = null;
                   _currentIdea = null;
+                  _riddleAnswerVisible = false;
+                  _fortuneRevealed = false;
                 });
                 NgmyFunGamesCache.saveCategory(i);
+                _loadLimits();
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
@@ -613,28 +669,414 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
     );
   }
 
-  Widget _placeholderCategory() {
-    final item = _categories[_category];
-    return _comingSoonCard(title: '${item.label} Zone', icon: item.icon, subtitle: 'More games and challenges coming soon.', accent: item.color);
+  Future<void> _revealConfidenceQuote() async {
+    if (!_confCanViewToday) {
+      if (_confTodayQuote != null) {
+        await showNgmyConfidencePopup(
+          context,
+          quote: _confTodayQuote!,
+          index: _confTodayIndex >= 0 ? _confTodayIndex : _confCycleIndex,
+          total: NgmyConfidenceQuotes.count,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('One confidence boost per day — come back tomorrow! 💪')),
+        );
+      }
+      return;
+    }
+    final idx = _confCycleIndex % NgmyConfidenceQuotes.count;
+    final quote = NgmyConfidenceQuotes.at(idx);
+    final result = await NgmyFunGamesLimits.consumeConfidenceQuote(quote, idx);
+    if (result == null || !mounted) return;
+    setState(() {
+      _confCanViewToday = false;
+      _confTodayQuote = result.quote;
+      _confTodayIndex = result.index;
+      _confDisplayQuote = result.quote;
+      _confCycleIndex = result.index + 1;
+      _pulseBtn = true;
+    });
+    Future<void>.delayed(const Duration(milliseconds: 140), () {
+      if (mounted) setState(() => _pulseBtn = false);
+    });
+    await showNgmyConfidencePopup(context, quote: result.quote, index: result.index, total: NgmyConfidenceQuotes.count);
   }
 
-  Widget _comingSoonCard({required String title, required IconData icon, required String subtitle, required Color accent}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 28, 18, 28),
-      decoration: BoxDecoration(
-        color: _panel,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: accent.withOpacity(0.22)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 44, color: accent),
-          const SizedBox(height: 12),
-          Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-          const SizedBox(height: 8),
-          Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13)),
-        ],
+  Future<void> _revealRiddleAnswer() async {
+    setState(() => _riddleAnswerVisible = true);
+  }
+
+  Future<void> _nextRiddle() async {
+    if (_riddlesRemaining <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('15 riddles per day — your brain earned a rest! 🧠')),
+      );
+      return;
+    }
+    final next = await NgmyFunGamesLimits.advanceRiddle(_riddleIndex);
+    if (next == null) {
+      if (mounted) await _loadLimits();
+      return;
+    }
+    setState(() {
+      _riddleIndex = next;
+      _riddlesRemaining = (_riddlesRemaining - 1).clamp(0, NgmyFunGamesLimits.riddlesDailyLimit);
+      _riddleAnswerVisible = false;
+      _pulseBtn = true;
+    });
+    Future<void>.delayed(const Duration(milliseconds: 140), () {
+      if (mounted) setState(() => _pulseBtn = false);
+    });
+  }
+
+  Future<void> _revealFortune() async {
+    if (_fortunesRemaining <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('5 fortunes per day — the crystal ball rests until tomorrow 🔮')),
+      );
+      return;
+    }
+    final consumed = await NgmyFunGamesLimits.consumeFortune();
+    if (consumed == null) {
+      if (mounted) await _loadLimits();
+      return;
+    }
+    final item = NgmyFortuneContent.at(consumed.index);
+    setState(() {
+      _currentFortune = item;
+      _fortuneRevealed = true;
+      _fortuneIndex = consumed.index + 1;
+      _fortunesRemaining = (_fortunesRemaining - 1).clamp(0, NgmyFunGamesLimits.fortuneDailyLimit);
+      _pulseBtn = true;
+    });
+    Future<void>.delayed(const Duration(milliseconds: 140), () {
+      if (mounted) setState(() => _pulseBtn = false);
+    });
+    await showNgmyFortunePopup(context, fortune: item);
+  }
+
+  Widget _confidenceContent() {
+    const accent = Color(0xFFF59E0B);
+    const accentDeep = Color(0xFFB45309);
+    final progress = (_confCycleIndex % NgmyConfidenceQuotes.count) / NgmyConfidenceQuotes.count;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(top: 10, right: 14, child: _mini3DIcon(Icons.bolt_rounded, accent, 38, _orbCtrl)),
+        Positioned(bottom: 36, left: 8, child: _mini3DIcon(Icons.bolt_rounded, accent, 28, _orbCtrl)),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
+          decoration: BoxDecoration(
+            color: _panel,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: accent.withOpacity(0.4)),
+            boxShadow: [BoxShadow(color: accent.withOpacity(0.15), blurRadius: 18)],
+          ),
+          child: Column(
+            children: [
+              SizedBox(
+                width: 120,
+                height: 120,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 120,
+                      height: 120,
+                      child: CircularProgressIndicator(
+                        value: progress == 0 ? null : progress,
+                        strokeWidth: 8,
+                        backgroundColor: accent.withOpacity(0.15),
+                        color: accent,
+                      ),
+                    ),
+                    AnimatedBuilder(
+                      animation: _orbCtrl,
+                      builder: (context, _) {
+                        final t = _orbCtrl.value * math.pi * 2;
+                        return Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()
+                            ..setEntry(3, 2, 0.003)
+                            ..rotateY(math.sin(t) * 0.4),
+                          child: const Text('💪', style: TextStyle(fontSize: 44)),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${_confCycleIndex % NgmyConfidenceQuotes.count} / ${NgmyConfidenceQuotes.count}',
+                style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 12),
+              ),
+              const SizedBox(height: 10),
+              const Text('Confidence Circle', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+              const SizedBox(height: 6),
+              Text(
+                _confCanViewToday ? 'One powerful quote per day — walk the full circle of 300.' : 'Today\'s boost unlocked — come back tomorrow for the next.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              if (_confDisplayQuote != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [accent.withOpacity(0.2), accentDeep.withOpacity(0.12)]),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: accent.withOpacity(0.45)),
+                  ),
+                  child: Text(_confDisplayQuote!, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.45, fontWeight: FontWeight.w600)),
+                ),
+              const SizedBox(height: 14),
+              _accentActionButton(
+                label: _confCanViewToday ? 'Reveal Today\'s Boost' : 'View Today\'s Boost Again',
+                onTap: _revealConfidenceQuote,
+                colors: const [Color(0xFFFBBF24), accent, accentDeep],
+                glow: accent,
+              ),
+              const SizedBox(height: 8),
+              Text('${NgmyConfidenceQuotes.count} quotes · pops up when you return to the app', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _brainContent() {
+    const accent = Color(0xFF8B5CF6);
+    const accentDeep = Color(0xFF6D28D9);
+    final riddle = NgmyRiddlesContent.at(_riddleIndex);
+    final catLabel = riddle.category[0].toUpperCase() + riddle.category.substring(1);
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(top: 8, right: 12, child: _mini3DIcon(Icons.psychology_alt_rounded, accent, 40, _brainCtrl)),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
+          decoration: BoxDecoration(
+            color: _panel,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: accent.withOpacity(0.35)),
+            boxShadow: [BoxShadow(color: accent.withOpacity(0.12), blurRadius: 18)],
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: accent.withOpacity(0.2), borderRadius: BorderRadius.circular(20), border: Border.all(color: accent.withOpacity(0.5))),
+                    child: Text(catLabel, style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 11)),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('${_riddleIndex % NgmyRiddlesContent.count + 1}/${NgmyRiddlesContent.count}', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11, fontWeight: FontWeight.w700)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text('Brain Teasers', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+              const SizedBox(height: 4),
+              Text('$_riddlesRemaining of ${NgmyFunGamesLimits.riddlesDailyLimit} riddles left today', style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0A0F1C),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: accent.withOpacity(0.35)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('RIDDLE', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+                    const SizedBox(height: 8),
+                    Text(riddle.question, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.45, fontWeight: FontWeight.w600)),
+                    if (_riddleAnswerVisible) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [accent.withOpacity(0.25), accentDeep.withOpacity(0.15)]),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: accent.withOpacity(0.5)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('ANSWER', style: TextStyle(color: Color(0xFFC4B5FD), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+                            const SizedBox(height: 6),
+                            Text(riddle.answer, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (!_riddleAnswerVisible)
+                _accentActionButton(label: 'Reveal Answer', onTap: _revealRiddleAnswer, colors: const [accent, accentDeep], glow: accent)
+              else
+                _accentActionButton(label: 'Next Riddle →', onTap: _nextRiddle, colors: const [accent, accentDeep], glow: accent),
+              const SizedBox(height: 8),
+              Text('${NgmyRiddlesContent.count} riddles · love · bible · street · church & more', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _fortuneContent() {
+    const accent = Color(0xFF06B6D4);
+    const accentDeep = Color(0xFF0891B2);
+    final fortune = _currentFortune;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(top: 6, right: 10, child: _mini3DIcon(Icons.auto_awesome_rounded, accent, 36, _orbCtrl)),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
+          decoration: BoxDecoration(
+            color: _panel,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: accent.withOpacity(0.35)),
+            boxShadow: [BoxShadow(color: accent.withOpacity(0.12), blurRadius: 18)],
+          ),
+          child: Column(
+            children: [
+              AnimatedBuilder(
+                animation: _orbCtrl,
+                builder: (context, _) {
+                  final t = _orbCtrl.value * math.pi * 2;
+                  return Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()
+                      ..setEntry(3, 2, 0.004)
+                      ..rotateY(math.sin(t) * 0.55)
+                      ..rotateX(0.3 + math.cos(t * 0.7) * 0.12),
+                    child: Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(colors: [Colors.white.withOpacity(0.85), accent, accentDeep.withOpacity(0.5)]),
+                        boxShadow: [BoxShadow(color: accent.withOpacity(0.5), blurRadius: 20)],
+                      ),
+                      child: const Center(child: Text('🔮', style: TextStyle(fontSize: 42))),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              const Text('Fortune Crystal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+              const SizedBox(height: 4),
+              Text('$_fortunesRemaining of ${NgmyFunGamesLimits.fortuneDailyLimit} readings left today', style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 14),
+              if (_fortuneRevealed && fortune != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [accent.withOpacity(0.18), accentDeep.withOpacity(0.1)]),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: accent.withOpacity(0.4)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(fortune.mood, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1)),
+                      const SizedBox(height: 8),
+                      Text(fortune.text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 10),
+                      Text('Lucky: ${fortune.luckyNumbers.join(' · ')}', style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 12, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                )
+              else
+                Text('Shake the crystal — tap below for your fortune.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12)),
+              const SizedBox(height: 14),
+              _accentActionButton(
+                label: _fortuneRevealed ? 'Read Another Fortune' : 'Reveal My Fortune',
+                onTap: _revealFortune,
+                colors: const [accent, accentDeep, Color(0xFF164E63)],
+                glow: accent,
+              ),
+              const SizedBox(height: 8),
+              Text('${NgmyFortuneContent.count} fortunes · 3D crystal popup', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _mini3DIcon(IconData icon, Color color, double size, AnimationController ctrl) {
+    return AnimatedBuilder(
+      animation: ctrl,
+      builder: (context, _) {
+        final t = ctrl.value * math.pi * 2;
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.002)
+            ..rotateY(math.sin(t) * 0.35)
+            ..rotateX(0.35),
+          child: Icon(icon, color: color.withValues(alpha: 0.35 + math.sin(t) * 0.15), size: size),
+        );
+      },
+    );
+  }
+
+  Widget _accentActionButton({
+    required String label,
+    required VoidCallback onTap,
+    required List<Color> colors,
+    required Color glow,
+  }) {
+    return AnimatedScale(
+      scale: _pulseBtn ? 0.96 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      child: SizedBox(
+        width: double.infinity,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: colors),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [BoxShadow(color: glow.withOpacity(0.45), blurRadius: 14, offset: const Offset(0, 6))],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('✨', style: TextStyle(fontSize: 16)),
+                    const SizedBox(width: 8),
+                    Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
