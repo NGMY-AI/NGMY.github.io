@@ -6,6 +6,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_banner_text_style.dart';
+
 
 
 /// Professional broadcast overlay styles — video background + inset editable graphics.
@@ -218,6 +220,8 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   final double scale;
 
+  final NgmyBannerTextStyle textStyle;
+
 
 
   NgmyNewsBannerPainter({
@@ -235,6 +239,8 @@ class NgmyNewsBannerPainter extends CustomPainter {
     this.topAccent = false,
 
     this.scale = 1.0,
+
+    this.textStyle = NgmyBannerTextStyle.broadcastClassic,
 
   });
 
@@ -381,39 +387,23 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
 
   void _brandCorner(Canvas canvas, Size size, {required Color bg, required Color fg, bool glass = true}) {
-
     final l = _l(size);
-
     final r = l.brandRect;
-
-    final paint = Paint()
-
-      ..color = (glass ? bg.withValues(alpha: 0.78) : bg.withValues(alpha: 0.92));
-
-    canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(10)), paint);
-
-    canvas.drawRRect(
-
-      RRect.fromRectAndRadius(r, const Radius.circular(10)),
-
-      Paint()
-
-        ..color = Colors.white.withValues(alpha: 0.28)
-
-        ..style = PaintingStyle.stroke
-
-        ..strokeWidth = 1.2,
-
+    NgmyBannerTextRenderer.drawBrand(
+      canvas,
+      r,
+      style: textStyle,
+      title: title,
+      subtitle: subtitle,
+      bg: glass ? bg.withValues(alpha: 0.78) : bg,
+      fg: fg,
     );
-
-    _txt(canvas, title.toUpperCase(), r.left + 10, r.top + r.height * 0.22, r.height * 0.34, fg, FontWeight.w900, maxW: r.width - 16);
-
-    if (subtitle.trim().isNotEmpty) {
-
-      _txt(canvas, subtitle, r.left + 10, r.top + r.height * 0.58, r.height * 0.24, fg.withValues(alpha: 0.88), FontWeight.w600, maxW: r.width - 16);
-
+    if (textStyle == NgmyBannerTextStyle.broadcastClassic && glass) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(r, const Radius.circular(10)),
+        Paint()..color = Colors.white.withValues(alpha: 0.28)..style = PaintingStyle.stroke..strokeWidth = 1.2,
+      );
     }
-
   }
 
 
@@ -466,34 +456,20 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
     final r = l.footerRect;
 
-    canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(12)), Paint()..color = bg.withValues(alpha: 0.88));
-
-    canvas.drawRRect(
-
-      RRect.fromRectAndRadius(r, const Radius.circular(12)),
-
-      Paint()
-
-        ..color = accent.withValues(alpha: 0.45)
-
-        ..style = PaintingStyle.stroke
-
-        ..strokeWidth = 1,
-
-    );
-
     final left = subtitle.trim().isNotEmpty ? subtitle : '@NGMY';
 
     final right = liveLabel.trim().isNotEmpty ? liveLabel : '@NGMYOfficial';
 
-    final fs = r.height * 0.38;
-
-    _txt(canvas, left, r.left + 12, r.top + r.height * 0.28, fs, text, FontWeight.w700);
-
-    _socialIcons(canvas, Offset(r.left + r.width * 0.36, r.top + r.height * 0.18), r.height * 0.52, accent);
-
-    _txt(canvas, right, r.right - 12, r.top + r.height * 0.28, fs, text, FontWeight.w700, align: TextAlign.right, maxW: r.width * 0.28);
-
+    NgmyBannerTextRenderer.drawFooter(
+      canvas,
+      r,
+      style: textStyle,
+      left: left,
+      right: right,
+      bg: bg,
+      accent: accent,
+      text: text,
+    );
   }
 
 

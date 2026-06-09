@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_banner_text_style.dart';
 import 'ngmy_news_banner_painter.dart';
 import 'ngmy_news_banner_templates.dart';
 
@@ -225,6 +226,7 @@ class NgmyVideoStudioExportConfig {
   final bool showTextOverlay;
   final NgmyNewsBannerStyle? newsBannerStyle;
   final bool newsTopAccent;
+  final NgmyBannerTextStyle bannerTextStyle;
 
   const NgmyVideoStudioExportConfig({
     required this.templateId,
@@ -246,6 +248,7 @@ class NgmyVideoStudioExportConfig {
     this.showTextOverlay = false,
     this.newsBannerStyle,
     this.newsTopAccent = false,
+    this.bannerTextStyle = NgmyBannerTextStyle.broadcastClassic,
   });
 
   int get outputWidth => format.exportWidth;

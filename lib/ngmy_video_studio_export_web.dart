@@ -13,7 +13,7 @@ import 'ngmy_video_studio_models.dart';
 
 const _metaTimeout = Duration(seconds: 18);
 const _maxRecordSeconds = 180.0;
-const _exportCanvasFps = 24;
+const _exportCanvasFps = 12;
 const _exportVideoBitsPerSecond = 4500000;
 const _exportAudioBitsPerSecond = 128000;
 const _recorderTimesliceMs = 500;
@@ -140,6 +140,24 @@ void _ngmyDrawImageContained(
     ly = y;
   }
   ctx.drawImageScaled(img, lx, ly, lw, lh);
+}
+
+Future<void> _seekVideoTo(html.VideoElement v, double seconds) async {
+  final maxT = v.duration.isFinite && v.duration > 0 ? math.max(0.0, v.duration - 0.05) : seconds;
+  final target = seconds.clamp(0.0, maxT);
+  if ((v.currentTime - target).abs() < 0.04) return;
+  final done = Completer<void>();
+  void onSeeked(html.Event _) {
+    v.removeEventListener('seeked', onSeeked);
+    if (!done.isCompleted) done.complete();
+  }
+  v.addEventListener('seeked', onSeeked);
+  v.currentTime = target;
+  try {
+    await done.future.timeout(const Duration(milliseconds: 1800));
+  } catch (_) {
+    v.removeEventListener('seeked', onSeeked);
+  }
 }
 
 double _resolveRecordingDuration(Iterable<html.VideoElement> videos) {
@@ -548,13 +566,17 @@ Future<String> exportNgmyVideoStudioComposed({
 
     var durationSec = _resolveRecordingDuration(videos.values);
 
-    onProgress?.call(0.08, 'Building your video…');
+    onProgress?.call(0.08, 'Preparing overlay…');
 
     final w = config.outputWidth;
     final h = config.outputHeight;
     html.ImageElement? bannerOverlay;
     if (config.newsBannerStyle != null) {
-      bannerOverlay = await _renderNewsBannerOverlay(config, w, h);
+      try {
+        bannerOverlay = await _renderNewsBannerOverlay(config, w, h).timeout(const Duration(seconds: 20));
+      } catch (e) {
+        debugPrint('[studio export] banner overlay failed: $e');
+      }
     }
     exportCanvas = html.CanvasElement(width: w, height: h);
     final canvas = exportCanvas!;
@@ -647,24 +669,8 @@ Future<String> exportNgmyVideoStudioComposed({
       if (!done.isCompleted) done.complete();
     });
 
-    for (final v in videos.values) {
-      v.playbackRate = _exportPlaybackRate;
-      v.currentTime = 0;
-    }
-
     var stopped = false;
-    var forceEnd = false;
-    var playbackStuck = false;
-    var lastCurrentTime = -1.0;
-    var stallFrames = 0;
     final startMs = DateTime.now().millisecondsSinceEpoch;
-    final recordStartedMs = startMs;
-
-    for (final v in videos.values) {
-      v.onEnded.listen((_) {
-        if (videos.values.every((vv) => vv.ended)) forceEnd = true;
-      });
-    }
 
     try {
       ctx.imageSmoothingEnabled = true;
@@ -761,25 +767,13 @@ Future<String> exportNgmyVideoStudioComposed({
       }
     }
 
-    // Prime canvas so captureStream has frames before MediaRecorder starts.
-    paintFrame();
-    await Future<void>.delayed(const Duration(milliseconds: 32));
-    paintFrame();
-
     for (final v in videos.values) {
-      try {
-        await v.play();
-      } catch (e) {
-        debugPrint('[studio export] video play failed, retry muted: $e');
-        v.muted = true;
-        try {
-          await v.play();
-        } catch (e2) {
-          debugPrint('[studio export] muted play failed: $e2');
-        }
-      }
+      v.muted = true;
+      v.pause();
+      await _seekVideoTo(v, 0);
     }
-    await Future<void>.delayed(const Duration(milliseconds: 80));
+    paintFrame();
+    await Future<void>.delayed(const Duration(milliseconds: 120));
     paintFrame();
 
     try {
@@ -789,60 +783,34 @@ Future<String> exportNgmyVideoStudioComposed({
       return _downloadAllVideoClips(sources);
     }
 
-    void drawFrame(num _) {
-      if (stopped) return;
+    final frameMs = (1000 / _exportCanvasFps).round();
+    final totalFrames = (durationSec * _exportCanvasFps).ceil().clamp(1, (_maxRecordSeconds * _exportCanvasFps).round());
+    onProgress?.call(0.1, 'Exporting… 0%');
+
+    for (var frame = 0; frame < totalFrames; frame++) {
+      if (stopped) break;
+      final t = frame / _exportCanvasFps;
+      for (final v in videos.values) {
+        await _seekVideoTo(v, t);
+      }
       paintFrame();
-
-      final primary = videos.values.first;
-      final t = primary.currentTime;
-      final recordMs = DateTime.now().millisecondsSinceEpoch - recordStartedMs;
-      if (t <= lastCurrentTime + 0.001) {
-        stallFrames++;
-      } else {
-        stallFrames = 0;
-        lastCurrentTime = t.toDouble();
-      }
-
-      final timeProgress = durationSec > 0 ? (t / durationSec) : 0.0;
-      final wallProgress = recordMs / math.max(800, (durationSec * 1000) / _exportPlaybackRate);
-      final progress = math.max(timeProgress, wallProgress).clamp(0.0, 0.99);
-      onProgress?.call(progress, _ngmyExportStatusLabel(progress, durationSec, recordMs));
-
-      final allEnded = videos.values.every((v) => v.ended);
-      final reachedMetaEnd = t >= durationSec - 0.08;
-      final stallAbort = recordMs > 4000 && t < 0.25 && stallFrames > 30;
-      if (stallAbort) playbackStuck = true;
-      final wallCapMs = ((math.min(durationSec, _exportWallCapSec) + 3) * 1000).round();
-      final wallCapHit = recordMs >= wallCapMs;
-      if (((forceEnd || allEnded || primary.ended || reachedMetaEnd || stallAbort || wallCapHit) && recordMs >= _minRecordMs)) {
-        stopped = true;
-        for (final v in videos.values) {
-          v.pause();
-          v.playbackRate = 1.0;
-        }
-        unawaited(_stopRecorderDrain(recorder, done));
-        return;
-      }
-      html.window.requestAnimationFrame(drawFrame);
+      final p = (frame + 1) / totalFrames;
+      final recordMs = frame * frameMs;
+      onProgress?.call(p.clamp(0.05, 0.99), _ngmyExportStatusLabel(p, durationSec, recordMs));
+      await Future.delayed(Duration(milliseconds: frameMs));
+      if (frame % 8 == 0) await Future<void>.delayed(Duration.zero);
     }
 
-    html.window.requestAnimationFrame(drawFrame);
-
-    await Future.any([
-      done.future,
-      Future.delayed(Duration(milliseconds: ((math.min(durationSec, _exportWallCapSec) + 5) * 1000).round())),
-    ]);
-
+    stopped = true;
+    await _stopRecorderDrain(recorder, done);
     if (!done.isCompleted) {
-      await _stopRecorderDrain(recorder, done);
+      await Future.any([
+        done.future,
+        Future.delayed(const Duration(seconds: 6)),
+      ]);
     }
 
     onProgress?.call(1.0, 'Saving your file…');
-
-    if (playbackStuck && chunks.isEmpty) {
-      debugPrint('[studio export] playback stuck — saving original clip');
-      return _downloadAllVideoClips(sources);
-    }
 
     if (chunks.isEmpty) {
       debugPrint('[studio export] empty chunks (mime=$mimeType), falling back to raw clips');
@@ -909,6 +877,7 @@ Future<html.ImageElement> _renderNewsBannerOverlay(NgmyVideoStudioExportConfig c
     liveLabel: config.liveLabel,
     topAccent: config.newsTopAccent,
     scale: config.headlineFontScale.clamp(0.6, 1.8),
+    textStyle: config.bannerTextStyle,
   ).paint(canvas, Size(w.toDouble(), h.toDouble()));
   final picture = recorder.endRecording();
   final image = await picture.toImage(w, h);

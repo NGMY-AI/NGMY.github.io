@@ -22,23 +22,39 @@ const _videoSlot = NgmyVideoSlotDef(
 
 
 
-const _logoSlotYoutube = NgmyVideoSlotDef(
-
-  id: 'logo',
-
-  label: 'Brand logo (top-right)',
-
-  youtubeRect: Rect.fromLTWH(0.72, 0.04, 0.22, 0.11),
-
-  tiktokRect: Rect.fromLTWH(0.62, 0.06, 0.30, 0.062),
-
+const _logoSlot1 = NgmyVideoSlotDef(
+  id: 'logo1',
+  label: 'Brand logo 1 (top-right)',
+  youtubeRect: Rect.fromLTWH(0.72, 0.04, 0.20, 0.10),
+  tiktokRect: Rect.fromLTWH(0.60, 0.055, 0.28, 0.058),
   kind: NgmySlotKind.logoAnim,
-
 );
 
+const _logoSlot2 = NgmyVideoSlotDef(
+  id: 'logo2',
+  label: 'Brand logo 2 (top-left)',
+  youtubeRect: Rect.fromLTWH(0.04, 0.04, 0.14, 0.10),
+  tiktokRect: Rect.fromLTWH(0.06, 0.055, 0.20, 0.055),
+  kind: NgmySlotKind.logoAnim,
+);
 
+const _logoSlot3 = NgmyVideoSlotDef(
+  id: 'logo3',
+  label: 'Brand logo 3 (bottom-left)',
+  youtubeRect: Rect.fromLTWH(0.04, 0.82, 0.14, 0.11),
+  tiktokRect: Rect.fromLTWH(0.06, 0.78, 0.20, 0.058),
+  kind: NgmySlotKind.logoAnim,
+);
 
-const List<NgmyVideoSlotDef> _broadcastSlots = [_videoSlot, _logoSlotYoutube];
+const _logoSlot4 = NgmyVideoSlotDef(
+  id: 'logo4',
+  label: 'Brand logo 4 (bottom-right)',
+  youtubeRect: Rect.fromLTWH(0.72, 0.82, 0.20, 0.11),
+  tiktokRect: Rect.fromLTWH(0.60, 0.78, 0.28, 0.058),
+  kind: NgmySlotKind.logoAnim,
+);
+
+const List<NgmyVideoSlotDef> _broadcastSlots = [_videoSlot, _logoSlot1, _logoSlot2, _logoSlot3, _logoSlot4];
 
 
 

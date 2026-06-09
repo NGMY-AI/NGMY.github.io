@@ -14,6 +14,7 @@ import 'ngmy_video_studio_models.dart';
 import 'ngmy_video_studio_painter.dart';
 import 'ngmy_video_studio_picker.dart';
 import 'ngmy_studio_slot_video.dart';
+import 'ngmy_banner_text_style.dart';
 import 'ngmy_news_banner_painter.dart';
 
 void showNgmyVideoStudio(BuildContext context) {
@@ -76,6 +77,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   final _liveC = TextEditingController();
   double _headlineScale = 1.0;
   double _titleScale = 1.0;
+  NgmyBannerTextStyle _bannerTextStyle = NgmyBannerTextStyle.broadcastClassic;
 
   NgmyVideoTemplateDef get _def => ngmyTemplateDef(_templateId);
   List<NgmyVideoTemplateDef> get _formatTemplates => ngmyTemplatesForFormat(_format);
@@ -127,6 +129,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         _logoVisible.putIfAbsent(s.id, () => true);
         _logoFrameStyles.putIfAbsent(s.id, () => NgmyLogoFrameStyle.goldRing);
       }
+    }
+    for (final s in def.slots) {
+      _slotMedia.putIfAbsent(s.id, () => _SlotMedia());
     }
     if (resetMedia) {
       for (final m in _slotMedia.values) {
@@ -277,6 +282,13 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       final url = ngmyLogoBytesToDataUrl(e.value);
       if (url != null) logos[e.key] = url;
     }
+    for (final e in _logoPaths.entries) {
+      final path = e.value.trim();
+      if (path.isEmpty) continue;
+      if (path.startsWith('blob:') || path.startsWith('data:') || path.startsWith('http')) {
+        logos.putIfAbsent(e.key, () => path);
+      }
+    }
     return NgmyVideoStudioExportConfig(
       templateId: _templateId,
       format: _format,
@@ -297,6 +309,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       showTextOverlay: _def.showTextOverlay,
       newsBannerStyle: _def.newsBannerStyle,
       newsTopAccent: _def.newsTopAccent,
+      bannerTextStyle: _bannerTextStyle,
     );
   }
 
@@ -754,6 +767,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                   liveLabel: _liveC.text,
                   topAccent: _def.newsTopAccent,
                   scale: _headlineScale,
+                  textStyle: _bannerTextStyle,
                 ),
               ),
             ),
@@ -1049,6 +1063,24 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
               _field('Brand / channel name', _titleC),
               _field('Social handle (left)', _subtitleC),
               _field('Social handle (right)', _liveC),
+              const SizedBox(height: 8),
+              Text('Brand & social text style', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 10)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: NgmyBannerTextStyle.values.map((s) {
+                  final sel = _bannerTextStyle == s;
+                  return ChoiceChip(
+                    label: Text(s.label, style: TextStyle(fontSize: 9, color: sel ? Colors.white : Colors.white70)),
+                    selected: sel,
+                    selectedColor: _accent.withOpacity(0.35),
+                    backgroundColor: Colors.white.withOpacity(0.06),
+                    side: BorderSide(color: sel ? _accent : Colors.white24),
+                    onSelected: (_) => setState(() => _bannerTextStyle = s),
+                  );
+                }).toList(),
+              ),
               _slider('Overlay scale', _headlineScale, 0.6, 1.8, (v) => setState(() => _headlineScale = v)),
             ],
           ),
