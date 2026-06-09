@@ -18,7 +18,7 @@ class NgmyFunGamesLimits {
 
   static const confidenceDailyLimit = 1;
   static const riddlesDailyLimit = 15;
-  static const fortuneDailyLimit = 5;
+  static const fortuneDailyLimit = 1;
 
   static String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
 

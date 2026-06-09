@@ -38529,6 +38529,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   bool _kbMode = false;
   List<NgmyHelperKbCategory> _kbCategories = ngmyHelperKbDefaultCategories();
   Timer? _chatGateTimer;
+  Timer? _helperQuotaTimer;
   Timer? _newsPollTimer;
   int _unreadNewsInternal = 0;
   List<Announcement> _newsItems = [];
@@ -38573,6 +38574,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _loadChatMemory();
     unawaited(_loadHelperKb());
     _startChatGateWatcher();
+    _startHelperQuotaWatcher();
     _subscribeNewsRealtime();
     _newsPollTimer = Timer.periodic(const Duration(minutes: 3), (_) => unawaited(_pollNewsFromCloud()));
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -38591,13 +38593,23 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   bool get _shouldShowKb {
     if (widget.user.isAdmin) return _kbMode;
-    return _kbMode || (_helperRemaining == 0 && widget.config.ngmyHelperDailyMessageLimit > 0);
+    final limit = widget.config.ngmyHelperDailyMessageLimit;
+    if (limit > 0 && _helperRemaining == 0) return true;
+    return false;
+  }
+
+  bool get _kbLockedByDailyLimit {
+    if (widget.user.isAdmin) return false;
+    final limit = widget.config.ngmyHelperDailyMessageLimit;
+    return limit > 0 && _helperRemaining == 0;
   }
 
   void _applyKbAutoSwitch() {
     if (widget.user.isAdmin) return;
-    if (widget.config.ngmyHelperDailyMessageLimit > 0 && _helperRemaining == 0 && !_kbMode) {
+    if (_kbLockedByDailyLimit && !_kbMode) {
       setState(() => _kbMode = true);
+    } else if (!_kbLockedByDailyLimit && _kbMode) {
+      setState(() => _kbMode = false);
     }
   }
 
@@ -38785,6 +38797,12 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _scrollNewsToBottom();
   }
 
+  void _startHelperQuotaWatcher() {
+    _helperQuotaTimer?.cancel();
+    if (widget.user.isAdmin) return;
+    _helperQuotaTimer = Timer.periodic(const Duration(seconds: 60), (_) => unawaited(_refreshHelperQuota()));
+  }
+
   void _startChatGateWatcher() {
     _chatGateTimer?.cancel();
     _chatGateTimer = Timer.periodic(const Duration(seconds: 45), (_) => unawaited(_syncChatClosedFromCloud()));
@@ -38878,6 +38896,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   @override
   void dispose() {
     _chatGateTimer?.cancel();
+    _helperQuotaTimer?.cancel();
     _newsPollTimer?.cancel();
     try {
       _newsChannel?.unsubscribe();
@@ -39221,7 +39240,9 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                             Expanded(
                               child: Text(
                                 _shouldShowKb && _activeTab == 0
-                                    ? 'Help Topics • Instant answers'
+                                    ? (_kbLockedByDailyLimit
+                                        ? 'Help Topics • AI returns when your 24h limit resets'
+                                        : 'Help Topics • Instant answers')
                                     : (_isBoss
                                         ? 'Online • Personal assistant for Sir'
                                         : 'Online • Chat & community updates'),
@@ -39267,12 +39288,36 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
             Expanded(
               child: _activeTab == 0
                   ? (_shouldShowKb
-                      ? NgmyHelperKbHub(
-                          categories: _kbCategories,
-                          logoUrl: widget.config.logoUrl,
-                          logoBuilder: (url, {size = 48}) => _ngmyLogoCircle(url, size: size),
-                          showTapToSwitch: widget.user.isAdmin,
-                          onTapLogoSwitch: widget.user.isAdmin ? _toggleKbModeForAdmin : null,
+                      ? Column(
+                          children: [
+                            if (_kbLockedByDailyLimit)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF16A34A).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.45)),
+                                  ),
+                                  child: const Text(
+                                    'Daily AI limit reached — browse Help Topics below. AI chat unlocks automatically after 24 hours.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Color(0xFFBBF7D0), fontSize: 11, fontWeight: FontWeight.w600, height: 1.35),
+                                  ),
+                                ),
+                              ),
+                            Expanded(
+                              child: NgmyHelperKbHub(
+                                categories: _kbCategories,
+                                logoUrl: widget.config.logoUrl,
+                                logoBuilder: (url, {size = 48}) => _ngmyLogoCircle(url, size: size),
+                                showTapToSwitch: widget.user.isAdmin,
+                                onTapLogoSwitch: widget.user.isAdmin ? _toggleKbModeForAdmin : null,
+                              ),
+                            ),
+                          ],
                         )
                       : _chatView(isDark, chatBg))
                   : Column(

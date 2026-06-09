@@ -14,16 +14,12 @@ const _fortuneCyan = Color(0xFF06B6D4);
 Future<void> showNgmyConfidencePopup(
   BuildContext context, {
   required String quote,
-  required int index,
-  required int total,
 }) async {
   final overlay = Overlay.of(context, rootOverlay: true);
   late OverlayEntry entry;
   entry = OverlayEntry(
     builder: (ctx) => _ConfidencePopupOverlay(
       quote: quote,
-      index: index,
-      total: total,
       onDismiss: () => entry.remove(),
     ),
   );
@@ -43,14 +39,10 @@ Future<void> showNgmyFortunePopup(BuildContext context, {required NgmyFortuneIte
 class _ConfidencePopupOverlay extends StatefulWidget {
   const _ConfidencePopupOverlay({
     required this.quote,
-    required this.index,
-    required this.total,
     required this.onDismiss,
   });
 
   final String quote;
-  final int index;
-  final int total;
   final VoidCallback onDismiss;
 
   @override
@@ -115,11 +107,6 @@ class _ConfidencePopupOverlayState extends State<_ConfidencePopupOverlay> with S
                         const Text(
                           'Daily Confidence Boost',
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.5),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '${widget.index + 1} of ${widget.total}',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12, fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 14),
                         Text(
@@ -278,8 +265,6 @@ Future<void> ngmyMaybeShowConfidenceResumePopup(BuildContext context) async {
   await showNgmyConfidencePopup(
     context,
     quote: quote.text,
-    index: quote.index,
-    total: quote.total,
   );
 }
 
@@ -287,9 +272,8 @@ Future<void> ngmyMaybeShowConfidenceResumePopup(BuildContext context) async {
 class NgmyFunGamesResumeGate {
   static DateTime? _lastPopupAt;
   static String? _cachedQuote;
-  static int _cachedIndex = 0;
 
-  static Future<({String text, int index, int total})?> todayQuoteIfAny() async {
+  static Future<({String text})?> todayQuoteIfAny() async {
     final has = await NgmyFunGamesLimits.hasConfidenceTodayQuote();
     if (!has) return null;
     final quote = await NgmyFunGamesLimits.todayConfidenceQuote();
@@ -301,10 +285,8 @@ class NgmyFunGamesResumeGate {
     if (_cachedQuote == quote && _lastPopupAt != null && now.difference(_lastPopupAt!) < const Duration(minutes: 2)) {
       return null;
     }
-    final state = await NgmyFunGamesLimits.confidenceState();
     _lastPopupAt = now;
     _cachedQuote = quote;
-    _cachedIndex = state.todayIndex;
-    return (text: quote, index: state.todayIndex >= 0 ? state.todayIndex : state.cycleIndex, total: 300);
+    return (text: quote);
   }
 }

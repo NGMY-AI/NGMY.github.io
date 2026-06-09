@@ -136,36 +136,42 @@ class _NgmyHelperKbHubState extends State<NgmyHelperKbHub> {
     );
   }
 
+  Widget _logoColumn(_KbPalette p) {
+    return Column(
+      children: [
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: p.cardBg,
+            boxShadow: [
+              BoxShadow(color: const Color(0xFF7C3AED).withValues(alpha: 0.22), blurRadius: 14),
+              BoxShadow(color: p.shadow, blurRadius: 8),
+            ],
+            border: Border.all(color: p.panelBorder, width: 2),
+          ),
+          child: ClipOval(child: widget.logoBuilder(widget.logoUrl, size: 72)),
+        ),
+        if (widget.showTapToSwitch) ...[
+          const SizedBox(height: 6),
+          Text('Tap to switch', style: TextStyle(color: p.accentGreen, fontWeight: FontWeight.w700, fontSize: 12)),
+        ],
+      ],
+    );
+  }
+
   Widget _buildCategoryGrid(_KbPalette p) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
       children: [
         Center(
-          child: GestureDetector(
-            onTap: widget.onTapLogoSwitch,
-            child: Column(
-              children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: p.cardBg,
-                    boxShadow: [
-                      BoxShadow(color: const Color(0xFF7C3AED).withValues(alpha: 0.22), blurRadius: 14),
-                      BoxShadow(color: p.shadow, blurRadius: 8),
-                    ],
-                    border: Border.all(color: p.panelBorder, width: 2),
-                  ),
-                  child: ClipOval(child: widget.logoBuilder(widget.logoUrl, size: 72)),
-                ),
-                if (widget.showTapToSwitch) ...[
-                  const SizedBox(height: 6),
-                  Text('Tap to switch', style: TextStyle(color: p.accentGreen, fontWeight: FontWeight.w700, fontSize: 12)),
-                ],
-              ],
-            ),
-          ),
+          child: widget.onTapLogoSwitch != null
+              ? GestureDetector(
+                  onTap: widget.onTapLogoSwitch,
+                  child: _logoColumn(p),
+                )
+              : _logoColumn(p),
         ),
         const SizedBox(height: 14),
         Text(

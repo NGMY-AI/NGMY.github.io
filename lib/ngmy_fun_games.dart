@@ -672,12 +672,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
   Future<void> _revealConfidenceQuote() async {
     if (!_confCanViewToday) {
       if (_confTodayQuote != null) {
-        await showNgmyConfidencePopup(
-          context,
-          quote: _confTodayQuote!,
-          index: _confTodayIndex >= 0 ? _confTodayIndex : _confCycleIndex,
-          total: NgmyConfidenceQuotes.count,
-        );
+        await showNgmyConfidencePopup(context, quote: _confTodayQuote!);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('One confidence boost per day — come back tomorrow! 💪')),
@@ -700,7 +695,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
     Future<void>.delayed(const Duration(milliseconds: 140), () {
       if (mounted) setState(() => _pulseBtn = false);
     });
-    await showNgmyConfidencePopup(context, quote: result.quote, index: result.index, total: NgmyConfidenceQuotes.count);
+    await showNgmyConfidencePopup(context, quote: result.quote);
   }
 
   Future<void> _revealRiddleAnswer() async {
@@ -731,9 +726,13 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
   }
 
   Future<void> _revealFortune() async {
+    if (_fortuneRevealed && _currentFortune != null && _fortunesRemaining <= 0) {
+      await showNgmyFortunePopup(context, fortune: _currentFortune!);
+      return;
+    }
     if (_fortunesRemaining <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('5 fortunes per day — the crystal ball rests until tomorrow 🔮')),
+        const SnackBar(content: Text('One fortune per day — come back tomorrow! 🔮')),
       );
       return;
     }
@@ -809,16 +808,11 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                '${_confCycleIndex % NgmyConfidenceQuotes.count} / ${NgmyConfidenceQuotes.count}',
-                style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 12),
-              ),
               const SizedBox(height: 10),
               const Text('Confidence Circle', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
               const SizedBox(height: 6),
               Text(
-                _confCanViewToday ? 'One powerful quote per day — walk the full circle of 300.' : 'Today\'s boost unlocked — come back tomorrow for the next.',
+                _confCanViewToday ? 'One powerful quote per day — keep building your confidence circle.' : 'Today\'s boost unlocked — come back tomorrow for the next.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12),
               ),
@@ -841,8 +835,6 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                 colors: const [Color(0xFFFBBF24), accent, accentDeep],
                 glow: accent,
               ),
-              const SizedBox(height: 8),
-              Text('${NgmyConfidenceQuotes.count} quotes · pops up when you return to the app', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10)),
             ],
           ),
         ),
@@ -879,8 +871,6 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                     decoration: BoxDecoration(color: accent.withOpacity(0.2), borderRadius: BorderRadius.circular(20), border: Border.all(color: accent.withOpacity(0.5))),
                     child: Text(catLabel, style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 11)),
                   ),
-                  const SizedBox(width: 8),
-                  Text('${_riddleIndex % NgmyRiddlesContent.count + 1}/${NgmyRiddlesContent.count}', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11, fontWeight: FontWeight.w700)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -930,8 +920,6 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                 _accentActionButton(label: 'Reveal Answer', onTap: _revealRiddleAnswer, colors: const [accent, accentDeep], glow: accent)
               else
                 _accentActionButton(label: 'Next Riddle →', onTap: _nextRiddle, colors: const [accent, accentDeep], glow: accent),
-              const SizedBox(height: 8),
-              Text('${NgmyRiddlesContent.count} riddles · love · bible · street · church & more', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10)),
             ],
           ),
         ),
@@ -985,7 +973,10 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
               const SizedBox(height: 12),
               const Text('Fortune Crystal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
               const SizedBox(height: 4),
-              Text('$_fortunesRemaining of ${NgmyFunGamesLimits.fortuneDailyLimit} readings left today', style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w700)),
+              Text(
+                _fortunesRemaining > 0 ? 'Your daily fortune is ready' : 'Come back tomorrow for a new fortune',
+                style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 14),
               if (_fortuneRevealed && fortune != null)
                 Container(
@@ -1010,13 +1001,11 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                 Text('Shake the crystal — tap below for your fortune.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12)),
               const SizedBox(height: 14),
               _accentActionButton(
-                label: _fortuneRevealed ? 'Read Another Fortune' : 'Reveal My Fortune',
+                label: _fortuneRevealed ? 'View Today\'s Fortune Again' : 'Reveal My Fortune',
                 onTap: _revealFortune,
                 colors: const [accent, accentDeep, Color(0xFF164E63)],
                 glow: accent,
               ),
-              const SizedBox(height: 8),
-              Text('${NgmyFortuneContent.count} fortunes · 3D crystal popup', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10)),
             ],
           ),
         ),
