@@ -2,17 +2,36 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+import 'ngmy_voice_mic_permission_stub.dart'
+    if (dart.library.html) 'ngmy_voice_mic_permission_web.dart';
+
 class NgmyVoiceInput {
   static final stt.SpeechToText _speech = stt.SpeechToText();
-  static bool _initialized = false;
+  static bool _initWorked = false;
+  static String? _lastError;
+
+  static String? get lastError => _lastError;
 
   static Future<bool> ensureReady() async {
-    if (_initialized) return _speech.isAvailable;
-    _initialized = true;
+    if (_initWorked) return true;
     try {
-      return await _speech.initialize(onStatus: (_) {}, onError: (e) => debugPrint('[voice] $e'));
+      final options = kIsWeb ? <stt.SpeechConfigOption>[stt.SpeechToText.webDoNotAggregate] : null;
+      final ok = await _speech.initialize(
+        debugLogging: kDebugMode,
+        onError: (e) {
+          _lastError = e.errorMsg;
+          debugPrint('[voice] error: ${e.errorMsg}');
+        },
+        onStatus: (s) => debugPrint('[voice] status: $s'),
+        options: options,
+      );
+      _initWorked = ok;
+      if (!ok) _lastError ??= 'not-supported';
+      return ok;
     } catch (e) {
       debugPrint('[voice] init: $e');
+      _initWorked = false;
+      _lastError = 'init-failed';
       return false;
     }
   }
@@ -24,15 +43,69 @@ class NgmyVoiceInput {
   }
 
   static Future<bool> listen({required void Function(String text, {bool isFinal}) onText}) async {
+    _lastError = null;
+
+    final micOk = await ngmyRequestMicPermission();
+    if (!micOk) {
+      _lastError = 'not-allowed';
+      return false;
+    }
+
     final ok = await ensureReady();
     if (!ok) return false;
+
     if (_speech.isListening) await _speech.stop();
-    return _speech.listen(
-      onResult: (result) => onText(result.recognizedWords, isFinal: result.finalResult),
-      listenMode: stt.ListenMode.confirmation,
-      partialResults: true,
-      cancelOnError: true,
-    ).then((v) => v == true);
+
+    try {
+      await _speech.listen(
+        onResult: (result) => onText(result.recognizedWords, isFinal: result.finalResult),
+        listenFor: const Duration(seconds: 60),
+        pauseFor: const Duration(seconds: 4),
+        listenOptions: stt.SpeechListenOptions(
+          partialResults: true,
+          cancelOnError: false,
+          listenMode: stt.ListenMode.dictation,
+        ),
+      );
+
+      // listen() returns void — wait for the engine to start or report an error.
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+
+      final err = _speech.lastError;
+      if (err != null) {
+        _lastError = err.errorMsg;
+        return false;
+      }
+
+      return _speech.isListening ||
+          _speech.lastStatus == stt.SpeechToText.listeningStatus ||
+          _speech.lastStatus == 'listening';
+    } catch (e) {
+      debugPrint('[voice] listen: $e');
+      _lastError = 'listen-failed';
+      return false;
+    }
+  }
+
+  static String userMessageForError(String? code) {
+    switch (code) {
+      case 'not-allowed':
+      case 'error_permission':
+      case 'permission':
+        return 'Microphone blocked. Tap the lock icon in your browser address bar, allow Microphone for this site, then reload.';
+      case 'not-supported':
+      case 'speech_not_supported':
+      case 'not supported':
+        return 'Voice input is not supported in this browser. Try Chrome or Edge on desktop or Android.';
+      case 'network':
+      case 'error_network':
+        return 'Voice needs an internet connection. Check your network and try again.';
+      case 'no-speech':
+      case 'error_no_match':
+        return 'No speech detected. Tap the mic and speak clearly.';
+      default:
+        return 'Could not start voice input. Use Chrome/Edge, allow microphone access, and reload the page.';
+    }
   }
 }
 
@@ -66,7 +139,10 @@ class _NgmyVoiceMicButtonState extends State<NgmyVoiceMicButton> {
     if (mounted) setState(() => _listening = started);
     if (!started && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Microphone not available. Allow mic access in browser settings.')),
+        SnackBar(
+          content: Text(NgmyVoiceInput.userMessageForError(NgmyVoiceInput.lastError)),
+          duration: const Duration(seconds: 5),
+        ),
       );
     }
   }
