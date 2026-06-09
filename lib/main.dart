@@ -12330,38 +12330,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ],
               ),
               const SizedBox(height: 30),
-              // MAIN FRAME FOR THE CIRCLE
-              Container(
-                width: double.infinity,
-                height: 248,
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(25),
-                  border: isLight ? Border.all(color: const Color(0xFF00B25A).withOpacity(0.2), width: 1.5) : null,
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: _clockInNameTag(isLight),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.center,
-                          child: _clock(context),
-                        ),
-                      ),
-                    ),
-                    _clockInFooter(context),
-                  ],
-                ),
-              ),
+              _buildClockInFrame(isLight),
               const SizedBox(height: 40),
               _status(context),
               const SizedBox(height: 20),
@@ -12606,6 +12575,64 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  Widget _buildClockInFrame(bool isLight) {
+    final active = widget.user.isClockedIn;
+    final alreadyDone = widget.user.alreadyClockedInToday && !active;
+    final circleCentered = active || alreadyDone;
+
+    return Container(
+      width: double.infinity,
+      height: 248,
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(25),
+        border: isLight ? Border.all(color: const Color(0xFF00B25A).withOpacity(0.2), width: 1.5) : null,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: circleCentered
+          ? Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                Align(
+                  alignment: Alignment.topLeft,
+                  child: _clockInNameTag(isLight),
+                ),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.center,
+                      child: _clock(context),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _clockInNameTag(isLight),
+                ),
+                Expanded(
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.center,
+                      child: _clock(context),
+                    ),
+                  ),
+                ),
+                _clockInFooter(context),
+              ],
+            ),
+    );
+  }
+
   Widget _clockInNameTag(bool isLight) {
     final name = widget.user.username.trim().isEmpty ? 'MEMBER' : widget.user.username.toUpperCase();
     final useGlassBlur = !ngmyPreferLightGraphics;
@@ -12746,7 +12773,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         widget.user.activeInvestment != null &&
         lateInfo != null;
 
-    // Only enlarge the green spinning circle AFTER clock-in — gold pre-clock-in stays original size.
+    // Enlarge + center only while counting or after session completes — gold pre-clock-in stays original.
     const smokeBase = 184.0;
     const readyRingBase = 168.0;
     const particleRBase = 80.0;
@@ -12758,19 +12785,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     const batterySlotH = 76.0;
     const batteryBodyW = 38.0;
     const batteryBodyH = 56.0;
-    final clockedInScale = active ? 1.14 : 1.0;
+    final enlargeCircle = active || alreadyDone;
+    final clockedInScale = enlargeCircle ? 1.28 : 1.0;
     final smokeD = smokeBase * clockedInScale;
     final particleR = particleRBase * clockedInScale;
     final outerRingD = outerRingBase * clockedInScale;
     final innerD = innerBase * clockedInScale;
-    final outerBorderW = outerBorderBase * (active ? 1.1 : 1.0);
+    final outerBorderW = outerBorderBase * (enlargeCircle ? 1.12 : 1.0);
     final pulseD = pulseBase * clockedInScale;
     final battW = batterySlotW * clockedInScale;
     final battH = batterySlotH * clockedInScale;
     final battBodyW = batteryBodyW * clockedInScale;
     final battBodyH = batteryBodyH * clockedInScale;
-    final earningsFontSize = active ? 21.0 : 20.0;
-    final doneIconSize = active ? 44.0 : 40.0;
+    final earningsFontSize = enlargeCircle ? 22.0 : 20.0;
+    final doneIconSize = enlargeCircle ? 48.0 : 40.0;
 
     return GestureDetector(
       onTap: (active || alreadyDone || blocked || (!onTrial && widget.user.activeInvestment == null))
@@ -12895,7 +12923,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ],
             ),
             child: Transform.translate(
-              offset: const Offset(0, -6),
+              offset: enlargeCircle ? Offset.zero : const Offset(0, -6),
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Column(
