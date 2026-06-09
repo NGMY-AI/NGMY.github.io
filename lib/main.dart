@@ -12505,8 +12505,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     final isPhone = MediaQuery.of(context).size.width < 420;
                     final buttonWidth = isPhone ? 96.0 : (constraints.maxWidth > 190 ? 112.0 : 104.0);
                     final buttonHeight = isPhone ? 34.0 : 36.0;
-                    final iconSize = isPhone ? 12.0 : 13.0;
-                    final labelSize = isPhone ? 8.5 : 9.0;
                     return SizedBox(
                       width: buttonWidth,
                       height: buttonHeight,
@@ -12514,30 +12512,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         shimmer: shimmer,
                         borderRadius: BorderRadius.circular(17),
                         padding: const EdgeInsets.all(1.6),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Text(
-                              'ACTIVE',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: labelSize,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
-                                height: 1.0,
-                                shadows: [Shadow(color: const Color(0xFF064E3B).withValues(alpha: 0.45), blurRadius: 2)],
-                              ),
+                        child: Center(
+                          child: Text(
+                            'ACTIVE',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isPhone ? 9.5 : 10.5,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                              height: 1.0,
+                              shadows: [Shadow(color: const Color(0xFF064E3B).withValues(alpha: 0.45), blurRadius: 2)],
                             ),
-                            Positioned(
-                              left: isPhone ? 7 : 8,
-                              child: Icon(Icons.sports_esports_rounded, color: Colors.white.withValues(alpha: 0.95), size: iconSize),
-                            ),
-                            Positioned(
-                              right: isPhone ? 7 : 8,
-                              child: Icon(Icons.bolt_rounded, color: const Color(0xFFBBF7D0), size: iconSize),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     );

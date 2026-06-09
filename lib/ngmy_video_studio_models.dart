@@ -7,6 +7,35 @@ enum NgmyVideoFormat { youtube, tiktok }
 
 enum NgmyVideoSlotShape { rect, circle }
 
+/// Decorative frame around the brand logo slot.
+enum NgmyLogoFrameStyle {
+  none,
+  goldRing,
+  presidentialSeal,
+  glassPanel,
+  diamondCrest,
+  neonHalo,
+  marbleInset,
+  velvetBadge,
+  silverLaurel,
+  crownJewel,
+}
+
+extension NgmyLogoFrameStyleExt on NgmyLogoFrameStyle {
+  String get label => switch (this) {
+        NgmyLogoFrameStyle.none => 'No frame',
+        NgmyLogoFrameStyle.goldRing => 'Gold ring',
+        NgmyLogoFrameStyle.presidentialSeal => 'Presidential seal',
+        NgmyLogoFrameStyle.glassPanel => 'Glass panel',
+        NgmyLogoFrameStyle.diamondCrest => 'Diamond crest',
+        NgmyLogoFrameStyle.neonHalo => 'Neon halo',
+        NgmyLogoFrameStyle.marbleInset => 'Marble inset',
+        NgmyLogoFrameStyle.velvetBadge => 'Velvet badge',
+        NgmyLogoFrameStyle.silverLaurel => 'Silver laurel',
+        NgmyLogoFrameStyle.crownJewel => 'Crown jewel',
+      };
+}
+
 enum NgmySlotKind { video, logoAnim }
 
 enum NgmyVideoTemplateId {
@@ -42,6 +71,16 @@ enum NgmyVideoTemplateId {
   ytBanner12,
   ytBanner13,
   ytBanner14,
+  ytBanner15,
+  ytBanner16,
+  ytBanner17,
+  ytBanner18,
+  ytBanner19,
+  ytBanner20,
+  ytBanner21,
+  ytBanner22,
+  ytBanner23,
+  ytBanner24,
   ttBanner0,
   ttBanner1,
   ttBanner2,
@@ -57,7 +96,20 @@ enum NgmyVideoTemplateId {
   ttBanner12,
   ttBanner13,
   ttBanner14,
+  ttBanner15,
+  ttBanner16,
+  ttBanner17,
+  ttBanner18,
+  ttBanner19,
+  ttBanner20,
+  ttBanner21,
+  ttBanner22,
+  ttBanner23,
+  ttBanner24,
 }
+
+/// TikTok first in the studio picker (user preference).
+const List<NgmyVideoFormat> kNgmyStudioFormatOrder = [NgmyVideoFormat.tiktok, NgmyVideoFormat.youtube];
 
 extension NgmyVideoFormatExt on NgmyVideoFormat {
   double get aspectRatio => this == NgmyVideoFormat.youtube ? 16 / 9 : 9 / 16;
@@ -161,6 +213,8 @@ class NgmyVideoStudioExportConfig {
   final Map<String, Rect> slotRects;
   final Map<String, NgmyVideoSlotShape> slotShapes;
   final Map<String, NgmySlotKind> slotKinds;
+  final Map<String, bool> logoVisibleBySlot;
+  final Map<String, NgmyLogoFrameStyle> logoFrameStyleBySlot;
   final String headline;
   final String title;
   final String subtitle;
@@ -180,6 +234,8 @@ class NgmyVideoStudioExportConfig {
     required this.slotRects,
     required this.slotShapes,
     required this.slotKinds,
+    this.logoVisibleBySlot = const {},
+    this.logoFrameStyleBySlot = const {},
     required this.headline,
     required this.title,
     required this.subtitle,

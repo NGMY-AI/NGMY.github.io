@@ -51,8 +51,8 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   static const _panel = Color(0xFF0F1419);
   static const _accent = Color(0xFF00B25A);
 
-  NgmyVideoFormat _format = NgmyVideoFormat.youtube;
-  NgmyVideoTemplateId _templateId = NgmyVideoTemplateId.ytBanner0;
+  NgmyVideoFormat _format = NgmyVideoFormat.tiktok;
+  NgmyVideoTemplateId _templateId = NgmyVideoTemplateId.ttBanner0;
   bool _templatesExpanded = false;
   bool _exporting = false;
   double _exportProgress = 0;
@@ -66,6 +66,8 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   final Map<String, _SlotMedia> _slotMedia = {};
   final Map<String, Uint8List> _logoBytes = {};
   final Map<String, String> _logoPaths = {};
+  final Map<String, bool> _logoVisible = {};
+  final Map<String, NgmyLogoFrameStyle> _logoFrameStyles = {};
   String? _preparingSlotId;
 
   final _headlineC = TextEditingController();
@@ -121,6 +123,10 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       _slotRects[s.id] = s.defaultRect(_format);
       _slotShapes[s.id] = s.shape;
       _slotKinds[s.id] = s.kind;
+      if (s.kind == NgmySlotKind.logoAnim) {
+        _logoVisible.putIfAbsent(s.id, () => true);
+        _logoFrameStyles.putIfAbsent(s.id, () => NgmyLogoFrameStyle.goldRing);
+      }
     }
     if (resetMedia) {
       for (final m in _slotMedia.values) {
@@ -280,6 +286,8 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       slotRects: Map.from(_slotRects),
       slotShapes: Map.from(_slotShapes),
       slotKinds: Map.from(_slotKinds),
+      logoVisibleBySlot: Map.from(_logoVisible),
+      logoFrameStyleBySlot: Map.from(_logoFrameStyles),
       headline: _headlineC.text.trim(),
       title: _titleC.text.trim(),
       subtitle: _subtitleC.text.trim(),
@@ -494,7 +502,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         border: Border.all(color: Colors.white12),
       ),
       child: Row(
-        children: NgmyVideoFormat.values.map((f) {
+        children: kNgmyStudioFormatOrder.map((f) {
           final sel = f == _format;
           return Expanded(
             child: Padding(
@@ -567,7 +575,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
             ],
           ),
           subtitle: Text(
-            '15 broadcast overlays per format — upload video, logo, edit text, download',
+            '25 broadcast overlays per format — video, logo, frames, text, download',
             style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 10),
           ),
           children: [
@@ -826,14 +834,14 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     final px = _px(rect, size);
 
     if (slot.kind == NgmySlotKind.logoAnim) {
+      if (_logoVisible[slot.id] == false) return const SizedBox.shrink();
       return Positioned.fromRect(
         rect: px,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: NgmyStudioLogoAnim(
-            imageBytes: _logoBytes[slot.id],
-            filePath: _logoPaths[slot.id],
-          ),
+        child: NgmyStudioLogoAnim(
+          imageBytes: _logoBytes[slot.id],
+          filePath: _logoPaths[slot.id],
+          shape: _slotShapes[slot.id] ?? NgmyVideoSlotShape.rect,
+          frameStyle: _logoFrameStyles[slot.id] ?? NgmyLogoFrameStyle.goldRing,
         ),
       );
     }
@@ -953,6 +961,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
             final sid = slotDef!.id;
             final rect = _slotRects[sid];
             if (rect == null) return const SizedBox.shrink();
+            final isLogo = slotDef.kind == NgmySlotKind.logoAnim;
             return Column(
               children: [
                 const SizedBox(height: 12),
@@ -962,14 +971,53 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Resize: ${slotDef.label}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
-                      _slider('Width', rect.width, 0.08, 0.98, (v) {
+                      Text(isLogo ? 'Brand logo' : 'Resize: ${slotDef.label}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+                      if (isLogo) ...[
+                        const SizedBox(height: 6),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          title: const Text('Show brand logo', style: TextStyle(color: Colors.white, fontSize: 12)),
+                          value: _logoVisible[sid] ?? true,
+                          activeThumbColor: _accent,
+                          onChanged: (v) => setState(() => _logoVisible[sid] = v),
+                        ),
+                        Text('Shape', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 10)),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            _logoShapeChip(sid, NgmyVideoSlotShape.circle, Icons.account_circle_outlined, 'Circle'),
+                            const SizedBox(width: 8),
+                            _logoShapeChip(sid, NgmyVideoSlotShape.rect, Icons.crop_square_rounded, 'Rectangle'),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text('Logo frame', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 10)),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: NgmyLogoFrameStyle.values.map((f) {
+                            final sel = (_logoFrameStyles[sid] ?? NgmyLogoFrameStyle.goldRing) == f;
+                            return ChoiceChip(
+                              label: Text(f.label, style: TextStyle(fontSize: 9, color: sel ? Colors.white : Colors.white70)),
+                              selected: sel,
+                              selectedColor: _accent.withOpacity(0.35),
+                              backgroundColor: Colors.white.withOpacity(0.06),
+                              side: BorderSide(color: sel ? _accent : Colors.white24),
+                              onSelected: (_) => setState(() => _logoFrameStyles[sid] = f),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      _slider('Width', rect.width, isLogo ? 0.06 : 0.08, isLogo ? 0.42 : 0.98, (v) {
                         setState(() {
                           final r = _slotRects[sid]!;
                           _slotRects[sid] = Rect.fromLTWH(r.left, r.top, v, r.height);
                         });
                       }),
-                      _slider('Height', rect.height, 0.06, 0.92, (v) {
+                      _slider('Height', rect.height, isLogo ? 0.05 : 0.06, isLogo ? 0.38 : 0.92, (v) {
                         setState(() {
                           final r = _slotRects[sid]!;
                           _slotRects[sid] = Rect.fromLTWH(r.left, r.top, r.width, v);
@@ -1027,6 +1075,30 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           filled: true,
           fillColor: Colors.white.withOpacity(0.06),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        ),
+      ),
+    );
+  }
+
+  Widget _logoShapeChip(String sid, NgmyVideoSlotShape shape, IconData icon, String label) {
+    final sel = (_slotShapes[sid] ?? NgmyVideoSlotShape.rect) == shape;
+    return Expanded(
+      child: Material(
+        color: sel ? _accent.withOpacity(0.22) : Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => setState(() => _slotShapes[sid] = shape),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              children: [
+                Icon(icon, color: sel ? _accent : Colors.white54, size: 20),
+                const SizedBox(height: 2),
+                Text(label, style: TextStyle(color: sel ? Colors.white : Colors.white60, fontSize: 9, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
         ),
       ),
     );

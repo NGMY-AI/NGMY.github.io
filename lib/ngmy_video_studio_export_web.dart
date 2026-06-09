@@ -19,6 +19,82 @@ const _exportAudioBitsPerSecond = 192000;
 const _recorderTimesliceMs = 250;
 const _minRecordMs = 400;
 
+void _ngmyClipLogoShape(html.CanvasRenderingContext2D ctx, double dx, double dy, double dw, double dh, NgmyVideoSlotShape shape) {
+  ctx.beginPath();
+  if (shape == NgmyVideoSlotShape.circle) {
+    ctx.arc(dx + dw / 2, dy + dh / 2, math.min(dw, dh) / 2, 0, math.pi * 2);
+  } else {
+    final rad = 10.0;
+    ctx.moveTo(dx + rad, dy);
+    ctx.lineTo(dx + dw - rad, dy);
+    ctx.quadraticCurveTo(dx + dw, dy, dx + dw, dy + rad);
+    ctx.lineTo(dx + dw, dy + dh - rad);
+    ctx.quadraticCurveTo(dx + dw, dy + dh, dx + dw - rad, dy + dh);
+    ctx.lineTo(dx + rad, dy + dh);
+    ctx.quadraticCurveTo(dx, dy + dh, dx, dy + dh - rad);
+    ctx.lineTo(dx, dy + rad);
+    ctx.quadraticCurveTo(dx, dy, dx + rad, dy);
+    ctx.closePath();
+  }
+  ctx.clip();
+}
+
+void _ngmyDrawLogoFrame(html.CanvasRenderingContext2D ctx, double dx, double dy, double dw, double dh, NgmyVideoSlotShape shape, NgmyLogoFrameStyle frame, double t) {
+  if (frame == NgmyLogoFrameStyle.none) return;
+  ctx.save();
+  ctx.lineWidth = 2.4;
+  if (frame == NgmyLogoFrameStyle.neonHalo || frame == NgmyLogoFrameStyle.crownJewel) {
+    final glow = 0.45 + math.sin(t * math.pi * 2) * 0.25;
+    ctx.strokeStyle = 'rgba(34, 211, 238, ${glow.toStringAsFixed(2)})';
+  } else if (frame == NgmyLogoFrameStyle.presidentialSeal || frame == NgmyLogoFrameStyle.velvetBadge) {
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.95)';
+    ctx.fillStyle = frame == NgmyLogoFrameStyle.velvetBadge ? 'rgba(127, 29, 29, 0.9)' : 'rgba(30, 58, 138, 0.88)';
+    _ngmyClipLogoShape(ctx, dx - 2, dy - 2, dw + 4, dh + 4, shape);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.95)';
+  } else if (frame == NgmyLogoFrameStyle.marbleInset) {
+    ctx.fillStyle = 'rgba(231, 229, 228, 0.92)';
+    _ngmyClipLogoShape(ctx, dx - 3, dy - 3, dw + 6, dh + 6, shape);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = 'rgba(168, 162, 158, 0.95)';
+  } else {
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.92)';
+  }
+  _ngmyClipLogoShape(ctx, dx, dy, dw, dh, shape);
+  ctx.stroke();
+  ctx.restore();
+}
+
+void _ngmyPaintLogoSlot(
+  html.CanvasRenderingContext2D ctx,
+  html.ImageElement logo,
+  double dx,
+  double dy,
+  double dw,
+  double dh,
+  NgmyVideoSlotShape shape,
+  NgmyLogoFrameStyle frame,
+  double t,
+) {
+  _ngmyDrawLogoFrame(ctx, dx, dy, dw, dh, shape, frame, t);
+  final inset = frame == NgmyLogoFrameStyle.none ? 0.0 : math.min(dw, dh) * 0.1;
+  final ix = dx + inset;
+  final iy = dy + inset;
+  final iw = dw - inset * 2;
+  final ih = dh - inset * 2;
+  final scale = 0.9 + math.sin(t * math.pi * 2) * 0.04 + 0.06;
+  final lw = iw * scale;
+  final lh = ih * scale;
+  ctx.save();
+  _ngmyClipLogoShape(ctx, ix, iy, iw, ih, shape);
+  ctx.drawImageScaled(logo, ix + (iw - lw) / 2, iy + (ih - lh) / 2, lw, lh);
+  ctx.restore();
+}
+
 bool _ngmyIsAppleMobileBrowser() {
   final ua = html.window.navigator.userAgent.toLowerCase();
   return ua.contains('iphone') ||
@@ -543,19 +619,21 @@ Future<String> exportNgmyVideoStudioComposed({
         final dh = r.height * h;
 
         if (kind == NgmySlotKind.logoAnim) {
-          if (bannerOverlay == null) {
+          if (bannerOverlay == null && config.logoVisibleBySlot[e.key] != false) {
             final logo = logos[e.key];
             if (logo != null) {
               final t = ((DateTime.now().millisecondsSinceEpoch - startMs) % 2200) / 2200;
-              final scale = 0.88 + math.sin(t * math.pi * 2) * 0.07 + 0.07;
-              ctx.save();
-              ctx.beginPath();
-              ctx.rect(dx, dy, dw, dh);
-              ctx.clip();
-              final lw = dw * scale;
-              final lh = dh * scale;
-              ctx.drawImageScaled(logo, dx + (dw - lw) / 2, dy + (dh - lh) / 2, lw, lh);
-              ctx.restore();
+              _ngmyPaintLogoSlot(
+                ctx,
+                logo,
+                dx,
+                dy,
+                dw,
+                dh,
+                config.slotShapes[e.key] ?? NgmyVideoSlotShape.rect,
+                config.logoFrameStyleBySlot[e.key] ?? NgmyLogoFrameStyle.goldRing,
+                t,
+              );
             }
           }
           continue;
@@ -591,6 +669,7 @@ Future<String> exportNgmyVideoStudioComposed({
       if (bannerOverlay != null) {
         for (final e in config.slotRects.entries) {
           if ((config.slotKinds[e.key] ?? NgmySlotKind.video) != NgmySlotKind.logoAnim) continue;
+          if (config.logoVisibleBySlot[e.key] == false) continue;
           final logo = logos[e.key];
           if (logo == null) continue;
           final r = e.value;
@@ -599,15 +678,17 @@ Future<String> exportNgmyVideoStudioComposed({
           final dw = r.width * w;
           final dh = r.height * h;
           final t = ((DateTime.now().millisecondsSinceEpoch - startMs) % 2200) / 2200;
-          final scale = 0.88 + math.sin(t * math.pi * 2) * 0.07 + 0.07;
-          ctx.save();
-          ctx.beginPath();
-          ctx.rect(dx, dy, dw, dh);
-          ctx.clip();
-          final lw = dw * scale;
-          final lh = dh * scale;
-          ctx.drawImageScaled(logo, dx + (dw - lw) / 2, dy + (dh - lh) / 2, lw, lh);
-          ctx.restore();
+          _ngmyPaintLogoSlot(
+            ctx,
+            logo,
+            dx,
+            dy,
+            dw,
+            dh,
+            config.slotShapes[e.key] ?? NgmyVideoSlotShape.rect,
+            config.logoFrameStyleBySlot[e.key] ?? NgmyLogoFrameStyle.goldRing,
+            t,
+          );
         }
       }
     }

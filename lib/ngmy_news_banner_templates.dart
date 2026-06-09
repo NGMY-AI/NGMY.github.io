@@ -73,6 +73,16 @@ const List<NgmyVideoTemplateId> kYtNewsBannerTemplateIds = [
   NgmyVideoTemplateId.ytBanner13,
 
   NgmyVideoTemplateId.ytBanner14,
+  NgmyVideoTemplateId.ytBanner15,
+  NgmyVideoTemplateId.ytBanner16,
+  NgmyVideoTemplateId.ytBanner17,
+  NgmyVideoTemplateId.ytBanner18,
+  NgmyVideoTemplateId.ytBanner19,
+  NgmyVideoTemplateId.ytBanner20,
+  NgmyVideoTemplateId.ytBanner21,
+  NgmyVideoTemplateId.ytBanner22,
+  NgmyVideoTemplateId.ytBanner23,
+  NgmyVideoTemplateId.ytBanner24,
 
 ];
 
@@ -109,6 +119,16 @@ const List<NgmyVideoTemplateId> kTtNewsBannerTemplateIds = [
   NgmyVideoTemplateId.ttBanner13,
 
   NgmyVideoTemplateId.ttBanner14,
+  NgmyVideoTemplateId.ttBanner15,
+  NgmyVideoTemplateId.ttBanner16,
+  NgmyVideoTemplateId.ttBanner17,
+  NgmyVideoTemplateId.ttBanner18,
+  NgmyVideoTemplateId.ttBanner19,
+  NgmyVideoTemplateId.ttBanner20,
+  NgmyVideoTemplateId.ttBanner21,
+  NgmyVideoTemplateId.ttBanner22,
+  NgmyVideoTemplateId.ttBanner23,
+  NgmyVideoTemplateId.ttBanner24,
 
 ];
 
@@ -162,7 +182,7 @@ NgmyVideoTemplateDef _bannerDef(NgmyVideoTemplateId id, NgmyNewsBannerStyle styl
 
     name: style.label,
 
-    category: 'Broadcast Overlay',
+    category: style.index >= 15 ? 'Luxury Collection' : 'Broadcast Overlay',
 
     icon: _iconFor(style),
 
@@ -219,6 +239,16 @@ IconData _iconFor(NgmyNewsBannerStyle s) => switch (s) {
       NgmyNewsBannerStyle.cleanMinimal => Icons.horizontal_rule_rounded,
 
       NgmyNewsBannerStyle.luxuryDark => Icons.nightlife_rounded,
+      NgmyNewsBannerStyle.imperialGold => Icons.workspace_premium_rounded,
+      NgmyNewsBannerStyle.presidentialBlue => Icons.account_balance_rounded,
+      NgmyNewsBannerStyle.royalCrimson => Icons.military_tech_rounded,
+      NgmyNewsBannerStyle.diamondElite => Icons.diamond_outlined,
+      NgmyNewsBannerStyle.marblePalace => Icons.museum_rounded,
+      NgmyNewsBannerStyle.velvetThrone => Icons.chair_rounded,
+      NgmyNewsBannerStyle.sovereignSilver => Icons.shield_rounded,
+      NgmyNewsBannerStyle.crownJewel => Icons.emoji_events_rounded,
+      NgmyNewsBannerStyle.executiveBrief => Icons.business_center_rounded,
+      NgmyNewsBannerStyle.gildedHerald => Icons.flag_rounded,
 
     };
 
@@ -437,6 +467,16 @@ IconData _iconFor(NgmyNewsBannerStyle s) => switch (s) {
         false,
 
       ),
+    NgmyNewsBannerStyle.imperialGold => ('IMPERIAL ADDRESS', 'NGMY ROYAL', 'NGMY Crown', 'NGMYKing', false),
+    NgmyNewsBannerStyle.presidentialBlue => ('STATE OF THE NATION', 'NGMY PRESIDENT', 'NGMY Office', 'NGMYState', false),
+    NgmyNewsBannerStyle.royalCrimson => ('ROYAL DECREE', 'NGMY REGAL', 'NGMY Royal', 'NGMYRegal', true),
+    NgmyNewsBannerStyle.diamondElite => ('EXCLUSIVE DIAMOND COVERAGE', 'NGMY ELITE', 'NGMY VIP', 'NGMYDiamond', false),
+    NgmyNewsBannerStyle.marblePalace => ('FROM THE PALACE DESK', 'NGMY PALACE', 'NGMY Hall', 'NGMYPalace', false),
+    NgmyNewsBannerStyle.velvetThrone => ('THE SOVEREIGN REPORT', 'NGMY THRONE', 'NGMY Velvet', 'NGMYThrone', false),
+    NgmyNewsBannerStyle.sovereignSilver => ('SILVER BULLETIN', 'NGMY SOVEREIGN', 'NGMY Silver', 'NGMYSilver', false),
+    NgmyNewsBannerStyle.crownJewel => ('CROWN JEWEL BROADCAST', 'NGMY JEWEL', 'NGMY Crown', 'NGMYJewel', true),
+    NgmyNewsBannerStyle.executiveBrief => ('EXECUTIVE BRIEFING', 'NGMY EXEC', 'NGMY Board', 'NGMYExec', false),
+    NgmyNewsBannerStyle.gildedHerald => ('GILDED HERALD LIVE', 'NGMY HERALD', 'NGMY Herald', 'NGMYHerald', true),
 
   };
 
