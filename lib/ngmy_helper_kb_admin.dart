@@ -28,10 +28,13 @@ class _NgmyHelperKbAdminScreenState extends State<NgmyHelperKbAdminScreen> {
   @override
   void initState() {
     super.initState();
-    _categories = widget.initialCategories.map((c) => c.copyWith(questions: List.from(c.questions))).toList();
+    _categories = widget.initialCategories.map((c) => c.copyWith(questions: List.from(c.questions))).toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    _normalizeSortOrders();
   }
 
   Future<void> _saveAll() async {
+    _normalizeSortOrders();
     setState(() => _saving = true);
     final ok = await widget.onSave(_categories);
     if (mounted) {
@@ -70,6 +73,22 @@ class _NgmyHelperKbAdminScreenState extends State<NgmyHelperKbAdminScreen> {
 
   void _deleteCategory(int index) {
     setState(() => _categories.removeAt(index));
+    _normalizeSortOrders();
+  }
+
+  void _normalizeSortOrders() {
+    for (var i = 0; i < _categories.length; i++) {
+      _categories[i] = _categories[i].copyWith(sortOrder: i);
+    }
+  }
+
+  void _onReorderCategories(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) newIndex -= 1;
+      final item = _categories.removeAt(oldIndex);
+      _categories.insert(newIndex, item);
+      _normalizeSortOrders();
+    });
   }
 
   void _manageQuestions(int catIndex) async {
@@ -107,40 +126,83 @@ class _NgmyHelperKbAdminScreenState extends State<NgmyHelperKbAdminScreen> {
         label: const Text('Category'),
         backgroundColor: const Color(0xFF00B25A),
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (_, i) {
-          final c = _categories[i];
-          return Material(
-            color: isDark ? const Color(0xFF151C28) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            child: ListTile(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Color(c.colorValue).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
-                child: Icon(c.icon, color: Color(c.colorValue)),
-              ),
-              title: Text(c.title, style: const TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: Text('${c.questions.length} question(s)'),
-              trailing: PopupMenuButton<String>(
-                onSelected: (v) {
-                  if (v == 'edit') _editCategory(i);
-                  if (v == 'questions') _manageQuestions(i);
-                  if (v == 'delete') _deleteCategory(i);
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'questions', child: Text('Manage questions')),
-                  PopupMenuItem(value: 'edit', child: Text('Edit category')),
-                  PopupMenuItem(value: 'delete', child: Text('Delete category')),
-                ],
-              ),
-              onTap: () => _manageQuestions(i),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Text(
+              'Drag categories to reorder what users see first.',
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54),
             ),
-          );
-        },
+          ),
+          Expanded(
+            child: ReorderableListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _categories.length,
+              onReorder: _onReorderCategories,
+              buildDefaultDragHandles: false,
+              itemBuilder: (_, i) {
+                final c = _categories[i];
+                return Padding(
+                  key: ValueKey(c.id),
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Material(
+                  color: isDark ? const Color(0xFF151C28) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  child: ListTile(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    leading: ReorderableDragStartListener(
+                      index: i,
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Color(c.colorValue).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.drag_handle_rounded, color: isDark ? Colors.white54 : Colors.black45, size: 20),
+                      ),
+                    ),
+                    title: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Color(c.colorValue).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(c.icon, color: Color(c.colorValue), size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(c.title, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                        ),
+                      ],
+                    ),
+                    subtitle: Text(
+                      '#${i + 1} · ${c.questions.length} question(s)',
+                      style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 11),
+                    ),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (v) {
+                        if (v == 'edit') _editCategory(i);
+                        if (v == 'questions') _manageQuestions(i);
+                        if (v == 'delete') _deleteCategory(i);
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'questions', child: Text('Manage questions')),
+                        PopupMenuItem(value: 'edit', child: Text('Edit category')),
+                        PopupMenuItem(value: 'delete', child: Text('Delete category')),
+                      ],
+                    ),
+                    onTap: () => _manageQuestions(i),
+                  ),
+                ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

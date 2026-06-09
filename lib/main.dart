@@ -38523,7 +38523,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   int _helperRemaining = -1;
   bool _kbMode = false;
   List<NgmyHelperKbCategory> _kbCategories = ngmyHelperKbDefaultCategories();
-  final List<Map<String, dynamic>> _kbThread = [];
   Timer? _chatGateTimer;
   Timer? _newsPollTimer;
   int _unreadNewsInternal = 0;
@@ -38612,18 +38611,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       setState(() => _helperRemaining = remaining);
       _applyKbAutoSwitch();
     }
-  }
-
-  void _onKbQuestionAsked(NgmyHelperKbCategory category, NgmyHelperKbQuestion question) {
-    setState(() {
-      _kbThread.add({
-        'question': question.question,
-        'answerBlocks': question.answerBlocks.map((b) => b.toJson()).toList(),
-        'printable': question.printable,
-        'category': category.title,
-        'at': DateTime.now().toUtc().toIso8601String(),
-      });
-    });
   }
 
   Future<void> _openKbAdmin() async {
@@ -39278,8 +39265,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                           categories: _kbCategories,
                           logoUrl: widget.config.logoUrl,
                           logoBuilder: (url, {size = 48}) => _ngmyLogoCircle(url, size: size),
-                          onQuestionAsked: _onKbQuestionAsked,
-                          kbThread: _kbThread,
                           showTapToSwitch: widget.user.isAdmin,
                           onTapLogoSwitch: widget.user.isAdmin ? _toggleKbModeForAdmin : null,
                         )
