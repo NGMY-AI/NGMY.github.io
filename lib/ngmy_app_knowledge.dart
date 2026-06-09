@@ -104,8 +104,11 @@ class NgmyAppKnowledge {
       buf.writeln();
     }
 
-    final chatClosed = config['ngmyChatClosed'] == true;
-    buf.writeln('NGMY Helper chat ${chatClosed ? "CLOSED for regular users" : "OPEN"}.');
+    final newsClosed = config['ngmyChatClosed'] == true;
+    buf.writeln(
+      'Community News feed ${newsClosed ? "CLOSED — regular users cannot post new community news" : "OPEN — users can post community news"}.',
+    );
+    buf.writeln('NGMY Helper AI chat is ALWAYS available — news open/closed does not affect AI assistance.');
     return buf.toString().trim();
   }
 

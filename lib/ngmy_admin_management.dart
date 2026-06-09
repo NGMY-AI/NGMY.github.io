@@ -10,6 +10,8 @@ const String _kNgmyInvoicePaymentSettingsKey = 'invoice_payment_settings';
 const String _kNgmyInvoicePaymentPrefsKey = 'ngmy_invoice_payment_settings_v1';
 const String _kNgmyHelperAiSettingsKey = 'ngmy_helper_ai_settings';
 const String _kNgmyHelperAiPrefsKey = 'ngmy_helper_ai_settings_v1';
+const String _kNgmyAppBrandingSettingsKey = 'ngmy_app_branding';
+const String _kNgmyAppBrandingPrefsKey = 'ngmy_app_branding_v1';
 
 Future<Set<String>> _fetchDeletedMediaIdsFromCloud() async {
   final row = await _fetchNgmySettingSafe(_kNgmyDeletedMediaSettingsKey);
@@ -458,6 +460,79 @@ Future<void> ngmyHydrateHelperAiSettingsFromAllBackups(AppConfig config) async {
   }
 }
 
+Map<String, dynamic> _appBrandingPayload(AppConfig config) => {
+      'logoUrl': config.logoUrl.trim(),
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyAppBrandingPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+  final logo = (payload['logoUrl'] ?? '').toString().trim();
+  if (logo.isNotEmpty) config.logoUrl = logo;
+}
+
+Future<void> _persistAppBrandingLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyAppBrandingPrefsKey, jsonEncode(_appBrandingPayload(config)));
+  } catch (e) {
+    debugPrint('[admin branding] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateAppBrandingFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyAppBrandingPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyAppBrandingPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[admin branding] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyAppBrandingSettingsKey);
+    if (row != null) _applyAppBrandingPayload(config, row);
+  }
+}
+
+Future<bool> ngmyPersistAppBrandingSettings(AppConfig config) async {
+  await _persistAppBrandingLocal(config);
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyAppBrandingSettingsKey, _appBrandingPayload(config));
+    try {
+      var row = <String, dynamic>{
+        'id': kNgmyConfigRowId,
+        'logoUrl': config.logoUrl.trim(),
+      };
+      for (var i = 0; i < 6; i++) {
+        try {
+          await Supabase.instance.client.from('config').upsert(row);
+          cloudOk = true;
+          break;
+        } catch (e) {
+          final missing = _missingColumnFromPostgrestError(e);
+          if (missing != null && missing.isNotEmpty && row.containsKey(missing)) {
+            row = Map<String, dynamic>.from(row)..remove(missing);
+            if (row.length <= 1) break;
+            continue;
+          }
+          debugPrint('[admin branding] config upsert: $e');
+          break;
+        }
+      }
+    } catch (e) {
+      debugPrint('[admin branding] config save: $e');
+    }
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
 Future<bool> ngmyPersistHelperAiSettings(AppConfig config) async {
   await _persistHelperAiSettingsLocal(config);
   NgmyAdminLiveRefresh.notify();
@@ -576,6 +651,7 @@ Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
   }
 
   await ngmyHydrateManagementListsFromAllBackups(config);
+  await ngmyHydrateAppBrandingFromAllBackups(config);
   _mergeOperationalManagementListsIntoConfig(config, snapshot);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
 }

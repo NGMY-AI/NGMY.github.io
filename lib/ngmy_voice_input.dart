@@ -148,7 +148,7 @@ class _NgmyVoiceMicButtonState extends State<NgmyVoiceMicButton> {
       if (spoken.isEmpty) return;
       widget.controller.text = _base.isEmpty ? spoken : '$_base $spoken';
       widget.controller.selection = TextSelection.collapsed(offset: widget.controller.text.length);
-      if (isFinal && mounted) setState(() => _listening = false);
+      if (mounted) setState(() {});
     });
     if (mounted) setState(() => _listening = started);
     if (!started && mounted) {

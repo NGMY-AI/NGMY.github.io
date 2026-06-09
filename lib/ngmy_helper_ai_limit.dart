@@ -56,6 +56,28 @@ class NgmyHelperAiLimit {
     return (dailyLimit - entry.count).clamp(0, dailyLimit);
   }
 
+  static String _threeLeftPopupKey(String email, DateTime windowStart) =>
+      'ngmy_helper_3left_${_key(email)}_${windowStart.toUtc().toIso8601String()}';
+
+  /// Whether the "3 messages left" popup was already shown for this rolling window.
+  static Future<bool> wasThreeLeftPopupShown(String email) async {
+    final key = _key(email);
+    if (key.isEmpty) return true;
+    final map = await _loadUsageMap();
+    final entry = _normalizeRollingWindow(_entryForEmail(map, email), DateTime.now());
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_threeLeftPopupKey(email, entry.windowStart)) == true;
+  }
+
+  static Future<void> markThreeLeftPopupShown(String email) async {
+    final key = _key(email);
+    if (key.isEmpty) return;
+    final map = await _loadUsageMap();
+    final entry = _normalizeRollingWindow(_entryForEmail(map, email), DateTime.now());
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_threeLeftPopupKey(email, entry.windowStart), true);
+  }
+
   /// Returns false when the user hit the limit.
   static Future<bool> tryConsume(String email, int dailyLimit) async {
     if (dailyLimit <= 0) return true;

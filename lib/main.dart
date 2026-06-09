@@ -54,6 +54,7 @@ import 'ngmy_fun_games.dart';
 import 'ngmy_fun_games_popups.dart';
 import 'ngmy_invoice_storage.dart';
 import 'ngmy_helper_ai_limit.dart';
+import 'ngmy_helper_quota_popup.dart';
 import 'ngmy_helper_kb.dart';
 import 'ngmy_helper_kb_ui.dart';
 import 'ngmy_helper_kb_admin.dart';
@@ -2004,6 +2005,13 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     next.invoiceLuxuryLifetimeEmails = List<String>.from(keep.invoiceLuxuryLifetimeEmails);
   }
 
+  if (record.containsKey('logoUrl') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final remoteLogo = (record['logoUrl'] ?? '').toString().trim();
+    if (remoteLogo.isNotEmpty) next.logoUrl = remoteLogo;
+  } else if (keep.logoUrl.trim().isNotEmpty) {
+    next.logoUrl = keep.logoUrl;
+  }
+
   if (record.containsKey('jobPosts') && record['jobPosts'] is List) {
     final remoteJobs = (record['jobPosts'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
     if (remoteJobs.isNotEmpty) {
@@ -2174,6 +2182,7 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
     'loanCompanyZelle': config.loanCompanyZelle,
     'maxMediaPostsPerWeek': config.maxMediaPostsPerWeek,
     'ngmyHelperDailyMessageLimit': config.ngmyHelperDailyMessageLimit,
+    'logoUrl': config.logoUrl.trim(),
   };
   for (var i = 0; i < 12; i++) {
     try {
@@ -5038,6 +5047,90 @@ Widget _ngmyMenuPillFrame(BuildContext context, {required bool isDark, required 
   );
 }
 
+/// Animated glassy green frame — clock-in tag style, reusable on home stats.
+Widget _ngmyGlassGreenShell({
+  required Widget child,
+  required double shimmer,
+  BorderRadius borderRadius = const BorderRadius.all(Radius.circular(16)),
+  EdgeInsets padding = const EdgeInsets.all(2),
+  bool useBlur = true,
+}) {
+  Widget core(double s) {
+    final inner = Container(
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(const Color(0xFF6EE7B7), const Color(0xFF34D399), s)!.withValues(alpha: 0.72),
+            const Color(0xFF059669).withValues(alpha: 0.58),
+            const Color(0xFF047857).withValues(alpha: 0.68),
+          ],
+          stops: const [0, 0.55, 1],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.40 + s * 0.30), width: 1.2),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF22C55E).withValues(alpha: 0.26 + s * 0.20), blurRadius: 16, offset: const Offset(0, 5)),
+          BoxShadow(color: Colors.white.withValues(alpha: 0.16), blurRadius: 4, offset: const Offset(-1, -1)),
+          BoxShadow(color: const Color(0xFF064E3B).withValues(alpha: 0.22), blurRadius: 8, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 4,
+            right: 4,
+            top: 0,
+            height: 14,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(borderRadius.topLeft.x - 2)),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.white.withValues(alpha: 0.38 + s * 0.16), Colors.white.withValues(alpha: 0)],
+                ),
+              ),
+            ),
+          ),
+          child,
+        ],
+      ),
+    );
+    if (!useBlur || ngmyPreferLightGraphics) return inner;
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: inner,
+      ),
+    );
+  }
+
+  return Container(
+    padding: padding,
+    decoration: BoxDecoration(
+      borderRadius: borderRadius,
+      gradient: SweepGradient(
+        colors: [
+          const Color(0xFF86EFAC).withValues(alpha: 0.06),
+          const Color(0xFFBBF7D0).withValues(alpha: 0.50 + shimmer * 0.28),
+          const Color(0xFF22C55E).withValues(alpha: 0.78),
+          const Color(0xFF6EE7B7).withValues(alpha: 0.38 + shimmer * 0.18),
+          const Color(0xFF86EFAC).withValues(alpha: 0.06),
+        ],
+        transform: GradientRotation(shimmer * math.pi * 2),
+      ),
+      boxShadow: [
+        BoxShadow(color: const Color(0xFF34D399).withValues(alpha: 0.16 + shimmer * 0.14), blurRadius: 12, spreadRadius: 0.5),
+      ],
+    ),
+    child: core(shimmer),
+  );
+}
+
 class Announcement {
   final String id;
   final String title;
@@ -5363,6 +5456,7 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'Never tell users to configure API keys, Gemini, OpenAI, Claude, or Supabase — admins handle that. '
           'The AI is connected and working — never say you are waiting for an API key or that Gemini is unreachable. '
           'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n'
+          'Community News may be closed for posting — that never disables you. Always answer NGMY Helper AI questions normally.\n'
           'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n'
       : 'You are the helpful assistant for the NGMY platform (Next Generation - Make Yours). '
           '$founderFacts'
@@ -5373,6 +5467,7 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'Never tell users to configure API keys, Gemini, OpenAI, Claude, or Supabase — admins handle that. '
           'The AI is connected and working — never say you are waiting for an API key or that Gemini is unreachable. '
           'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n'
+          'Community News may be closed for posting — that never disables you. Always answer NGMY Helper AI questions normally.\n'
           'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n';
 }
 
@@ -6039,6 +6134,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
     await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
     await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
+    await ngmyHydrateAppBrandingFromAllBackups(_config);
     await ngmyApplyStoreSellAccessFromSettings(_config);
     _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
     await _persistLocalOnly();
@@ -8586,6 +8682,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         return;
       }
+      if (key == _kNgmyAppBrandingSettingsKey) {
+        final value = payload.newRecord['value'];
+        if (value is Map) {
+          if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+          setState(() => _applyAppBrandingPayload(_config, Map<String, dynamic>.from(value)));
+          unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
+          NgmyAdminLiveRefresh.notify();
+        }
+        return;
+      }
       if (key.isNotEmpty) {
         _scheduleLegalPlansRefreshFromCloud();
       }
@@ -8982,6 +9088,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
+          await ngmyHydrateAppBrandingFromAllBackups(_config);
         } catch (_) {}
       }
       final localMediaJson = safeGet('all_media');
@@ -9237,6 +9344,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
+          await ngmyHydrateAppBrandingFromAllBackups(_config);
           _mergeOperationalManagementListsIntoConfig(_config, localConfigSnapshot);
           await ngmyApplyStoreSellAccessFromSettings(_config);
           _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
@@ -12328,106 +12436,111 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _status(BuildContext ctx) {
-    bool isLight = Theme.of(ctx).brightness == Brightness.light;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Theme.of(ctx).cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: isLight ? Border.all(color: const Color(0xFF00B25A).withOpacity(0.2)) : null,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Row(
-        children: [
-          Expanded(
+    final isLight = Theme.of(ctx).brightness == Brightness.light;
+    return AnimatedBuilder(
+      animation: _smokeCtrl,
+      builder: (context, _) {
+        final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
+        return _ngmyGlassGreenShell(
+          shimmer: shimmer,
+          borderRadius: BorderRadius.circular(22),
+          padding: const EdgeInsets.all(2.2),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFF8EEBC0), Color(0xFF54C995)]),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: const Icon(Icons.wifi, color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Network Status',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 24 * 0.7,
-                        color: isLight ? const Color(0xFF111827) : Colors.white,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      _ngmyGlassGreenShell(
+                        shimmer: shimmer,
+                        borderRadius: BorderRadius.circular(14),
+                        padding: const EdgeInsets.all(1.6),
+                        child: SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Icon(Icons.wifi_rounded, color: Colors.white.withValues(alpha: 0.96), size: 22),
+                        ),
                       ),
-                    ),
-                    Text(
-                      'Real-time statistics',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isLight ? Colors.black54 : Colors.white60,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          ),
-          const SizedBox(width: 10),
-          GestureDetector(
-            onTap: _openGameCenter,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final bool isPhone = MediaQuery.of(context).size.width < 420;
-                final double buttonWidth = isPhone ? 96 : (constraints.maxWidth > 190 ? 112 : 104);
-                final double buttonHeight = isPhone ? 32 : 34;
-                final double iconSize = isPhone ? 12 : 13;
-                final double labelSize = isPhone ? 8.5 : 9;
-                return Container(
-                  width: buttonWidth,
-                  height: buttonHeight,
-                  padding: const EdgeInsets.all(1.6),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFFFFC107), Color(0xFFFF9800)]),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFFB300).withOpacity(0.35),
-                        blurRadius: 10,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Network Status',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16.8,
+                                color: isLight ? const Color(0xFFECFDF5) : Colors.white,
+                                shadows: [Shadow(color: const Color(0xFF064E3B).withValues(alpha: 0.45), blurRadius: 2)],
+                              ),
+                            ),
+                            Text(
+                              'Real-time statistics',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.82),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFF13B7A0), Color(0xFF13C86A)]),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.sports_esports_rounded, color: Colors.pinkAccent, size: iconSize),
-                        const SizedBox(width: 4),
-                        Text('ACTIVE', style: TextStyle(color: Colors.white, fontSize: labelSize, fontWeight: FontWeight.w900)),
-                        const SizedBox(width: 4),
-                        Icon(Icons.attach_money_rounded, color: Colors.amber, size: iconSize),
-                      ],
-                    ),
+                ),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: _openGameCenter,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isPhone = MediaQuery.of(context).size.width < 420;
+                      final buttonWidth = isPhone ? 100.0 : (constraints.maxWidth > 190 ? 118.0 : 108.0);
+                      final buttonHeight = isPhone ? 36.0 : 38.0;
+                      final iconSize = isPhone ? 13.0 : 14.0;
+                      final labelSize = isPhone ? 9.0 : 9.5;
+                      return SizedBox(
+                        width: buttonWidth,
+                        height: buttonHeight,
+                        child: _ngmyGlassGreenShell(
+                          shimmer: shimmer,
+                          borderRadius: BorderRadius.circular(18),
+                          padding: const EdgeInsets.all(1.8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.sports_esports_rounded, color: Colors.white.withValues(alpha: 0.95), size: iconSize),
+                              const SizedBox(width: 4),
+                              Text(
+                                'ACTIVE',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: labelSize,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.6,
+                                  shadows: [Shadow(color: const Color(0xFF064E3B).withValues(alpha: 0.5), blurRadius: 2)],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.bolt_rounded, color: const Color(0xFFBBF7D0), size: iconSize),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -20537,9 +20650,13 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                                 geminiSynced = await widget.persistGeminiKey(widget.config.geminiApiKey);
                               }
                               await ngmyFlushCriticalConfigLocalAndCloud(widget.config, cloud: false);
+                              final brandingOk = await ngmyPersistAppBrandingSettings(widget.config);
                               final helperOk = await ngmyPersistHelperAiSettings(widget.config);
                               if (mounted) {
-                                setState(() => _pendingLogoBytes = null);
+                                setState(() {
+                                  _pendingLogoBytes = null;
+                                  _logoC.text = widget.config.logoUrl;
+                                });
                               }
                               widget.onDataChanged();
                               final mgmtOk = await widget.onPersistManagement?.call() ?? await ngmyAdminPersistManagementConfig(widget.config);
@@ -20547,14 +20664,15 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                               final detected = ngmyAiProviderLabel(
                                 ngmyParseAiCredentials(widget.config.geminiApiKey).provider,
                               );
+                              final allCloudOk = geminiSynced && mgmtOk && helperOk && brandingOk;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    geminiSynced && mgmtOk && helperOk
+                                    allCloudOk
                                         ? 'Global settings saved to cloud ($detected).'
                                         : 'Saved locally. Supabase sync failed — check connection.',
                                   ),
-                                  backgroundColor: geminiSynced && mgmtOk && helperOk ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
+                                  backgroundColor: allCloudOk ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
                                 ),
                               );
                               setState(() {});
@@ -20579,9 +20697,11 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('NGMY Chat', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                const Text('Community News', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                 Text(
-                                  widget.config.ngmyChatClosed ? 'Chat is closed for users' : 'Chat is open',
+                                  widget.config.ngmyChatClosed
+                                      ? 'News posting closed — AI Helper still works'
+                                      : 'News posting open for users',
                                   style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
                                 ),
                               ],
@@ -20614,7 +20734,7 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
                               backgroundColor: widget.config.ngmyChatClosed ? const Color(0xFF16A34A) : Colors.redAccent,
                             ),
                             icon: Icon(widget.config.ngmyChatClosed ? Icons.lock_open_rounded : Icons.lock_rounded, size: 18),
-                            label: Text(widget.config.ngmyChatClosed ? 'Reopen Chat' : 'Close Chat'),
+                            label: Text(widget.config.ngmyChatClosed ? 'Reopen News' : 'Close News'),
                           ),
                         ],
                       ),
@@ -38540,9 +38660,10 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   bool _isPostingNews = false;
   bool _isTyping = false;
   bool _memoryLoaded = false;
-  bool _chatClosedForUsers = false;
+  bool _newsClosedForUsers = false;
   int _helperRemaining = -1;
   bool _kbMode = false;
+  bool _kbVoluntaryBrowse = false;
   List<NgmyHelperKbCategory> _kbCategories = ngmyHelperKbDefaultCategories();
   Timer? _chatGateTimer;
   Timer? _helperQuotaTimer;
@@ -38582,7 +38703,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   @override
   void initState() {
     super.initState();
-    _chatClosedForUsers = widget.config.ngmyChatClosed;
+    _newsClosedForUsers = widget.config.ngmyChatClosed;
     _newsItems = List<Announcement>.from(widget.announcements);
     for (final a in _newsItems) {
       if (a.id.isNotEmpty) _seenNewsIds.add(a.id);
@@ -38611,6 +38732,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     if (widget.user.isAdmin) return _kbMode;
     final limit = widget.config.ngmyHelperDailyMessageLimit;
     if (limit > 0 && _helperRemaining == 0) return true;
+    if (_kbVoluntaryBrowse && !_kbLockedByDailyLimit) return true;
     return false;
   }
 
@@ -38622,11 +38744,18 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   void _applyKbAutoSwitch() {
     if (widget.user.isAdmin) return;
-    if (_kbLockedByDailyLimit && !_kbMode) {
-      setState(() => _kbMode = true);
-    } else if (!_kbLockedByDailyLimit && _kbMode) {
+    if (_kbLockedByDailyLimit) {
+      if (!_kbMode) setState(() => _kbMode = true);
+    } else if (_kbMode) {
       setState(() => _kbMode = false);
     }
+  }
+
+  void _returnToAiChatFromKb() {
+    setState(() {
+      _kbVoluntaryBrowse = false;
+      _kbMode = false;
+    });
   }
 
   Future<void> _refreshHelperQuota() async {
@@ -38643,7 +38772,26 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     if (mounted) {
       setState(() => _helperRemaining = remaining);
       _applyKbAutoSwitch();
+      if (remaining == 3) {
+        unawaited(_maybeShowThreeLeftPopup(remaining));
+      }
     }
+  }
+
+  Future<void> _maybeShowThreeLeftPopup(int remaining) async {
+    if (!mounted || widget.user.isAdmin) return;
+    final limit = widget.config.ngmyHelperDailyMessageLimit;
+    if (limit <= 0 || remaining != 3) return;
+    await showNgmyHelperThreeLeftPopup(
+      context,
+      userEmail: widget.user.email,
+      remaining: remaining,
+      dailyLimit: limit,
+      onBrowseHelpTopics: () {
+        if (!mounted) return;
+        setState(() => _kbVoluntaryBrowse = true);
+      },
+    );
   }
 
   Future<void> _openKbAdmin() async {
@@ -38847,8 +38995,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       }
     } catch (_) {}
     if (!mounted) return;
-    if (closed != _chatClosedForUsers) {
-      setState(() => _chatClosedForUsers = closed);
+    if (closed != _newsClosedForUsers) {
+      setState(() => _newsClosedForUsers = closed);
     }
   }
 
@@ -38936,7 +39084,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     });
   }
 
-  bool get _newsPostingLocked => _chatClosedForUsers && !widget.user.isAdmin;
+  bool get _newsPostingLocked => _newsClosedForUsers && !widget.user.isAdmin;
 
   Future<void> _refreshGeminiKeyFromCloud() async {
     final remote = await _fetchRemoteGeminiApiKey();
@@ -38961,6 +39109,9 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           return;
         }
         await _refreshHelperQuota();
+        if (mounted && _helperRemaining == 3) {
+          unawaited(_maybeShowThreeLeftPopup(3));
+        }
       }
     }
 
@@ -39324,6 +39475,36 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                                   ),
                                 ),
                               ),
+                            if (_kbVoluntaryBrowse && !_kbLockedByDailyLimit)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                                child: Material(
+                                  color: const Color(0xFF00B25A).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: _returnToAiChatFromKb,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.arrow_back_rounded, size: 16, color: isDark ? const Color(0xFFBBF7D0) : const Color(0xFF166534)),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Back to NGMY Helper AI',
+                                            style: TextStyle(
+                                              color: isDark ? const Color(0xFFBBF7D0) : const Color(0xFF166534),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             Expanded(
                               child: NgmyHelperKbHub(
                                 categories: _kbCategories,
@@ -39370,23 +39551,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                           ),
                         ),
                       if (_memoryLoaded && _messages.length <= 1) const SizedBox(height: 8),
-                      if (!widget.user.isAdmin && _helperRemaining >= 0)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _helperRemaining == 0
-                                  ? 'No Helper messages left in the next 24 hours'
-                                  : '$_helperRemaining Helper message${_helperRemaining == 1 ? '' : 's'} left today',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: _helperRemaining <= 3 ? Colors.orangeAccent : (isDark ? Colors.white54 : Colors.black54),
-                              ),
-                            ),
-                          ),
-                        ),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -39565,15 +39729,33 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       return _ngmyMenuPillFrame(
         context,
         isDark: isDark,
-        child: Text(
-          'Unable to send messages at the moment.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.15,
-            color: isDark ? Colors.white70 : const Color(0xFF475569),
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.newspaper_rounded, color: isDark ? Colors.white54 : const Color(0xFF64748B), size: 22),
+            const SizedBox(height: 8),
+            Text(
+              'Community news is closed right now.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.15,
+                color: isDark ? Colors.white70 : const Color(0xFF475569),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Switch to the Chat tab — NGMY Helper AI is still available.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                height: 1.35,
+                color: isDark ? Colors.white54 : const Color(0xFF64748B),
+              ),
+            ),
+          ],
         ),
       );
     }

@@ -47,12 +47,12 @@ class _NgmyVideoStudioPage extends StatefulWidget {
 }
 
 class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
-  static const _bg = Color(0xFF0B0E18);
-  static const _panel = Color(0xFF12182A);
-  static const _accent = Color(0xFF7C3AED);
+  static const _bg = Color(0xFF06080F);
+  static const _panel = Color(0xFF0F1419);
+  static const _accent = Color(0xFF00B25A);
 
   NgmyVideoFormat _format = NgmyVideoFormat.youtube;
-  NgmyVideoTemplateId _templateId = NgmyVideoTemplateId.ytStudioCurved;
+  NgmyVideoTemplateId _templateId = NgmyVideoTemplateId.ytBanner0;
   bool _templatesExpanded = false;
   bool _exporting = false;
   double _exportProgress = 0;
@@ -418,9 +418,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         foregroundColor: Colors.white,
         title: const Row(
           children: [
-            Icon(Icons.auto_fix_high_rounded, color: _accent, size: 22),
+            Icon(Icons.live_tv_rounded, color: _accent, size: 22),
             SizedBox(width: 10),
-            Text('NGMY Video Studio', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+            Text('NGMY Broadcast Studio', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
           ],
         ),
         actions: [
@@ -567,7 +567,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
             ],
           ),
           subtitle: Text(
-            'Tap to open — ${_format == NgmyVideoFormat.youtube ? "studios match your screenshot colors" : "vertical TikTok layouts"}',
+            '15 broadcast overlays per format — upload video, logo, edit text, download',
             style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 10),
           ),
           children: [
@@ -694,9 +694,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            _def.usesPhotoBackdrop
-                ? 'Your studio colors stay exactly as in the template. Only the TV/monitor areas accept video or logo.'
-                : 'Black end-screen frames — upload one video per box.',
+            'Your video fills the screen. Overlays (banner, logo, social bar) are fully editable.',
             style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10, height: 1.35),
           ),
         ],
@@ -739,7 +737,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
 
         if (_def.isNewsBanner) {
           for (final slot in _def.slots) {
-            children.add(_slotLayer(slot, size));
+            if (slot.kind != NgmySlotKind.logoAnim) children.add(_slotLayer(slot, size));
           }
           children.add(
             Positioned.fill(
@@ -751,10 +749,14 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                   subtitle: _subtitleC.text,
                   liveLabel: _liveC.text,
                   topAccent: _def.newsTopAccent,
+                  scale: _headlineScale,
                 ),
               ),
             ),
           );
+          for (final slot in _def.slots) {
+            if (slot.kind == NgmySlotKind.logoAnim) children.add(_slotLayer(slot, size));
+          }
           for (final slot in _def.slots) {
             children.add(_slotTap(slot, size));
           }
@@ -911,7 +913,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('${_format.label} frames', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+            Text('Media layers', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
             if (_picking)
               LinearProgressIndicator(
                 minHeight: 2,
@@ -990,16 +992,20 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                _def.isNewsBanner ? 'Banner text' : 'Text overlays',
+                _def.isNewsBanner ? 'Overlay text' : 'Text overlays',
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
               ),
+              const SizedBox(height: 4),
+              Text(
+                'Main banner · brand name · social left · social right',
+                style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 10),
+              ),
               const SizedBox(height: 8),
-              _field('Headline', _headlineC, maxLines: 2),
-              _field('Title', _titleC),
-              _field('Badge', _subtitleC),
-              _field('Live / footer', _liveC),
-              _slider('Headline size', _headlineScale, 0.6, 1.8, (v) => setState(() => _headlineScale = v)),
-              _slider('Title size', _titleScale, 0.6, 1.8, (v) => setState(() => _titleScale = v)),
+              _field('Main banner text', _headlineC, maxLines: 3),
+              _field('Brand / channel name', _titleC),
+              _field('Social handle (left)', _subtitleC),
+              _field('Social handle (right)', _liveC),
+              _slider('Overlay scale', _headlineScale, 0.6, 1.8, (v) => setState(() => _headlineScale = v)),
             ],
           ),
         ),

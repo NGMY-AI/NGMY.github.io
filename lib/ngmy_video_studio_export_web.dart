@@ -543,18 +543,20 @@ Future<String> exportNgmyVideoStudioComposed({
         final dh = r.height * h;
 
         if (kind == NgmySlotKind.logoAnim) {
-          final logo = logos[e.key];
-          if (logo != null) {
-            final t = ((DateTime.now().millisecondsSinceEpoch - startMs) % 2200) / 2200;
-            final scale = 0.88 + math.sin(t * math.pi * 2) * 0.07 + 0.07;
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(dx, dy, dw, dh);
-            ctx.clip();
-            final lw = dw * scale;
-            final lh = dh * scale;
-            ctx.drawImageScaled(logo, dx + (dw - lw) / 2, dy + (dh - lh) / 2, lw, lh);
-            ctx.restore();
+          if (bannerOverlay == null) {
+            final logo = logos[e.key];
+            if (logo != null) {
+              final t = ((DateTime.now().millisecondsSinceEpoch - startMs) % 2200) / 2200;
+              final scale = 0.88 + math.sin(t * math.pi * 2) * 0.07 + 0.07;
+              ctx.save();
+              ctx.beginPath();
+              ctx.rect(dx, dy, dw, dh);
+              ctx.clip();
+              final lw = dw * scale;
+              final lh = dh * scale;
+              ctx.drawImageScaled(logo, dx + (dw - lw) / 2, dy + (dh - lh) / 2, lw, lh);
+              ctx.restore();
+            }
           }
           continue;
         }
@@ -584,6 +586,29 @@ Future<String> exportNgmyVideoStudioComposed({
         ctx.drawImageScaled(bannerOverlay, 0, 0, w, h);
       } else if (config.showTextOverlay) {
         _drawTextOverlay(ctx, w.toDouble(), h.toDouble(), config);
+      }
+
+      if (bannerOverlay != null) {
+        for (final e in config.slotRects.entries) {
+          if ((config.slotKinds[e.key] ?? NgmySlotKind.video) != NgmySlotKind.logoAnim) continue;
+          final logo = logos[e.key];
+          if (logo == null) continue;
+          final r = e.value;
+          final dx = r.left * w;
+          final dy = r.top * h;
+          final dw = r.width * w;
+          final dh = r.height * h;
+          final t = ((DateTime.now().millisecondsSinceEpoch - startMs) % 2200) / 2200;
+          final scale = 0.88 + math.sin(t * math.pi * 2) * 0.07 + 0.07;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(dx, dy, dw, dh);
+          ctx.clip();
+          final lw = dw * scale;
+          final lh = dh * scale;
+          ctx.drawImageScaled(logo, dx + (dw - lw) / 2, dy + (dh - lh) / 2, lw, lh);
+          ctx.restore();
+        }
       }
     }
 
@@ -708,6 +733,7 @@ Future<html.ImageElement> _renderNewsBannerOverlay(NgmyVideoStudioExportConfig c
     subtitle: config.subtitle,
     liveLabel: config.liveLabel,
     topAccent: config.newsTopAccent,
+    scale: config.headlineFontScale.clamp(0.6, 1.8),
   ).paint(canvas, Size(w.toDouble(), h.toDouble()));
   final picture = recorder.endRecording();
   final image = await picture.toImage(w, h);

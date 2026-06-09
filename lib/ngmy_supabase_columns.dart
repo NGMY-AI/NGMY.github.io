@@ -10,7 +10,7 @@ class NgmySupabaseColumns {
       'gameInvites,civicSelfEnrollmentEnabled,civicRegistryPin,civicRegistryPinsByState,'
       'openedContributionReceiptKeys,dismissedContributionReceiptKeys,storeSellAccessEmails,'
       'geminiApiKey,gemini_api_key,aiApiKey,ai_api_key,gameTimeLimits,diceSettings,'
-      'familyTreeCreateFee,familyTreePhotoMonthlyFee,familyTreePhotoAccessUntilByEmail';
+      'familyTreeCreateFee,familyTreePhotoMonthlyFee,familyTreePhotoAccessUntilByEmail,logoUrl';
 
   static const configBootstrapCore =
       'id,investmentPlans,ngmyChatClosed,civicSelfEnrollmentEnabled,civicRegistryPin,'
