@@ -420,7 +420,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           children: [
             Icon(Icons.live_tv_rounded, color: _accent, size: 22),
             SizedBox(width: 10),
-            Text('NGMY Broadcast Studio', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+            Text('NGMY Studio', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
           ],
         ),
         actions: [
@@ -694,7 +694,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Your video fills the screen. Overlays (banner, logo, social bar) are fully editable.',
+            'Video fills the frame. Overlays sit inset with margins — edit text, logo, and scale.',
             style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10, height: 1.35),
           ),
         ],

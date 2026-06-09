@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'dart:ui' as ui;
 
 
@@ -6,7 +8,7 @@ import 'package:flutter/material.dart';
 
 
 
-/// Professional broadcast overlay styles — full-screen video + editable graphics.
+/// Professional broadcast overlay styles — video background + inset editable graphics.
 
 enum NgmyNewsBannerStyle {
 
@@ -84,6 +86,102 @@ extension NgmyNewsBannerStyleExt on NgmyNewsBannerStyle {
 
 
 
+class _BannerLayout {
+
+  _BannerLayout(Size size, double scale) {
+
+    final vertical = size.height > size.width * 1.05;
+
+    final sc = scale.clamp(0.55, 1.6);
+
+    final norm = vertical ? 0.62 : 1.0;
+
+
+
+    if (vertical) {
+
+      marginH = size.width * 0.082;
+
+      marginTop = size.height * 0.056;
+
+      marginBottom = size.height * 0.050;
+
+      bannerH = size.height * 0.072 * sc * norm;
+
+      footerH = size.height * 0.034 * sc * norm;
+
+      brandW = size.width * 0.26;
+
+      brandH = size.height * 0.054 * sc;
+
+      gap = size.height * 0.014;
+
+    } else {
+
+      marginH = size.width * 0.032;
+
+      marginTop = size.height * 0.038;
+
+      marginBottom = size.height * 0.028;
+
+      bannerH = size.height * 0.155 * sc;
+
+      footerH = size.height * 0.048 * sc;
+
+      brandW = size.width * 0.18;
+
+      brandH = size.height * 0.11 * sc;
+
+      gap = size.height * 0.01;
+
+    }
+
+    this.size = size;
+
+    this.sc = sc;
+
+  }
+
+
+
+  late final Size size;
+
+  late final double marginH;
+
+  late final double marginTop;
+
+  late final double marginBottom;
+
+  late final double bannerH;
+
+  late final double footerH;
+
+  late final double brandW;
+
+  late final double brandH;
+
+  late final double gap;
+
+  late final double sc;
+
+
+
+  double get footerTop => size.height - marginBottom - footerH;
+
+  double get bannerTop => footerTop - gap - bannerH;
+
+
+
+  Rect get bannerRect => Rect.fromLTWH(marginH, bannerTop, size.width - marginH * 2, bannerH);
+
+  Rect get footerRect => Rect.fromLTWH(marginH, footerTop, size.width - marginH * 2, footerH);
+
+  Rect get brandRect => Rect.fromLTWH(size.width - marginH - brandW, marginTop, brandW, brandH);
+
+}
+
+
+
 class NgmyNewsBannerPainter extends CustomPainter {
 
   final NgmyNewsBannerStyle style;
@@ -122,6 +220,10 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
 
 
+  _BannerLayout _l(Size size) => _BannerLayout(size, scale);
+
+
+
   @override
 
   void paint(Canvas canvas, Size size) {
@@ -134,143 +236,123 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
         _broadcastGradient(canvas, size);
 
-        break;
-
       case NgmyNewsBannerStyle.ngmyPrime:
 
         _ngmyPrime(canvas, size);
-
-        break;
 
       case NgmyNewsBannerStyle.sunsetPulse:
 
         _sunsetPulse(canvas, size);
 
-        break;
-
       case NgmyNewsBannerStyle.cyberNeon:
 
         _cyberNeon(canvas, size);
-
-        break;
 
       case NgmyNewsBannerStyle.royalBlue:
 
         _royalBlue(canvas, size);
 
-        break;
-
       case NgmyNewsBannerStyle.fireAlert:
 
         _fireAlert(canvas, size);
-
-        break;
 
       case NgmyNewsBannerStyle.emeraldWave:
 
         _emeraldWave(canvas, size);
 
-        break;
-
       case NgmyNewsBannerStyle.purpleHype:
 
         _purpleHype(canvas, size);
-
-        break;
 
       case NgmyNewsBannerStyle.midnightGold:
 
         _midnightGold(canvas, size);
 
-        break;
-
       case NgmyNewsBannerStyle.tropicalVibe:
 
         _tropicalVibe(canvas, size);
-
-        break;
 
       case NgmyNewsBannerStyle.sportDynamic:
 
         _sportDynamic(canvas, size);
 
-        break;
-
       case NgmyNewsBannerStyle.podcastPro:
 
         _podcastPro(canvas, size);
-
-        break;
 
       case NgmyNewsBannerStyle.newsFlash:
 
         _newsFlash(canvas, size);
 
-        break;
-
       case NgmyNewsBannerStyle.cleanMinimal:
 
         _cleanMinimal(canvas, size);
-
-        break;
 
       case NgmyNewsBannerStyle.luxuryDark:
 
         _luxuryDark(canvas, size);
 
-        break;
-
     }
 
   }
-
-
-
-  double _s(double v, Size size) => v * scale * (size.height / 1080).clamp(0.55, 1.35);
 
 
 
   void _topLiveStrip(Canvas canvas, Size size) {
 
-    final h = size.height * 0.045 * scale;
+    final l = _l(size);
 
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, h), Paint()..color = const Color(0xFFDC2626));
+    final h = size.height * (size.height > size.width ? 0.032 : 0.038) * l.sc;
 
-    _txt(canvas, liveLabel.toUpperCase(), size.width * 0.04, h * 0.18, h * 0.55, Colors.white, FontWeight.w900);
+    final r = RRect.fromRectAndRadius(
+
+      Rect.fromLTWH(l.marginH, l.marginTop * 0.35, size.width - l.marginH * 2, h),
+
+      const Radius.circular(8),
+
+    );
+
+    canvas.drawRRect(r, Paint()..color = const Color(0xFFDC2626).withValues(alpha: 0.92));
+
+    _txt(canvas, liveLabel.toUpperCase(), l.marginH + 10, l.marginTop * 0.35 + h * 0.22, h * 0.48, Colors.white, FontWeight.w900);
 
   }
 
 
 
-  void _brandCorner(Canvas canvas, Size size, {required Color bg, required Color fg, bool showTriangles = false}) {
+  void _brandCorner(Canvas canvas, Size size, {required Color bg, required Color fg, bool glass = true}) {
 
-    final w = size.width;
+    final l = _l(size);
 
-    final boxW = w * 0.20;
+    final r = l.brandRect;
 
-    final boxH = size.height * 0.13 * scale;
+    final paint = Paint()
 
-    final left = w - boxW - w * 0.03;
+      ..color = (glass ? bg.withValues(alpha: 0.78) : bg.withValues(alpha: 0.92));
 
-    final top = size.height * 0.04;
+    canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(10)), paint);
 
     canvas.drawRRect(
 
-      RRect.fromRectAndRadius(Rect.fromLTWH(left, top, boxW, boxH), const Radius.circular(6)),
+      RRect.fromRectAndRadius(r, const Radius.circular(10)),
 
-      Paint()..color = bg.withValues(alpha: 0.92),
+      Paint()
+
+        ..color = Colors.white.withValues(alpha: 0.28)
+
+        ..style = PaintingStyle.stroke
+
+        ..strokeWidth = 1.2,
 
     );
 
-    _txt(canvas, title.toUpperCase(), left + boxW * 0.08, top + boxH * 0.28, boxH * 0.32, fg, FontWeight.w900, maxW: boxW * 0.84);
+    _txt(canvas, title.toUpperCase(), r.left + 10, r.top + r.height * 0.22, r.height * 0.34, fg, FontWeight.w900, maxW: r.width - 16);
 
     if (subtitle.trim().isNotEmpty) {
 
-      _txt(canvas, subtitle, left + boxW * 0.08, top + boxH * 0.62, boxH * 0.22, fg.withValues(alpha: 0.85), FontWeight.w600, maxW: boxW * 0.84);
+      _txt(canvas, subtitle, r.left + 10, r.top + r.height * 0.58, r.height * 0.24, fg.withValues(alpha: 0.88), FontWeight.w600, maxW: r.width - 16);
 
     }
-
-    if (showTriangles) _triangleAccents(canvas, size, const Color(0xFF14B8A6), count: 3);
 
   }
 
@@ -278,27 +360,39 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _triangleAccents(Canvas canvas, Size size, Color color, {int count = 3}) {
 
-    final w = size.width;
+    final l = _l(size);
 
-    final baseY = size.height * 0.78;
+    final baseY = l.bannerTop + l.bannerH * 0.15;
 
     for (var i = 0; i < count; i++) {
 
-      final cx = w * (0.55 + i * 0.12);
+      final cx = l.bannerRect.left + l.bannerRect.width * (0.45 + i * 0.14);
 
-      final h = size.height * (0.22 + i * 0.04) * scale;
+      final h = l.bannerH * (0.55 + i * 0.12);
 
       final path = Path()
 
         ..moveTo(cx, baseY)
 
-        ..lineTo(cx - h * 0.35, baseY + h)
+        ..lineTo(cx - h * 0.32, baseY + h)
 
-        ..lineTo(cx + h * 0.35, baseY + h)
+        ..lineTo(cx + h * 0.32, baseY + h)
 
         ..close();
 
-      canvas.drawPath(path, Paint()..color = color.withValues(alpha: 0.55)..style = PaintingStyle.stroke..strokeWidth = 2.5);
+      canvas.drawPath(
+
+        path,
+
+        Paint()
+
+          ..color = color.withValues(alpha: 0.5)
+
+          ..style = PaintingStyle.stroke
+
+          ..strokeWidth = 2,
+
+      );
 
     }
 
@@ -308,23 +402,37 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _socialFooter(Canvas canvas, Size size, {required Color bg, required Color accent, required Color text}) {
 
-    final w = size.width;
+    final l = _l(size);
 
-    final fh = size.height * 0.055 * scale;
+    final r = l.footerRect;
 
-    final top = size.height - fh;
+    canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(12)), Paint()..color = bg.withValues(alpha: 0.88));
 
-    canvas.drawRect(Rect.fromLTWH(0, top, w, fh), Paint()..color = bg);
+    canvas.drawRRect(
+
+      RRect.fromRectAndRadius(r, const Radius.circular(12)),
+
+      Paint()
+
+        ..color = accent.withValues(alpha: 0.45)
+
+        ..style = PaintingStyle.stroke
+
+        ..strokeWidth = 1,
+
+    );
 
     final left = subtitle.trim().isNotEmpty ? subtitle : '@NGMY';
 
     final right = liveLabel.trim().isNotEmpty ? liveLabel : '@NGMYOfficial';
 
-    _txt(canvas, left, w * 0.04, top + fh * 0.28, fh * 0.42, text, FontWeight.w700);
+    final fs = r.height * 0.38;
 
-    _socialIcons(canvas, Offset(w * 0.38, top + fh * 0.22), fh * 0.55, accent);
+    _txt(canvas, left, r.left + 12, r.top + r.height * 0.28, fs, text, FontWeight.w700);
 
-    _txt(canvas, right, w * 0.72, top + fh * 0.28, fh * 0.42, text, FontWeight.w700, align: TextAlign.right, maxW: w * 0.24);
+    _socialIcons(canvas, Offset(r.left + r.width * 0.36, r.top + r.height * 0.18), r.height * 0.52, accent);
+
+    _txt(canvas, right, r.right - 12, r.top + r.height * 0.28, fs, text, FontWeight.w700, align: TextAlign.right, maxW: r.width * 0.28);
 
   }
 
@@ -336,21 +444,7 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
     for (var i = 0; i < icons.length; i++) {
 
-      _icon(canvas, icons[i], Offset(at.dx + i * (h * 1.15), at.dy), h * 0.7, color);
-
-      if (i < icons.length - 1) {
-
-        canvas.drawLine(
-
-          Offset(at.dx + (i + 1) * (h * 1.15) - h * 0.2, at.dy + h * 0.1),
-
-          Offset(at.dx + (i + 1) * (h * 1.15) - h * 0.05, at.dy + h * 0.85),
-
-          Paint()..color = color.withValues(alpha: 0.5)..strokeWidth = 1.2,
-
-        );
-
-      }
+      _icon(canvas, icons[i], Offset(at.dx + i * (h * 1.1), at.dy), h * 0.65, color);
 
     }
 
@@ -358,11 +452,11 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
 
 
-  void _icon(Canvas canvas, IconData icon, Offset at, double size, Color color) {
+  void _icon(Canvas canvas, IconData icon, Offset at, double iconSize, Color color) {
 
     final tp = TextPainter(
 
-      text: TextSpan(text: String.fromCharCode(icon.codePoint), style: TextStyle(fontSize: size, fontFamily: icon.fontFamily, color: color)),
+      text: TextSpan(text: String.fromCharCode(icon.codePoint), style: TextStyle(fontSize: iconSize, fontFamily: icon.fontFamily, color: color)),
 
       textDirection: TextDirection.ltr,
 
@@ -374,31 +468,63 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
 
 
-  void _gradientBanner(Canvas canvas, Size size, List<Color> colors, {bool triangles = false}) {
+  void _drawInsetBanner(Canvas canvas, Size size, List<Color> colors, {bool angledTop = false, bool triangles = false}) {
 
-    final w = size.width;
+    final l = _l(size);
 
-    final h = size.height;
+    final r = l.bannerRect;
 
-    final bh = h * 0.22 * scale;
+    final path = Path();
 
-    final top = h - bh - h * 0.055 * scale;
+    if (angledTop) {
 
-    final rect = Rect.fromLTWH(0, top, w, bh);
+      path
 
-    canvas.drawRect(
+        ..moveTo(r.left, r.bottom)
 
-      rect,
+        ..lineTo(r.left, r.top + r.height * 0.22)
+
+        ..lineTo(r.right - r.width * 0.08, r.top)
+
+        ..lineTo(r.right, r.top + r.height * 0.12)
+
+        ..lineTo(r.right, r.bottom)
+
+        ..close();
+
+    } else {
+
+      path.addRRect(RRect.fromRectAndRadius(r, const Radius.circular(14)));
+
+    }
+
+    canvas.drawPath(
+
+      path,
 
       Paint()
 
-        ..shader = ui.Gradient.linear(Offset.zero, Offset(w, 0), colors)
+        ..shader = ui.Gradient.linear(Offset(r.left, r.top), Offset(r.right, r.top), colors)
 
         ..blendMode = BlendMode.srcOver,
 
     );
 
-    _txt(canvas, headline.toUpperCase(), w * 0.04, top + bh * 0.22, bh * 0.38, Colors.white, FontWeight.w900, maxW: w * 0.92);
+    canvas.drawPath(
+
+      path,
+
+      Paint()
+
+        ..color = Colors.white.withValues(alpha: 0.22)
+
+        ..style = PaintingStyle.stroke
+
+        ..strokeWidth = 1.2,
+
+    );
+
+    _txt(canvas, headline.toUpperCase(), r.left + 14, r.top + r.height * 0.28, r.height * 0.36, Colors.white, FontWeight.w900, maxW: r.width - 24);
 
     if (triangles) _triangleAccents(canvas, size, colors.last);
 
@@ -410,9 +536,9 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _broadcastGradient(Canvas canvas, Size size) {
 
-    _brandCorner(canvas, size, bg: const Color(0xFF0F172A), fg: Colors.white, showTriangles: false);
+    _brandCorner(canvas, size, bg: const Color(0xFF0F172A), fg: Colors.white);
 
-    _gradientBanner(canvas, size, const [Color(0xFFF97316), Color(0xFF14B8A6), Color(0xFF0EA5E9)], triangles: true);
+    _drawInsetBanner(canvas, size, const [Color(0xFFF97316), Color(0xFF14B8A6), Color(0xFF0EA5E9)], triangles: true);
 
   }
 
@@ -420,9 +546,9 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _ngmyPrime(Canvas canvas, Size size) {
 
-    _brandCorner(canvas, size, bg: const Color(0xFF00B25A), fg: Colors.white);
+    _brandCorner(canvas, size, bg: const Color(0xFF065F46), fg: Colors.white);
 
-    _gradientBanner(canvas, size, const [Color(0xFF065F46), Color(0xFF00B25A), Color(0xFF34D399)]);
+    _drawInsetBanner(canvas, size, const [Color(0xFF047857), Color(0xFF00B25A), Color(0xFF6EE7B7)]);
 
   }
 
@@ -432,7 +558,7 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
     _brandCorner(canvas, size, bg: const Color(0xFF7C2D12), fg: const Color(0xFFFDE68A));
 
-    _gradientBanner(canvas, size, const [Color(0xFFDC2626), Color(0xFFF97316), Color(0xFFFBBF24)], triangles: true);
+    _drawInsetBanner(canvas, size, const [Color(0xFFDC2626), Color(0xFFF97316), Color(0xFFFBBF24)], angledTop: true, triangles: true);
 
   }
 
@@ -440,23 +566,19 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _cyberNeon(Canvas canvas, Size size) {
 
-    final w = size.width;
-
-    final h = size.height;
+    final l = _l(size);
 
     _brandCorner(canvas, size, bg: Colors.black, fg: const Color(0xFF22D3EE));
 
-    final bh = h * 0.20 * scale;
+    final r = l.bannerRect;
 
-    final top = h - bh - h * 0.055 * scale;
+    canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(12)), Paint()..color = const Color(0xFF0F172A).withValues(alpha: 0.85));
 
-    canvas.drawRect(Rect.fromLTWH(0, top, w, bh), Paint()..color = const Color(0xFF0F172A).withValues(alpha: 0.92));
+    canvas.drawLine(Offset(r.left, r.top), Offset(r.right, r.top), Paint()..color = const Color(0xFF22D3EE)..strokeWidth = 2.5);
 
-    canvas.drawRect(Rect.fromLTWH(0, top, w, 3), Paint()..color = const Color(0xFF22D3EE));
+    canvas.drawLine(Offset(r.left, r.bottom), Offset(r.right, r.bottom), Paint()..color = const Color(0xFFA855F7)..strokeWidth = 2.5);
 
-    canvas.drawRect(Rect.fromLTWH(0, top + bh - 3, w, 3), Paint()..color = const Color(0xFFA855F7));
-
-    _txt(canvas, headline.toUpperCase(), w * 0.04, top + bh * 0.28, bh * 0.36, const Color(0xFF22D3EE), FontWeight.w900, maxW: w * 0.9);
+    _txt(canvas, headline.toUpperCase(), r.left + 12, r.top + r.height * 0.30, r.height * 0.34, const Color(0xFF67E8F9), FontWeight.w900, maxW: r.width - 20);
 
     _socialFooter(canvas, size, bg: Colors.black, accent: const Color(0xFFA855F7), text: const Color(0xFF67E8F9));
 
@@ -466,23 +588,34 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _royalBlue(Canvas canvas, Size size) {
 
-    final w = size.width;
-
-    final h = size.height;
+    final l = _l(size);
 
     _brandCorner(canvas, size, bg: const Color(0xFF1E3A8A), fg: Colors.white);
 
-    final bh = h * 0.24 * scale;
+    final r = l.bannerRect;
 
-    final top = h - bh - h * 0.055 * scale;
+    final liveW = r.width * 0.22;
 
-    canvas.drawRect(Rect.fromLTWH(0, top, w * 0.28, bh * 0.35), Paint()..color = const Color(0xFFDC2626));
+    canvas.drawRRect(
+      RRect.fromRectAndCorners(
+        Rect.fromLTWH(r.left, r.top, liveW, r.height),
+        topLeft: const Radius.circular(12),
+        bottomLeft: const Radius.circular(12),
+      ),
+      Paint()..color = const Color(0xFFDC2626),
+    );
 
-    _txt(canvas, 'LIVE', w * 0.04, top + bh * 0.06, bh * 0.22, Colors.white, FontWeight.w900);
+    _txt(canvas, 'LIVE', r.left + 10, r.top + r.height * 0.32, r.height * 0.30, Colors.white, FontWeight.w900);
 
-    canvas.drawRect(Rect.fromLTWH(0, top + bh * 0.32, w, bh * 0.68), Paint()..color = const Color(0xFF1D4ED8));
+    canvas.drawRRect(
 
-    _txt(canvas, headline.toUpperCase(), w * 0.04, top + bh * 0.48, bh * 0.34, Colors.white, FontWeight.w900, maxW: w * 0.92);
+      RRect.fromRectAndRadius(Rect.fromLTWH(r.left + liveW - 6, r.top, r.width - liveW + 6, r.height), const Radius.circular(12)),
+
+      Paint()..color = const Color(0xFF1D4ED8).withValues(alpha: 0.92),
+
+    );
+
+    _txt(canvas, headline.toUpperCase(), r.left + liveW + 8, r.top + r.height * 0.28, r.height * 0.34, Colors.white, FontWeight.w900, maxW: r.width - liveW - 16);
 
     _socialFooter(canvas, size, bg: const Color(0xFF0F172A), accent: const Color(0xFF3B82F6), text: Colors.white70);
 
@@ -492,33 +625,29 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _fireAlert(Canvas canvas, Size size) {
 
-    final w = size.width;
-
-    final h = size.height;
+    final l = _l(size);
 
     _brandCorner(canvas, size, bg: const Color(0xFFDC2626), fg: Colors.white);
 
-    final bh = h * 0.21 * scale;
-
-    final top = h - bh - h * 0.055 * scale;
+    final r = l.bannerRect;
 
     final path = Path()
 
-      ..moveTo(0, top + bh)
+      ..moveTo(r.left, r.bottom)
 
-      ..lineTo(w * 0.15, top)
+      ..lineTo(r.left + r.width * 0.12, r.top)
 
-      ..lineTo(w, top)
+      ..lineTo(r.right, r.top + r.height * 0.08)
 
-      ..lineTo(w, top + bh)
+      ..lineTo(r.right - r.width * 0.06, r.bottom)
 
       ..close();
 
-    canvas.drawPath(path, Paint()..color = const Color(0xFFEF4444));
+    canvas.drawPath(path, Paint()..color = const Color(0xFFEF4444).withValues(alpha: 0.92));
 
-    _txt(canvas, 'BREAKING', w * 0.04, top + bh * 0.08, bh * 0.28, Colors.white, FontWeight.w900);
+    _txt(canvas, 'BREAKING', r.left + 12, r.top + r.height * 0.12, r.height * 0.26, Colors.white, FontWeight.w900);
 
-    _txt(canvas, headline.toUpperCase(), w * 0.04, top + bh * 0.42, bh * 0.36, Colors.white, FontWeight.w900, maxW: w * 0.9);
+    _txt(canvas, headline.toUpperCase(), r.left + 12, r.top + r.height * 0.44, r.height * 0.32, Colors.white, FontWeight.w900, maxW: r.width - 20);
 
     _socialFooter(canvas, size, bg: Colors.black, accent: const Color(0xFFEF4444), text: Colors.white70);
 
@@ -530,7 +659,7 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
     _brandCorner(canvas, size, bg: const Color(0xFF064E3B), fg: const Color(0xFF6EE7B7));
 
-    _gradientBanner(canvas, size, const [Color(0xFF047857), Color(0xFF10B981), Color(0xFF6EE7B7)]);
+    _drawInsetBanner(canvas, size, const [Color(0xFF047857), Color(0xFF10B981), Color(0xFF6EE7B7)], angledTop: true);
 
   }
 
@@ -540,7 +669,7 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
     _brandCorner(canvas, size, bg: const Color(0xFF4C1D95), fg: const Color(0xFFE9D5FF));
 
-    _gradientBanner(canvas, size, const [Color(0xFF6D28D9), Color(0xFFA855F7), Color(0xFFF472B6)], triangles: true);
+    _drawInsetBanner(canvas, size, const [Color(0xFF6D28D9), Color(0xFFA855F7), Color(0xFFF472B6)], triangles: true);
 
   }
 
@@ -548,21 +677,29 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _midnightGold(Canvas canvas, Size size) {
 
-    final w = size.width;
-
-    final h = size.height;
+    final l = _l(size);
 
     _brandCorner(canvas, size, bg: const Color(0xFF1C1917), fg: const Color(0xFFFBBF24));
 
-    final bh = h * 0.22 * scale;
+    final r = l.bannerRect;
 
-    final top = h - bh - h * 0.055 * scale;
+    canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(14)), Paint()..color = const Color(0xFF1C1917).withValues(alpha: 0.9));
 
-    canvas.drawRect(Rect.fromLTWH(0, top, w, bh), Paint()..color = const Color(0xFF1C1917).withValues(alpha: 0.94));
+    canvas.drawRRect(
 
-    canvas.drawRect(Rect.fromLTWH(0, top, w, 4), Paint()..color = const Color(0xFFFBBF24));
+      RRect.fromRectAndRadius(r.deflate(1), const Radius.circular(13)),
 
-    _txt(canvas, headline.toUpperCase(), w * 0.04, top + bh * 0.28, bh * 0.36, const Color(0xFFFBBF24), FontWeight.w900, maxW: w * 0.9);
+      Paint()
+
+        ..color = const Color(0xFFFBBF24)
+
+        ..style = PaintingStyle.stroke
+
+        ..strokeWidth = 2,
+
+    );
+
+    _txt(canvas, headline.toUpperCase(), r.left + 14, r.top + r.height * 0.28, r.height * 0.34, const Color(0xFFFBBF24), FontWeight.w900, maxW: r.width - 24);
 
     _socialFooter(canvas, size, bg: const Color(0xFF0C0A09), accent: const Color(0xFFFBBF24), text: const Color(0xFFFDE68A));
 
@@ -574,7 +711,7 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
     _brandCorner(canvas, size, bg: const Color(0xFF0E7490), fg: Colors.white);
 
-    _gradientBanner(canvas, size, const [Color(0xFF06B6D4), Color(0xFF2DD4BF), Color(0xFF34D399)], triangles: true);
+    _drawInsetBanner(canvas, size, const [Color(0xFF06B6D4), Color(0xFF2DD4BF), Color(0xFF34D399)], triangles: true);
 
   }
 
@@ -582,29 +719,37 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _sportDynamic(Canvas canvas, Size size) {
 
-    final w = size.width;
-
-    final h = size.height;
+    final l = _l(size);
 
     _brandCorner(canvas, size, bg: const Color(0xFF1E40AF), fg: Colors.white);
 
-    final bh = h * 0.23 * scale;
-
-    final top = h - bh - h * 0.055 * scale;
+    final r = l.bannerRect;
 
     canvas.save();
 
-    canvas.translate(w * 0.5, top + bh * 0.5);
+    canvas.translate(r.center.dx, r.center.dy);
 
-    canvas.rotate(-0.04);
+    canvas.rotate(-0.035);
 
-    canvas.drawRect(Rect.fromCenter(center: Offset.zero, width: w * 1.1, height: bh), Paint()..color = const Color(0xFF2563EB));
+    canvas.drawRRect(
+
+      RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: r.width, height: r.height), const Radius.circular(10)),
+
+      Paint()..color = const Color(0xFF2563EB).withValues(alpha: 0.9),
+
+    );
 
     canvas.restore();
 
-    canvas.drawRect(Rect.fromLTWH(0, top + bh * 0.55, w * 0.35, bh * 0.45), Paint()..color = const Color(0xFFDC2626));
+    canvas.drawRRect(
 
-    _txt(canvas, headline.toUpperCase(), w * 0.04, top + bh * 0.18, bh * 0.34, Colors.white, FontWeight.w900, maxW: w * 0.92);
+      RRect.fromRectAndRadius(Rect.fromLTWH(r.left, r.top + r.height * 0.55, r.width * 0.38, r.height * 0.42), const Radius.circular(6)),
+
+      Paint()..color = const Color(0xFFDC2626),
+
+    );
+
+    _txt(canvas, headline.toUpperCase(), r.left + 12, r.top + r.height * 0.22, r.height * 0.34, Colors.white, FontWeight.w900, maxW: r.width - 16);
 
     _socialFooter(canvas, size, bg: const Color(0xFF0F172A), accent: const Color(0xFF38BDF8), text: Colors.white70);
 
@@ -614,27 +759,17 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _podcastPro(Canvas canvas, Size size) {
 
-    final w = size.width;
+    final l = _l(size);
 
-    final h = size.height;
+    final r = l.bannerRect;
 
-    final bh = h * 0.26 * scale;
+    canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(18)), Paint()..color = const Color(0xFF18181B).withValues(alpha: 0.82));
 
-    final top = h - bh - h * 0.055 * scale;
+    canvas.drawCircle(Offset(r.left + r.height * 0.42, r.center.dy), r.height * 0.28, Paint()..color = const Color(0xFF7C3AED));
 
-    canvas.drawRRect(
+    _txt(canvas, title.toUpperCase(), r.left + r.height * 0.78, r.top + r.height * 0.22, r.height * 0.22, const Color(0xFFA78BFA), FontWeight.w800);
 
-      RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.04, top, w * 0.92, bh), const Radius.circular(18)),
-
-      Paint()..color = const Color(0xFF18181B).withValues(alpha: 0.92),
-
-    );
-
-    canvas.drawCircle(Offset(w * 0.1, top + bh * 0.5), bh * 0.22, Paint()..color = const Color(0xFF7C3AED));
-
-    _txt(canvas, title.toUpperCase(), w * 0.18, top + bh * 0.22, bh * 0.22, const Color(0xFFA78BFA), FontWeight.w800);
-
-    _txt(canvas, headline, w * 0.18, top + bh * 0.52, bh * 0.30, Colors.white, FontWeight.w700, maxW: w * 0.76);
+    _txt(canvas, headline, r.left + r.height * 0.78, r.top + r.height * 0.50, r.height * 0.28, Colors.white, FontWeight.w700, maxW: r.width - r.height * 0.9);
 
     _socialFooter(canvas, size, bg: Colors.black, accent: const Color(0xFF7C3AED), text: Colors.white60);
 
@@ -644,23 +779,34 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _newsFlash(Canvas canvas, Size size) {
 
-    final w = size.width;
-
-    final h = size.height;
+    final l = _l(size);
 
     _brandCorner(canvas, size, bg: Colors.white, fg: const Color(0xFFDC2626));
 
-    final bh = h * 0.20 * scale;
+    final r = l.bannerRect;
 
-    final top = h - bh - h * 0.055 * scale;
+    final badgeW = r.width * 0.24;
 
-    canvas.drawRect(Rect.fromLTWH(0, top, w * 0.22, bh), Paint()..color = const Color(0xFFDC2626));
+    canvas.drawRRect(
+      RRect.fromRectAndCorners(
+        Rect.fromLTWH(r.left, r.top, badgeW, r.height),
+        topLeft: const Radius.circular(12),
+        bottomLeft: const Radius.circular(12),
+      ),
+      Paint()..color = const Color(0xFFDC2626),
+    );
 
-    _txt(canvas, 'NEWS', w * 0.03, top + bh * 0.32, bh * 0.38, Colors.white, FontWeight.w900);
+    _txt(canvas, 'NEWS', r.left + 8, r.top + r.height * 0.30, r.height * 0.34, Colors.white, FontWeight.w900);
 
-    canvas.drawRect(Rect.fromLTWH(w * 0.22, top, w * 0.78, bh), Paint()..color = const Color(0xFF1E3A8A));
+    canvas.drawRRect(
 
-    _txt(canvas, headline.toUpperCase(), w * 0.26, top + bh * 0.28, bh * 0.36, Colors.white, FontWeight.w900, maxW: w * 0.7);
+      RRect.fromRectAndRadius(Rect.fromLTWH(r.left + badgeW - 4, r.top, r.width - badgeW + 4, r.height), const Radius.circular(12)),
+
+      Paint()..color = const Color(0xFF1E3A8A).withValues(alpha: 0.92),
+
+    );
+
+    _txt(canvas, headline.toUpperCase(), r.left + badgeW + 8, r.top + r.height * 0.28, r.height * 0.34, Colors.white, FontWeight.w900, maxW: r.width - badgeW - 14);
 
     _socialFooter(canvas, size, bg: const Color(0xFF0F172A), accent: const Color(0xFFDC2626), text: Colors.white70);
 
@@ -670,21 +816,17 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _cleanMinimal(Canvas canvas, Size size) {
 
-    final w = size.width;
+    final l = _l(size);
 
-    final h = size.height;
+    final r = l.bannerRect;
 
-    final bh = h * 0.14 * scale;
+    canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(16)), Paint()..color = Colors.white.withValues(alpha: 0.9));
 
-    final top = h - bh - h * 0.055 * scale;
-
-    canvas.drawRect(Rect.fromLTWH(w * 0.04, top, w * 0.92, bh), Paint()..color = Colors.white.withValues(alpha: 0.94));
-
-    _txt(canvas, headline.toUpperCase(), w * 0.07, top + bh * 0.28, bh * 0.42, Colors.black87, FontWeight.w800, maxW: w * 0.86);
+    _txt(canvas, headline.toUpperCase(), r.left + 14, r.top + r.height * 0.28, r.height * 0.40, Colors.black87, FontWeight.w800, maxW: r.width - 24);
 
     if (title.trim().isNotEmpty) {
 
-      _txt(canvas, title, w * 0.07, top - bh * 0.55, bh * 0.38, Colors.white, FontWeight.w700);
+      _txt(canvas, title, l.brandRect.left, l.brandRect.top + l.brandRect.height * 0.28, l.brandRect.height * 0.36, Colors.white, FontWeight.w700);
 
     }
 
@@ -696,25 +838,25 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
   void _luxuryDark(Canvas canvas, Size size) {
 
-    final w = size.width;
-
-    final h = size.height;
+    final l = _l(size);
 
     _brandCorner(canvas, size, bg: const Color(0xFF27272A), fg: const Color(0xFFD4D4D8));
 
-    final bh = h * 0.24 * scale;
+    final r = l.bannerRect;
 
-    final top = h - bh - h * 0.055 * scale;
+    canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(14)), Paint()..color = const Color(0xFF09090B).withValues(alpha: 0.82));
 
-    canvas.drawRect(Rect.fromLTWH(0, top, w, bh), Paint()..color = const Color(0xFF09090B).withValues(alpha: 0.88));
+    for (var i = 0; i < 4; i++) {
 
-    for (var i = 0; i < 5; i++) {
+      final x0 = r.left + r.width * i / 4;
 
-      canvas.drawLine(Offset(w * i / 4, top), Offset(w * (i + 1) / 4 - w * 0.02, top + bh), Paint()..color = const Color(0xFF52525B).withValues(alpha: 0.35)..strokeWidth = 1);
+      final x1 = r.left + r.width * (i + 1) / 4 - 6;
+
+      canvas.drawLine(Offset(x0, r.top), Offset(x1, r.bottom), Paint()..color = const Color(0xFF52525B).withValues(alpha: 0.3)..strokeWidth = 1);
 
     }
 
-    _txt(canvas, headline.toUpperCase(), w * 0.04, top + bh * 0.30, bh * 0.34, const Color(0xFFFAFAFA), FontWeight.w800, maxW: w * 0.9);
+    _txt(canvas, headline.toUpperCase(), r.left + 14, r.top + r.height * 0.30, r.height * 0.32, const Color(0xFFFAFAFA), FontWeight.w800, maxW: r.width - 24);
 
     _socialFooter(canvas, size, bg: Colors.black, accent: const Color(0xFFA1A1AA), text: const Color(0xFFD4D4D8));
 
@@ -748,7 +890,7 @@ class NgmyNewsBannerPainter extends CustomPainter {
 
     final tp = TextPainter(
 
-      text: TextSpan(text: t, style: TextStyle(color: col, fontSize: fs, fontWeight: w, letterSpacing: 0.5)),
+      text: TextSpan(text: t, style: TextStyle(color: col, fontSize: fs, fontWeight: w, letterSpacing: 0.4)),
 
       textDirection: TextDirection.ltr,
 

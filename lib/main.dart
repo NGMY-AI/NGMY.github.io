@@ -5076,8 +5076,10 @@ Widget _ngmyGlassGreenShell({
           BoxShadow(color: const Color(0xFF064E3B).withValues(alpha: 0.22), blurRadius: 8, offset: const Offset(0, 3)),
         ],
       ),
+      alignment: Alignment.center,
       child: Stack(
         clipBehavior: Clip.none,
+        alignment: Alignment.center,
         children: [
           Positioned(
             left: 4,
@@ -12441,103 +12443,108 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       animation: _smokeCtrl,
       builder: (context, _) {
         final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
-        return _ngmyGlassGreenShell(
-          shimmer: shimmer,
-          borderRadius: BorderRadius.circular(22),
-          padding: const EdgeInsets.all(2.2),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      _ngmyGlassGreenShell(
-                        shimmer: shimmer,
-                        borderRadius: BorderRadius.circular(14),
-                        padding: const EdgeInsets.all(1.6),
-                        child: SizedBox(
-                          width: 44,
-                          height: 44,
-                          child: Icon(Icons.wifi_rounded, color: Colors.white.withValues(alpha: 0.96), size: 22),
-                        ),
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Theme.of(ctx).cardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: isLight ? Border.all(color: const Color(0xFF00B25A).withOpacity(0.2)) : null,
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    _ngmyGlassGreenShell(
+                      shimmer: shimmer,
+                      borderRadius: BorderRadius.circular(13),
+                      padding: const EdgeInsets.all(1.5),
+                      child: SizedBox(
+                        width: 42,
+                        height: 42,
+                        child: Center(child: Icon(Icons.wifi_rounded, color: Colors.white.withValues(alpha: 0.96), size: 20)),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Network Status',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 24 * 0.7,
+                              color: isLight ? const Color(0xFF111827) : Colors.white,
+                            ),
+                          ),
+                          Text(
+                            'Real-time statistics',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isLight ? Colors.black54 : Colors.white60,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: _openGameCenter,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isPhone = MediaQuery.of(context).size.width < 420;
+                    final buttonWidth = isPhone ? 96.0 : (constraints.maxWidth > 190 ? 112.0 : 104.0);
+                    final buttonHeight = isPhone ? 34.0 : 36.0;
+                    final iconSize = isPhone ? 12.0 : 13.0;
+                    final labelSize = isPhone ? 8.5 : 9.0;
+                    return SizedBox(
+                      width: buttonWidth,
+                      height: buttonHeight,
+                      child: _ngmyGlassGreenShell(
+                        shimmer: shimmer,
+                        borderRadius: BorderRadius.circular(17),
+                        padding: const EdgeInsets.all(1.6),
+                        child: Stack(
+                          alignment: Alignment.center,
                           children: [
                             Text(
-                              'Network Status',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              'ACTIVE',
+                              textAlign: TextAlign.center,
                               style: TextStyle(
+                                color: Colors.white,
+                                fontSize: labelSize,
                                 fontWeight: FontWeight.w900,
-                                fontSize: 16.8,
-                                color: isLight ? const Color(0xFFECFDF5) : Colors.white,
+                                letterSpacing: 0.5,
+                                height: 1.0,
                                 shadows: [Shadow(color: const Color(0xFF064E3B).withValues(alpha: 0.45), blurRadius: 2)],
                               ),
                             ),
-                            Text(
-                              'Real-time statistics',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.82),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            Positioned(
+                              left: isPhone ? 7 : 8,
+                              child: Icon(Icons.sports_esports_rounded, color: Colors.white.withValues(alpha: 0.95), size: iconSize),
+                            ),
+                            Positioned(
+                              right: isPhone ? 7 : 8,
+                              child: Icon(Icons.bolt_rounded, color: const Color(0xFFBBF7D0), size: iconSize),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-                const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: _openGameCenter,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isPhone = MediaQuery.of(context).size.width < 420;
-                      final buttonWidth = isPhone ? 100.0 : (constraints.maxWidth > 190 ? 118.0 : 108.0);
-                      final buttonHeight = isPhone ? 36.0 : 38.0;
-                      final iconSize = isPhone ? 13.0 : 14.0;
-                      final labelSize = isPhone ? 9.0 : 9.5;
-                      return SizedBox(
-                        width: buttonWidth,
-                        height: buttonHeight,
-                        child: _ngmyGlassGreenShell(
-                          shimmer: shimmer,
-                          borderRadius: BorderRadius.circular(18),
-                          padding: const EdgeInsets.all(1.8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.sports_esports_rounded, color: Colors.white.withValues(alpha: 0.95), size: iconSize),
-                              const SizedBox(width: 4),
-                              Text(
-                                'ACTIVE',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: labelSize,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.6,
-                                  shadows: [Shadow(color: const Color(0xFF064E3B).withValues(alpha: 0.5), blurRadius: 2)],
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(Icons.bolt_rounded, color: const Color(0xFFBBF7D0), size: iconSize),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
