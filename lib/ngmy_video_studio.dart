@@ -351,8 +351,11 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         backgroundColor: const Color(0xFF1A1A2E),
         title: const Text('Save your video', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
         content: Text(
-          'Tap Save below, then choose Save Video or Add to Photos.\n\nFile: $name',
-          style: const TextStyle(color: Colors.white70, height: 1.35),
+          'Tap Save below.\n\n'
+          '• iPhone: pick Save Video or Save to Files in the share menu.\n'
+          '• If nothing appears, the video opens in a new tab — tap Share ↗ → Save Video.\n\n'
+          'File: $name',
+          style: const TextStyle(color: Colors.white70, height: 1.35, fontSize: 13),
         ),
         actions: [
           TextButton(
@@ -365,28 +368,26 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFF00B25A)),
             onPressed: () async {
-              Navigator.pop(ctx);
-              final shared = await ngmyTryShareStagedStudioVideo();
-              if (!shared) ngmyOpenStagedIosStudioVideo();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      shared
-                          ? 'Choose Save Video in the share menu.'
-                          : 'Video opened — tap Share ↗ then Save Video.',
-                    ),
-                    duration: const Duration(seconds: 6),
+              // Share/download must run on the button tap (iOS requires user gesture).
+              final saved = await ngmySaveStagedStudioVideo();
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    saved
+                        ? 'Choose Save Video or Save to Files in the menu that opened.'
+                        : 'Video opened in a new tab — tap Share ↗ at the bottom, then Save Video or Add to Photos.',
                   ),
-                );
-              }
+                  duration: const Duration(seconds: 8),
+                ),
+              );
             },
             child: const Text('Save to Photos / Files'),
           ),
         ],
       ),
     );
-    if (ngmyHasStagedIosStudioVideo) ngmyClearStagedIosStudioVideo();
   }
 
   Future<void> _export() async {
@@ -419,12 +420,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
             );
       if (mounted) {
         final lower = msg.toLowerCase();
-        final needsIosSave = ngmyHasStagedIosStudioVideo ||
-            lower.contains('save video') ||
-            lower.contains('ios_pending') ||
-            lower.contains('ios_open') ||
-            lower.contains('shared');
-        if (needsIosSave) {
+        if (ngmyHasStagedIosStudioVideo) {
           await _showIosSaveVideoDialog(msg);
         } else if (lower.contains('failed') || lower.contains('unsupported')) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -432,7 +428,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), duration: const Duration(seconds: 5)),
+            SnackBar(content: Text(msg), duration: const Duration(seconds: 6)),
           );
         }
       }

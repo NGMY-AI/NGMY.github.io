@@ -29,12 +29,23 @@ void ngmyStageIosStudioVideo(String blobUrl, String filename) {
 
 void ngmyOpenStagedIosStudioVideo() {
   final url = _pendingUrl;
+  final name = _pendingName ?? 'ngmy_video.mp4';
+  if (url == null || url.isEmpty) return;
   _pendingName = null;
   _pendingUrl = null;
-  if (url == null || url.isEmpty) return;
-  html.window.open(url, '_blank');
+
+  // Same-tab navigation keeps blob URLs alive longer on iOS Safari/PWA.
+  final anchor = html.AnchorElement()
+    ..href = url
+    ..target = '_blank'
+    ..rel = 'noopener'
+    ..download = name;
+  html.document.body?.append(anchor);
+  anchor.click();
+  anchor.remove();
+
   if (url.startsWith('blob:')) {
-    Future<void>.delayed(const Duration(seconds: 120), () {
+    Future<void>.delayed(const Duration(seconds: 180), () {
       try {
         html.Url.revokeObjectUrl(url);
       } catch (_) {}
@@ -77,10 +88,47 @@ Future<bool> ngmyTryShareStudioVideoUrl(String href, String filename) async {
     });
     final nav = html.window.navigator;
     final canShare = js_util.callMethod<bool?>(nav, 'canShare', [shareData]);
-    if (canShare != true) return false;
+    if (canShare == false) return false;
     await js_util.promiseToFuture<void>(js_util.callMethod(nav, 'share', [shareData]));
     return true;
   } catch (e) {
     return false;
   }
+}
+
+/// Anchor download — works on many Android/desktop browsers.
+Future<bool> ngmyTryAnchorDownloadStudioVideo(String href, String filename) async {
+  try {
+    var safeName = filename.trim().isEmpty ? 'ngmy_video.mp4' : filename.trim();
+    if (!safeName.contains('.')) safeName = '$safeName.mp4';
+    final anchor = html.AnchorElement()
+      ..href = href
+      ..download = safeName
+      ..style.display = 'none';
+    html.document.body?.append(anchor);
+    anchor.click();
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    anchor.remove();
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Best-effort save while the staged blob is still alive (call from a button tap).
+Future<bool> ngmySaveStagedStudioVideo() async {
+  final url = _pendingUrl;
+  final name = _pendingName ?? 'ngmy_video.mp4';
+  if (url == null || url.isEmpty) return false;
+
+  if (await ngmyTryShareStagedStudioVideo()) {
+    Future<void>.delayed(const Duration(seconds: 45), ngmyClearStagedIosStudioVideo);
+    return true;
+  }
+  if (await ngmyTryAnchorDownloadStudioVideo(url, name)) {
+    Future<void>.delayed(const Duration(seconds: 45), ngmyClearStagedIosStudioVideo);
+    return true;
+  }
+  ngmyOpenStagedIosStudioVideo();
+  return false;
 }

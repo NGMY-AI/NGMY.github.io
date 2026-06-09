@@ -10863,11 +10863,13 @@ class _LateClockInBanner extends StatefulWidget {
   final String message;
   final double penaltyPercent;
   final bool isBlocked;
+  final bool compact;
 
   const _LateClockInBanner({
     required this.message,
     required this.penaltyPercent,
     this.isBlocked = false,
+    this.compact = false,
   });
 
   @override
@@ -10901,9 +10903,13 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
       builder: (context, _) {
         final pulse = 0.55 + (_ctrl.value * 0.45);
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          width: widget.compact ? double.infinity : null,
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.compact ? 10 : 12,
+            vertical: widget.compact ? 5 : 8,
+          ),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(widget.compact ? 12 : 16),
             gradient: LinearGradient(
               colors: blocked
                   ? [const Color(0xFF1E293B), const Color(0xFF334155)]
@@ -10928,15 +10934,15 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
               Icon(
                 blocked ? Icons.event_busy_rounded : Icons.alarm_rounded,
                 color: Colors.white.withOpacity(0.95),
-                size: 14,
+                size: widget.compact ? 12 : 14,
               ),
-              const SizedBox(width: 7),
+              SizedBox(width: widget.compact ? 5 : 7),
               Flexible(
                 child: Text(
                   widget.message,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
-                    fontSize: 11,
+                    fontSize: widget.compact ? 10 : 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.2,
                   ),
@@ -12327,36 +12333,33 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               // MAIN FRAME FOR THE CIRCLE
               Container(
                 width: double.infinity,
-                height: 300,
-                clipBehavior: Clip.antiAlias,
+                height: 248,
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(25),
                   border: isLight ? Border.all(color: const Color(0xFF00B25A).withOpacity(0.2), width: 1.5) : null,
                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
                 ),
-                child: LayoutBuilder(
-                  builder: (context, frame) {
-                    final maxCircle = math.min(frame.maxWidth - 28, frame.maxHeight - 52);
-                    final clockScale = (maxCircle * 0.90 / 184).clamp(1.0, 1.34);
-                    return Stack(
-                      clipBehavior: Clip.hardEdge,
-                      children: [
-                        Positioned(
-                          top: 12,
-                          left: 12,
-                          child: _clockInNameTag(isLight),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: _clockInNameTag(isLight),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.center,
+                          child: _clock(context),
                         ),
-                        Align(
-                          alignment: const Alignment(0, 0.16),
-                          child: Transform.scale(
-                            scale: clockScale,
-                            child: _clock(context),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                      ),
+                    ),
+                    _clockInFooter(context),
+                  ],
                 ),
               ),
               const SizedBox(height: 40),
@@ -12743,6 +12746,32 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         widget.user.activeInvestment != null &&
         lateInfo != null;
 
+    // Only enlarge the green spinning circle AFTER clock-in — gold pre-clock-in stays original size.
+    const smokeBase = 184.0;
+    const readyRingBase = 168.0;
+    const particleRBase = 80.0;
+    const outerRingBase = 152.0;
+    const innerBase = 122.0;
+    const outerBorderBase = 10.0;
+    const pulseBase = 72.0;
+    const batterySlotW = 50.0;
+    const batterySlotH = 76.0;
+    const batteryBodyW = 38.0;
+    const batteryBodyH = 56.0;
+    final clockedInScale = active ? 1.14 : 1.0;
+    final smokeD = smokeBase * clockedInScale;
+    final particleR = particleRBase * clockedInScale;
+    final outerRingD = outerRingBase * clockedInScale;
+    final innerD = innerBase * clockedInScale;
+    final outerBorderW = outerBorderBase * (active ? 1.1 : 1.0);
+    final pulseD = pulseBase * clockedInScale;
+    final battW = batterySlotW * clockedInScale;
+    final battH = batterySlotH * clockedInScale;
+    final battBodyW = batteryBodyW * clockedInScale;
+    final battBodyH = batteryBodyH * clockedInScale;
+    final earningsFontSize = active ? 21.0 : 20.0;
+    final doneIconSize = active ? 44.0 : 40.0;
+
     return GestureDetector(
       onTap: (active || alreadyDone || blocked || (!onTrial && widget.user.activeInvestment == null))
         ? () {
@@ -12758,12 +12787,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             }
           }
         : widget.onClockIn,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
           // Animated Smoke Effect
           AnimatedBuilder(
             animation: _smokeCtrl,
@@ -12773,7 +12799,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               return Transform.rotate(
                 angle: active ? _smokeRot.value : (readyToClockIn ? _smokeRot.value * 0.35 : 0),
                 child: Container(
-                  width: 184, height: 184,
+                  width: smokeD, height: smokeD,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: ringAccent.withOpacity(readyToClockIn ? 0.06 : 0.03),
@@ -12795,8 +12821,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               builder: (context, _) {
                 final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
                 return Container(
-                  width: 168,
-                  height: 168,
+                  width: readyRingBase,
+                  height: readyRingBase,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
@@ -12822,10 +12848,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               builder: (context, child) {
                 double currentAngle = active ? (angle + _smokeRot.value) : angle;
                 return Transform.translate(
-                  offset: Offset(math.cos(currentAngle) * 80, math.sin(currentAngle) * 80),
+                  offset: Offset(math.cos(currentAngle) * particleR, math.sin(currentAngle) * particleR),
                   child: Icon(
                     Icons.wb_sunny_rounded,
-                    size: readyToClockIn ? 8 : 6,
+                    size: readyToClockIn ? 8 : (active ? 7 : 6),
                     color: (clockMuted ? Colors.grey : (readyToClockIn ? const Color(0xFFFDE68A) : Colors.amber))
                         .withOpacity(active || readyToClockIn ? (0.55 + (readyToClockIn ? 0.25 : 0)) : 0.2),
                   ),
@@ -12835,15 +12861,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           }),
           // Outer ring
           Container(
-            width: 152, height: 152,
+            width: outerRingD, height: outerRingD,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: ringAccent.withOpacity(readyToClockIn ? 0.35 : 0.12), width: 10),
+              border: Border.all(color: ringAccent.withOpacity(readyToClockIn ? 0.35 : 0.12), width: outerBorderW),
             ),
           ),
           // Main inner circle
           Container(
-            width: 122, height: 122,
+            width: innerD, height: innerD,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
@@ -12903,8 +12929,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         alignment: Alignment.center,
                         children: [
                           Container(
-                            width: 72 * pulseRing,
-                            height: 72 * pulseRing,
+                            width: pulseD * pulseRing,
+                            height: pulseD * pulseRing,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: fullColor.withOpacity(0.14),
@@ -12919,8 +12945,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           ),
                           if (!alreadyDone)
                             SizedBox(
-                              width: 50,
-                              height: 76,
+                              width: battW,
+                              height: battH,
                               child: Stack(
                                 alignment: Alignment.center,
                                 clipBehavior: Clip.none,
@@ -12929,8 +12955,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   Positioned(
                                     bottom: 0,
                                     child: Container(
-                                      width: 38,
-                                      height: 56,
+                                      width: battBodyW,
+                                      height: battBodyH,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(color: Colors.white.withOpacity(0.94), width: 2.1),
@@ -13018,10 +13044,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   ),
                                   // Top battery terminal/tap
                                   Positioned(
-                                    top: 14,
+                                    top: active ? 15 : 14,
                                     child: Container(
-                                      width: 14,
-                                      height: 6,
+                                      width: active ? 15 : 14,
+                                      height: active ? 6.5 : 6,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(3),
                                         color: Colors.white.withOpacity(0.96),
@@ -13032,7 +13058,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               ),
                             ),
                           if (alreadyDone)
-                            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 40),
+                            Icon(Icons.check_circle_rounded, color: Colors.white, size: doneIconSize),
                           if (!alreadyDone)
                             Positioned(
                               left: 10 + (math.sin(_smokeCtrl.value * 2 * math.pi) * 8),
@@ -13056,12 +13082,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 if (!alreadyDone)
                   Text(
                     '\$${formatCurrency(widget.user.displayedTodayEarnings)}',
-                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                    style: TextStyle(color: Colors.white, fontSize: earningsFontSize, fontWeight: FontWeight.w900),
                   ),
                 if (alreadyDone && widget.user.displayedTodayEarnings > 0)
                   Text(
                     '\$${formatCurrency(widget.user.displayedTodayEarnings)}',
-                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                    style: TextStyle(color: Colors.white, fontSize: earningsFontSize, fontWeight: FontWeight.w900),
                   ),
                 if (!active && !alreadyDone && !blocked)
                   Text(
@@ -13085,60 +13111,87 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
-          if (readyToClockIn) ...[
-            const SizedBox(height: 10),
-            AnimatedBuilder(
-              animation: _smokeCtrl,
-              builder: (context, _) {
-                final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: LinearGradient(
-                      colors: [
-                        Color.lerp(const Color(0xFFFEF3C7), const Color(0xFFFBBF24), shimmer)!,
-                        Color.lerp(const Color(0xFFFBBF24), const Color(0xFFD97706), shimmer)!,
-                      ],
+    );
+  }
+
+  Widget _clockInFooter(BuildContext ctx) {
+    final now = DateTime.now();
+    final active = widget.user.isClockedIn;
+    final alreadyDone = widget.user.alreadyClockedInToday && !active;
+    final onTrial = widget.user.isOnFreeTrial;
+    final weekend = !onTrial && _ngmyIsWeekend(now);
+    final missedWindow = !onTrial && _ngmyIsPastNoon(now);
+    final blocked = !active && !alreadyDone && (weekend || missedWindow);
+    final readyToClockIn = !active && !alreadyDone && !blocked;
+    final lateInfo = _clockLateInfo();
+    final showLate = !onTrial &&
+        !active &&
+        !alreadyDone &&
+        widget.user.activeInvestment != null &&
+        lateInfo != null;
+
+    if (!readyToClockIn && !(showLate && lateInfo != null)) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (readyToClockIn) ...[
+          AnimatedBuilder(
+            animation: _smokeCtrl,
+            builder: (context, _) {
+              final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(
+                    colors: [
+                      Color.lerp(const Color(0xFFFEF3C7), const Color(0xFFFBBF24), shimmer)!,
+                      Color.lerp(const Color(0xFFFBBF24), const Color(0xFFD97706), shimmer)!,
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFF59E0B).withOpacity(0.28 + shimmer * 0.12),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFF59E0B).withOpacity(0.35 + shimmer * 0.15),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.notifications_active_rounded, size: 12, color: const Color(0xFF78350F).withOpacity(0.9)),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Time to clock in',
+                      style: TextStyle(
+                        color: const Color(0xFF78350F),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.2,
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.notifications_active_rounded, size: 14, color: const Color(0xFF78350F).withOpacity(0.9)),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Time to clock in',
-                        style: TextStyle(
-                          color: const Color(0xFF78350F),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-          if (showLate && lateInfo != null) ...[
-            const SizedBox(height: 5),
-            _LateClockInBanner(
-              message: lateInfo.message,
-              penaltyPercent: lateInfo.penalty,
-              isBlocked: lateInfo.blocked,
-            ),
-          ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
-      ),
+        if (showLate && lateInfo != null) ...[
+          if (readyToClockIn) const SizedBox(height: 4),
+          _LateClockInBanner(
+            message: lateInfo.message,
+            penaltyPercent: lateInfo.penalty,
+            isBlocked: lateInfo.blocked,
+            compact: true,
+          ),
+        ],
+      ],
     );
   }
 
