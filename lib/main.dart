@@ -36114,7 +36114,10 @@ class MediaHubScreen extends StatefulWidget {
 
 class _MediaHubScreenState extends State<MediaHubScreen> {
   final _captionController = TextEditingController();
+  final _mediaSearchCtrl = TextEditingController();
+  final _mediaSearchFocus = FocusNode();
   bool _isPosting = false;
+  bool _mediaSearchOpen = false;
   OverlayEntry? _noticeEntry;
   Timer? _mediaSyncTimer;
   String _lastFeedSig = '';
@@ -36122,6 +36125,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   @override
   void initState() {
     super.initState();
+    _mediaSearchCtrl.addListener(_onMediaSearchChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await widget.onPurgeBrokenMedia?.call();
       await _cleanupExpiredPosts();
@@ -36849,10 +36853,159 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     });
   }
 
+  void _onMediaSearchChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _openInlineMediaSearch() {
+    setState(() => _mediaSearchOpen = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _mediaSearchFocus.requestFocus();
+    });
+  }
+
+  void _closeInlineMediaSearch() {
+    _mediaSearchFocus.unfocus();
+    _mediaSearchCtrl.clear();
+    setState(() => _mediaSearchOpen = false);
+  }
+
+  Widget _mediaHubHeaderIcon({
+    required bool isDark,
+    required IconData icon,
+    required VoidCallback onTap,
+    Color? backgroundColor,
+    Color? iconColor,
+  }) {
+    return Material(
+      color: backgroundColor ?? (isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB)),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, color: iconColor ?? (isDark ? Colors.white : Colors.black87), size: 20),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInlineMediaSearchResults(bool isDark) {
+    final q = _mediaSearchCtrl.text.trim();
+    if (q.isEmpty) {
+      return Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF111731).withOpacity(0.96) : Colors.white.withOpacity(0.98),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(isDark ? 0.1 : 0.85)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.14), blurRadius: 18, offset: const Offset(0, 8))],
+          ),
+          child: Text(
+            'Search users by name or posts by #hashtag',
+            style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    final results = ngmyMediaSearchMatches(
+      query: q,
+      allUsers: widget.allUsers,
+      allMedia: widget.allMedia,
+      isPostExpired: (m) => _isExpired(m as MediaPost),
+    );
+    final matchedUsers = results.users;
+    final matchedPosts = results.posts;
+    final sub = isDark ? Colors.white38 : Colors.black45;
+    final titleColor = isDark ? Colors.white : Colors.black87;
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.42),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF111731).withOpacity(0.98) : Colors.white.withOpacity(0.98),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(isDark ? 0.1 : 0.85)),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.14), blurRadius: 18, offset: const Offset(0, 8))],
+        ),
+        child: matchedUsers.isEmpty && matchedPosts.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(child: Text('No results for "$q"', style: TextStyle(color: sub, fontWeight: FontWeight.w600))),
+              )
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                shrinkWrap: true,
+                children: [
+                  if (matchedUsers.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+                      child: Text('People', style: TextStyle(color: titleColor, fontWeight: FontWeight.w800, fontSize: 13)),
+                    ),
+                    ...matchedUsers.map((u) {
+                      final avatar = ngmyAdminUserAvatar(u);
+                      return ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                        leading: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB),
+                          backgroundImage: avatar,
+                          child: avatar == null ? Icon(Icons.person, size: 18, color: sub) : null,
+                        ),
+                        title: Text((u.username ?? 'User').toString(), style: TextStyle(color: titleColor, fontWeight: FontWeight.w700, fontSize: 14)),
+                        subtitle: Text((u.email ?? '').toString(), style: TextStyle(color: sub, fontSize: 11)),
+                        onTap: () {
+                          _closeInlineMediaSearch();
+                          _openMediaProfile(u.email.toString());
+                        },
+                      );
+                    }),
+                    if (matchedPosts.isNotEmpty) const SizedBox(height: 6),
+                  ],
+                  if (matchedPosts.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+                      child: Text('Posts', style: TextStyle(color: titleColor, fontWeight: FontWeight.w800, fontSize: 13)),
+                    ),
+                    ...matchedPosts.map((m) {
+                      final caption = (m.caption ?? '').toString();
+                      return ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                        leading: const Icon(Icons.tag_rounded, color: Color(0xFF7C3AED), size: 22),
+                        title: Text(
+                          caption.isEmpty ? 'Media post' : caption,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: titleColor, fontSize: 13),
+                        ),
+                        subtitle: Text('@${(m.username ?? '').toString()}', style: TextStyle(color: sub, fontSize: 11)),
+                        onTap: () {
+                          _closeInlineMediaSearch();
+                          _openMediaProfile(m.userEmail.toString());
+                        },
+                      );
+                    }),
+                  ],
+                ],
+              ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _mediaSyncTimer?.cancel();
     _noticeEntry?.remove();
+    _mediaSearchCtrl.removeListener(_onMediaSearchChanged);
+    _mediaSearchCtrl.dispose();
+    _mediaSearchFocus.dispose();
     _captionController.dispose();
     super.dispose();
   }
@@ -36875,16 +37028,6 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
     } catch (_) {
       return src;
     }
-  }
-
-  void _openMediaSearch() {
-    showNgmyMediaSearch(
-      context: context,
-      allUsers: widget.allUsers,
-      allMedia: widget.allMedia,
-      isPostExpired: (m) => _isExpired(m as MediaPost),
-      onOpenProfile: _openMediaProfile,
-    );
   }
 
   void _openMediaProfile(String email) {
@@ -36924,6 +37067,7 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final topInset = MediaQuery.paddingOf(context).top + 68;
+    final searchPanelTop = MediaQuery.paddingOf(context).top + 8 + 64 + 6;
     final mediaFeed = _visibleMediaPosts(
       widget.allMedia,
       extraFilter: (m) => !_isExpired(m),
@@ -37006,49 +37150,89 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                         children: [
                           Padding(
                             padding: const EdgeInsets.only(left: 4),
-                            child: Material(
-                              color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB),
-                              shape: const CircleBorder(),
-                              child: InkWell(
-                                customBorder: const CircleBorder(),
-                                onTap: _openMediaSearch,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Icon(
-                                    Icons.search_rounded,
-                                    color: isDark ? Colors.white : Colors.black87,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
+                            child: _mediaHubHeaderIcon(
+                              isDark: isDark,
+                              icon: Icons.auto_fix_high_rounded,
+                              onTap: () => showNgmyVideoStudio(context),
                             ),
                           ),
                           Expanded(
-                            child: Center(
-                              child: Text(
-                                'MEDIA HUB',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 22,
-                                  letterSpacing: 1.4,
-                                  color: isDark ? Colors.white : Colors.black87,
-                                ),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 260),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, animation) => FadeTransition(
+                                opacity: animation,
+                                child: SizeTransition(sizeFactor: animation, axisAlignment: -1, child: child),
                               ),
+                              child: _mediaSearchOpen
+                                  ? Padding(
+                                      key: const ValueKey('media_search_field'),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      child: TextField(
+                                        controller: _mediaSearchCtrl,
+                                        focusNode: _mediaSearchFocus,
+                                        style: TextStyle(
+                                          color: isDark ? Colors.white : Colors.black87,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        decoration: InputDecoration(
+                                          isDense: true,
+                                          hintText: 'Search users or #tags',
+                                          hintStyle: TextStyle(
+                                            color: isDark ? Colors.white38 : Colors.black38,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          prefixIcon: Icon(Icons.search_rounded, size: 20, color: isDark ? Colors.white54 : Colors.black45),
+                                          filled: true,
+                                          fillColor: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+                                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                                        ),
+                                        textInputAction: TextInputAction.search,
+                                        onSubmitted: (_) => setState(() {}),
+                                      ),
+                                    )
+                                  : Center(
+                                      key: const ValueKey('media_hub_title'),
+                                      child: Text(
+                                        'MEDIA HUB',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 22,
+                                          letterSpacing: 1.4,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                        ),
+                                      ),
+                                    ),
                             ),
                           ),
+                          if (_mediaSearchOpen)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: _mediaHubHeaderIcon(
+                                isDark: isDark,
+                                icon: Icons.close_rounded,
+                                onTap: _closeInlineMediaSearch,
+                              ),
+                            )
+                          else
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: _mediaHubHeaderIcon(
+                                isDark: isDark,
+                                icon: Icons.search_rounded,
+                                onTap: _openInlineMediaSearch,
+                              ),
+                            ),
                           Padding(
                             padding: const EdgeInsets.only(right: 6),
-                            child: Material(
-                              color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB),
-                              shape: const CircleBorder(),
-                              child: InkWell(
-                                customBorder: const CircleBorder(),
-                                onTap: () => _openMediaProfile(widget.user.email),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Icon(Icons.person_rounded, color: isDark ? Colors.white : Colors.black87, size: 20),
-                                ),
-                              ),
+                            child: _mediaHubHeaderIcon(
+                              isDark: isDark,
+                              icon: Icons.person_rounded,
+                              onTap: () => _openMediaProfile(widget.user.email),
                             ),
                           ),
                         ],
@@ -37059,6 +37243,13 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
               ),
             ),
           ),
+          if (_mediaSearchOpen)
+            Positioned(
+              top: searchPanelTop,
+              left: 15,
+              right: 15,
+              child: _buildInlineMediaSearchResults(isDark),
+            ),
         ],
       ),
     );

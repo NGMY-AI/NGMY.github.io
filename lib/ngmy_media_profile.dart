@@ -2317,6 +2317,40 @@ class _PostPreviewThumbState extends State<_PostPreviewThumb> {
   }
 }
 
+({List<dynamic> users, List<dynamic> posts}) ngmyMediaSearchMatches({
+  required String query,
+  required List<dynamic> allUsers,
+  required List<dynamic> allMedia,
+  required bool Function(dynamic post) isPostExpired,
+  int userLimit = 20,
+  int postLimit = 30,
+}) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return (users: <dynamic>[], posts: <dynamic>[]);
+  final tag = q.startsWith('#') ? q.substring(1) : q;
+
+  final matchedUsers = allUsers.where((u) {
+    final username = (u.username ?? '').toString().toLowerCase();
+    final email = (u.email ?? '').toString().toLowerCase();
+    final name = (u.fullName ?? '').toString().toLowerCase();
+    return username.contains(q) || email.contains(q) || name.contains(q);
+  }).take(userLimit).toList();
+
+  final matchedPosts = allMedia.where((m) {
+    if (isPostExpired(m)) return false;
+    final caption = (m.caption ?? '').toString().toLowerCase();
+    final tags = NgmyMediaProfile.asStringList((m as dynamic).taggedUsers);
+    final tagHit = tag.isNotEmpty &&
+        (caption.contains('#$tag') ||
+            caption.split(RegExp(r'\s+')).any((w) => w.startsWith('#') && w.substring(1).contains(tag)) ||
+            tags.any((t) => t.toLowerCase().contains(q.replaceAll('@', ''))));
+    final userHit = (m.username ?? '').toString().toLowerCase().contains(q);
+    return tagHit || caption.contains(q) || userHit;
+  }).take(postLimit).toList();
+
+  return (users: matchedUsers, posts: matchedPosts);
+}
+
 Future<void> showNgmyMediaSearch({
   required BuildContext context,
   required List<dynamic> allUsers,
@@ -2333,30 +2367,14 @@ Future<void> showNgmyMediaSearch({
       return StatefulBuilder(
         builder: (ctx, setSheet) {
           final q = queryCtrl.text.trim().toLowerCase();
-          final tag = q.startsWith('#') ? q.substring(1) : q;
-
-          List<dynamic> matchedUsers = [];
-          List<dynamic> matchedPosts = [];
-
-          if (q.isNotEmpty) {
-            matchedUsers = allUsers.where((u) {
-              final username = (u.username ?? '').toString().toLowerCase();
-              final email = (u.email ?? '').toString().toLowerCase();
-              final name = (u.fullName ?? '').toString().toLowerCase();
-              return username.contains(q) || email.contains(q) || name.contains(q);
-            }).take(20).toList();
-
-            matchedPosts = allMedia.where((m) {
-              if (isPostExpired(m)) return false;
-              final caption = (m.caption ?? '').toString().toLowerCase();
-              final tags = NgmyMediaProfile.asStringList((m as dynamic).taggedUsers);
-              final tagHit = tag.isNotEmpty &&
-                  (caption.contains('#$tag') ||
-                      tags.any((t) => t.toLowerCase().contains(q.replaceAll('@', ''))));
-              final userHit = (m.username ?? '').toString().toLowerCase().contains(q);
-              return tagHit || caption.contains(q) || userHit;
-            }).take(30).toList();
-          }
+          final results = ngmyMediaSearchMatches(
+            query: q,
+            allUsers: allUsers,
+            allMedia: allMedia,
+            isPostExpired: isPostExpired,
+          );
+          final matchedUsers = results.users;
+          final matchedPosts = results.posts;
 
           final bottom = MediaQuery.viewInsetsOf(ctx).bottom;
           return Padding(
