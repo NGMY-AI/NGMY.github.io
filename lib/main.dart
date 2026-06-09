@@ -22337,7 +22337,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     );
   }
 
-  void _openMFunGames() => showNgmyFunGamesDialog(context);
+  void _openMFunGames() => showNgmyFunGamesDialog(context, userEmail: widget.user.email);
 
   void _openYQrGenerator() => showNgmyQrGeneratorDialog(context);
 

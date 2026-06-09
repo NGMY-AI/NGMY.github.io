@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -12,16 +13,17 @@ import 'ngmy_love_content.dart';
 import 'ngmy_love_popups.dart';
 
 /// Fun & Games — Entertainment Hub (opened from the **M** in NGMY Services).
-void showNgmyFunGamesDialog(BuildContext context) {
+void showNgmyFunGamesDialog(BuildContext context, {String? userEmail}) {
   showDialog<void>(
     context: context,
     barrierColor: Colors.black.withOpacity(0.82),
-    builder: (ctx) => const _NgmyFunGamesDialog(),
+    builder: (ctx) => _NgmyFunGamesDialog(userEmail: userEmail),
   );
 }
 
 class _NgmyFunGamesDialog extends StatefulWidget {
-  const _NgmyFunGamesDialog();
+  final String? userEmail;
+  const _NgmyFunGamesDialog({this.userEmail});
 
   @override
   State<_NgmyFunGamesDialog> createState() => _NgmyFunGamesDialogState();
@@ -48,20 +50,20 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
   bool _pulseBtn = false;
 
   // Confidence
-  int _confCycleIndex = 0;
+  int _confContentIndex = 0;
+  int _confCyclePosition = 0;
   bool _confCanViewToday = true;
   String? _confTodayQuote;
-  int _confTodayIndex = -1;
   String? _confDisplayQuote;
 
   // Brain
-  int _riddleIndex = 0;
+  int _riddleContentIndex = 0;
   int _riddlesRemaining = 15;
   bool _riddleAnswerVisible = false;
 
   // Fortune
-  int _fortuneIndex = 0;
-  int _fortunesRemaining = 5;
+  int _fortuneContentIndex = 0;
+  int _fortunesRemaining = 1;
   NgmyFortuneItem? _currentFortune;
   bool _fortuneRevealed = false;
 
@@ -84,24 +86,26 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
     _orbCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
     _brainCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat();
     _loadCache();
+    unawaited(NgmyFunGamesLimits.configureUser(widget.userEmail));
     _loadLimits();
   }
 
   Future<void> _loadLimits() async {
-    final conf = await NgmyFunGamesLimits.confidenceState();
-    final riddles = await NgmyFunGamesLimits.riddleState();
-    final fortune = await NgmyFunGamesLimits.fortuneState();
+    await NgmyFunGamesLimits.configureUser(widget.userEmail);
+    final conf = await NgmyFunGamesLimits.confidenceState(NgmyConfidenceQuotes.count);
+    final riddles = await NgmyFunGamesLimits.riddleState(NgmyRiddlesContent.count);
+    final fortune = await NgmyFunGamesLimits.fortuneState(NgmyFortuneContent.count);
     if (!mounted) return;
     setState(() {
-      _confCycleIndex = conf.cycleIndex;
+      _confContentIndex = conf.contentIndex;
+      _confCyclePosition = conf.cyclePosition;
       _confCanViewToday = conf.canViewToday;
       _confTodayQuote = conf.todayQuote;
-      _confTodayIndex = conf.todayIndex;
-      _confDisplayQuote = conf.todayQuote ?? NgmyConfidenceQuotes.at(conf.cycleIndex);
-      _riddleIndex = riddles.index;
+      _confDisplayQuote = conf.todayQuote ?? NgmyConfidenceQuotes.at(conf.contentIndex);
+      _riddleContentIndex = riddles.contentIndex;
       _riddlesRemaining = riddles.remaining;
       _riddleAnswerVisible = false;
-      _fortuneIndex = fortune.index;
+      _fortuneContentIndex = fortune.contentIndex;
       _fortunesRemaining = fortune.remaining;
     });
   }
@@ -680,16 +684,17 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
       }
       return;
     }
-    final idx = _confCycleIndex % NgmyConfidenceQuotes.count;
+    final idx = _confContentIndex;
     final quote = NgmyConfidenceQuotes.at(idx);
-    final result = await NgmyFunGamesLimits.consumeConfidenceQuote(quote, idx);
+    final result = await NgmyFunGamesLimits.consumeConfidenceQuote(quote, idx, NgmyConfidenceQuotes.count);
     if (result == null || !mounted) return;
+    final nextState = await NgmyFunGamesLimits.confidenceState(NgmyConfidenceQuotes.count);
     setState(() {
       _confCanViewToday = false;
       _confTodayQuote = result.quote;
-      _confTodayIndex = result.index;
       _confDisplayQuote = result.quote;
-      _confCycleIndex = result.index + 1;
+      _confContentIndex = nextState.contentIndex;
+      _confCyclePosition = nextState.cyclePosition;
       _pulseBtn = true;
     });
     Future<void>.delayed(const Duration(milliseconds: 140), () {
@@ -709,13 +714,13 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
       );
       return;
     }
-    final next = await NgmyFunGamesLimits.advanceRiddle(_riddleIndex);
+    final next = await NgmyFunGamesLimits.advanceRiddle(NgmyRiddlesContent.count);
     if (next == null) {
       if (mounted) await _loadLimits();
       return;
     }
     setState(() {
-      _riddleIndex = next;
+      _riddleContentIndex = next;
       _riddlesRemaining = (_riddlesRemaining - 1).clamp(0, NgmyFunGamesLimits.riddlesDailyLimit);
       _riddleAnswerVisible = false;
       _pulseBtn = true;
@@ -736,17 +741,18 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
       );
       return;
     }
-    final consumed = await NgmyFunGamesLimits.consumeFortune();
+    final consumed = await NgmyFunGamesLimits.consumeFortune(NgmyFortuneContent.count);
     if (consumed == null) {
       if (mounted) await _loadLimits();
       return;
     }
-    final item = NgmyFortuneContent.at(consumed.index);
+    final item = NgmyFortuneContent.at(consumed.contentIndex);
+    final nextState = await NgmyFunGamesLimits.fortuneState(NgmyFortuneContent.count);
     setState(() {
       _currentFortune = item;
       _fortuneRevealed = true;
-      _fortuneIndex = consumed.index + 1;
-      _fortunesRemaining = (_fortunesRemaining - 1).clamp(0, NgmyFunGamesLimits.fortuneDailyLimit);
+      _fortuneContentIndex = nextState.contentIndex;
+      _fortunesRemaining = nextState.remaining;
       _pulseBtn = true;
     });
     Future<void>.delayed(const Duration(milliseconds: 140), () {
@@ -758,7 +764,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
   Widget _confidenceContent() {
     const accent = Color(0xFFF59E0B);
     const accentDeep = Color(0xFFB45309);
-    final progress = (_confCycleIndex % NgmyConfidenceQuotes.count) / NgmyConfidenceQuotes.count;
+    final progress = NgmyConfidenceQuotes.count > 0 ? _confCyclePosition / NgmyConfidenceQuotes.count : 0.0;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -845,7 +851,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
   Widget _brainContent() {
     const accent = Color(0xFF8B5CF6);
     const accentDeep = Color(0xFF6D28D9);
-    final riddle = NgmyRiddlesContent.at(_riddleIndex);
+    final riddle = NgmyRiddlesContent.at(_riddleContentIndex);
     final catLabel = riddle.category[0].toUpperCase() + riddle.category.substring(1);
 
     return Stack(
