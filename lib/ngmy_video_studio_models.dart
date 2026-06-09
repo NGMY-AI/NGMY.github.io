@@ -114,9 +114,10 @@ const List<NgmyVideoFormat> kNgmyStudioFormatOrder = [NgmyVideoFormat.tiktok, Ng
 extension NgmyVideoFormatExt on NgmyVideoFormat {
   double get aspectRatio => this == NgmyVideoFormat.youtube ? 16 / 9 : 9 / 16;
 
-  int get exportWidth => this == NgmyVideoFormat.youtube ? 1920 : 1080;
+  /// 720p-class export — much faster to encode than full 1080p while staying sharp on phones.
+  int get exportWidth => this == NgmyVideoFormat.youtube ? 1280 : 720;
 
-  int get exportHeight => this == NgmyVideoFormat.youtube ? 1080 : 1920;
+  int get exportHeight => this == NgmyVideoFormat.youtube ? 720 : 1280;
 
   String get label => this == NgmyVideoFormat.youtube ? 'YouTube' : 'TikTok';
 

@@ -372,10 +372,10 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                 if (!mounted) return;
                 setState(() {
                   _exportProgress = p;
-                  _exportStatus = p < 0.15
+                  _exportStatus = p < 0.12
                       ? 'Loading videos…'
                       : p < 0.98
-                          ? 'Building video (${(p * 100).round()}%)…'
+                          ? 'Rendering ${(p * 100).round()}% — usually matches video length'
                           : 'Saving file…';
                 });
               },

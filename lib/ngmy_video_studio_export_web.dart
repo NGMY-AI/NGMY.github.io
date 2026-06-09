@@ -13,10 +13,11 @@ import 'ngmy_video_studio_models.dart';
 
 const _metaTimeout = Duration(seconds: 18);
 const _maxRecordSeconds = 180.0;
-const _exportCanvasFps = 30;
-const _exportVideoBitsPerSecond = 8000000;
-const _exportAudioBitsPerSecond = 192000;
-const _recorderTimesliceMs = 250;
+const _exportCanvasFps = 24;
+const _exportVideoBitsPerSecond = 4500000;
+const _exportAudioBitsPerSecond = 128000;
+const _recorderTimesliceMs = 500;
+const _exportWallCapSec = 150.0;
 const _minRecordMs = 400;
 
 void _ngmyClipLogoShape(html.CanvasRenderingContext2D ctx, double dx, double dy, double dw, double dh, NgmyVideoSlotShape shape) {
@@ -86,13 +87,61 @@ void _ngmyPaintLogoSlot(
   final iy = dy + inset;
   final iw = dw - inset * 2;
   final ih = dh - inset * 2;
-  final scale = 0.9 + math.sin(t * math.pi * 2) * 0.04 + 0.06;
-  final lw = iw * scale;
-  final lh = ih * scale;
   ctx.save();
   _ngmyClipLogoShape(ctx, ix, iy, iw, ih, shape);
-  ctx.drawImageScaled(logo, ix + (iw - lw) / 2, iy + (ih - lh) / 2, lw, lh);
+  _ngmyDrawImageContained(ctx, logo, ix, iy, iw, ih, circle: shape == NgmyVideoSlotShape.circle);
   ctx.restore();
+}
+
+void _ngmyDrawImageContained(
+  html.CanvasRenderingContext2D ctx,
+  html.ImageElement img,
+  double x,
+  double y,
+  double w,
+  double h, {
+  bool circle = false,
+}) {
+  final nw = img.naturalWidth;
+  final nh = img.naturalHeight;
+  if (circle) {
+    ctx.fillStyle = 'rgba(15, 20, 35, 0.92)';
+    ctx.fillRect(x, y, w, h);
+  }
+  if (nw <= 0 || nh <= 0) {
+    ctx.drawImageScaled(img, x, y, w, h);
+    return;
+  }
+  final imgAspect = nw / nh;
+  final boxAspect = w / h;
+  late final double lw;
+  late final double lh;
+  late final double lx;
+  late final double ly;
+  if (imgAspect > boxAspect) {
+    lw = w;
+    lh = (w / imgAspect).toDouble();
+    lx = x;
+    ly = y + (h - lh) / 2;
+  } else {
+    lh = h;
+    lw = (h * imgAspect).toDouble();
+    lx = x + (w - lw) / 2;
+    ly = y;
+  }
+  ctx.drawImageScaled(img, lx, ly, lw, lh);
+}
+
+double _resolveRecordingDuration(Iterable<html.VideoElement> videos) {
+  var best = 3.0;
+  for (final v in videos) {
+    final d = v.duration;
+    if (!d.isFinite || d <= 0) continue;
+    // Some uploads report inflated duration — cap trust for timeout math.
+    final trusted = (d > 240 ? math.min(d, 90.0) : d).toDouble();
+    if (trusted > best) best = trusted;
+  }
+  return best.clamp(1.0, _maxRecordSeconds).toDouble();
 }
 
 bool _ngmyIsAppleMobileBrowser() {
@@ -298,8 +347,8 @@ Future<bool> _waitVideoCanPlay(html.VideoElement v) async {
 /// Chrome often reports video/mp4 as supported but records zero bytes — prefer WebM.
 String? _pickRecorderMimeType() {
   for (final m in [
-    'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp9,opus',
     'video/webm',
     'video/mp4',
   ]) {
@@ -484,11 +533,7 @@ Future<String> exportNgmyVideoStudioComposed({
       return 'Video is still loading. Wait a moment and tap Download again.';
     }
 
-    var durationSec = 3.0;
-    for (final v in videos.values) {
-      if (v.duration.isFinite && v.duration > durationSec) durationSec = v.duration.toDouble();
-    }
-    durationSec = durationSec.clamp(1.0, _maxRecordSeconds);
+    var durationSec = _resolveRecordingDuration(videos.values);
 
     onProgress?.call(0.12);
 
@@ -595,12 +640,21 @@ Future<String> exportNgmyVideoStudioComposed({
     }
 
     var stopped = false;
+    var forceEnd = false;
+    var lastCurrentTime = -1.0;
+    var stallFrames = 0;
     final startMs = DateTime.now().millisecondsSinceEpoch;
     final recordStartedMs = startMs;
 
+    for (final v in videos.values) {
+      v.onEnded.listen((_) {
+        if (videos.values.every((vv) => vv.ended)) forceEnd = true;
+      });
+    }
+
     try {
       ctx.imageSmoothingEnabled = true;
-      js_util.setProperty(ctx, 'imageSmoothingQuality', 'high');
+      js_util.setProperty(ctx, 'imageSmoothingQuality', 'medium');
     } catch (_) {}
 
     void paintFrame() {
@@ -719,13 +773,22 @@ Future<String> exportNgmyVideoStudioComposed({
 
       final primary = videos.values.first;
       final t = primary.currentTime;
-      final elapsedSec = (DateTime.now().millisecondsSinceEpoch - startMs) / 1000.0;
       final recordMs = DateTime.now().millisecondsSinceEpoch - recordStartedMs;
+      if (t <= lastCurrentTime + 0.001) {
+        stallFrames++;
+      } else {
+        stallFrames = 0;
+        lastCurrentTime = t.toDouble();
+      }
+
       onProgress?.call((t / durationSec).clamp(0.12, 0.98));
 
-      final reachedEnd = t >= durationSec - 0.05 || primary.ended;
-      final timedOut = elapsedSec >= durationSec + 2.0;
-      if ((reachedEnd || timedOut) && recordMs >= _minRecordMs) {
+      final allEnded = videos.values.every((v) => v.ended);
+      final reachedMetaEnd = t >= durationSec - 0.08;
+      final stallAbort = recordMs > 5000 && t < 0.35 && stallFrames > 45;
+      final wallCapMs = ((math.min(durationSec, _exportWallCapSec) + 3) * 1000).round();
+      final wallCapHit = recordMs >= wallCapMs;
+      if (((forceEnd || allEnded || primary.ended || reachedMetaEnd || stallAbort || wallCapHit) && recordMs >= _minRecordMs)) {
         stopped = true;
         for (final v in videos.values) {
           v.pause();
@@ -741,7 +804,7 @@ Future<String> exportNgmyVideoStudioComposed({
 
     await Future.any([
       done.future,
-      Future.delayed(Duration(milliseconds: ((durationSec + 15) * 1000).round())),
+      Future.delayed(Duration(milliseconds: ((math.min(durationSec, _exportWallCapSec) + 5) * 1000).round())),
     ]);
 
     if (!done.isCompleted) {

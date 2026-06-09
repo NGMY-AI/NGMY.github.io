@@ -12512,17 +12512,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         shimmer: shimmer,
                         borderRadius: BorderRadius.circular(17),
                         padding: const EdgeInsets.all(1.6),
-                        child: Center(
-                          child: Text(
-                            'ACTIVE',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: isPhone ? 9.5 : 10.5,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.2,
-                              height: 1.0,
-                              shadows: [Shadow(color: const Color(0xFF064E3B).withValues(alpha: 0.45), blurRadius: 2)],
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Icon(Icons.sports_esports_rounded, color: Colors.white.withValues(alpha: 0.95), size: isPhone ? 11 : 12),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'ACTIVE',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: isPhone ? 8.5 : 9.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.6,
+                                    height: 1.0,
+                                    shadows: [Shadow(color: const Color(0xFF064E3B).withValues(alpha: 0.45), blurRadius: 2)],
+                                  ),
+                                ),
+                                const SizedBox(width: 3),
+                                Icon(Icons.bolt_rounded, color: const Color(0xFFBBF7D0), size: isPhone ? 11 : 12),
+                              ],
                             ),
                           ),
                         ),
