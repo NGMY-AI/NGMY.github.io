@@ -56,6 +56,7 @@ import 'ngmy_helper_ai_limit.dart';
 import 'ngmy_helper_kb.dart';
 import 'ngmy_helper_kb_ui.dart';
 import 'ngmy_helper_kb_admin.dart';
+import 'ngmy_voice_input.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_store_location.dart';
@@ -38621,6 +38622,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       MaterialPageRoute(
         builder: (_) => NgmyHelperKbAdminScreen(
           initialCategories: _kbCategories,
+          apiKey: widget.config.geminiApiKey,
           onSave: (cats) async {
             final ok = await NgmyHelperKbStore.save(cats);
             if (mounted) setState(() => _kbCategories = cats);
@@ -39345,7 +39347,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                               onSubmitted: (_) => _isTyping ? null : _sendMessage(),
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          NgmyVoiceMicButton(controller: _chatController, color: primaryColor),
+                          const SizedBox(width: 6),
                           Material(
                             color: primaryColor,
                             shape: const CircleBorder(),

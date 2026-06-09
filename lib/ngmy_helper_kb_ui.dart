@@ -573,9 +573,32 @@ class _BlockWidget extends StatelessWidget {
         if (block.content.trim().isEmpty) return const SizedBox.shrink();
         return Padding(
           padding: const EdgeInsets.only(bottom: 6),
-          child: Text(block.content, style: TextStyle(height: 1.4, color: palette.bodyText, fontSize: 13)),
+          child: _styledText(block.content, palette),
         );
     }
+  }
+
+  static Widget _styledText(String raw, _KbPalette palette) {
+    final spans = <TextSpan>[];
+    final pattern = RegExp(r'\*\*(.+?)\*\*|\*(.+?)\*|__(.+?)__');
+    var last = 0;
+    for (final m in pattern.allMatches(raw)) {
+      if (m.start > last) {
+        spans.add(TextSpan(text: raw.substring(last, m.start), style: TextStyle(height: 1.4, color: palette.bodyText, fontSize: 13)));
+      }
+      if (m.group(1) != null) {
+        spans.add(TextSpan(text: m.group(1), style: TextStyle(height: 1.4, color: palette.bodyText, fontSize: 13, fontWeight: FontWeight.w800)));
+      } else if (m.group(2) != null) {
+        spans.add(TextSpan(text: m.group(2), style: TextStyle(height: 1.4, color: palette.bodyText, fontSize: 13, fontStyle: FontStyle.italic)));
+      } else if (m.group(3) != null) {
+        spans.add(TextSpan(text: m.group(3), style: TextStyle(height: 1.4, color: palette.bodyText, fontSize: 13, decoration: TextDecoration.underline)));
+      }
+      last = m.end;
+    }
+    if (last < raw.length) {
+      spans.add(TextSpan(text: raw.substring(last), style: TextStyle(height: 1.4, color: palette.bodyText, fontSize: 13)));
+    }
+    return RichText(text: TextSpan(children: spans));
   }
 }
 

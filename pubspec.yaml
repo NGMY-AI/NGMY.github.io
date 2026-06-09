@@ -47,6 +47,7 @@ dependencies:
   google_sign_in: ^6.3.0
   file_picker: ^8.1.7
   audioplayers: ^6.1.0
+  speech_to_text: ^7.0.0
 
 dev_dependencies:
   flutter_test:
