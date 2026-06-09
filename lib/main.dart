@@ -12718,7 +12718,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final weekend = !onTrial && _ngmyIsWeekend(now);
     final missedWindow = !onTrial && _ngmyIsPastNoon(now);
     final blocked = !active && !alreadyDone && (weekend || missedWindow);
+    final readyToClockIn = !active && !alreadyDone && !blocked;
     final clockMuted = alreadyDone || blocked;
+    final ringAccent = active
+        ? const Color(0xFF00B25A)
+        : readyToClockIn
+            ? const Color(0xFFFBBF24)
+            : Colors.grey;
     final lateInfo = _clockLateInfo();
     final showLate = !onTrial &&
         !active &&
@@ -12751,18 +12757,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           AnimatedBuilder(
             animation: _smokeCtrl,
             builder: (context, child) {
+              final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
+              final glowPulse = readyToClockIn ? (0.14 + shimmer * 0.22) : (active ? 0.08 : 0.04);
               return Transform.rotate(
-                angle: active ? _smokeRot.value : 0,
+                angle: active ? _smokeRot.value : (readyToClockIn ? _smokeRot.value * 0.35 : 0),
                 child: Container(
                   width: 206, height: 206,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: (clockMuted ? Colors.grey : const Color(0xFF00B25A)).withOpacity(0.03),
+                    color: ringAccent.withOpacity(readyToClockIn ? 0.06 : 0.03),
                     boxShadow: [
                       BoxShadow(
-                        color: (clockMuted ? Colors.grey : const Color(0xFF00B25A)).withOpacity(0.08),
-                        blurRadius: active ? (30 + (math.sin(_smokeCtrl.value * 2 * math.pi) * 10)) : 30,
-                        spreadRadius: 2,
+                        color: ringAccent.withOpacity(glowPulse),
+                        blurRadius: readyToClockIn ? (38 + shimmer * 18) : (active ? (30 + shimmer * 10) : 30),
+                        spreadRadius: readyToClockIn ? 4 : 2,
                       )
                     ],
                   ),
@@ -12770,6 +12778,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               );
             },
           ),
+          if (readyToClockIn)
+            AnimatedBuilder(
+              animation: _smokeCtrl,
+              builder: (context, _) {
+                final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
+                return Container(
+                  width: 188,
+                  height: 188,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Color.lerp(const Color(0xFFFDE68A), const Color(0xFFF59E0B), shimmer)!.withOpacity(0.55 + shimmer * 0.35),
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFBBF24).withOpacity(0.28 + shimmer * 0.2),
+                        blurRadius: 22,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           // Floating particles / stars
           ...List.generate(5, (i) {
             double angle = (i * 2 * math.pi / 5);
@@ -12779,7 +12812,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 double currentAngle = active ? (angle + _smokeRot.value) : angle;
                 return Transform.translate(
                   offset: Offset(math.cos(currentAngle) * 90, math.sin(currentAngle) * 90),
-                  child: Icon(Icons.wb_sunny_rounded, size: 6, color: (clockMuted ? Colors.grey : Colors.amber).withOpacity(active ? 0.4 : 0.2)),
+                  child: Icon(
+                    Icons.wb_sunny_rounded,
+                    size: readyToClockIn ? 8 : 6,
+                    color: (clockMuted ? Colors.grey : (readyToClockIn ? const Color(0xFFFDE68A) : Colors.amber))
+                        .withOpacity(active || readyToClockIn ? (0.55 + (readyToClockIn ? 0.25 : 0)) : 0.2),
+                  ),
                 );
               },
             );
@@ -12789,7 +12827,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             width: 170, height: 170,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: (clockMuted ? Colors.grey : const Color(0xFF00B25A)).withOpacity(0.12), width: 12),
+              border: Border.all(color: ringAccent.withOpacity(readyToClockIn ? 0.35 : 0.12), width: 12),
             ),
           ),
           // Main inner circle
@@ -12802,14 +12840,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 end: Alignment.bottomCenter,
                 colors: active
                   ? [const Color(0xFF00B25A), const Color(0xFF00894B)]
-                  : (clockMuted
-                      ? [Colors.grey.shade600, Colors.grey.shade800]
-                      : [Colors.grey.shade400, Colors.grey.shade600]),
+                  : readyToClockIn
+                      ? [const Color(0xFFFDE68A), const Color(0xFFFBBF24), const Color(0xFFD97706)]
+                      : [Colors.grey.shade600, Colors.grey.shade800],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: (active ? const Color(0xFF00B25A) : Colors.grey).withOpacity(0.4),
-                  blurRadius: 15,
+                  color: (active
+                          ? const Color(0xFF00B25A)
+                          : readyToClockIn
+                              ? const Color(0xFFF59E0B)
+                              : Colors.grey)
+                      .withOpacity(readyToClockIn ? 0.55 : 0.4),
+                  blurRadius: readyToClockIn ? 22 : 15,
                   offset: const Offset(0, 8),
                 )
               ],
@@ -13009,7 +13052,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     '\$${formatCurrency(widget.user.displayedTodayEarnings)}',
                     style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
                   ),
-                if (!active && !alreadyDone && !blocked) const Text('ACTIVATE', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
+                if (!active && !alreadyDone && !blocked)
+                  Text(
+                    'CLOCK IN',
+                    style: TextStyle(
+                      color: readyToClockIn ? const Color(0xFF78350F) : Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                      shadows: readyToClockIn
+                          ? [Shadow(color: Colors.white.withOpacity(0.65), blurRadius: 2)]
+                          : null,
+                    ),
+                  ),
                 if (blocked && !alreadyDone) const Text('CLOSED', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
                 if (alreadyDone) const Text('TOMORROW', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
                 ],
@@ -13019,6 +13074,50 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
+          if (readyToClockIn) ...[
+            const SizedBox(height: 10),
+            AnimatedBuilder(
+              animation: _smokeCtrl,
+              builder: (context, _) {
+                final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      colors: [
+                        Color.lerp(const Color(0xFFFEF3C7), const Color(0xFFFBBF24), shimmer)!,
+                        Color.lerp(const Color(0xFFFBBF24), const Color(0xFFD97706), shimmer)!,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF59E0B).withOpacity(0.35 + shimmer * 0.15),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.notifications_active_rounded, size: 14, color: const Color(0xFF78350F).withOpacity(0.9)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Time to clock in',
+                        style: TextStyle(
+                          color: const Color(0xFF78350F),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
           if (showLate && lateInfo != null) ...[
             const SizedBox(height: 5),
             _LateClockInBanner(
