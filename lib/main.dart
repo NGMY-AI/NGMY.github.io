@@ -53,6 +53,9 @@ import 'ngmy_dice_config.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_invoice_storage.dart';
 import 'ngmy_helper_ai_limit.dart';
+import 'ngmy_helper_kb.dart';
+import 'ngmy_helper_kb_ui.dart';
+import 'ngmy_helper_kb_admin.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_store_location.dart';
@@ -38518,6 +38521,9 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   bool _memoryLoaded = false;
   bool _chatClosedForUsers = false;
   int _helperRemaining = -1;
+  bool _kbMode = false;
+  List<NgmyHelperKbCategory> _kbCategories = ngmyHelperKbDefaultCategories();
+  final List<Map<String, dynamic>> _kbThread = [];
   Timer? _chatGateTimer;
   Timer? _newsPollTimer;
   int _unreadNewsInternal = 0;
@@ -38561,6 +38567,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       if (a.id.isNotEmpty) _seenNewsIds.add(a.id);
     }
     _loadChatMemory();
+    unawaited(_loadHelperKb());
     _startChatGateWatcher();
     _subscribeNewsRealtime();
     _newsPollTimer = Timer.periodic(const Duration(minutes: 3), (_) => unawaited(_pollNewsFromCloud()));
@@ -38570,6 +38577,24 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       _refreshUnreadNewsInternal();
       if (_activeTab == 1) _scrollNewsToBottom(jump: true);
     });
+  }
+
+  Future<void> _loadHelperKb() async {
+    final cats = await NgmyHelperKbStore.hydrate();
+    if (!mounted) return;
+    setState(() => _kbCategories = cats);
+  }
+
+  bool get _shouldShowKb {
+    if (widget.user.isAdmin) return _kbMode;
+    return _kbMode || (_helperRemaining == 0 && widget.config.ngmyHelperDailyMessageLimit > 0);
+  }
+
+  void _applyKbAutoSwitch() {
+    if (widget.user.isAdmin) return;
+    if (widget.config.ngmyHelperDailyMessageLimit > 0 && _helperRemaining == 0 && !_kbMode) {
+      setState(() => _kbMode = true);
+    }
   }
 
   Future<void> _refreshHelperQuota() async {
@@ -38583,7 +38608,45 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       return;
     }
     final remaining = await NgmyHelperAiLimit.remaining(widget.user.email, limit);
-    if (mounted) setState(() => _helperRemaining = remaining);
+    if (mounted) {
+      setState(() => _helperRemaining = remaining);
+      _applyKbAutoSwitch();
+    }
+  }
+
+  void _onKbQuestionAsked(NgmyHelperKbCategory category, NgmyHelperKbQuestion question) {
+    setState(() {
+      _kbThread.add({
+        'question': question.question,
+        'answerBlocks': question.answerBlocks.map((b) => b.toJson()).toList(),
+        'printable': question.printable,
+        'category': category.title,
+        'at': DateTime.now().toUtc().toIso8601String(),
+      });
+    });
+  }
+
+  Future<void> _openKbAdmin() async {
+    await _loadHelperKb();
+    if (!mounted) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NgmyHelperKbAdminScreen(
+          initialCategories: _kbCategories,
+          onSave: (cats) async {
+            final ok = await NgmyHelperKbStore.save(cats);
+            if (mounted) setState(() => _kbCategories = cats);
+            return ok;
+          },
+        ),
+      ),
+    );
+    await _loadHelperKb();
+  }
+
+  void _toggleKbModeForAdmin() {
+    setState(() => _kbMode = !_kbMode);
   }
 
   void _subscribeNewsRealtime() {
@@ -38865,12 +38928,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         final allowed = await NgmyHelperAiLimit.tryConsume(widget.user.email, limit);
         if (!allowed) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Daily NGMY Helper limit reached ($limit messages per 24 hours). Try again later.'),
-            ),
-          );
           await _refreshHelperQuota();
+          setState(() => _kbMode = true);
           return;
         }
         await _refreshHelperQuota();
@@ -38938,6 +38997,9 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       setState(() => _isTyping = false);
       _scrollToBottom();
       unawaited(_persistChatMemory());
+      if (!widget.user.isAdmin) {
+        unawaited(_refreshHelperQuota());
+      }
     }
   }
 
@@ -39110,35 +39172,68 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white38, width: 1.5),
+                  GestureDetector(
+                    onTap: widget.user.isAdmin ? _openKbAdmin : null,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white38, width: 1.5),
+                      ),
+                      child: _ngmyLogoCircle(widget.config.logoUrl, size: 48),
                     ),
-                    child: _ngmyLogoCircle(widget.config.logoUrl, size: 48),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _isBoss ? 'NGMY Helper · Your AI' : 'NGMY Helper',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _isBoss ? 'NGMY Helper · Your AI' : 'NGMY Helper',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                              ),
+                            ),
+                            if (widget.user.isAdmin)
+                              Material(
+                                color: Colors.white.withOpacity(0.18),
+                                borderRadius: BorderRadius.circular(10),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(10),
+                                  onTap: _toggleKbModeForAdmin,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(_kbMode ? Icons.smart_toy_rounded : Icons.grid_view_rounded, color: Colors.white, size: 14),
+                                        const SizedBox(width: 4),
+                                        Text(_kbMode ? 'AI' : 'Topics', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 2),
                         Row(
                           children: [
                             Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF4ADE80), shape: BoxShape.circle)),
                             const SizedBox(width: 6),
-                            Text(
-                              _isBoss
-                                  ? 'Online • Personal assistant for Sir'
-                                  : 'Online • Chat & community updates',
-                              style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w500),
+                            Expanded(
+                              child: Text(
+                                _shouldShowKb && _activeTab == 0
+                                    ? 'Help Topics • Instant answers'
+                                    : (_isBoss
+                                        ? 'Online • Personal assistant for Sir'
+                                        : 'Online • Chat & community updates'),
+                                style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w500),
+                              ),
                             ),
                           ],
                         ),
@@ -39178,7 +39273,17 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
             const SizedBox(height: 8),
             Expanded(
               child: _activeTab == 0
-                  ? _chatView(isDark, chatBg)
+                  ? (_shouldShowKb
+                      ? NgmyHelperKbHub(
+                          categories: _kbCategories,
+                          logoUrl: widget.config.logoUrl,
+                          logoBuilder: (url, {size = 48}) => _ngmyLogoCircle(url, size: size),
+                          onQuestionAsked: _onKbQuestionAsked,
+                          kbThread: _kbThread,
+                          showTapToSwitch: widget.user.isAdmin,
+                          onTapLogoSwitch: widget.user.isAdmin ? _toggleKbModeForAdmin : null,
+                        )
+                      : _chatView(isDark, chatBg))
                   : Column(
                       children: [
                         Expanded(child: _newsView(isDark)),
@@ -39189,7 +39294,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                       ],
                     ),
             ),
-            if (_activeTab == 0)
+            if (_activeTab == 0 && !_shouldShowKb)
               _ngmyGlassComposerBar(
                 isDark: isDark,
                 child: Padding(
