@@ -81,6 +81,8 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
 
   NgmyVideoTemplateDef get _def => ngmyTemplateDef(_templateId);
   List<NgmyVideoTemplateDef> get _formatTemplates => ngmyTemplatesForFormat(_format);
+  List<NgmyVideoSlotDef> get _logoSlots =>
+      _def.slots.where((s) => s.kind == NgmySlotKind.logoAnim).toList(growable: false);
 
   @override
   void initState() {
@@ -201,6 +203,8 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         debugPrint('[studio] media dispose: $e');
       }
 
+      if (!mounted) return;
+
       String? source;
       if (kIsWeb) {
         final path = picked.path;
@@ -225,9 +229,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       }
 
       media.source = source;
-
       media.controller = null;
       _slotMedia[slotId] = media;
+      if (!mounted) return;
       setState(() => _activeSlotId = slotId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -888,11 +892,14 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       if (_logoVisible[slot.id] == false) return const SizedBox.shrink();
       return Positioned.fromRect(
         rect: px,
-        child: NgmyStudioLogoAnim(
-          imageBytes: _logoBytes[slot.id],
-          filePath: _logoPaths[slot.id],
-          shape: _slotShapes[slot.id] ?? NgmyVideoSlotShape.rect,
-          frameStyle: _logoFrameStyles[slot.id] ?? NgmyLogoFrameStyle.goldRing,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+          child: NgmyStudioLogoAnim(
+            imageBytes: _logoBytes[slot.id],
+            filePath: _logoPaths[slot.id],
+            shape: _slotShapes[slot.id] ?? NgmyVideoSlotShape.rect,
+            frameStyle: _logoFrameStyles[slot.id] ?? NgmyLogoFrameStyle.goldRing,
+          ),
         ),
       );
     }
@@ -901,7 +908,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     final src = media?.source;
     Widget child;
     if (src != null && src.isNotEmpty) {
-      child = NgmyStudioSlotVideo(key: ValueKey(src), source: src);
+      child = NgmyStudioSlotVideo(key: ValueKey('${slot.id}|$src'), source: src);
     } else {
       child = Container(
         color: Colors.black87,
@@ -923,7 +930,13 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       child = ClipRRect(borderRadius: BorderRadius.circular(2), child: child);
     }
 
-    return Positioned.fromRect(rect: px, child: child);
+    return Positioned.fromRect(
+      rect: px,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+        child: child,
+      ),
+    );
   }
 
   Widget _slotTap(NgmyVideoSlotDef slot, Size size) {
@@ -979,6 +992,32 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                 color: _accent,
                 semanticsLabel: _preparingSlotId == null ? 'Working…' : 'Preparing preview…',
               ),
+            if (_logoSlots.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ..._logoSlots.map((logoSlot) {
+                final visible = _logoVisible[logoSlot.id] ?? true;
+                return SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: Text(
+                    _logoSlots.length == 1 ? 'Show brand logo' : 'Show ${logoSlot.label}',
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                  subtitle: Text(
+                    visible ? 'Logo slot visible in preview & export' : 'Logo slot hidden (no upload needed)',
+                    style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 10),
+                  ),
+                  value: visible,
+                  activeThumbColor: _accent,
+                  onChanged: _picking
+                      ? null
+                      : (v) => setState(() {
+                            _logoVisible[logoSlot.id] = v;
+                            _activeSlotId = logoSlot.id;
+                          }),
+                );
+              }),
+            ],
             const SizedBox(height: 8),
             ..._def.slots.map((s) {
               final isLogo = s.kind == NgmySlotKind.logoAnim;
@@ -988,7 +1027,16 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: OutlinedButton.icon(
-                  onPressed: _picking ? null : () => isLogo ? _pickLogoForSlot(s.id) : _pickVideoForSlot(s.id),
+                  onPressed: _picking
+                      ? null
+                      : () {
+                          setState(() => _activeSlotId = s.id);
+                          if (isLogo) {
+                            _pickLogoForSlot(s.id);
+                          } else {
+                            _pickVideoForSlot(s.id);
+                          }
+                        },
                   icon: Icon(
                     isLogo ? Icons.animation : Icons.upload_file_rounded,
                     size: 18,

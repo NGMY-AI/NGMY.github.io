@@ -226,7 +226,15 @@ class _NgmyStudioLogoAnimState extends State<NgmyStudioLogoAnim> with SingleTick
 
                 )
 
-              : AnimatedBuilder(
+              : _ctrl == null
+                  ? Padding(
+                      padding: EdgeInsets.all(inset),
+                      child: ClipPath(
+                        clipper: _LogoShapeClipper(widget.shape),
+                        child: SizedBox(width: box.width, height: box.height, child: img),
+                      ),
+                    )
+                  : AnimatedBuilder(
                   animation: _ctrl!,
                   builder: (_, child) {
                     final t = _ctrl!.value;

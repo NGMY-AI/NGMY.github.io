@@ -40,6 +40,7 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
     final gen = ++_generation;
     final old = _controller;
     _controller = null;
+    old?.removeListener(_onTick);
     if (old != null) {
       try {
         await old.dispose();
@@ -55,6 +56,9 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
 
     VideoPlayerController? c;
     try {
+      await Future<void>.delayed(Duration.zero);
+      if (gen != _generation || !mounted) return;
+
       c = slot_io.createStudioVideoController(src);
       if (c == null) {
         throw StateError('This device cannot preview that video format.');
@@ -75,11 +79,17 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
     } catch (e) {
       if (c != null) {
         try {
+          c.removeListener(_onTick);
           await c.dispose();
         } catch (_) {}
       }
       if (gen != _generation || !mounted) return;
-      setState(() => _error = e is TimeoutException ? e.message! : e.toString());
+      final msg = e is TimeoutException
+          ? e.message!
+          : e is StateError
+              ? e.message
+              : 'Could not load video preview';
+      setState(() => _error = msg);
     }
   }
 
@@ -210,7 +220,10 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
           ValueListenableBuilder<VideoPlayerValue>(
             valueListenable: c,
             builder: (context, value, _) {
-              if (!value.isInitialized || value.hasError) return const SizedBox.shrink();
+              if (value.hasError) {
+                return _errorBox();
+              }
+              if (!value.isInitialized) return const SizedBox.shrink();
               final w = value.size.width > 0 ? value.size.width : 16.0;
               final h = value.size.height > 0 ? value.size.height : 9.0;
               return GestureDetector(
@@ -246,6 +259,14 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
     final src = widget.source?.trim() ?? '';
     if (src.isEmpty) return const SizedBox.shrink();
 
-    return ClipRect(child: _nativePlayer());
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tooSmall = constraints.maxWidth < 8 || constraints.maxHeight < 8;
+        if (tooSmall) {
+          return Container(color: Colors.black87);
+        }
+        return ClipRect(child: _nativePlayer());
+      },
+    );
   }
 }

@@ -12327,7 +12327,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               // MAIN FRAME FOR THE CIRCLE
               Container(
                 width: double.infinity,
-                height: 272,
+                height: 300,
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
@@ -12335,19 +12335,28 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   border: isLight ? Border.all(color: const Color(0xFF00B25A).withOpacity(0.2), width: 1.5) : null,
                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
                 ),
-                child: Stack(
-                  clipBehavior: Clip.hardEdge,
-                  children: [
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: _clockInNameTag(isLight),
-                    ),
-                    Align(
-                      alignment: const Alignment(0, 0.14),
-                      child: _clock(context),
-                    ),
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, frame) {
+                    final maxCircle = math.min(frame.maxWidth - 28, frame.maxHeight - 52);
+                    final clockScale = (maxCircle * 0.90 / 184).clamp(1.0, 1.34);
+                    return Stack(
+                      clipBehavior: Clip.hardEdge,
+                      children: [
+                        Positioned(
+                          top: 12,
+                          left: 12,
+                          child: _clockInNameTag(isLight),
+                        ),
+                        Align(
+                          alignment: const Alignment(0, 0.16),
+                          child: Transform.scale(
+                            scale: clockScale,
+                            child: _clock(context),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 40),
