@@ -18,6 +18,16 @@ const _exportVideoBitsPerSecond = 4500000;
 const _exportAudioBitsPerSecond = 128000;
 const _recorderTimesliceMs = 500;
 const _exportWallCapSec = 150.0;
+const _exportPlaybackRate = 3.0;
+
+String _ngmyExportStatusLabel(double progress, double durationSec, int recordMs) {
+  if (progress < 0.04) return 'Starting export…';
+  if (progress >= 0.98) return 'Saving your file…';
+  final totalSec = math.max(3, (durationSec / _exportPlaybackRate).ceil());
+  final elapsedSec = (recordMs / 1000).ceil();
+  final remain = math.max(0, totalSec - elapsedSec);
+  return remain > 0 ? 'Exporting… about ${remain}s left' : 'Exporting… almost done';
+}
 const _minRecordMs = 400;
 
 void _ngmyClipLogoShape(html.CanvasRenderingContext2D ctx, double dx, double dy, double dw, double dh, NgmyVideoSlotShape shape) {
@@ -449,11 +459,14 @@ Future<String> _downloadAllVideoClips(Map<String, String> sources) async {
   return _ngmyDownloadResultMessage(lastMode, clipCount: n);
 }
 
-void _configureVideoElement(html.VideoElement v, String src) {
+void _configureVideoElement(html.VideoElement v, String src, {required bool forExport}) {
   v.src = src;
   v.preload = 'auto';
-  v.muted = false;
+  v.muted = forExport;
+  v.defaultMuted = forExport;
+  v.autoplay = false;
   v.setAttribute('playsinline', 'true');
+  v.setAttribute('webkit-playsinline', 'true');
   if (src.startsWith('http') && !src.startsWith('blob:')) {
     v.crossOrigin = 'anonymous';
   }
@@ -462,7 +475,7 @@ void _configureVideoElement(html.VideoElement v, String src) {
 
 Future<String> exportNgmyVideoStudioComposed({
   required NgmyVideoStudioExportConfig config,
-  void Function(double progress)? onProgress,
+  void Function(double progress, String status)? onProgress,
 }) async {
   final sources = config.videoSourcesBySlot;
   if (sources.isEmpty || sources.values.every((s) => s.trim().isEmpty)) {
@@ -474,17 +487,17 @@ Future<String> exportNgmyVideoStudioComposed({
   }
 
   if (!_webSupportsComposedCapture()) {
-    onProgress?.call(0.5);
+    onProgress?.call(0.5, 'Saving your video…');
     return _downloadAllVideoClips(sources);
   }
 
-  onProgress?.call(0.03);
+  onProgress?.call(0.02, 'Loading your video…');
 
   final videos = <String, html.VideoElement>{};
   for (final e in sources.entries) {
     if (e.value.trim().isEmpty) continue;
     final v = html.VideoElement();
-    _configureVideoElement(v, e.value);
+    _configureVideoElement(v, e.value, forExport: true);
     html.document.body?.append(v);
     videos[e.key] = v;
   }
@@ -522,7 +535,7 @@ Future<String> exportNgmyVideoStudioComposed({
   var usedCanvasStream = false;
 
   try {
-    onProgress?.call(0.08);
+    onProgress?.call(0.06, 'Preparing studio export…');
 
     final metaOk = await Future.wait(videos.values.map(_waitVideoMeta));
     if (metaOk.contains(false)) {
@@ -535,7 +548,7 @@ Future<String> exportNgmyVideoStudioComposed({
 
     var durationSec = _resolveRecordingDuration(videos.values);
 
-    onProgress?.call(0.12);
+    onProgress?.call(0.08, 'Building your video…');
 
     final w = config.outputWidth;
     final h = config.outputHeight;
@@ -635,12 +648,13 @@ Future<String> exportNgmyVideoStudioComposed({
     });
 
     for (final v in videos.values) {
-      v.playbackRate = 1.0;
+      v.playbackRate = _exportPlaybackRate;
       v.currentTime = 0;
     }
 
     var stopped = false;
     var forceEnd = false;
+    var playbackStuck = false;
     var lastCurrentTime = -1.0;
     var stallFrames = 0;
     final startMs = DateTime.now().millisecondsSinceEpoch;
@@ -752,10 +766,18 @@ Future<String> exportNgmyVideoStudioComposed({
     await Future<void>.delayed(const Duration(milliseconds: 32));
     paintFrame();
 
-    try {
-      await Future.wait(videos.values.map((v) => v.play()));
-    } catch (e) {
-      debugPrint('[studio export] video play failed: $e');
+    for (final v in videos.values) {
+      try {
+        await v.play();
+      } catch (e) {
+        debugPrint('[studio export] video play failed, retry muted: $e');
+        v.muted = true;
+        try {
+          await v.play();
+        } catch (e2) {
+          debugPrint('[studio export] muted play failed: $e2');
+        }
+      }
     }
     await Future<void>.delayed(const Duration(milliseconds: 80));
     paintFrame();
@@ -781,11 +803,15 @@ Future<String> exportNgmyVideoStudioComposed({
         lastCurrentTime = t.toDouble();
       }
 
-      onProgress?.call((t / durationSec).clamp(0.12, 0.98));
+      final timeProgress = durationSec > 0 ? (t / durationSec) : 0.0;
+      final wallProgress = recordMs / math.max(800, (durationSec * 1000) / _exportPlaybackRate);
+      final progress = math.max(timeProgress, wallProgress).clamp(0.0, 0.99);
+      onProgress?.call(progress, _ngmyExportStatusLabel(progress, durationSec, recordMs));
 
       final allEnded = videos.values.every((v) => v.ended);
       final reachedMetaEnd = t >= durationSec - 0.08;
-      final stallAbort = recordMs > 5000 && t < 0.35 && stallFrames > 45;
+      final stallAbort = recordMs > 4000 && t < 0.25 && stallFrames > 30;
+      if (stallAbort) playbackStuck = true;
       final wallCapMs = ((math.min(durationSec, _exportWallCapSec) + 3) * 1000).round();
       final wallCapHit = recordMs >= wallCapMs;
       if (((forceEnd || allEnded || primary.ended || reachedMetaEnd || stallAbort || wallCapHit) && recordMs >= _minRecordMs)) {
@@ -811,7 +837,12 @@ Future<String> exportNgmyVideoStudioComposed({
       await _stopRecorderDrain(recorder, done);
     }
 
-    onProgress?.call(1.0);
+    onProgress?.call(1.0, 'Saving your file…');
+
+    if (playbackStuck && chunks.isEmpty) {
+      debugPrint('[studio export] playback stuck — saving original clip');
+      return _downloadAllVideoClips(sources);
+    }
 
     if (chunks.isEmpty) {
       debugPrint('[studio export] empty chunks (mime=$mimeType), falling back to raw clips');

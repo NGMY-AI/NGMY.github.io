@@ -5726,9 +5726,9 @@ class UserData {
       pendingInvestmentName: json['pendingInvestmentName'] as String?,
       pendingInvestmentAmount: json['pendingInvestmentAmount'] == null ? null : (json['pendingInvestmentAmount'] as num).toDouble(),
       pendingInvestmentRoi: json['pendingInvestmentRoi'] == null ? null : (json['pendingInvestmentRoi'] as num).toDouble(),
-      savedCashAppTag: (json['savedCashAppTag'] ?? '').toString(),
+      savedCashAppTag: (json['savedCashAppTag'] ?? json['saved_cash_app_tag'] ?? '').toString(),
       savedZelleInfo: (json['savedZelleInfo'] ?? '').toString(),
-      savedBitcoinAddress: (json['savedBitcoinAddress'] ?? '').toString(),
+      savedBitcoinAddress: (json['savedBitcoinAddress'] ?? json['saved_bitcoin_address'] ?? '').toString(),
       crownBadge: (json['crownBadge'] ?? '').toString(),
       freeFixCredit: (json['freeFixCredit'] ?? 0.0).toDouble(),
       freeTrialActive: json['freeTrialActive'] == true,
@@ -8996,6 +8996,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       remote.points = local.points;
     }
     _mergeUserMediaProfileFields(local, remote);
+    if (local.savedCashAppTag.trim().isNotEmpty && remote.savedCashAppTag.trim().isEmpty) {
+      remote.savedCashAppTag = local.savedCashAppTag;
+    }
+    if (local.savedBitcoinAddress.trim().isNotEmpty && remote.savedBitcoinAddress.trim().isEmpty) {
+      remote.savedBitcoinAddress = local.savedBitcoinAddress;
+    }
     if (local.isApprovedWorker && !remote.isApprovedWorker) remote.isApprovedWorker = true;
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
     if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) remote.isAuthorizedRegistrar = true;
@@ -11839,6 +11845,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onAdd: widget.onAddTransaction,
         config: widget.config,
         onDataChanged: widget.onDataChanged,
+        onPersistUser: (u) => _pushUserToCloudFast(u),
       ),
       NgmyHubScreen(
         user: widget.user,
@@ -12503,8 +12510,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final isPhone = MediaQuery.of(context).size.width < 420;
-                    final buttonWidth = isPhone ? 96.0 : (constraints.maxWidth > 190 ? 112.0 : 104.0);
-                    final buttonHeight = isPhone ? 34.0 : 36.0;
+                    final buttonWidth = isPhone ? 108.0 : (constraints.maxWidth > 190 ? 124.0 : 116.0);
+                    final buttonHeight = isPhone ? 36.0 : 38.0;
                     return SizedBox(
                       width: buttonWidth,
                       height: buttonHeight,
@@ -12512,33 +12519,40 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         shimmer: shimmer,
                         borderRadius: BorderRadius.circular(17),
                         padding: const EdgeInsets.all(1.6),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 5),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Icon(Icons.sports_esports_rounded, color: Colors.white.withValues(alpha: 0.95), size: isPhone ? 11 : 12),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'ACTIVE',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: isPhone ? 8.5 : 9.5,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.6,
-                                    height: 1.0,
-                                    shadows: [Shadow(color: const Color(0xFF064E3B).withValues(alpha: 0.45), blurRadius: 2)],
-                                  ),
-                                ),
-                                const SizedBox(width: 3),
-                                Icon(Icons.bolt_rounded, color: const Color(0xFFBBF7D0), size: isPhone ? 11 : 12),
-                              ],
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.sports_esports_rounded,
+                              color: Colors.white,
+                              size: isPhone ? 15 : 16,
+                              shadows: const [Shadow(color: Color(0xFF064E3B), blurRadius: 3)],
                             ),
-                          ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'ACTIVE',
+                                maxLines: 1,
+                                overflow: TextOverflow.visible,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: isPhone ? 8 : 8.5,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.4,
+                                  height: 1.0,
+                                  shadows: const [Shadow(color: Color(0xFF064E3B), blurRadius: 2)],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.bolt_rounded,
+                              color: const Color(0xFF86EFAC),
+                              size: isPhone ? 15 : 16,
+                              shadows: const [Shadow(color: Color(0xFF14532D), blurRadius: 4)],
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -18287,6 +18301,34 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
 enum _WalletHistoryFilter { all, deposit, withdrawal, clockIn }
 
+Future<void> ngmyPersistWalletHandlesLocal(UserData user) async {
+  final key = user.email.toLowerCase().trim();
+  if (key.isEmpty) return;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('ngmy_cash_tag_$key', user.savedCashAppTag.trim());
+    await prefs.setString('ngmy_btc_addr_$key', user.savedBitcoinAddress.trim());
+  } catch (e) {
+    debugPrint('[wallet] persist handles: $e');
+  }
+}
+
+Future<void> ngmyHydrateWalletHandlesLocal(UserData user) async {
+  final key = user.email.toLowerCase().trim();
+  if (key.isEmpty) return;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    if (user.savedCashAppTag.trim().isEmpty) {
+      user.savedCashAppTag = (prefs.getString('ngmy_cash_tag_$key') ?? '').trim();
+    }
+    if (user.savedBitcoinAddress.trim().isEmpty) {
+      user.savedBitcoinAddress = (prefs.getString('ngmy_btc_addr_$key') ?? '').trim();
+    }
+  } catch (e) {
+    debugPrint('[wallet] hydrate handles: $e');
+  }
+}
+
 class WalletScreen extends StatefulWidget {
   final UserData user;
   final List<AppTransaction> transactions;
@@ -18294,6 +18336,7 @@ class WalletScreen extends StatefulWidget {
   final Function(AppTransaction) onAdd;
   final AppConfig config;
   final VoidCallback onDataChanged;
+  final Future<void> Function(UserData user)? onPersistUser;
   const WalletScreen({
     super.key,
     required this.user,
@@ -18302,6 +18345,7 @@ class WalletScreen extends StatefulWidget {
     required this.onAdd,
     required this.config,
     required this.onDataChanged,
+    this.onPersistUser,
   });
   @override State<WalletScreen> createState() => _WalletScreenState();
 }
@@ -18309,11 +18353,12 @@ class _WalletScreenState extends State<WalletScreen> {
   final _amt = TextEditingController(); final _handle = TextEditingController(); PaymentMethod _method = PaymentMethod.cashApp;
   int _view = 0; // 0: Deposit, 1: Withdraw, 2: History
   _WalletHistoryFilter _historyFilter = _WalletHistoryFilter.all;
+  Timer? _handleSaveDebounce;
 
   @override
   void initState() {
     super.initState();
-    _applySavedWithdrawHandle();
+    unawaited(_loadSavedWithdrawHandles());
   }
 
   @override
@@ -18327,9 +18372,16 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   void dispose() {
+    _handleSaveDebounce?.cancel();
     _amt.dispose();
     _handle.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSavedWithdrawHandles() async {
+    await ngmyHydrateWalletHandlesLocal(widget.user);
+    _applySavedWithdrawHandle();
+    if (mounted) setState(() {});
   }
 
   String get _savedHandleForMethod =>
@@ -18348,7 +18400,18 @@ class _WalletScreenState extends State<WalletScreen> {
     } else {
       widget.user.savedBitcoinAddress = trimmed;
     }
+    unawaited(ngmyPersistWalletHandlesLocal(widget.user));
     widget.onDataChanged();
+    final persist = widget.onPersistUser;
+    if (persist != null) unawaited(persist(widget.user));
+  }
+
+  void _scheduleWithdrawHandleSave() {
+    _handleSaveDebounce?.cancel();
+    _handleSaveDebounce = Timer(const Duration(milliseconds: 700), () {
+      final text = _handle.text.trim();
+      if (text.isNotEmpty) _saveWithdrawHandle(text);
+    });
   }
 
   void _clearSavedWithdrawHandle() {
@@ -18808,6 +18871,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   _handle.text = '\$$v';
                   _handle.selection = TextSelection.fromPosition(TextPosition(offset: _handle.text.length));
                 }
+                _scheduleWithdrawHandleSave();
               },
             ),
             if (_savedHandleForMethod.isNotEmpty) ...[

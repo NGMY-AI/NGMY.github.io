@@ -3,7 +3,7 @@ import 'ngmy_video_studio_models.dart';
 
 Future<String> exportNgmyVideoStudioComposed({
   required NgmyVideoStudioExportConfig config,
-  void Function(double progress)? onProgress,
+  void Function(double progress, String status)? onProgress,
 }) {
   return impl.exportNgmyVideoStudioComposed(config: config, onProgress: onProgress);
 }

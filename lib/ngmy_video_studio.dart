@@ -368,15 +368,11 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           ? await exportNgmyVideoStudioDirect(videoSourceUrl: cfg.videoSourcesBySlot.values.first)
           : await exportNgmyVideoStudioComposed(
               config: cfg,
-              onProgress: (p) {
+              onProgress: (p, status) {
                 if (!mounted) return;
                 setState(() {
                   _exportProgress = p;
-                  _exportStatus = p < 0.12
-                      ? 'Loading videos…'
-                      : p < 0.98
-                          ? 'Rendering ${(p * 100).round()}% — usually matches video length'
-                          : 'Saving file…';
+                  _exportStatus = status;
                 });
               },
             );
