@@ -10920,12 +10920,14 @@ class _LateClockInBanner extends StatefulWidget {
   final double penaltyPercent;
   final bool isBlocked;
   final bool compact;
+  final bool goldFrame;
 
   const _LateClockInBanner({
     required this.message,
     required this.penaltyPercent,
     this.isBlocked = false,
     this.compact = false,
+    this.goldFrame = false,
   });
 
   @override
@@ -10958,13 +10960,14 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
       animation: _ctrl,
       builder: (context, _) {
         final pulse = 0.55 + (_ctrl.value * 0.45);
+        final goldCompact = widget.compact && widget.goldFrame;
         return Container(
           padding: EdgeInsets.symmetric(
-            horizontal: widget.compact ? 8 : 12,
-            vertical: widget.compact ? 3 : 8,
+            horizontal: goldCompact ? 10 : (widget.compact ? 8 : 12),
+            vertical: goldCompact ? 5 : (widget.compact ? 3 : 8),
           ),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(widget.compact ? 10 : 16),
+            borderRadius: BorderRadius.circular(goldCompact ? 12 : (widget.compact ? 10 : 16)),
             gradient: LinearGradient(
               colors: blocked
                   ? [const Color(0xFF1E293B), const Color(0xFF334155)]
@@ -10990,15 +10993,15 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
               Icon(
                 blocked ? Icons.event_busy_rounded : Icons.alarm_rounded,
                 color: Colors.white.withOpacity(0.95),
-                size: widget.compact ? 10 : 14,
+                size: goldCompact ? 11 : (widget.compact ? 10 : 14),
               ),
-              SizedBox(width: widget.compact ? 4 : 7),
+              SizedBox(width: goldCompact ? 5 : (widget.compact ? 4 : 7)),
               Text(
                 widget.message,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: widget.compact ? 9 : 11,
+                  fontSize: goldCompact ? 10 : (widget.compact ? 9 : 11),
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.2,
                 ),
@@ -11006,7 +11009,7 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
               if (!blocked && penalty > 0) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: widget.compact ? 5 : 7, vertical: widget.compact ? 2 : 3),
+                  padding: EdgeInsets.symmetric(horizontal: goldCompact ? 6 : (widget.compact ? 5 : 7), vertical: goldCompact ? 3 : (widget.compact ? 2 : 3)),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.25),
                     borderRadius: BorderRadius.circular(999),
@@ -11016,7 +11019,7 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
                     '-${penalty.toInt()}%',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: widget.compact ? 8 : 10,
+                      fontSize: goldCompact ? 9 : (widget.compact ? 8 : 10),
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -12639,6 +12642,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final onTrial = widget.user.isOnFreeTrial;
     final missedTodayBlocked = !onTrial && _ngmyIsPastNoon(now) && !_ngmyIsWeekend(now) && !active && !alreadyDone;
     final circleCentered = active || alreadyDone || missedTodayBlocked;
+    final weekend = !onTrial && _ngmyIsWeekend(now);
+    final missedWindow = !onTrial && _ngmyIsPastNoon(now);
+    final blocked = !active && !alreadyDone && (weekend || missedWindow);
+    final readyGoldClockIn = !active && !alreadyDone && !blocked;
 
     return Container(
       width: double.infinity,
@@ -12679,25 +12686,53 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
               ],
             )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: _clockInNameTag(isLight),
-                ),
-                Expanded(
-                  child: Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.center,
-                      child: _clock(context),
+          : readyGoldClockIn
+              ? Stack(
+                  clipBehavior: Clip.hardEdge,
+                  children: [
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: _clockInNameTag(isLight),
                     ),
-                  ),
+                    Positioned(
+                      top: 24,
+                      left: 2,
+                      right: 2,
+                      bottom: 48,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.topCenter,
+                        child: _clock(context),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: _clockInFooter(context),
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: _clockInNameTag(isLight),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.center,
+                          child: _clock(context),
+                        ),
+                      ),
+                    ),
+                    _clockInFooter(context),
+                  ],
                 ),
-                _clockInFooter(context),
-              ],
-            ),
     );
   }
 
@@ -12855,7 +12890,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     const batteryBodyH = 56.0;
     final missedTodayBlocked = !onTrial && missedWindow && !weekend && !active && !alreadyDone;
     final enlargeCircle = active || alreadyDone || missedTodayBlocked;
-    final clockedInScale = enlargeCircle ? 1.28 : (readyToClockIn ? 1.24 : 1.0);
+    final clockedInScale = enlargeCircle ? 1.28 : (readyToClockIn ? 1.36 : 1.0);
     final smokeD = smokeBase * clockedInScale;
     final particleR = particleRBase * clockedInScale;
     final outerRingD = outerRingBase * clockedInScale;
@@ -12866,7 +12901,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final battH = batterySlotH * clockedInScale;
     final battBodyW = batteryBodyW * clockedInScale;
     final battBodyH = batteryBodyH * clockedInScale;
-    final earningsFontSize = enlargeCircle ? 22.0 : 20.0;
+    final earningsFontSize = enlargeCircle ? 22.0 : (readyToClockIn ? 21.0 : 20.0);
     final doneIconSize = enlargeCircle ? 48.0 : 40.0;
 
     return GestureDetector(
@@ -12992,7 +13027,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ],
             ),
             child: Transform.translate(
-              offset: enlargeCircle ? Offset.zero : const Offset(0, -6),
+              offset: enlargeCircle ? Offset.zero : (readyToClockIn ? Offset.zero : const Offset(0, -6)),
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Column(
@@ -13241,9 +13276,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             builder: (context, _) {
               final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(13),
                   gradient: LinearGradient(
                     colors: [
                       Color.lerp(const Color(0xFFFEF3C7), const Color(0xFFFBBF24), shimmer)!,
@@ -13262,13 +13297,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.notifications_active_rounded, size: 11, color: const Color(0xFF78350F).withOpacity(0.9)),
-                    const SizedBox(width: 4),
+                    Icon(Icons.notifications_active_rounded, size: 12, color: const Color(0xFF78350F).withOpacity(0.9)),
+                    const SizedBox(width: 5),
                     Text(
                       'Time to clock in',
                       style: TextStyle(
                         color: const Color(0xFF78350F),
-                        fontSize: 9,
+                        fontSize: 10,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.2,
                       ),
@@ -13280,12 +13315,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ],
         if (showLate && lateInfo != null) ...[
-          if (readyToClockIn) const SizedBox(height: 3),
+          if (readyToClockIn) const SizedBox(height: 4),
           _LateClockInBanner(
             message: lateInfo.message,
             penaltyPercent: lateInfo.penalty,
             isBlocked: lateInfo.blocked,
             compact: true,
+            goldFrame: readyToClockIn,
           ),
         ],
       ],
