@@ -426,9 +426,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
             );
       if (mounted) {
         final lower = msg.toLowerCase();
-        if (ngmyHasStagedIosStudioVideo) {
+        if (ngmyHasStagedIosStudioVideo || lower.contains('tap open & save')) {
           await _showIosSaveVideoDialog(msg);
-        } else if (lower.contains('failed') || lower.contains('unsupported')) {
+        } else if (lower.startsWith('export failed') || lower.contains('unsupported')) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700),
           );

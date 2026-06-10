@@ -447,35 +447,19 @@ bool _webSupportsComposedCapture() {
   }
 }
 
-bool _studioNeedsComposition(NgmyVideoStudioExportConfig config) => !config.canDirectDownload;
-
-void _requestCanvasVideoFrame(html.MediaStream? stream) {
-  if (stream == null) return;
-  final tracks = stream.getVideoTracks();
-  if (tracks.isEmpty) return;
-  try {
-    js_util.callMethod(tracks.first, 'requestFrame', const []);
-  } catch (_) {}
-}
-
-Future<void> _cleanupStudioExport({
-  html.CanvasElement? canvas,
-  Iterable<html.VideoElement> videos = const [],
-  Iterable<html.ImageElement> logos = const [],
-}) async {
-  try {
-    canvas?.remove();
-  } catch (_) {}
-  for (final v in videos) {
-    try {
-      v.remove();
-    } catch (_) {}
+(int, int) _exportDimensions(NgmyVideoStudioExportConfig config) {
+  var w = config.outputWidth;
+  var h = config.outputHeight;
+  if (_ngmyIsAppleMobileBrowser()) {
+    // Smaller canvas helps Safari MediaRecorder actually emit MP4 chunks.
+    const maxW = 720;
+    if (w > maxW) {
+      final scale = maxW / w;
+      w = maxW;
+      h = (h * scale).round().clamp(480, config.outputHeight);
+    }
   }
-  for (final i in logos) {
-    try {
-      i.remove();
-    } catch (_) {}
-  }
+  return (w, h);
 }
 
 void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video) {
@@ -573,10 +557,6 @@ Future<String> exportNgmyVideoStudioComposed({
   }
 
   if (!_webSupportsComposedCapture()) {
-    if (_studioNeedsComposition(config)) {
-      return 'Your browser cannot merge studio templates into the video. '
-          'Use Chrome or Edge on a computer for a full export with banners and logos.';
-    }
     onProgress?.call(0.5, 'Saving your video…');
     return _downloadAllVideoClips(sources);
   }
@@ -621,11 +601,10 @@ Future<String> exportNgmyVideoStudioComposed({
     }
   }
 
-    html.CanvasElement? exportCanvas;
-    html.MediaStream? canvasStream;
-    var manualCanvasFrames = false;
+  html.CanvasElement? exportCanvas;
+  var usedCanvasStream = false;
 
-    try {
+  try {
     onProgress?.call(0.06, 'Preparing studio export…');
 
     final metaOk = await Future.wait(videos.values.map(_waitVideoMeta));
@@ -641,14 +620,13 @@ Future<String> exportNgmyVideoStudioComposed({
 
     onProgress?.call(0.08, 'Preparing overlay…');
 
-    final w = config.outputWidth;
-    final h = config.outputHeight;
+    final (w, h) = _exportDimensions(config);
     html.ImageElement? bannerOverlay;
     if (config.newsBannerStyle != null) {
-      bannerOverlay = await _renderNewsBannerOverlay(config, w, h);
-      if (bannerOverlay == null) {
-        await _cleanupStudioExport(canvas: exportCanvas, videos: videos.values, logos: logos.values);
-        return 'Could not render your studio overlay for export. Try again or use Chrome on a computer.';
+      try {
+        bannerOverlay = await _renderNewsBannerOverlay(config, w, h).timeout(const Duration(seconds: 25));
+      } catch (e) {
+        debugPrint('[studio export] banner overlay failed: $e');
       }
     }
     exportCanvas = html.CanvasElement(width: w, height: h);
@@ -658,75 +636,14 @@ Future<String> exportNgmyVideoStudioComposed({
     final composed = html.MediaStream();
     canvas
       ..style.position = 'fixed'
-      ..style.left = '-10000px'
+      ..style.left = '0'
       ..style.top = '0'
+      ..style.opacity = '0.01'
       ..style.width = '${w}px'
       ..style.height = '${h}px'
       ..style.pointerEvents = 'none'
-      ..style.zIndex = '0';
+      ..style.zIndex = '-1';
     html.document.body?.append(canvas);
-
-    canvasStream = _safeCaptureStream(canvas, fps: _exportCanvasFps);
-    if (canvasStream == null || canvasStream.getVideoTracks().isEmpty) {
-      canvasStream = _safeCaptureStream(canvas, fps: 0);
-      manualCanvasFrames = canvasStream != null && canvasStream.getVideoTracks().isNotEmpty;
-    }
-    var usedCanvasStream = false;
-    if (canvasStream != null) {
-      for (final t in canvasStream.getVideoTracks()) {
-        composed.addTrack(t);
-      }
-      usedCanvasStream = composed.getVideoTracks().isNotEmpty;
-    }
-
-    if (!usedCanvasStream) {
-      await _cleanupStudioExport(canvas: exportCanvas, videos: videos.values, logos: logos.values);
-      return 'Could not record your studio layout in this browser. '
-          'Use Chrome or Edge on a computer to download with all templates and logos.';
-    }
-
-    for (final v in videos.values) {
-      _appendVideoAudioTracks(composed, v);
-      if (composed.getAudioTracks().isNotEmpty) break;
-    }
-
-    if (composed.getTracks().isEmpty) {
-      await _cleanupStudioExport(canvas: exportCanvas, videos: videos.values, logos: logos.values);
-      return 'Could not start studio recording. Try Chrome or Edge on a computer.';
-    }
-
-    final mimeType = _pickRecorderMimeType();
-    if (mimeType == null) {
-      await _cleanupStudioExport(canvas: exportCanvas, videos: videos.values, logos: logos.values);
-      return 'Video recording is not supported in this browser. Use Chrome or Edge on a computer.';
-    }
-
-    final recorderOptions = <String, dynamic>{
-      'mimeType': mimeType,
-      'videoBitsPerSecond': _exportVideoBitsPerSecond,
-    };
-    if (composed.getAudioTracks().isNotEmpty) {
-      recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
-    }
-
-    final recorder = _createMediaRecorder(composed, recorderOptions);
-    if (recorder == null) {
-      await _cleanupStudioExport(canvas: exportCanvas, videos: videos.values, logos: logos.values);
-      return 'Could not start video encoder in this browser. Use Chrome or Edge on a computer.';
-    }
-
-    final chunks = <html.Blob>[];
-    recorder.addEventListener('dataavailable', (event) {
-      final b = (event as html.BlobEvent).data;
-      if (b != null && b.size > 0) chunks.add(b);
-    });
-    recorder.addEventListener('error', (event) {
-      debugPrint('[studio export] MediaRecorder error: $event');
-    });
-    final done = Completer<void>();
-    recorder.addEventListener('stop', (_) {
-      if (!done.isCompleted) done.complete();
-    });
 
     var stopped = false;
     final startMs = DateTime.now().millisecondsSinceEpoch;
@@ -805,10 +722,6 @@ Future<String> exportNgmyVideoStudioComposed({
           t,
         );
       }
-
-      if (manualCanvasFrames) {
-        _requestCanvasVideoFrame(canvasStream);
-      }
     }
 
     for (final v in videos.values) {
@@ -820,16 +733,97 @@ Future<String> exportNgmyVideoStudioComposed({
     await Future<void>.delayed(const Duration(milliseconds: 120));
     paintFrame();
 
+    final canvasStream = _safeCaptureStream(canvas, fps: _exportCanvasFps);
+    if (canvasStream != null) {
+      for (final t in canvasStream.getVideoTracks()) {
+        composed.addTrack(t);
+      }
+      usedCanvasStream = composed.getVideoTracks().isNotEmpty;
+    }
+
+    if (!usedCanvasStream) {
+      final vStream = _safeCaptureStream(videos.values.first);
+      if (vStream != null) {
+        for (final t in vStream.getVideoTracks()) {
+          composed.addTrack(t);
+        }
+      } else {
+        exportCanvas?.remove();
+        for (final v in videos.values) {
+          v.remove();
+        }
+        for (final i in logos.values) {
+          i.remove();
+        }
+        return _downloadAllVideoClips(sources);
+      }
+    }
+
+    for (final v in videos.values) {
+      _appendVideoAudioTracks(composed, v);
+      if (composed.getAudioTracks().isNotEmpty) break;
+    }
+
+    if (composed.getTracks().isEmpty) {
+      exportCanvas?.remove();
+      for (final v in videos.values) {
+        v.remove();
+      }
+      for (final i in logos.values) {
+        i.remove();
+      }
+      return _downloadAllVideoClips(sources);
+    }
+
+    final mimeType = _pickRecorderMimeType();
+    if (mimeType == null) {
+      return _downloadAllVideoClips(sources);
+    }
+
+    final appleMobile = _ngmyIsAppleMobileBrowser();
+    final recorderOptions = <String, dynamic>{
+      'mimeType': mimeType,
+      'videoBitsPerSecond': appleMobile ? 2800000 : _exportVideoBitsPerSecond,
+    };
+    if (composed.getAudioTracks().isNotEmpty) {
+      recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
+    }
+
+    final recorder = _createMediaRecorder(composed, recorderOptions);
+    if (recorder == null) {
+      return _downloadAllVideoClips(sources);
+    }
+
+    final chunks = <html.Blob>[];
+    recorder.addEventListener('dataavailable', (event) {
+      final b = (event as html.BlobEvent).data;
+      if (b != null && b.size > 0) chunks.add(b);
+    });
+    recorder.addEventListener('error', (event) {
+      debugPrint('[studio export] MediaRecorder error: $event');
+    });
+    final done = Completer<void>();
+    recorder.addEventListener('stop', (_) {
+      if (!done.isCompleted) done.complete();
+    });
+
     try {
-      recorder.start(_recorderTimesliceMs);
+      if (appleMobile) {
+        recorder.start();
+      } else {
+        recorder.start(_recorderTimesliceMs);
+      }
     } catch (e) {
       debugPrint('[studio export] recorder.start failed: $e');
-      await _cleanupStudioExport(canvas: exportCanvas, videos: videos.values, logos: logos.values);
-      return 'Export failed to start. Try Chrome or Edge on a computer.';
+      return _downloadAllVideoClips(sources);
+    }
+
+    if (appleMobile) {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
     }
 
     final frameMs = (1000 / _exportCanvasFps).round();
-    final totalFrames = (durationSec * _exportCanvasFps).ceil().clamp(1, (_maxRecordSeconds * _exportCanvasFps).round());
+    final totalFrames = (durationSec * _exportCanvasFps).ceil().clamp(12, (_maxRecordSeconds * _exportCanvasFps).round());
     onProgress?.call(0.1, 'Exporting… 0%');
 
     for (var frame = 0; frame < totalFrames; frame++) {
@@ -847,6 +841,9 @@ Future<String> exportNgmyVideoStudioComposed({
     }
 
     stopped = true;
+    if (appleMobile) {
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+    }
     await _stopRecorderDrain(recorder, done);
     if (!done.isCompleted) {
       await Future.any([
@@ -854,12 +851,18 @@ Future<String> exportNgmyVideoStudioComposed({
         Future.delayed(const Duration(seconds: 6)),
       ]);
     }
+    if (appleMobile) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
 
     onProgress?.call(1.0, 'Saving your file…');
 
     if (chunks.isEmpty) {
-      debugPrint('[studio export] empty chunks (mime=$mimeType)');
-      return 'Export failed — no video data was recorded. Try Chrome or Edge on a computer.';
+      debugPrint('[studio export] empty chunks (mime=$mimeType), falling back to raw clips');
+      final raw = await _downloadAllVideoClips(sources);
+      if (raw.contains('failed') || raw.contains('No video')) return raw;
+      return 'Saved your video — studio overlay could not be merged on this device. '
+          'For templates baked in, use Chrome on a computer. ($raw)';
     }
 
     final apple = _ngmyIsAppleMobileBrowser();
@@ -867,25 +870,31 @@ Future<String> exportNgmyVideoStudioComposed({
     var ext = blobType.contains('webm') ? 'webm' : 'mp4';
     if (apple) {
       if (blobType.contains('webm')) {
-        debugPrint('[studio export] WebM on iOS — composed MP4 required');
-        return 'Export format not supported on iPhone. Tap Download again — the app records MP4 with your full studio overlay.';
+        debugPrint('[studio export] WebM on iOS — falling back to original MP4 clip(s)');
+        return _downloadAllVideoClips(sources);
       }
       blobType = 'video/mp4';
       ext = 'mp4';
     }
     final blob = html.Blob(chunks, blobType);
-    final filename = 'ngmy_${config.format.name}_${config.outputWidth}x${config.outputHeight}_$startMs.$ext';
+    final filename = 'ngmy_${config.format.name}_${w}x${h}_$startMs.$ext';
     if (apple) {
       try {
         await ngmyStageIosStudioVideoFromBlob(blob, filename);
       } catch (e) {
         debugPrint('[studio export] iOS stage failed: $e');
-        return 'Your video exported with templates but could not open the save sheet. Try again or use Share from the browser menu.';
+        return _downloadAllVideoClips(sources);
+      }
+      if (!usedCanvasStream) {
+        return '${_ngmyDownloadResultMessage('ios_pending')} (Full studio merge works best in Chrome on desktop.)';
       }
       return _ngmyDownloadResultMessage('ios_pending');
     }
     final url = html.Url.createObjectUrlFromBlob(blob);
     final mode = await ngmyTriggerBrowserDownload(url, filename);
+    if (!usedCanvasStream) {
+      return '${_ngmyDownloadResultMessage(mode)} (video track — full studio merge needs Chrome/Edge on desktop.)';
+    }
     return _ngmyDownloadResultMessage(mode);
   } catch (e, st) {
     debugPrint('[studio export] composed failed: $e\n$st');
@@ -901,9 +910,6 @@ Future<String> exportNgmyVideoStudioComposed({
       try {
         i.remove();
       } catch (_) {}
-    }
-    if (_studioNeedsComposition(config)) {
-      return 'Export failed — your templates were not saved. Use Chrome or Edge on a computer and try again.';
     }
     return _downloadAllVideoClips(sources);
   } finally {
