@@ -10,6 +10,10 @@ const String _kNgmyInvoicePaymentSettingsKey = 'invoice_payment_settings';
 const String _kNgmyInvoicePaymentPrefsKey = 'ngmy_invoice_payment_settings_v1';
 const String _kNgmyMusicPaymentSettingsKey = 'music_studio_payment_settings';
 const String _kNgmyMusicPaymentPrefsKey = 'ngmy_music_payment_settings_v1';
+const String _kNgmyCommunicateSettingsKey = 'communicate_settings';
+const String _kNgmyCommunicatePrefsKey = 'ngmy_communicate_settings_v1';
+const String _kNgmyCommunicatePaymentSettingsKey = 'communicate_payment_settings';
+const String _kNgmyCommunicatePaymentPrefsKey = 'ngmy_communicate_payment_settings_v1';
 const String _kNgmyWalletPaymentSettingsKey = 'wallet_payment_settings';
 const String _kNgmyWalletPaymentPrefsKey = 'ngmy_wallet_payment_settings_v1';
 const String _kNgmyHelperAiSettingsKey = 'ngmy_helper_ai_settings';
@@ -554,6 +558,125 @@ Future<bool> ngmyPersistMusicPaymentSettings(AppConfig config) async {
   if (await ngmyCanReachCloud()) {
     final payload = _musicPaymentPayload(config);
     cloudOk = await _upsertNgmySettingSafe(_kNgmyMusicPaymentSettingsKey, payload);
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
+Map<String, dynamic> _communicateSettingsPayload(AppConfig config) => {
+      'communicateEnabled': config.communicateEnabled,
+      'communicateProfiles': config.communicateProfiles,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyCommunicateSettingsPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+  if (payload.containsKey('communicateEnabled')) {
+    config.communicateEnabled = payload['communicateEnabled'] == true;
+  }
+  final raw = payload['communicateProfiles'];
+  if (raw is List) {
+    config.communicateProfiles = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+}
+
+Future<void> _persistCommunicateSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyCommunicatePrefsKey, jsonEncode(_communicateSettingsPayload(config)));
+  } catch (e) {
+    debugPrint('[admin communicate] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateCommunicateSettingsFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyCommunicatePrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyCommunicateSettingsPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[admin communicate] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyCommunicateSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      _applyCommunicateSettingsPayload(config, row);
+    }
+  }
+}
+
+Future<bool> ngmyPersistCommunicateSettings(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  await _persistCommunicateSettingsLocal(config);
+
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _communicateSettingsPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyCommunicateSettingsKey, payload);
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
+Map<String, dynamic> _communicatePaymentPayload(AppConfig config) => {
+      'communicateFeeAmount': config.communicateFeeAmount,
+      'communicateMinutesPerPayment': config.communicateMinutesPerPayment,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyCommunicatePaymentPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+  final fee = payload['communicateFeeAmount'];
+  if (fee is num && fee >= 0) config.communicateFeeAmount = fee.toDouble();
+  final mins = payload['communicateMinutesPerPayment'];
+  if (mins is num && mins > 0) config.communicateMinutesPerPayment = mins.toInt();
+}
+
+Future<void> _persistCommunicatePaymentSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyCommunicatePaymentPrefsKey, jsonEncode(_communicatePaymentPayload(config)));
+  } catch (e) {
+    debugPrint('[admin communicate payments] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateCommunicatePaymentsFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyCommunicatePaymentPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyCommunicatePaymentPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[admin communicate payments] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyCommunicatePaymentSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      _applyCommunicatePaymentPayload(config, row);
+    }
+  }
+}
+
+Future<bool> ngmyPersistCommunicatePaymentSettings(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  await _persistCommunicatePaymentSettingsLocal(config);
+
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _communicatePaymentPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyCommunicatePaymentSettingsKey, payload);
     await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
   }
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);

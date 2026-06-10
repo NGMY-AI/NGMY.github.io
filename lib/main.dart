@@ -92,6 +92,9 @@ import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_invoice_payments.dart';
 import 'ngmy_music_payments.dart';
+import 'ngmy_communicate.dart';
+import 'ngmy_communicate_admin.dart';
+import 'ngmy_communicate_payments.dart';
 import 'ngmy_invoice_protected_preview.dart';
 import 'ngmy_web_viewport.dart';
 import 'ngmy_web_status_bar.dart';
@@ -984,6 +987,11 @@ class AppConfig {
   Map<String, String> familyTreePhotoAccessUntilByEmail;
   /// Wallet fee per Music Studio AI song generation (0 = free).
   double musicStudioPerSongFee;
+  /// Admin toggle — double-tap Chat reveals Communicate.
+  bool communicateEnabled;
+  double communicateFeeAmount;
+  int communicateMinutesPerPayment;
+  List<Map<String, dynamic>> communicateProfiles;
   double invoicePremiumOneTimeFee;
   double invoicePremiumMonthlyFee;
   double invoiceLuxuryOneTimeFee;
@@ -1053,6 +1061,10 @@ class AppConfig {
     this.familyTreeCreateFee = NgmyFamilyTreePayments.defaultCreateFee,
     this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
     this.musicStudioPerSongFee = NgmyMusicPayments.defaultPerSongFee,
+    this.communicateEnabled = false,
+    this.communicateFeeAmount = NgmyCommunicatePayments.defaultFeeAmount,
+    this.communicateMinutesPerPayment = NgmyCommunicatePayments.defaultMinutesPerPayment,
+    List<Map<String, dynamic>>? communicateProfiles,
     Map<String, String>? familyTreePhotoAccessUntilByEmail,
     this.invoicePremiumOneTimeFee = NgmyInvoicePayments.defaultPremiumOneTime,
     this.invoicePremiumMonthlyFee = NgmyInvoicePayments.defaultPremiumMonthly,
@@ -1072,6 +1084,7 @@ class AppConfig {
           legacyCities: cities,
         ),
         loanApplications = loanApplications ?? [],
+        communicateProfiles = communicateProfiles ?? const [],
         familyTreePhotoAccessUntilByEmail = familyTreePhotoAccessUntilByEmail ?? const {},
         invoicePremiumAccessUntilByEmail = invoicePremiumAccessUntilByEmail ?? const {},
         invoiceLuxuryAccessUntilByEmail = invoiceLuxuryAccessUntilByEmail ?? const {},
@@ -1141,6 +1154,10 @@ class AppConfig {
     'familyTreePhotoMonthlyFee': familyTreePhotoMonthlyFee,
     'familyTreePhotoAccessUntilByEmail': familyTreePhotoAccessUntilByEmail,
     'musicStudioPerSongFee': musicStudioPerSongFee,
+    'communicateEnabled': communicateEnabled,
+    'communicateFeeAmount': communicateFeeAmount,
+    'communicateMinutesPerPayment': communicateMinutesPerPayment,
+    'communicateProfiles': communicateProfiles,
     'invoicePremiumOneTimeFee': invoicePremiumOneTimeFee,
     'invoicePremiumMonthlyFee': invoicePremiumMonthlyFee,
     'invoiceLuxuryOneTimeFee': invoiceLuxuryOneTimeFee,
@@ -1226,6 +1243,12 @@ class AppConfig {
     familyTreeCreateFee: (json['familyTreeCreateFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultCreateFee,
     familyTreePhotoMonthlyFee: (json['familyTreePhotoMonthlyFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
     musicStudioPerSongFee: (json['musicStudioPerSongFee'] as num?)?.toDouble() ?? NgmyMusicPayments.defaultPerSongFee,
+    communicateEnabled: json['communicateEnabled'] == true,
+    communicateFeeAmount: (json['communicateFeeAmount'] as num?)?.toDouble() ?? NgmyCommunicatePayments.defaultFeeAmount,
+    communicateMinutesPerPayment: (json['communicateMinutesPerPayment'] as num?)?.toInt() ?? NgmyCommunicatePayments.defaultMinutesPerPayment,
+    communicateProfiles: List<Map<String, dynamic>>.from(
+      (json['communicateProfiles'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
+    ),
     familyTreePhotoAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['familyTreePhotoAccessUntilByEmail']),
     invoicePremiumOneTimeFee: (json['invoicePremiumOneTimeFee'] as num?)?.toDouble() ?? NgmyInvoicePayments.defaultPremiumOneTime,
     invoicePremiumMonthlyFee: (json['invoicePremiumMonthlyFee'] as num?)?.toDouble() ?? NgmyInvoicePayments.defaultPremiumMonthly,
@@ -1973,6 +1996,30 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     }
   } else {
     next.musicStudioPerSongFee = keep.musicStudioPerSongFee;
+  }
+  if (record.containsKey('communicateEnabled')) {
+    next.communicateEnabled = record['communicateEnabled'] == true;
+  } else {
+    next.communicateEnabled = keep.communicateEnabled;
+  }
+  if (record.containsKey('communicateFeeAmount') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['communicateFeeAmount'];
+    if (v is num && v >= 0) next.communicateFeeAmount = v.toDouble();
+  } else {
+    next.communicateFeeAmount = keep.communicateFeeAmount;
+  }
+  if (record.containsKey('communicateMinutesPerPayment') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['communicateMinutesPerPayment'];
+    if (v is num && v > 0) next.communicateMinutesPerPayment = v.toInt();
+  } else {
+    next.communicateMinutesPerPayment = keep.communicateMinutesPerPayment;
+  }
+  if (record.containsKey('communicateProfiles') && record['communicateProfiles'] is List) {
+    next.communicateProfiles = List<Map<String, dynamic>>.from(
+      (record['communicateProfiles'] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+    );
+  } else if (keep.communicateProfiles.isNotEmpty) {
+    next.communicateProfiles = List<Map<String, dynamic>>.from(keep.communicateProfiles.map((e) => Map<String, dynamic>.from(e)));
   }
   if (record.containsKey('familyTreePhotoAccessUntilByEmail') && record['familyTreePhotoAccessUntilByEmail'] is Map) {
     final remote = _familyTreePhotoAccessFromJson(record['familyTreePhotoAccessUntilByEmail']);
@@ -6176,6 +6223,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
     await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
     await ngmyHydrateMusicPaymentsFromAllBackups(_config);
+    await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
+    await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
     await ngmyHydrateWalletPaymentsFromAllBackups(_config);
     await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
     await ngmyHydrateAppBrandingFromAllBackups(_config);
@@ -9148,6 +9197,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
           await ngmyHydrateMusicPaymentsFromAllBackups(_config);
+          await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
+          await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
@@ -9406,6 +9457,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
           await ngmyHydrateMusicPaymentsFromAllBackups(_config);
+          await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
+          await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
@@ -16953,6 +17006,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Announcements', Icons.campaign_outlined, Colors.orange, () => unawaited(_openAnnouncementAdmin(isDark)), isDark),
             _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => unawaited(_openCivicRegistryAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications)),
             _menuFrame('Payments', Icons.payments_outlined, const Color(0xFF0D9488), () => unawaited(_openPaymentsAdmin(isDark)), isDark),
+            _menuFrame('Communicate', Icons.favorite_rounded, const Color(0xFFEC4899), () => unawaited(_openCommunicateAdmin(isDark)), isDark),
             _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => unawaited(_openJobApplicationsAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingJobWorkerApplications(widget.config.jobWorkerApplications)),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => unawaited(_openPopupsAdmin(isDark)), isDark),
             _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => unawaited(_openGamesAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingGameInvites(widget.config.gameInvites)),
@@ -17068,9 +17122,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
     var luxOneOn = widget.config.invoiceLuxuryAllowOneTime;
     var luxMoOn = widget.config.invoiceLuxuryAllowMonthly;
     final musicC = TextEditingController(text: widget.config.musicStudioPerSongFee.toStringAsFixed(2));
+    final commFeeC = TextEditingController(text: widget.config.communicateFeeAmount.toStringAsFixed(2));
+    final commMinsC = TextEditingController(text: '${widget.config.communicateMinutesPerPayment}');
     var familyExpanded = true;
     var invoicesExpanded = false;
     var musicExpanded = false;
+    var communicatePayExpanded = false;
 
     Widget categoryShell({
       required String title,
@@ -17335,6 +17392,63 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ),
                         ],
                       ),
+                      categoryShell(
+                        title: 'Communicate',
+                        subtitle: 'Time-based fee for companion chat (double-tap Chat)',
+                        icon: Icons.favorite_rounded,
+                        accent: const Color(0xFFF472B6),
+                        expanded: communicatePayExpanded,
+                        onToggle: () => setST(() {
+                          communicatePayExpanded = !communicatePayExpanded;
+                          if (communicatePayExpanded) {
+                            familyExpanded = false;
+                            invoicesExpanded = false;
+                            musicExpanded = false;
+                          }
+                        }),
+                        children: [
+                          TextField(
+                            controller: commFeeC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Fee per time block (\$)',
+                              prefixIcon: Icon(Icons.timer_outlined),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: commMinsC,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Minutes per payment block',
+                              prefixIcon: Icon(Icons.schedule_rounded),
+                              helperText: 'e.g. 10 min = \$1 — time stacks across sessions until paid',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: () async {
+                              final fee = double.tryParse(commFeeC.text.trim());
+                              final mins = int.tryParse(commMinsC.text.trim());
+                              if (fee == null || mins == null || fee < 0 || mins <= 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid fee and minutes.')));
+                                return;
+                              }
+                              setST(() {
+                                widget.config.communicateFeeAmount = fee;
+                                widget.config.communicateMinutesPerPayment = mins;
+                              });
+                              widget.onDataChanged();
+                              final ok = await ngmyPersistCommunicatePaymentSettings(widget.config);
+                              if (!context.mounted) return;
+                              setState(() {});
+                              ngmyAdminShowCloudSaveSnackBar(context, cloudOk: ok, success: 'Communicate payment settings saved.');
+                            },
+                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFF472B6), minimumSize: const Size(double.infinity, 44)),
+                            child: const Text('Save Communicate', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -17351,7 +17465,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
       luxOneC.dispose();
       luxMoC.dispose();
       musicC.dispose();
+      commFeeC.dispose();
+      commMinsC.dispose();
     });
+  }
+
+  Future<void> _openCommunicateAdmin(bool isDark) async {
+    await showNgmyCommunicateAdminSheet(
+      context: context,
+      config: widget.config,
+      isDark: isDark,
+      onDataChanged: widget.onDataChanged,
+      onPersist: () => ngmyPersistCommunicateSettings(widget.config),
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> _openCivicRegistryAdmin(bool isDark) async {
@@ -39083,6 +39210,9 @@ class AnnouncementScreen extends StatefulWidget {
 class _AnnouncementScreenState extends State<AnnouncementScreen> {
   int _activeTab = 0; // 0: Chat, 1: News, 2: Music
   late final PageController _hubPageController;
+  DateTime? _lastChatTabTap;
+  bool _communicateDropdownOpen = false;
+  bool _communicateMode = false;
   final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _chatController = TextEditingController();
   final TextEditingController _newsController = TextEditingController();
@@ -39539,11 +39669,42 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     super.dispose();
   }
 
+  void _onChatTabTap() {
+    final now = DateTime.now();
+    final canCommunicate = widget.config.communicateEnabled || widget.user.isAdmin;
+    if (_lastChatTabTap != null && now.difference(_lastChatTabTap!) < const Duration(milliseconds: 450) && canCommunicate) {
+      setState(() {
+        _communicateDropdownOpen = !_communicateDropdownOpen;
+        _lastChatTabTap = null;
+      });
+      return;
+    }
+    _lastChatTabTap = now;
+    setState(() {
+      _communicateDropdownOpen = false;
+      if (_communicateMode) _communicateMode = false;
+    });
+    _goToHubTab(0);
+  }
+
+  void _openCommunicateMode() {
+    setState(() {
+      _communicateMode = true;
+      _communicateDropdownOpen = false;
+    });
+    _goToHubTab(0);
+  }
+
   void _goToHubTab(int idx, {bool animate = true}) {
     if (idx == 1) {
       _selectNewsTab(jumpPage: false);
     } else {
-      setState(() => _activeTab = idx);
+      setState(() {
+        _activeTab = idx;
+        if (idx != 0) {
+          _communicateDropdownOpen = false;
+        }
+      });
     }
     if (_hubPageController.hasClients) {
       if (animate) {
@@ -39934,16 +40095,47 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFD1D5DB)),
                 ),
-                child: Row(
+                child: Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    _tabBtn(0, Icons.chat_rounded, 'Chat'),
-                    _tabBtn(
-                      1,
-                      Icons.newspaper_rounded,
-                      'News',
-                      badge: _unreadNewsInternal,
+                    Row(
+                      children: [
+                        _chatTabBtn(),
+                        _tabBtn(
+                          1,
+                          Icons.newspaper_rounded,
+                          'News',
+                          badge: _unreadNewsInternal,
+                        ),
+                        _tabBtn(2, Icons.music_note_rounded, 'Music'),
+                      ],
                     ),
-                    _tabBtn(2, Icons.music_note_rounded, 'Music'),
+                    if (_communicateDropdownOpen && (widget.config.communicateEnabled || widget.user.isAdmin))
+                      Positioned(
+                        top: 46,
+                        left: 8,
+                        right: null,
+                        child: Material(
+                          elevation: 8,
+                          borderRadius: BorderRadius.circular(12),
+                          color: isDark ? const Color(0xFF1A2030) : Colors.white,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: _openCommunicateMode,
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.favorite_rounded, size: 16, color: Color(0xFFEC4899)),
+                                  SizedBox(width: 8),
+                                  Text('Communicate', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -39961,7 +40153,28 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                   }
                 },
                 children: [
-                  _shouldShowKb
+                  _communicateMode && (widget.config.communicateEnabled || widget.user.isAdmin)
+                      ? NgmyCommunicatePanel(
+                          user: widget.user,
+                          config: widget.config,
+                          apiKey: widget.config.geminiApiKey,
+                          onBackToChat: () => setState(() => _communicateMode = false),
+                          onChargeWallet: widget.user.isAdmin
+                              ? null
+                              : (amount, desc) async {
+                                  if (widget.onAddTransaction == null) return false;
+                                  final charged = ngmyChargeUserWallet(
+                                    user: widget.user,
+                                    allUsers: widget.allUsers,
+                                    amount: amount,
+                                    description: desc,
+                                    onAddTransaction: widget.onAddTransaction!,
+                                  );
+                                  if (charged) widget.onDataChanged?.call();
+                                  return charged;
+                                },
+                        )
+                      : _shouldShowKb
                       ? Column(
                           children: [
                             if (_kbLockedByDailyLimit)
@@ -40085,7 +40298,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                 ],
               ),
             ),
-            if (_activeTab == 0 && !_shouldShowKb)
+            if (_activeTab == 0 && !_shouldShowKb && !_communicateMode)
               _ngmyGlassComposerBar(
                 isDark: isDark,
                 child: Padding(
@@ -40164,6 +40377,42 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         ),
       ),
     ),
+    );
+  }
+
+  Widget _chatTabBtn() {
+    final sel = _activeTab == 0 && !_communicateMode;
+    final commSel = _activeTab == 0 && _communicateMode;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = commSel ? const Color(0xFFEC4899) : const Color(0xFF00B25A);
+    return Expanded(
+      child: GestureDetector(
+        onTap: _onChatTabTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: BoxDecoration(
+            color: (sel || commSel) ? color.withOpacity(isDark ? 0.25 : 0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(11),
+            border: (sel || commSel) ? Border.all(color: color.withOpacity(0.5)) : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.chat_rounded, size: 17, color: (sel || commSel) ? color : Colors.grey),
+              const SizedBox(width: 6),
+              Text(
+                commSel ? 'Communicate' : 'Chat',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: (sel || commSel) ? (isDark ? Colors.white : const Color(0xFF111827)) : Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
