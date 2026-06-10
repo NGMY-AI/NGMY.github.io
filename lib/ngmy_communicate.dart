@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -13,6 +15,7 @@ class NgmyCommunicateProfile {
   final String personality;
   final String bio;
   final String emoji;
+  final String avatarUrl;
   final bool active;
 
   const NgmyCommunicateProfile({
@@ -22,6 +25,7 @@ class NgmyCommunicateProfile {
     required this.personality,
     this.bio = '',
     this.emoji = '💬',
+    this.avatarUrl = '',
     this.active = true,
   });
 
@@ -34,6 +38,7 @@ class NgmyCommunicateProfile {
       personality: (m['personality'] ?? '').toString(),
       bio: (m['bio'] ?? '').toString(),
       emoji: (m['emoji'] ?? (g == 'male' ? '👨' : '👩')).toString(),
+      avatarUrl: (m['avatarUrl'] ?? m['avatar_url'] ?? '').toString(),
       active: m['active'] != false,
     );
   }
@@ -45,6 +50,7 @@ class NgmyCommunicateProfile {
         'personality': personality,
         'bio': bio,
         'emoji': emoji,
+        'avatarUrl': avatarUrl,
         'active': active,
       };
 
@@ -63,6 +69,46 @@ class NgmyCommunicateProfile {
         '- Remember every past message in the history below.\n'
         '- Match ${gender == 'male' ? "how guys" : "how girls"} really text — feelings, plans, getting mad, being sweet.\n'
         '- Reply like real back-and-forth texting. Short-medium messages. Stay in character.\n';
+  }
+}
+
+class NgmyCommunicateAvatar extends StatelessWidget {
+  final NgmyCommunicateProfile profile;
+  final double size;
+
+  const NgmyCommunicateAvatar({super.key, required this.profile, this.size = 44});
+
+  @override
+  Widget build(BuildContext context) {
+    final url = profile.avatarUrl.trim();
+    Widget child;
+    if (url.startsWith('data:image')) {
+      try {
+        child = ClipOval(
+          child: Image.memory(
+            base64Decode(url.split(',').last),
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+          ),
+        );
+      } catch (_) {
+        child = Text(profile.emoji, style: TextStyle(fontSize: size * 0.5));
+      }
+    } else if (url.startsWith('http')) {
+      child = ClipOval(
+        child: Image.network(url, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) {
+          return Center(child: Text(profile.emoji, style: TextStyle(fontSize: size * 0.5)));
+        }),
+      );
+    } else {
+      child = Text(profile.emoji, style: TextStyle(fontSize: size * 0.5));
+    }
+    return CircleAvatar(
+      radius: size / 2,
+      backgroundColor: const Color(0xFFEC4899).withValues(alpha: 0.2),
+      child: child,
+    );
   }
 }
 
@@ -155,10 +201,7 @@ class _NgmyCommunicatePanelState extends State<NgmyCommunicatePanel> {
                       margin: const EdgeInsets.only(bottom: 10),
                       color: isDark ? const Color(0xFF1A2030) : Colors.white,
                       child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: const Color(0xFFEC4899).withValues(alpha: 0.2),
-                          child: Text(p.emoji, style: const TextStyle(fontSize: 22)),
-                        ),
+                        leading: NgmyCommunicateAvatar(profile: p, size: 44),
                         title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800)),
                         subtitle: Text('${p.genderLabel} · Tap to chat', style: const TextStyle(fontSize: 11)),
                         trailing: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFFEC4899)),
@@ -355,7 +398,7 @@ class _CommunicateChatViewState extends State<_CommunicateChatView> with Widgets
           child: Row(
             children: [
               IconButton(icon: const Icon(Icons.arrow_back_rounded, size: 20), onPressed: widget.onBack),
-              Text(widget.profile.emoji, style: const TextStyle(fontSize: 20)),
+              NgmyCommunicateAvatar(profile: widget.profile, size: 36),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(

@@ -40095,51 +40095,52 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFD1D5DB)),
                 ),
-                child: Stack(
-                  clipBehavior: Clip.none,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        _chatTabBtn(),
-                        _tabBtn(
-                          1,
-                          Icons.newspaper_rounded,
-                          'News',
-                          badge: _unreadNewsInternal,
-                        ),
-                        _tabBtn(2, Icons.music_note_rounded, 'Music'),
-                      ],
+                    _chatTabBtn(),
+                    _tabBtn(
+                      1,
+                      Icons.newspaper_rounded,
+                      'News',
+                      badge: _unreadNewsInternal,
                     ),
-                    if (_communicateDropdownOpen && (widget.config.communicateEnabled || widget.user.isAdmin))
-                      Positioned(
-                        top: 46,
-                        left: 8,
-                        right: null,
-                        child: Material(
-                          elevation: 8,
-                          borderRadius: BorderRadius.circular(12),
-                          color: isDark ? const Color(0xFF1A2030) : Colors.white,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: _openCommunicateMode,
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.favorite_rounded, size: 16, color: Color(0xFFEC4899)),
-                                  SizedBox(width: 8),
-                                  Text('Communicate', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                    _tabBtn(2, Icons.music_note_rounded, 'Music'),
                   ],
                 ),
               ),
             ),
+            if (_communicateDropdownOpen && (widget.config.communicateEnabled || widget.user.isAdmin))
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+                child: Material(
+                  elevation: 10,
+                  shadowColor: const Color(0xFFEC4899).withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(14),
+                  color: isDark ? const Color(0xFF1A2030) : Colors.white,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: _openCommunicateMode,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFEC4899).withValues(alpha: 0.45)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.favorite_rounded, size: 18, color: Color(0xFFEC4899)),
+                          SizedBox(width: 10),
+                          Text('Communicate', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFFEC4899))),
+                          SizedBox(width: 6),
+                          Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFEC4899)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             const SizedBox(height: 8),
             Expanded(
               child: PageView(

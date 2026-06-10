@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_communicate.dart';
 
@@ -11,7 +14,6 @@ Future<void> showNgmyCommunicateAdminSheet({
   required Future<bool> Function() onPersist,
 }) async {
   var profiles = ngmyCommunicateProfilesFromConfig(config);
-  // Include inactive for admin edit
   final raw = (config as dynamic).communicateProfiles;
   if (raw is List) {
     profiles = raw
@@ -56,7 +58,7 @@ Future<void> showNgmyCommunicateAdminSheet({
                       title: const Text('Open Communicate for users', style: TextStyle(fontWeight: FontWeight.w800)),
                       subtitle: const Text('When off, double-tap Chat does nothing extra'),
                       value: enabled,
-                      activeColor: const Color(0xFFEC4899),
+                      activeThumbColor: const Color(0xFFEC4899),
                       onChanged: (v) => setST(() => enabled = v),
                     ),
                     const SizedBox(height: 8),
@@ -75,7 +77,7 @@ Future<void> showNgmyCommunicateAdminSheet({
                         margin: const EdgeInsets.only(bottom: 8),
                         color: isDark ? const Color(0xFF151922) : const Color(0xFFF8FAFC),
                         child: ListTile(
-                          leading: Text(p.emoji, style: const TextStyle(fontSize: 24)),
+                          leading: NgmyCommunicateAvatar(profile: p, size: 44),
                           title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800)),
                           subtitle: Text('${p.gender == 'male' ? 'Male' : 'Female'} · ${p.active ? 'Active' : 'Hidden'}'),
                           trailing: Row(
@@ -140,74 +142,136 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
   final emojiC = TextEditingController(text: existing?.emoji ?? '👩');
   var gender = existing?.gender ?? 'female';
   var active = existing?.active ?? true;
+  var avatarUrl = existing?.avatarUrl ?? '';
 
-  return showDialog<NgmyCommunicateProfile>(
+  final result = await showDialog<NgmyCommunicateProfile>(
     context: ctx,
     builder: (dCtx) {
       return StatefulBuilder(
-        builder: (dCtx, setD) => AlertDialog(
-          title: Text(existing == null ? 'New companion' : 'Edit companion'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Name')),
-                const SizedBox(height: 8),
-                TextField(controller: emojiC, decoration: const InputDecoration(labelText: 'Emoji avatar')),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: gender,
-                  decoration: const InputDecoration(labelText: 'Gender'),
-                  items: const [
-                    DropdownMenuItem(value: 'female', child: Text('Female')),
-                    DropdownMenuItem(value: 'male', child: Text('Male')),
+        builder: (dCtx, setD) {
+          final preview = NgmyCommunicateProfile(
+            id: existing?.id ?? 'preview',
+            name: nameC.text.trim().isEmpty ? 'Companion' : nameC.text.trim(),
+            gender: gender,
+            personality: personalityC.text,
+            bio: bioC.text,
+            emoji: emojiC.text.trim().isEmpty ? (gender == 'male' ? '👨' : '👩') : emojiC.text.trim(),
+            avatarUrl: avatarUrl,
+            active: active,
+          );
+          return AlertDialog(
+            title: Text(existing == null ? 'New companion' : 'Edit companion', style: const TextStyle(fontWeight: FontWeight.w900)),
+            content: SizedBox(
+              width: 340,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(child: NgmyCommunicateAvatar(profile: preview, size: 88)),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final img = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 512);
+                        if (img == null) return;
+                        final bytes = await img.readAsBytes();
+                        setD(() => avatarUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}');
+                      },
+                      icon: const Icon(Icons.photo_camera_rounded, size: 18),
+                      label: const Text('Upload avatar photo'),
+                      style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEC4899)),
+                    ),
+                    if (avatarUrl.isNotEmpty)
+                      TextButton(
+                        onPressed: () => setD(() => avatarUrl = ''),
+                        child: const Text('Remove photo — use emoji instead'),
+                      ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: nameC,
+                      decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
+                      onChanged: (_) => setD(() {}),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: emojiC,
+                      decoration: const InputDecoration(
+                        labelText: 'Emoji fallback',
+                        helperText: 'Shown if no photo uploaded',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (_) => setD(() {}),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      value: gender,
+                      decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'female', child: Text('Female')),
+                        DropdownMenuItem(value: 'male', child: Text('Male')),
+                      ],
+                      onChanged: (v) => setD(() => gender = v ?? 'female'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: personalityC,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Personality',
+                        helperText: 'Romantic, playful, jealous, sweet…',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: bioC,
+                      maxLines: 2,
+                      decoration: const InputDecoration(labelText: 'Bio (optional)', border: OutlineInputBorder()),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Visible to users'),
+                      value: active,
+                      activeThumbColor: const Color(0xFFEC4899),
+                      onChanged: (v) => setD(() => active = v),
+                    ),
                   ],
-                  onChanged: (v) => setD(() => gender = v ?? 'female'),
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: personalityC,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Personality',
-                    helperText: 'How they talk — romantic, playful, jealous, sweet…',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(controller: bioC, maxLines: 2, decoration: const InputDecoration(labelText: 'Bio (optional)')),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Visible to users'),
-                  value: active,
-                  onChanged: (v) => setD(() => active = v),
-                ),
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                final name = nameC.text.trim();
-                if (name.isEmpty) return;
-                Navigator.pop(
-                  dCtx,
-                  NgmyCommunicateProfile(
-                    id: existing?.id ?? 'cmp-${DateTime.now().microsecondsSinceEpoch}',
-                    name: name,
-                    gender: gender,
-                    personality: personalityC.text.trim(),
-                    bio: bioC.text.trim(),
-                    emoji: emojiC.text.trim().isEmpty ? (gender == 'male' ? '👨' : '👩') : emojiC.text.trim(),
-                    active: active,
-                  ),
-                );
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('Cancel')),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEC4899)),
+                onPressed: () {
+                  final name = nameC.text.trim();
+                  if (name.isEmpty) return;
+                  Navigator.pop(
+                    dCtx,
+                    NgmyCommunicateProfile(
+                      id: existing?.id ?? 'cmp-${DateTime.now().microsecondsSinceEpoch}',
+                      name: name,
+                      gender: gender,
+                      personality: personalityC.text.trim(),
+                      bio: bioC.text.trim(),
+                      emoji: emojiC.text.trim().isEmpty ? (gender == 'male' ? '👨' : '👩') : emojiC.text.trim(),
+                      avatarUrl: avatarUrl,
+                      active: active,
+                    ),
+                  );
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       );
     },
   );
+
+  nameC.dispose();
+  bioC.dispose();
+  personalityC.dispose();
+  emojiC.dispose();
+  return result;
 }
