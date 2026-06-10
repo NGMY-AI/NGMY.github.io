@@ -91,6 +91,7 @@ import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_invoice_payments.dart';
+import 'ngmy_music_payments.dart';
 import 'ngmy_invoice_protected_preview.dart';
 import 'ngmy_web_viewport.dart';
 import 'ngmy_web_status_bar.dart';
@@ -981,6 +982,8 @@ class AppConfig {
   double familyTreeCreateFee;
   double familyTreePhotoMonthlyFee;
   Map<String, String> familyTreePhotoAccessUntilByEmail;
+  /// Wallet fee per Music Studio AI song generation (0 = free).
+  double musicStudioPerSongFee;
   double invoicePremiumOneTimeFee;
   double invoicePremiumMonthlyFee;
   double invoiceLuxuryOneTimeFee;
@@ -1049,6 +1052,7 @@ class AppConfig {
     this.civicSelfEnrollmentEnabled = false,
     this.familyTreeCreateFee = NgmyFamilyTreePayments.defaultCreateFee,
     this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
+    this.musicStudioPerSongFee = NgmyMusicPayments.defaultPerSongFee,
     Map<String, String>? familyTreePhotoAccessUntilByEmail,
     this.invoicePremiumOneTimeFee = NgmyInvoicePayments.defaultPremiumOneTime,
     this.invoicePremiumMonthlyFee = NgmyInvoicePayments.defaultPremiumMonthly,
@@ -1136,6 +1140,7 @@ class AppConfig {
     'familyTreeCreateFee': familyTreeCreateFee,
     'familyTreePhotoMonthlyFee': familyTreePhotoMonthlyFee,
     'familyTreePhotoAccessUntilByEmail': familyTreePhotoAccessUntilByEmail,
+    'musicStudioPerSongFee': musicStudioPerSongFee,
     'invoicePremiumOneTimeFee': invoicePremiumOneTimeFee,
     'invoicePremiumMonthlyFee': invoicePremiumMonthlyFee,
     'invoiceLuxuryOneTimeFee': invoiceLuxuryOneTimeFee,
@@ -1220,6 +1225,7 @@ class AppConfig {
     civicSelfEnrollmentEnabled: json['civicSelfEnrollmentEnabled'] == true,
     familyTreeCreateFee: (json['familyTreeCreateFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultCreateFee,
     familyTreePhotoMonthlyFee: (json['familyTreePhotoMonthlyFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
+    musicStudioPerSongFee: (json['musicStudioPerSongFee'] as num?)?.toDouble() ?? NgmyMusicPayments.defaultPerSongFee,
     familyTreePhotoAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['familyTreePhotoAccessUntilByEmail']),
     invoicePremiumOneTimeFee: (json['invoicePremiumOneTimeFee'] as num?)?.toDouble() ?? NgmyInvoicePayments.defaultPremiumOneTime,
     invoicePremiumMonthlyFee: (json['invoicePremiumMonthlyFee'] as num?)?.toDouble() ?? NgmyInvoicePayments.defaultPremiumMonthly,
@@ -1957,6 +1963,16 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     }
   } else {
     next.familyTreePhotoMonthlyFee = keep.familyTreePhotoMonthlyFee;
+  }
+  if (record.containsKey('musicStudioPerSongFee')) {
+    if (ngmyShouldDeferRemoteConfigOverwrite()) {
+      next.musicStudioPerSongFee = keep.musicStudioPerSongFee;
+    } else {
+      final v = record['musicStudioPerSongFee'];
+      if (v is num && v >= 0) next.musicStudioPerSongFee = v.toDouble();
+    }
+  } else {
+    next.musicStudioPerSongFee = keep.musicStudioPerSongFee;
   }
   if (record.containsKey('familyTreePhotoAccessUntilByEmail') && record['familyTreePhotoAccessUntilByEmail'] is Map) {
     final remote = _familyTreePhotoAccessFromJson(record['familyTreePhotoAccessUntilByEmail']);
@@ -6159,6 +6175,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateManagementListsFromAllBackups(_config);
     await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
     await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+    await ngmyHydrateMusicPaymentsFromAllBackups(_config);
     await ngmyHydrateWalletPaymentsFromAllBackups(_config);
     await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
     await ngmyHydrateAppBrandingFromAllBackups(_config);
@@ -9130,6 +9147,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateManagementListsFromAllBackups(_config);
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+          await ngmyHydrateMusicPaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
@@ -9387,6 +9405,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateManagementListsFromAllBackups(_config);
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+          await ngmyHydrateMusicPaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
@@ -10939,15 +10958,13 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
       animation: _ctrl,
       builder: (context, _) {
         final pulse = 0.55 + (_ctrl.value * 0.45);
-        final shrinkWrap = widget.compact && blocked;
         return Container(
-          width: widget.compact && !blocked ? double.infinity : null,
           padding: EdgeInsets.symmetric(
-            horizontal: widget.compact ? 10 : 12,
-            vertical: widget.compact ? 5 : 8,
+            horizontal: widget.compact ? 8 : 12,
+            vertical: widget.compact ? 3 : 8,
           ),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(widget.compact ? 12 : 16),
+            borderRadius: BorderRadius.circular(widget.compact ? 10 : 16),
             gradient: LinearGradient(
               colors: blocked
                   ? [const Color(0xFF1E293B), const Color(0xFF334155)]
@@ -10968,28 +10985,28 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: shrinkWrap ? MainAxisAlignment.center : MainAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 blocked ? Icons.event_busy_rounded : Icons.alarm_rounded,
                 color: Colors.white.withOpacity(0.95),
-                size: widget.compact ? 12 : 14,
+                size: widget.compact ? 10 : 14,
               ),
-              SizedBox(width: widget.compact ? 5 : 7),
+              SizedBox(width: widget.compact ? 4 : 7),
               Text(
                 widget.message,
-                textAlign: shrinkWrap ? TextAlign.center : TextAlign.start,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: widget.compact ? 10 : 11,
+                  fontSize: widget.compact ? 9 : 11,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.2,
                 ),
               ),
               if (!blocked && penalty > 0) ...[
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  padding: EdgeInsets.symmetric(horizontal: widget.compact ? 5 : 7, vertical: widget.compact ? 2 : 3),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.25),
                     borderRadius: BorderRadius.circular(999),
@@ -10997,9 +11014,9 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
                   ),
                   child: Text(
                     '-${penalty.toInt()}%',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 10,
+                      fontSize: widget.compact ? 8 : 10,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -12165,6 +12182,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         onPostToNews: widget.onAddAnnouncement,
         onNewsRead: _refreshUnreadNewsBadge,
         onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead,
+        onAddTransaction: widget.onAddTransaction,
+        onDataChanged: widget.onDataChanged,
         liveAppKnowledge: () => NgmyAppKnowledge.build(
           viewer: {
             'email': widget.user.email,
@@ -12836,7 +12855,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     const batteryBodyH = 56.0;
     final missedTodayBlocked = !onTrial && missedWindow && !weekend && !active && !alreadyDone;
     final enlargeCircle = active || alreadyDone || missedTodayBlocked;
-    final clockedInScale = enlargeCircle ? 1.28 : 1.0;
+    final clockedInScale = enlargeCircle ? 1.28 : (readyToClockIn ? 1.24 : 1.0);
     final smokeD = smokeBase * clockedInScale;
     final particleR = particleRBase * clockedInScale;
     final outerRingD = outerRingBase * clockedInScale;
@@ -12899,8 +12918,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               builder: (context, _) {
                 final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
                 return Container(
-                  width: readyRingBase,
-                  height: readyRingBase,
+                  width: readyRingBase * clockedInScale,
+                  height: readyRingBase * clockedInScale,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
@@ -13214,7 +13233,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: readyToClockIn ? CrossAxisAlignment.stretch : CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         if (readyToClockIn) ...[
           AnimatedBuilder(
@@ -13222,9 +13241,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             builder: (context, _) {
               final shimmer = (math.sin(_smokeCtrl.value * 2 * math.pi) + 1) / 2;
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                   gradient: LinearGradient(
                     colors: [
                       Color.lerp(const Color(0xFFFEF3C7), const Color(0xFFFBBF24), shimmer)!,
@@ -13234,7 +13253,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   boxShadow: [
                     BoxShadow(
                       color: const Color(0xFFF59E0B).withOpacity(0.28 + shimmer * 0.12),
-                      blurRadius: 8,
+                      blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
                   ],
@@ -13243,13 +13262,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.notifications_active_rounded, size: 12, color: const Color(0xFF78350F).withOpacity(0.9)),
-                    const SizedBox(width: 5),
+                    Icon(Icons.notifications_active_rounded, size: 11, color: const Color(0xFF78350F).withOpacity(0.9)),
+                    const SizedBox(width: 4),
                     Text(
                       'Time to clock in',
                       style: TextStyle(
                         color: const Color(0xFF78350F),
-                        fontSize: 10,
+                        fontSize: 9,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.2,
                       ),
@@ -13261,15 +13280,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ],
         if (showLate && lateInfo != null) ...[
-          if (readyToClockIn) const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.center,
-            child: _LateClockInBanner(
-              message: lateInfo.message,
-              penaltyPercent: lateInfo.penalty,
-              isBlocked: lateInfo.blocked,
-              compact: true,
-            ),
+          if (readyToClockIn) const SizedBox(height: 3),
+          _LateClockInBanner(
+            message: lateInfo.message,
+            penaltyPercent: lateInfo.penalty,
+            isBlocked: lateInfo.blocked,
+            compact: true,
           ),
         ],
       ],
@@ -17011,8 +17027,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
     var premMoOn = widget.config.invoicePremiumAllowMonthly;
     var luxOneOn = widget.config.invoiceLuxuryAllowOneTime;
     var luxMoOn = widget.config.invoiceLuxuryAllowMonthly;
+    final musicC = TextEditingController(text: widget.config.musicStudioPerSongFee.toStringAsFixed(2));
     var familyExpanded = true;
     var invoicesExpanded = false;
+    var musicExpanded = false;
 
     Widget categoryShell({
       required String title,
@@ -17116,7 +17134,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         expanded: familyExpanded,
                         onToggle: () => setST(() {
                           familyExpanded = !familyExpanded;
-                          if (familyExpanded) invoicesExpanded = false;
+                          if (familyExpanded) {
+                            invoicesExpanded = false;
+                            musicExpanded = false;
+                          }
                         }),
                         children: [
                           TextField(
@@ -17170,7 +17191,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         expanded: invoicesExpanded,
                         onToggle: () => setST(() {
                           invoicesExpanded = !invoicesExpanded;
-                          if (invoicesExpanded) familyExpanded = false;
+                          if (invoicesExpanded) {
+                            familyExpanded = false;
+                            musicExpanded = false;
+                          }
                         }),
                         children: [
                           Text('Premium', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
@@ -17224,6 +17248,53 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ),
                         ],
                       ),
+                      categoryShell(
+                        title: 'Music Studio',
+                        subtitle: 'NGMY Helper → Music AI songwriting fee per generation',
+                        icon: Icons.lyrics_rounded,
+                        accent: const Color(0xFFEC4899),
+                        expanded: musicExpanded,
+                        onToggle: () => setST(() {
+                          musicExpanded = !musicExpanded;
+                          if (musicExpanded) {
+                            familyExpanded = false;
+                            invoicesExpanded = false;
+                          }
+                        }),
+                        children: [
+                          TextField(
+                            controller: musicC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Fee per AI song (\$)',
+                              prefixIcon: Icon(Icons.music_note_rounded),
+                              helperText: 'Charged from NGMY wallet each time user generates lyrics. Set 0 for free.',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: () async {
+                              final fee = double.tryParse(musicC.text.trim());
+                              if (fee == null || fee < 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid dollar amount (0 or more).')));
+                                return;
+                              }
+                              setST(() => widget.config.musicStudioPerSongFee = fee);
+                              widget.onDataChanged();
+                              final ok = await ngmyPersistMusicPaymentSettings(widget.config);
+                              if (!context.mounted) return;
+                              setState(() {});
+                              ngmyAdminShowCloudSaveSnackBar(
+                                context,
+                                cloudOk: ok,
+                                success: 'Music Studio payment settings saved.',
+                              );
+                            },
+                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEC4899), minimumSize: const Size(double.infinity, 44)),
+                            child: const Text('Save Music Studio', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -17239,6 +17310,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       premMoC.dispose();
       luxOneC.dispose();
       luxMoC.dispose();
+      musicC.dispose();
     });
   }
 
@@ -38948,6 +39020,8 @@ class AnnouncementScreen extends StatefulWidget {
   final VoidCallback? onNewsRead;
   final Future<void> Function(List<String> ids)? onMarkAnnouncementsRead;
   final String Function()? liveAppKnowledge;
+  final Function(AppTransaction)? onAddTransaction;
+  final VoidCallback? onDataChanged;
   const AnnouncementScreen({
     super.key,
     required this.user,
@@ -38958,6 +39032,8 @@ class AnnouncementScreen extends StatefulWidget {
     this.onNewsRead,
     this.onMarkAnnouncementsRead,
     this.liveAppKnowledge,
+    this.onAddTransaction,
+    this.onDataChanged,
   });
 
   @override
@@ -39923,20 +39999,46 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                     apiKey: widget.config.geminiApiKey,
                     userEmail: widget.user.email,
                     isTypingLocked: _isTyping,
+                    perSongFee: widget.user.isAdmin ? 0 : NgmyMusicPayments.perSongFeeFromConfig(widget.config),
                     onBeforeSend: () async {
-                      if (widget.user.isAdmin) return true;
-                      final limit = widget.config.ngmyHelperDailyMessageLimit;
-                      if (limit <= 0) return true;
-                      final allowed = await NgmyHelperAiLimit.tryConsume(widget.user.email, limit);
-                      if (!allowed) {
-                        if (mounted) {
-                          await _refreshHelperQuota();
-                          setState(() => _kbMode = true);
-                          _goToHubTab(0);
+                      if (!widget.user.isAdmin) {
+                        final fee = NgmyMusicPayments.perSongFeeFromConfig(widget.config);
+                        if (fee > 0 && widget.onAddTransaction != null) {
+                          final paid = await NgmyMusicPayments.confirmAndCharge(
+                            context: context,
+                            user: widget.user,
+                            config: widget.config,
+                            amount: fee,
+                            title: 'NGMY Music Studio',
+                            message: 'AI songwriting — one full song generation',
+                            onCharge: (amount, desc) async {
+                              final charged = ngmyChargeUserWallet(
+                                user: widget.user,
+                                allUsers: widget.allUsers,
+                                amount: amount,
+                                description: desc,
+                                onAddTransaction: widget.onAddTransaction!,
+                              );
+                              if (charged) widget.onDataChanged?.call();
+                              return charged;
+                            },
+                          );
+                          if (!paid) return false;
                         }
-                        return false;
+                        final limit = widget.config.ngmyHelperDailyMessageLimit;
+                        if (limit > 0) {
+                          final allowed = await NgmyHelperAiLimit.tryConsume(widget.user.email, limit);
+                          if (!allowed) {
+                            if (mounted) {
+                              await _refreshHelperQuota();
+                              setState(() => _kbMode = true);
+                              _goToHubTab(0);
+                            }
+                            return false;
+                          }
+                          await _refreshHelperQuota();
+                        }
                       }
-                      await _refreshHelperQuota();
                       return true;
                     },
                   ),

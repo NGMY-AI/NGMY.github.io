@@ -66,13 +66,16 @@ TWIST = one phrase heard two ways (Swahili pun, name split, English flip). Examp
   — Idi Amin Dada (leader) but "dada" = sister; "amezaha" rhymes with shangaha AND means sister gave birth / twist on the name.
 • "KATI YA KISU NA JUA NINI KINA CHOMA" — kisu (knife) vs jua (sun), what burns?
 • "we just live in the moment — atulipi rent" — English freedom vs Swahili "we don't pay rent".
+• "Between my group and a private jet — which one flies?" — fly = looking fly/stylish AND a jet flies.
+• "Where do you live?" / "I live in the moment" — live (where you stay) vs live (in the now).
 
 RULES FOR MIX:
 1. NO line without rhyme — every couplet or quatrain must rhyme tight.
 2. At least 2–3 twist bars per verse (names, homophones, Swahili/English double meaning).
 3. Twist can use historical names, street slang, bible words, or everyday words that flip.
-4. Lines must still MAKE SENSE when you hear both meanings.
+4. Lines must still MAKE SENSE when you hear both meanings — twists must FLOW together, not random words.
 5. Swahili + English can sit in the same bar when the twist lands harder.
+6. When artist gives a rough line, polish it into rhyming twist bars that connect bar-to-bar.
 ''';
 
 bool _isContinueRequest(String text) {
@@ -88,12 +91,47 @@ bool _isContinueRequest(String text) {
       t.contains('tuendelee');
 }
 
+bool _isRewriteRequest(String text) {
+  final t = text.toLowerCase();
+  return t.contains('fix') ||
+      t.contains('rewrite') ||
+      t.contains('re-write') ||
+      t.contains('rhyme better') ||
+      t.contains('better rhyme') ||
+      t.contains('sound better') ||
+      t.contains('improve') ||
+      t.contains('polish') ||
+      t.contains('make it rhyme') ||
+      t.contains('boresha') ||
+      t.contains('rekebisha') ||
+      t.contains('endeleza mistari');
+}
+
+bool _isBibleRequest(String text) {
+  final t = text.toLowerCase();
+  return t.contains('bible') ||
+      t.contains('scripture') ||
+      t.contains('biblia') ||
+      t.contains('andiko') ||
+      t.contains('gospel verse') ||
+      RegExp(r'\b\d+\s*:\s*\d+\b').hasMatch(text) ||
+      RegExp(r'\b(genesis|exodus|leviticus|numbers|deuteronomy|psalm|proverbs|isaiah|jeremiah|matthew|mark|luke|john|romans|corinthians|galatians|ephesians|philippians|revelation)\b', caseSensitive: false).hasMatch(t);
+}
+
+bool _looksLikeUserLyrics(String text) {
+  final lines = text.split('\n').where((l) => l.trim().isNotEmpty).length;
+  return lines >= 3 || (text.length > 100 && text.contains('\n'));
+}
+
 String ngmyMusicAiSystemContext({
   required NgmyMusicLane lane,
   required NgmyMusicRhymeScheme rhyme,
   required NgmyMusicStyleOption? style,
   required bool continuing,
   required bool firstFullSong,
+  required bool rewriteMode,
+  required bool bibleMode,
+  required bool userLyricsMode,
 }) {
   final laneBlock = switch (lane) {
     NgmyMusicLane.swahili =>
@@ -115,10 +153,26 @@ String ngmyMusicAiSystemContext({
           'Add [Verse 3+], extra [Chorus], [Bridge], or [Outro] — pick up the story, same twists, same rhyme scheme. Do NOT restart.\n'
       : '';
 
+  final rewriteBlock = rewriteMode || userLyricsMode
+      ? 'REWRITE / FIX MODE: Artist gave their own lines or asked to fix rhyme, flow, or sound. KEEP their story, topic, and meaning. '
+          'Improve rhymes, twists, punchlines, and how bars connect. Return the FULL improved song — not tips or commentary.\n'
+      : '';
+
+  final bibleBlock = bibleMode
+      ? 'BIBLE MODE: Artist gave a Bible verse or faith topic. Build the FULL song around it. Weave their verse into lyrics. '
+          'Also pick 1–2 OTHER Bible verses on the SAME topic/theme (tag like [Psalm 23:1] or [Romans 8:28]). Keep it musical — not a sermon essay.\n'
+      : '';
+
+  final voiceBlock =
+      'VOICE / TOPIC MODE: Artist may speak or type a raw idea, one line, or a question — treat it as the song seed and deliver polished, rhyming lyrics.\n';
+
   return 'You are NGMY Music AI — elite songwriter for Swahili, English, and MIX twist tracks.\n'
       '$laneBlock\n'
       '${rhyme.aiInstruction}\n'
+      '$voiceBlock'
       '$fullSongBlock'
+      '$rewriteBlock'
+      '$bibleBlock'
       '$continueBlock'
       'Label sections: [Verse 1], [Chorus], etc. Strong rhythm. No explaining rules — only lyrics.\n';
 }
@@ -129,6 +183,7 @@ class NgmyHelperMusicPanel extends StatefulWidget {
   final String userEmail;
   final bool isTypingLocked;
   final Future<bool> Function()? onBeforeSend;
+  final double? perSongFee;
 
   const NgmyHelperMusicPanel({
     super.key,
@@ -136,6 +191,7 @@ class NgmyHelperMusicPanel extends StatefulWidget {
     required this.userEmail,
     this.isTypingLocked = false,
     this.onBeforeSend,
+    this.perSongFee,
   });
 
   @override
@@ -223,9 +279,13 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
     }
 
     HapticFeedback.lightImpact();
+
     final continuing = _isContinueRequest(text);
     final hadAiReplies = _messages.any((m) => m['role'] == 'ai');
     final firstFullSong = !continuing && !hadAiReplies;
+    final rewriteMode = _isRewriteRequest(text) || (_looksLikeUserLyrics(text) && hadAiReplies);
+    final bibleMode = _isBibleRequest(text);
+    final userLyricsMode = _looksLikeUserLyrics(text) && !continuing;
 
     setState(() {
       _messages.add({'role': 'user', 'text': text});
@@ -250,7 +310,7 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
       final transcript = _messages
           .map((m) => '${m['role'] == 'user' ? 'Artist' : 'NGMY Music'}: ${m['text']}')
           .join('\n\n');
-      final prompt = '${ngmyMusicAiSystemContext(lane: _lane, rhyme: _rhyme, style: _activeStyle, continuing: continuing, firstFullSong: firstFullSong)}\n'
+      final prompt = '${ngmyMusicAiSystemContext(lane: _lane, rhyme: _rhyme, style: _activeStyle, continuing: continuing, firstFullSong: firstFullSong, rewriteMode: rewriteMode, bibleMode: bibleMode, userLyricsMode: userLyricsMode)}\n'
           '${transcript.isNotEmpty ? '--- Conversation so far ---\n$transcript\n---\n' : ''}'
           'Artist request: $text';
       final result = await ngmyAiGenerateWithCredentials(creds, prompt);
@@ -367,7 +427,7 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
           Icon(Icons.lyrics_rounded, size: 52, color: _violet.withValues(alpha: 0.5)),
           const SizedBox(height: 14),
           Text(
-            'AI writes a WHOLE song first\nSwipe up ↑ for bigger lyrics view',
+            'Speak or type your idea — AI writes a WHOLE song\nPaste your lyrics to fix rhyme · Bible verses welcome\nSwipe up ↑ for bigger lyrics view',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 14, height: 1.45, color: isDark ? Colors.white54 : Colors.black45, fontWeight: FontWeight.w600),
           ),
@@ -378,7 +438,9 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
             alignment: WrapAlignment.center,
             children: [
               _starterChip('Full bongo love song ABAB', isDark),
-              _starterChip('Mix twist — Idi Amin dada style', isDark),
+              _starterChip('Mix: group vs private jet — which flies?', isDark),
+              _starterChip('Song from John 3:16 + matching verses', isDark),
+              _starterChip('Fix my rhyme — paste your lines', isDark),
             ],
           ),
         ],
@@ -714,6 +776,7 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
   }
 
   Widget _composer(bool isDark) {
+    final fee = widget.perSongFee ?? 0;
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
@@ -722,7 +785,19 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
         color: isDark ? const Color(0xFF0F172A).withValues(alpha: 0.95) : Colors.white,
         border: Border.all(color: _violet.withValues(alpha: 0.2)),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (fee > 0)
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 4),
+              child: Text(
+                '\$${fee.toStringAsFixed(2)} per song · mic for voice input',
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _gold.withValues(alpha: 0.85)),
+              ),
+            ),
+          Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
@@ -733,8 +808,8 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
               style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
               decoration: InputDecoration(
                 hintText: _lane == NgmyMusicLane.mix
-                    ? 'Mix twist song — rhyming double meanings…'
-                    : 'Describe your full song…',
+                    ? 'Mix twist — rhyming double meanings (fly/jet, live/moment)…'
+                    : 'Topic, Bible verse, or paste lyrics to fix…',
                 hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 13),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -758,6 +833,8 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
               ),
             ),
           ),
+        ],
+      ),
         ],
       ),
     );

@@ -8,6 +8,8 @@ const String _kNgmyFamilyTreePaymentSettingsKey = 'family_tree_payment_settings'
 const String _kNgmyFamilyTreePaymentPrefsKey = 'ngmy_family_tree_payment_settings_v1';
 const String _kNgmyInvoicePaymentSettingsKey = 'invoice_payment_settings';
 const String _kNgmyInvoicePaymentPrefsKey = 'ngmy_invoice_payment_settings_v1';
+const String _kNgmyMusicPaymentSettingsKey = 'music_studio_payment_settings';
+const String _kNgmyMusicPaymentPrefsKey = 'ngmy_music_payment_settings_v1';
 const String _kNgmyWalletPaymentSettingsKey = 'wallet_payment_settings';
 const String _kNgmyWalletPaymentPrefsKey = 'ngmy_wallet_payment_settings_v1';
 const String _kNgmyHelperAiSettingsKey = 'ngmy_helper_ai_settings';
@@ -497,6 +499,62 @@ Future<bool> ngmyPersistFamilyTreePaymentSettings(AppConfig config) async {
     } catch (e) {
       debugPrint('[admin payments] config save: $e');
     }
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
+Map<String, dynamic> _musicPaymentPayload(AppConfig config) => {
+      'musicStudioPerSongFee': config.musicStudioPerSongFee,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyMusicPaymentPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+  final fee = payload['musicStudioPerSongFee'];
+  if (fee is num && fee >= 0) config.musicStudioPerSongFee = fee.toDouble();
+}
+
+Future<void> _persistMusicPaymentSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyMusicPaymentPrefsKey, jsonEncode(_musicPaymentPayload(config)));
+  } catch (e) {
+    debugPrint('[admin music payments] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateMusicPaymentsFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyMusicPaymentPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyMusicPaymentPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[admin music payments] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyMusicPaymentSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      _applyMusicPaymentPayload(config, row);
+    }
+  }
+}
+
+/// Authoritative save for Admin → Management → Payments (Music Studio fee).
+Future<bool> ngmyPersistMusicPaymentSettings(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  await _persistMusicPaymentSettingsLocal(config);
+
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _musicPaymentPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyMusicPaymentSettingsKey, payload);
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
   }
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   return cloudOk;
