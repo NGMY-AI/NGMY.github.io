@@ -447,6 +447,37 @@ bool _webSupportsComposedCapture() {
   }
 }
 
+bool _studioNeedsComposition(NgmyVideoStudioExportConfig config) => !config.canDirectDownload;
+
+void _requestCanvasVideoFrame(html.MediaStream? stream) {
+  if (stream == null) return;
+  final tracks = stream.getVideoTracks();
+  if (tracks.isEmpty) return;
+  try {
+    js_util.callMethod(tracks.first, 'requestFrame', const []);
+  } catch (_) {}
+}
+
+Future<void> _cleanupStudioExport({
+  html.CanvasElement? canvas,
+  Iterable<html.VideoElement> videos = const [],
+  Iterable<html.ImageElement> logos = const [],
+}) async {
+  try {
+    canvas?.remove();
+  } catch (_) {}
+  for (final v in videos) {
+    try {
+      v.remove();
+    } catch (_) {}
+  }
+  for (final i in logos) {
+    try {
+      i.remove();
+    } catch (_) {}
+  }
+}
+
 void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video) {
   if (composed.getAudioTracks().isNotEmpty) return;
   video.muted = false;
@@ -542,6 +573,10 @@ Future<String> exportNgmyVideoStudioComposed({
   }
 
   if (!_webSupportsComposedCapture()) {
+    if (_studioNeedsComposition(config)) {
+      return 'Your browser cannot merge studio templates into the video. '
+          'Use Chrome or Edge on a computer for a full export with banners and logos.';
+    }
     onProgress?.call(0.5, 'Saving your video…');
     return _downloadAllVideoClips(sources);
   }
@@ -586,10 +621,11 @@ Future<String> exportNgmyVideoStudioComposed({
     }
   }
 
-  html.CanvasElement? exportCanvas;
-  var usedCanvasStream = false;
+    html.CanvasElement? exportCanvas;
+    html.MediaStream? canvasStream;
+    var manualCanvasFrames = false;
 
-  try {
+    try {
     onProgress?.call(0.06, 'Preparing studio export…');
 
     final metaOk = await Future.wait(videos.values.map(_waitVideoMeta));
@@ -609,10 +645,10 @@ Future<String> exportNgmyVideoStudioComposed({
     final h = config.outputHeight;
     html.ImageElement? bannerOverlay;
     if (config.newsBannerStyle != null) {
-      try {
-        bannerOverlay = await _renderNewsBannerOverlay(config, w, h).timeout(const Duration(seconds: 20));
-      } catch (e) {
-        debugPrint('[studio export] banner overlay failed: $e');
+      bannerOverlay = await _renderNewsBannerOverlay(config, w, h);
+      if (bannerOverlay == null) {
+        await _cleanupStudioExport(canvas: exportCanvas, videos: videos.values, logos: logos.values);
+        return 'Could not render your studio overlay for export. Try again or use Chrome on a computer.';
       }
     }
     exportCanvas = html.CanvasElement(width: w, height: h);
@@ -630,7 +666,12 @@ Future<String> exportNgmyVideoStudioComposed({
       ..style.zIndex = '0';
     html.document.body?.append(canvas);
 
-    final canvasStream = _safeCaptureStream(canvas, fps: _exportCanvasFps);
+    canvasStream = _safeCaptureStream(canvas, fps: _exportCanvasFps);
+    if (canvasStream == null || canvasStream.getVideoTracks().isEmpty) {
+      canvasStream = _safeCaptureStream(canvas, fps: 0);
+      manualCanvasFrames = canvasStream != null && canvasStream.getVideoTracks().isNotEmpty;
+    }
+    var usedCanvasStream = false;
     if (canvasStream != null) {
       for (final t in canvasStream.getVideoTracks()) {
         composed.addTrack(t);
@@ -639,21 +680,9 @@ Future<String> exportNgmyVideoStudioComposed({
     }
 
     if (!usedCanvasStream) {
-      final vStream = _safeCaptureStream(videos.values.first);
-      if (vStream != null) {
-        for (final t in vStream.getVideoTracks()) {
-          composed.addTrack(t);
-        }
-      } else {
-        exportCanvas?.remove();
-        for (final v in videos.values) {
-          v.remove();
-        }
-        for (final i in logos.values) {
-          i.remove();
-        }
-        return _downloadAllVideoClips(sources);
-      }
+      await _cleanupStudioExport(canvas: exportCanvas, videos: videos.values, logos: logos.values);
+      return 'Could not record your studio layout in this browser. '
+          'Use Chrome or Edge on a computer to download with all templates and logos.';
     }
 
     for (final v in videos.values) {
@@ -662,19 +691,14 @@ Future<String> exportNgmyVideoStudioComposed({
     }
 
     if (composed.getTracks().isEmpty) {
-      exportCanvas?.remove();
-      for (final v in videos.values) {
-        v.remove();
-      }
-      for (final i in logos.values) {
-        i.remove();
-      }
-      return _downloadAllVideoClips(sources);
+      await _cleanupStudioExport(canvas: exportCanvas, videos: videos.values, logos: logos.values);
+      return 'Could not start studio recording. Try Chrome or Edge on a computer.';
     }
 
     final mimeType = _pickRecorderMimeType();
     if (mimeType == null) {
-      return _downloadAllVideoClips(sources);
+      await _cleanupStudioExport(canvas: exportCanvas, videos: videos.values, logos: logos.values);
+      return 'Video recording is not supported in this browser. Use Chrome or Edge on a computer.';
     }
 
     final recorderOptions = <String, dynamic>{
@@ -687,7 +711,8 @@ Future<String> exportNgmyVideoStudioComposed({
 
     final recorder = _createMediaRecorder(composed, recorderOptions);
     if (recorder == null) {
-      return _downloadAllVideoClips(sources);
+      await _cleanupStudioExport(canvas: exportCanvas, videos: videos.values, logos: logos.values);
+      return 'Could not start video encoder in this browser. Use Chrome or Edge on a computer.';
     }
 
     final chunks = <html.Blob>[];
@@ -727,23 +752,6 @@ Future<String> exportNgmyVideoStudioComposed({
         final dh = r.height * h;
 
         if (kind == NgmySlotKind.logoAnim) {
-          if (bannerOverlay == null && config.logoVisibleBySlot[e.key] != false) {
-            final logo = logos[e.key];
-            if (logo != null) {
-              final t = ((DateTime.now().millisecondsSinceEpoch - startMs) % 2200) / 2200;
-              _ngmyPaintLogoSlot(
-                ctx,
-                logo,
-                dx,
-                dy,
-                dw,
-                dh,
-                config.slotShapes[e.key] ?? NgmyVideoSlotShape.rect,
-                config.logoFrameStyleBySlot[e.key] ?? NgmyLogoFrameStyle.goldRing,
-                t,
-              );
-            }
-          }
           continue;
         }
 
@@ -774,30 +782,32 @@ Future<String> exportNgmyVideoStudioComposed({
         _drawTextOverlay(ctx, w.toDouble(), h.toDouble(), config);
       }
 
-      if (bannerOverlay != null) {
-        for (final e in config.slotRects.entries) {
-          if ((config.slotKinds[e.key] ?? NgmySlotKind.video) != NgmySlotKind.logoAnim) continue;
-          if (config.logoVisibleBySlot[e.key] == false) continue;
-          final logo = logos[e.key];
-          if (logo == null) continue;
-          final r = e.value;
-          final dx = r.left * w;
-          final dy = r.top * h;
-          final dw = r.width * w;
-          final dh = r.height * h;
-          final t = ((DateTime.now().millisecondsSinceEpoch - startMs) % 2200) / 2200;
-          _ngmyPaintLogoSlot(
-            ctx,
-            logo,
-            dx,
-            dy,
-            dw,
-            dh,
-            config.slotShapes[e.key] ?? NgmyVideoSlotShape.rect,
-            config.logoFrameStyleBySlot[e.key] ?? NgmyLogoFrameStyle.goldRing,
-            t,
-          );
-        }
+      for (final e in config.slotRects.entries) {
+        if ((config.slotKinds[e.key] ?? NgmySlotKind.video) != NgmySlotKind.logoAnim) continue;
+        if (config.logoVisibleBySlot[e.key] == false) continue;
+        final logo = logos[e.key];
+        if (logo == null) continue;
+        final r = e.value;
+        final dx = r.left * w;
+        final dy = r.top * h;
+        final dw = r.width * w;
+        final dh = r.height * h;
+        final t = ((DateTime.now().millisecondsSinceEpoch - startMs) % 2200) / 2200;
+        _ngmyPaintLogoSlot(
+          ctx,
+          logo,
+          dx,
+          dy,
+          dw,
+          dh,
+          config.slotShapes[e.key] ?? NgmyVideoSlotShape.rect,
+          config.logoFrameStyleBySlot[e.key] ?? NgmyLogoFrameStyle.goldRing,
+          t,
+        );
+      }
+
+      if (manualCanvasFrames) {
+        _requestCanvasVideoFrame(canvasStream);
       }
     }
 
@@ -814,7 +824,8 @@ Future<String> exportNgmyVideoStudioComposed({
       recorder.start(_recorderTimesliceMs);
     } catch (e) {
       debugPrint('[studio export] recorder.start failed: $e');
-      return _downloadAllVideoClips(sources);
+      await _cleanupStudioExport(canvas: exportCanvas, videos: videos.values, logos: logos.values);
+      return 'Export failed to start. Try Chrome or Edge on a computer.';
     }
 
     final frameMs = (1000 / _exportCanvasFps).round();
@@ -847,11 +858,8 @@ Future<String> exportNgmyVideoStudioComposed({
     onProgress?.call(1.0, 'Saving your file…');
 
     if (chunks.isEmpty) {
-      debugPrint('[studio export] empty chunks (mime=$mimeType), falling back to raw clips');
-      final raw = await _downloadAllVideoClips(sources);
-      if (raw.contains('failed') || raw.contains('No video')) return raw;
-      return 'Could not build the merged studio file in this browser — saved your original clip instead. '
-          'For full templates use Chrome or Edge on a computer. ($raw)';
+      debugPrint('[studio export] empty chunks (mime=$mimeType)');
+      return 'Export failed — no video data was recorded. Try Chrome or Edge on a computer.';
     }
 
     final apple = _ngmyIsAppleMobileBrowser();
@@ -859,8 +867,8 @@ Future<String> exportNgmyVideoStudioComposed({
     var ext = blobType.contains('webm') ? 'webm' : 'mp4';
     if (apple) {
       if (blobType.contains('webm')) {
-        debugPrint('[studio export] WebM on iOS — falling back to original MP4 clip(s)');
-        return _downloadAllVideoClips(sources);
+        debugPrint('[studio export] WebM on iOS — composed MP4 required');
+        return 'Export format not supported on iPhone. Tap Download again — the app records MP4 with your full studio overlay.';
       }
       blobType = 'video/mp4';
       ext = 'mp4';
@@ -872,18 +880,12 @@ Future<String> exportNgmyVideoStudioComposed({
         await ngmyStageIosStudioVideoFromBlob(blob, filename);
       } catch (e) {
         debugPrint('[studio export] iOS stage failed: $e');
-        return _downloadAllVideoClips(sources);
-      }
-      if (!usedCanvasStream) {
-        return '${_ngmyDownloadResultMessage('ios_pending')} (Full studio merge works best in Chrome on desktop.)';
+        return 'Your video exported with templates but could not open the save sheet. Try again or use Share from the browser menu.';
       }
       return _ngmyDownloadResultMessage('ios_pending');
     }
     final url = html.Url.createObjectUrlFromBlob(blob);
     final mode = await ngmyTriggerBrowserDownload(url, filename);
-    if (!usedCanvasStream) {
-      return '${_ngmyDownloadResultMessage(mode)} (video track — full studio merge needs Chrome/Edge on desktop.)';
-    }
     return _ngmyDownloadResultMessage(mode);
   } catch (e, st) {
     debugPrint('[studio export] composed failed: $e\n$st');
@@ -900,6 +902,9 @@ Future<String> exportNgmyVideoStudioComposed({
         i.remove();
       } catch (_) {}
     }
+    if (_studioNeedsComposition(config)) {
+      return 'Export failed — your templates were not saved. Use Chrome or Edge on a computer and try again.';
+    }
     return _downloadAllVideoClips(sources);
   } finally {
     try {
@@ -914,27 +919,40 @@ Future<String> exportNgmyVideoStudioComposed({
   }
 }
 
-Future<html.ImageElement> _renderNewsBannerOverlay(NgmyVideoStudioExportConfig config, int w, int h) async {
-  final recorder = ui.PictureRecorder();
-  final canvas = Canvas(recorder);
-  NgmyNewsBannerPainter(
-    style: config.newsBannerStyle!,
-    headline: config.headline,
-    title: config.title,
-    subtitle: config.subtitle,
-    liveLabel: config.liveLabel,
-    topAccent: config.newsTopAccent,
-    scale: config.headlineFontScale.clamp(0.6, 1.8),
-    textStyle: config.bannerTextStyle,
-  ).paint(canvas, Size(w.toDouble(), h.toDouble()));
-  final picture = recorder.endRecording();
-  final image = await picture.toImage(w, h);
-  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-  final blob = html.Blob([bytes!.buffer.asUint8List()], 'image/png');
-  final url = html.Url.createObjectUrlFromBlob(blob);
-  final img = html.ImageElement()..src = url;
-  await img.onLoad.first;
-  return img;
+Future<html.ImageElement?> _renderNewsBannerOverlay(NgmyVideoStudioExportConfig config, int w, int h) async {
+  for (final scale in [1.0, 0.75, 0.5]) {
+    final rw = math.max(320, (w * scale).round());
+    final rh = math.max(320, (h * scale).round());
+    try {
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      NgmyNewsBannerPainter(
+        style: config.newsBannerStyle!,
+        headline: config.headline,
+        title: config.title,
+        subtitle: config.subtitle,
+        liveLabel: config.liveLabel,
+        topAccent: config.newsTopAccent,
+        scale: config.headlineFontScale.clamp(0.6, 1.8),
+        textStyle: config.bannerTextStyle,
+      ).paint(canvas, Size(rw.toDouble(), rh.toDouble()));
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(rw, rh).timeout(const Duration(seconds: 25));
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes == null) continue;
+      final blob = html.Blob([bytes.buffer.asUint8List()], 'image/png');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final img = html.ImageElement()
+        ..src = url
+        ..width = w
+        ..height = h;
+      await img.onLoad.first.timeout(const Duration(seconds: 12));
+      return img;
+    } catch (e) {
+      debugPrint('[studio export] banner overlay render scale=$scale failed: $e');
+    }
+  }
+  return null;
 }
 
 void _drawProgramBg(html.CanvasRenderingContext2D ctx, double w, double h, NgmyVideoStudioExportConfig c) {
