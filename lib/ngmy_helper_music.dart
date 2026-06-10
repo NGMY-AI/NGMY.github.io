@@ -58,6 +58,23 @@ const _englishStyles = [
   NgmyMusicStyleOption('afro_eng', 'Afro-Fusion', '🌍', 'English with African bounce — global club ready.'),
 ];
 
+const _mixTwistMasterclass = '''
+MIX TWIST MODE — this is NOT a normal song. Every bar must RHYME and TWIST.
+
+TWIST = one phrase heard two ways (Swahili pun, name split, English flip). Examples:
+• "mambo mengi mpaka wana shangaha" / "kuhona Idi Amin dada amezaha"
+  — Idi Amin Dada (leader) but "dada" = sister; "amezaha" rhymes with shangaha AND means sister gave birth / twist on the name.
+• "KATI YA KISU NA JUA NINI KINA CHOMA" — kisu (knife) vs jua (sun), what burns?
+• "we just live in the moment — atulipi rent" — English freedom vs Swahili "we don't pay rent".
+
+RULES FOR MIX:
+1. NO line without rhyme — every couplet or quatrain must rhyme tight.
+2. At least 2–3 twist bars per verse (names, homophones, Swahili/English double meaning).
+3. Twist can use historical names, street slang, bible words, or everyday words that flip.
+4. Lines must still MAKE SENSE when you hear both meanings.
+5. Swahili + English can sit in the same bar when the twist lands harder.
+''';
+
 bool _isContinueRequest(String text) {
   final t = text.toLowerCase();
   return t.contains('continue') ||
@@ -76,31 +93,34 @@ String ngmyMusicAiSystemContext({
   required NgmyMusicRhymeScheme rhyme,
   required NgmyMusicStyleOption? style,
   required bool continuing,
+  required bool firstFullSong,
 }) {
   final laneBlock = switch (lane) {
     NgmyMusicLane.swahili =>
       'Language: Swahili (East African — Tanzania/Kenya). Style: ${style?.aiHint ?? "general Swahili song"}.',
     NgmyMusicLane.english =>
       'Language: English. Style: ${style?.aiHint ?? "general English song"}.',
-    NgmyMusicLane.mix =>
-      'Language: Swahili–English MIX (code-switching). Drop fire lines with DOUBLE MEANINGS — words that hit in both languages or flip meaning mid-bar. '
-          'Examples of the vibe: "KATI YA KISU NA JUA NINI KINA CHOMA" (knife vs sun — what burns?). '
-          '"We just live in the moment — atulipi rent" (freedom vs broke). '
-          'Use parables, street wisdom, church metaphors, and bars that make listeners rewind. Hard punchlines > safe lines.',
+    NgmyMusicLane.mix => _mixTwistMasterclass,
   };
 
-  final continueBlock = continuing
-      ? 'CONTINUE MODE: The user wants the NEXT part of the SAME song. Read the full lyrics you already wrote in this chat. '
-          'Pick up exactly where you stopped — same topic, same characters, same vibe. Do NOT restart from scratch. '
-          'Label new sections ([Verse 2], [Chorus repeat], [Bridge], [Outro]) and keep the rhyme scheme.\n'
+  final fullSongBlock = firstFullSong
+      ? 'FIRST REQUEST — WRITE A WHOLE COMPLETE SONG NOW. Required sections: [Verse 1], [Verse 2], [Chorus] (repeatable hook), '
+          'and at least one of [Bridge] or [Verse 3]. Optional [Outro]. '
+          'Minimum 20–32 lines of lyrics total. Do NOT give a short teaser, sample, or "here is the start" — deliver the FULL song in one reply. '
+          'User should NOT need Continue just to get a basic complete song.\n'
       : '';
 
-  return 'You are NGMY Music AI — elite songwriter for Swahili, English, and mixed street/gospel/bongo tracks.\n'
+  final continueBlock = continuing
+      ? 'CONTINUE MODE: User wants MORE of the SAME song after your full song. Read all prior lyrics. '
+          'Add [Verse 3+], extra [Chorus], [Bridge], or [Outro] — pick up the story, same twists, same rhyme scheme. Do NOT restart.\n'
+      : '';
+
+  return 'You are NGMY Music AI — elite songwriter for Swahili, English, and MIX twist tracks.\n'
       '$laneBlock\n'
       '${rhyme.aiInstruction}\n'
+      '$fullSongBlock'
       '$continueBlock'
-      'Output singable lyrics with [Verse], [Chorus], [Bridge] labels. Strong rhythm. No lecture about rhyme rules.\n'
-      'When user says continue / endelea / keep going — always extend the existing song in this conversation.\n';
+      'Label sections: [Verse 1], [Chorus], etc. Strong rhythm. No explaining rules — only lyrics.\n';
 }
 
 /// Music studio inside NGMY Helper — lane pickers, sub-styles, rhyme, AI lyrics.
@@ -140,6 +160,10 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
   static const _pink = Color(0xFFEC4899);
   static const _cyan = Color(0xFF22D3EE);
   static const _gold = Color(0xFFFBBF24);
+
+  double get _headerExpandedHeight => _lane == NgmyMusicLane.mix
+      ? (_stylesExpanded ? 340 : 300)
+      : (_stylesExpanded ? 360 : 320);
 
   @override
   void initState() {
@@ -200,6 +224,8 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
 
     HapticFeedback.lightImpact();
     final continuing = _isContinueRequest(text);
+    final hadAiReplies = _messages.any((m) => m['role'] == 'ai');
+    final firstFullSong = !continuing && !hadAiReplies;
 
     setState(() {
       _messages.add({'role': 'user', 'text': text});
@@ -224,7 +250,7 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
       final transcript = _messages
           .map((m) => '${m['role'] == 'user' ? 'Artist' : 'NGMY Music'}: ${m['text']}')
           .join('\n\n');
-      final prompt = '${ngmyMusicAiSystemContext(lane: _lane, rhyme: _rhyme, style: _activeStyle, continuing: continuing)}\n'
+      final prompt = '${ngmyMusicAiSystemContext(lane: _lane, rhyme: _rhyme, style: _activeStyle, continuing: continuing, firstFullSong: firstFullSong)}\n'
           '${transcript.isNotEmpty ? '--- Conversation so far ---\n$transcript\n---\n' : ''}'
           'Artist request: $text';
       final result = await ngmyAiGenerateWithCredentials(creds, prompt);
@@ -243,7 +269,8 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
     }
   }
 
-  void _continueSong() => _send('Continue the song from where you stopped — same vibe, next verse or bridge.');
+  void _continueSong() =>
+      _send('Continue the same song — add another verse, bridge, or outro. Keep the twist rhymes and same story.');
 
   @override
   Widget build(BuildContext context) {
@@ -252,13 +279,188 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
 
     return Container(
       color: bg,
-      child: Column(
+      child: Stack(
         children: [
-          _studioHeader(isDark),
-          Expanded(child: _lyricsFeed(isDark)),
-          if (_messages.isNotEmpty && !_busy) _continueChip(isDark),
-          _composer(isDark),
+          Column(
+            children: [
+              Expanded(child: _scrollableBody(isDark)),
+              _composer(isDark),
+            ],
+          ),
+          if (_messages.isNotEmpty && !_busy)
+            Positioned(
+              right: 14,
+              bottom: 78,
+              child: _floatingContinue(isDark),
+            ),
         ],
+      ),
+    );
+  }
+
+  Widget _scrollableBody(bool isDark) {
+    return CustomScrollView(
+      controller: _scroll,
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      slivers: [
+        SliverAppBar(
+          pinned: false,
+          floating: false,
+          snap: false,
+          automaticallyImplyLeading: false,
+          expandedHeight: _headerExpandedHeight,
+          collapsedHeight: 0,
+          toolbarHeight: 0,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: FlexibleSpaceBar(
+            background: _studioHeader(isDark),
+            collapseMode: CollapseMode.parallax,
+          ),
+        ),
+        if (_messages.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _emptyState(isDark),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 88),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) {
+                  if (_busy && i == _messages.length) {
+                    return Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: _pink.withValues(alpha: 0.9)),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Writing full song…',
+                            style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black45, fontStyle: FontStyle.italic),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return _lyricBubble(_messages[i], isDark);
+                },
+                childCount: _messages.length + (_busy ? 1 : 0),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _emptyState(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.lyrics_rounded, size: 52, color: _violet.withValues(alpha: 0.5)),
+          const SizedBox(height: 14),
+          Text(
+            'AI writes a WHOLE song first\nSwipe up ↑ for bigger lyrics view',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, height: 1.45, color: isDark ? Colors.white54 : Colors.black45, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              _starterChip('Full bongo love song ABAB', isDark),
+              _starterChip('Mix twist — Idi Amin dada style', isDark),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _lyricBubble(Map<String, String> m, bool isDark) {
+    final user = m['role'] == 'user';
+    return Align(
+      alignment: user ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.94),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(18),
+            topRight: const Radius.circular(18),
+            bottomLeft: Radius.circular(user ? 18 : 4),
+            bottomRight: Radius.circular(user ? 4 : 18),
+          ),
+          gradient: user
+              ? LinearGradient(colors: [_violet, _pink.withValues(alpha: 0.85)])
+              : LinearGradient(
+                  colors: isDark
+                      ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                      : [Colors.white, const Color(0xFFF8FAFC)],
+                ),
+          boxShadow: [
+            BoxShadow(
+              color: (user ? _pink : _violet).withValues(alpha: 0.22),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+          ],
+          border: Border.all(color: Colors.white.withValues(alpha: user ? 0.2 : 0.08)),
+        ),
+        child: Text(
+          m['text'] ?? '',
+          style: TextStyle(
+            color: user ? Colors.white : (isDark ? const Color(0xFFE2E8F0) : Colors.black87),
+            fontSize: user ? 13.5 : 15,
+            height: 1.55,
+            fontStyle: user ? FontStyle.normal : FontStyle.italic,
+            fontWeight: user ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _floatingContinue(bool isDark) {
+    return Material(
+      color: Colors.transparent,
+      elevation: 10,
+      shadowColor: _gold.withValues(alpha: 0.55),
+      shape: const StadiumBorder(),
+      child: InkWell(
+        onTap: _busy ? null : _continueSong,
+        customBorder: const StadiumBorder(),
+        child: Ink(
+          decoration: BoxDecoration(
+            shape: BoxShape.rectangle,
+            borderRadius: BorderRadius.circular(28),
+            gradient: LinearGradient(colors: [_gold, const Color(0xFFF59E0B)]),
+            boxShadow: [
+              BoxShadow(color: _gold.withValues(alpha: 0.45), blurRadius: 16, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.fast_forward_rounded, color: Color(0xFF422006), size: 18),
+                SizedBox(width: 6),
+                Text('Continue', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Color(0xFF422006))),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -269,7 +471,7 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
       builder: (context, _) {
         final glow = 0.35 + _pulseCtrl.value * 0.25;
         return Container(
-          margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+          margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
@@ -282,7 +484,6 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
             ),
             boxShadow: [
               BoxShadow(color: _violet.withValues(alpha: glow), blurRadius: 28, spreadRadius: -4, offset: const Offset(0, 8)),
-              BoxShadow(color: _pink.withValues(alpha: glow * 0.6), blurRadius: 18, offset: const Offset(-4, 4)),
             ],
             border: Border.all(color: Colors.white.withValues(alpha: isDark ? 0.08 : 0.5)),
           ),
@@ -298,17 +499,14 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         ShaderMask(
-                          shaderCallback: (r) => const LinearGradient(
-                            colors: [_violet, _pink, _cyan],
-                          ).createShader(r),
+                          shaderCallback: (r) => const LinearGradient(colors: [_violet, _pink, _cyan]).createShader(r),
                           child: const Text(
                             'NGMY Music Studio',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.3),
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white),
                           ),
                         ),
-                        const SizedBox(height: 2),
                         Text(
-                          'Swipe News ↔ Music · Pick language · Write fire',
+                          'Swipe ↑ lyrics bigger · Full song first',
                           style: TextStyle(fontSize: 10, color: isDark ? Colors.white60 : Colors.black54, fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -316,7 +514,7 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   _laneCard(NgmyMusicLane.swahili, 'Swahili', '🇹🇿', isDark),
@@ -327,51 +525,10 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
                 ],
               ),
               if (_lane != NgmyMusicLane.mix) ...[
-                const SizedBox(height: 10),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: _busy ? null : () => setState(() => _stylesExpanded = !_stylesExpanded),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: _cyan.withValues(alpha: 0.35)),
-                      ),
-                      child: Row(
-                        children: [
-                          Text(_activeStyle?.emoji ?? '🎵', style: const TextStyle(fontSize: 18)),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _lane == NgmyMusicLane.swahili ? 'Swahili style' : 'English style',
-                                  style: TextStyle(fontSize: 9, color: isDark ? Colors.white54 : Colors.black45, fontWeight: FontWeight.w700),
-                                ),
-                                Text(
-                                  _activeStyle?.label ?? 'Choose',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            _stylesExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                            color: _cyan,
-                            size: 22,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                AnimatedCrossFade(
-                  firstChild: const SizedBox.shrink(),
-                  secondChild: Padding(
+                const SizedBox(height: 8),
+                _styleDropdown(isDark),
+                if (_stylesExpanded)
+                  Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Wrap(
                       spacing: 6,
@@ -379,27 +536,23 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
                       children: _styleList.map((s) => _styleTile(s, isDark)).toList(),
                     ),
                   ),
-                  crossFadeState: _stylesExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                  duration: const Duration(milliseconds: 220),
-                ),
               ] else
                 Padding(
-                  padding: const EdgeInsets.only(top: 10),
+                  padding: const EdgeInsets.only(top: 8),
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [_pink.withValues(alpha: 0.2), _violet.withValues(alpha: 0.15)]),
+                      gradient: LinearGradient(colors: [_pink.withValues(alpha: 0.22), _violet.withValues(alpha: 0.12)]),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _pink.withValues(alpha: 0.4)),
+                      border: Border.all(color: _pink.withValues(alpha: 0.45)),
                     ),
                     child: Text(
-                      'Mix mode — double meanings, parables, Swahili×English bars that hit twice. '
-                      'e.g. "KATI YA KISU NA JUA…" · "atulipi rent"',
-                      style: TextStyle(fontSize: 10, height: 1.35, color: isDark ? const Color(0xFFFBCFE8) : const Color(0xFF831843), fontWeight: FontWeight.w600),
+                      'Twist rhymes only — e.g. "mambo mengi…shangaha" / "Idi Amin dada amezaha" (dada=sister + name twist)',
+                      style: TextStyle(fontSize: 10, height: 1.35, color: isDark ? const Color(0xFFFBCFE8) : const Color(0xFF831843), fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Row(
                 children: NgmyMusicRhymeScheme.values.map((r) {
                   final sel = _rhyme == r;
@@ -407,8 +560,7 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
                     child: Padding(
                       padding: EdgeInsets.only(right: r != NgmyMusicRhymeScheme.aabb ? 6 : 0),
                       child: Material(
-                        elevation: sel ? 6 : 0,
-                        shadowColor: _violet.withValues(alpha: 0.5),
+                        elevation: sel ? 5 : 0,
                         borderRadius: BorderRadius.circular(12),
                         color: sel
                             ? (isDark ? _violet.withValues(alpha: 0.45) : _violet.withValues(alpha: 0.15))
@@ -417,11 +569,11 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
                           borderRadius: BorderRadius.circular(12),
                           onTap: _busy ? null : () => setState(() => _rhyme = r),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 7),
                             child: Column(
                               children: [
-                                Text(r.label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: sel ? Colors.white : (isDark ? Colors.white70 : Colors.black87))),
-                                Text(r.subtitle, style: TextStyle(fontSize: 8, color: sel ? Colors.white70 : (isDark ? Colors.white38 : Colors.black45))),
+                                Text(r.label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: sel ? Colors.white : (isDark ? Colors.white70 : Colors.black87))),
+                                Text(r.subtitle, style: TextStyle(fontSize: 7, color: sel ? Colors.white70 : (isDark ? Colors.white38 : Colors.black45))),
                               ],
                             ),
                           ),
@@ -438,6 +590,37 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
     );
   }
 
+  Widget _styleDropdown(bool isDark) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: _busy ? null : () => setState(() => _stylesExpanded = !_stylesExpanded),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _cyan.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              Text(_activeStyle?.emoji ?? '🎵', style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _activeStyle?.label ?? 'Style',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87),
+                ),
+              ),
+              Icon(_stylesExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: _cyan, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _vinylBadge() {
     return Transform(
       transform: Matrix4.identity()
@@ -445,17 +628,14 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
         ..rotateY(_pulseCtrl.value * 0.08),
       alignment: Alignment.center,
       child: Container(
-        width: 48,
-        height: 48,
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: const RadialGradient(colors: [Color(0xFF1F2937), Color(0xFF030712)]),
-          boxShadow: [
-            BoxShadow(color: _violet.withValues(alpha: 0.5), blurRadius: 12, offset: const Offset(0, 4)),
-          ],
           border: Border.all(color: _gold.withValues(alpha: 0.6), width: 2),
         ),
-        child: const Icon(Icons.album_rounded, color: _gold, size: 26),
+        child: const Icon(Icons.album_rounded, color: _gold, size: 24),
       ),
     );
   }
@@ -469,8 +649,7 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
     };
     return Expanded(
       child: Material(
-        elevation: sel ? 8 : 1,
-        shadowColor: colors.first.withValues(alpha: 0.45),
+        elevation: sel ? 6 : 0,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
@@ -485,25 +664,16 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
                   }),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               gradient: sel ? LinearGradient(colors: colors) : null,
               color: sel ? null : Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
-              border: Border.all(color: sel ? Colors.white24 : Colors.white10),
             ),
             child: Column(
               children: [
-                Text(flag, style: const TextStyle(fontSize: 18)),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    color: sel ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                  ),
-                ),
+                Text(flag, style: const TextStyle(fontSize: 16)),
+                Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: sel ? Colors.white : (isDark ? Colors.white70 : Colors.black87))),
               ],
             ),
           ),
@@ -515,133 +685,23 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
   Widget _styleTile(NgmyMusicStyleOption s, bool isDark) {
     final sel = _styleId == s.id;
     return Material(
-      elevation: sel ? 4 : 0,
       borderRadius: BorderRadius.circular(20),
       color: sel ? _cyan.withValues(alpha: isDark ? 0.25 : 0.15) : Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: _busy
-            ? null
-            : () {
-                _setStyleId(s.id);
-                HapticFeedback.selectionClick();
-              },
+        onTap: _busy ? null : () => _setStyleId(s.id),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(s.emoji, style: const TextStyle(fontSize: 14)),
-              const SizedBox(width: 5),
-              Text(s.label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
+              Text(s.emoji, style: const TextStyle(fontSize: 13)),
+              const SizedBox(width: 4),
+              Text(s.label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _lyricsFeed(bool isDark) {
-    if (_messages.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.lyrics_rounded, size: 56, color: _violet.withValues(alpha: 0.5)),
-              const SizedBox(height: 16),
-              Text(
-                'Pick Swahili, English, or Mix\nDescribe your song — AI writes the lyrics',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, height: 1.45, color: isDark ? Colors.white54 : Colors.black45, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  _starterChip('Bongo love song ABAB', isDark),
-                  _starterChip('Gospel hook in English', isDark),
-                  _starterChip('Mix — mitaani wordplay', isDark),
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      controller: _scroll,
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-      itemCount: _messages.length + (_busy ? 1 : 0),
-      itemBuilder: (context, i) {
-        if (_busy && i == _messages.length) {
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: _pink.withValues(alpha: 0.9)),
-                ),
-                const SizedBox(width: 10),
-                Text('Composing…', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black45, fontStyle: FontStyle.italic)),
-              ],
-            ),
-          );
-        }
-        final m = _messages[i];
-        final user = m['role'] == 'user';
-        return Align(
-          alignment: user ? Alignment.centerRight : Alignment.centerLeft,
-          child: Transform(
-            transform: Matrix4.identity()..setEntry(3, 2, 0.001)..rotateX(user ? 0 : -0.02),
-            alignment: user ? Alignment.centerRight : Alignment.centerLeft,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.9),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(18),
-                  topRight: const Radius.circular(18),
-                  bottomLeft: Radius.circular(user ? 18 : 4),
-                  bottomRight: Radius.circular(user ? 4 : 18),
-                ),
-                gradient: user
-                    ? LinearGradient(colors: [_violet, _pink.withValues(alpha: 0.85)])
-                    : LinearGradient(
-                        colors: isDark
-                            ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                            : [Colors.white, const Color(0xFFF8FAFC)],
-                      ),
-                boxShadow: [
-                  BoxShadow(
-                    color: (user ? _pink : _violet).withValues(alpha: 0.25),
-                    blurRadius: 14,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-                border: Border.all(color: Colors.white.withValues(alpha: user ? 0.2 : 0.08)),
-              ),
-              child: Text(
-                m['text'] ?? '',
-                style: TextStyle(
-                  color: user ? Colors.white : (isDark ? const Color(0xFFE2E8F0) : Colors.black87),
-                  fontSize: 13.5,
-                  height: 1.5,
-                  fontStyle: user ? FontStyle.normal : FontStyle.italic,
-                  fontWeight: user ? FontWeight.w600 : FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -649,59 +709,18 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
     return ActionChip(
       label: Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
       backgroundColor: _violet.withValues(alpha: isDark ? 0.2 : 0.1),
-      side: BorderSide(color: _violet.withValues(alpha: 0.4)),
       onPressed: _busy ? null : () => _send(label),
-    );
-  }
-
-  Widget _continueChip(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      child: Material(
-        elevation: 6,
-        shadowColor: _gold.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(24),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(24),
-          onTap: _busy ? null : _continueSong,
-          child: Ink(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(colors: [_gold.withValues(alpha: 0.9), const Color(0xFFF59E0B)]),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.fast_forward_rounded, color: Color(0xFF422006), size: 18),
-                  SizedBox(width: 8),
-                  Text('Continue song', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Color(0xFF422006))),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 
   Widget _composer(bool isDark) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 4, 12, 14),
-      padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          colors: isDark
-              ? [const Color(0xFF1E1B4B).withValues(alpha: 0.9), const Color(0xFF0F172A)]
-              : [Colors.white, const Color(0xFFF5F3FF)],
-        ),
-        boxShadow: [
-          BoxShadow(color: _violet.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, -2)),
-        ],
-        border: Border.all(color: _violet.withValues(alpha: 0.25)),
+        borderRadius: BorderRadius.circular(22),
+        color: isDark ? const Color(0xFF0F172A).withValues(alpha: 0.95) : Colors.white,
+        border: Border.all(color: _violet.withValues(alpha: 0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -714,37 +733,28 @@ class _NgmyHelperMusicPanelState extends State<NgmyHelperMusicPanel> with Single
               style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
               decoration: InputDecoration(
                 hintText: _lane == NgmyMusicLane.mix
-                    ? 'Describe your mix — wordplay, parables, fire…'
-                    : 'Describe your ${_lane == NgmyMusicLane.swahili ? "Swahili" : "English"} song…',
+                    ? 'Mix twist song — rhyming double meanings…'
+                    : 'Describe your full song…',
                 hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 13),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               onSubmitted: (_) => _send(),
             ),
           ),
           NgmyVoiceMicButton(controller: _controller, color: _violet),
-          const SizedBox(width: 4),
           Material(
-            elevation: 8,
-            shadowColor: _pink.withValues(alpha: 0.5),
             shape: const CircleBorder(),
             child: InkWell(
               onTap: _busy ? null : () => _send(),
               customBorder: const CircleBorder(),
               child: Ink(
-                width: 46,
-                height: 46,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(colors: [_violet, _pink]),
-                ),
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [_violet, _pink])),
                 child: _busy
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                    ? const Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.send_rounded, color: Colors.white, size: 18),
               ),
             ),
           ),
