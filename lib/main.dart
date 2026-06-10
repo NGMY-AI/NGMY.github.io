@@ -10902,8 +10902,9 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
       animation: _ctrl,
       builder: (context, _) {
         final pulse = 0.55 + (_ctrl.value * 0.45);
+        final shrinkWrap = widget.compact && blocked;
         return Container(
-          width: widget.compact ? double.infinity : null,
+          width: widget.compact && !blocked ? double.infinity : null,
           padding: EdgeInsets.symmetric(
             horizontal: widget.compact ? 10 : 12,
             vertical: widget.compact ? 5 : 8,
@@ -10930,6 +10931,7 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: shrinkWrap ? MainAxisAlignment.center : MainAxisAlignment.start,
             children: [
               Icon(
                 blocked ? Icons.event_busy_rounded : Icons.alarm_rounded,
@@ -10937,15 +10939,14 @@ class _LateClockInBannerState extends State<_LateClockInBanner> with SingleTicke
                 size: widget.compact ? 12 : 14,
               ),
               SizedBox(width: widget.compact ? 5 : 7),
-              Flexible(
-                child: Text(
-                  widget.message,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: widget.compact ? 10 : 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.2,
-                  ),
+              Text(
+                widget.message,
+                textAlign: shrinkWrap ? TextAlign.center : TextAlign.start,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: widget.compact ? 10 : 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
                 ),
               ),
               if (!blocked && penalty > 0) ...[
@@ -12578,7 +12579,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildClockInFrame(bool isLight) {
     final active = widget.user.isClockedIn;
     final alreadyDone = widget.user.alreadyClockedInToday && !active;
-    final circleCentered = active || alreadyDone;
+    final now = DateTime.now();
+    final onTrial = widget.user.isOnFreeTrial;
+    final missedTodayBlocked = !onTrial && _ngmyIsPastNoon(now) && !_ngmyIsWeekend(now) && !active && !alreadyDone;
+    final circleCentered = active || alreadyDone || missedTodayBlocked;
 
     return Container(
       width: double.infinity,
@@ -12601,7 +12605,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
                 Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    padding: EdgeInsets.fromLTRB(6, 8, 6, missedTodayBlocked ? 36 : 8),
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.center,
@@ -12609,6 +12613,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                   ),
                 ),
+                if (missedTodayBlocked)
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: _clockInFooter(context),
+                    ),
+                  ),
               ],
             )
           : Column(
@@ -12785,7 +12797,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     const batterySlotH = 76.0;
     const batteryBodyW = 38.0;
     const batteryBodyH = 56.0;
-    final enlargeCircle = active || alreadyDone;
+    final missedTodayBlocked = !onTrial && missedWindow && !weekend && !active && !alreadyDone;
+    final enlargeCircle = active || alreadyDone || missedTodayBlocked;
     final clockedInScale = enlargeCircle ? 1.28 : 1.0;
     final smokeD = smokeBase * clockedInScale;
     final particleR = particleRBase * clockedInScale;
@@ -13164,7 +13177,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: readyToClockIn ? CrossAxisAlignment.stretch : CrossAxisAlignment.center,
       children: [
         if (readyToClockIn) ...[
           AnimatedBuilder(
@@ -13212,11 +13225,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ],
         if (showLate && lateInfo != null) ...[
           if (readyToClockIn) const SizedBox(height: 4),
-          _LateClockInBanner(
-            message: lateInfo.message,
-            penaltyPercent: lateInfo.penalty,
-            isBlocked: lateInfo.blocked,
-            compact: true,
+          Align(
+            alignment: Alignment.center,
+            child: _LateClockInBanner(
+              message: lateInfo.message,
+              penaltyPercent: lateInfo.penalty,
+              isBlocked: lateInfo.blocked,
+              compact: true,
+            ),
           ),
         ],
       ],
@@ -38925,11 +38941,13 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   bool _memoryLoaded = false;
   bool _newsClosedForUsers = false;
   int _helperRemaining = -1;
+  DateTime? _helperUnlockAt;
   bool _kbMode = false;
   bool _kbVoluntaryBrowse = false;
   List<NgmyHelperKbCategory> _kbCategories = ngmyHelperKbDefaultCategories();
   Timer? _chatGateTimer;
   Timer? _helperQuotaTimer;
+  Timer? _helperCountdownTimer;
   Timer? _newsPollTimer;
   int _unreadNewsInternal = 0;
   List<Announcement> _newsItems = [];
@@ -39005,6 +39023,13 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     return limit > 0 && _helperRemaining == 0;
   }
 
+  Duration get _helperUnlockRemaining {
+    final unlockAt = _helperUnlockAt;
+    if (unlockAt == null) return Duration.zero;
+    final left = unlockAt.difference(DateTime.now());
+    return left.isNegative ? Duration.zero : left;
+  }
+
   void _applyKbAutoSwitch() {
     if (widget.user.isAdmin) return;
     if (_kbLockedByDailyLimit) {
@@ -39032,8 +39057,13 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       return;
     }
     final remaining = await NgmyHelperAiLimit.remaining(widget.user.email, limit);
+    final unlockAt = remaining == 0 ? await NgmyHelperAiLimit.unlockAt(widget.user.email, limit) : null;
     if (mounted) {
-      setState(() => _helperRemaining = remaining);
+      setState(() {
+        _helperRemaining = remaining;
+        _helperUnlockAt = unlockAt;
+      });
+      _syncHelperCountdownTimer();
       _applyKbAutoSwitch();
       if (remaining == 3) {
         unawaited(_maybeShowThreeLeftPopup(remaining));
@@ -39230,6 +39260,21 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _helperQuotaTimer = Timer.periodic(const Duration(seconds: 60), (_) => unawaited(_refreshHelperQuota()));
   }
 
+  void _syncHelperCountdownTimer() {
+    _helperCountdownTimer?.cancel();
+    _helperCountdownTimer = null;
+    if (!_kbLockedByDailyLimit || _helperUnlockAt == null) return;
+    _helperCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_helperUnlockRemaining.inSeconds <= 0) {
+        _helperCountdownTimer?.cancel();
+        unawaited(_refreshHelperQuota());
+        return;
+      }
+      setState(() {});
+    });
+  }
+
   void _startChatGateWatcher() {
     _chatGateTimer?.cancel();
     _chatGateTimer = Timer.periodic(const Duration(seconds: 45), (_) => unawaited(_syncChatClosedFromCloud()));
@@ -39324,6 +39369,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   void dispose() {
     _chatGateTimer?.cancel();
     _helperQuotaTimer?.cancel();
+    _helperCountdownTimer?.cancel();
     _newsPollTimer?.cancel();
     try {
       _newsChannel?.unsubscribe();
@@ -39731,10 +39777,12 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.45)),
                                   ),
-                                  child: const Text(
-                                    'Daily AI limit reached — browse Help Topics below. AI chat unlocks automatically after 24 hours.',
+                                  child: Text(
+                                    _helperUnlockAt != null
+                                        ? 'Daily AI limit reached — browse Help Topics below. AI chat unlocks in ${NgmyHelperAiLimit.formatCountdown(_helperUnlockRemaining)}.'
+                                        : 'Daily AI limit reached — browse Help Topics below. AI chat unlocks automatically after 24 hours.',
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(color: Color(0xFFBBF7D0), fontSize: 11, fontWeight: FontWeight.w600, height: 1.35),
+                                    style: const TextStyle(color: Color(0xFFBBF7D0), fontSize: 11, fontWeight: FontWeight.w600, height: 1.35),
                                   ),
                                 ),
                               ),

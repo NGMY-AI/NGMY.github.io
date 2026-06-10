@@ -56,6 +56,32 @@ class NgmyHelperAiLimit {
     return (dailyLimit - entry.count).clamp(0, dailyLimit);
   }
 
+  /// When the user hit the daily limit, when AI chat unlocks (rolling window end).
+  static Future<DateTime?> unlockAt(String email, int dailyLimit) async {
+    if (dailyLimit <= 0) return null;
+    final key = _key(email);
+    if (key.isEmpty) return null;
+    final map = await _loadUsageMap();
+    final now = DateTime.now();
+    final entry = _normalizeRollingWindow(_entryForEmail(map, email), now);
+    if (entry.count < dailyLimit) return null;
+    return entry.windowStart.add(const Duration(hours: _kWindowHours));
+  }
+
+  static String formatCountdown(Duration remaining) {
+    if (remaining.inSeconds <= 0) return '0s';
+    final h = remaining.inHours;
+    final m = remaining.inMinutes.remainder(60);
+    final s = remaining.inSeconds.remainder(60);
+    if (h > 0) {
+      return '${h}h ${m.toString().padLeft(2, '0')}m ${s.toString().padLeft(2, '0')}s';
+    }
+    if (m > 0) {
+      return '${m}m ${s.toString().padLeft(2, '0')}s';
+    }
+    return '${s}s';
+  }
+
   static String _threeLeftPopupKey(String email, DateTime windowStart) =>
       'ngmy_helper_3left_${_key(email)}_${windowStart.toUtc().toIso8601String()}';
 
