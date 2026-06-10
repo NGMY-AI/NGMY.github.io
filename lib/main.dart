@@ -39212,7 +39212,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   late final PageController _hubPageController;
   DateTime? _lastChatTabTap;
   bool _communicateDropdownOpen = false;
-  bool _communicateMode = false;
   final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _chatController = TextEditingController();
   final TextEditingController _newsController = TextEditingController();
@@ -39680,19 +39679,32 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       return;
     }
     _lastChatTabTap = now;
-    setState(() {
-      _communicateDropdownOpen = false;
-      if (_communicateMode) _communicateMode = false;
-    });
+    setState(() => _communicateDropdownOpen = false);
     _goToHubTab(0);
   }
 
   void _openCommunicateMode() {
-    setState(() {
-      _communicateMode = true;
-      _communicateDropdownOpen = false;
-    });
-    _goToHubTab(0);
+    setState(() => _communicateDropdownOpen = false);
+    ngmyOpenCommunicateWorld(
+      context,
+      user: widget.user,
+      config: widget.config,
+      apiKey: widget.config.geminiApiKey,
+      onChargeWallet: widget.user.isAdmin
+          ? null
+          : (amount, desc) async {
+              if (widget.onAddTransaction == null) return false;
+              final charged = ngmyChargeUserWallet(
+                user: widget.user,
+                allUsers: widget.allUsers,
+                amount: amount,
+                description: desc,
+                onAddTransaction: widget.onAddTransaction!,
+              );
+              if (charged) widget.onDataChanged?.call();
+              return charged;
+            },
+    );
   }
 
   void _goToHubTab(int idx, {bool animate = true}) {
@@ -40154,28 +40166,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                   }
                 },
                 children: [
-                  _communicateMode && (widget.config.communicateEnabled || widget.user.isAdmin)
-                      ? NgmyCommunicatePanel(
-                          user: widget.user,
-                          config: widget.config,
-                          apiKey: widget.config.geminiApiKey,
-                          onBackToChat: () => setState(() => _communicateMode = false),
-                          onChargeWallet: widget.user.isAdmin
-                              ? null
-                              : (amount, desc) async {
-                                  if (widget.onAddTransaction == null) return false;
-                                  final charged = ngmyChargeUserWallet(
-                                    user: widget.user,
-                                    allUsers: widget.allUsers,
-                                    amount: amount,
-                                    description: desc,
-                                    onAddTransaction: widget.onAddTransaction!,
-                                  );
-                                  if (charged) widget.onDataChanged?.call();
-                                  return charged;
-                                },
-                        )
-                      : _shouldShowKb
+                  _shouldShowKb
                       ? Column(
                           children: [
                             if (_kbLockedByDailyLimit)
@@ -40299,7 +40290,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                 ],
               ),
             ),
-            if (_activeTab == 0 && !_shouldShowKb && !_communicateMode)
+            if (_activeTab == 0 && !_shouldShowKb)
               _ngmyGlassComposerBar(
                 isDark: isDark,
                 child: Padding(
@@ -40382,10 +40373,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   Widget _chatTabBtn() {
-    final sel = _activeTab == 0 && !_communicateMode;
-    final commSel = _activeTab == 0 && _communicateMode;
+    final sel = _activeTab == 0;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = commSel ? const Color(0xFFEC4899) : const Color(0xFF00B25A);
     return Expanded(
       child: GestureDetector(
         onTap: _onChatTabTap,
@@ -40393,21 +40382,21 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 11),
           decoration: BoxDecoration(
-            color: (sel || commSel) ? color.withOpacity(isDark ? 0.25 : 0.12) : Colors.transparent,
+            color: sel ? const Color(0xFF00B25A).withOpacity(isDark ? 0.25 : 0.12) : Colors.transparent,
             borderRadius: BorderRadius.circular(11),
-            border: (sel || commSel) ? Border.all(color: color.withOpacity(0.5)) : null,
+            border: sel ? Border.all(color: const Color(0xFF00B25A).withOpacity(0.5)) : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.chat_rounded, size: 17, color: (sel || commSel) ? color : Colors.grey),
+              Icon(Icons.chat_rounded, size: 17, color: sel ? const Color(0xFF00B25A) : Colors.grey),
               const SizedBox(width: 6),
               Text(
-                commSel ? 'Communicate' : 'Chat',
+                'Chat',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
-                  color: (sel || commSel) ? (isDark ? Colors.white : const Color(0xFF111827)) : Colors.grey,
+                  color: sel ? (isDark ? Colors.white : const Color(0xFF111827)) : Colors.grey,
                 ),
               ),
             ],
