@@ -279,7 +279,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
         onChargeWallet: widget.onChargeWallet,
       );
     }
-    final topPad = MediaQuery.paddingOf(context).top + 248;
+    final topPad = MediaQuery.paddingOf(context).top + 300;
     final bottomPad = MediaQuery.paddingOf(context).bottom + 96;
 
     return Scaffold(
@@ -297,7 +297,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
                 _worldHeader(),
                 _welcomeBanner(),
                 _filterMenu(),
-                const SizedBox(height: 14),
+                const SizedBox(height: 22),
               ],
             ),
           ),
@@ -433,7 +433,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
       );
     }
     return GridView.builder(
-      padding: EdgeInsets.fromLTRB(16, topPad, 16, bottomPad),
+      padding: EdgeInsets.fromLTRB(16, topPad + 18, 16, bottomPad),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 14,
@@ -518,25 +518,37 @@ class _Companion3DCard extends StatelessWidget {
                   if (profile.roleBadgeLabel != null)
                     Positioned(top: 8, right: 8, child: _roleBadge(profile.roleBadgeLabel!, small: true)),
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        NgmyCommunicateAvatar(profile: profile, size: 72, glow: true),
-                        const SizedBox(height: 12),
-                        Text(profile.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
-                        const SizedBox(height: 4),
-                        Text(profile.genderLabel, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11)),
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            gradient: const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)]),
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Center(child: NgmyCommunicateAvatar(profile: profile, size: 72, glow: true)),
+                          const SizedBox(height: 12),
+                          Text(
+                            profile.name,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15),
                           ),
-                          child: const Text('Say hi 💬', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          Text(
+                            profile.genderLabel,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              gradient: const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)]),
+                            ),
+                            child: const Text('Say hi 💬', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
