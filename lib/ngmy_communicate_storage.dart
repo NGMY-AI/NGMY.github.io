@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Long-term local storage for Communicate companion chats (months on same device).
@@ -106,5 +108,66 @@ class NgmyCommunicateTimeTracker {
     if (email.trim().isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_key(email), 0);
+  }
+}
+
+/// Offline avatar cache — companion photos stay on device when Wi‑Fi drops.
+class NgmyCommunicateAvatarCache {
+  static String _key(String profileId) => 'ngmy_comm_avatar_${profileId.trim()}';
+
+  static Future<Uint8List?> loadBytes(String profileId) async {
+    if (profileId.trim().isEmpty) return null;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key(profileId));
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return base64Decode(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> saveBytes(String profileId, Uint8List bytes) async {
+    if (profileId.trim().isEmpty || bytes.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key(profileId), base64Encode(bytes));
+  }
+
+  static Future<void> saveFromDataUrl(String profileId, String dataUrl) async {
+    final url = dataUrl.trim();
+    if (!url.startsWith('data:image') || profileId.trim().isEmpty) return;
+    try {
+      final bytes = base64Decode(url.split(',').last);
+      await saveBytes(profileId, bytes);
+    } catch (_) {}
+  }
+
+  static Future<void> ensureCached(String profileId, String avatarUrl) async {
+    if (profileId.trim().isEmpty) return;
+    final existing = await loadBytes(profileId);
+    if (existing != null && existing.isNotEmpty) return;
+
+    final url = avatarUrl.trim();
+    if (url.startsWith('data:image')) {
+      await saveFromDataUrl(profileId, url);
+      return;
+    }
+    if (!url.startsWith('http')) return;
+    try {
+      final resp = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
+      if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty) {
+        await saveBytes(profileId, resp.bodyBytes);
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> cacheAllProfiles(Iterable<dynamic> rawProfiles) async {
+    for (final e in rawProfiles) {
+      if (e is! Map) continue;
+      final id = (e['id'] ?? '').toString().trim();
+      final url = (e['avatarUrl'] ?? e['avatar_url'] ?? '').toString().trim();
+      if (id.isEmpty || url.isEmpty) continue;
+      await ensureCached(id, url);
+    }
   }
 }

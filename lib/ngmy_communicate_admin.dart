@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_communicate.dart';
+import 'ngmy_communicate_storage.dart';
 
 /// Admin → Management → Communicate — create AI companion profiles.
 Future<void> showNgmyCommunicateAdminSheet({
@@ -80,7 +81,7 @@ Future<void> showNgmyCommunicateAdminSheet({
                           leading: NgmyCommunicateAvatar(profile: p, size: 44),
                           title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800)),
                           subtitle: Text(
-                            '${p.gender == 'male' ? 'Male' : 'Female'} · ${p.role == 'companion' ? 'Companion' : p.role == 'therapist' ? 'Therapist' : 'Teacher'} · ${p.active ? 'Active' : 'Hidden'}',
+                            '${p.gender == 'male' ? 'Male' : 'Female'} · ${ngmyCommunicateRoleLabel(p.role)} · ${p.active ? 'Active' : 'Hidden'}',
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -221,15 +222,13 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
                       value: role,
                       decoration: const InputDecoration(
                         labelText: 'Role',
-                        helperText: 'Therapist & teacher get special badges and behavior',
+                        helperText: 'Each role gets a badge and professional behavior',
                         border: OutlineInputBorder(),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'companion', child: Text('Companion')),
-                        DropdownMenuItem(value: 'therapist', child: Text('Therapist')),
-                        DropdownMenuItem(value: 'teacher', child: Text('Teacher')),
-                      ],
-                      onChanged: (v) => setD(() => role = v ?? 'companion'),
+                      items: kNgmyCommunicateRoles.entries
+                          .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                          .toList(),
+                      onChanged: (v) => setD(() => role = ngmyCommunicateNormalizeRole(v ?? 'companion')),
                     ),
                     const SizedBox(height: 10),
                     TextField(
@@ -237,11 +236,15 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
                       maxLines: 3,
                       decoration: InputDecoration(
                         labelText: 'Personality',
-                        helperText: role == 'therapist'
-                            ? 'Warm, professional, comforting…'
-                            : role == 'teacher'
-                                ? 'Patient, encouraging, clear…'
-                                : 'Romantic, playful, jealous, sweet…',
+                        helperText: switch (ngmyCommunicateNormalizeRole(role)) {
+                          'therapist' || 'counselor' => 'Warm, professional, comforting…',
+                          'teacher' => 'Patient, encouraging, clear…',
+                          'lawyer' => 'Sharp, calm, precise…',
+                          'financial_advisor' => 'Practical, trustworthy…',
+                          'pastor' => 'Compassionate, faithful, wise…',
+                          'romantic' => 'Chill at first, real partner energy over time…',
+                          _ => 'Natural human personality for this role…',
+                        },
                         border: const OutlineInputBorder(),
                       ),
                     ),
@@ -269,17 +272,21 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
                 onPressed: () {
                   final name = nameC.text.trim();
                   if (name.isEmpty) return;
+                  final id = existing?.id ?? 'cmp-${DateTime.now().microsecondsSinceEpoch}';
+                  if (avatarUrl.trim().isNotEmpty) {
+                    NgmyCommunicateAvatarCache.saveFromDataUrl(id, avatarUrl);
+                  }
                   Navigator.pop(
                     dCtx,
                     NgmyCommunicateProfile(
-                      id: existing?.id ?? 'cmp-${DateTime.now().microsecondsSinceEpoch}',
+                      id: id,
                       name: name,
                       gender: gender,
                       personality: personalityC.text.trim(),
                       bio: bioC.text.trim(),
                       emoji: emojiC.text.trim().isEmpty ? (gender == 'male' ? '👨' : '👩') : emojiC.text.trim(),
                       avatarUrl: avatarUrl,
-                      role: role,
+                      role: ngmyCommunicateNormalizeRole(role),
                       active: active,
                     ),
                   );
