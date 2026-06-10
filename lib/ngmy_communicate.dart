@@ -279,8 +279,8 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
         onChargeWallet: widget.onChargeWallet,
       );
     }
-    final topPad = MediaQuery.paddingOf(context).top + 200;
-    final bottomPad = MediaQuery.paddingOf(context).bottom + 88;
+    final topPad = MediaQuery.paddingOf(context).top + 248;
+    final bottomPad = MediaQuery.paddingOf(context).bottom + 96;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0612),
@@ -297,6 +297,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
                 _worldHeader(),
                 _welcomeBanner(),
                 _filterMenu(),
+                const SizedBox(height: 14),
               ],
             ),
           ),
@@ -341,38 +342,34 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     return AnimatedBuilder(
       animation: _floatCtrl,
       builder: (context, _) {
-        final lift = _floatCtrl.value * 4;
+        final lift = _floatCtrl.value * 6;
         return Transform.translate(
           offset: Offset(0, -lift),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(22, 10, 22, 6),
-            child: Column(
-              children: [
-                const Text('💕', style: TextStyle(fontSize: 26)),
-                const SizedBox(height: 4),
-                Text(
-                  'Welcome — you belong here',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.95),
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    height: 1.3,
-                    shadows: [Shadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 12)],
-                  ),
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+            child: _loveGlassPanel(
+              borderRadius: BorderRadius.circular(22),
+              fillAlpha: 0.1,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                child: Column(
+                  children: [
+                    const Text('💕', style: TextStyle(fontSize: 28)),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Welcome — you belong here',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, height: 1.3),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Another world of love. Real conversations, real feelings.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12, height: 1.4),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  'Another world of love. Real conversations, real feelings.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.72),
-                    fontSize: 12,
-                    height: 1.4,
-                    shadows: [Shadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 8)],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );
@@ -395,8 +392,8 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
               gradient: sel
                   ? const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)])
                   : null,
-              color: sel ? null : Colors.transparent,
-              border: Border.all(color: sel ? Colors.transparent : Colors.white.withValues(alpha: sel ? 0 : 0.22)),
+              color: sel ? null : Colors.white.withValues(alpha: 0.06),
+              border: Border.all(color: sel ? Colors.transparent : Colors.white.withValues(alpha: 0.12)),
               boxShadow: sel ? [BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.35), blurRadius: 12)] : null,
             ),
             child: Row(
@@ -413,8 +410,15 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      child: Row(children: [chip('all', 'All', Icons.grid_view_rounded), chip('female', 'Girls', Icons.female_rounded), chip('male', 'Guys', Icons.male_rounded)]),
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
+      child: _loveGlassPanel(
+        borderRadius: BorderRadius.circular(18),
+        fillAlpha: 0.08,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          child: Row(children: [chip('all', 'All', Icons.grid_view_rounded), chip('female', 'Girls', Icons.female_rounded), chip('male', 'Guys', Icons.male_rounded)]),
+        ),
+      ),
     );
   }
 
@@ -451,14 +455,21 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
 
   Widget _worldBottomMenu() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _menuItem(Icons.explore_rounded, 'Discover', true),
-          _menuItem(Icons.chat_bubble_rounded, 'Chats', false),
-          _menuItem(Icons.favorite_border_rounded, 'Loved', false),
-        ],
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: _loveGlassPanel(
+        borderRadius: BorderRadius.circular(20),
+        fillAlpha: 0.06,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _menuItem(Icons.explore_rounded, 'Discover', true),
+              _menuItem(Icons.chat_bubble_rounded, 'Chats', false),
+              _menuItem(Icons.favorite_border_rounded, 'Loved', false),
+            ],
+          ),
+        ),
       ),
     );
   }
