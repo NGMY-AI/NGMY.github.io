@@ -21,10 +21,41 @@ void ngmyClearStagedIosStudioVideo() {
   }
 }
 
+bool _ngmyIsAppleMobileBrowser() {
+  final ua = html.window.navigator.userAgent.toLowerCase();
+  return ua.contains('iphone') ||
+      ua.contains('ipad') ||
+      ua.contains('ipod') ||
+      (ua.contains('macintosh') && ua.contains('mobile'));
+}
+
+String _ensureMp4Filename(String filename) {
+  var name = filename.trim().isEmpty ? 'ngmy_video.mp4' : filename.trim();
+  if (name.toLowerCase().endsWith('.webm')) {
+    name = '${name.substring(0, name.length - 5)}.mp4';
+  } else if (!name.toLowerCase().endsWith('.mp4') && !name.toLowerCase().endsWith('.mov')) {
+    name = name.contains('.') ? name.replaceAll(RegExp(r'\.[^.]+$'), '.mp4') : '$name.mp4';
+  }
+  return name;
+}
+
 void ngmyStageIosStudioVideo(String blobUrl, String filename) {
   ngmyClearStagedIosStudioVideo();
   _pendingUrl = blobUrl;
-  _pendingName = filename;
+  _pendingName = _ensureMp4Filename(filename);
+}
+
+/// Stage export for iPhone Photos — always MP4 blob + .mp4 filename.
+Future<void> ngmyStageIosStudioVideoFromBlob(html.Blob blob, String filename) async {
+  ngmyClearStagedIosStudioVideo();
+  final name = _ensureMp4Filename(filename);
+  if (_ngmyIsAppleMobileBrowser() && blob.type.contains('webm')) {
+    throw StateError('WebM cannot be saved to iPhone Photos. Re-export after updating the app.');
+  }
+  final type = blob.type.contains('mp4') || blob.type.contains('quicktime') ? blob.type : 'video/mp4';
+  final ready = (type == blob.type) ? blob : html.Blob([blob], type);
+  _pendingUrl = html.Url.createObjectUrlFromBlob(ready);
+  _pendingName = name;
 }
 
 void ngmyOpenStagedIosStudioVideo() {
@@ -78,17 +109,24 @@ Future<bool> ngmyTryShareStudioVideoUrl(String href, String filename) async {
   try {
     final blob = await _blobFromHref(href);
     if (blob == null || blob.size <= 0) return false;
-    var safeName = filename.trim().isEmpty ? 'ngmy_video.mp4' : filename.trim();
-    if (!safeName.contains('.')) safeName = '$safeName.mp4';
-    final type = blob.type.isNotEmpty ? blob.type : 'video/mp4';
-    final file = html.File([blob], safeName, {'type': type});
+    if (_ngmyIsAppleMobileBrowser() && blob.type.contains('webm')) {
+      return false;
+    }
+    var safeName = _ensureMp4Filename(filename);
+    final type = _ngmyIsAppleMobileBrowser()
+        ? 'video/mp4'
+        : (blob.type.isNotEmpty ? blob.type : 'video/mp4');
+    final shareBlob = _ngmyIsAppleMobileBrowser() && !blob.type.contains('mp4')
+        ? html.Blob([blob], 'video/mp4')
+        : blob;
+    final file = html.File([shareBlob], safeName, {'type': type});
     final shareData = js_util.jsify(<String, Object>{
       'files': [file],
       'title': safeName,
     });
     final nav = html.window.navigator;
     final canShare = js_util.callMethod<bool?>(nav, 'canShare', [shareData]);
-    if (canShare == false) return false;
+    if (canShare == false && !_ngmyIsAppleMobileBrowser()) return false;
     await js_util.promiseToFuture<void>(js_util.callMethod(nav, 'share', [shareData]));
     return true;
   } catch (e) {
@@ -120,6 +158,13 @@ Future<bool> ngmySaveStagedStudioVideo() async {
   final url = _pendingUrl;
   final name = _pendingName ?? 'ngmy_video.mp4';
   if (url == null || url.isEmpty) return false;
+
+  if (_ngmyIsAppleMobileBrowser()) {
+    final blob = await _blobFromHref(url);
+    if (blob != null && blob.type.contains('webm')) {
+      return false;
+    }
+  }
 
   if (await ngmyTryShareStagedStudioVideo()) {
     Future<void>.delayed(const Duration(seconds: 45), ngmyClearStagedIosStudioVideo);

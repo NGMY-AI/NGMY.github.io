@@ -235,7 +235,15 @@ Future<String> ngmyTriggerBrowserDownload(String href, String filename) async {
 
     if (href.startsWith('blob:')) {
       if (_ngmyIsAppleMobileBrowser()) {
-        ngmyStageIosStudioVideo(href, safeName);
+        final blob = await _ngmyBlobFromHref(href);
+        if (blob != null && blob.type.contains('webm')) {
+          return 'iPhone Photos cannot save WebM. Tap Download again — your video will export as MP4.';
+        }
+        if (blob != null) {
+          await ngmyStageIosStudioVideoFromBlob(blob, safeName);
+        } else {
+          ngmyStageIosStudioVideo(href, safeName);
+        }
         return 'ios_pending';
       }
       final anchor = html.AnchorElement()
@@ -372,8 +380,19 @@ Future<bool> _waitVideoCanPlay(html.VideoElement v) async {
   }
 }
 
-/// Chrome often reports video/mp4 as supported but records zero bytes — prefer WebM.
+/// iPhone Photos only accepts MP4/MOV — never record WebM on Apple mobile browsers.
 String? _pickRecorderMimeType() {
+  if (_ngmyIsAppleMobileBrowser()) {
+    for (final m in [
+      'video/mp4',
+      'video/mp4;codecs=avc1,mp4a',
+      'video/mp4;codecs="avc1.42E01E, mp4a.40.2"',
+      'video/mp4;codecs=h264',
+    ]) {
+      if (html.MediaRecorder.isTypeSupported(m)) return m;
+    }
+    return 'video/mp4';
+  }
   for (final m in [
     'video/webm;codecs=vp8,opus',
     'video/webm;codecs=vp9,opus',
@@ -383,6 +402,24 @@ String? _pickRecorderMimeType() {
     if (html.MediaRecorder.isTypeSupported(m)) return m;
   }
   return null;
+}
+
+html.MediaRecorder? _createMediaRecorder(html.MediaStream stream, Map<String, dynamic> options) {
+  final mime = options['mimeType'] as String?;
+  if (mime != null && mime.isNotEmpty) {
+    try {
+      return html.MediaRecorder(stream, options);
+    } catch (e) {
+      debugPrint('[studio export] MediaRecorder($mime) failed: $e');
+    }
+  }
+  try {
+    final fallback = Map<String, dynamic>.from(options)..remove('mimeType');
+    return html.MediaRecorder(stream, fallback.isEmpty ? null : fallback);
+  } catch (e) {
+    debugPrint('[studio export] MediaRecorder default failed: $e');
+    return null;
+  }
 }
 
 Future<void> _stopRecorderDrain(html.MediaRecorder recorder, Completer<void> done) async {
@@ -648,11 +685,8 @@ Future<String> exportNgmyVideoStudioComposed({
       recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
     }
 
-    html.MediaRecorder recorder;
-    try {
-      recorder = html.MediaRecorder(composed, recorderOptions);
-    } catch (e) {
-      debugPrint('[studio export] MediaRecorder ctor failed: $e');
+    final recorder = _createMediaRecorder(composed, recorderOptions);
+    if (recorder == null) {
       return _downloadAllVideoClips(sources);
     }
 
@@ -820,18 +854,32 @@ Future<String> exportNgmyVideoStudioComposed({
           'For full templates use Chrome or Edge on a computer. ($raw)';
     }
 
-    final blobType = mimeType.contains('webm') ? 'video/webm' : 'video/mp4';
+    final apple = _ngmyIsAppleMobileBrowser();
+    var blobType = mimeType.contains('webm') ? 'video/webm' : 'video/mp4';
+    var ext = blobType.contains('webm') ? 'webm' : 'mp4';
+    if (apple) {
+      if (blobType.contains('webm')) {
+        debugPrint('[studio export] WebM on iOS — falling back to original MP4 clip(s)');
+        return _downloadAllVideoClips(sources);
+      }
+      blobType = 'video/mp4';
+      ext = 'mp4';
+    }
     final blob = html.Blob(chunks, blobType);
-    final ext = blobType.contains('webm') ? 'webm' : 'mp4';
     final filename = 'ngmy_${config.format.name}_${config.outputWidth}x${config.outputHeight}_$startMs.$ext';
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    if (_ngmyIsAppleMobileBrowser()) {
-      ngmyStageIosStudioVideo(url, filename);
+    if (apple) {
+      try {
+        await ngmyStageIosStudioVideoFromBlob(blob, filename);
+      } catch (e) {
+        debugPrint('[studio export] iOS stage failed: $e');
+        return _downloadAllVideoClips(sources);
+      }
       if (!usedCanvasStream) {
         return '${_ngmyDownloadResultMessage('ios_pending')} (Full studio merge works best in Chrome on desktop.)';
       }
       return _ngmyDownloadResultMessage('ios_pending');
     }
+    final url = html.Url.createObjectUrlFromBlob(blob);
     final mode = await ngmyTriggerBrowserDownload(url, filename);
     if (!usedCanvasStream) {
       return '${_ngmyDownloadResultMessage(mode)} (video track — full studio merge needs Chrome/Edge on desktop.)';

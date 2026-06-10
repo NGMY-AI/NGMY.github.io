@@ -344,6 +344,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   Future<void> _showIosSaveVideoDialog(String hint) async {
     if (!mounted) return;
     final name = ngmyStagedIosStudioVideoName ?? 'your video';
+    final displayName = name.toLowerCase().endsWith('.webm')
+        ? '${name.substring(0, name.length - 5)}.mp4'
+        : name;
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -351,10 +354,10 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         backgroundColor: const Color(0xFF1A1A2E),
         title: const Text('Save your video', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
         content: Text(
-          'Tap Save below.\n\n'
-          '• iPhone: pick Save Video or Save to Files in the share menu.\n'
-          '• If nothing appears, the video opens in a new tab — tap Share ↗ → Save Video.\n\n'
-          'File: $name',
+          'Tap Save below. Your video is exported as MP4 so it can go into Photos.\n\n'
+          '• In the menu, tap Save Video (or Add to Photos).\n'
+          '• Do not pick "Save to Files" only — choose Save Video for your gallery.\n\n'
+          'File: $displayName',
           style: const TextStyle(color: Colors.white70, height: 1.35, fontSize: 13),
         ),
         actions: [
@@ -372,14 +375,17 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
               final saved = await ngmySaveStagedStudioVideo();
               if (ctx.mounted) Navigator.pop(ctx);
               if (!mounted) return;
+              final wasWebm = name.toLowerCase().endsWith('.webm');
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
                     saved
-                        ? 'Choose Save Video or Save to Files in the menu that opened.'
-                        : 'Video opened in a new tab — tap Share ↗ at the bottom, then Save Video or Add to Photos.',
+                        ? 'In the menu, tap Save Video or Add to Photos.'
+                        : wasWebm
+                            ? 'This file was WebM (not supported in Photos). Tap Download again — the app now exports MP4 for iPhone.'
+                            : 'Video opened — tap Share ↗ at the bottom, then Save Video or Add to Photos.',
                   ),
-                  duration: const Duration(seconds: 8),
+                  duration: const Duration(seconds: 9),
                 ),
               );
             },

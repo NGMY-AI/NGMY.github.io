@@ -6,6 +6,8 @@ void ngmyClearStagedIosStudioVideo() {}
 
 void ngmyStageIosStudioVideo(String blobUrl, String filename) {}
 
+Future<void> ngmyStageIosStudioVideoFromBlob(Object blob, String filename) async {}
+
 void ngmyOpenStagedIosStudioVideo() {}
 
 String? get ngmyStagedIosStudioVideoUrl => null;
