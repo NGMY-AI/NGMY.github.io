@@ -12650,8 +12650,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return Container(
       width: double.infinity,
       height: 248,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      clipBehavior: Clip.antiAlias,
+      padding: EdgeInsets.fromLTRB(10, readyGoldClockIn ? 4 : 8, 10, 8),
+      clipBehavior: readyGoldClockIn ? Clip.none : Clip.antiAlias,
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(25),
@@ -12695,22 +12695,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       child: _clockInNameTag(isLight),
                     ),
                     Expanded(
-                      child: ClipRect(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 1),
-                          child: Align(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return Align(
                             alignment: Alignment.topCenter,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.topCenter,
-                              child: _clock(context),
+                            child: SizedBox(
+                              width: constraints.maxWidth,
+                              height: constraints.maxHeight,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.topCenter,
+                                child: _clock(context),
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
+                      padding: const EdgeInsets.only(top: 2, bottom: 2),
                       child: _clockInFooter(context),
                     ),
                   ],
@@ -12891,7 +12894,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     const batteryBodyH = 56.0;
     final missedTodayBlocked = !onTrial && missedWindow && !weekend && !active && !alreadyDone;
     final enlargeCircle = active || alreadyDone || missedTodayBlocked;
-    final clockedInScale = enlargeCircle ? 1.28 : (readyToClockIn ? 1.42 : 1.0);
+    final clockedInScale = enlargeCircle ? 1.28 : (readyToClockIn ? 1.48 : 1.0);
     final smokeD = smokeBase * clockedInScale;
     final particleR = particleRBase * clockedInScale;
     final outerRingD = outerRingBase * clockedInScale;
