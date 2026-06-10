@@ -10,14 +10,16 @@ class NgmySupabaseColumns {
       'gameInvites,civicSelfEnrollmentEnabled,civicRegistryPin,civicRegistryPinsByState,'
       'openedContributionReceiptKeys,dismissedContributionReceiptKeys,storeSellAccessEmails,'
       'geminiApiKey,gemini_api_key,aiApiKey,ai_api_key,gameTimeLimits,diceSettings,'
-      'familyTreeCreateFee,familyTreePhotoMonthlyFee,familyTreePhotoAccessUntilByEmail,logoUrl';
+      'familyTreeCreateFee,familyTreePhotoMonthlyFee,familyTreePhotoAccessUntilByEmail,logoUrl,'
+      'officialCashApp,officialBitcoin,loanPhone,loanHowItWorks,loanCompanyZelle';
 
   static const configBootstrapCore =
       'id,investmentPlans,ngmyChatClosed,civicSelfEnrollmentEnabled,civicRegistryPin,'
       'civicRegistryPinsByState,storeSellAccessEmails,openedContributionReceiptKeys,'
       'dismissedContributionReceiptKeys,familyTreeCreateFee,familyTreePhotoMonthlyFee,'
       'familyTreePhotoAccessUntilByEmail,geminiApiKey,gemini_api_key,aiApiKey,ai_api_key,'
-      'gameTimeLimits,diceSettings,gameInvites';
+      'gameTimeLimits,diceSettings,gameInvites,officialCashApp,officialBitcoin,'
+      'loanPhone,loanHowItWorks,loanCompanyZelle';
 
   static const configBootstrapHeavy =
       'storeListings,storeInquiries,storeOrders,helpHelperApplications,helpRequests,'

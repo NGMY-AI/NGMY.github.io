@@ -154,8 +154,8 @@ class AppConfig {
   };
 
   factory AppConfig.fromJson(Map<String, dynamic> json) => AppConfig(
-    officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
-    officialBitcoin: json['officialBitcoin'] ?? 'bc1q...',
+    officialCashApp: (json['officialCashApp'] ?? json['official_cash_app'] ?? 'NGMYpay').toString(),
+    officialBitcoin: (json['officialBitcoin'] ?? json['official_bitcoin'] ?? 'bc1q...').toString(),
     termsAndConditions: json['termsAndConditions'] ?? 'Welcome to NGMY. By using our services, you agree to...',
     privacyPolicy: json['privacyPolicy'] ?? 'We value your privacy. We collect data only to...',
     loanPhone: json['loanPhone'] ?? '706-623-7963',

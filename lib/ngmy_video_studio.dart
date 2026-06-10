@@ -13,6 +13,7 @@ import 'ngmy_video_studio_logo.dart';
 import 'ngmy_video_studio_models.dart';
 import 'ngmy_video_studio_painter.dart';
 import 'ngmy_video_studio_picker.dart';
+import 'ngmy_studio_html_video_stub.dart' if (dart.library.html) 'ngmy_studio_html_video.dart' as html_vid;
 import 'ngmy_studio_slot_video.dart';
 import 'ngmy_banner_text_style.dart';
 import 'ngmy_news_banner_painter.dart';
@@ -269,10 +270,23 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       if (picked == null || !picked.hasContent) return;
       await Future<void>.delayed(Duration.zero);
       if (!mounted) return;
+      Uint8List? logoBytes;
+      if (!kIsWeb && picked.filePath != null) {
+        try {
+          final bytes = await File(picked.filePath!).readAsBytes();
+          if (bytes.isNotEmpty) logoBytes = bytes;
+        } catch (e) {
+          debugPrint('[studio] logo bytes read: $e');
+        }
+      }
       setState(() {
         if (picked.filePath != null) {
           _logoPaths[slotId] = picked.filePath!;
-          _logoBytes.remove(slotId);
+          if (logoBytes != null) {
+            _logoBytes[slotId] = logoBytes;
+          } else {
+            _logoBytes.remove(slotId);
+          }
         } else if (picked.bytes != null) {
           _logoBytes[slotId] = picked.bytes!;
           _logoPaths.remove(slotId);
@@ -428,9 +442,11 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         final lower = msg.toLowerCase();
         if (ngmyHasStagedIosStudioVideo || lower.contains('tap open & save')) {
           await _showIosSaveVideoDialog(msg);
-        } else if (lower.startsWith('export failed') || lower.contains('unsupported')) {
+        } else if (lower.startsWith('export failed') ||
+            lower.contains('not added') ||
+            lower.contains('unsupported')) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700),
+            SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700, duration: const Duration(seconds: 9)),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -910,7 +926,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     final src = media?.source;
     Widget child;
     if (src != null && src.isNotEmpty) {
-      child = NgmyStudioSlotVideo(key: ValueKey('${slot.id}|$src'), source: src);
+      child = kIsWeb
+          ? html_vid.NgmyStudioHtmlVideo(key: ValueKey('${slot.id}|$src'), source: src)
+          : NgmyStudioSlotVideo(key: ValueKey('${slot.id}|$src'), source: src);
     } else {
       child = Container(
         color: Colors.black87,
@@ -946,25 +964,55 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     if (rect == null) return const SizedBox.shrink();
     final px = _px(rect, size);
     final active = _activeSlotId == slot.id;
+    final hasVideo = slot.kind == NgmySlotKind.video &&
+        (_slotMedia[slot.id]?.source?.isNotEmpty ?? false);
+
+    void onDrag(DragUpdateDetails d) {
+      setState(() {
+        var r = _slotRects[slot.id]!;
+        var l = (r.left + d.delta.dx / size.width).clamp(0.0, 1.0 - r.width);
+        var t = (r.top + d.delta.dy / size.height).clamp(0.0, 1.0 - r.height);
+        _slotRects[slot.id] = Rect.fromLTWH(l, t, r.width, r.height);
+      });
+    }
+
     return Positioned.fromRect(
       rect: px,
-      child: GestureDetector(
-        onTap: () => setState(() => _activeSlotId = slot.id),
-        onPanUpdate: active
-            ? (d) {
-                setState(() {
-                  var r = _slotRects[slot.id]!;
-                  var l = (r.left + d.delta.dx / size.width).clamp(0.0, 1.0 - r.width);
-                  var t = (r.top + d.delta.dy / size.height).clamp(0.0, 1.0 - r.height);
-                  _slotRects[slot.id] = Rect.fromLTWH(l, t, r.width, r.height);
-                });
-              }
-            : null,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: active ? const Color(0xFFFF3B8A) : Colors.transparent, width: 2),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: active && hasVideo,
+              child: GestureDetector(
+                onTap: () => setState(() => _activeSlotId = slot.id),
+                onPanUpdate: active && !hasVideo ? onDrag : null,
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: active ? const Color(0xFFFF3B8A) : Colors.transparent, width: 2),
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
+          if (active)
+            Positioned(
+              right: 2,
+              bottom: 2,
+              child: GestureDetector(
+                onPanUpdate: onDrag,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.open_with, color: Colors.white, size: 16),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

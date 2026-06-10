@@ -121,12 +121,23 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
     if (_savingPayments) return;
     setState(() => _savingPayments = true);
     try {
-      final ok = await widget.onSavePayments(_cashAppC.text.trim(), _bitcoinC.text.trim());
+      final cash = _cashAppC.text.trim();
+      final btc = _bitcoinC.text.trim();
+      final ok = await widget.onSavePayments(cash, btc);
       if (!mounted) return;
+      widget.config.officialCashApp = cash;
+      widget.config.officialBitcoin = btc;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(ok ? 'Payment settings saved for all users.' : 'Saved locally — connect internet to sync.'),
+          content: Text(
+            ok
+                ? 'Cash App and Bitcoin saved — all users will see these payment addresses.'
+                : btc.isEmpty
+                    ? 'Saved locally — enter a Bitcoin address and connect internet to sync.'
+                    : 'Saved locally — connect internet and tap Save again to sync Bitcoin & Cash App.',
+          ),
           backgroundColor: ok ? const Color(0xFF00B25A) : Colors.orange,
+          duration: const Duration(seconds: 6),
         ),
       );
     } finally {

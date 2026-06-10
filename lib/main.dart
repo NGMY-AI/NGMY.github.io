@@ -1157,8 +1157,8 @@ class AppConfig {
       legacyCities: legacyCities,
     );
     return AppConfig(
-    officialCashApp: json['officialCashApp'] ?? 'NGMYpay',
-    officialBitcoin: json['officialBitcoin'] ?? 'bc1q...',
+    officialCashApp: (json['officialCashApp'] ?? json['official_cash_app'] ?? 'NGMYpay').toString(),
+    officialBitcoin: (json['officialBitcoin'] ?? json['official_bitcoin'] ?? 'bc1q...').toString(),
     termsAndConditions: json['termsAndConditions'] ?? 'Welcome to NGMY. By using our services, you agree to...',
     privacyPolicy: json['privacyPolicy'] ?? 'We value your privacy. We collect data only to...',
     loanPhone: json['loanPhone'] ?? '706-623-7963',
@@ -1913,6 +1913,28 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     next.civicSelfEnrollmentEnabled = record['civicSelfEnrollmentEnabled'] == true;
   } else {
     next.civicSelfEnrollmentEnabled = keep.civicSelfEnrollmentEnabled;
+  }
+
+  if (record.containsKey('officialCashApp') || record.containsKey('official_cash_app')) {
+    final remote = (record['officialCashApp'] ?? record['official_cash_app'] ?? '').toString().trim();
+    if (remote.isNotEmpty) {
+      next.officialCashApp = remote;
+    } else if (keep.officialCashApp.trim().isNotEmpty) {
+      next.officialCashApp = keep.officialCashApp;
+    }
+  } else if (keep.officialCashApp.trim().isNotEmpty) {
+    next.officialCashApp = keep.officialCashApp;
+  }
+
+  if (record.containsKey('officialBitcoin') || record.containsKey('official_bitcoin')) {
+    final remote = (record['officialBitcoin'] ?? record['official_bitcoin'] ?? '').toString().trim();
+    if (remote.isNotEmpty) {
+      next.officialBitcoin = remote;
+    } else if (keep.officialBitcoin.trim().isNotEmpty) {
+      next.officialBitcoin = keep.officialBitcoin;
+    }
+  } else if (keep.officialBitcoin.trim().isNotEmpty) {
+    next.officialBitcoin = keep.officialBitcoin;
   }
 
   if (record.containsKey('familyTreeCreateFee')) {
@@ -6047,9 +6069,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _config.officialCashApp = cashApp.trim();
       _config.officialBitcoin = bitcoin.trim();
     });
-    await ngmyPersistAdminConfigNow(_config);
+    final ok = await ngmyPersistWalletPaymentSettings(_config);
     await _persistLocalOnly();
-    return await ngmyCanReachCloud();
+    if (mounted) setState(() {});
+    return ok;
   }
 
   Future<bool> _upsertAdminInvestmentPlan(InvestmentPlan plan, {InvestmentPlan? replace}) async {
@@ -6135,6 +6158,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateManagementListsFromAllBackups(_config);
     await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
     await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+    await ngmyHydrateWalletPaymentsFromAllBackups(_config);
     await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
     await ngmyHydrateAppBrandingFromAllBackups(_config);
     await ngmyApplyStoreSellAccessFromSettings(_config);
@@ -8671,6 +8695,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         return;
       }
+      if (key == _kNgmyWalletPaymentSettingsKey) {
+        final value = payload.newRecord['value'];
+        if (value is Map) {
+          setState(() => _applyWalletPaymentPayload(_config, Map<String, dynamic>.from(value)));
+          unawaited(_persistWalletPaymentSettingsLocal(_config));
+          unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
+          NgmyAdminLiveRefresh.notify();
+        }
+        return;
+      }
       if (key == _kNgmySettingsChatClosedKey) {
         final value = payload.newRecord['value'];
         if (value is Map) {
@@ -9095,6 +9129,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateManagementListsFromAllBackups(_config);
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+          await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
         } catch (_) {}
@@ -9351,6 +9386,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateManagementListsFromAllBackups(_config);
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+          await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
           _mergeOperationalManagementListsIntoConfig(_config, localConfigSnapshot);

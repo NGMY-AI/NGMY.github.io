@@ -254,6 +254,9 @@ class NgmyVideoStudioExportConfig {
   int get outputWidth => format.exportWidth;
   int get outputHeight => format.exportHeight;
 
+  /// True when templates, logos, text, or backdrop must be baked into the export.
+  bool get needsComposedExport => !canDirectDownload;
+
   /// One local video — download the raw clip directly (templates with text still use composed export).
   bool get canDirectDownload {
     final filled = videoSourcesBySlot.values.where((s) => s.trim().isNotEmpty).length;

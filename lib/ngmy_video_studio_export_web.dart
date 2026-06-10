@@ -496,17 +496,42 @@ void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video)
 }
 
 html.MediaStream? _safeCaptureStream(dynamic element, {int fps = _exportCanvasFps}) {
-  try {
-    if (element is html.CanvasElement) {
-      return element.captureStream(fps);
+  for (var attempt = 0; attempt < 4; attempt++) {
+    try {
+      if (element is html.CanvasElement) {
+        final stream = element.captureStream(fps);
+        if (stream.getVideoTracks().isNotEmpty) return stream;
+      } else if (element is html.VideoElement) {
+        final stream = element.captureStream();
+        if (stream.getVideoTracks().isNotEmpty) return stream;
+      }
+    } catch (e) {
+      debugPrint('[studio export] captureStream attempt ${attempt + 1}: $e');
     }
-    if (element is html.VideoElement) {
-      return element.captureStream();
+    if (attempt < 3) {
+      // Safari sometimes needs a painted frame before captureStream works.
+      try {
+        if (element is html.CanvasElement) {
+          element.context2D.fillRect(0, 0, 1, 1);
+        }
+      } catch (_) {}
     }
-  } catch (e) {
-    debugPrint('[studio export] captureStream failed: $e');
   }
   return null;
+}
+
+Future<String> _fallbackComposedExport(
+  NgmyVideoStudioExportConfig config,
+  Map<String, String> sources, {
+  String? reason,
+}) async {
+  if (config.needsComposedExport) {
+    final detail = reason?.trim();
+    final suffix = detail != null && detail.isNotEmpty ? ' ($detail)' : '';
+    return 'Export failed: your template, text, and logo were not added to the video$suffix. '
+        'Open NGMY in Chrome or Edge on a computer, then tap Download again.';
+  }
+  return _downloadAllVideoClips(sources);
 }
 
 Future<String> _downloadAllVideoClips(Map<String, String> sources) async {
@@ -558,7 +583,7 @@ Future<String> exportNgmyVideoStudioComposed({
 
   if (!_webSupportsComposedCapture()) {
     onProgress?.call(0.5, 'Saving your video…');
-    return _downloadAllVideoClips(sources);
+    return _fallbackComposedExport(config, sources, reason: 'browser cannot capture canvas');
   }
 
   onProgress?.call(0.02, 'Loading your video…');
@@ -636,13 +661,13 @@ Future<String> exportNgmyVideoStudioComposed({
     final composed = html.MediaStream();
     canvas
       ..style.position = 'fixed'
-      ..style.left = '0'
+      ..style.left = '-12000px'
       ..style.top = '0'
-      ..style.opacity = '0.01'
+      ..style.opacity = '1'
       ..style.width = '${w}px'
       ..style.height = '${h}px'
       ..style.pointerEvents = 'none'
-      ..style.zIndex = '-1';
+      ..style.zIndex = '1';
     html.document.body?.append(canvas);
 
     var stopped = false;
@@ -742,6 +767,16 @@ Future<String> exportNgmyVideoStudioComposed({
     }
 
     if (!usedCanvasStream) {
+      if (config.needsComposedExport) {
+        exportCanvas?.remove();
+        for (final v in videos.values) {
+          v.remove();
+        }
+        for (final i in logos.values) {
+          i.remove();
+        }
+        return _fallbackComposedExport(config, sources, reason: 'canvas capture unavailable on this device');
+      }
       final vStream = _safeCaptureStream(videos.values.first);
       if (vStream != null) {
         for (final t in vStream.getVideoTracks()) {
@@ -755,7 +790,7 @@ Future<String> exportNgmyVideoStudioComposed({
         for (final i in logos.values) {
           i.remove();
         }
-        return _downloadAllVideoClips(sources);
+        return _fallbackComposedExport(config, sources, reason: 'video stream unavailable');
       }
     }
 
@@ -772,12 +807,12 @@ Future<String> exportNgmyVideoStudioComposed({
       for (final i in logos.values) {
         i.remove();
       }
-      return _downloadAllVideoClips(sources);
+      return _fallbackComposedExport(config, sources, reason: 'no media tracks');
     }
 
     final mimeType = _pickRecorderMimeType();
     if (mimeType == null) {
-      return _downloadAllVideoClips(sources);
+      return _fallbackComposedExport(config, sources, reason: 'recording not supported');
     }
 
     final appleMobile = _ngmyIsAppleMobileBrowser();
@@ -791,7 +826,7 @@ Future<String> exportNgmyVideoStudioComposed({
 
     final recorder = _createMediaRecorder(composed, recorderOptions);
     if (recorder == null) {
-      return _downloadAllVideoClips(sources);
+      return _fallbackComposedExport(config, sources, reason: 'recorder failed');
     }
 
     final chunks = <html.Blob>[];
@@ -815,7 +850,7 @@ Future<String> exportNgmyVideoStudioComposed({
       }
     } catch (e) {
       debugPrint('[studio export] recorder.start failed: $e');
-      return _downloadAllVideoClips(sources);
+      return _fallbackComposedExport(config, sources, reason: 'recorder start failed');
     }
 
     if (appleMobile) {
@@ -826,11 +861,25 @@ Future<String> exportNgmyVideoStudioComposed({
     final totalFrames = (durationSec * _exportCanvasFps).ceil().clamp(12, (_maxRecordSeconds * _exportCanvasFps).round());
     onProgress?.call(0.1, 'Exporting… 0%');
 
+    for (final v in videos.values) {
+      try {
+        v.muted = true;
+        await v.play();
+      } catch (e) {
+        debugPrint('[studio export] video play for export: $e');
+      }
+    }
+
     for (var frame = 0; frame < totalFrames; frame++) {
       if (stopped) break;
       final t = frame / _exportCanvasFps;
       for (final v in videos.values) {
         await _seekVideoTo(v, t);
+        if (v.paused) {
+          try {
+            await v.play();
+          } catch (_) {}
+        }
       }
       paintFrame();
       final p = (frame + 1) / totalFrames;
@@ -858,11 +907,8 @@ Future<String> exportNgmyVideoStudioComposed({
     onProgress?.call(1.0, 'Saving your file…');
 
     if (chunks.isEmpty) {
-      debugPrint('[studio export] empty chunks (mime=$mimeType), falling back to raw clips');
-      final raw = await _downloadAllVideoClips(sources);
-      if (raw.contains('failed') || raw.contains('No video')) return raw;
-      return 'Saved your video — studio overlay could not be merged on this device. '
-          'For templates baked in, use Chrome on a computer. ($raw)';
+      debugPrint('[studio export] empty chunks (mime=$mimeType)');
+      return _fallbackComposedExport(config, sources, reason: 'recording produced no data');
     }
 
     final apple = _ngmyIsAppleMobileBrowser();
@@ -871,7 +917,7 @@ Future<String> exportNgmyVideoStudioComposed({
     if (apple) {
       if (blobType.contains('webm')) {
         debugPrint('[studio export] WebM on iOS — falling back to original MP4 clip(s)');
-        return _downloadAllVideoClips(sources);
+        return _fallbackComposedExport(config, sources, reason: 'iPhone needs MP4 export');
       }
       blobType = 'video/mp4';
       ext = 'mp4';
@@ -883,7 +929,7 @@ Future<String> exportNgmyVideoStudioComposed({
         await ngmyStageIosStudioVideoFromBlob(blob, filename);
       } catch (e) {
         debugPrint('[studio export] iOS stage failed: $e');
-        return _downloadAllVideoClips(sources);
+        return _fallbackComposedExport(config, sources, reason: 'could not stage video on iPhone');
       }
       if (!usedCanvasStream) {
         return '${_ngmyDownloadResultMessage('ios_pending')} (Full studio merge works best in Chrome on desktop.)';
@@ -911,7 +957,7 @@ Future<String> exportNgmyVideoStudioComposed({
         i.remove();
       } catch (_) {}
     }
-    return _downloadAllVideoClips(sources);
+    return _fallbackComposedExport(config, sources, reason: 'export crashed');
   } finally {
     try {
       exportCanvas?.remove();

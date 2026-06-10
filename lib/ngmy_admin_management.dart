@@ -8,6 +8,8 @@ const String _kNgmyFamilyTreePaymentSettingsKey = 'family_tree_payment_settings'
 const String _kNgmyFamilyTreePaymentPrefsKey = 'ngmy_family_tree_payment_settings_v1';
 const String _kNgmyInvoicePaymentSettingsKey = 'invoice_payment_settings';
 const String _kNgmyInvoicePaymentPrefsKey = 'ngmy_invoice_payment_settings_v1';
+const String _kNgmyWalletPaymentSettingsKey = 'wallet_payment_settings';
+const String _kNgmyWalletPaymentPrefsKey = 'ngmy_wallet_payment_settings_v1';
 const String _kNgmyHelperAiSettingsKey = 'ngmy_helper_ai_settings';
 const String _kNgmyHelperAiPrefsKey = 'ngmy_helper_ai_settings_v1';
 const String _kNgmyAppBrandingSettingsKey = 'ngmy_app_branding';
@@ -350,6 +352,86 @@ Future<bool> ngmyPersistInvoicePaymentSettings(AppConfig config) async {
   return cloudOk;
 }
 
+Map<String, dynamic> _walletPaymentPayload(AppConfig config) => {
+      'officialCashApp': config.officialCashApp.trim(),
+      'officialBitcoin': config.officialBitcoin.trim(),
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyWalletPaymentPayload(AppConfig config, Map<String, dynamic> payload) {
+  final cash = (payload['officialCashApp'] ?? payload['official_cash_app'] ?? '').toString().trim();
+  final btc = (payload['officialBitcoin'] ?? payload['official_bitcoin'] ?? '').toString().trim();
+  if (cash.isNotEmpty) config.officialCashApp = cash;
+  if (btc.isNotEmpty) config.officialBitcoin = btc;
+}
+
+Future<void> _persistWalletPaymentSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyWalletPaymentPrefsKey, jsonEncode(_walletPaymentPayload(config)));
+  } catch (e) {
+    debugPrint('[admin wallet payments] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateWalletPaymentsFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyWalletPaymentPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyWalletPaymentPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[admin wallet payments] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyWalletPaymentSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      _applyWalletPaymentPayload(config, row);
+    }
+    try {
+      final cfg = await _fetchNgmyConfigRow(columns: 'officialCashApp,officialBitcoin');
+      if (cfg != null) {
+        _applyWalletPaymentPayload(config, cfg);
+      }
+    } catch (e) {
+      debugPrint('[admin wallet payments] config hydrate: $e');
+    }
+  }
+}
+
+/// Authoritative save for Admin → Wallet → Payments (Cash App + Bitcoin for all users).
+Future<bool> ngmyPersistWalletPaymentSettings(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  await _persistWalletPaymentSettingsLocal(config);
+
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _walletPaymentPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyWalletPaymentSettingsKey, payload);
+    for (final entry in <String, String>{
+      'officialCashApp': config.officialCashApp.trim(),
+      'officialBitcoin': config.officialBitcoin.trim(),
+    }.entries) {
+      try {
+        await Supabase.instance.client.from('config').upsert({
+          'id': kNgmyConfigRowId,
+          entry.key: entry.value,
+        });
+        cloudOk = true;
+      } catch (e) {
+        debugPrint('[admin wallet payments] config column ${entry.key}: $e');
+      }
+    }
+    cloudOk = await _persistOperationalConfigToCloud(config) || cloudOk;
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
 Future<void> _persistFamilyTreePaymentSettingsLocal(AppConfig config) async {
   try {
     final prefs = await SharedPreferences.getInstance();
@@ -629,6 +711,7 @@ Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
   await ngmyHydrateManagementListsFromAllBackups(config);
   await ngmyHydrateFamilyTreePaymentsFromAllBackups(config);
   await ngmyHydrateInvoicePaymentsFromAllBackups(config);
+  await ngmyHydrateWalletPaymentsFromAllBackups(config);
   final snapshot = AppConfig.fromJson(config.toJson());
 
   if (await ngmyCanReachCloud()) {
