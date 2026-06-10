@@ -12687,30 +12687,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ],
             )
           : readyGoldClockIn
-              ? Stack(
-                  clipBehavior: Clip.hardEdge,
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Align(
                       alignment: Alignment.topLeft,
                       child: _clockInNameTag(isLight),
                     ),
-                    Positioned(
-                      top: 24,
-                      left: 2,
-                      right: 2,
-                      bottom: 48,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.topCenter,
-                        child: _clock(context),
+                    Expanded(
+                      child: ClipRect(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 1),
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.topCenter,
+                              child: _clock(context),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: _clockInFooter(context),
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: _clockInFooter(context),
                     ),
                   ],
                 )
@@ -12890,7 +12891,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     const batteryBodyH = 56.0;
     final missedTodayBlocked = !onTrial && missedWindow && !weekend && !active && !alreadyDone;
     final enlargeCircle = active || alreadyDone || missedTodayBlocked;
-    final clockedInScale = enlargeCircle ? 1.28 : (readyToClockIn ? 1.36 : 1.0);
+    final clockedInScale = enlargeCircle ? 1.28 : (readyToClockIn ? 1.42 : 1.0);
     final smokeD = smokeBase * clockedInScale;
     final particleR = particleRBase * clockedInScale;
     final outerRingD = outerRingBase * clockedInScale;
