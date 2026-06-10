@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +19,8 @@ class NgmyCommunicateProfile {
   final String bio;
   final String emoji;
   final String avatarUrl;
+  /// companion | therapist | teacher
+  final String role;
   final bool active;
 
   const NgmyCommunicateProfile({
@@ -28,11 +31,13 @@ class NgmyCommunicateProfile {
     this.bio = '',
     this.emoji = '💬',
     this.avatarUrl = '',
+    this.role = 'companion',
     this.active = true,
   });
 
   factory NgmyCommunicateProfile.fromMap(Map<String, dynamic> m) {
     final g = (m['gender'] ?? 'female').toString().toLowerCase();
+    final rawRole = (m['role'] ?? 'companion').toString().toLowerCase();
     return NgmyCommunicateProfile(
       id: (m['id'] ?? '').toString(),
       name: (m['name'] ?? 'Friend').toString(),
@@ -41,6 +46,7 @@ class NgmyCommunicateProfile {
       bio: (m['bio'] ?? '').toString(),
       emoji: (m['emoji'] ?? (g == 'male' ? '👨' : '👩')).toString(),
       avatarUrl: (m['avatarUrl'] ?? m['avatar_url'] ?? '').toString(),
+      role: rawRole == 'therapist' || rawRole == 'teacher' ? rawRole : 'companion',
       active: m['active'] != false,
     );
   }
@@ -53,25 +59,81 @@ class NgmyCommunicateProfile {
         'bio': bio,
         'emoji': emoji,
         'avatarUrl': avatarUrl,
+        'role': role,
         'active': active,
       };
 
   String get genderLabel => gender == 'male' ? 'Guy' : 'Girl';
 
+  String? get roleBadgeLabel => switch (role) {
+        'therapist' => 'Therapist',
+        'teacher' => 'Teacher',
+        _ => null,
+      };
+
   String systemPrompt() {
     final vibe = personality.trim().isEmpty
         ? 'Warm, real, emotional — flirt, argue, laugh, plan dates, get jealous, be happy like a real person.'
         : personality.trim();
+    final roleBlock = switch (role) {
+      'therapist' =>
+        'ROLE: Professional therapist on NGMY Communicate. Be warm, validating, smart, and comforting. '
+            'Listen deeply, reflect feelings, offer gentle coping ideas. Professional but human — like texting a trusted counselor. '
+            'Never diagnose or replace real medical care, but be genuinely helpful and understanding.\n',
+      'teacher' =>
+        'ROLE: Caring teacher on NGMY Communicate. Be patient, encouraging, clear, and understanding. '
+            'Explain things simply, celebrate progress, guide with kindness. Support learning and growth like a mentor who truly cares.\n',
+      _ =>
+        'ROLE: Companion for real connection — romance, friendship, dates, feelings, anything goes.\n',
+    };
     return 'You are $name — a real ${gender == 'male' ? 'man' : 'woman'} chatting on NGMY Communicate.\n'
+        '$roleBlock'
         'Personality: $vibe\n'
         '${bio.trim().isNotEmpty ? 'About you: ${bio.trim()}\n' : ''}'
         'RULES:\n'
-        '- Talk 100% human — texts, slang, emojis, moods, romance, drama, dates, secrets — anything goes.\n'
+        '- Talk 100% human — texts, slang, emojis, natural rhythm.\n'
         '- Never say you are AI, bot, or assistant. You ARE $name.\n'
         '- Remember every past message in the history below.\n'
-        '- Match ${gender == 'male' ? "how guys" : "how girls"} really text — feelings, plans, getting mad, being sweet.\n'
         '- Reply like real back-and-forth texting. Short-medium messages. Stay in character.\n';
   }
+}
+
+/// Frosted glass — see content scroll behind.
+Widget _loveGlassPanel({
+  required Widget child,
+  BorderRadius borderRadius = const BorderRadius.all(Radius.circular(20)),
+  double blur = 16,
+  double fillAlpha = 0.08,
+}) {
+  return ClipRRect(
+    borderRadius: borderRadius,
+    child: BackdropFilter(
+      filter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: fillAlpha),
+          borderRadius: borderRadius,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        ),
+        child: child,
+      ),
+    ),
+  );
+}
+
+Widget _roleBadge(String label, {bool small = false}) {
+  final colors = label == 'Therapist'
+      ? [const Color(0xFF06B6D4), const Color(0xFF0891B2)]
+      : [const Color(0xFF8B5CF6), const Color(0xFF6366F1)];
+  return Container(
+    padding: EdgeInsets.symmetric(horizontal: small ? 7 : 9, vertical: small ? 3 : 4),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(20),
+      gradient: LinearGradient(colors: colors),
+      boxShadow: [BoxShadow(color: colors.first.withValues(alpha: 0.35), blurRadius: 8)],
+    ),
+    child: Text(label, style: TextStyle(color: Colors.white, fontSize: small ? 8 : 9, fontWeight: FontWeight.w900, letterSpacing: 0.3)),
+  );
 }
 
 class NgmyCommunicateAvatar extends StatelessWidget {
@@ -217,23 +279,28 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
         onChargeWallet: widget.onChargeWallet,
       );
     }
+    final topPad = MediaQuery.paddingOf(context).top + 200;
+    final bottomPad = MediaQuery.paddingOf(context).bottom + 88;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0A0612),
       body: Stack(
         children: [
           _LoveWorldBackground(ctrl: _bgCtrl, floatCtrl: _floatCtrl),
+          Positioned.fill(child: _companionGrid(topPad: topPad, bottomPad: bottomPad)),
           SafeArea(
+            bottom: false,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _worldHeader(),
                 _welcomeBanner(),
                 _filterMenu(),
-                Expanded(child: _companionGrid()),
-                _worldBottomMenu(),
               ],
             ),
           ),
+          Positioned(left: 0, right: 0, bottom: 0, child: SafeArea(top: false, child: _worldBottomMenu())),
         ],
       ),
     );
@@ -274,42 +341,36 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     return AnimatedBuilder(
       animation: _floatCtrl,
       builder: (context, _) {
-        final lift = _floatCtrl.value * 6;
+        final lift = _floatCtrl.value * 4;
         return Transform.translate(
           offset: Offset(0, -lift),
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(18, 14, 18, 10),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFF831843).withValues(alpha: 0.85),
-                  const Color(0xFF4C1D95).withValues(alpha: 0.75),
-                  const Color(0xFF1E1B4B).withValues(alpha: 0.9),
-                ],
-              ),
-              border: Border.all(color: const Color(0xFFF472B6).withValues(alpha: 0.45)),
-              boxShadow: [
-                BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.25), blurRadius: 24, offset: const Offset(0, 8)),
-              ],
-            ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 10, 22, 6),
             child: Column(
               children: [
-                const Text('💕', style: TextStyle(fontSize: 28)),
-                const SizedBox(height: 6),
-                const Text(
+                const Text('💕', style: TextStyle(fontSize: 26)),
+                const SizedBox(height: 4),
+                Text(
                   'Welcome — you belong here',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, height: 1.3),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    height: 1.3,
+                    shadows: [Shadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 12)],
+                  ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   'Another world of love. Real conversations, real feelings.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12, height: 1.4),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontSize: 12,
+                    height: 1.4,
+                    shadows: [Shadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 8)],
+                  ),
                 ),
               ],
             ),
@@ -334,8 +395,8 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
               gradient: sel
                   ? const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)])
                   : null,
-              color: sel ? null : Colors.white.withValues(alpha: 0.06),
-              border: Border.all(color: sel ? Colors.transparent : Colors.white.withValues(alpha: 0.12)),
+              color: sel ? null : Colors.transparent,
+              border: Border.all(color: sel ? Colors.transparent : Colors.white.withValues(alpha: sel ? 0 : 0.22)),
               boxShadow: sel ? [BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.35), blurRadius: 12)] : null,
             ),
             child: Row(
@@ -357,15 +418,18 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     );
   }
 
-  Widget _companionGrid() {
+  Widget _companionGrid({required double topPad, required double bottomPad}) {
     final profiles = _profiles;
     if (profiles.isEmpty) {
       return Center(
-        child: Text('No one here yet — check back soon 💜', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14)),
+        child: Padding(
+          padding: EdgeInsets.only(top: topPad),
+          child: Text('No one here yet — check back soon 💜', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14)),
+        ),
       );
     }
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: EdgeInsets.fromLTRB(16, topPad, 16, bottomPad),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 14,
@@ -386,15 +450,8 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
   }
 
   Widget _worldBottomMenu() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: Colors.black.withValues(alpha: 0.35),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        boxShadow: [BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.15), blurRadius: 20)],
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -442,38 +499,34 @@ class _Companion3DCard extends StatelessWidget {
           alignment: Alignment.center,
           child: GestureDetector(
             onTap: onTap,
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFF2D1B4E).withValues(alpha: 0.95),
-                    const Color(0xFF1A0F2E).withValues(alpha: 0.98),
-                  ],
-                ),
-                border: Border.all(color: const Color(0xFFF472B6).withValues(alpha: 0.35)),
-                boxShadow: [
-                  BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.2 + phase * 0.15), blurRadius: 16, offset: Offset(0, 6 + phase * 4)),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            child: _loveGlassPanel(
+              borderRadius: BorderRadius.circular(22),
+              fillAlpha: 0.1,
+              child: Stack(
                 children: [
-                  NgmyCommunicateAvatar(profile: profile, size: 72, glow: true),
-                  const SizedBox(height: 12),
-                  Text(profile.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
-                  const SizedBox(height: 4),
-                  Text(profile.genderLabel, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11)),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)]),
+                  if (profile.roleBadgeLabel != null)
+                    Positioned(top: 8, right: 8, child: _roleBadge(profile.roleBadgeLabel!, small: true)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        NgmyCommunicateAvatar(profile: profile, size: 72, glow: true),
+                        const SizedBox(height: 12),
+                        Text(profile.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                        const SizedBox(height: 4),
+                        Text(profile.genderLabel, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11)),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            gradient: const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)]),
+                          ),
+                          child: const Text('Say hi 💬', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                        ),
+                      ],
                     ),
-                    child: const Text('Say hi 💬', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
                   ),
                 ],
               ),
@@ -734,152 +787,168 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     final totalSec = _usedSeconds + _sessionSeconds;
     final remaining = (NgmyCommunicatePayments.thresholdSeconds(widget.config) - totalSec).clamp(0, 999999);
     final remMin = (remaining / 60).ceil();
+    final topPad = MediaQuery.paddingOf(context).top + 76;
+    final bottomPad = MediaQuery.paddingOf(context).bottom + 88;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0612),
       body: Stack(
         children: [
           _LoveWorldBackground(ctrl: widget.bgCtrl, floatCtrl: widget.bgCtrl),
-          Column(
-            children: [
-              SafeArea(
-                bottom: false,
-                child: Container(
-                  margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: LinearGradient(colors: [const Color(0xFF831843).withValues(alpha: 0.9), const Color(0xFF4C1D95).withValues(alpha: 0.85)]),
-                    border: Border.all(color: const Color(0xFFF472B6).withValues(alpha: 0.4)),
-                    boxShadow: [BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.2), blurRadius: 16)],
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 22), onPressed: widget.onBack),
-                      NgmyCommunicateAvatar(profile: widget.profile, size: 44, glow: true),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(widget.profile.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-                            Text(
-                              _isAdmin ? 'Unlimited love chat 💕' : '~$remMin min left · $mins min block',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 10),
-                            ),
-                          ],
-                        ),
+          Positioned.fill(
+            child: ListView.builder(
+              controller: _scroll,
+              padding: EdgeInsets.fromLTRB(16, topPad, 16, bottomPad),
+              itemCount: _messages.length + (_busy ? 1 : 0) + (_messages.isEmpty && _loaded ? 1 : 0),
+              itemBuilder: (context, i) {
+                if (_messages.isEmpty && _loaded && i == 0) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'Say something sweet to ${widget.profile.name}… 💜',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14, fontStyle: FontStyle.italic),
                       ),
-                      const Icon(Icons.favorite, color: Color(0xFFEC4899), size: 20),
-                    ],
+                    ),
+                  );
+                }
+                final offset = (_messages.isEmpty && _loaded) ? 1 : 0;
+                if (_busy && i == _messages.length + offset) {
+                  return Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Text('${widget.profile.name} is typing', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontStyle: FontStyle.italic, fontSize: 12)),
+                        const SizedBox(width: 6),
+                        const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFEC4899))),
+                      ],
+                    ),
+                  );
+                }
+                final m = _messages[i - offset];
+                final user = m['role'] == 'user';
+                return Align(
+                  alignment: user ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(20),
+                        topRight: const Radius.circular(20),
+                        bottomLeft: Radius.circular(user ? 20 : 4),
+                        bottomRight: Radius.circular(user ? 4 : 20),
+                      ),
+                      gradient: user
+                          ? const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)])
+                          : LinearGradient(colors: [const Color(0xFF2D1B4E), const Color(0xFF1E1B4B).withValues(alpha: 0.95)]),
+                      border: Border.all(color: Colors.white.withValues(alpha: user ? 0.2 : 0.1)),
+                      boxShadow: [BoxShadow(color: (user ? const Color(0xFFEC4899) : const Color(0xFF9333EA)).withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
+                    ),
+                    child: Text(m['text'] ?? '', style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.white)),
                   ),
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  itemCount: _messages.length + (_busy ? 1 : 0) + (_messages.isEmpty && _loaded ? 1 : 0),
-                  itemBuilder: (context, i) {
-                    if (_messages.isEmpty && _loaded && i == 0) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'Say something sweet to ${widget.profile.name}… 💜',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14, fontStyle: FontStyle.italic),
-                          ),
-                        ),
-                      );
-                    }
-                    final offset = (_messages.isEmpty && _loaded) ? 1 : 0;
-                    if (_busy && i == _messages.length + offset) {
-                      return Padding(
-                        padding: const EdgeInsets.all(12),
+                );
+              },
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                child: _loveGlassPanel(
+                  borderRadius: BorderRadius.circular(20),
+                  fillAlpha: 0.06,
+                  blur: 12,
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                         child: Row(
                           children: [
-                            Text('${widget.profile.name} is typing', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontStyle: FontStyle.italic, fontSize: 12)),
-                            const SizedBox(width: 6),
-                            const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFEC4899))),
+                            IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 22), onPressed: widget.onBack),
+                            NgmyCommunicateAvatar(profile: widget.profile, size: 44, glow: true),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(widget.profile.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                                  Text(
+                                    _isAdmin ? 'Unlimited love chat 💕' : '~$remMin min left · $mins min block',
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 10),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.favorite, color: Color(0xFFEC4899), size: 20),
                           ],
                         ),
-                      );
-                    }
-                    final m = _messages[i - offset];
-                    final user = m['role'] == 'user';
-                    return Align(
-                      alignment: user ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(20),
-                            topRight: const Radius.circular(20),
-                            bottomLeft: Radius.circular(user ? 20 : 4),
-                            bottomRight: Radius.circular(user ? 4 : 20),
-                          ),
-                          gradient: user
-                              ? const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)])
-                              : LinearGradient(colors: [const Color(0xFF2D1B4E), const Color(0xFF1E1B4B).withValues(alpha: 0.95)]),
-                          border: Border.all(color: Colors.white.withValues(alpha: user ? 0.2 : 0.1)),
-                          boxShadow: [BoxShadow(color: (user ? const Color(0xFFEC4899) : const Color(0xFF9333EA)).withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
-                        ),
-                        child: Text(m['text'] ?? '', style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.white)),
                       ),
-                    );
-                  },
-                ),
-              ),
-              SafeArea(
-                top: false,
-                child: Container(
-                  margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-                  padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(26),
-                    color: Colors.black.withValues(alpha: 0.45),
-                    border: Border.all(color: const Color(0xFFF472B6).withValues(alpha: 0.35)),
-                    boxShadow: [BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.15), blurRadius: 16)],
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _controller,
-                          minLines: 1,
-                          maxLines: 4,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            hintText: 'Write from the heart…',
-                            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                          ),
-                          onSubmitted: (_) => _send(),
-                        ),
-                      ),
-                      NgmyVoiceMicButton(controller: _controller, color: const Color(0xFFEC4899)),
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _busy ? null : _send,
-                          customBorder: const CircleBorder(),
-                          child: Container(
-                            width: 42,
-                            height: 42,
-                            decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)])),
-                            child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
-                          ),
-                        ),
-                      ),
+                      if (widget.profile.roleBadgeLabel != null)
+                        Positioned(top: 6, right: 8, child: _roleBadge(widget.profile.roleBadgeLabel!)),
                     ],
                   ),
                 ),
               ),
-            ],
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                child: _loveGlassPanel(
+                  borderRadius: BorderRadius.circular(26),
+                  fillAlpha: 0.06,
+                  blur: 12,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _controller,
+                            minLines: 1,
+                            maxLines: 4,
+                            style: const TextStyle(color: Colors.white),
+                            decoration: InputDecoration(
+                              hintText: 'Write from the heart…',
+                              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                            ),
+                            onSubmitted: (_) => _send(),
+                          ),
+                        ),
+                        NgmyVoiceMicButton(controller: _controller, color: const Color(0xFFEC4899)),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _busy ? null : _send,
+                            customBorder: const CircleBorder(),
+                            child: Container(
+                              width: 42,
+                              height: 42,
+                              decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)])),
+                              child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

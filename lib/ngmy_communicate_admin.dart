@@ -79,7 +79,9 @@ Future<void> showNgmyCommunicateAdminSheet({
                         child: ListTile(
                           leading: NgmyCommunicateAvatar(profile: p, size: 44),
                           title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800)),
-                          subtitle: Text('${p.gender == 'male' ? 'Male' : 'Female'} · ${p.active ? 'Active' : 'Hidden'}'),
+                          subtitle: Text(
+                            '${p.gender == 'male' ? 'Male' : 'Female'} · ${p.role == 'companion' ? 'Companion' : p.role == 'therapist' ? 'Therapist' : 'Teacher'} · ${p.active ? 'Active' : 'Hidden'}',
+                          ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -141,6 +143,7 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
   final personalityC = TextEditingController(text: existing?.personality ?? '');
   final emojiC = TextEditingController(text: existing?.emoji ?? '👩');
   var gender = existing?.gender ?? 'female';
+  var role = existing?.role ?? 'companion';
   var active = existing?.active ?? true;
   var avatarUrl = existing?.avatarUrl ?? '';
 
@@ -157,6 +160,7 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
             bio: bioC.text,
             emoji: emojiC.text.trim().isEmpty ? (gender == 'male' ? '👨' : '👩') : emojiC.text.trim(),
             avatarUrl: avatarUrl,
+            role: role,
             active: active,
           );
           return AlertDialog(
@@ -213,13 +217,32 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
                       onChanged: (v) => setD(() => gender = v ?? 'female'),
                     ),
                     const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      value: role,
+                      decoration: const InputDecoration(
+                        labelText: 'Role',
+                        helperText: 'Therapist & teacher get special badges and behavior',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'companion', child: Text('Companion')),
+                        DropdownMenuItem(value: 'therapist', child: Text('Therapist')),
+                        DropdownMenuItem(value: 'teacher', child: Text('Teacher')),
+                      ],
+                      onChanged: (v) => setD(() => role = v ?? 'companion'),
+                    ),
+                    const SizedBox(height: 10),
                     TextField(
                       controller: personalityC,
                       maxLines: 3,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Personality',
-                        helperText: 'Romantic, playful, jealous, sweet…',
-                        border: OutlineInputBorder(),
+                        helperText: role == 'therapist'
+                            ? 'Warm, professional, comforting…'
+                            : role == 'teacher'
+                                ? 'Patient, encouraging, clear…'
+                                : 'Romantic, playful, jealous, sweet…',
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -256,6 +279,7 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
                       bio: bioC.text.trim(),
                       emoji: emojiC.text.trim().isEmpty ? (gender == 'male' ? '👨' : '👩') : emojiC.text.trim(),
                       avatarUrl: avatarUrl,
+                      role: role,
                       active: active,
                     ),
                   );
