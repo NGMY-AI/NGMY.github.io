@@ -524,12 +524,18 @@ Future<String> _fallbackComposedExport(
   NgmyVideoStudioExportConfig config,
   Map<String, String> sources, {
   String? reason,
+  bool allowRawFallback = true,
 }) async {
   if (config.needsComposedExport) {
-    final detail = reason?.trim();
-    final suffix = detail != null && detail.isNotEmpty ? ' ($detail)' : '';
-    return 'Export failed: your template, text, and logo were not added to the video$suffix. '
-        'Open NGMY in Chrome or Edge on a computer, then tap Download again.';
+    if (!allowRawFallback) {
+      final detail = reason?.trim();
+      final suffix = detail != null && detail.isNotEmpty ? ' ($detail)' : '';
+      return 'Export failed: templates could not be merged$suffix. Try Chrome on a computer.';
+    }
+    final raw = await _downloadAllVideoClips(sources);
+    if (raw.toLowerCase().contains('failed') || raw.contains('No video')) return raw;
+    return 'Video saved — templates/logo could not be embedded on this device. '
+        'For full studio export with overlays, use Chrome on a computer. ($raw)';
   }
   return _downloadAllVideoClips(sources);
 }
@@ -767,16 +773,6 @@ Future<String> exportNgmyVideoStudioComposed({
     }
 
     if (!usedCanvasStream) {
-      if (config.needsComposedExport) {
-        exportCanvas?.remove();
-        for (final v in videos.values) {
-          v.remove();
-        }
-        for (final i in logos.values) {
-          i.remove();
-        }
-        return _fallbackComposedExport(config, sources, reason: 'canvas capture unavailable on this device');
-      }
       final vStream = _safeCaptureStream(videos.values.first);
       if (vStream != null) {
         for (final t in vStream.getVideoTracks()) {
@@ -908,7 +904,7 @@ Future<String> exportNgmyVideoStudioComposed({
 
     if (chunks.isEmpty) {
       debugPrint('[studio export] empty chunks (mime=$mimeType)');
-      return _fallbackComposedExport(config, sources, reason: 'recording produced no data');
+      return _fallbackComposedExport(config, sources, reason: 'recording produced no data', allowRawFallback: true);
     }
 
     final apple = _ngmyIsAppleMobileBrowser();

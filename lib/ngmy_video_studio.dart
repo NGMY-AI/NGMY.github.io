@@ -13,7 +13,6 @@ import 'ngmy_video_studio_logo.dart';
 import 'ngmy_video_studio_models.dart';
 import 'ngmy_video_studio_painter.dart';
 import 'ngmy_video_studio_picker.dart';
-import 'ngmy_studio_html_video_stub.dart' if (dart.library.html) 'ngmy_studio_html_video.dart' as html_vid;
 import 'ngmy_studio_slot_video.dart';
 import 'ngmy_banner_text_style.dart';
 import 'ngmy_news_banner_painter.dart';
@@ -926,9 +925,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     final src = media?.source;
     Widget child;
     if (src != null && src.isNotEmpty) {
-      child = kIsWeb
-          ? html_vid.NgmyStudioHtmlVideo(key: ValueKey('${slot.id}|$src'), source: src)
-          : NgmyStudioSlotVideo(key: ValueKey('${slot.id}|$src'), source: src);
+      child = NgmyStudioSlotVideo(key: ValueKey('${slot.id}|$src'), source: src);
     } else {
       child = Container(
         color: Colors.black87,

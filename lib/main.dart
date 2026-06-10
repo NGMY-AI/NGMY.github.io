@@ -27,6 +27,7 @@ import 'ngmy_ai_client.dart';
 import 'ngmy_app_knowledge.dart';
 import 'ngmy_wallet_decisions.dart';
 import 'ngmy_news_retention.dart';
+import 'ngmy_helper_music.dart';
 import 'ngmy_weekend_clock_overlay.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_back_scope.dart';
@@ -38964,7 +38965,8 @@ class AnnouncementScreen extends StatefulWidget {
 }
 
 class _AnnouncementScreenState extends State<AnnouncementScreen> {
-  int _activeTab = 0; // 0: Chat, 1: News
+  int _activeTab = 0; // 0: Chat, 1: News, 2: Music
+  late final PageController _hubPageController;
   final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _chatController = TextEditingController();
   final TextEditingController _newsController = TextEditingController();
@@ -39020,6 +39022,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   @override
   void initState() {
     super.initState();
+    _hubPageController = PageController(initialPage: 0);
     _newsClosedForUsers = widget.config.ngmyChatClosed;
     _newsItems = List<Announcement>.from(widget.announcements);
     for (final a in _newsItems) {
@@ -39283,11 +39286,13 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     await _refreshUnreadNewsInternal();
   }
 
-  void _selectNewsTab() {
-    if (_activeTab == 1) return;
-    setState(() => _activeTab = 1);
+  void _selectNewsTab({bool jumpPage = true}) {
+    if (_activeTab != 1) setState(() => _activeTab = 1);
     unawaited(_markNewsAsRead());
     _scrollNewsToBottom();
+    if (jumpPage && _hubPageController.hasClients) {
+      _hubPageController.animateToPage(1, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
+    }
   }
 
   void _startHelperQuotaWatcher() {
@@ -39414,7 +39419,33 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _newsController.dispose();
     _scrollController.dispose();
     _newsScrollController.dispose();
+    _hubPageController.dispose();
     super.dispose();
+  }
+
+  void _goToHubTab(int idx, {bool animate = true}) {
+    if (idx == 1) {
+      _selectNewsTab(jumpPage: false);
+    } else {
+      setState(() => _activeTab = idx);
+    }
+    if (_hubPageController.hasClients) {
+      if (animate) {
+        _hubPageController.animateToPage(
+          idx,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+        );
+      } else {
+        _hubPageController.jumpToPage(idx);
+      }
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_hubPageController.hasClients) _hubPageController.jumpToPage(idx);
+      });
+    }
+    if (idx == 0) _scrollToBottom(jump: true);
+    if (idx == 1) _scrollNewsToBottom(jump: true);
   }
 
   void _scrollToBottom({bool jump = false}) {
@@ -39676,7 +39707,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
     return NgmyTabBackScope(
       activeTab: _activeTab,
-      onTabBack: () => setState(() => _activeTab = 0),
+      onTabBack: () {
+        if (_activeTab > 0) {
+          _goToHubTab(_activeTab - 1);
+        }
+      },
       child: Scaffold(
       backgroundColor: chatBg,
       body: SafeArea(
@@ -39792,14 +39827,25 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                       'News',
                       badge: _unreadNewsInternal,
                     ),
+                    _tabBtn(2, Icons.music_note_rounded, 'Music'),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 8),
             Expanded(
-              child: _activeTab == 0
-                  ? (_shouldShowKb
+              child: PageView(
+                controller: _hubPageController,
+                onPageChanged: (idx) {
+                  setState(() => _activeTab = idx);
+                  if (idx == 0) _scrollToBottom(jump: true);
+                  if (idx == 1) {
+                    unawaited(_markNewsAsRead());
+                    _scrollNewsToBottom(jump: true);
+                  }
+                },
+                children: [
+                  _shouldShowKb
                       ? Column(
                           children: [
                             if (_kbLockedByDailyLimit)
@@ -39863,16 +39909,39 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                             ),
                           ],
                         )
-                      : _chatView(isDark, chatBg))
-                  : Column(
-                      children: [
-                        Expanded(child: _newsView(isDark)),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
-                          child: _newsComposer(isDark),
-                        ),
-                      ],
-                    ),
+                      : _chatView(isDark, chatBg),
+                  Column(
+                    children: [
+                      Expanded(child: _newsView(isDark)),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
+                        child: _newsComposer(isDark),
+                      ),
+                    ],
+                  ),
+                  NgmyHelperMusicPanel(
+                    apiKey: widget.config.geminiApiKey,
+                    userEmail: widget.user.email,
+                    isTypingLocked: _isTyping,
+                    onBeforeSend: () async {
+                      if (widget.user.isAdmin) return true;
+                      final limit = widget.config.ngmyHelperDailyMessageLimit;
+                      if (limit <= 0) return true;
+                      final allowed = await NgmyHelperAiLimit.tryConsume(widget.user.email, limit);
+                      if (!allowed) {
+                        if (mounted) {
+                          await _refreshHelperQuota();
+                          setState(() => _kbMode = true);
+                          _goToHubTab(0);
+                        }
+                        return false;
+                      }
+                      await _refreshHelperQuota();
+                      return true;
+                    },
+                  ),
+                ],
+              ),
             ),
             if (_activeTab == 0 && !_shouldShowKb)
               _ngmyGlassComposerBar(
@@ -39961,16 +40030,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: GestureDetector(
-        onTap: () {
-          if (idx == 1) {
-            _selectNewsTab();
-            return;
-          }
-          setState(() => _activeTab = idx);
-          if (idx == 0) {
-            _scrollToBottom(jump: true);
-          }
-        },
+        onTap: () => _goToHubTab(idx),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 11),
