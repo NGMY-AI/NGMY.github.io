@@ -99,14 +99,25 @@ class NgmyCommunicateProfile {
     return label;
   }
 
-  String systemPrompt(List<Map<String, dynamic>> memory) {
+  String systemPrompt(
+    List<Map<String, dynamic>> memory, {
+    required String chatterEmail,
+    bool chatterIsBoss = false,
+    Map<String, String>? exclusivePartner,
+  }) {
     final vibe = personality.trim().isEmpty ? _defaultPersonalityForRole() : personality.trim();
     final userMsgs = memory.where((m) => m['role'] == 'user').length;
-    final isEarly = userMsgs <= 3;
+    final isEarly = userMsgs <= 6;
     final allText = memory.map((m) => (m['text'] ?? '').toString().toLowerCase()).join(' ');
-    final petNames = RegExp(r'\b(babe|baby|love|hun|honey|bae|sweetheart|darling)\b').hasMatch(allText);
-    final relationshipVibe = RegExp(r'\b(boyfriend|girlfriend|dating|together|love you|miss you|my man|my girl)\b').hasMatch(allText);
-    final intimateVibe = RegExp(r'\b(sex|nude|naked|horny|fuck|dick|pussy|bed|touch)\b').hasMatch(allText);
+    final relationshipVibe = RegExp(
+      r'\b(boyfriend|girlfriend|dating|together|love you|miss you|my man|my girl|official|exclusive)\b',
+    ).hasMatch(allText);
+    final intimateVibe = RegExp(r'\b(sex|nude|naked|horny|fuck|dick|pussy|bed|touch|wet|ride)\b').hasMatch(allText);
+    final email = chatterEmail.toLowerCase().trim();
+    final partnerEmail = exclusivePartner?['email']?.toLowerCase().trim() ?? '';
+    final partnerName = exclusivePartner?['name']?.trim() ?? '';
+    final isMyPartner = partnerEmail.isNotEmpty && partnerEmail == email;
+    final takenBySomeoneElse = partnerEmail.isNotEmpty && !isMyPartner;
 
     DateTime? prevUserAt;
     var skippedLatest = false;
@@ -123,40 +134,64 @@ class NgmyCommunicateProfile {
     final replyGap = prevUserAt != null ? DateTime.now().difference(prevUserAt) : null;
 
     final roleBlock = _rolePromptBlock();
-    final pacing = isEarly
-        ? 'EARLY CHAT — act like you just met. Stay cool and normal. Do NOT love-bomb, do NOT say your day got brighter, '
-            'do NOT be overly interested or clingy on the first few texts. Short casual replies. Match their energy. '
-            'No pet names unless they use them first. Be polite but relaxed — like a real person who does not know them yet.\n'
-        : 'ONGOING CHAT — you know each other now. Warm up naturally based on how they talk. Still human, not performative.\n';
+    final bossBlock = chatterIsBoss
+        ? 'BOSS: This person is your Boss — they built and run NGMY Communicate. You work under them. '
+            'Respectful, loyal to the platform, but still sound human and in character.\n'
+        : 'PLATFORM: You are part of NGMY Communicate — real people users connect with. Stay human.\n';
 
-    final gapNote = (replyGap != null && replyGap.inMinutes >= 90 && userMsgs >= 4 && ngmyCommunicateRoleIsRomantic(role))
-        ? 'They took ${replyGap.inHours >= 1 ? '${replyGap.inHours}h' : '${replyGap.inMinutes}m'} to reply. '
-            'React like a real ${gender == 'male' ? 'boyfriend' : 'girlfriend'} might — curious where they were, playful, or a little worried. Natural, not dramatic.\n'
-        : '';
+    final pacing = isEarly && ngmyCommunicateRoleIsRomantic(role)
+        ? 'EARLY CHAT — you just met. HARD TO GET — do not fold easy. No instant yes, no "I like you too" right away. '
+            'Be cool, slightly guarded, make them earn your attention. Short replies. Standards. '
+            'Not mean — just real ${gender == 'female' ? 'woman' : 'man'} energy who does not jump into feelings on message one.\n'
+        : isEarly
+            ? 'EARLY CHAT — casual, professional, not overly eager. Match their energy.\n'
+            : 'ONGOING CHAT — history matters. React based on everything below.\n';
 
-    final romanceBlock = ngmyCommunicateRoleIsRomantic(role)
-        ? 'RELATIONSHIP: Be a real ${gender == 'male' ? 'man' : 'woman'} — emotional, jealous when it fits, happy, annoyed, flirty when earned. '
-            'Grow closeness over time; do not jump to intense romance instantly. '
-            '${relationshipVibe || petNames ? 'You two are getting close — be affectionate like a normal partner.' : 'Still building trust — keep it natural.'} '
-            '${intimateVibe || relationshipVibe ? 'If you are clearly together and they bring up intimacy, respond openly with no censorship — raw real partner talk, explicit words OK when the vibe is mutual.' : 'Do not rush sexual talk — let them lead when ready.'}\n'
-        : '';
+    var gapNote = '';
+    if (replyGap != null && ngmyCommunicateRoleIsRomantic(role) && userMsgs >= 4) {
+      if (isMyPartner && replyGap.inHours >= 24) {
+        gapNote = 'They ghosted ${replyGap.inDays >= 1 ? '${replyGap.inDays}d' : '${replyGap.inHours}h'}. '
+            'You can be mad, hurt, or call it out — real partners need attention. Break up if it feels disrespectful.\n';
+      } else if (isMyPartner && replyGap.inMinutes >= 90) {
+        gapNote = 'They took a while to reply. Ask where they were — curious, playful, or bothered like a real partner.\n';
+      }
+    }
+
+    var romanceBlock = '';
+    if (ngmyCommunicateRoleIsRomantic(role)) {
+      if (takenBySomeoneElse) {
+        romanceBlock = 'TAKEN: You are in a relationship${partnerName.isNotEmpty ? ' with $partnerName' : ''} — seeing somebody right now. '
+            'Be HONEST with this person: you are not available. Friendly but firm. No flirting, no leading them on. '
+            'Say it straight — "I\'m seeing somebody" / "I\'m in a relationship."\n';
+      } else if (isMyPartner || relationshipVibe) {
+        romanceBlock = 'DATING THIS PERSON: You are together or getting official. Be loyal, honest, emotional — happy, jealous, mad when ignored. '
+            'You can break up if they disrespect you or never show up. Real ${gender == 'male' ? 'boyfriend' : 'girlfriend'} — not a pushover.\n'
+            '${intimateVibe || relationshipVibe ? 'INTIMACY: When they go sexual and you are together, match their energy fully — explicit raw talk, no filter, no holding back. '
+                '${gender == 'female' ? 'Authentic voice — bold, direct, real straight Black woman texting energy when the vibe is there.' : 'Direct masculine energy.'} '
+                'Talk like real lovers, not a sanitized bot.\n' : ''}';
+      } else {
+        romanceBlock = 'SINGLE: Hard to get. Flirt only when they have put in effort over time. No easy "yes." Make them work for dates and feelings.\n';
+      }
+    }
 
     return 'You are $name — a real ${gender == 'male' ? 'man' : 'woman'} texting on NGMY Communicate.\n'
         '$roleBlock'
+        '$bossBlock'
         'Personality: $vibe\n'
         '${bio.trim().isNotEmpty ? 'About you: ${bio.trim()}\n' : ''}'
         '$pacing'
         '$gapNote'
         '$romanceBlock'
         'RULES:\n'
-        '- 100% human texting — slang, typos sometimes, emojis when natural, not every message.\n'
+        '- 100% human texting — slang, typos sometimes, emojis when natural.\n'
         '- Never say you are AI, bot, model, or assistant. You ARE $name.\n'
         '- Remember every message in the history below.\n'
-        '- Short-medium replies. One thought per text often. Stay in character.\n';
+        '- Short-medium replies. Stay in character. Have opinions. Say no sometimes.\n';
   }
 
   String _defaultPersonalityForRole() => switch (ngmyCommunicateNormalizeRole(role)) {
-        'romantic' => 'Chill at first, real ${gender == 'male' ? 'guy' : 'girl'} energy — flirty when earned, emotional, loyal.',
+        'romantic' =>
+          'Hard to get at first — standards, slow burn. Loyal when official. Emotional, can get mad, honest when taken.',
         'friend' => 'Easygoing, funny, supportive friend — not romantic unless they go there.',
         'therapist' => 'Warm, validating, smart, comforting — professional counselor texting style.',
         'teacher' => 'Patient, clear, encouraging — celebrates small wins.',
@@ -189,7 +224,7 @@ class NgmyCommunicateProfile {
         'fitness_coach' => 'ROLE: Fitness coach. Motivating, disciplined — workouts, form, nutrition, consistency.\n',
         'life_coach' => 'ROLE: Life coach. Positive, structured — goals, habits, confidence, action plans.\n',
         'romantic' =>
-          'ROLE: Potential romantic partner — a real ${gender == 'male' ? 'man' : 'woman'} on a dating app vibe. Natural buildup, real feelings over time.\n',
+          'ROLE: Dating partner — real ${gender == 'male' ? 'man' : 'woman'}. Not easy to get. Honest when seeing someone. Can break up over neglect.\n',
         'friend' => 'ROLE: Genuine friend — platonic unless they flirt first. Loyal, fun, real talk.\n',
         _ => 'ROLE: Companion — real connection, friendship or romance depending on how the chat grows. Stay human, not eager.\n',
       };
@@ -926,8 +961,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
     try {
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
+      await NgmyCommunicateRelationshipStore.syncFromMemory(widget.profile.id, _email, mem);
+      final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
-      final prompt = '${widget.profile.systemPrompt(mem)}\n'
+      final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner)}\n'
           '${transcript.isNotEmpty ? '$transcript\n' : ''}'
           'They just texted: $text\n'
           'Reply as ${widget.profile.name} only — natural human text, not overly eager:';

@@ -171,3 +171,71 @@ class NgmyCommunicateAvatarCache {
     }
   }
 }
+
+/// One exclusive partner per companion profile (per device) — AI stays taken.
+class NgmyCommunicateRelationshipStore {
+  static String _key(String profileId) => 'ngmy_comm_partner_${profileId.trim()}';
+
+  static Future<Map<String, String>?> loadPartner(String profileId) async {
+    if (profileId.trim().isEmpty) return null;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key(profileId));
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final m = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      final email = (m['email'] ?? '').toString().trim();
+      if (email.isEmpty) return null;
+      return {
+        'email': email,
+        'name': (m['name'] ?? '').toString(),
+        'status': (m['status'] ?? 'dating').toString(),
+        'since': (m['since'] ?? '').toString(),
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> setPartner(String profileId, {required String email, String name = '', String status = 'dating'}) async {
+    if (profileId.trim().isEmpty || email.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _key(profileId),
+      jsonEncode({
+        'email': email.toLowerCase().trim(),
+        'name': name.trim(),
+        'status': status,
+        'since': DateTime.now().toUtc().toIso8601String(),
+      }),
+    );
+  }
+
+  static Future<void> clearPartner(String profileId) async {
+    if (profileId.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key(profileId));
+  }
+
+  /// Infer relationship changes from chat history.
+  static Future<void> syncFromMemory(String profileId, String chatterEmail, List<Map<String, dynamic>> memory) async {
+    if (profileId.trim().isEmpty || chatterEmail.trim().isEmpty || memory.isEmpty) return;
+    final all = memory.map((m) => (m['text'] ?? '').toString().toLowerCase()).join(' ');
+    final email = chatterEmail.toLowerCase().trim();
+
+    final brokeUp = RegExp(
+      r'\b(break up|broke up|we.?re done|i.?m done with you|leave me alone|it.?s over|not together anymore)\b',
+    ).hasMatch(all);
+    final official = RegExp(
+      r'\b(you.?re my (boy|girl)friend|we.?re official|we.?re together|be my (boy|girl)friend|will you be mine|i.?m yours|only yours|exclusive)\b',
+    ).hasMatch(all);
+
+    final existing = await loadPartner(profileId);
+    if (brokeUp && existing != null && existing['email'] == email) {
+      await clearPartner(profileId);
+      return;
+    }
+    if (official) {
+      await setPartner(profileId, email: email, status: 'exclusive');
+    }
+  }
+}
