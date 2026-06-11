@@ -1,7 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
+import 'ngmy_app_builder_ai.dart';
+import 'ngmy_app_builder_runtime.dart';
 import 'ngmy_app_builder_layout_utils.dart';
 import 'ngmy_app_builder_models.dart';
+import 'ngmy_app_studio_shell.dart';
 
 /// Full-screen studio for editing one app screen — widgets, wiring, drag reorder.
 class NgmyAppScreenEditorPage extends StatefulWidget {
@@ -11,12 +16,14 @@ class NgmyAppScreenEditorPage extends StatefulWidget {
     required this.allScreens,
     required this.themeColor,
     this.screenIndex = 0,
+    this.apiKey = '',
   });
 
   final NgmyAppScreen screen;
   final List<NgmyAppScreen> allScreens;
   final Color themeColor;
   final int screenIndex;
+  final String apiKey;
 
   @override
   State<NgmyAppScreenEditorPage> createState() => _NgmyAppScreenEditorPageState();
@@ -71,6 +78,7 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
   }
 
   Future<void> _editWidget(int index) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final updated = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
@@ -79,6 +87,9 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
         widget: _widgets[index],
         screens: widget.allScreens,
         themeColor: widget.themeColor,
+        isDark: isDark,
+        apiKey: widget.apiKey,
+        screen: _buildResult(),
       ),
     );
     if (updated != null && mounted) {
@@ -86,11 +97,107 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
     }
   }
 
+  Future<void> _askAi() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ctrl = TextEditingController();
+    final request = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Ask Bolt AI', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
+              const SizedBox(height: 6),
+              Text(
+                'Describe how buttons should work, what text should say, or how this screen should look.',
+                style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : Colors.black54),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'e.g. Add a big Checkout button that goes to cart and make the title say Welcome',
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF111827) : Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: const Text('Update screen with AI'),
+                style: FilledButton.styleFrom(backgroundColor: widget.themeColor, minimumSize: const Size(double.infinity, 48)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    ctrl.dispose();
+    if (request == null || request.isEmpty || !mounted) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(color: widget.themeColor),
+            const SizedBox(width: 16),
+            Expanded(child: Text('Bolt is updating your screen…', style: TextStyle(color: isDark ? Colors.white : Colors.black87))),
+          ],
+        ),
+      ),
+    );
+
+    final result = await ngmyAppBuilderAiEditScreen(
+      apiKey: widget.apiKey,
+      screen: _buildResult(),
+      allScreens: widget.allScreens,
+      userMessage: request,
+    );
+
+    if (!mounted) return;
+    Navigator.pop(context);
+
+    if (result.screen != null) {
+      final s = ngmyScreenEnsureEditable(result.screen!);
+      setState(() {
+        _screen = s;
+        _titleCtrl.text = s.title;
+        _widgets = ngmyLayoutChildren(s);
+      });
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.message), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 4)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = widget.themeColor;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF07080F) : const Color(0xFFE8EDF5);
+    final subText = isDark ? Colors.white60 : Colors.grey.shade600;
+    final titleText = isDark ? Colors.white : Colors.grey.shade800;
+    final fieldFill = isDark ? const Color(0xFF111827) : Colors.grey.shade50;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
+      backgroundColor: bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -102,88 +209,138 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
               onDone: _saveAndPop,
             ),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                children: [
-                  _SectionCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Screen name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey.shade600)),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _titleCtrl,
-                          decoration: InputDecoration(
-                            hintText: 'e.g. Home, Cart, Profile',
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Text('Widgets on this screen', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.grey.shade800)),
-                      const Spacer(),
-                      Text('${_widgets.length}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: theme)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (_widgets.isEmpty)
+              child: NgmyAppStudioContentFrame(
+                isDark: isDark,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
+                  children: [
                     _SectionCard(
+                      isDark: isDark,
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.widgets_outlined, size: 40, color: Colors.grey.shade400),
+                          Text('Screen name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: subText)),
                           const SizedBox(height: 8),
-                          Text('No widgets yet', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.grey.shade700)),
-                          const SizedBox(height: 4),
-                          Text('Add buttons, forms, lists, menus, and more.', style: TextStyle(fontSize: 13, color: Colors.grey.shade600), textAlign: TextAlign.center),
+                          TextField(
+                            controller: _titleCtrl,
+                            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                            decoration: InputDecoration(
+                              hintText: 'e.g. Home, Cart, Profile',
+                              filled: true,
+                              fillColor: fieldFill,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            ),
+                          ),
                         ],
                       ),
-                    )
-                  else
-                    ReorderableListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      buildDefaultDragHandles: false,
-                      onReorder: (o, n) {
-                        setState(() {
-                          if (n > o) n--;
-                          final item = _widgets.removeAt(o);
-                          _widgets.insert(n, item);
-                        });
-                      },
-                      itemCount: _widgets.length,
-                      itemBuilder: (context, i) {
-                        final w = _widgets[i];
-                        final type = (w['type'] ?? 'text').toString();
-                        return _WidgetTile(
-                          key: ValueKey('w_${i}_${type}_${_widgets.length}'),
-                          index: i,
-                          type: type,
-                          label: _widgetSummary(w),
-                          theme: theme,
-                          onEdit: () => _editWidget(i),
-                          onDelete: () => setState(() => _widgets.removeAt(i)),
-                        );
-                      },
                     ),
-                  const SizedBox(height: 12),
-                  _QuickWidgetChips(theme: theme, onAdd: _addWidget),
-                ],
+                    const SizedBox(height: 10),
+                    Material(
+                      color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.15 : 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
+                        onTap: _askAi,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.auto_awesome_rounded, color: Color(0xFFF59E0B)),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Ask AI about this screen', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                                    Text('Tell Bolt how buttons should work or how text should read', style: TextStyle(fontSize: 12, color: subText)),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.chevron_right_rounded, color: subText),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text('Widgets on this screen', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: titleText)),
+                        const Spacer(),
+                        Text('${_widgets.length}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: theme)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (_widgets.isEmpty)
+                      _SectionCard(
+                        isDark: isDark,
+                        child: Column(
+                          children: [
+                            Icon(Icons.widgets_outlined, size: 40, color: subText),
+                            const SizedBox(height: 8),
+                            Text('No widgets yet', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.grey.shade700)),
+                            const SizedBox(height: 4),
+                            Text('Add buttons, forms, lists, menus, and more — or ask AI above.', style: TextStyle(fontSize: 13, color: subText), textAlign: TextAlign.center),
+                          ],
+                        ),
+                      )
+                    else
+                      ReorderableListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        buildDefaultDragHandles: false,
+                        onReorder: (o, n) {
+                          setState(() {
+                            if (n > o) n--;
+                            final item = _widgets.removeAt(o);
+                            _widgets.insert(n, item);
+                          });
+                        },
+                        itemCount: _widgets.length,
+                        itemBuilder: (context, i) {
+                          final w = _widgets[i];
+                          final type = (w['type'] ?? 'text').toString();
+                          return _WidgetTile(
+                            key: ValueKey('w_${i}_${type}_${_widgets.length}'),
+                            index: i,
+                            type: type,
+                            label: _widgetSummary(w),
+                            theme: theme,
+                            isDark: isDark,
+                            onEdit: () => _editWidget(i),
+                            onDelete: () => setState(() => _widgets.removeAt(i)),
+                          );
+                        },
+                      ),
+                    const SizedBox(height: 12),
+                    _QuickWidgetChips(theme: theme, isDark: isDark, onAdd: _addWidget),
+                  ],
+                ),
               ),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAddPalette,
-        backgroundColor: theme,
-        icon: const Icon(Icons.add),
-        label: const Text('Add widget'),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'screen_ai',
+            onPressed: _askAi,
+            backgroundColor: const Color(0xFFF59E0B),
+            icon: const Icon(Icons.auto_awesome_rounded),
+            label: const Text('Ask AI'),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.extended(
+            heroTag: 'screen_add',
+            onPressed: _openAddPalette,
+            backgroundColor: theme,
+            icon: const Icon(Icons.add),
+            label: const Text('Add widget'),
+          ),
+        ],
       ),
     );
   }
@@ -267,8 +424,9 @@ class _EditorHeader extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.child});
+  const _SectionCard({required this.child, required this.isDark});
   final Widget child;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -276,9 +434,9 @@ class _SectionCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
       ),
       child: child,
     );
@@ -292,6 +450,7 @@ class _WidgetTile extends StatelessWidget {
     required this.type,
     required this.label,
     required this.theme,
+    required this.isDark,
     required this.onEdit,
     required this.onDelete,
   });
@@ -300,6 +459,7 @@ class _WidgetTile extends StatelessWidget {
   final String type;
   final String label;
   final Color theme;
+  final bool isDark;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -332,7 +492,7 @@ class _WidgetTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           onTap: onEdit,
@@ -341,13 +501,13 @@ class _WidgetTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.grey.shade200),
+              border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
             ),
             child: Row(
               children: [
                 ReorderableDragStartListener(
                   index: index,
-                  child: Icon(Icons.drag_handle, color: Colors.grey.shade400),
+                  child: Icon(Icons.drag_handle, color: isDark ? Colors.white38 : Colors.grey.shade400),
                 ),
                 const SizedBox(width: 8),
                 Container(
@@ -361,7 +521,7 @@ class _WidgetTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(ngmyWidgetTypeLabel(type), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: theme)),
-                      Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: Colors.grey.shade800)),
+                      Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.grey.shade800)),
                     ],
                   ),
                 ),
@@ -376,8 +536,9 @@ class _WidgetTile extends StatelessWidget {
 }
 
 class _QuickWidgetChips extends StatelessWidget {
-  const _QuickWidgetChips({required this.theme, required this.onAdd});
+  const _QuickWidgetChips({required this.theme, required this.isDark, required this.onAdd});
   final Color theme;
+  final bool isDark;
   final void Function(String type) onAdd;
 
   static const _chips = [
@@ -526,10 +687,20 @@ class _PaletteTile extends StatelessWidget {
 }
 
 class _WidgetEditorSheet extends StatefulWidget {
-  const _WidgetEditorSheet({required this.widget, required this.screens, required this.themeColor});
+  const _WidgetEditorSheet({
+    required this.widget,
+    required this.screens,
+    required this.themeColor,
+    required this.isDark,
+    this.apiKey = '',
+    this.screen,
+  });
   final Map<String, dynamic> widget;
   final List<NgmyAppScreen> screens;
   final Color themeColor;
+  final bool isDark;
+  final String apiKey;
+  final NgmyAppScreen? screen;
 
   @override
   State<_WidgetEditorSheet> createState() => _WidgetEditorSheetState();
@@ -546,14 +717,61 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
 
   void _set(String key, dynamic value) => setState(() => _w[key] = value);
 
+  Future<void> _askAiForWidget() async {
+    if (widget.screen == null) return;
+    final ctrl = TextEditingController();
+    final request = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+        title: Text('Ask AI', style: TextStyle(color: widget.isDark ? Colors.white : Colors.black87)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(hintText: 'e.g. Make this button say Buy Now and open checkout'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Apply')),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (request == null || request.isEmpty || !mounted) return;
+
+    final prompt = 'Only change the ${ngmyWidgetTypeLabel((_w['type'] ?? '').toString())} widget. '
+        'Current widget JSON: ${jsonEncode(_w)}. User request: $request';
+    final result = await ngmyAppBuilderAiEditScreen(
+      apiKey: widget.apiKey,
+      screen: widget.screen!,
+      allScreens: widget.screens,
+      userMessage: prompt,
+    );
+    if (!mounted) return;
+    final layout = ngmyScreenLayout(result.screen ?? widget.screen!);
+    final children = layout?['children'];
+    if (children is List && children.isNotEmpty) {
+      for (final c in children) {
+        if (c is Map && (c['type'] ?? '').toString() == (_w['type'] ?? '').toString()) {
+          setState(() => _w = Map<String, dynamic>.from(c));
+          break;
+        }
+      }
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.message), behavior: SnackBarBehavior.floating));
+  }
+
   @override
   Widget build(BuildContext context) {
     final type = (_w['type'] ?? '').toString();
+    final sheetBg = widget.isDark ? const Color(0xFF1E293B) : Colors.white;
+    final titleColor = widget.isDark ? Colors.white : Colors.black87;
     return Container(
       constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: sheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -564,8 +782,13 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
             padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
             child: Row(
               children: [
-                Text('Edit ${ngmyWidgetTypeLabel(type)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                const Spacer(),
+                Expanded(child: Text('Edit ${ngmyWidgetTypeLabel(type)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: titleColor))),
+                if (widget.apiKey.isNotEmpty)
+                  IconButton(
+                    tooltip: 'Ask AI',
+                    onPressed: _askAiForWidget,
+                    icon: const Icon(Icons.auto_awesome_rounded, color: Color(0xFFF59E0B)),
+                  ),
                 FilledButton(onPressed: () => Navigator.pop(context, _w), child: const Text('Save')),
               ],
             ),

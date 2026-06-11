@@ -234,6 +234,91 @@ User: $userMessage
   }
 }
 
+class NgmyAppScreenAiResult {
+  final String message;
+  final NgmyAppScreen? screen;
+
+  const NgmyAppScreenAiResult({required this.message, this.screen});
+}
+
+/// AI edits a single screen layout from natural language (buttons, text, wiring).
+Future<NgmyAppScreenAiResult> ngmyAppBuilderAiEditScreen({
+  required String apiKey,
+  required NgmyAppScreen screen,
+  required List<NgmyAppScreen> allScreens,
+  required String userMessage,
+}) async {
+  final creds = ngmyParseAiCredentials(apiKey);
+  if (creds.apiKey.isEmpty) {
+    return const NgmyAppScreenAiResult(
+      message: 'Add an AI API key in Admin → Management Hub → Global Settings, then try again.',
+    );
+  }
+
+  final screensList = [for (final s in allScreens) {'id': s.id, 'title': s.title}];
+  final prompt = '''
+You are Bolt editing ONE screen in NGMY App Studio.
+The user describes how buttons, text, or widgets should look or behave on this screen.
+
+RESPONSE FORMAT:
+1) Short friendly reply (1-3 sentences).
+2) Append exactly ---SCREEN_JSON---
+3) Then ONE screen JSON object:
+   {"id":"${screen.id}","title":"...","kind":"custom","data":{"layout":{"type":"column","children":[...]}}}
+
+RULES:
+- Keep screen id "${screen.id}" unchanged.
+- Use kind "custom" with data.layout.children for all widgets.
+- Buttons: {"type":"button","label":"...","target":"<screenId>","action":"navigate|snack|clear"}
+- Text: {"type":"text","text":"...","style":"title|subtitle|body"}
+- Wire "target" to real ids: ${jsonEncode(screensList)}
+- If user wants a button to show a message, use action "snack" with "message".
+- Build working widgets — not placeholder-only text.
+
+Current screen JSON:
+${jsonEncode(screen.toMap())}
+
+$kNgmyAppBuilderCodeSchemaHelp
+
+User request: $userMessage
+''';
+
+  try {
+    final reply = await ngmyAiGenerateWithCredentials(creds, prompt);
+    final text = reply.text?.trim();
+    if (text == null || text.isEmpty) {
+      return NgmyAppScreenAiResult(message: reply.error ?? 'AI returned an empty reply. Try again.');
+    }
+    const marker = '---SCREEN_JSON---';
+    if (!text.contains(marker)) {
+      return NgmyAppScreenAiResult(message: text);
+    }
+    final parts = text.split(marker);
+    final message = parts.first.trim();
+    final jsonPart = parts.length > 1 ? parts.sublist(1).join(marker).trim() : '';
+    final jsonText = _extractJson(jsonPart);
+    if (jsonText == null) {
+      return NgmyAppScreenAiResult(
+        message: message.isEmpty ? 'Could not apply that change — try being more specific.' : message,
+      );
+    }
+    final map = jsonDecode(jsonText);
+    if (map is! Map) {
+      return NgmyAppScreenAiResult(message: message.isEmpty ? 'Invalid screen JSON from AI.' : message);
+    }
+    final screenMap = Map<String, dynamic>.from(map);
+    screenMap['id'] = screen.id;
+    final updated = NgmyAppScreen.fromMap(screenMap);
+    return NgmyAppScreenAiResult(
+      message: message.isEmpty ? 'Screen updated!' : message,
+      screen: updated,
+    );
+  } catch (e) {
+    debugPrint('[app builder screen ai] $e');
+    return NgmyAppScreenAiResult(message: 'AI error: $e');
+  }
+}
+
 Future<NgmyAppProject?> ngmyAppBuilderAiGenerateApp({
   required String apiKey,
   required String ownerEmail,

@@ -798,6 +798,7 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
         allScreens: _project.screens,
         themeColor: _project.theme,
         screenIndex: index,
+        apiKey: widget.apiKey,
       ),
       routeName: 'NgmyAppScreenEditorPage',
     );
@@ -899,18 +900,61 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
     notesC.dispose();
   }
 
-  Widget _editorCard({required Widget child}) {
+  Widget _editorCard({required Widget child, required bool isDark}) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3))],
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04), blurRadius: 10, offset: const Offset(0, 3))],
       ),
       child: child,
+    );
+  }
+
+  Future<void> _runAiReview() async {
+    _saveLocal();
+    if (!mounted) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        content: Row(
+          children: [
+            const CircularProgressIndicator(color: Color(0xFF10B981)),
+            const SizedBox(width: 16),
+            Expanded(child: Text('Sage is reviewing your app…', style: TextStyle(color: isDark ? Colors.white : Colors.black87))),
+          ],
+        ),
+      ),
+    );
+    String review;
+    try {
+      final actor = kNgmyAppBuilderActors.firstWhere((a) => a.id == 'reviewer');
+      review = await ngmyAppBuilderAiChat(
+        apiKey: widget.apiKey,
+        actor: actor,
+        userMessage: 'Review this app for publish readiness. List issues and a score 0-100.',
+        project: _project,
+      );
+    } catch (e) {
+      review = 'Review failed: $e';
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        title: Text('Sage Review', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+        content: SingleChildScrollView(child: Text(review, style: TextStyle(color: isDark ? Colors.white70 : Colors.black87))),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+      ),
     );
   }
 
@@ -922,13 +966,17 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
     return '$types$extra';
   }
 
-  Widget _buildVisualEditor() {
+  Widget _buildVisualEditor(bool isDark) {
     final theme = _project.theme;
+    final subText = isDark ? Colors.white60 : Colors.grey.shade600;
+    final titleColor = isDark ? Colors.white : Colors.black87;
+    final fieldFill = isDark ? const Color(0xFF111827) : Colors.grey.shade50;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
       children: [
         if (_project.publicUrl.isNotEmpty)
           _editorCard(
+            isDark: isDark,
             child: ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Container(
@@ -936,8 +984,8 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
                 decoration: BoxDecoration(color: const Color(0xFF2563EB).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
                 child: const Icon(Icons.public_rounded, color: Color(0xFF2563EB)),
               ),
-              title: const Text('Public link', style: TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: Text(_project.publicUrl, maxLines: 2, overflow: TextOverflow.ellipsis),
+              title: Text('Public link', style: TextStyle(fontWeight: FontWeight.w800, color: titleColor)),
+              subtitle: Text(_project.publicUrl, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: subText)),
               trailing: IconButton(
                 icon: const Icon(Icons.copy_rounded),
                 onPressed: () {
@@ -948,6 +996,7 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
             ),
           ),
         _editorCard(
+          isDark: isDark,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -961,7 +1010,7 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
                       children: [
                         Text('App identity', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: theme)),
                         const SizedBox(height: 4),
-                        Text(_nameC.text.trim().isEmpty ? 'Untitled app' : _nameC.text.trim(), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+                        Text(_nameC.text.trim().isEmpty ? 'Untitled app' : _nameC.text.trim(), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: titleColor)),
                       ],
                     ),
                   ),
@@ -970,10 +1019,11 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
               const SizedBox(height: 16),
               TextField(
                 controller: _nameC,
+                style: TextStyle(color: titleColor),
                 decoration: InputDecoration(
                   labelText: 'App name',
                   filled: true,
-                  fillColor: Colors.grey.shade50,
+                  fillColor: fieldFill,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
                 onChanged: (_) => _saveLocal(),
@@ -981,16 +1031,17 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
               const SizedBox(height: 10),
               TextField(
                 controller: _taglineC,
+                style: TextStyle(color: titleColor),
                 decoration: InputDecoration(
                   labelText: 'Tagline / Google description',
                   filled: true,
-                  fillColor: Colors.grey.shade50,
+                  fillColor: fieldFill,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
                 onChanged: (_) => _saveLocal(),
               ),
               const SizedBox(height: 14),
-              Text('App icon', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.grey.shade700)),
+              Text('App icon', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: subText)),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -1027,38 +1078,39 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
           ),
         ),
         _editorCard(
+          isDark: isDark,
           child: ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.storage_rounded, color: theme),
-            title: const Text('External database', style: TextStyle(fontWeight: FontWeight.w800)),
-            subtitle: Text(_project.database.isConnected ? _project.database.provider.label : 'Optional — Firebase, Supabase, MongoDB'),
+            title: Text('External database', style: TextStyle(fontWeight: FontWeight.w800, color: titleColor)),
+            subtitle: Text(_project.database.isConnected ? _project.database.provider.label : 'Optional — Firebase, Supabase, MongoDB', style: TextStyle(color: subText)),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: _editDatabase,
           ),
         ),
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
-          child: Text('Quick add screens', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.grey.shade800)),
+          child: Text('Quick add screens', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: titleColor)),
         ),
-        Text('Ready-made screens with forms, lists, and navigation — opens the screen studio.', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        Text('Ready-made screens with forms, lists, and navigation — opens the screen studio.', style: TextStyle(fontSize: 12, color: subText)),
         const SizedBox(height: 10),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _QuickAddTile(theme: theme, icon: Icons.edit_note_rounded, label: 'Form', subtitle: 'Save data', onTap: () => _quickAddScreen('form')),
-              _QuickAddTile(theme: theme, icon: Icons.list_alt_rounded, label: 'List', subtitle: 'Show items', onTap: () => _quickAddScreen('list')),
-              _QuickAddTile(theme: theme, icon: Icons.dashboard_rounded, label: 'Menu', subtitle: 'Navigation', onTap: () => _quickAddScreen('menu')),
-              _QuickAddTile(theme: theme, icon: Icons.tune_rounded, label: 'Settings', subtitle: 'Toggles', onTap: () => _quickAddScreen('settings')),
+              _QuickAddTile(isDark: isDark, theme: theme, icon: Icons.edit_note_rounded, label: 'Form', subtitle: 'Save data', onTap: () => _quickAddScreen('form')),
+              _QuickAddTile(isDark: isDark, theme: theme, icon: Icons.list_alt_rounded, label: 'List', subtitle: 'Show items', onTap: () => _quickAddScreen('list')),
+              _QuickAddTile(isDark: isDark, theme: theme, icon: Icons.dashboard_rounded, label: 'Menu', subtitle: 'Navigation', onTap: () => _quickAddScreen('menu')),
+              _QuickAddTile(isDark: isDark, theme: theme, icon: Icons.tune_rounded, label: 'Settings', subtitle: 'Toggles', onTap: () => _quickAddScreen('settings')),
             ],
           ),
         ),
         const SizedBox(height: 18),
         Row(
           children: [
-            Text('Screens', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.grey.shade800)),
+            Text('Screens', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: titleColor)),
             const Spacer(),
-            Text('Drag ≡ to reorder', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+            Text('Drag ≡ to reorder', style: TextStyle(fontSize: 11, color: subText)),
           ],
         ),
         const SizedBox(height: 8),
@@ -1083,9 +1135,9 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
               key: ValueKey(s.id),
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isHome ? theme.withValues(alpha: 0.35) : Colors.grey.shade200, width: isHome ? 1.5 : 1),
+                border: Border.all(color: isHome ? theme.withValues(alpha: 0.35) : (isDark ? Colors.white10 : Colors.grey.shade200), width: isHome ? 1.5 : 1),
               ),
               child: Material(
                 color: Colors.transparent,
@@ -1098,7 +1150,7 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
                       children: [
                         ReorderableDragStartListener(
                           index: e,
-                          child: Icon(Icons.drag_handle_rounded, color: Colors.grey.shade400),
+                          child: Icon(Icons.drag_handle_rounded, color: isDark ? Colors.white38 : Colors.grey.shade400),
                         ),
                         const SizedBox(width: 8),
                         Container(
@@ -1113,7 +1165,7 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
                             children: [
                               Row(
                                 children: [
-                                  Expanded(child: Text(s.title, style: const TextStyle(fontWeight: FontWeight.w800))),
+                                  Expanded(child: Text(s.title, style: TextStyle(fontWeight: FontWeight.w800, color: titleColor))),
                                   if (isHome)
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1123,7 +1175,7 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
                                 ],
                               ),
                               const SizedBox(height: 2),
-                              Text(_screenWidgetSummary(s), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                              Text(_screenWidgetSummary(s), style: TextStyle(fontSize: 12, color: subText)),
                             ],
                           ),
                         ),
@@ -1154,24 +1206,7 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
         ),
         const SizedBox(height: 16),
         FilledButton.icon(
-          onPressed: () async {
-            final actor = kNgmyAppBuilderActors.firstWhere((a) => a.id == 'reviewer');
-            final review = await ngmyAppBuilderAiChat(
-              apiKey: widget.apiKey,
-              actor: actor,
-              userMessage: 'Review this app for publish readiness.',
-              project: _project,
-            );
-            if (!context.mounted) return;
-            showDialog<void>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('Sage Review'),
-                content: SingleChildScrollView(child: Text(review)),
-                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-              ),
-            );
-          },
+          onPressed: _runAiReview,
           icon: const Icon(Icons.fact_check_rounded),
           label: const Text('AI Review'),
           style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981), minimumSize: const Size(double.infinity, 48)),
@@ -1181,6 +1216,7 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
   }
 
   Future<void> _addNewScreen() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleC = TextEditingController(text: 'New Screen');
     final title = await showModalBottomSheet<String>(
       context: context,
@@ -1188,9 +1224,9 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.paddingOf(ctx).bottom + 24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1198,9 +1234,9 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
           children: [
             Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 16),
-            const Text('New screen', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            Text('New screen', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
             const SizedBox(height: 6),
-            Text('Opens the screen studio so you can add buttons, forms, lists, and menus.', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+            Text('Opens the screen studio so you can add buttons, forms, lists, and menus.', style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : Colors.grey.shade600)),
             const SizedBox(height: 16),
             TextField(
               controller: titleC,
@@ -1246,69 +1282,114 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = _project.theme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF07080F) : const Color(0xFFE8EDF5);
+    final headerText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final appTitle = _nameC.text.trim().isEmpty ? 'Edit App' : _nameC.text.trim();
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF4F6FA),
-        body: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) => [
-            SliverAppBar(
-              expandedHeight: 120,
-              pinned: true,
-              backgroundColor: theme,
-              foregroundColor: Colors.white,
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.only(left: 56, bottom: 52),
-                title: Text(
-                  _nameC.text.trim().isEmpty ? 'Edit App' : _nameC.text.trim(),
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
-                ),
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [theme, theme.withValues(alpha: 0.82)]),
-                  ),
-                ),
-              ),
-              actions: [
-                IconButton(icon: const Icon(Icons.download_rounded), tooltip: 'Download backup', onPressed: _exportCurrent),
-                IconButton(icon: const Icon(Icons.preview_rounded), tooltip: 'Preview', onPressed: () => NgmyNavigator.push(
-                      context,
-                      NgmyAppRuntimeScreen(project: _project, apiKey: widget.apiKey, email: widget.email),
-                      routeName: 'NgmyAppRuntimeScreen',
-                    )),
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilledButton(
-                    onPressed: _persistAndPop,
-                    style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: theme),
-                    child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
-                  ),
-                ),
-              ],
-              bottom: TabBar(
-                indicatorColor: Colors.white,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white70,
-                tabs: const [
-                  Tab(icon: Icon(Icons.dashboard_customize_rounded), text: 'Visual'),
-                  Tab(icon: Icon(Icons.code_rounded), text: 'Code'),
-                ],
-              ),
-            ),
-          ],
-          body: TabBarView(
+        backgroundColor: bg,
+        body: SafeArea(
+          child: Column(
             children: [
-              _buildVisualEditor(),
-              NgmyAppCodeStudioTab(
-                project: _project,
-                onProjectChanged: (p) {
-                  setState(() {
-                    _project = p;
-                    _nameC.text = p.name;
-                    _taglineC.text = p.tagline;
-                    _iconC.text = p.appIcon;
-                  });
-                },
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08)),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06), blurRadius: 10, offset: const Offset(0, 3))],
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.maybePop(context),
+                        icon: Icon(Icons.arrow_back_rounded, color: headerText, size: 22),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(appTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: headerText)),
+                            Text('My App', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: theme)),
+                          ],
+                        ),
+                      ),
+                      IconButton(icon: Icon(Icons.download_rounded, color: headerText), tooltip: 'Backup', onPressed: _exportCurrent),
+                      IconButton(
+                        icon: Icon(Icons.preview_rounded, color: headerText),
+                        tooltip: 'Preview',
+                        onPressed: () => NgmyNavigator.push(
+                          context,
+                          NgmyAppRuntimeScreen(project: _project, apiKey: widget.apiKey, email: widget.email),
+                          routeName: 'NgmyAppRuntimeScreen',
+                        ),
+                      ),
+                      FilledButton(
+                        onPressed: _persistAndPop,
+                        style: FilledButton.styleFrom(backgroundColor: theme, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 14)),
+                        child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: NgmyAppStudioContentFrame(
+                  isDark: isDark,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06)),
+                          ),
+                          child: TabBar(
+                            indicator: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              color: theme.withValues(alpha: isDark ? 0.35 : 0.18),
+                            ),
+                            indicatorSize: TabBarIndicatorSize.tab,
+                            dividerColor: Colors.transparent,
+                            labelColor: isDark ? Colors.white : theme,
+                            unselectedLabelColor: isDark ? Colors.white54 : Colors.black54,
+                            tabs: const [
+                              Tab(icon: Icon(Icons.dashboard_customize_rounded, size: 20), text: 'Visual'),
+                              Tab(icon: Icon(Icons.code_rounded, size: 20), text: 'Code'),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            _buildVisualEditor(isDark),
+                            NgmyAppCodeStudioTab(
+                              project: _project,
+                              onProjectChanged: (p) {
+                                setState(() {
+                                  _project = p;
+                                  _nameC.text = p.name;
+                                  _taglineC.text = p.tagline;
+                                  _iconC.text = p.appIcon;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -1325,7 +1406,8 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
 }
 
 class _QuickAddTile extends StatelessWidget {
-  const _QuickAddTile({required this.theme, required this.icon, required this.label, required this.subtitle, required this.onTap});
+  const _QuickAddTile({required this.isDark, required this.theme, required this.icon, required this.label, required this.subtitle, required this.onTap});
+  final bool isDark;
   final Color theme;
   final IconData icon;
   final String label;
@@ -1337,7 +1419,7 @@ class _QuickAddTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 10),
       child: Material(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: onTap,
@@ -1354,8 +1436,8 @@ class _QuickAddTile extends StatelessWidget {
               children: [
                 Icon(icon, color: theme),
                 const SizedBox(height: 8),
-                Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                Text(subtitle, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
+                Text(subtitle, style: TextStyle(fontSize: 10, color: isDark ? Colors.white60 : Colors.grey.shade600)),
               ],
             ),
           ),
