@@ -808,4 +808,13 @@ VENUE APP EXAMPLE — home screen:
 ]}
 
 NEVER use plain text screens for features users can interact with. Use forms + dataList + switches.
+
+BUTTON WIRING:
+{"type":"button","label":"Go to cart","target":"cart","action":"navigate","large":true}
+{"type":"button","label":"Show tip","action":"snack","message":"Thanks for visiting!"}
+{"type":"button","label":"Clear all","action":"clear","collection":"cart"}
+
+STORE APP MINIMUM SCREENS (when user asks for shop/store):
+home, add_product (form collection:products), products_list (dataList), cart (dataList collection:cart), checkout (form), settings (switches).
+Home menuGrid: Browse→products_list, Sell→add_product, Cart→cart, Settings→settings.
 ''';

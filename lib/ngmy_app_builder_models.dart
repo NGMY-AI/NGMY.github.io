@@ -1,6 +1,10 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+
+/// Prefix for [NgmyAppProject.appIcon] when the user uploads a custom image (base64 PNG/JPEG).
+const String kNgmyAppIconImagePrefix = 'ngmyimg:';
 
 enum NgmyAppBuilderStatus { draft, submitted, published, rejected }
 
@@ -90,7 +94,9 @@ const List<NgmyAppBuilderActor> kNgmyAppBuilderActors = [
         'fitness, e-commerce, school, church, games, portfolios, booking, CRM, dashboards, or custom code notes. '
         'You write full working JSON layouts AND can put raw code ideas in customCode. Users may also edit Code Studio themselves. '
         'Never refuse — always deliver ---APP_JSON--- when they want changes. Forms save data, lists show data, switches work, '
-        'dark_mode toggles theme. Keep stable screen ids when editing.',
+        'dark_mode toggles theme. Keep stable screen ids when editing. '
+        'Understand intent: "add a button that..." means create button widget + target screen + wire navigation. '
+        '"Build a store" means checkout, cart, add product form, product list, likes/favorites if relevant — full app not one screen.',
   ),
   NgmyAppBuilderActor(
     id: 'reviewer',
@@ -333,7 +339,21 @@ class NgmyAppProject {
 
   Color get theme => Color(themeColor);
 
-  String get displayIcon => appIcon.trim().isNotEmpty ? appIcon.trim() : '✨';
+  bool get hasUploadedIconImage => appIcon.startsWith(kNgmyAppIconImagePrefix);
+
+  Uint8List? get uploadedIconBytes {
+    if (!hasUploadedIconImage) return null;
+    try {
+      return base64Decode(appIcon.substring(kNgmyAppIconImagePrefix.length));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String get displayIcon {
+    if (hasUploadedIconImage) return '✨';
+    return appIcon.trim().isNotEmpty ? appIcon.trim() : '✨';
+  }
 
   NgmyAppScreen? screenById(String? id) {
     if (id == null || id.trim().isEmpty) return null;

@@ -2,8 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_app_builder_ai.dart';
+import 'ngmy_app_builder_icon.dart';
+import 'ngmy_app_builder_layout_utils.dart';
+import 'ngmy_app_builder_screen_editor.dart';
 import 'ngmy_app_builder_cloud.dart';
 import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
@@ -362,17 +366,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
           ),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            leading: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [p.theme, p.theme.withValues(alpha: 0.7)]),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [BoxShadow(color: p.theme.withValues(alpha: 0.35), blurRadius: 10)],
-              ),
-              alignment: Alignment.center,
-              child: Text(p.displayIcon, style: const TextStyle(fontSize: 24)),
-            ),
+            leading: NgmyAppProjectIcon(project: p, size: 48, fontSize: 24),
             title: Row(
               children: [
                 Expanded(child: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800))),
@@ -775,79 +769,58 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  void _quickAddScreen(String kind) {
-    final id = 'scr_${DateTime.now().millisecondsSinceEpoch}';
-    NgmyAppScreen screen;
-    switch (kind) {
-      case 'form':
-        screen = NgmyAppScreen(
-          id: id,
-          title: 'New Form',
-          kind: NgmyAppScreenKind.custom,
-          data: {
-            'layout': {
-              'type': 'column',
-              'children': [
-                {
-                  'type': 'form',
-                  'collection': 'entries',
-                  'submitLabel': 'Save',
-                  'successMessage': 'Saved!',
-                  'fields': [
-                    {'id': 'name', 'label': 'Name', 'type': 'text'},
-                    {'id': 'notes', 'label': 'Notes', 'type': 'text'},
-                  ],
-                },
-              ],
-            },
-          },
-        );
-      case 'list':
-        screen = NgmyAppScreen(
-          id: id,
-          title: 'My List',
-          kind: NgmyAppScreenKind.custom,
-          data: {
-            'layout': {
-              'type': 'column',
-              'children': [
-                {
-                  'type': 'dataList',
-                  'collection': 'entries',
-                  'titleField': 'name',
-                  'subtitleField': 'notes',
-                  'emptyText': 'No items yet.',
-                  'addLabel': 'Add item',
-                },
-              ],
-            },
-          },
-        );
-      case 'settings':
-        screen = NgmyAppScreen(
-          id: id,
-          title: 'Settings',
-          kind: NgmyAppScreenKind.custom,
-          data: {
-            'layout': {
-              'type': 'column',
-              'children': [
-                {'type': 'switch', 'setting': 'notifications', 'label': 'Notifications', 'default': true},
-                {'type': 'switch', 'setting': 'dark_mode', 'label': 'Dark mode', 'subtitle': 'Light when off, dark when on', 'default': false},
-              ],
-            },
-          },
-        );
-      default:
-        screen = NgmyAppScreen.menu(
-          id: id,
-          title: 'Menu',
-          items: [
-            {'label': 'Home', 'targetScreenId': _project.homeScreen.id, 'icon': 'home'},
-          ],
-        );
+  Future<void> _pickAppIcon() async {
+    final img = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 88, maxWidth: 256, maxHeight: 256);
+    if (img == null || !mounted) return;
+    final bytes = await img.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _iconC.text = '$kNgmyAppIconImagePrefix${base64Encode(bytes)}';
+      _saveLocal();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Custom icon uploaded'), behavior: SnackBarBehavior.floating));
+  }
+
+  void _clearAppIconImage() {
+    if (!_project.hasUploadedIconImage) return;
+    setState(() {
+      _iconC.text = '🚀';
+      _saveLocal();
+    });
+  }
+
+  Future<void> _openScreenEditor(int index) async {
+    final s = _project.screens[index];
+    final edited = await NgmyNavigator.push<NgmyAppScreen>(
+      context,
+      NgmyAppScreenEditorPage(
+        screen: s,
+        allScreens: _project.screens,
+        themeColor: _project.theme,
+        screenIndex: index,
+      ),
+      routeName: 'NgmyAppScreenEditorPage',
+    );
+    if (edited != null && mounted) {
+      final list = [..._project.screens];
+      list[index] = edited;
+      setState(() => _project = _project.copyWith(screens: list));
     }
-    setState(() => _project = _project.copyWith(screens: [..._project.screens, screen]));
+  }
+
+  Future<void> _quickAddScreen(String kind) async {
+    final screen = ngmyQuickAddScreen(kind, _project);
+    final screens = [..._project.screens, screen];
+    setState(() => _project = _project.copyWith(screens: screens));
+    if (!mounted) return;
+    final label = switch (kind) {
+      'form' => 'Form screen added — saves data to your app',
+      'list' => 'List screen added — shows saved items',
+      'settings' => 'Settings screen added — toggles work in preview',
+      _ => 'Menu screen added — links to your screens',
+    };
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(label), behavior: SnackBarBehavior.floating));
+    await _openScreenEditor(screens.length - 1);
   }
 
   Future<void> _openCopilot() async {
@@ -926,318 +899,466 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
     notesC.dispose();
   }
 
+  Widget _editorCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3))],
+      ),
+      child: child,
+    );
+  }
+
+  String _screenWidgetSummary(NgmyAppScreen s) {
+    final children = ngmyLayoutChildren(ngmyScreenEnsureEditable(s));
+    if (children.isEmpty) return s.kind.label;
+    final types = children.map((w) => ngmyWidgetTypeLabel((w['type'] ?? '').toString())).take(3).join(' · ');
+    final extra = children.length > 3 ? ' +${children.length - 3}' : '';
+    return '$types$extra';
+  }
+
   Widget _buildVisualEditor() {
+    final theme = _project.theme;
     return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
-        children: [
-          if (_project.publicUrl.isNotEmpty)
-            Card(
-              color: const Color(0xFF2563EB).withOpacity(0.08),
-              child: ListTile(
-                leading: const Icon(Icons.public_rounded, color: Color(0xFF2563EB)),
-                title: const Text('Public link', style: TextStyle(fontWeight: FontWeight.w800)),
-                subtitle: Text(_project.publicUrl, maxLines: 2, overflow: TextOverflow.ellipsis),
-                trailing: IconButton(
-                  icon: const Icon(Icons.copy_rounded),
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: _project.publicUrl));
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied!')));
-                  },
-                ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      children: [
+        if (_project.publicUrl.isNotEmpty)
+          _editorCard(
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: const Color(0xFF2563EB).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.public_rounded, color: Color(0xFF2563EB)),
+              ),
+              title: const Text('Public link', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text(_project.publicUrl, maxLines: 2, overflow: TextOverflow.ellipsis),
+              trailing: IconButton(
+                icon: const Icon(Icons.copy_rounded),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: _project.publicUrl));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied!')));
+                },
               ),
             ),
-          TextField(controller: _nameC, decoration: const InputDecoration(labelText: 'App name'), onChanged: (_) => _saveLocal()),
-          const SizedBox(height: 10),
-          TextField(controller: _taglineC, decoration: const InputDecoration(labelText: 'Tagline / Google description'), onChanged: (_) => _saveLocal()),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _iconC,
-            decoration: const InputDecoration(
-              labelText: 'App icon (emoji)',
-              hintText: '🚀 ✨ 🤖 💎',
-              prefixIcon: Icon(Icons.emoji_emotions_rounded),
-            ),
-            onChanged: (_) => _saveLocal(),
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: ['🚀', '✨', '🤖', '💎', '🔥', '⚡', '🎯', '🌟'].map((e) {
-              return ActionChip(
-                label: Text(e, style: const TextStyle(fontSize: 18)),
-                onPressed: () {
-                  _iconC.text = e;
-                  _saveLocal();
-                },
-              );
-            }).toList(),
+        _editorCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  NgmyAppProjectIcon(project: _project.copyWith(appIcon: _iconC.text.trim()), size: 56, fontSize: 28),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('App identity', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: theme)),
+                        const SizedBox(height: 4),
+                        Text(_nameC.text.trim().isEmpty ? 'Untitled app' : _nameC.text.trim(), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _nameC,
+                decoration: InputDecoration(
+                  labelText: 'App name',
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+                onChanged: (_) => _saveLocal(),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _taglineC,
+                decoration: InputDecoration(
+                  labelText: 'Tagline / Google description',
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+                onChanged: (_) => _saveLocal(),
+              ),
+              const SizedBox(height: 14),
+              Text('App icon', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.grey.shade700)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  for (final e in const ['🚀', '✨', '💎'])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Material(
+                        color: _iconC.text == e ? theme.withValues(alpha: 0.15) : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          onTap: () {
+                            _iconC.text = e;
+                            _saveLocal();
+                          },
+                          borderRadius: BorderRadius.circular(14),
+                          child: SizedBox(width: 52, height: 52, child: Center(child: Text(e, style: const TextStyle(fontSize: 26)))),
+                        ),
+                      ),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: _pickAppIcon,
+                    icon: const Icon(Icons.upload_rounded, size: 18),
+                    label: const Text('Upload'),
+                  ),
+                  if (_iconC.text.startsWith(kNgmyAppIconImagePrefix))
+                    IconButton(
+                      tooltip: 'Remove custom image',
+                      onPressed: _clearAppIconImage,
+                      icon: Icon(Icons.close_rounded, color: Colors.red.shade400),
+                    ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          ListTile(
+        ),
+        _editorCard(
+          child: ListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('External database (optional)', style: TextStyle(fontWeight: FontWeight.w800)),
-            subtitle: Text(_project.database.isConnected ? _project.database.provider.label : 'Optional — connect your own Firebase/Supabase'),
-            trailing: const Icon(Icons.storage_rounded),
+            leading: Icon(Icons.storage_rounded, color: theme),
+            title: const Text('External database', style: TextStyle(fontWeight: FontWeight.w800)),
+            subtitle: Text(_project.database.isConnected ? _project.database.provider.label : 'Optional — Firebase, Supabase, MongoDB'),
+            trailing: const Icon(Icons.chevron_right_rounded),
             onTap: _editDatabase,
           ),
-          const SizedBox(height: 16),
-          const Text('Quick add', style: TextStyle(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                ActionChip(
-                  avatar: const Icon(Icons.edit_note_rounded, size: 16),
-                  label: const Text('Form'),
-                  onPressed: () => _quickAddScreen('form'),
-                ),
-                const SizedBox(width: 8),
-                ActionChip(
-                  avatar: const Icon(Icons.list_alt_rounded, size: 16),
-                  label: const Text('List'),
-                  onPressed: () => _quickAddScreen('list'),
-                ),
-                const SizedBox(width: 8),
-                ActionChip(
-                  avatar: const Icon(Icons.dashboard_rounded, size: 16),
-                  label: const Text('Menu'),
-                  onPressed: () => _quickAddScreen('menu'),
-                ),
-                const SizedBox(width: 8),
-                ActionChip(
-                  avatar: const Icon(Icons.tune_rounded, size: 16),
-                  label: const Text('Settings'),
-                  onPressed: () => _quickAddScreen('settings'),
-                ),
-              ],
-            ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
+          child: Text('Quick add screens', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.grey.shade800)),
+        ),
+        Text('Ready-made screens with forms, lists, and navigation — opens the screen studio.', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        const SizedBox(height: 10),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _QuickAddTile(theme: theme, icon: Icons.edit_note_rounded, label: 'Form', subtitle: 'Save data', onTap: () => _quickAddScreen('form')),
+              _QuickAddTile(theme: theme, icon: Icons.list_alt_rounded, label: 'List', subtitle: 'Show items', onTap: () => _quickAddScreen('list')),
+              _QuickAddTile(theme: theme, icon: Icons.dashboard_rounded, label: 'Menu', subtitle: 'Navigation', onTap: () => _quickAddScreen('menu')),
+              _QuickAddTile(theme: theme, icon: Icons.tune_rounded, label: 'Settings', subtitle: 'Toggles', onTap: () => _quickAddScreen('settings')),
+            ],
           ),
-          const SizedBox(height: 16),
-          const Text('Screens — drag to reorder', style: TextStyle(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
-          ReorderableListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _project.screens.length,
-            onReorder: (oldIndex, newIndex) {
-              setState(() {
-                final list = [..._project.screens];
-                if (newIndex > oldIndex) newIndex -= 1;
-                final item = list.removeAt(oldIndex);
-                list.insert(newIndex, item);
-                _project = _project.copyWith(screens: list);
-              });
-            },
-            itemBuilder: (context, e) {
-              final s = _project.screens[e];
-              return Card(
-                key: ValueKey(s.id),
-                child: ListTile(
-                  leading: ReorderableDragStartListener(
-                    index: e,
-                    child: Icon(Icons.drag_handle_rounded, color: _project.theme),
+        ),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            Text('Screens', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.grey.shade800)),
+            const Spacer(),
+            Text('Drag ≡ to reorder', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          itemCount: _project.screens.length,
+          onReorder: (oldIndex, newIndex) {
+            setState(() {
+              final list = [..._project.screens];
+              if (newIndex > oldIndex) newIndex -= 1;
+              final item = list.removeAt(oldIndex);
+              list.insert(newIndex, item);
+              _project = _project.copyWith(screens: list);
+            });
+          },
+          itemBuilder: (context, e) {
+            final s = _project.screens[e];
+            final isHome = e == 0;
+            return Container(
+              key: ValueKey(s.id),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isHome ? theme.withValues(alpha: 0.35) : Colors.grey.shade200, width: isHome ? 1.5 : 1),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => _openScreenEditor(e),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Row(
+                      children: [
+                        ReorderableDragStartListener(
+                          index: e,
+                          child: Icon(Icons.drag_handle_rounded, color: Colors.grey.shade400),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: theme.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+                          child: Icon(s.kind.icon, color: theme, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(child: Text(s.title, style: const TextStyle(fontWeight: FontWeight.w800))),
+                                  if (isHome)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(color: theme.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                                      child: Text('HOME', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: theme)),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(_screenWidgetSummary(s), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                            ],
+                          ),
+                        ),
+                        IconButton(icon: Icon(Icons.edit_rounded, size: 20, color: theme), onPressed: () => _openScreenEditor(e)),
+                        IconButton(
+                          icon: Icon(Icons.delete_outline_rounded, size: 20, color: Colors.red.shade300),
+                          onPressed: _project.screens.length <= 1
+                              ? null
+                              : () => setState(() {
+                                    final list = [..._project.screens]..removeAt(e);
+                                    _project = _project.copyWith(screens: list);
+                                  }),
+                        ),
+                      ],
+                    ),
                   ),
-                  title: Row(
-                    children: [
-                      Icon(s.kind.icon, color: _project.theme, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(s.title, style: const TextStyle(fontWeight: FontWeight.w700))),
-                    ],
-                  ),
-                  subtitle: Text(s.kind.label),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
-                    onPressed: _project.screens.length <= 1
-                        ? null
-                        : () => setState(() {
-                              final list = [..._project.screens]..removeAt(e);
-                              _project = _project.copyWith(screens: list);
-                            }),
-                  ),
-                  onTap: () async {
-                    final edited = await _editScreenDialog(s);
-                    if (edited != null) {
-                      final list = [..._project.screens];
-                      list[e] = edited;
-                      setState(() => _project = _project.copyWith(screens: list));
-                    }
-                  },
                 ),
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () async {
-              final created = await _addScreenDialog();
-              if (created != null) {
-                setState(() => _project = _project.copyWith(screens: [..._project.screens, created]));
-              }
-            },
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Add screen'),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: () async {
-              final actor = kNgmyAppBuilderActors.firstWhere((a) => a.id == 'reviewer');
-              final review = await ngmyAppBuilderAiChat(
-                apiKey: widget.apiKey,
-                actor: actor,
-                userMessage: 'Review this app for publish readiness.',
-                project: _project,
-              );
-              if (!context.mounted) return;
-              showDialog<void>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Sage Review'),
-                  content: SingleChildScrollView(child: Text(review)),
-                  actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                ),
-              );
-            },
-            icon: const Icon(Icons.fact_check_rounded),
-            label: const Text('AI Review'),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981), minimumSize: const Size(double.infinity, 48)),
-          ),
-        ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _addNewScreen,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Add blank screen'),
+          style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: () async {
+            final actor = kNgmyAppBuilderActors.firstWhere((a) => a.id == 'reviewer');
+            final review = await ngmyAppBuilderAiChat(
+              apiKey: widget.apiKey,
+              actor: actor,
+              userMessage: 'Review this app for publish readiness.',
+              project: _project,
+            );
+            if (!context.mounted) return;
+            showDialog<void>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Sage Review'),
+                content: SingleChildScrollView(child: Text(review)),
+                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+              ),
+            );
+          },
+          icon: const Icon(Icons.fact_check_rounded),
+          label: const Text('AI Review'),
+          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981), minimumSize: const Size(double.infinity, 48)),
+        ),
+      ],
     );
+  }
+
+  Future<void> _addNewScreen() async {
+    final titleC = TextEditingController(text: 'New Screen');
+    final title = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.paddingOf(ctx).bottom + 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            const Text('New screen', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            Text('Opens the screen studio so you can add buttons, forms, lists, and menus.', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: titleC,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Screen name',
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, titleC.text.trim()),
+              style: FilledButton.styleFrom(backgroundColor: _project.theme, minimumSize: const Size(double.infinity, 48)),
+              child: const Text('Create & edit'),
+            ),
+          ],
+        ),
+      ),
+    );
+    titleC.dispose();
+    if (title == null || title.isEmpty || !mounted) return;
+    final id = 'scr_${DateTime.now().millisecondsSinceEpoch}';
+    final screen = NgmyAppScreen(
+      id: id,
+      title: title,
+      kind: NgmyAppScreenKind.custom,
+      data: {
+        'layout': {
+          'type': 'column',
+          'children': [
+            {'type': 'text', 'text': title, 'style': 'title'},
+            {'type': 'text', 'text': 'Tap + Add widget to build this screen.', 'style': 'subtitle'},
+          ],
+        },
+      },
+    );
+    setState(() => _project = _project.copyWith(screens: [..._project.screens, screen]));
+    await _openScreenEditor(_project.screens.length - 1);
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = _project.theme;
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Edit App', style: TextStyle(fontWeight: FontWeight.w900)),
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.dashboard_customize_rounded), text: 'Visual'),
-              Tab(icon: Icon(Icons.code_rounded), text: 'Code Studio'),
+        backgroundColor: const Color(0xFFF4F6FA),
+        body: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverAppBar(
+              expandedHeight: 120,
+              pinned: true,
+              backgroundColor: theme,
+              foregroundColor: Colors.white,
+              flexibleSpace: FlexibleSpaceBar(
+                titlePadding: const EdgeInsets.only(left: 56, bottom: 52),
+                title: Text(
+                  _nameC.text.trim().isEmpty ? 'Edit App' : _nameC.text.trim(),
+                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+                ),
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [theme, theme.withValues(alpha: 0.82)]),
+                  ),
+                ),
+              ),
+              actions: [
+                IconButton(icon: const Icon(Icons.download_rounded), tooltip: 'Download backup', onPressed: _exportCurrent),
+                IconButton(icon: const Icon(Icons.preview_rounded), tooltip: 'Preview', onPressed: () => NgmyNavigator.push(
+                      context,
+                      NgmyAppRuntimeScreen(project: _project, apiKey: widget.apiKey, email: widget.email),
+                      routeName: 'NgmyAppRuntimeScreen',
+                    )),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilledButton(
+                    onPressed: _persistAndPop,
+                    style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: theme),
+                    child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                ),
+              ],
+              bottom: TabBar(
+                indicatorColor: Colors.white,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white70,
+                tabs: const [
+                  Tab(icon: Icon(Icons.dashboard_customize_rounded), text: 'Visual'),
+                  Tab(icon: Icon(Icons.code_rounded), text: 'Code'),
+                ],
+              ),
+            ),
+          ],
+          body: TabBarView(
+            children: [
+              _buildVisualEditor(),
+              NgmyAppCodeStudioTab(
+                project: _project,
+                onProjectChanged: (p) {
+                  setState(() {
+                    _project = p;
+                    _nameC.text = p.name;
+                    _taglineC.text = p.tagline;
+                    _iconC.text = p.appIcon;
+                  });
+                },
+              ),
             ],
           ),
-          actions: [
-            IconButton(icon: const Icon(Icons.download_rounded), tooltip: 'Download backup', onPressed: _exportCurrent),
-            IconButton(icon: const Icon(Icons.smart_toy_rounded), tooltip: 'AI Copilot', onPressed: _openCopilot),
-            IconButton(
-              icon: const Icon(Icons.preview_rounded),
-              onPressed: () => NgmyNavigator.push(
-                    context,
-                    NgmyAppRuntimeScreen(project: _project, apiKey: widget.apiKey, email: widget.email),
-                    routeName: 'NgmyAppRuntimeScreen',
-                  ),
-            ),
-            TextButton(onPressed: _persistAndPop, child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800))),
-          ],
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _openCopilot,
           backgroundColor: const Color(0xFFF59E0B),
-          icon: const Icon(Icons.mic_rounded),
-          label: const Text('Ask AI'),
-        ),
-        body: TabBarView(
-          children: [
-            _buildVisualEditor(),
-            NgmyAppCodeStudioTab(
-              project: _project,
-              onProjectChanged: (p) {
-                setState(() {
-                  _project = p;
-                  _nameC.text = p.name;
-                  _taglineC.text = p.tagline;
-                });
-              },
-            ),
-          ],
+          icon: const Icon(Icons.auto_awesome_rounded),
+          label: const Text('Ask Bolt AI'),
         ),
       ),
     );
   }
+}
 
-  Future<NgmyAppScreen?> _editScreenDialog(NgmyAppScreen screen) async {
-    final titleC = TextEditingController(text: screen.title);
-    final bodyC = TextEditingController(text: (screen.data['body'] ?? screen.data['subtitle'] ?? '').toString());
-    return showDialog<NgmyAppScreen>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Edit ${screen.kind.label}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Title')),
-            const SizedBox(height: 8),
-            TextField(controller: bodyC, maxLines: 4, decoration: const InputDecoration(labelText: 'Text / subtitle / body')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final data = Map<String, dynamic>.from(screen.data);
-              if (screen.kind == NgmyAppScreenKind.welcome) {
-                data['subtitle'] = bodyC.text.trim();
-              } else if (screen.kind == NgmyAppScreenKind.content) {
-                data['body'] = bodyC.text.trim();
-              }
-              Navigator.pop(ctx, screen.copyWith(title: titleC.text.trim(), data: data));
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
+class _QuickAddTile extends StatelessWidget {
+  const _QuickAddTile({required this.theme, required this.icon, required this.label, required this.subtitle, required this.onTap});
+  final Color theme;
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
 
-  Future<NgmyAppScreen?> _addScreenDialog() async {
-    var kind = NgmyAppScreenKind.content;
-    final titleC = TextEditingController(text: 'New Screen');
-    return showDialog<NgmyAppScreen>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setST) => AlertDialog(
-          title: const Text('Add screen'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<NgmyAppScreenKind>(
-                value: kind,
-                decoration: const InputDecoration(labelText: 'Screen type'),
-                items: NgmyAppScreenKind.values
-                    .map((k) => DropdownMenuItem(value: k, child: Text(k.label)))
-                    .toList(),
-                onChanged: (v) => setST(() => kind = v ?? NgmyAppScreenKind.content),
-              ),
-              TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Title')),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                final id = 'scr_${DateTime.now().millisecondsSinceEpoch}';
-                final data = kind == NgmyAppScreenKind.custom
-                    ? {
-                        'layout': {
-                          'type': 'column',
-                          'children': [
-                            {'type': 'hero', 'emoji': '✨', 'title': titleC.text.trim(), 'subtitle': 'Edit in Code Studio or ask AI'},
-                            {'type': 'menuGrid', 'columns': 2, 'items': []},
-                          ],
-                        },
-                      }
-                    : const {'body': 'Your content here.'};
-                Navigator.pop(
-                  ctx,
-                  NgmyAppScreen(id: id, title: titleC.text.trim(), kind: kind, data: data),
-                );
-              },
-              child: const Text('Add'),
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: 108,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.withValues(alpha: 0.2)),
             ),
-          ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, color: theme),
+                const SizedBox(height: 8),
+                Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                Text(subtitle, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+              ],
+            ),
+          ),
         ),
       ),
     );
