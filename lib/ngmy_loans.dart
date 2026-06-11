@@ -1602,15 +1602,17 @@ class NgmyLoanTrackingScreen extends StatefulWidget {
   State<NgmyLoanTrackingScreen> createState() => _NgmyLoanTrackingScreenState();
 }
 
-class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with WidgetsBindingObserver {
+class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   Timer? _poll;
   bool _syncing = false;
   DateTime? _lastSync;
+  late final AnimationController _headerPulse;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _headerPulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
     unawaited(_pullLatest());
     _poll = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_pullLatest(silent: true)));
   }
@@ -1618,6 +1620,7 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
   @override
   void dispose() {
     _poll?.cancel();
+    _headerPulse.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -1755,6 +1758,181 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
     });
   }
 
+  Widget _buildPaymentsHeader({
+    required Map<String, dynamic> loan,
+    required double progress,
+    required int paidCount,
+    required int paymentCount,
+    required double paidTotal,
+    required double remaining,
+  }) {
+    final amount = (loan['amount'] as num?)?.toDouble() ?? 0;
+    final schedule = (loan['scheduleSummary'] ?? '').toString();
+    final titleLabel = widget.isAdmin ? 'Loan tracking' : 'My payments';
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(right: -24, top: -18, child: _headerGlowOrb(90, 0.1)),
+            Positioned(left: -30, bottom: 20, child: _headerGlowOrb(70, 0.07)),
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const Spacer(),
+                        if (_lastSync != null)
+                          AnimatedBuilder(
+                            animation: _headerPulse,
+                            builder: (context, child) {
+                              final glow = 0.55 + (_headerPulse.value * 0.45);
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.circle, color: Colors.white.withValues(alpha: glow), size: 6),
+                                    const SizedBox(width: 5),
+                                    const Text('Live', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white)),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.11),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '\$${ngmyLoanFormatCurrency(amount)}',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, height: 1),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    const Text('Active loan', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ),
+                              TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: progress),
+                                duration: const Duration(milliseconds: 900),
+                                curve: Curves.easeOutCubic,
+                                builder: (context, value, _) => SizedBox(
+                                  width: 44,
+                                  height: 44,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      CircularProgressIndicator(value: value, strokeWidth: 4, backgroundColor: Colors.white24, color: Colors.white),
+                                      Text('${(value * 100).round()}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (schedule.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                schedule,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 10, height: 1.25),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 10),
+                          Container(height: 1, color: Colors.white.withValues(alpha: 0.14)),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '$paidCount of $paymentCount received',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
+                                ),
+                              ),
+                              Text(
+                                '\$${ngmyLoanFormatCurrency(paidTotal)} paid',
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 10, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '\$${ngmyLoanFormatCurrency(remaining)} left to pay',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.white.withValues(alpha: 0.14),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                      ),
+                      child: Text(titleLabel, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Colors.white)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _headerGlowOrb(double size, double alpha) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: alpha)),
+      );
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1783,138 +1961,14 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            SliverAppBar(
-              expandedHeight: 210,
-              pinned: true,
-              backgroundColor: _loanGreen,
-              foregroundColor: Colors.white,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
-              ),
-              flexibleSpace: ClipRRect(
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
-                child: FlexibleSpaceBar(
-                  centerTitle: true,
-                  titlePadding: const EdgeInsets.only(bottom: 14),
-                  title: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      color: Colors.white.withValues(alpha: 0.14),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.38)),
-                    ),
-                    child: Text(
-                      widget.isAdmin ? 'Loan tracking' : 'My payments',
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.white),
-                    ),
-                  ),
-                  background: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                    ),
-                    child: SafeArea(
-                      bottom: false,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 52, 18, 52),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '\$${ngmyLoanFormatCurrency((loan['amount'] as num?)?.toDouble() ?? 0)}',
-                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, height: 1),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        const Text('Active loan', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          (loan['scheduleSummary'] ?? '').toString(),
-                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 11, height: 1.3),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                if (_lastSync != null) ...[
-                                  const SizedBox(width: 10),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.14),
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-                                    ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.circle, color: Colors.white, size: 6),
-                                        SizedBox(width: 5),
-                                        Text('Live', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width: 52,
-                                        height: 52,
-                                        child: CircularProgressIndicator(value: progress, strokeWidth: 4.5, backgroundColor: Colors.white24, color: Colors.white),
-                                      ),
-                                      Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
-                                    ],
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('$paidCount of ${payments.length} received', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          '\$${ngmyLoanFormatCurrency(paidTotal)} paid · \$${ngmyLoanFormatCurrency(remaining)} left',
-                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 11),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            SliverToBoxAdapter(child: _buildPaymentsHeader(
+              loan: loan,
+              progress: progress,
+              paidCount: paidCount,
+              paymentCount: payments.length,
+              paidTotal: paidTotal,
+              remaining: remaining,
+            )),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               sliver: SliverToBoxAdapter(
