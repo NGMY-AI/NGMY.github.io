@@ -527,30 +527,55 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
 
     return Scaffold(
       backgroundColor: ui.pageBg,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: ui.card,
+        backgroundColor: Colors.transparent,
         foregroundColor: ui.textPrimary,
         elevation: 0,
-        surfaceTintColor: ui.card,
-        leading: IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: ui.textPrimary), onPressed: () => Navigator.pop(context)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(color: _loanGreen, borderRadius: BorderRadius.circular(9)),
-              child: const Icon(Icons.trending_up_rounded, color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Text('Loan Services', style: TextStyle(fontWeight: FontWeight.w800, color: ui.textPrimary)),
-          ],
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new_rounded, color: ui.textPrimary, size: 20),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
+        title: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.92),
+            border: Border.all(color: _loanGreen.withValues(alpha: 0.35)),
+            boxShadow: [
+              BoxShadow(color: _loanGreen.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 4)),
+              BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06), blurRadius: 6),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)]),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.trending_up_rounded, color: Colors.white, size: 16),
+              ),
+              const SizedBox(width: 8),
+              Text('Loan Services', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: ui.textPrimary)),
+            ],
+          ),
+        ),
+        centerTitle: true,
       ),
       body: RefreshIndicator(
         color: _loanGreen,
         onRefresh: _refreshLoans,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + kToolbarHeight + 8, 20, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -560,27 +585,27 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
                 ...active.map((a) => _activeLoanHeroCard(context, a, isDark)),
               ],
               const SizedBox(height: 18),
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: ui.card,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: ui.border),
-                  boxShadow: isDark ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
-                ),
+              Center(
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(28),
                     onTap: () => _openApplication(context),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.description_outlined, color: _loanGreen, size: 22),
-                          SizedBox(width: 10),
-                          Text('Apply for a Loan', style: TextStyle(fontWeight: FontWeight.w800, color: _loanGreen, fontSize: 16)),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28),
+                        gradient: const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)]),
+                        boxShadow: [
+                          BoxShadow(color: _loanGreen.withValues(alpha: 0.4), blurRadius: 14, offset: const Offset(0, 5)),
+                        ],
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.description_outlined, color: Colors.white, size: 18),
+                          SizedBox(width: 8),
+                          Text('Apply for a Loan', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 14)),
                         ],
                       ),
                     ),
@@ -627,44 +652,84 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
             ),
             const SizedBox(height: 10),
             Text(
-              'Call ${widget.config.loanPhone} or apply with collateral. Up to 2 loans under \$1,000 — 1 loan if \$1,000+.',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13, height: 1.4),
+              'Call ${widget.config.loanPhone} or apply with collateral.',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Up to 2 loans under \$1,000 · 1 loan if \$1,000+.',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 11, fontWeight: FontWeight.w600),
             ),
           ],
         ),
       );
 
-  Widget _howItWorks(BuildContext context, bool isDark) => Stack(
+  Widget _howItWorks(BuildContext context, bool isDark) {
+    final lines = widget.config.loanHowItWorks.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: isDark ? const Color(0xFF151B28) : Colors.white,
+        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFD1FAE5)),
+        boxShadow: isDark ? null : [BoxShadow(color: _loanGreen.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 6))],
+      ),
+      child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(18, 18, 52, 18),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFE8F0FF),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFBFDBFE)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 48, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('How it works', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : _loanGreenDark)),
+                const SizedBox(height: 12),
+                ...lines.asMap().entries.map((e) {
+                  final text = e.value.replaceFirst(RegExp(r'^\d+\.\s*'), '').trim();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 22,
+                          height: 22,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(color: _loanGreen.withValues(alpha: 0.15), shape: BoxShape.circle),
+                          child: Text('${e.key + 1}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: _loanGreen)),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(text, style: TextStyle(fontSize: 12, height: 1.45, color: isDark ? Colors.white70 : Colors.black87))),
+                      ],
+                    ),
+                  );
+                }),
+              ],
             ),
-            child: Text(widget.config.loanHowItWorks, style: TextStyle(fontSize: 13, height: 1.7, color: isDark ? Colors.white70 : Colors.black87)),
           ),
           Positioned(
             top: 10,
             right: 10,
             child: Material(
-              color: _loanGreen.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(14),
+              color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(12),
                 onTap: () => showNgmyLoanCalculator(context),
-                child: const Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Icon(Icons.calculate_rounded, color: _loanGreen, size: 24),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)]),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [BoxShadow(color: _loanGreen.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))],
+                  ),
+                  child: const Icon(Icons.calculate_rounded, color: Colors.white, size: 18),
                 ),
               ),
             ),
           ),
         ],
-      );
+      ),
+    );
+  }
 
   Widget _activeLoanHeroCard(BuildContext context, Map<String, dynamic> app, bool isDark) {
     final amount = (app['amount'] as num?)?.toDouble() ?? 0;
@@ -1837,9 +1902,9 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 0.82,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 1.75,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, i) => _paymentGridTile(context, payments[i], isDark: isDark),
@@ -1900,70 +1965,61 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
   Widget _paymentGridTile(BuildContext context, Map<String, dynamic> p, {required bool isDark}) {
     final due = DateTime.tryParse((p['dueDate'] ?? '').toString())?.toLocal();
     final paid = (p['status'] ?? '') == 'paid';
-    final paidAmt = (p['paidAmount'] as num?)?.toDouble();
     final dueAmt = (p['amount'] as num?)?.toDouble() ?? 0;
     final paidAt = DateTime.tryParse((p['paidAt'] ?? '').toString())?.toLocal();
     final statusColor = paid ? _loanGreen : const Color(0xFFF59E0B);
-    return Container(
-      decoration: BoxDecoration(
-        gradient: paid
-            ? LinearGradient(colors: [_loanGreen.withValues(alpha: 0.18), _loanGreen.withValues(alpha: 0.06)], begin: Alignment.topLeft, end: Alignment.bottomRight)
-            : LinearGradient(colors: [isDark ? const Color(0xFF1A2235) : Colors.white, isDark ? const Color(0xFF151B28) : const Color(0xFFF9FAFB)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: statusColor.withValues(alpha: paid ? 0.55 : 0.3), width: paid ? 1.5 : 1),
-        boxShadow: paid ? [BoxShadow(color: _loanGreen.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))] : null,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: widget.isAdmin && !paid ? () => _recordPayment(p) : null,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    final dateLabel = paid && paidAt != null
+        ? '${paidAt.month}/${paidAt.day}'
+        : (due != null ? '${due.month}/${due.day}' : '—');
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: widget.isAdmin && !paid ? () => _recordPayment(p) : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: paid ? _loanGreen.withValues(alpha: isDark ? 0.14 : 0.08) : (isDark ? const Color(0xFF1A2235) : Colors.white),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: statusColor.withValues(alpha: paid ? 0.45 : 0.25)),
+          ),
+          child: Row(
+            children: [
+              Icon(paid ? Icons.check_circle_rounded : Icons.schedule_rounded, color: statusColor, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-                      child: Icon(paid ? Icons.verified_rounded : Icons.calendar_today_rounded, color: statusColor, size: 16),
+                    Row(
+                      children: [
+                        Text('Wk ${p['id']}', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : Colors.grey.shade600)),
+                        const SizedBox(width: 6),
+                        Text(dateLabel, style: TextStyle(fontSize: 9, color: isDark ? Colors.white38 : Colors.grey.shade500)),
+                      ],
                     ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
-                      child: Text(paid ? 'PAID' : 'DUE', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: statusColor, letterSpacing: 0.5)),
-                    ),
+                    Text('\$${ngmyLoanFormatCurrency(dueAmt)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87, height: 1.1)),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Text('Week ${p['id']}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : Colors.grey.shade600)),
-                const SizedBox(height: 2),
-                Text('\$${ngmyLoanFormatCurrency(dueAmt)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: isDark ? Colors.white : Colors.black87)),
-                const Spacer(),
-                Text(
-                  paid && paidAt != null
-                      ? '${paidAt.month}/${paidAt.day}/${paidAt.year}'
-                      : (due != null ? 'Due ${due.month}/${due.day}' : 'Scheduled'),
-                  style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.grey.shade600),
-                ),
-                if (paid && paidAmt != null)
-                  Text('Got \$${ngmyLoanFormatCurrency(paidAmt)}', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: statusColor)),
-                if (widget.isAdmin && !paid) ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(backgroundColor: _loanGreen, padding: const EdgeInsets.symmetric(vertical: 8), minimumSize: Size.zero),
-                      onPressed: () => _recordPayment(p),
-                      child: const Text('Record', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
-                    ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                child: Text(paid ? 'PAID' : 'DUE', style: TextStyle(fontSize: 7, fontWeight: FontWeight.w900, color: statusColor)),
+              ),
+              if (widget.isAdmin && !paid) ...[
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () => _recordPayment(p),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: _loanGreen, borderRadius: BorderRadius.circular(6)),
+                    child: const Icon(Icons.check_rounded, color: Colors.white, size: 12),
                   ),
-                ],
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ),
@@ -1973,6 +2029,7 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
 
 void showNgmyLoanCalculator(BuildContext context) {
   final amt = TextEditingController();
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -1986,32 +2043,83 @@ void showNgmyLoanCalculator(BuildContext context) {
         final weekly = term != null && term.weeks > 0 ? total / term.weeks : 0.0;
 
         return Container(
-          height: MediaQuery.of(context).size.height * 0.62,
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
           decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+            color: isDark ? const Color(0xFF151B28) : Colors.white,
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: _loanGreen.withValues(alpha: 0.3)),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 24, offset: const Offset(0, 8))],
           ),
-          padding: const EdgeInsets.all(25),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(99))),
-              const SizedBox(height: 20),
-              const Text('Loan Calculator', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              TextField(
-                controller: amt,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Loan amount (\$)', border: OutlineInputBorder()),
-                onChanged: (_) => setST(() {}),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)]),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.calculate_rounded, color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Loan Calculator', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                          Text('36% interest · weekly payments', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22)),
+                  ],
+                ),
               ),
-              const SizedBox(height: 20),
-              if (term != null) Text(term.summary, style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 12),
-              _calcRow('Interest (36%)', '\$${ngmyLoanFormatCurrency(interest)}', Colors.orange),
-              _calcRow('Total repayment', '\$${ngmyLoanFormatCurrency(total)}', Colors.blue),
-              if (weekly > 0) _calcRow('Each weekly payment', '\$${ngmyLoanFormatCurrency(weekly)}', Colors.green),
-              const Spacer(),
-              ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: amt,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        prefixText: '\$ ',
+                        prefixStyle: const TextStyle(color: _loanGreen, fontWeight: FontWeight.w900, fontSize: 18),
+                        hintText: '0',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF1E2535) : const Color(0xFFF0FDF4),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                      onChanged: (_) => setST(() {}),
+                    ),
+                    if (term != null) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(color: _loanGreen.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                        child: Text(term.summary, style: const TextStyle(color: _loanGreenDark, fontWeight: FontWeight.w700, fontSize: 12)),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    _calcCard('Interest (36%)', '\$${ngmyLoanFormatCurrency(interest)}', const Color(0xFFF59E0B), isDark),
+                    const SizedBox(height: 8),
+                    _calcCard('Total repayment', '\$${ngmyLoanFormatCurrency(total)}', const Color(0xFF3B82F6), isDark),
+                    if (weekly > 0) ...[
+                      const SizedBox(height: 8),
+                      _calcCard('Weekly payment', '\$${ngmyLoanFormatCurrency(weekly)}', _loanGreen, isDark, highlight: true),
+                    ],
+                  ],
+                ),
+              ),
             ],
           ),
         );
@@ -2020,13 +2128,19 @@ void showNgmyLoanCalculator(BuildContext context) {
   );
 }
 
-Widget _calcRow(String l, String v, Color c) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+Widget _calcCard(String label, String value, Color accent, bool isDark, {bool highlight = false}) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: highlight ? accent.withValues(alpha: 0.12) : (isDark ? const Color(0xFF1E2535) : const Color(0xFFF9FAFB)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: highlight ? accent.withValues(alpha: 0.4) : (isDark ? Colors.white10 : Colors.grey.shade200)),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(l),
-          Text(v, style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 17)),
+          Container(width: 4, height: 28, decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black54))),
+          Text(value, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 16)),
         ],
       ),
     );
