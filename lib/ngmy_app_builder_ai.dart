@@ -40,6 +40,8 @@ Future<NgmyAppBuilderCopilotResult> ngmyAppBuilderAiCopilot({
   final prompt = '''
 ${actor.systemPrompt}
 
+You can handle ANY App Studio request — new apps, edits, renames, theme changes, adding menus, forms, lists, settings, workouts, venues, databases, SEO, navigation, or fixing broken screens.
+
 You build WORKING apps — not text-only brochures. Every feature must FUNCTION:
 - Forms MUST have "collection" and save data (venues, check-ins, contacts, etc.)
 - Lists MUST use "dataList" widget bound to the same collection
@@ -76,6 +78,8 @@ IMPORTANT RESPONSE FORMAT:
 4) Keep screen ids stable when editing. Use target / targetScreenId for navigation.
 5) Use data.layout with form+dataList+switch+workoutPlan+stat widgets. Forms without "collection" are WRONG.
 6) When user asks for settings, venues, workouts, contact — build working UI not placeholder text.
+7) If the user says "change", "add", "remove", "fix", or "make it like" — always emit ---APP_JSON--- with the full updated app.
+8) You may add appIcon (emoji), themeColorHex, tagline, seoDescription, and multiple screens in one reply.
 
 $kNgmyAppBuilderCodeSchemaHelp
 
@@ -160,6 +164,7 @@ NgmyAppProject? _projectFromAiMap(Map<String, dynamic> map, NgmyAppProject? base
     seoDescription: (map['seoDescription'] ?? base?.seoDescription ?? map['tagline'] ?? '').toString(),
     database: database,
     customCode: (map['customCode'] ?? base?.customCode ?? '').toString(),
+    appIcon: (map['appIcon'] ?? base?.appIcon ?? '').toString(),
     publishedAt: base?.publishedAt,
     reviewNote: base?.reviewNote,
   );

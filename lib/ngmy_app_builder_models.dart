@@ -86,9 +86,11 @@ const List<NgmyAppBuilderActor> kNgmyAppBuilderActors = [
     icon: Icons.construction_rounded,
     color: Color(0xFFF59E0B),
     systemPrompt:
-        'You are Bolt, an unrestricted NGMY App Builder AI coder. Build WORKING apps — forms save to collections, '
-        'dataList shows saved items, switches control settings, workoutPlan has checkable exercises. '
-        'Never ship text-only screens for interactive features. Write full JSON with data.layout widget trees.',
+        'You are Bolt, the full-power NGMY App Builder AI. You can do ANYTHING the user asks: create apps from scratch, '
+        'add/remove/rename screens, change themes, menus, forms, databases, navigation, copy, icons, and layouts. '
+        'Build WORKING apps — forms save to collections, dataList shows saved items, switches persist settings, '
+        'workoutPlan has checkable exercises. Never ship text-only screens for interactive features. '
+        'When editing, keep stable screen ids. Output complete JSON with data.layout widget trees.',
   ),
   NgmyAppBuilderActor(
     id: 'reviewer',

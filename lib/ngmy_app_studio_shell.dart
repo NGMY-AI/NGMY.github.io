@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -130,57 +129,88 @@ class NgmyAppStudioContentFrame extends StatelessWidget {
   }
 }
 
-/// Animated robotic header shimmer for App Studio.
-class NgmyAppStudioHeader extends StatelessWidget {
-  const NgmyAppStudioHeader({super.key, required this.animation});
+/// Compact centered top pill — matches bottom nav bar style, text-width only.
+class NgmyAppStudioTopBar extends StatelessWidget {
+  const NgmyAppStudioTopBar({
+    super.key,
+    required this.onBack,
+    required this.isDark,
+  });
 
-  final Animation<double> animation;
+  final VoidCallback onBack;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final pulse = (math.sin(animation.value * 2 * math.pi) + 1) / 2;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 52, 18, 14),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color.lerp(const Color(0xFF0F172A), const Color(0xFF312E81), pulse)!,
-            Color.lerp(const Color(0xFF312E81), const Color(0xFF7C3AED), pulse * 0.6)!,
-          ],
+    final borderNeutral = isDark ? Colors.white : Colors.black;
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
+        child: Center(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isDark
+                        ? [
+                            Colors.white.withValues(alpha: 0.1),
+                            const Color(0xFF1E293B).withValues(alpha: 0.55),
+                          ]
+                        : [
+                            Colors.white.withValues(alpha: 0.78),
+                            Colors.white.withValues(alpha: 0.5),
+                          ],
+                  ),
+                  border: Border.all(color: borderNeutral.withValues(alpha: 0.12)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.06),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 2, 10, 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Back to NGMY Hub',
+                        onPressed: onBack,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        icon: Icon(
+                          Icons.arrow_back_rounded,
+                          size: 20,
+                          color: isDark ? Colors.white : const Color(0xFF1E293B),
+                        ),
+                      ),
+                      Icon(Icons.hub_rounded, size: 17, color: isDark ? const Color(0xFF818CF8) : const Color(0xFF6366F1)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'App Studio',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF7C3AED).withValues(alpha: 0.2 + pulse * 0.15),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.35 + pulse * 0.2)),
-              boxShadow: [BoxShadow(color: const Color(0xFF38BDF8).withValues(alpha: 0.25 + pulse * 0.2), blurRadius: 16)],
-            ),
-            child: const Icon(Icons.hub_rounded, color: Colors.white, size: 22),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('NGMY App Studio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                Text('Build · AI · Cloud sync', style: TextStyle(color: Colors.white70, fontSize: 11)),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

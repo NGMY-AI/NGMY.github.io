@@ -265,10 +265,12 @@ class NgmyCommunicateProfile {
         'therapist' =>
           'ROLE: Licensed-style therapist. Professional, comforting, smart. Reflect feelings, ask thoughtful questions, offer coping tools. Never replace emergency care.\n',
         'teacher' =>
-          'ROLE: Dedicated teacher and homework helper. When users send photos of homework, worksheets, textbooks, or notes, read every visible question carefully.\n'
-          'DEFAULT STYLE: Explain step by step in the simplest words — one question at a time unless they ask for all. Celebrate effort; never shame them.\n'
-          'If they ask for straight answers only, give clear answers. If they ask to explain, teach the method too. When they want a simpler or different explanation, offer another approach.\n'
-          'For math: show each step. For reading/writing: break down the idea. Ask what grade or subject if unclear.\n',
+          'ROLE: Dedicated teacher and homework helper. NEVER generate, draw, or send images — text replies only.\n'
+          'When users send homework photos, READ AND REMEMBER every word, number, and question on the image. You already saw their photos in this chat — never ask them to retype questions that were on a photo they sent.\n'
+          'DEFAULT: Explain step by step in the simplest words — one question at a time unless they ask for all. Celebrate effort; never shame them.\n'
+          'Straight answers when asked; full explanations when asked. Offer simpler or different approaches on request.\n'
+          'Use markdown tables, bullet lists, numbered steps, and outline structures (like slides) when it helps — you cannot attach files but format clearly in text.\n'
+          'For math: show each step. For reading/writing: break down the idea.\n',
         'lawyer' =>
           'ROLE: Experienced attorney. Professional, analytical, confident. Explain legal concepts, options, and risks clearly. Not a substitute for formal representation.\n',
         'financial_advisor' =>
@@ -1090,8 +1092,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         : explain || text.isEmpty
             ? 'Explain STEP BY STEP in the SIMPLEST words — one question at a time unless they asked for all. Show your work for math.'
             : 'Default: explain simply step by step; if they only want answers, give answers clearly.';
-    return 'HOMEWORK PHOTO: Read every visible question on the image carefully. $style '
-        'If something is blurry or cut off, say what you can see and ask them to resend or type the missing part.\n';
+    return 'HOMEWORK PHOTO: OCR the entire image — every question number, equation, word, and instruction. '
+        'List mentally all questions you see, then answer using that content. $style '
+        'Never ask the user to retype questions already visible on their photo. '
+        'If something is blurry or cut off, say what you can see and ask only about the missing part.\n';
   }
 
   Future<void> _send() async {
@@ -1112,13 +1116,18 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       _pendingImageMime = 'image/jpeg';
       _busy = true;
     });
-    await NgmyCommunicateMemoryStore.append(
-      _email,
-      widget.profile.id,
-      role: 'user',
-      text: displayText,
-      imageB64: imageB64,
-    );
+    if (imageB64 != null) {
+      await NgmyCommunicateMemoryStore.appendWithMime(
+        _email,
+        widget.profile.id,
+        role: 'user',
+        text: displayText,
+        imageB64: imageB64,
+        imageMime: imageMime,
+      );
+    } else {
+      await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'user', text: displayText);
+    }
     _scrollBottom();
 
     final apiKey = widget.apiKey.trim();
@@ -1136,6 +1145,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       final creds = ngmyParseAiCredentials(apiKey);
       final wantsImage = text.isNotEmpty &&
+          !_allowsPhotoUpload &&
           ngmyUserRequestedChatImage(text) &&
           (_isAdmin || ngmyCommunicateRoleAllowsChatImages(widget.profile.role));
       final userSentPhoto = imageB64 != null && _allowsPhotoUpload;
@@ -1190,11 +1200,21 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         }
       } else {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
+        final recentPhotos = _allowsPhotoUpload ? NgmyCommunicateMemoryStore.recentUserImages(mem) : const <NgmyAiImagePart>[];
+        final homeworkCtx = recentPhotos.isNotEmpty
+            ? 'HOMEWORK MEMORY: They already sent homework photo(s) in this chat. Re-read the image(s) — answer using what is ON the photo. '
+                'Do NOT ask them to type questions that are visible on their homework image.\n'
+            : '';
+        final visionHint = recentPhotos.isNotEmpty ? _homeworkVisionInstruction(text, hasPhoto: true) : '';
         final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner)}\n'
+            '$homeworkCtx'
+            '$visionHint'
             '${transcript.isNotEmpty ? '$transcript\n' : ''}'
             'They just texted: $text\n'
             'Reply as ${widget.profile.name} only — natural human text, not overly eager:';
-        final result = await ngmyAiGenerateWithCredentials(creds, prompt);
+        final result = recentPhotos.isNotEmpty
+            ? await ngmyAiGenerateWithCredentials(creds, prompt, images: recentPhotos)
+            : await ngmyAiGenerateWithCredentials(creds, prompt);
         final reply = (result.text != null && result.text!.trim().isNotEmpty)
             ? result.text!.trim()
             : ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: result.error);

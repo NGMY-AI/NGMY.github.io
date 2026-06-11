@@ -116,9 +116,8 @@ class NgmyAppBuilderScreen extends StatefulWidget {
   State<NgmyAppBuilderScreen> createState() => _NgmyAppBuilderScreenState();
 }
 
-class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with SingleTickerProviderStateMixin {
+class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
   int _tabIndex = 0;
-  late AnimationController _headerFx;
   List<NgmyAppProject> _mine = [];
   List<NgmyAppProject> _published = [];
   bool _loading = true;
@@ -131,14 +130,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
   @override
   void initState() {
     super.initState();
-    _headerFx = AnimationController(vsync: this, duration: const Duration(seconds: 5))..repeat();
     _reload();
-  }
-
-  @override
-  void dispose() {
-    _headerFx.dispose();
-    super.dispose();
   }
 
   Future<void> _reload() async {
@@ -282,9 +274,9 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
       backgroundColor: bg,
       body: Column(
         children: [
-          AnimatedBuilder(
-            animation: _headerFx,
-            builder: (_, __) => NgmyAppStudioHeader(animation: _headerFx),
+          NgmyAppStudioTopBar(
+            isDark: isDark,
+            onBack: () => NgmyNavigator.pop(context),
           ),
           Expanded(
             child: _loading

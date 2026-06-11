@@ -30,20 +30,34 @@ class NgmyAppBundle {
 
   static NgmyAppBundle? fromMap(Map<String, dynamic> map) {
     final marker = map[kNgmyAppBundleMarker];
-    if (marker == null && map['project'] is! Map) return null;
     final projectRaw = map['project'];
-    if (projectRaw is! Map) return null;
-    final project = NgmyAppProject.fromMap(Map<String, dynamic>.from(projectRaw));
-    final runtime = map['runtimeData'];
-    return NgmyAppBundle(
-      project: project,
-      runtimeData: runtime is Map ? Map<String, dynamic>.from(runtime) : const {},
-    );
+    if (projectRaw is Map) {
+      try {
+        final project = NgmyAppProject.fromMap(Map<String, dynamic>.from(projectRaw));
+        final runtime = map['runtimeData'];
+        return NgmyAppBundle(
+          project: project,
+          runtimeData: runtime is Map ? Map<String, dynamic>.from(runtime) : const {},
+        );
+      } catch (e) {
+        debugPrint('[app bundle fromMap project] $e');
+      }
+    }
+    if (marker == null && map['screens'] is List && map['name'] != null) {
+      try {
+        return NgmyAppBundle(project: NgmyAppProject.fromMap(map));
+      } catch (e) {
+        debugPrint('[app bundle fromMap flat] $e');
+      }
+    }
+    return null;
   }
 
   static NgmyAppBundle? parseJson(String raw) {
     try {
-      final decoded = jsonDecode(raw);
+      var text = raw.trim();
+      if (text.startsWith('\uFEFF')) text = text.substring(1);
+      final decoded = jsonDecode(text);
       if (decoded is! Map) return null;
       return fromMap(Map<String, dynamic>.from(decoded));
     } catch (e) {
@@ -55,7 +69,10 @@ class NgmyAppBundle {
   static bool looksLikeBundle(String raw) {
     final trimmed = raw.trim();
     if (!trimmed.startsWith('{')) return false;
-    return trimmed.contains(kNgmyAppBundleMarker) || trimmed.contains('"project"');
+    final lower = trimmed.toLowerCase();
+    return lower.contains(kNgmyAppBundleMarker.toLowerCase()) ||
+        trimmed.contains('"project"') ||
+        (lower.contains('"screens"') && lower.contains('"name"'));
   }
 }
 
@@ -77,24 +94,43 @@ Future<String> ngmyDownloadAppBundle(NgmyAppProject project) async {
 Future<NgmyAppProject?> ngmyImportAppBundleFromJson(String email, String raw) async {
   final bundle = NgmyAppBundle.parseJson(raw);
   if (bundle == null) return null;
-  await NgmyAppDataStore.importRawData(bundle.project.id, bundle.runtimeData);
+  try {
+    await NgmyAppDataStore.importRawData(bundle.project.id, bundle.runtimeData);
+  } catch (e) {
+    debugPrint('[app bundle import runtime] $e');
+  }
+  final owner = email.toLowerCase().trim();
   final project = bundle.project.copyWith(
-    ownerEmail: email.toLowerCase().trim(),
+    ownerEmail: owner.isNotEmpty ? owner : bundle.project.ownerEmail,
     updatedAt: DateTime.now().toUtc().toIso8601String(),
   );
-  await ngmySaveUserAppProject(email, project);
+  await ngmySaveUserAppProject(owner.isNotEmpty ? owner : project.ownerEmail, project);
   return project;
 }
 
 Future<String?> _readPickedBackupText(PlatformFile file) async {
   if (file.bytes != null && file.bytes!.isNotEmpty) {
-    return utf8.decode(file.bytes!);
+    return utf8.decode(file.bytes!, allowMalformed: true);
   }
   if (!kIsWeb && file.path != null && file.path!.trim().isNotEmpty) {
     try {
       return await File(file.path!).readAsString();
     } catch (e) {
       debugPrint('[app bundle import] read path: $e');
+    }
+  }
+  final stream = file.readStream;
+  if (stream != null) {
+    try {
+      final chunks = <int>[];
+      await for (final chunk in stream) {
+        chunks.addAll(chunk);
+      }
+      if (chunks.isNotEmpty) {
+        return utf8.decode(chunks, allowMalformed: true);
+      }
+    } catch (e) {
+      debugPrint('[app bundle import] read stream: $e');
     }
   }
   return null;
@@ -113,19 +149,24 @@ class NgmyAppBundleImportResult {
 Future<NgmyAppBundleImportResult> ngmyPickAndImportAppBundleDetailed(String email) async {
   try {
     final result = await FilePicker.platform.pickFiles(
-      type: kIsWeb ? FileType.custom : FileType.any,
-      allowedExtensions: kIsWeb ? const ['json', 'ngmy'] : null,
-      withData: kIsWeb,
+      type: FileType.any,
+      withData: true,
       allowMultiple: false,
     );
     if (result == null || result.files.isEmpty) {
       return const NgmyAppBundleImportResult(errorMessage: 'No file selected.');
     }
     final file = result.files.first;
+    final name = file.name.toLowerCase();
+    if (!name.endsWith('.json') && !name.endsWith('.ngmy')) {
+      return const NgmyAppBundleImportResult(
+        errorMessage: 'Please choose a .json or .ngmy.json backup file from App Studio.',
+      );
+    }
     final raw = await _readPickedBackupText(file);
     if (raw == null || raw.trim().isEmpty) {
       return const NgmyAppBundleImportResult(
-        errorMessage: 'Could not read file. Try the .ngmy.json backup you downloaded from App Studio.',
+        errorMessage: 'Could not read file. Re-download your .ngmy.json backup from App Studio and try again.',
       );
     }
     if (!NgmyAppBundle.looksLikeBundle(raw)) {
@@ -136,7 +177,7 @@ Future<NgmyAppBundleImportResult> ngmyPickAndImportAppBundleDetailed(String emai
     final imported = await ngmyImportAppBundleFromJson(email, raw);
     if (imported == null) {
       return const NgmyAppBundleImportResult(
-        errorMessage: 'Invalid backup format. Re-download your app from App Studio and try again.',
+        errorMessage: 'Invalid backup format. Export again from App Studio → menu → Download backup.',
       );
     }
     return NgmyAppBundleImportResult(project: imported);

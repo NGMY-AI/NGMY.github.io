@@ -56,6 +56,16 @@ class NgmyCommunicateMemoryStore {
     required String role,
     required String text,
     String? imageB64,
+  }) async =>
+      appendWithMime(email, profileId, role: role, text: text, imageB64: imageB64);
+
+  static Future<void> appendWithMime(
+    String email,
+    String profileId, {
+    required String role,
+    required String text,
+    String? imageB64,
+    String imageMime = 'image/jpeg',
   }) async {
     if (email.trim().isEmpty || profileId.trim().isEmpty) return;
     final trimmed = text.trim();
@@ -67,7 +77,11 @@ class NgmyCommunicateMemoryStore {
       'text': trimmed,
       'at': DateTime.now().toUtc().toIso8601String(),
     };
-    if (img.isNotEmpty) row['imageB64'] = img;
+    if (img.isNotEmpty) {
+      row['imageB64'] = img;
+      final mime = imageMime.trim();
+      if (mime.isNotEmpty) row['imageMime'] = mime;
+    }
     list.add(row);
     await saveAll(email, profileId, list);
   }
@@ -85,7 +99,11 @@ class NgmyCommunicateMemoryStore {
       final at = DateTime.tryParse((m['at'] ?? '').toString()) ?? now;
       if (at.isBefore(cutoff)) continue;
       final row = <String, dynamic>{'role': role, 'text': text, 'at': at.toUtc().toIso8601String()};
-      if (imageB64.isNotEmpty) row['imageB64'] = imageB64;
+      if (imageB64.isNotEmpty) {
+        row['imageB64'] = imageB64;
+        final mime = (m['imageMime'] ?? '').toString().trim();
+        if (mime.isNotEmpty) row['imageMime'] = mime;
+      }
       cleaned.add(row);
     }
     while (cleaned.length > maxStoredMessages) {
@@ -105,9 +123,34 @@ class NgmyCommunicateMemoryStore {
     final buf = StringBuffer('Your conversation history with this person (remember everything):\n');
     for (final m in slice) {
       final who = m['role'] == 'user' ? 'Them' : 'You';
-      buf.writeln('$who: ${m['text']}');
+      final text = (m['text'] ?? '').toString().trim();
+      final img = (m['imageB64'] ?? '').toString().trim();
+      if (img.isNotEmpty && who == 'Them') {
+        buf.writeln('$who: ${text.isEmpty ? '[sent homework photo]' : '$text [+ homework photo]'}');
+      } else {
+        buf.writeln('$who: $text');
+      }
     }
     return buf.toString();
+  }
+
+  /// Recent user homework photos still in chat memory (newest last).
+  static List<({String mimeType, String data})> recentUserImages(
+    List<Map<String, dynamic>> memory, {
+    int maxImages = 2,
+    int withinLastMessages = 20,
+  }) {
+    final slice = memory.length <= withinLastMessages ? memory : memory.sublist(memory.length - withinLastMessages);
+    final found = <({String mimeType, String data})>[];
+    for (final m in slice) {
+      if (m['role'] != 'user') continue;
+      final data = (m['imageB64'] ?? '').toString().trim();
+      if (data.isEmpty) continue;
+      final mime = (m['imageMime'] ?? 'image/jpeg').toString().trim();
+      found.add((mimeType: mime.isEmpty ? 'image/jpeg' : mime, data: data));
+    }
+    if (found.length <= maxImages) return found;
+    return found.sublist(found.length - maxImages);
   }
 }
 
