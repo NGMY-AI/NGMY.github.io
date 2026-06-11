@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'ngmy_app_builder_ai.dart';
+import 'ngmy_app_builder_ai_usage.dart';
 import 'ngmy_app_builder_runtime.dart';
 import 'ngmy_app_builder_layout_utils.dart';
 import 'ngmy_app_builder_models.dart';
@@ -17,6 +18,13 @@ class NgmyAppScreenEditorPage extends StatefulWidget {
     required this.themeColor,
     this.screenIndex = 0,
     this.apiKey = '',
+    this.email = '',
+    this.config,
+    this.user,
+    this.isAdmin = false,
+    this.onChargeWallet,
+    this.onDataChanged,
+    this.onPersistConfig,
   });
 
   final NgmyAppScreen screen;
@@ -24,6 +32,13 @@ class NgmyAppScreenEditorPage extends StatefulWidget {
   final Color themeColor;
   final int screenIndex;
   final String apiKey;
+  final String email;
+  final dynamic config;
+  final dynamic user;
+  final bool isAdmin;
+  final Future<bool> Function(double amount, String description)? onChargeWallet;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
 
   @override
   State<NgmyAppScreenEditorPage> createState() => _NgmyAppScreenEditorPageState();
@@ -90,6 +105,13 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
         isDark: isDark,
         apiKey: widget.apiKey,
         screen: _buildResult(),
+        email: widget.email,
+        config: widget.config,
+        user: widget.user,
+        isAdmin: widget.isAdmin,
+        onChargeWallet: widget.onChargeWallet,
+        onDataChanged: widget.onDataChanged,
+        onPersistConfig: widget.onPersistConfig,
       ),
     );
     if (updated != null && mounted) {
@@ -149,6 +171,20 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
     ctrl.dispose();
     if (request == null || request.isEmpty || !mounted) return;
 
+    if (!await NgmyAppBuilderAiUsage.ensureAccess(
+      context: context,
+      config: widget.config,
+      email: widget.email,
+      isNewAppRequest: false,
+      isAdmin: widget.isAdmin,
+      user: widget.user,
+      onCharge: widget.onChargeWallet,
+      onDataChanged: widget.onDataChanged,
+      onPersistConfig: widget.onPersistConfig,
+    )) {
+      return;
+    }
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -172,6 +208,10 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
 
     if (!mounted) return;
     Navigator.pop(context);
+
+    if (!widget.isAdmin && widget.email.isNotEmpty) {
+      await NgmyAppBuilderAiUsage.recordPrompt(widget.email);
+    }
 
     if (result.screen != null) {
       final s = ngmyScreenEnsureEditable(result.screen!);
@@ -597,6 +637,11 @@ class _AddWidgetSheet extends StatelessWidget {
       ('checklist', 'Checklist', Icons.checklist),
       ('workout', 'Workout plan', Icons.fitness_center),
     ],
+    'QR & Invoices': [
+      ('qrGenerator', 'QR generator', Icons.qr_code_2),
+      ('qrCode', 'Static QR', Icons.qr_code),
+      ('invoiceBuilder', 'Invoice', Icons.receipt_long),
+    ],
     'Layout': [
       ('spacer', 'Spacer', Icons.space_bar),
       ('divider', 'Divider', Icons.horizontal_rule),
@@ -694,6 +739,13 @@ class _WidgetEditorSheet extends StatefulWidget {
     required this.isDark,
     this.apiKey = '',
     this.screen,
+    this.email = '',
+    this.config,
+    this.user,
+    this.isAdmin = false,
+    this.onChargeWallet,
+    this.onDataChanged,
+    this.onPersistConfig,
   });
   final Map<String, dynamic> widget;
   final List<NgmyAppScreen> screens;
@@ -701,6 +753,13 @@ class _WidgetEditorSheet extends StatefulWidget {
   final bool isDark;
   final String apiKey;
   final NgmyAppScreen? screen;
+  final String email;
+  final dynamic config;
+  final dynamic user;
+  final bool isAdmin;
+  final Future<bool> Function(double amount, String description)? onChargeWallet;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
 
   @override
   State<_WidgetEditorSheet> createState() => _WidgetEditorSheetState();
@@ -740,6 +799,20 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
     ctrl.dispose();
     if (request == null || request.isEmpty || !mounted) return;
 
+    if (!await NgmyAppBuilderAiUsage.ensureAccess(
+      context: context,
+      config: widget.config,
+      email: widget.email,
+      isNewAppRequest: false,
+      isAdmin: widget.isAdmin,
+      user: widget.user,
+      onCharge: widget.onChargeWallet,
+      onDataChanged: widget.onDataChanged,
+      onPersistConfig: widget.onPersistConfig,
+    )) {
+      return;
+    }
+
     final prompt = 'Only change the ${ngmyWidgetTypeLabel((_w['type'] ?? '').toString())} widget. '
         'Current widget JSON: ${jsonEncode(_w)}. User request: $request';
     final result = await ngmyAppBuilderAiEditScreen(
@@ -749,6 +822,9 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
       userMessage: prompt,
     );
     if (!mounted) return;
+    if (!widget.isAdmin && widget.email.isNotEmpty) {
+      await NgmyAppBuilderAiUsage.recordPrompt(widget.email);
+    }
     final layout = ngmyScreenLayout(result.screen ?? widget.screen!);
     final children = layout?['children'];
     if (children is List && children.isNotEmpty) {

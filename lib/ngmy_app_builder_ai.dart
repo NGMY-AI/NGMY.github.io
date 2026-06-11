@@ -42,9 +42,17 @@ ${actor.systemPrompt}
 
 You can handle ANY App Studio request — new apps, edits, renames, theme changes, dark/light mode toggles, adding menus, forms, lists, settings, workouts, venues, databases, SEO, navigation, or fixing broken screens.
 
-NEVER say a feature is impossible or limited. App Studio is FREE and UNLIMITED — no caps on screens, features, or complexity.
+NEVER say a feature is impossible. You can build ANY app type — media feeds, stores, invoices, QR, video hubs, social, fitness, booking, dashboards — with no cap on screens or complexity.
 Dark mode WORKS: switch setting "dark_mode". Users can write custom code in customCode and edit Code Studio.
 Always emit ---APP_JSON--- when they want any change. Build like a professional no-code app creator.
+
+CRITICAL — CREATE / BUILD / MAKE / GENERATE requests:
+If the user asks to CREATE, BUILD, MAKE, GENERATE, or "give me" an app (QR code, invoice, video links, store, anything) — you MUST ALWAYS end your reply with ---APP_JSON--- containing a COMPLETE working app. Never reply with only instructions or "I can't". You CAN build everything using layout widgets.
+
+QR CODE APPS: use {"type":"qrGenerator","mode":"url"} and {"type":"qrGenerator","mode":"text"} screens + dataList of saved codes.
+INVOICE APPS: use {"type":"invoiceBuilder","collection":"invoices"} + dataList of invoices.
+VIDEO / DOWNLOAD LINK APPS: form saves url field + dataList with urlField:"url" so tapping opens the link.
+MEDIA / SOCIAL APPS: post form (collection: posts) with imageUrl/caption fields + feed dataList + profile stat + settings. Wire home menuGrid to Post, Feed, Profile.
 
 You build WORKING apps — not text-only brochures. Every feature must FUNCTION:
 - Forms MUST have "collection" and save data (venues, check-ins, contacts, etc.)
@@ -123,6 +131,23 @@ User: $userMessage
 NgmyAppBuilderCopilotResult _parseCopilotReply(String raw, NgmyAppProject? base) {
   final marker = '---APP_JSON---';
   if (!raw.contains(marker)) {
+    final fallback = _extractJson(raw);
+    if (fallback != null) {
+      try {
+        final decoded = jsonDecode(fallback);
+        if (decoded is Map) {
+          final updated = _projectFromAiMap(Map<String, dynamic>.from(decoded), base);
+          if (updated != null && _projectHasUsableScreens(updated)) {
+            return NgmyAppBuilderCopilotResult(
+              message: '${raw.trim()}\n\n(Done — I applied the app JSON from your reply.)',
+              updatedProject: updated,
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('[app builder copilot fallback] $e');
+      }
+    }
     return NgmyAppBuilderCopilotResult(message: raw.trim());
   }
   final parts = raw.split(marker);
@@ -151,6 +176,14 @@ NgmyAppBuilderCopilotResult _parseCopilotReply(String raw, NgmyAppProject? base)
   }
 }
 
+bool _projectHasUsableScreens(NgmyAppProject p) {
+  if (p.screens.isEmpty) return false;
+  if (p.screens.length > 1) return true;
+  final s = p.screens.first;
+  if (ngmyScreenLayout(s) != null) return true;
+  return s.kind != NgmyAppScreenKind.content;
+}
+
 NgmyAppProject? _projectFromAiMap(Map<String, dynamic> map, NgmyAppProject? base) {
   final screensRaw = map['screens'];
   final screens = <NgmyAppScreen>[];
@@ -160,6 +193,7 @@ NgmyAppProject? _projectFromAiMap(Map<String, dynamic> map, NgmyAppProject? base
     }
   }
   if (screens.isEmpty && base != null) return base;
+  if (screens.isEmpty) return null;
 
   final now = DateTime.now().toUtc().toIso8601String();
   final dbRaw = map['database'];

@@ -19,6 +19,7 @@ import 'ngmy_app_builder_runtime.dart';
 import 'ngmy_app_builder_storage.dart';
 import 'ngmy_app_builder_templates.dart';
 import 'ngmy_app_builder_urls.dart';
+import 'ngmy_app_builder_ai_usage.dart';
 import 'ngmy_app_studio_payments.dart';
 import 'ngmy_app_studio_shell.dart';
 import 'ngmy_nav.dart';
@@ -160,6 +161,11 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
         isAdmin: _isAdmin,
         apiKey: _apiKey,
         email: _email,
+        config: widget.config,
+        user: widget.user,
+        onChargeWallet: widget.onChargeWallet,
+        onDataChanged: widget.onDataChanged,
+        onPersistConfig: widget.onPersistConfig,
       ),
       routeName: 'NgmyAppEditorScreen',
     );
@@ -179,7 +185,17 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
   Future<void> _openAiCopilot({NgmyAppProject? project}) async {
     final updated = await NgmyNavigator.push<NgmyAppProject>(
       context,
-      NgmyAppBuilderCopilotScreen(project: project, apiKey: _apiKey, email: _email),
+      NgmyAppBuilderCopilotScreen(
+        project: project,
+        apiKey: _apiKey,
+        email: _email,
+        config: widget.config,
+        user: widget.user,
+        isAdmin: _isAdmin,
+        onChargeWallet: widget.onChargeWallet,
+        onDataChanged: widget.onDataChanged,
+        onPersistConfig: widget.onPersistConfig,
+      ),
       routeName: 'NgmyAppBuilderCopilotScreen',
     );
     if (updated != null) {
@@ -745,6 +761,11 @@ class NgmyAppEditorScreen extends StatefulWidget {
   final bool isAdmin;
   final String apiKey;
   final String email;
+  final dynamic config;
+  final dynamic user;
+  final Future<bool> Function(double amount, String description)? onChargeWallet;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
 
   const NgmyAppEditorScreen({
     super.key,
@@ -752,6 +773,11 @@ class NgmyAppEditorScreen extends StatefulWidget {
     required this.isAdmin,
     required this.apiKey,
     required this.email,
+    this.config,
+    this.user,
+    this.onChargeWallet,
+    this.onDataChanged,
+    this.onPersistConfig,
   });
 
   @override
@@ -835,6 +861,13 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
         themeColor: _project.theme,
         screenIndex: index,
         apiKey: widget.apiKey,
+        email: widget.email,
+        config: widget.config,
+        user: widget.user,
+        isAdmin: widget.isAdmin,
+        onChargeWallet: widget.onChargeWallet,
+        onDataChanged: widget.onDataChanged,
+        onPersistConfig: widget.onPersistConfig,
       ),
       routeName: 'NgmyAppScreenEditorPage',
     );
@@ -863,7 +896,17 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
   Future<void> _openCopilot() async {
     final updated = await NgmyNavigator.push<NgmyAppProject>(
       context,
-      NgmyAppBuilderCopilotScreen(project: _project, apiKey: widget.apiKey, email: widget.email),
+      NgmyAppBuilderCopilotScreen(
+        project: _project,
+        apiKey: widget.apiKey,
+        email: widget.email,
+        config: widget.config,
+        user: widget.user,
+        isAdmin: widget.isAdmin,
+        onChargeWallet: widget.onChargeWallet,
+        onDataChanged: widget.onDataChanged,
+        onPersistConfig: widget.onPersistConfig,
+      ),
       routeName: 'NgmyAppBuilderCopilotScreen',
     );
     if (updated != null) {
@@ -1636,12 +1679,24 @@ class NgmyAppBuilderCopilotScreen extends StatefulWidget {
   final NgmyAppProject? project;
   final String apiKey;
   final String email;
+  final dynamic config;
+  final dynamic user;
+  final bool isAdmin;
+  final Future<bool> Function(double amount, String description)? onChargeWallet;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
 
   const NgmyAppBuilderCopilotScreen({
     super.key,
     this.project,
     required this.apiKey,
     required this.email,
+    this.config,
+    this.user,
+    this.isAdmin = false,
+    this.onChargeWallet,
+    this.onDataChanged,
+    this.onPersistConfig,
   });
 
   @override
@@ -1654,13 +1709,14 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
   final List<Map<String, String>> _messages = [];
   NgmyAppProject? _project;
   bool _busy = false;
+  int _promptsRemaining = -1;
 
   static const _hints = [
-    'Build a venue manager — forms save venues, list shows them, settings toggles work',
-    'Make my fitness app workouts interactive with checkable exercises',
-    'Add a contact form that saves leads and a list screen to view them',
-    'Fix settings — add working notification and dark mode toggles',
-    'Replace all text-only screens with working forms and data lists',
+    'Build me a QR code app for websites and text with save list',
+    'Create an invoice app where I bill clients and show payment QR',
+    'Make a video link hub to save and open YouTube URLs',
+    'Build a store with products, cart, and checkout',
+    'Create anything — full working app with all screens wired',
   ];
 
   @override
@@ -1668,7 +1724,29 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
     super.initState();
     _project = widget.project;
     _loadMemory();
+    _refreshUsage();
   }
+
+  Future<void> _refreshUsage() async {
+    final left = await NgmyAppBuilderAiUsage.promptsRemaining(
+      widget.config,
+      widget.email,
+      isAdmin: widget.isAdmin,
+    );
+    if (mounted) setState(() => _promptsRemaining = left);
+  }
+
+  Future<bool> _ensureAiAccess({required bool isNewAppRequest}) => NgmyAppBuilderAiUsage.ensureAccess(
+        context: context,
+        config: widget.config,
+        email: widget.email,
+        isNewAppRequest: isNewAppRequest,
+        isAdmin: widget.isAdmin,
+        user: widget.user,
+        onCharge: widget.onChargeWallet,
+        onDataChanged: widget.onDataChanged,
+        onPersistConfig: widget.onPersistConfig,
+      );
 
   Future<void> _loadMemory() async {
     final stored = await NgmyAppBuilderCopilotMemoryStore.load(
@@ -1684,7 +1762,7 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
       if (_project == null) {
         _messages.add({
           'role': 'ai',
-          'text': 'Hi! I\'m Bolt — your unrestricted AI coder. Ask for ANYTHING: menus, tabs, dark/light mode, databases, redesigns. I write full working JSON.',
+          'text': 'Hi! I\'m Bolt — your AI coder. Ask for ANY app: media, store, invoice, QR, video hub, fitness, anything. I write full working JSON.',
         });
       } else {
         _messages.add({
@@ -1714,12 +1792,15 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
   Future<void> _send([String? preset]) async {
     final text = (preset ?? _inputC.text).trim();
     if (text.isEmpty || _busy) return;
+    final isNewApp = widget.project == null && _project == null;
+    if (!await _ensureAiAccess(isNewAppRequest: isNewApp)) return;
     _inputC.clear();
     setState(() {
       _messages.add({'role': 'user', 'text': text});
       _busy = true;
     });
     await _persistMemory();
+    final hadProjectBefore = _project != null;
     final result = await ngmyAppBuilderAiCopilot(
       apiKey: widget.apiKey,
       userMessage: text,
@@ -1727,6 +1808,7 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
       history: _messages,
     );
     if (!mounted) return;
+    var savedProject = false;
     setState(() {
       _messages.add({'role': 'ai', 'text': result.message});
       if (result.updatedProject != null) {
@@ -1745,12 +1827,34 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
           publicUrl: _project?.publicUrl ?? base.publicUrl,
           seoDescription: base.seoDescription,
           database: base.database,
+          customCode: base.customCode,
+          appIcon: base.appIcon,
           publishedAt: _project?.publishedAt,
           reviewNote: _project?.reviewNote,
         );
+        savedProject = true;
       }
       _busy = false;
     });
+    if (savedProject && _project != null) {
+      await ngmySaveUserAppProject(widget.email, _project!);
+      if (!hadProjectBefore) {
+        await NgmyAppBuilderAiUsage.markAiCreatedApp(widget.email, _project!.id);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"${_project!.name}" saved to My Apps (${_project!.screens.length} screens). Tap Preview or Use app.'),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+    if (!widget.isAdmin) {
+      await NgmyAppBuilderAiUsage.recordPrompt(widget.email);
+    }
+    await _refreshUsage();
     await _persistMemory();
     await Future<void>.delayed(const Duration(milliseconds: 50));
     if (_scrollC.hasClients) _scrollC.jumpTo(_scrollC.position.maxScrollExtent);
@@ -1805,6 +1909,21 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
       ),
       body: Column(
         children: [
+          if (_promptsRemaining >= 0)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.35)),
+              ),
+              child: Text(
+                '$_promptsRemaining free AI prompts left',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : const Color(0xFF4338CA)),
+              ),
+            ),
           if (_project != null)
             Container(
               width: double.infinity,

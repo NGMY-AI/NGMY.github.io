@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_app_builder_data.dart';
 import 'ngmy_app_builder_models.dart';
+import 'ngmy_app_builder_runtime_extras.dart';
 
 /// Renders interactive app screens from JSON — forms save, lists show data, settings work.
 class NgmyAppLayoutRenderer extends StatefulWidget {
@@ -85,7 +86,12 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
             padding: const EdgeInsets.all(14),
-            child: children.isEmpty ? const SizedBox.shrink() : _buildNode(context, children.first),
+            child: children.isEmpty
+                ? const SizedBox.shrink()
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 8), child: _buildNode(context, c))).toList(),
+                  ),
           ),
         );
       case 'hero':
@@ -182,7 +188,7 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
         return _SettingSwitch(node: node, theme: widget.theme, store: _store);
       case 'datalist':
       case 'data_list':
-        return _DataList(node: node, theme: widget.theme, store: _store, onNavigate: widget.onNavigate);
+        return _DataList(node: node, theme: widget.theme, store: _store, onNavigate: widget.onNavigate, onSnack: widget.onSnack);
       case 'workout':
       case 'workoutplan':
       case 'workout_plan':
@@ -194,6 +200,36 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
         return _StatCard(node: node, theme: widget.theme, store: _store);
       case 'chip':
         return Chip(label: Text((node['label'] ?? '').toString()), backgroundColor: widget.theme.withValues(alpha: 0.12));
+      case 'qrcode':
+      case 'qr_code':
+      case 'qr':
+        return NgmyRuntimeQrDisplay(
+          data: (node['data'] ?? node['value'] ?? node['text'] ?? '').toString(),
+          label: (node['label'] ?? '').toString(),
+          theme: widget.theme,
+          isDark: widget.isDarkMode,
+          size: (node['size'] as num?)?.toDouble() ?? 200,
+        );
+      case 'qrgenerator':
+      case 'qr_generator':
+      case 'qrGenerator':
+        return NgmyRuntimeQrGenerator(
+          node: node,
+          theme: widget.theme,
+          store: _store,
+          isDark: widget.isDarkMode,
+          onSnack: widget.onSnack,
+        );
+      case 'invoicebuilder':
+      case 'invoice_builder':
+      case 'invoiceBuilder':
+        return NgmyRuntimeInvoiceBuilder(
+          node: node,
+          theme: widget.theme,
+          store: _store,
+          isDark: widget.isDarkMode,
+          onSnack: widget.onSnack,
+        );
       default:
         if (children.isNotEmpty) {
           return Column(children: children.map((c) => _buildNode(context, c)).toList());
@@ -207,6 +243,12 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
     switch (action) {
       case 'snack':
         widget.onSnack((node['message'] ?? 'Done').toString());
+        return;
+      case 'openurl':
+      case 'open_url':
+      case 'link':
+        ngmyRuntimeOpenUrl((node['url'] ?? node['link'] ?? node['target'] ?? '').toString(), widget.onSnack);
+        return;
       case 'clear':
         final col = (node['collection'] ?? '').toString();
         if (col.isNotEmpty) {
@@ -218,6 +260,7 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
             widget.onSnack((node['message'] ?? 'Cleared').toString());
           });
         }
+        return;
       default:
         widget.onNavigate((node['target'] ?? node['targetScreenId'] ?? '').toString());
     }
@@ -368,8 +411,9 @@ class _DataList extends StatelessWidget {
   final Color theme;
   final NgmyAppDataStore store;
   final void Function(String? target) onNavigate;
+  final void Function(String message) onSnack;
 
-  const _DataList({required this.node, required this.theme, required this.store, required this.onNavigate});
+  const _DataList({required this.node, required this.theme, required this.store, required this.onNavigate, required this.onSnack});
 
   @override
   Widget build(BuildContext context) {
@@ -379,6 +423,7 @@ class _DataList extends StatelessWidget {
     final emptyText = (node['emptyText'] ?? 'Nothing here yet.').toString();
     final addTarget = (node['addTarget'] ?? node['addScreen'] ?? '').toString();
     final allowDelete = node['allowDelete'] != false;
+    final urlField = (node['urlField'] ?? node['linkField'] ?? 'url').toString();
     final records = store.records(collection);
 
     return Column(
@@ -393,18 +438,31 @@ class _DataList extends StatelessWidget {
         ...records.map((r) {
           final title = (r[titleField] ?? r['title'] ?? r['name'] ?? 'Item').toString();
           final subtitle = (r[subtitleField] ?? r['description'] ?? r['notes'] ?? '').toString();
+          final link = (r[urlField] ?? r['url'] ?? r['link'] ?? '').toString().trim();
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
-              leading: CircleAvatar(backgroundColor: theme.withValues(alpha: 0.15), child: Icon(Icons.article_rounded, color: theme, size: 20)),
+              leading: CircleAvatar(backgroundColor: theme.withValues(alpha: 0.15), child: Icon(link.isNotEmpty ? Icons.play_circle_rounded : Icons.article_rounded, color: theme, size: 20)),
               title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
               subtitle: subtitle.isEmpty ? null : Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
-              trailing: allowDelete
-                  ? IconButton(
+              onTap: link.isNotEmpty ? () => ngmyRuntimeOpenUrl(link, onSnack) : null,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (link.isNotEmpty)
+                    IconButton(
+                      icon: Icon(Icons.open_in_new_rounded, color: theme),
+                      onPressed: () => ngmyRuntimeOpenUrl(link, onSnack),
+                    ),
+                  if (allowDelete)
+                    IconButton(
                       icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
                       onPressed: () => store.deleteRecord(collection, r['id']?.toString() ?? ''),
                     )
-                  : const Icon(Icons.chevron_right_rounded),
+                  else if (link.isEmpty)
+                    const Icon(Icons.chevron_right_rounded),
+                ],
+              ),
             ),
           );
         }),
@@ -817,4 +875,17 @@ BUTTON WIRING:
 STORE APP MINIMUM SCREENS (when user asks for shop/store):
 home, add_product (form collection:products), products_list (dataList), cart (dataList collection:cart), checkout (form), settings (switches).
 Home menuGrid: Browse→products_list, Sell→add_product, Cart→cart, Settings→settings.
+
+QR CODE (WORKING — renders real scannable QR):
+Static: {"type":"qrCode","data":"https://example.com","label":"Scan to visit"}
+Live generator URL: {"type":"qrGenerator","mode":"url","placeholder":"https://yoursite.com","collection":"qr_codes","allowSave":true}
+Live generator text: {"type":"qrGenerator","mode":"text","placeholder":"Your message","collection":"qr_codes"}
+
+INVOICE APP (use invoiceBuilder — creates real invoice + optional payment QR):
+{"type":"invoiceBuilder","collection":"invoices","title":"New Invoice"}
+Plus dataList screen: collection invoices, titleField client, subtitleField amount
+
+VIDEO / LINK HUB: form saves video URLs to collection "videos", dataList shows them, button {"action":"openUrl","url":"{{field}}"} or per-item open button on list screen with link field.
+
+WHEN USER ASKS FOR QR / INVOICE / VIDEO APP — you MUST use qrGenerator, qrCode, invoiceBuilder widgets. Never reply without ---APP_JSON--- when they want to create or change an app.
 ''';

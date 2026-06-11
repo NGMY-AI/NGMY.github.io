@@ -158,6 +158,13 @@ Map<String, dynamic> ngmyNewWidget(String type, {List<NgmyAppScreen> screens = c
           {'type': 'text', 'text': 'Card body text', 'style': 'subtitle'},
         ],
       };
+    case 'qrCode':
+    case 'qr':
+      return {'type': 'qrCode', 'data': 'https://example.com', 'label': 'Scan me'};
+    case 'qrGenerator':
+      return {'type': 'qrGenerator', 'mode': 'url', 'placeholder': 'https://your-site.com', 'collection': 'qr_codes', 'allowSave': true};
+    case 'invoiceBuilder':
+      return {'type': 'invoiceBuilder', 'collection': 'invoices', 'title': 'Create invoice'};
     default:
       return {'type': 'text', 'text': 'Widget', 'style': 'subtitle'};
   }
@@ -196,6 +203,16 @@ String ngmyWidgetTypeLabel(String type) {
       return 'Image';
     case 'card':
       return 'Card';
+    case 'qrcode':
+    case 'qr_code':
+    case 'qr':
+      return 'QR code';
+    case 'qrgenerator':
+    case 'qr_generator':
+      return 'QR generator';
+    case 'invoicebuilder':
+    case 'invoice_builder':
+      return 'Invoice builder';
     case 'tabs':
       return 'Tabs';
     default:

@@ -618,6 +618,9 @@ Future<bool> ngmyPersistMusicPaymentSettings(AppConfig config) async {
 
 Map<String, dynamic> _appStudioPaymentPayload(AppConfig config) => {
       'appStudioCloudSaveFee': config.appStudioCloudSaveFee,
+      'appStudioAiMonthlyFee': config.appStudioAiMonthlyFee,
+      'appStudioAiPromptLimit': config.appStudioAiPromptLimit,
+      'appStudioAiFreeAppLimit': config.appStudioAiFreeAppLimit,
       'savedAt': DateTime.now().toUtc().toIso8601String(),
     };
 
@@ -625,6 +628,12 @@ void _applyAppStudioPaymentPayload(AppConfig config, Map<String, dynamic> payloa
   if (ngmyShouldDeferRemoteConfigOverwrite()) return;
   final fee = payload['appStudioCloudSaveFee'];
   if (fee is num && fee >= 0) config.appStudioCloudSaveFee = fee.toDouble();
+  final aiFee = payload['appStudioAiMonthlyFee'];
+  if (aiFee is num && aiFee >= 0) config.appStudioAiMonthlyFee = aiFee.toDouble();
+  final prompts = payload['appStudioAiPromptLimit'];
+  if (prompts is num && prompts >= 0) config.appStudioAiPromptLimit = prompts.toInt();
+  final apps = payload['appStudioAiFreeAppLimit'];
+  if (apps is num && apps >= 0) config.appStudioAiFreeAppLimit = apps.toInt();
 }
 
 Future<void> _persistAppStudioPaymentSettingsLocal(AppConfig config) async {

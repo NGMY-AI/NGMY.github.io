@@ -1009,6 +1009,13 @@ class AppConfig {
   /// Monthly wallet fee for App Studio cloud sync (0 = free). Up to 5 apps while active.
   double appStudioCloudSaveFee;
   Map<String, String> appStudioCloudAccessUntilByEmail;
+  /// Monthly fee for unlimited Bolt AI app creation (0 = free).
+  double appStudioAiMonthlyFee;
+  /// Free Bolt AI prompts before payment (default 10).
+  int appStudioAiPromptLimit;
+  /// Free AI-built apps before payment (default 1).
+  int appStudioAiFreeAppLimit;
+  Map<String, String> appStudioAiAccessUntilByEmail;
   /// Admin toggle — double-tap Chat reveals Communicate.
   bool communicateEnabled;
   /// Admin toggle — center star in NGMY Hub opens App Builder for all users.
@@ -1089,6 +1096,10 @@ class AppConfig {
     this.musicStudioPerSongFee = NgmyMusicPayments.defaultPerSongFee,
     this.appStudioCloudSaveFee = NgmyAppStudioPayments.defaultCloudSaveMonthlyFee,
     Map<String, String>? appStudioCloudAccessUntilByEmail,
+    this.appStudioAiMonthlyFee = NgmyAppStudioPayments.defaultAiMonthlyFee,
+    this.appStudioAiPromptLimit = NgmyAppStudioPayments.defaultAiPromptLimit,
+    this.appStudioAiFreeAppLimit = NgmyAppStudioPayments.defaultAiFreeAppLimit,
+    Map<String, String>? appStudioAiAccessUntilByEmail,
     this.communicateEnabled = false,
     this.appBuilderEnabled = false,
     List<Map<String, dynamic>>? appBuilderPublished,
@@ -1118,6 +1129,7 @@ class AppConfig {
         communicateProfiles = communicateProfiles ?? const [],
         familyTreePhotoAccessUntilByEmail = familyTreePhotoAccessUntilByEmail ?? const {},
         appStudioCloudAccessUntilByEmail = appStudioCloudAccessUntilByEmail ?? const {},
+        appStudioAiAccessUntilByEmail = appStudioAiAccessUntilByEmail ?? const {},
         invoicePremiumAccessUntilByEmail = invoicePremiumAccessUntilByEmail ?? const {},
         invoiceLuxuryAccessUntilByEmail = invoiceLuxuryAccessUntilByEmail ?? const {},
         invoicePremiumLifetimeEmails = invoicePremiumLifetimeEmails ?? const [],
@@ -1190,6 +1202,10 @@ class AppConfig {
     'musicStudioPerSongFee': musicStudioPerSongFee,
     'appStudioCloudSaveFee': appStudioCloudSaveFee,
     'appStudioCloudAccessUntilByEmail': appStudioCloudAccessUntilByEmail,
+    'appStudioAiMonthlyFee': appStudioAiMonthlyFee,
+    'appStudioAiPromptLimit': appStudioAiPromptLimit,
+    'appStudioAiFreeAppLimit': appStudioAiFreeAppLimit,
+    'appStudioAiAccessUntilByEmail': appStudioAiAccessUntilByEmail,
     'communicateEnabled': communicateEnabled,
     'appBuilderEnabled': appBuilderEnabled,
     'appBuilderPublished': appBuilderPublished,
@@ -1284,6 +1300,10 @@ class AppConfig {
     musicStudioPerSongFee: (json['musicStudioPerSongFee'] as num?)?.toDouble() ?? NgmyMusicPayments.defaultPerSongFee,
     appStudioCloudSaveFee: (json['appStudioCloudSaveFee'] as num?)?.toDouble() ?? NgmyAppStudioPayments.defaultCloudSaveMonthlyFee,
     appStudioCloudAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['appStudioCloudAccessUntilByEmail']),
+    appStudioAiMonthlyFee: (json['appStudioAiMonthlyFee'] as num?)?.toDouble() ?? NgmyAppStudioPayments.defaultAiMonthlyFee,
+    appStudioAiPromptLimit: (json['appStudioAiPromptLimit'] as num?)?.toInt() ?? NgmyAppStudioPayments.defaultAiPromptLimit,
+    appStudioAiFreeAppLimit: (json['appStudioAiFreeAppLimit'] as num?)?.toInt() ?? NgmyAppStudioPayments.defaultAiFreeAppLimit,
+    appStudioAiAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['appStudioAiAccessUntilByEmail']),
     communicateEnabled: json['communicateEnabled'] == true,
     appBuilderEnabled: json['appBuilderEnabled'] == true,
     appBuilderPublished: List<Map<String, dynamic>>.from(
@@ -2129,6 +2149,32 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     };
   } else if (keep.appStudioCloudAccessUntilByEmail.isNotEmpty) {
     next.appStudioCloudAccessUntilByEmail = Map<String, String>.from(keep.appStudioCloudAccessUntilByEmail);
+  }
+  if (record.containsKey('appStudioAiMonthlyFee') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['appStudioAiMonthlyFee'];
+    if (v is num && v >= 0) next.appStudioAiMonthlyFee = v.toDouble();
+  } else {
+    next.appStudioAiMonthlyFee = keep.appStudioAiMonthlyFee;
+  }
+  if (record.containsKey('appStudioAiPromptLimit') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['appStudioAiPromptLimit'];
+    if (v is num && v >= 0) next.appStudioAiPromptLimit = v.toInt();
+  } else {
+    next.appStudioAiPromptLimit = keep.appStudioAiPromptLimit;
+  }
+  if (record.containsKey('appStudioAiFreeAppLimit') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['appStudioAiFreeAppLimit'];
+    if (v is num && v >= 0) next.appStudioAiFreeAppLimit = v.toInt();
+  } else {
+    next.appStudioAiFreeAppLimit = keep.appStudioAiFreeAppLimit;
+  }
+  if (record.containsKey('appStudioAiAccessUntilByEmail') && record['appStudioAiAccessUntilByEmail'] is Map) {
+    next.appStudioAiAccessUntilByEmail = {
+      ..._familyTreePhotoAccessFromJson(record['appStudioAiAccessUntilByEmail']),
+      ...keep.appStudioAiAccessUntilByEmail,
+    };
+  } else if (keep.appStudioAiAccessUntilByEmail.isNotEmpty) {
+    next.appStudioAiAccessUntilByEmail = Map<String, String>.from(keep.appStudioAiAccessUntilByEmail);
   }
 
   if (record.containsKey('invoicePremiumOneTimeFee') && !ngmyShouldDeferRemoteConfigOverwrite()) {
@@ -17333,6 +17379,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     var luxMoOn = widget.config.invoiceLuxuryAllowMonthly;
     final musicC = TextEditingController(text: widget.config.musicStudioPerSongFee.toStringAsFixed(2));
     final appStudioC = TextEditingController(text: widget.config.appStudioCloudSaveFee.toStringAsFixed(2));
+    final appStudioAiFeeC = TextEditingController(text: widget.config.appStudioAiMonthlyFee.toStringAsFixed(2));
+    final appStudioAiPromptsC = TextEditingController(text: '${widget.config.appStudioAiPromptLimit}');
+    final appStudioAiAppsC = TextEditingController(text: '${widget.config.appStudioAiFreeAppLimit}');
     final commFeeC = TextEditingController(text: widget.config.communicateFeeAmount.toStringAsFixed(2));
     final commMinsC = TextEditingController(text: '${widget.config.communicateMinutesPerPayment}');
     var familyExpanded = true;
@@ -17606,7 +17655,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                       categoryShell(
                         title: 'App Studio',
-                        subtitle: 'Monthly fee for cloud sync — up to 5 apps per account',
+                        subtitle: 'Cloud sync + Bolt AI creation limits and fees',
                         icon: Icons.apps_rounded,
                         accent: const Color(0xFF6366F1),
                         expanded: appStudioExpanded,
@@ -17629,15 +17678,62 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               helperText: 'Charged once per 30 days. Users can save up to 5 apps while active. Set 0 for free.',
                             ),
                           ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Bolt AI (app creation)',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: appStudioAiFeeC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Bolt AI monthly fee (\$)',
+                              prefixIcon: Icon(Icons.auto_awesome_rounded),
+                              helperText: 'Unlimited AI prompts + more AI-built apps for 30 days. Set 0 for free.',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: appStudioAiPromptsC,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Free AI prompts before paywall',
+                              prefixIcon: Icon(Icons.chat_bubble_outline_rounded),
+                              helperText: 'How many Bolt commands each user gets free (default 10). Set 0 for unlimited free.',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: appStudioAiAppsC,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Free AI-built apps',
+                              prefixIcon: Icon(Icons.phone_android_rounded),
+                              helperText: 'How many apps users can create with AI before paying (default 1). Set 0 for unlimited.',
+                            ),
+                          ),
                           const SizedBox(height: 12),
                           FilledButton(
                             onPressed: () async {
                               final fee = double.tryParse(appStudioC.text.trim());
-                              if (fee == null || fee < 0) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid dollar amount (0 or more).')));
+                              final aiFee = double.tryParse(appStudioAiFeeC.text.trim());
+                              final prompts = int.tryParse(appStudioAiPromptsC.text.trim());
+                              final aiApps = int.tryParse(appStudioAiAppsC.text.trim());
+                              if (fee == null || fee < 0 || aiFee == null || aiFee < 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid dollar amounts (0 or more).')));
                                 return;
                               }
-                              setST(() => widget.config.appStudioCloudSaveFee = fee);
+                              if (prompts == null || prompts < 0 || aiApps == null || aiApps < 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid whole numbers for prompts and apps (0 or more).')));
+                                return;
+                              }
+                              setST(() {
+                                widget.config.appStudioCloudSaveFee = fee;
+                                widget.config.appStudioAiMonthlyFee = aiFee;
+                                widget.config.appStudioAiPromptLimit = prompts;
+                                widget.config.appStudioAiFreeAppLimit = aiApps;
+                              });
                               widget.onDataChanged();
                               final ok = await ngmyPersistAppStudioPaymentSettings(widget.config);
                               if (!context.mounted) return;
@@ -17645,7 +17741,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               ngmyAdminShowCloudSaveSnackBar(
                                 context,
                                 cloudOk: ok,
-                                success: 'App Studio payment settings saved.',
+                                success: 'App Studio + Bolt AI payment settings saved.',
                               );
                             },
                             style: FilledButton.styleFrom(backgroundColor: const Color(0xFF6366F1), minimumSize: const Size(double.infinity, 44)),
