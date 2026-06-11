@@ -67,38 +67,46 @@ class NgmyPriceCalculatorPanel extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
             Positioned(
-              top: 8,
-              right: 8,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: onEstimateTap,
-                  borderRadius: BorderRadius.circular(14),
-                  child: Ink(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          const Color(0xFFD4AF37).withValues(alpha: 0.45),
-                          _accent2.withValues(alpha: 0.15),
-                          Colors.transparent,
-                        ],
-                      ),
-                      border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.55), width: 1.2),
-                      boxShadow: [
-                        BoxShadow(color: const Color(0xFFD4AF37).withValues(alpha: 0.25), blurRadius: 12),
+              left: -28,
+              top: -24,
+              child: IgnorePointer(
+                child: Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        _accent2.withValues(alpha: 0.18),
+                        _accent.withValues(alpha: 0.06),
+                        Colors.transparent,
                       ],
                     ),
-                    child: const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.photo_camera_rounded, color: Colors.white, size: 18),
-                        Icon(Icons.payments_rounded, color: Color(0xFFF5E6B8), size: 12),
-                      ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: -8,
+              top: 0,
+              bottom: 0,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onEstimateTap,
+                    customBorder: const CircleBorder(),
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Icon(
+                        Icons.account_balance_wallet_rounded,
+                        size: 88,
+                        color: _accent2.withValues(alpha: 0.28),
+                      ),
                     ),
                   ),
                 ),

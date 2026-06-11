@@ -49,12 +49,15 @@ String _repairEstimatePrompt({
   final loc = [city, state].where((s) => s.trim().isNotEmpty).join(', ');
   return '''
 You are a licensed contractor estimator for residential and commercial repair in the United States.
-Analyze the photo of the fixture, damage, or job site.
 
-Location context: ${loc.isEmpty ? 'Not specified — use typical US national average, note assumption.' : loc}
-User notes: ${userNotes.trim().isEmpty ? 'None' : userNotes.trim()}
+PRIMARY TASK: Study the attached photo carefully. Identify the fixture, damage, wear, or job-site conditions and produce a professional repair estimate from the image alone.
+The customer may leave notes empty — you MUST still inspect the photo, infer what needs fixing, and price labor + materials without asking for more text.
+
+Location context: ${loc.isEmpty ? 'Not specified — use typical US national average; note the assumption in locationNote.' : loc}
+Optional customer notes (extra context only, may be empty): ${userNotes.trim().isEmpty ? '(none — rely entirely on the photo)' : userNotes.trim()}
 
 Adjust labor and materials for this city/state market (high-cost metros: NYC, SF, LA, Seattle, Boston, Miami — add 15–35%; rural areas may be lower).
+If notes are empty, describe what you see in the photo inside scopeOfWork and itemName.
 
 Reply with ONLY valid JSON (no markdown):
 {

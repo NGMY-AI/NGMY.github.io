@@ -18,6 +18,8 @@ const String _kNgmyCommunicatePaymentSettingsKey = 'communicate_payment_settings
 const String _kNgmyCommunicatePaymentPrefsKey = 'ngmy_communicate_payment_settings_v1';
 const String _kNgmyWalletPaymentSettingsKey = 'wallet_payment_settings';
 const String _kNgmyWalletPaymentPrefsKey = 'ngmy_wallet_payment_settings_v1';
+const String _kNgmyRepairEstimatePaymentSettingsKey = 'repair_estimate_payment_settings';
+const String _kNgmyRepairEstimatePaymentPrefsKey = 'ngmy_repair_estimate_payment_settings_v1';
 const String _kNgmyHelperAiSettingsKey = 'ngmy_helper_ai_settings';
 const String _kNgmyHelperAiPrefsKey = 'ngmy_helper_ai_settings_v1';
 const String _kNgmyAppBrandingSettingsKey = 'ngmy_app_branding';
@@ -681,6 +683,61 @@ Future<bool> ngmyPersistAppStudioPaymentSettings(AppConfig config) async {
   return cloudOk;
 }
 
+Map<String, dynamic> _repairEstimatePaymentPayload(AppConfig config) => {
+      'repairEstimateMonthlyFee': config.repairEstimateMonthlyFee,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyRepairEstimatePaymentPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+  final fee = payload['repairEstimateMonthlyFee'];
+  if (fee is num && fee >= 0) config.repairEstimateMonthlyFee = fee.toDouble();
+}
+
+Future<void> _persistRepairEstimatePaymentSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyRepairEstimatePaymentPrefsKey, jsonEncode(_repairEstimatePaymentPayload(config)));
+  } catch (e) {
+    debugPrint('[admin repair estimate payments] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateRepairEstimatePaymentsFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyRepairEstimatePaymentPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyRepairEstimatePaymentPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[admin repair estimate payments] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyRepairEstimatePaymentSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      _applyRepairEstimatePaymentPayload(config, row);
+    }
+  }
+}
+
+Future<bool> ngmyPersistRepairEstimatePaymentSettings(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  await _persistRepairEstimatePaymentSettingsLocal(config);
+
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _repairEstimatePaymentPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyRepairEstimatePaymentSettingsKey, payload);
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
 Map<String, dynamic> _communicateSettingsPayload(AppConfig config) => {
       'communicateEnabled': config.communicateEnabled,
       'communicateProfiles': config.communicateProfiles,
@@ -1014,6 +1071,7 @@ Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
   await ngmyHydrateFamilyTreePaymentsFromAllBackups(config);
   await ngmyHydrateInvoicePaymentsFromAllBackups(config);
   await ngmyHydrateWalletPaymentsFromAllBackups(config);
+  await ngmyHydrateRepairEstimatePaymentsFromAllBackups(config);
   final snapshot = AppConfig.fromJson(config.toJson());
 
   if (await ngmyCanReachCloud()) {

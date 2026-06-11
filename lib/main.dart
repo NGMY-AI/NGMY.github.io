@@ -36,6 +36,7 @@ import 'ngmy_price_product_scanner.dart';
 import 'ngmy_iron_triangle_panel.dart';
 import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_repair_estimate_flow.dart';
+import 'ngmy_repair_estimate_payments.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_games.dart';
@@ -1017,6 +1018,9 @@ class AppConfig {
   /// Free AI-built apps before payment (default 1).
   int appStudioAiFreeAppLimit;
   Map<String, String> appStudioAiAccessUntilByEmail;
+  /// Monthly wallet fee for G-Services AI repair estimates (photo → price). 0 = free.
+  double repairEstimateMonthlyFee;
+  Map<String, String> repairEstimateAccessUntilByEmail;
   /// Admin toggle — double-tap Chat reveals Communicate.
   bool communicateEnabled;
   /// Admin toggle — center star in NGMY Hub opens App Builder for all users.
@@ -1101,6 +1105,8 @@ class AppConfig {
     this.appStudioAiPromptLimit = NgmyAppStudioPayments.defaultAiPromptLimit,
     this.appStudioAiFreeAppLimit = NgmyAppStudioPayments.defaultAiFreeAppLimit,
     Map<String, String>? appStudioAiAccessUntilByEmail,
+    this.repairEstimateMonthlyFee = NgmyRepairEstimatePayments.defaultMonthlyFee,
+    Map<String, String>? repairEstimateAccessUntilByEmail,
     this.communicateEnabled = false,
     this.appBuilderEnabled = false,
     List<Map<String, dynamic>>? appBuilderPublished,
@@ -1131,6 +1137,7 @@ class AppConfig {
         familyTreePhotoAccessUntilByEmail = familyTreePhotoAccessUntilByEmail ?? const {},
         appStudioCloudAccessUntilByEmail = appStudioCloudAccessUntilByEmail ?? const {},
         appStudioAiAccessUntilByEmail = appStudioAiAccessUntilByEmail ?? const {},
+        repairEstimateAccessUntilByEmail = repairEstimateAccessUntilByEmail ?? const {},
         invoicePremiumAccessUntilByEmail = invoicePremiumAccessUntilByEmail ?? const {},
         invoiceLuxuryAccessUntilByEmail = invoiceLuxuryAccessUntilByEmail ?? const {},
         invoicePremiumLifetimeEmails = invoicePremiumLifetimeEmails ?? const [],
@@ -1207,6 +1214,8 @@ class AppConfig {
     'appStudioAiPromptLimit': appStudioAiPromptLimit,
     'appStudioAiFreeAppLimit': appStudioAiFreeAppLimit,
     'appStudioAiAccessUntilByEmail': appStudioAiAccessUntilByEmail,
+    'repairEstimateMonthlyFee': repairEstimateMonthlyFee,
+    'repairEstimateAccessUntilByEmail': repairEstimateAccessUntilByEmail,
     'communicateEnabled': communicateEnabled,
     'appBuilderEnabled': appBuilderEnabled,
     'appBuilderPublished': appBuilderPublished,
@@ -1305,6 +1314,8 @@ class AppConfig {
     appStudioAiPromptLimit: (json['appStudioAiPromptLimit'] as num?)?.toInt() ?? NgmyAppStudioPayments.defaultAiPromptLimit,
     appStudioAiFreeAppLimit: (json['appStudioAiFreeAppLimit'] as num?)?.toInt() ?? NgmyAppStudioPayments.defaultAiFreeAppLimit,
     appStudioAiAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['appStudioAiAccessUntilByEmail']),
+    repairEstimateMonthlyFee: (json['repairEstimateMonthlyFee'] as num?)?.toDouble() ?? NgmyRepairEstimatePayments.defaultMonthlyFee,
+    repairEstimateAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['repairEstimateAccessUntilByEmail']),
     communicateEnabled: json['communicateEnabled'] == true,
     appBuilderEnabled: json['appBuilderEnabled'] == true,
     appBuilderPublished: List<Map<String, dynamic>>.from(
@@ -2176,6 +2187,20 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     };
   } else if (keep.appStudioAiAccessUntilByEmail.isNotEmpty) {
     next.appStudioAiAccessUntilByEmail = Map<String, String>.from(keep.appStudioAiAccessUntilByEmail);
+  }
+  if (record.containsKey('repairEstimateMonthlyFee') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['repairEstimateMonthlyFee'];
+    if (v is num && v >= 0) next.repairEstimateMonthlyFee = v.toDouble();
+  } else {
+    next.repairEstimateMonthlyFee = keep.repairEstimateMonthlyFee;
+  }
+  if (record.containsKey('repairEstimateAccessUntilByEmail') && record['repairEstimateAccessUntilByEmail'] is Map) {
+    next.repairEstimateAccessUntilByEmail = {
+      ..._familyTreePhotoAccessFromJson(record['repairEstimateAccessUntilByEmail']),
+      ...keep.repairEstimateAccessUntilByEmail,
+    };
+  } else if (keep.repairEstimateAccessUntilByEmail.isNotEmpty) {
+    next.repairEstimateAccessUntilByEmail = Map<String, String>.from(keep.repairEstimateAccessUntilByEmail);
   }
 
   if (record.containsKey('invoicePremiumOneTimeFee') && !ngmyShouldDeferRemoteConfigOverwrite()) {
@@ -6453,6 +6478,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
     await ngmyHydrateMusicPaymentsFromAllBackups(_config);
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
+    await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
     await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
     await ngmyHydrateWalletPaymentsFromAllBackups(_config);
@@ -9431,6 +9457,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
           await ngmyHydrateMusicPaymentsFromAllBackups(_config);
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
+    await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
           await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
@@ -9692,6 +9719,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
           await ngmyHydrateMusicPaymentsFromAllBackups(_config);
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
+    await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
           await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
@@ -17383,12 +17411,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final appStudioAiFeeC = TextEditingController(text: widget.config.appStudioAiMonthlyFee.toStringAsFixed(2));
     final appStudioAiPromptsC = TextEditingController(text: '${widget.config.appStudioAiPromptLimit}');
     final appStudioAiAppsC = TextEditingController(text: '${widget.config.appStudioAiFreeAppLimit}');
+    final repairEstimateFeeC = TextEditingController(text: widget.config.repairEstimateMonthlyFee.toStringAsFixed(2));
     final commFeeC = TextEditingController(text: widget.config.communicateFeeAmount.toStringAsFixed(2));
     final commMinsC = TextEditingController(text: '${widget.config.communicateMinutesPerPayment}');
     var familyExpanded = true;
     var invoicesExpanded = false;
     var musicExpanded = false;
     var appStudioExpanded = false;
+    var repairEstimateExpanded = false;
     var communicatePayExpanded = false;
 
     Widget categoryShell({
@@ -17496,6 +17526,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           if (familyExpanded) {
                             invoicesExpanded = false;
                             musicExpanded = false;
+                            appStudioExpanded = false;
+                            repairEstimateExpanded = false;
+                            communicatePayExpanded = false;
                           }
                         }),
                         children: [
@@ -17553,6 +17586,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           if (invoicesExpanded) {
                             familyExpanded = false;
                             musicExpanded = false;
+                            appStudioExpanded = false;
+                            repairEstimateExpanded = false;
+                            communicatePayExpanded = false;
                           }
                         }),
                         children: [
@@ -17618,6 +17654,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           if (musicExpanded) {
                             familyExpanded = false;
                             invoicesExpanded = false;
+                            appStudioExpanded = false;
+                            repairEstimateExpanded = false;
+                            communicatePayExpanded = false;
                           }
                         }),
                         children: [
@@ -17666,6 +17705,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             familyExpanded = false;
                             invoicesExpanded = false;
                             musicExpanded = false;
+                            repairEstimateExpanded = false;
                             communicatePayExpanded = false;
                           }
                         }),
@@ -17751,6 +17791,57 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ],
                       ),
                       categoryShell(
+                        title: 'G-Services Estimates',
+                        subtitle: 'Monthly AI photo repair estimates in Pick Two calculator',
+                        icon: Icons.account_balance_wallet_rounded,
+                        accent: const Color(0xFF06B6D4),
+                        expanded: repairEstimateExpanded,
+                        onToggle: () => setST(() {
+                          repairEstimateExpanded = !repairEstimateExpanded;
+                          if (repairEstimateExpanded) {
+                            familyExpanded = false;
+                            invoicesExpanded = false;
+                            musicExpanded = false;
+                            appStudioExpanded = false;
+                            communicatePayExpanded = false;
+                          }
+                        }),
+                        children: [
+                          TextField(
+                            controller: repairEstimateFeeC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'AI estimate monthly fee (\$)',
+                              prefixIcon: Icon(Icons.photo_camera_rounded),
+                              helperText:
+                                  'Charged once per 30 days from NGMY wallet. Tap the wallet behind Price Calculator. Set 0 for free.',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: () async {
+                              final fee = double.tryParse(repairEstimateFeeC.text.trim());
+                              if (fee == null || fee < 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid dollar amount (0 or more).')));
+                                return;
+                              }
+                              setST(() => widget.config.repairEstimateMonthlyFee = fee);
+                              widget.onDataChanged();
+                              final ok = await ngmyPersistRepairEstimatePaymentSettings(widget.config);
+                              if (!context.mounted) return;
+                              setState(() {});
+                              ngmyAdminShowCloudSaveSnackBar(
+                                context,
+                                cloudOk: ok,
+                                success: 'G-Services estimate payment settings saved.',
+                              );
+                            },
+                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF06B6D4), minimumSize: const Size(double.infinity, 44)),
+                            child: const Text('Save G-Services Estimates', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
+                      categoryShell(
                         title: 'Communicate',
                         subtitle: 'Time-based fee for companion chat (double-tap Chat)',
                         icon: Icons.favorite_rounded,
@@ -17762,6 +17853,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             familyExpanded = false;
                             invoicesExpanded = false;
                             musicExpanded = false;
+                            appStudioExpanded = false;
+                            repairEstimateExpanded = false;
                           }
                         }),
                         children: [
@@ -23058,17 +23151,18 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       businessName: _bizNameC.text.trim(),
       businessPhone: _bizPhoneC.text.trim(),
       businessAddress: _bizStreetC.text.trim(),
-      onApplyToInvoice: (estimate, templateId) {
-        _invoiceTemplate = templateId;
-        _itemNameC.text = estimate.itemName;
-        _itemPriceC.text = estimate.total.toStringAsFixed(2);
-        _itemDescC.text = estimate.combinedDescription;
-        _paymentInfoC.text = estimate.paymentTerms;
-        _myPriceC.text = estimate.total.toStringAsFixed(2);
-        if (_calcServiceC.text.trim().isEmpty && estimate.fixtureType.isNotEmpty) {
-          _calcServiceC.text = estimate.fixtureType;
-        }
-      },
+      user: widget.user,
+      config: widget.config,
+      isAdmin: widget.user.isAdmin,
+      onDataChanged: widget.onDataChanged,
+      onPersistConfig: () => ngmyAdminPersistManagementConfig(widget.config),
+      onCharge: (amount, description) async => ngmyChargeUserWallet(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        amount: amount,
+        description: description,
+        onAddTransaction: widget.onAddTransaction,
+      ),
     );
   }
 

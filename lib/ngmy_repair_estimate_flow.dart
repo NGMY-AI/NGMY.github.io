@@ -9,6 +9,7 @@ import 'ngmy_invoice_protected_preview.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_repair_estimate_ai.dart';
+import 'ngmy_repair_estimate_payments.dart';
 
 /// Photo → AI repair estimate → luxury template preview → download.
 Future<void> showNgmyRepairEstimateFlow({
@@ -20,8 +21,30 @@ Future<void> showNgmyRepairEstimateFlow({
   String businessName = '',
   String businessPhone = '',
   String businessAddress = '',
-  void Function(NgmyRepairEstimateResult estimate, String templateId)? onApplyToInvoice,
+  dynamic user,
+  dynamic config,
+  bool isAdmin = false,
+  Future<bool> Function(double amount, String description)? onCharge,
+  VoidCallback? onDataChanged,
+  Future<bool> Function()? onPersistConfig,
 }) async {
+  if (config != null && user != null && onCharge != null && onDataChanged != null && onPersistConfig != null) {
+    final email = ((user as dynamic).email as String?) ?? '';
+    final admin = isAdmin || ((user as dynamic).isAdmin == true);
+    if (!admin && !NgmyRepairEstimatePayments.hasActiveSubscription(config, email)) {
+      final paid = await NgmyRepairEstimatePayments.confirmAndChargeMonthlyAccess(
+        context: context,
+        user: user,
+        config: config,
+        onCharge: onCharge,
+        onDataChanged: onDataChanged,
+        onPersistConfig: onPersistConfig,
+      );
+      if (!paid) return;
+    }
+  }
+
+  if (!context.mounted) return;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -34,7 +57,12 @@ Future<void> showNgmyRepairEstimateFlow({
       businessName: businessName,
       businessPhone: businessPhone,
       businessAddress: businessAddress,
-      onApplyToInvoice: onApplyToInvoice,
+      user: user,
+      config: config,
+      isAdmin: isAdmin,
+      onCharge: onCharge,
+      onDataChanged: onDataChanged,
+      onPersistConfig: onPersistConfig,
     ),
   );
 }
@@ -48,7 +76,12 @@ class _RepairEstimateSheet extends StatefulWidget {
     required this.businessName,
     required this.businessPhone,
     required this.businessAddress,
-    this.onApplyToInvoice,
+    this.user,
+    this.config,
+    this.isAdmin = false,
+    this.onCharge,
+    this.onDataChanged,
+    this.onPersistConfig,
   });
 
   final String geminiApiKey;
@@ -58,7 +91,12 @@ class _RepairEstimateSheet extends StatefulWidget {
   final String businessName;
   final String businessPhone;
   final String businessAddress;
-  final void Function(NgmyRepairEstimateResult estimate, String templateId)? onApplyToInvoice;
+  final dynamic user;
+  final dynamic config;
+  final bool isAdmin;
+  final Future<bool> Function(double amount, String description)? onCharge;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
 
   @override
   State<_RepairEstimateSheet> createState() => _RepairEstimateSheetState();
@@ -106,11 +144,29 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
     });
   }
 
+  Future<bool> _ensureEstimateAccess() async {
+    if (widget.config == null || widget.user == null || widget.onCharge == null) return true;
+    final email = ((widget.user as dynamic).email as String?) ?? '';
+    final admin = widget.isAdmin || ((widget.user as dynamic).isAdmin == true);
+    if (admin || NgmyRepairEstimatePayments.hasActiveSubscription(widget.config, email)) return true;
+    if (widget.onDataChanged == null || widget.onPersistConfig == null) return false;
+    return NgmyRepairEstimatePayments.confirmAndChargeMonthlyAccess(
+      context: context,
+      user: widget.user,
+      config: widget.config,
+      onCharge: widget.onCharge!,
+      onDataChanged: widget.onDataChanged!,
+      onPersistConfig: widget.onPersistConfig!,
+    );
+  }
+
   Future<void> _generate() async {
     if (_photoBytes == null) {
-      setState(() => _error = 'Take or upload a photo first.');
+      setState(() => _error = 'Take or upload a photo first — AI reads the image even without notes.');
       return;
     }
+    if (!await _ensureEstimateAccess()) return;
+    if (!mounted) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -197,7 +253,7 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
         decoration: BoxDecoration(
           color: const Color(0xFF0A1222),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.35)),
+          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.35)),
         ),
         child: Column(
           children: [
@@ -209,9 +265,9 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
-                      gradient: const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFCA8A04)]),
+                      gradient: const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF06B6D4)]),
                     ),
-                    child: const Icon(Icons.handyman_rounded, color: Colors.white, size: 20),
+                    child: const Icon(Icons.photo_camera_rounded, color: Colors.white, size: 20),
                   ),
                   const SizedBox(width: 10),
                   const Expanded(
@@ -219,7 +275,7 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('AI Repair Estimate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                        Text('Photo → city pricing → luxury PDF', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        Text('Photo scan → city pricing → download', style: TextStyle(color: Colors.white54, fontSize: 11)),
                       ],
                     ),
                   ),
@@ -266,7 +322,12 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    _field(_notesC, 'What needs fixing? (optional)', Icons.notes_rounded, maxLines: 2),
+                    _field(
+                      _notesC,
+                      'Describe the fix (optional — AI scans your photo)',
+                      Icons.notes_rounded,
+                      maxLines: 2,
+                    ),
                     const SizedBox(height: 8),
                     _field(_clientC, 'Customer name (optional)', Icons.person_outline_rounded),
                     const SizedBox(height: 12),
@@ -281,9 +342,9 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                           label: Text(ngmyEstimateTemplateLabel(id)),
                           selected: selected,
                           onSelected: (_) => setState(() => _templateId = id),
-                          selectedColor: const Color(0xFFD4AF37).withValues(alpha: 0.35),
+                          selectedColor: const Color(0xFF10B981).withValues(alpha: 0.35),
                           labelStyle: TextStyle(
-                            color: selected ? const Color(0xFFF5E6B8) : Colors.white70,
+                            color: selected ? const Color(0xFF6EE7B7) : Colors.white70,
                             fontWeight: FontWeight.w800,
                             fontSize: 11,
                           ),
@@ -341,33 +402,14 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _download,
-                              icon: const Icon(Icons.download_rounded),
-                              label: const Text('Download'),
-                              style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF10B981)),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          if (widget.onApplyToInvoice != null)
-                            Expanded(
-                              child: FilledButton.icon(
-                                onPressed: () {
-                                  widget.onApplyToInvoice!(_estimate!, _templateId);
-                                  Navigator.pop(context);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Estimate loaded into invoice editor.'), backgroundColor: Color(0xFF16A34A)),
-                                  );
-                                },
-                                icon: const Icon(Icons.receipt_long_rounded, size: 18),
-                                label: const Text('Use in invoice'),
-                                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFD4AF37)),
-                              ),
-                            ),
-                        ],
+                      FilledButton.icon(
+                        onPressed: _download,
+                        icon: const Icon(Icons.download_rounded),
+                        label: const Text('Download estimate'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
                       ),
                     ],
                   ],
