@@ -313,7 +313,7 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
                             icon: aiGenerating
                                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                                 : const Icon(Icons.auto_awesome_rounded, size: 18, color: Color(0xFFF472B6)),
-                            label: Text(aiGenerating ? 'Creating…' : 'Generate any image with AI', style: const TextStyle(color: Color(0xFFF472B6), fontWeight: FontWeight.w700)),
+                            label: Text(aiGenerating ? 'Creating…' : 'Generate avatar photo', style: const TextStyle(color: Color(0xFFF472B6), fontWeight: FontWeight.w700)),
                             style: OutlinedButton.styleFrom(
                               side: BorderSide(color: const Color(0xFFF472B6).withValues(alpha: 0.5)),
                               padding: const EdgeInsets.symmetric(vertical: 12),

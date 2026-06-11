@@ -1,9 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'ngmy_network_resilience.dart';
 
 /// Long-term local storage for Communicate companion chats (months on same device).
 class NgmyCommunicateMemoryStore {
@@ -106,27 +111,95 @@ class NgmyCommunicateMemoryStore {
   }
 }
 
-/// Rolling talk-time meter — accumulates across sessions until user pays.
+/// Cloud sync — same account shares talk-time across all devices.
+class NgmyCommunicateTimeCloud {
+  static const _settingsKey = 'ngmy_communicate_time_usage_v1';
+
+  static String _norm(String email) => email.toLowerCase().trim();
+
+  static Future<int> fetchSeconds(String email) async {
+    if (!await ngmyCanReachCloud() || email.trim().isEmpty) return 0;
+    try {
+      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _settingsKey).maybeSingle();
+      if (row == null) return 0;
+      final value = row['value'];
+      if (value is! Map) return 0;
+      final users = value['users'];
+      if (users is! Map) return 0;
+      final entry = users[_norm(email)];
+      if (entry is! Map) return 0;
+      return (entry['usedSeconds'] as num?)?.toInt() ?? 0;
+    } catch (e) {
+      debugPrint('[comm time cloud] fetch: $e');
+      return 0;
+    }
+  }
+
+  static Future<void> pushSeconds(String email, int seconds) async {
+    if (!await ngmyCanReachCloud() || email.trim().isEmpty) return;
+    try {
+      Map<String, dynamic> users = {};
+      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _settingsKey).maybeSingle();
+      if (row != null) {
+        final value = row['value'];
+        if (value is Map) {
+          final raw = value['users'];
+          if (raw is Map) users = Map<String, dynamic>.from(raw);
+        }
+      }
+      final key = _norm(email);
+      final prev = (users[key] is Map) ? Map<String, dynamic>.from(users[key] as Map) : <String, dynamic>{};
+      final prevSec = (prev['usedSeconds'] as num?)?.toInt() ?? 0;
+      users[key] = {
+        'usedSeconds': math.max(prevSec, seconds),
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      };
+      await Supabase.instance.client.from('ngmy_settings').upsert([
+        {
+          'key': _settingsKey,
+          'value': {'users': users, 'savedAt': DateTime.now().toUtc().toIso8601String()},
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        },
+      ], onConflict: 'key');
+    } catch (e) {
+      debugPrint('[comm time cloud] push: $e');
+    }
+  }
+
+  static Future<void> reset(String email) async {
+    await pushSeconds(email, 0);
+  }
+}
+
+/// Rolling talk-time meter — per account, synced across phones.
 class NgmyCommunicateTimeTracker {
   static String _key(String email) => 'ngmy_communicate_used_sec_${email.toLowerCase().trim()}';
 
   static Future<int> getUsedSeconds(String email) async {
     if (email.trim().isEmpty) return 0;
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_key(email)) ?? 0;
+    final local = prefs.getInt(_key(email)) ?? 0;
+    final cloud = await NgmyCommunicateTimeCloud.fetchSeconds(email);
+    final merged = math.max(local, cloud);
+    if (merged > local) await prefs.setInt(_key(email), merged);
+    return merged;
   }
 
   static Future<void> addSeconds(String email, int seconds) async {
     if (email.trim().isEmpty || seconds <= 0) return;
     final prefs = await SharedPreferences.getInstance();
     final cur = prefs.getInt(_key(email)) ?? 0;
-    await prefs.setInt(_key(email), cur + seconds);
+    final cloud = await NgmyCommunicateTimeCloud.fetchSeconds(email);
+    final next = math.max(cur, cloud) + seconds;
+    await prefs.setInt(_key(email), next);
+    unawaited(NgmyCommunicateTimeCloud.pushSeconds(email, next));
   }
 
   static Future<void> resetAfterPayment(String email) async {
     if (email.trim().isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_key(email), 0);
+    unawaited(NgmyCommunicateTimeCloud.reset(email));
   }
 }
 

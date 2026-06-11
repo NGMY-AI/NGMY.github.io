@@ -449,17 +449,15 @@ Future<({Uint8List? bytes, String? error})> ngmyPollinationsImage(String prompt)
   }
 }
 
-/// Romantic chat images — Pollinations first (no key), then paid APIs if configured.
+/// Romantic chat images — uses your configured AI API only.
 Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   String prompt, {
   NgmyAiCredentials? creds,
 }) async {
-  final poll = await ngmyPollinationsImage(prompt);
-  if (poll.bytes != null) return poll;
-  if (creds != null && creds.apiKey.trim().isNotEmpty) {
-    return ngmyAiGenerateImage(creds, prompt);
+  if (creds == null || creds.apiKey.trim().isEmpty) {
+    return (bytes: null, error: 'No AI API key configured in the app.');
   }
-  return (bytes: null, error: poll.error ?? 'Could not generate image.');
+  return ngmyAiGenerateImage(creds, prompt);
 }
 
 /// Admin image generation — any prompt, no content filter (companion avatars, etc.).

@@ -902,7 +902,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   void _tickTimer() {
     Future.doWhile(() async {
-      await Future<void>.delayed(const Duration(seconds: 15));
+      await Future<void>.delayed(const Duration(seconds: 8));
       if (!mounted) return false;
       _flushSessionTime();
       final used = await NgmyCommunicateTimeTracker.getUsedSeconds(_email);

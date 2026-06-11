@@ -555,7 +555,11 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _headerCard(),
-              const SizedBox(height: 20),
+              if (active.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                ...active.map((a) => _activeLoanHeroCard(context, a, isDark)),
+              ],
+              const SizedBox(height: 18),
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
@@ -583,15 +587,10 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
                   ),
                 ),
               ),
-              if (active.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                Text('Active loans — live tracking', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ui.textPrimary)),
-                const SizedBox(height: 10),
-                ...active.map((a) => _loanTile(context, a, isDark)),
-              ],
               if (pending.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 Text('Pending review', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ui.textPrimary)),
+                const SizedBox(height: 8),
                 ...pending.map((a) => _loanTile(context, a, isDark)),
               ],
               if (rejected.isNotEmpty) ...[
@@ -600,13 +599,7 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
                 ...rejected.map((a) => _loanTile(context, a, isDark)),
               ],
               const SizedBox(height: 24),
-              _howItWorks(isDark),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => showNgmyLoanCalculator(context),
-                icon: const Icon(Icons.calculate_outlined),
-                label: const Text('Loan calculator (36% interest)'),
-              ),
+              _howItWorks(context, isDark),
               const SizedBox(height: 40),
             ],
           ),
@@ -634,20 +627,154 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
             ),
             const SizedBox(height: 10),
             Text(
-              'Call ${widget.config.loanPhone} or apply with collateral. Max 3 active loans.',
+              'Call ${widget.config.loanPhone} or apply with collateral. Up to 2 loans under \$1,000 — 1 loan if \$1,000+.',
               style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13, height: 1.4),
             ),
           ],
         ),
       );
 
-  Widget _howItWorks(bool isDark) => Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFE8F0FF),
-          borderRadius: BorderRadius.circular(20),
+  Widget _howItWorks(BuildContext context, bool isDark) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(18, 18, 52, 18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFE8F0FF),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFBFDBFE)),
+            ),
+            child: Text(widget.config.loanHowItWorks, style: TextStyle(fontSize: 13, height: 1.7, color: isDark ? Colors.white70 : Colors.black87)),
+          ),
+          Positioned(
+            top: 10,
+            right: 10,
+            child: Material(
+              color: _loanGreen.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => showNgmyLoanCalculator(context),
+                child: const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: Icon(Icons.calculate_rounded, color: _loanGreen, size: 24),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+
+  Widget _activeLoanHeroCard(BuildContext context, Map<String, dynamic> app, bool isDark) {
+    final amount = (app['amount'] as num?)?.toDouble() ?? 0;
+    final total = (app['totalRepayment'] as num?)?.toDouble() ?? 0;
+    final payments = app['payments'] as List? ?? [];
+    final paid = ngmyLoanPaidCount(payments);
+    final totalWeeks = payments.length;
+    final progress = totalWeeks > 0 ? paid / totalWeeks : 0.0;
+    final paidTotal = ngmyLoanPaidTotal(payments);
+    final remaining = (total - paidTotal).clamp(0.0, total).toDouble();
+    final weekly = totalWeeks > 0 ? total / totalWeeks : 0.0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF00C96A), Color(0xFF007A45), Color(0xFF005C34)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Text(widget.config.loanHowItWorks, style: TextStyle(fontSize: 13, height: 1.7, color: isDark ? Colors.white70 : Colors.black87)),
+        boxShadow: [
+          BoxShadow(color: _loanGreen.withValues(alpha: 0.45), blurRadius: 22, offset: const Offset(0, 10)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(26),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => NgmyLoanTrackingScreen(
+                loanId: (app['id'] ?? '').toString(),
+                config: widget.config,
+                onDataChanged: widget.onDataChanged,
+                isAdmin: false,
+                onPersistNow: widget.onPersistNow,
+                onRefreshLoans: widget.onRefreshLoans,
+              ),
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(right: -30, top: -30, child: Container(width: 120, height: 120, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.08)))),
+              Positioned(left: -20, bottom: -20, child: Container(width: 80, height: 80, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.06)))),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(20)),
+                          child: const Text('ACTIVE LOAN', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                        ),
+                        const Spacer(),
+                        const Icon(Icons.bolt_rounded, color: Colors.white70, size: 20),
+                        const SizedBox(width: 4),
+                        const Text('Live', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text('\$${ngmyLoanFormatCurrency(amount)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 38, height: 1)),
+                    const SizedBox(height: 4),
+                    Text((app['scheduleSummary'] ?? '').toString(), style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        _heroStat('Total due', '\$${ngmyLoanFormatCurrency(total)}'),
+                        const SizedBox(width: 16),
+                        _heroStat('Weekly', '\$${ngmyLoanFormatCurrency(weekly)}'),
+                        const SizedBox(width: 16),
+                        _heroStat('Left', '\$${ngmyLoanFormatCurrency(remaining)}'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(value: progress, minHeight: 8, backgroundColor: Colors.white24, color: Colors.white),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text('$paid of $totalWeeks payments received', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+                        const Spacer(),
+                        const Text('Tap to track →', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _heroStat(String label, String value) => Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10, fontWeight: FontWeight.w600)),
+            Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+          ],
+        ),
       );
 
   Widget _loanTile(BuildContext context, Map<String, dynamic> app, bool isDark) {
@@ -745,11 +872,9 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
   }
 
   Future<void> _openApplication(BuildContext context) async {
-    final activeCount = NgmyLoanStore.appsForUser(widget.config.loanApplications, widget.userEmail)
-        .where((a) => (a['status'] ?? '') == 'approved' || (a['status'] ?? '') == 'pending')
-        .length;
-    if (activeCount >= 3) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maximum 3 active or pending loans. Finish or wait for review on current applications.')));
+    final myLoans = NgmyLoanStore.appsForUser(widget.config.loanApplications, widget.userEmail);
+    if (!NgmyLoanLogic.canUserApplyAnother(myLoans)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(NgmyLoanLogic.loanLimitMessage(myLoans))));
       return;
     }
     final ok = await Navigator.push<bool>(
@@ -1081,6 +1206,11 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please complete:\n• ${missing.join('\n• ')}'), duration: const Duration(seconds: 5)),
       );
+      return;
+    }
+    final myLoans = NgmyLoanStore.appsForUser(widget.config.loanApplications, widget.userEmail);
+    if (!NgmyLoanLogic.canUserApplyAnother(myLoans, newAmount: _amount)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(NgmyLoanLogic.loanLimitMessage(myLoans, newAmount: _amount))));
       return;
     }
     setState(() => _submitting = true);
@@ -1702,13 +1832,19 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
                 ),
               ),
             ),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, i) => Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                  child: _paymentCard(context, payments[i], isDark: isDark),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 0.82,
                 ),
-                childCount: payments.length,
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => _paymentGridTile(context, payments[i], isDark: isDark),
+                  childCount: payments.length,
+                ),
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -1761,72 +1897,71 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
     );
   }
 
-  Widget _paymentCard(BuildContext context, Map<String, dynamic> p, {required bool isDark}) {
+  Widget _paymentGridTile(BuildContext context, Map<String, dynamic> p, {required bool isDark}) {
     final due = DateTime.tryParse((p['dueDate'] ?? '').toString())?.toLocal();
     final paid = (p['status'] ?? '') == 'paid';
     final paidAmt = (p['paidAmount'] as num?)?.toDouble();
     final dueAmt = (p['amount'] as num?)?.toDouble() ?? 0;
     final paidAt = DateTime.tryParse((p['paidAt'] ?? '').toString())?.toLocal();
-    final statusColor = paid ? _loanGreen : Colors.orange;
+    final statusColor = paid ? _loanGreen : const Color(0xFFF59E0B);
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF151B28) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: statusColor.withValues(alpha: paid ? 0.5 : 0.25)),
+        gradient: paid
+            ? LinearGradient(colors: [_loanGreen.withValues(alpha: 0.18), _loanGreen.withValues(alpha: 0.06)], begin: Alignment.topLeft, end: Alignment.bottomRight)
+            : LinearGradient(colors: [isDark ? const Color(0xFF1A2235) : Colors.white, isDark ? const Color(0xFF151B28) : const Color(0xFFF9FAFB)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: statusColor.withValues(alpha: paid ? 0.55 : 0.3), width: paid ? 1.5 : 1),
+        boxShadow: paid ? [BoxShadow(color: _loanGreen.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))] : null,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           onTap: widget.isAdmin && !paid ? () => _recordPayment(p) : null,
           child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: statusColor.withValues(alpha: 0.15),
-                  ),
-                  child: Icon(paid ? Icons.check_circle_rounded : Icons.schedule_rounded, color: statusColor, size: 22),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
+                      child: Icon(paid ? Icons.verified_rounded : Icons.calendar_today_rounded, color: statusColor, size: 16),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+                      child: Text(paid ? 'PAID' : 'DUE', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: statusColor, letterSpacing: 0.5)),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text('Week ${p['id']}', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
-                            child: Text(paid ? 'RECEIVED' : 'DUE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: statusColor)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text('\$${ngmyLoanFormatCurrency(dueAmt)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: statusColor)),
-                      Text(
-                        paid && paidAt != null
-                            ? 'Recorded ${paidAt.month}/${paidAt.day}/${paidAt.year} · \$${ngmyLoanFormatCurrency(paidAmt ?? dueAmt)}'
-                            : (due != null ? 'Due ${due.month}/${due.day}/${due.year}' : 'Scheduled'),
-                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey.shade600),
-                      ),
-                      if ((p['adminNote'] ?? '').toString().isNotEmpty)
-                        Text((p['adminNote'] ?? '').toString(), style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: isDark ? Colors.white38 : Colors.grey)),
-                    ],
-                  ),
+                const SizedBox(height: 10),
+                Text('Week ${p['id']}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : Colors.grey.shade600)),
+                const SizedBox(height: 2),
+                Text('\$${ngmyLoanFormatCurrency(dueAmt)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: isDark ? Colors.white : Colors.black87)),
+                const Spacer(),
+                Text(
+                  paid && paidAt != null
+                      ? '${paidAt.month}/${paidAt.day}/${paidAt.year}'
+                      : (due != null ? 'Due ${due.month}/${due.day}' : 'Scheduled'),
+                  style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.grey.shade600),
                 ),
-                if (widget.isAdmin && !paid)
-                  FilledButton(
-                    style: FilledButton.styleFrom(backgroundColor: _loanGreen, minimumSize: const Size(72, 36)),
-                    onPressed: () => _recordPayment(p),
-                    child: const Text('Record', style: TextStyle(fontSize: 11)),
+                if (paid && paidAmt != null)
+                  Text('Got \$${ngmyLoanFormatCurrency(paidAmt)}', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: statusColor)),
+                if (widget.isAdmin && !paid) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(backgroundColor: _loanGreen, padding: const EdgeInsets.symmetric(vertical: 8), minimumSize: Size.zero),
+                      onPressed: () => _recordPayment(p),
+                      child: const Text('Record', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
+                    ),
                   ),
+                ],
               ],
             ),
           ),
@@ -2293,6 +2428,34 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
 
 class NgmyLoanLogic {
   static const interestRate = 0.36;
+
+  static List<Map<String, dynamic>> _activeLoans(List<Map<String, dynamic>> userLoans) => userLoans
+      .where((a) {
+        final s = (a['status'] ?? '').toString();
+        return s == 'approved' || s == 'pending';
+      })
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList();
+
+  /// Under \$1,000: max 2 active/pending. \$1,000+: max 1.
+  static bool canUserApplyAnother(List<Map<String, dynamic>> userLoans, {double? newAmount}) {
+    final active = _activeLoans(userLoans);
+    if (active.isEmpty) return true;
+    final anyLarge = active.any((a) => ((a['amount'] as num?)?.toDouble() ?? 0) >= 1000);
+    final newLarge = (newAmount ?? 0) >= 1000;
+    if (anyLarge || newLarge) return active.length < 1;
+    return active.length < 2;
+  }
+
+  static String loanLimitMessage(List<Map<String, dynamic>> userLoans, {double? newAmount}) {
+    final active = _activeLoans(userLoans);
+    final anyLarge = active.any((a) => ((a['amount'] as num?)?.toDouble() ?? 0) >= 1000);
+    final newLarge = (newAmount ?? 0) >= 1000;
+    if (anyLarge || newLarge) {
+      return 'Loans of \$1,000 or more allow only 1 active application at a time.';
+    }
+    return 'You can have up to 2 active loans under \$1,000. Wait for review or finish current ones.';
+  }
 
   static String requiredCollateralType(double amount) {
     if (amount <= 200) return 'phone';
