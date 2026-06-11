@@ -180,6 +180,55 @@ bool _ngmyIsAppleMobileBrowser() {
       (ua.contains('macintosh') && ua.contains('mobile'));
 }
 
+bool _ngmyIsMobileBrowser() {
+  final ua = html.window.navigator.userAgent.toLowerCase();
+  return _ngmyIsAppleMobileBrowser() || ua.contains('android');
+}
+
+List<String> _recorderMimeCandidates() {
+  final out = <String>[];
+  final candidates = _ngmyIsAppleMobileBrowser()
+      ? [
+          'video/mp4',
+          'video/mp4;codecs=avc1,mp4a',
+          'video/mp4;codecs="avc1.42E01E, mp4a.40.2"',
+          'video/mp4;codecs=h264',
+        ]
+      : [
+          'video/webm;codecs=vp8',
+          'video/webm;codecs=vp9,opus',
+          'video/webm;codecs=vp8,opus',
+          'video/webm',
+          'video/mp4',
+        ];
+  for (final m in candidates) {
+    if (html.MediaRecorder.isTypeSupported(m)) out.add(m);
+  }
+  if (out.isEmpty && _ngmyIsAppleMobileBrowser()) out.add('video/mp4');
+  return out;
+}
+
+void _styleExportCanvas(html.CanvasElement canvas, int w, int h) {
+  canvas
+    ..style.position = 'fixed'
+    ..style.left = '0'
+    ..style.top = '0'
+    ..style.width = '${w}px'
+    ..style.height = '${h}px'
+    ..style.opacity = '0.01'
+    ..style.pointerEvents = 'none'
+    ..style.zIndex = '0'
+    ..style.transform = 'translateZ(0)';
+}
+
+html.MediaStream _videoOnlyStream(html.MediaStream source) {
+  final out = html.MediaStream();
+  for (final t in source.getVideoTracks()) {
+    out.addTrack(t);
+  }
+  return out;
+}
+
 Future<html.Blob?> _ngmyBlobFromHref(String href) async {
   final src = href.trim();
   if (src.isEmpty) return null;
@@ -424,17 +473,150 @@ html.MediaRecorder? _createMediaRecorder(html.MediaStream stream, Map<String, dy
 
 Future<void> _stopRecorderDrain(html.MediaRecorder recorder, Completer<void> done) async {
   if (recorder.state == 'recording') {
-    try {
-      js_util.callMethod(recorder, 'requestData', const []);
-    } catch (_) {}
+    for (var i = 0; i < 3; i++) {
+      try {
+        js_util.callMethod(recorder, 'requestData', const []);
+      } catch (_) {}
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    }
     try {
       recorder.stop();
     } catch (_) {}
   }
   try {
-    await done.future.timeout(const Duration(seconds: 10));
+    await done.future.timeout(const Duration(seconds: 12));
   } catch (_) {}
-  await Future<void>.delayed(const Duration(milliseconds: 150));
+  await Future<void>.delayed(const Duration(milliseconds: 250));
+}
+
+Future<List<html.Blob>> _recordCanvasExport({
+  required html.MediaStream stream,
+  required String mimeType,
+  required void Function() paintFrame,
+  required List<html.VideoElement> videoList,
+  required double durationSec,
+  required void Function(double progress, String status) onProgress,
+  required bool realtimePlayback,
+}) async {
+  final appleMobile = _ngmyIsAppleMobileBrowser();
+  final recorderOptions = <String, dynamic>{
+    'mimeType': mimeType,
+    'videoBitsPerSecond': appleMobile ? 2200000 : (_ngmyIsMobileBrowser() ? 3200000 : _exportVideoBitsPerSecond),
+  };
+  if (stream.getAudioTracks().isNotEmpty) {
+    recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
+  }
+
+  final recorder = _createMediaRecorder(stream, recorderOptions);
+  if (recorder == null) return const [];
+
+  final chunks = <html.Blob>[];
+  recorder.addEventListener('dataavailable', (event) {
+    final b = (event as html.BlobEvent).data;
+    if (b != null && b.size > 0) chunks.add(b);
+  });
+  recorder.addEventListener('error', (event) {
+    debugPrint('[studio export] MediaRecorder error: $event');
+  });
+  final done = Completer<void>();
+  recorder.addEventListener('stop', (_) {
+    if (!done.isCompleted) done.complete();
+  });
+
+  const timeslice = 250;
+  try {
+    recorder.start(timeslice);
+  } catch (e) {
+    debugPrint('[studio export] recorder.start failed: $e');
+    return const [];
+  }
+
+  await Future<void>.delayed(const Duration(milliseconds: 200));
+  for (final v in videoList) {
+    v.pause();
+    v.playbackRate = 1.0;
+    await _seekVideoTo(v, 0);
+  }
+  paintFrame();
+
+  if (realtimePlayback) {
+    final speed = _ngmyIsMobileBrowser() ? 1.75 : 2.5;
+    for (final v in videoList) {
+      v.playbackRate = speed;
+      v.muted = true;
+      v.currentTime = 0;
+      try {
+        await v.play();
+      } catch (e) {
+        debugPrint('[studio export] play for record: $e');
+      }
+    }
+
+    final wallStart = DateTime.now();
+    var tick = 0;
+    final wallCapMs = ((durationSec / speed) * 1000).ceil() + 8000;
+
+    while (true) {
+      paintFrame();
+      tick++;
+      if (tick % 6 == 0) {
+        try {
+          js_util.callMethod(recorder, 'requestData', const []);
+        } catch (_) {}
+      }
+
+      final t = videoList.isEmpty ? 0.0 : videoList.first.currentTime;
+      final p = durationSec <= 0 ? 1.0 : (t / durationSec).clamp(0.0, 0.99);
+      onProgress(p, _ngmyExportStatusLabel(p, durationSec, (t * 1000).round()));
+
+      final ended = videoList.isNotEmpty &&
+          videoList.every((v) => v.ended || v.currentTime >= durationSec - 0.08);
+      final wallMs = DateTime.now().difference(wallStart).inMilliseconds;
+      if (ended || t >= durationSec - 0.05 || wallMs > wallCapMs) break;
+
+      await Future<void>.delayed(const Duration(milliseconds: 33));
+    }
+  } else {
+    final frameMs = (1000 / _exportCanvasFps).round();
+    final totalFrames = (durationSec * _exportCanvasFps).ceil().clamp(12, (_maxRecordSeconds * _exportCanvasFps).round());
+    onProgress(0.1, 'Exporting… 0%');
+
+    for (final v in videoList) {
+      v.muted = true;
+      try {
+        await v.play();
+      } catch (_) {}
+    }
+
+    for (var frame = 0; frame < totalFrames; frame++) {
+      final t = frame / _exportCanvasFps;
+      for (final v in videoList) {
+        await _seekVideoTo(v, t);
+      }
+      paintFrame();
+      if (frame % 4 == 0) {
+        try {
+          js_util.callMethod(recorder, 'requestData', const []);
+        } catch (_) {}
+      }
+      final p = (frame + 1) / totalFrames;
+      onProgress(p.clamp(0.05, 0.99), _ngmyExportStatusLabel(p, durationSec, frame * frameMs));
+      await Future.delayed(Duration(milliseconds: frameMs));
+    }
+  }
+
+  for (final v in videoList) {
+    v.pause();
+    v.playbackRate = 1.0;
+  }
+
+  paintFrame();
+  await Future<void>.delayed(Duration(milliseconds: appleMobile ? 500 : 280));
+  try {
+    js_util.callMethod(recorder, 'requestData', const []);
+  } catch (_) {}
+  await _stopRecorderDrain(recorder, done);
+  return chunks;
 }
 
 bool _webSupportsComposedCapture() {
@@ -450,8 +632,7 @@ bool _webSupportsComposedCapture() {
 (int, int) _exportDimensions(NgmyVideoStudioExportConfig config) {
   var w = config.outputWidth;
   var h = config.outputHeight;
-  if (_ngmyIsAppleMobileBrowser()) {
-    // Smaller canvas helps Safari MediaRecorder actually emit MP4 chunks.
+  if (_ngmyIsMobileBrowser()) {
     const maxW = 720;
     if (w > maxW) {
       final scale = maxW / w;
@@ -579,7 +760,15 @@ void _configureVideoElement(html.VideoElement v, String src, {required bool forE
   if (src.startsWith('http') && !src.startsWith('blob:')) {
     v.crossOrigin = 'anonymous';
   }
-  v.style.display = 'none';
+  v
+    ..style.position = 'fixed'
+    ..style.left = '0'
+    ..style.top = '0'
+    ..style.width = '1px'
+    ..style.height = '1px'
+    ..style.opacity = '0.01'
+    ..style.pointerEvents = 'none'
+    ..style.zIndex = '0';
 }
 
 Future<String> exportNgmyVideoStudioComposed({
@@ -668,19 +857,9 @@ Future<String> exportNgmyVideoStudioComposed({
     final canvas = exportCanvas!;
     final ctx = canvas.context2D;
 
-    final composed = html.MediaStream();
-    canvas
-      ..style.position = 'fixed'
-      ..style.left = '-12000px'
-      ..style.top = '0'
-      ..style.opacity = '1'
-      ..style.width = '${w}px'
-      ..style.height = '${h}px'
-      ..style.pointerEvents = 'none'
-      ..style.zIndex = '1';
+    _styleExportCanvas(canvas, w, h);
     html.document.body?.append(canvas);
 
-    var stopped = false;
     final startMs = DateTime.now().millisecondsSinceEpoch;
 
     try {
@@ -770,52 +949,7 @@ Future<String> exportNgmyVideoStudioComposed({
     }
 
     final canvasStream = _safeCaptureStream(canvas, fps: _exportCanvasFps);
-    if (canvasStream != null) {
-      for (final t in canvasStream.getVideoTracks()) {
-        composed.addTrack(t);
-      }
-      usedCanvasStream = composed.getVideoTracks().isNotEmpty;
-    }
-
-    if (!usedCanvasStream) {
-      if (config.needsComposedExport) {
-        exportCanvas?.remove();
-        for (final v in videos.values) {
-          v.remove();
-        }
-        for (final i in logos.values) {
-          i.remove();
-        }
-        return _fallbackComposedExport(
-          config,
-          sources,
-          reason: 'canvas capture unavailable',
-          allowRawFallback: false,
-        );
-      }
-      final vStream = _safeCaptureStream(videos.values.first);
-      if (vStream != null) {
-        for (final t in vStream.getVideoTracks()) {
-          composed.addTrack(t);
-        }
-      } else {
-        exportCanvas?.remove();
-        for (final v in videos.values) {
-          v.remove();
-        }
-        for (final i in logos.values) {
-          i.remove();
-        }
-        return _fallbackComposedExport(config, sources, reason: 'video stream unavailable');
-      }
-    }
-
-    for (final v in videos.values) {
-      _appendVideoAudioTracks(composed, v);
-      if (composed.getAudioTracks().isNotEmpty) break;
-    }
-
-    if (composed.getTracks().isEmpty) {
+    if (canvasStream == null || canvasStream.getVideoTracks().isEmpty) {
       exportCanvas?.remove();
       for (final v in videos.values) {
         v.remove();
@@ -823,112 +957,82 @@ Future<String> exportNgmyVideoStudioComposed({
       for (final i in logos.values) {
         i.remove();
       }
-      return _fallbackComposedExport(config, sources, reason: 'no media tracks');
+      return _fallbackComposedExport(
+        config,
+        sources,
+        reason: 'canvas capture unavailable',
+        allowRawFallback: false,
+      );
     }
 
-    final mimeType = _pickRecorderMimeType();
-    if (mimeType == null) {
+    usedCanvasStream = true;
+    final videoList = videos.values.toList();
+    final realtime = _ngmyIsMobileBrowser();
+    final mimeCandidates = _recorderMimeCandidates();
+    if (mimeCandidates.isEmpty) {
       return _fallbackComposedExport(config, sources, reason: 'recording not supported');
     }
 
-    final appleMobile = _ngmyIsAppleMobileBrowser();
-    final recorderOptions = <String, dynamic>{
-      'mimeType': mimeType,
-      'videoBitsPerSecond': appleMobile ? 2800000 : _exportVideoBitsPerSecond,
-    };
-    if (composed.getAudioTracks().isNotEmpty) {
-      recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
-    }
+    onProgress?.call(0.1, realtime ? 'Recording with template…' : 'Exporting… 0%');
 
-    final recorder = _createMediaRecorder(composed, recorderOptions);
-    if (recorder == null) {
-      return _fallbackComposedExport(config, sources, reason: 'recorder failed');
-    }
+    List<html.Blob> chunks = const [];
+    String? mimeType;
+    for (final mime in mimeCandidates) {
+      for (final withAudio in [false, true]) {
+        final recordStream = _videoOnlyStream(canvasStream);
+        if (withAudio) {
+          for (final v in videoList) {
+            _appendVideoAudioTracks(recordStream, v);
+            if (recordStream.getAudioTracks().isNotEmpty) break;
+          }
+        }
+        if (recordStream.getVideoTracks().isEmpty) continue;
 
-    final chunks = <html.Blob>[];
-    recorder.addEventListener('dataavailable', (event) {
-      final b = (event as html.BlobEvent).data;
-      if (b != null && b.size > 0) chunks.add(b);
-    });
-    recorder.addEventListener('error', (event) {
-      debugPrint('[studio export] MediaRecorder error: $event');
-    });
-    final done = Completer<void>();
-    recorder.addEventListener('stop', (_) {
-      if (!done.isCompleted) done.complete();
-    });
-
-    try {
-      if (appleMobile) {
-        recorder.start();
-      } else {
-        recorder.start(_recorderTimesliceMs);
+        chunks = await _recordCanvasExport(
+          stream: recordStream,
+          mimeType: mime,
+          paintFrame: paintFrame,
+          videoList: videoList,
+          durationSec: durationSec,
+          onProgress: (p, s) => onProgress?.call(p, s),
+          realtimePlayback: realtime,
+        );
+        if (chunks.isNotEmpty) {
+          mimeType = mime;
+          break;
+        }
+        debugPrint('[studio export] empty chunks mime=$mime audio=$withAudio realtime=$realtime');
       }
-    } catch (e) {
-      debugPrint('[studio export] recorder.start failed: $e');
-      return _fallbackComposedExport(config, sources, reason: 'recorder start failed');
+      if (chunks.isNotEmpty) break;
     }
 
-    if (appleMobile) {
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-    }
-
-    final frameMs = (1000 / _exportCanvasFps).round();
-    final totalFrames = (durationSec * _exportCanvasFps).ceil().clamp(12, (_maxRecordSeconds * _exportCanvasFps).round());
-    onProgress?.call(0.1, 'Exporting… 0%');
-
-    for (final v in videos.values) {
-      try {
-        v.muted = true;
-        await v.play();
-      } catch (e) {
-        debugPrint('[studio export] video play for export: $e');
-      }
-    }
-
-    for (var frame = 0; frame < totalFrames; frame++) {
-      if (stopped) break;
-      final t = frame / _exportCanvasFps;
-      for (final v in videos.values) {
-        await _seekVideoTo(v, t);
-        if (v.paused) {
-          try {
-            await v.play();
-          } catch (_) {}
+    if (chunks.isEmpty && !realtime) {
+      for (final mime in mimeCandidates) {
+        chunks = await _recordCanvasExport(
+          stream: _videoOnlyStream(canvasStream),
+          mimeType: mime,
+          paintFrame: paintFrame,
+          videoList: videoList,
+          durationSec: durationSec,
+          onProgress: (p, s) => onProgress?.call(p, s),
+          realtimePlayback: true,
+        );
+        if (chunks.isNotEmpty) {
+          mimeType = mime;
+          break;
         }
       }
-      paintFrame();
-      final p = (frame + 1) / totalFrames;
-      final recordMs = frame * frameMs;
-      onProgress?.call(p.clamp(0.05, 0.99), _ngmyExportStatusLabel(p, durationSec, recordMs));
-      await Future.delayed(Duration(milliseconds: frameMs));
-      if (frame % 8 == 0) await Future<void>.delayed(Duration.zero);
-    }
-
-    stopped = true;
-    if (appleMobile) {
-      await Future<void>.delayed(const Duration(milliseconds: 350));
-    }
-    await _stopRecorderDrain(recorder, done);
-    if (!done.isCompleted) {
-      await Future.any([
-        done.future,
-        Future.delayed(const Duration(seconds: 6)),
-      ]);
-    }
-    if (appleMobile) {
-      await Future<void>.delayed(const Duration(milliseconds: 200));
     }
 
     onProgress?.call(1.0, 'Saving your file…');
 
-    if (chunks.isEmpty) {
-      debugPrint('[studio export] empty chunks (mime=$mimeType)');
+    if (chunks.isEmpty || mimeType == null) {
+      debugPrint('[studio export] all recording attempts failed');
       return _fallbackComposedExport(
         config,
         sources,
         reason: 'recording produced no data',
-        allowRawFallback: _studioAllowsRawFallback(config),
+        allowRawFallback: false,
       );
     }
 
