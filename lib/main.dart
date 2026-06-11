@@ -94,6 +94,9 @@ import 'ngmy_invoice_payments.dart';
 import 'ngmy_music_payments.dart';
 import 'ngmy_communicate.dart';
 import 'ngmy_communicate_admin.dart';
+import 'ngmy_app_builder.dart';
+import 'ngmy_app_builder_admin.dart';
+import 'ngmy_app_builder_models.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_invoice_protected_preview.dart';
 import 'ngmy_web_viewport.dart';
@@ -989,6 +992,10 @@ class AppConfig {
   double musicStudioPerSongFee;
   /// Admin toggle — double-tap Chat reveals Communicate.
   bool communicateEnabled;
+  /// Admin toggle — center star in NGMY Hub opens App Builder for all users.
+  bool appBuilderEnabled;
+  List<Map<String, dynamic>> appBuilderPublished;
+  List<Map<String, dynamic>> appBuilderReviewQueue;
   double communicateFeeAmount;
   int communicateMinutesPerPayment;
   List<Map<String, dynamic>> communicateProfiles;
@@ -1062,6 +1069,9 @@ class AppConfig {
     this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
     this.musicStudioPerSongFee = NgmyMusicPayments.defaultPerSongFee,
     this.communicateEnabled = false,
+    this.appBuilderEnabled = false,
+    List<Map<String, dynamic>>? appBuilderPublished,
+    List<Map<String, dynamic>>? appBuilderReviewQueue,
     this.communicateFeeAmount = NgmyCommunicatePayments.defaultFeeAmount,
     this.communicateMinutesPerPayment = NgmyCommunicatePayments.defaultMinutesPerPayment,
     List<Map<String, dynamic>>? communicateProfiles,
@@ -1093,6 +1103,8 @@ class AppConfig {
         civicRegistryPinsByState = civicRegistryPinsByState ?? const {},
         civicRegistrarApplications = civicRegistrarApplications ?? const [],
         storeSellAccessEmails = storeSellAccessEmails ?? const [],
+        appBuilderPublished = appBuilderPublished ?? const [],
+        appBuilderReviewQueue = appBuilderReviewQueue ?? const [],
         gameTimeLimits = gameTimeLimits ?? ngmyDefaultGameTimeLimits(),
         diceSettings = diceSettings ?? NgmyDiceSettings().toJson(),
         gameInvites = gameInvites ?? [],
@@ -1155,6 +1167,9 @@ class AppConfig {
     'familyTreePhotoAccessUntilByEmail': familyTreePhotoAccessUntilByEmail,
     'musicStudioPerSongFee': musicStudioPerSongFee,
     'communicateEnabled': communicateEnabled,
+    'appBuilderEnabled': appBuilderEnabled,
+    'appBuilderPublished': appBuilderPublished,
+    'appBuilderReviewQueue': appBuilderReviewQueue,
     'communicateFeeAmount': communicateFeeAmount,
     'communicateMinutesPerPayment': communicateMinutesPerPayment,
     'communicateProfiles': communicateProfiles,
@@ -1244,6 +1259,13 @@ class AppConfig {
     familyTreePhotoMonthlyFee: (json['familyTreePhotoMonthlyFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
     musicStudioPerSongFee: (json['musicStudioPerSongFee'] as num?)?.toDouble() ?? NgmyMusicPayments.defaultPerSongFee,
     communicateEnabled: json['communicateEnabled'] == true,
+    appBuilderEnabled: json['appBuilderEnabled'] == true,
+    appBuilderPublished: List<Map<String, dynamic>>.from(
+      (json['appBuilderPublished'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
+    ),
+    appBuilderReviewQueue: List<Map<String, dynamic>>.from(
+      (json['appBuilderReviewQueue'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
+    ),
     communicateFeeAmount: (json['communicateFeeAmount'] as num?)?.toDouble() ?? NgmyCommunicatePayments.defaultFeeAmount,
     communicateMinutesPerPayment: (json['communicateMinutesPerPayment'] as num?)?.toInt() ?? NgmyCommunicatePayments.defaultMinutesPerPayment,
     communicateProfiles: List<Map<String, dynamic>>.from(
@@ -2019,6 +2041,25 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     next.communicateEnabled = record['communicateEnabled'] == true;
   } else {
     next.communicateEnabled = keep.communicateEnabled;
+  }
+  if (record.containsKey('appBuilderEnabled')) {
+    next.appBuilderEnabled = record['appBuilderEnabled'] == true;
+  } else {
+    next.appBuilderEnabled = keep.appBuilderEnabled;
+  }
+  if (record.containsKey('appBuilderPublished') && record['appBuilderPublished'] is List) {
+    next.appBuilderPublished = List<Map<String, dynamic>>.from(
+      (record['appBuilderPublished'] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+    );
+  } else if (keep.appBuilderPublished.isNotEmpty) {
+    next.appBuilderPublished = List<Map<String, dynamic>>.from(keep.appBuilderPublished.map((e) => Map<String, dynamic>.from(e)));
+  }
+  if (record.containsKey('appBuilderReviewQueue') && record['appBuilderReviewQueue'] is List) {
+    next.appBuilderReviewQueue = List<Map<String, dynamic>>.from(
+      (record['appBuilderReviewQueue'] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+    );
+  } else if (keep.appBuilderReviewQueue.isNotEmpty) {
+    next.appBuilderReviewQueue = List<Map<String, dynamic>>.from(keep.appBuilderReviewQueue.map((e) => Map<String, dynamic>.from(e)));
   }
   if (record.containsKey('communicateFeeAmount') && !ngmyShouldDeferRemoteConfigOverwrite()) {
     final v = record['communicateFeeAmount'];
@@ -17038,6 +17079,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => unawaited(_openCivicRegistryAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications)),
             _menuFrame('Payments', Icons.payments_outlined, const Color(0xFF0D9488), () => unawaited(_openPaymentsAdmin(isDark)), isDark),
             _menuFrame('Communicate', Icons.favorite_rounded, const Color(0xFFEC4899), () => unawaited(_openCommunicateAdmin(isDark)), isDark),
+            _menuFrame('App Builder', Icons.star_rounded, const Color(0xFFF59E0B), () => unawaited(_openAppBuilderAdmin(isDark)), isDark, badgeCount: widget.config.appBuilderReviewQueue.length),
             _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => unawaited(_openJobApplicationsAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingJobWorkerApplications(widget.config.jobWorkerApplications)),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => unawaited(_openPopupsAdmin(isDark)), isDark),
             _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => unawaited(_openGamesAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingGameInvites(widget.config.gameInvites)),
@@ -17509,6 +17551,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
       onDataChanged: widget.onDataChanged,
       onPersist: () => ngmyPersistCommunicateSettings(widget.config),
       apiKey: widget.config.geminiApiKey,
+    );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openAppBuilderAdmin(bool isDark) async {
+    await showNgmyAppBuilderAdminSheet(
+      context: context,
+      config: widget.config,
+      isDark: isDark,
+      onDataChanged: widget.onDataChanged,
+      onPersist: () => ngmyAdminPersistManagementConfig(widget.config),
     );
     if (mounted) setState(() {});
   }
@@ -23067,6 +23120,21 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
   void _openMFunGames() => showNgmyFunGamesDialog(context, userEmail: widget.user.email);
 
+  bool get _canOpenAppBuilder => ngmyUserCanAccessAppBuilder(
+        isAdmin: widget.user.isAdmin,
+        appBuilderEnabled: widget.config.appBuilderEnabled,
+      );
+
+  Future<void> _openAppBuilder() async {
+    await showNgmyAppBuilder(
+      context: context,
+      user: widget.user,
+      config: widget.config,
+      onDataChanged: widget.onDataChanged,
+      onPersistConfig: () => ngmyAdminPersistManagementConfig(widget.config),
+    );
+  }
+
   void _openYQrGenerator() => showNgmyQrGeneratorDialog(context);
 
   void _openDocumentScanner() {
@@ -23680,7 +23748,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       children: [
                         _animatedStar(20, spin: false),
                         const SizedBox(width: 10),
-                        _animatedStar(34, spin: true, reactive: true),
+                        _animatedStar(34, spin: true, reactive: _canOpenAppBuilder, onTap: _canOpenAppBuilder ? _openAppBuilder : null),
                         const SizedBox(width: 10),
                         _animatedStar(20, spin: false),
                       ],
@@ -23754,7 +23822,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     );
   }
 
-  Widget _animatedStar(double size, {bool spin = true, bool reactive = false}) {
+  Widget _animatedStar(double size, {bool spin = true, bool reactive = false, VoidCallback? onTap}) {
     Widget starCore = AnimatedBuilder(
       animation: _animCtrl,
       builder: (context, child) {
@@ -23827,6 +23895,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
         onTapDown: (_) => setState(() => _centerStarPressed = true),
         onTapUp: (_) => setState(() => _centerStarPressed = false),
         onTapCancel: () => setState(() => _centerStarPressed = false),
+        onTap: onTap,
         child: AnimatedScale(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,
