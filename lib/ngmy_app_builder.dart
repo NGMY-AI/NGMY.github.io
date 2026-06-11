@@ -126,7 +126,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
   List<NgmyAppProject> _mine = [];
   List<NgmyAppProject> _published = [];
   bool _loading = true;
-  String? _cloudSavedProjectId;
+  Set<String> _cloudSavedProjectIds = {};
 
   bool get _isAdmin => widget.user.isAdmin == true;
   String get _email => widget.user.email.toString().toLowerCase().trim();
@@ -140,11 +140,13 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
 
   Future<void> _reload() async {
     setState(() => _loading = true);
-    _cloudSavedProjectId = await NgmyAppStudioCloudSlot.fetchSavedProjectId(_email);
-    final cloud = await NgmyAppStudioCloudSlot.pullIntoLocal(_email);
+    _cloudSavedProjectIds = await NgmyAppStudioCloudSlot.fetchSavedProjectIds(_email);
+    final cloudApps = await NgmyAppStudioCloudSlot.pullAllIntoLocal(_email);
     _mine = await ngmyLoadUserAppProjects(_email);
-    if (cloud != null && !_mine.any((p) => p.id == cloud.id)) {
-      _mine.insert(0, cloud);
+    for (final cloud in cloudApps) {
+      if (!_mine.any((p) => p.id == cloud.id)) {
+        _mine.insert(0, cloud);
+      }
     }
     _published = await ngmyLoadLocalPublishedApps();
     if (mounted) setState(() => _loading = false);
@@ -252,12 +254,23 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
   }
 
   Future<void> _saveToCloud(NgmyAppProject project) async {
+    final isUpdate = _cloudSavedProjectIds.contains(project.id);
+    if (!isUpdate && _cloudSavedProjectIds.length >= NgmyAppStudioPayments.maxCloudApps) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cloud limit: ${NgmyAppStudioPayments.maxCloudApps} apps max. Update an existing cloud app or remove one first.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     final charge = widget.onChargeWallet;
     if (charge != null) {
       final ok = await NgmyAppStudioPayments.confirmAndChargeCloudSave(
         context: context,
         user: widget.user,
         config: widget.config,
+        email: _email,
         appName: project.name,
         onCharge: (amount, description) async {
           final charged = await charge(amount, description);
@@ -266,18 +279,20 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
         },
       );
       if (!ok) return;
+      await widget.onPersistConfig();
     }
-    final saved = await NgmyAppStudioCloudSlot.save(_email, project);
+    final err = await NgmyAppStudioCloudSlot.save(_email, project);
     if (!mounted) return;
-    if (saved) {
-      setState(() => _cloudSavedProjectId = project.id);
+    if (err == null) {
+      setState(() => _cloudSavedProjectIds = {..._cloudSavedProjectIds, project.id});
+      final subNote = NgmyAppStudioPayments.hasActiveSubscription(widget.config, _email)
+          ? ' Synced on all your devices.'
+          : '';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"${project.name}" saved to cloud — opens on all your devices.')),
+        SnackBar(content: Text('"${project.name}" saved to cloud (${_cloudSavedProjectIds.length}/${NgmyAppStudioPayments.maxCloudApps}).$subNote')),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cloud save failed. Check your connection and try again.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
     }
   }
 
@@ -370,7 +385,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
             title: Row(
               children: [
                 Expanded(child: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800))),
-                if (_cloudSavedProjectId == p.id)
+                if (_cloudSavedProjectIds.contains(p.id))
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
@@ -407,7 +422,11 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
                 const PopupMenuItem(value: 'ai', child: Text('Talk to AI Copilot')),
                 PopupMenuItem(
                   value: 'cloud',
-                  child: Text(_cloudSavedProjectId == p.id ? 'Update cloud save' : 'Save to cloud (1 slot)'),
+                  child: Text(
+                    _cloudSavedProjectIds.contains(p.id)
+                        ? 'Update cloud save'
+                        : 'Save to cloud (${_cloudSavedProjectIds.length}/${NgmyAppStudioPayments.maxCloudApps})',
+                  ),
                 ),
                 const PopupMenuItem(value: 'preview', child: Text('Preview')),
                 if (p.publicUrl.isNotEmpty) const PopupMenuItem(value: 'copy', child: Text('Copy public link')),
@@ -502,7 +521,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Save one app to NGMY cloud (syncs on every device). Download .ngmy.json backups anytime — import restores your app.',
+            'Save up to ${NgmyAppStudioPayments.maxCloudApps} apps to NGMY cloud with a monthly subscription — syncs on every device. Download .ngmy.json backups anytime.',
             style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
           ),
           const SizedBox(height: 24),
@@ -531,7 +550,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 14, crossAxisSpacing: 14, childAspectRatio: 0.82),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 14, crossAxisSpacing: 14, childAspectRatio: 0.72),
           itemCount: kNgmyAppTemplates.length,
           itemBuilder: (_, i) {
             final t = kNgmyAppTemplates[i];
@@ -542,43 +561,60 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
                 onTap: () => _previewTemplate(t),
                 borderRadius: BorderRadius.circular(22),
                 child: Container(
-                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: color.withValues(alpha: 0.35), width: 1.5),
-                    boxShadow: [BoxShadow(color: color.withValues(alpha: 0.15), blurRadius: 14, offset: const Offset(0, 6))],
+                    border: Border.all(color: color.withValues(alpha: 0.28)),
+                    boxShadow: [BoxShadow(color: color.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, 8))],
                   ),
+                  clipBehavior: Clip.antiAlias,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          Text(t.icon, style: const TextStyle(fontSize: 28)),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-                            child: Text('Preview', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: color)),
+                      Container(
+                        height: 56,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [color, color.withValues(alpha: 0.72)]),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(t.icon, style: const TextStyle(fontSize: 26)),
+                            const Spacer(),
+                            if (t.badge.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), borderRadius: BorderRadius.circular(8)),
+                                child: Text(t.badge, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white)),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(t.name, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+                              const SizedBox(height: 6),
+                              Text(
+                                t.description,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
+                              ),
+                              const Spacer(),
+                              Row(
+                                children: [
+                                  Icon(Icons.play_circle_fill_rounded, size: 16, color: color),
+                                  const SizedBox(width: 4),
+                                  Text('Preview template', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: color)),
+                                ],
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      const Spacer(),
-                      Text(t.name, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
-                      const SizedBox(height: 4),
-                      Text(
-                        t.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 10, color: isDark ? Colors.white60 : Colors.black54, height: 1.3),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.visibility_rounded, size: 13, color: color),
-                          const SizedBox(width: 4),
-                          Text('Tap to try', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
-                        ],
+                        ),
                       ),
                     ],
                   ),

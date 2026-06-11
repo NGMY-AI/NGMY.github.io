@@ -1006,8 +1006,9 @@ class AppConfig {
   Map<String, String> familyTreePhotoAccessUntilByEmail;
   /// Wallet fee per Music Studio AI song generation (0 = free).
   double musicStudioPerSongFee;
-  /// Wallet fee to save one app to NGMY cloud (0 = free). One slot per account.
+  /// Monthly wallet fee for App Studio cloud sync (0 = free). Up to 5 apps while active.
   double appStudioCloudSaveFee;
+  Map<String, String> appStudioCloudAccessUntilByEmail;
   /// Admin toggle — double-tap Chat reveals Communicate.
   bool communicateEnabled;
   /// Admin toggle — center star in NGMY Hub opens App Builder for all users.
@@ -1086,7 +1087,8 @@ class AppConfig {
     this.familyTreeCreateFee = NgmyFamilyTreePayments.defaultCreateFee,
     this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
     this.musicStudioPerSongFee = NgmyMusicPayments.defaultPerSongFee,
-    this.appStudioCloudSaveFee = NgmyAppStudioPayments.defaultCloudSaveFee,
+    this.appStudioCloudSaveFee = NgmyAppStudioPayments.defaultCloudSaveMonthlyFee,
+    Map<String, String>? appStudioCloudAccessUntilByEmail,
     this.communicateEnabled = false,
     this.appBuilderEnabled = false,
     List<Map<String, dynamic>>? appBuilderPublished,
@@ -1115,6 +1117,7 @@ class AppConfig {
         loanApplications = loanApplications ?? [],
         communicateProfiles = communicateProfiles ?? const [],
         familyTreePhotoAccessUntilByEmail = familyTreePhotoAccessUntilByEmail ?? const {},
+        appStudioCloudAccessUntilByEmail = appStudioCloudAccessUntilByEmail ?? const {},
         invoicePremiumAccessUntilByEmail = invoicePremiumAccessUntilByEmail ?? const {},
         invoiceLuxuryAccessUntilByEmail = invoiceLuxuryAccessUntilByEmail ?? const {},
         invoicePremiumLifetimeEmails = invoicePremiumLifetimeEmails ?? const [],
@@ -1186,6 +1189,7 @@ class AppConfig {
     'familyTreePhotoAccessUntilByEmail': familyTreePhotoAccessUntilByEmail,
     'musicStudioPerSongFee': musicStudioPerSongFee,
     'appStudioCloudSaveFee': appStudioCloudSaveFee,
+    'appStudioCloudAccessUntilByEmail': appStudioCloudAccessUntilByEmail,
     'communicateEnabled': communicateEnabled,
     'appBuilderEnabled': appBuilderEnabled,
     'appBuilderPublished': appBuilderPublished,
@@ -1278,7 +1282,8 @@ class AppConfig {
     familyTreeCreateFee: (json['familyTreeCreateFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultCreateFee,
     familyTreePhotoMonthlyFee: (json['familyTreePhotoMonthlyFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
     musicStudioPerSongFee: (json['musicStudioPerSongFee'] as num?)?.toDouble() ?? NgmyMusicPayments.defaultPerSongFee,
-    appStudioCloudSaveFee: (json['appStudioCloudSaveFee'] as num?)?.toDouble() ?? NgmyAppStudioPayments.defaultCloudSaveFee,
+    appStudioCloudSaveFee: (json['appStudioCloudSaveFee'] as num?)?.toDouble() ?? NgmyAppStudioPayments.defaultCloudSaveMonthlyFee,
+    appStudioCloudAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['appStudioCloudAccessUntilByEmail']),
     communicateEnabled: json['communicateEnabled'] == true,
     appBuilderEnabled: json['appBuilderEnabled'] == true,
     appBuilderPublished: List<Map<String, dynamic>>.from(
@@ -2116,6 +2121,14 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     next.familyTreePhotoAccessUntilByEmail = {...remote, ...keep.familyTreePhotoAccessUntilByEmail};
   } else if (keep.familyTreePhotoAccessUntilByEmail.isNotEmpty) {
     next.familyTreePhotoAccessUntilByEmail = Map<String, String>.from(keep.familyTreePhotoAccessUntilByEmail);
+  }
+  if (record.containsKey('appStudioCloudAccessUntilByEmail') && record['appStudioCloudAccessUntilByEmail'] is Map) {
+    next.appStudioCloudAccessUntilByEmail = {
+      ..._familyTreePhotoAccessFromJson(record['appStudioCloudAccessUntilByEmail']),
+      ...keep.appStudioCloudAccessUntilByEmail,
+    };
+  } else if (keep.appStudioCloudAccessUntilByEmail.isNotEmpty) {
+    next.appStudioCloudAccessUntilByEmail = Map<String, String>.from(keep.appStudioCloudAccessUntilByEmail);
   }
 
   if (record.containsKey('invoicePremiumOneTimeFee') && !ngmyShouldDeferRemoteConfigOverwrite()) {
@@ -17593,7 +17606,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                       categoryShell(
                         title: 'App Studio',
-                        subtitle: 'Fee to save one app to NGMY cloud (syncs on all devices)',
+                        subtitle: 'Monthly fee for cloud sync — up to 5 apps per account',
                         icon: Icons.apps_rounded,
                         accent: const Color(0xFF6366F1),
                         expanded: appStudioExpanded,
@@ -17611,9 +17624,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             controller: appStudioC,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             decoration: const InputDecoration(
-                              labelText: 'Cloud save fee per app (\$)',
+                              labelText: 'Monthly cloud subscription (\$)',
                               prefixIcon: Icon(Icons.cloud_upload_rounded),
-                              helperText: 'Charged when user saves their one cloud app slot. Set 0 for free.',
+                              helperText: 'Charged once per 30 days. Users can save up to 5 apps while active. Set 0 for free.',
                             ),
                           ),
                           const SizedBox(height: 12),
