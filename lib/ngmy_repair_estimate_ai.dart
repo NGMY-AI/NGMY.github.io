@@ -56,7 +56,18 @@ The customer may leave notes empty — you MUST still inspect the photo, infer w
 Location context: ${loc.isEmpty ? 'Not specified — use typical US national average; note the assumption in locationNote.' : loc}
 Optional customer notes (extra context only, may be empty): ${userNotes.trim().isEmpty ? '(none — rely entirely on the photo)' : userNotes.trim()}
 
-Adjust labor and materials for this city/state market (high-cost metros: NYC, SF, LA, Seattle, Boston, Miami — add 15–35%; rural areas may be lower).
+PRICING — fair, competitive handyman rates (do NOT inflate):
+- Tiny / simple fixes (speaker stand, shelf bracket, towel hook, small drywall patch, loose screw, caulk touch-up): total usually \$75–\$250 (often \$100–\$200).
+- Small repairs (minor drywall, faucet drip, door hinge, outlet cover): \$120–\$400.
+- Medium jobs (partial drywall section, appliance install, window/door repair): \$250–\$900.
+- Major work only when photo clearly shows large damage (HVAC, roof, full room): \$800+.
+Assume REPAIR not full replacement unless the item is clearly destroyed.
+Handyman labor: \$45–\$75/hr, typically 1–2 hrs for small items.
+Materials: real parts cost only (patch kit \$15–\$40, brackets \$10–\$60, small parts under \$100).
+Never quote \$1000+ for a small household item like a speaker stand or minor wall patch.
+
+Location: ${loc.isEmpty ? 'US national average' : loc} — high-cost metros may add up to 20%; do not double prices.
+
 If notes are empty, describe what you see in the photo inside scopeOfWork and itemName.
 
 Reply with ONLY valid JSON (no markdown):
@@ -71,8 +82,61 @@ Reply with ONLY valid JSON (no markdown):
   "locationNote": "One sentence on regional pricing applied",
   "paymentTerms": "Short payment terms for customer"
 }
-total must equal laborCost + materialsCost (reasonable professional estimate, not a token amount).
+total must equal laborCost + materialsCost. Keep totals realistic for the size of the job visible in the photo.
 ''';
+}
+
+bool _isSmallRepairJob(String blob) {
+  const keys = [
+    'speaker', 'stand', 'bracket', 'hook', 'knob', 'handle', 'patch', 'hole', 'crack',
+    'touch-up', 'touch up', 'loose', 'screw', 'anchor', 'shelf', 'towel', 'caulk', 'grout',
+    'drywall', 'nick', 'dent', 'scratch', 'trim', 'molding', 'baseboard', 'picture', 'mount',
+  ];
+  return keys.any(blob.contains);
+}
+
+bool _isMediumRepairJob(String blob) {
+  const keys = [
+    'faucet', 'toilet', 'door', 'window', 'outlet', 'fan', 'light', 'tile', 'cabinet',
+    'counter', 'appliance', 'disposal', 'garbage', 'leak', 'pipe', 'section',
+  ];
+  return keys.any(blob.contains);
+}
+
+double _maxTotalForJob(String fixtureType, String scope, String itemName) {
+  final blob = '${fixtureType.toLowerCase()} ${scope.toLowerCase()} ${itemName.toLowerCase()}';
+  if (_isSmallRepairJob(blob)) return 325;
+  if (_isMediumRepairJob(blob)) return 950;
+  return 4200;
+}
+
+/// Pulls inflated AI totals down to realistic market ranges.
+NgmyRepairEstimateResult ngmyClampRepairEstimatePricing(NgmyRepairEstimateResult r) {
+  final maxTotal = _maxTotalForJob(r.fixtureType, r.scopeOfWork, r.itemName);
+  if (r.total <= maxTotal) return r;
+
+  final ratio = maxTotal / r.total;
+  var labor = (r.laborCost * ratio * 100).round() / 100;
+  var materials = (r.materialsCost * ratio * 100).round() / 100;
+  var total = labor + materials;
+  if (total > maxTotal) {
+    final tRatio = maxTotal / total;
+    labor = (labor * tRatio * 100).round() / 100;
+    materials = (materials * tRatio * 100).round() / 100;
+    total = maxTotal;
+  }
+
+  return NgmyRepairEstimateResult(
+    fixtureType: r.fixtureType,
+    scopeOfWork: r.scopeOfWork,
+    itemName: r.itemName,
+    laborCost: labor,
+    materialsCost: materials,
+    total: total,
+    validityNote: r.validityNote,
+    locationNote: r.locationNote.isEmpty ? 'Adjusted to typical local handyman rates.' : r.locationNote,
+    paymentTerms: r.paymentTerms,
+  );
 }
 
 Map<String, dynamic>? _extractJsonMap(String raw) {
@@ -144,20 +208,23 @@ Future<({NgmyRepairEstimateResult? result, String? error})> ngmyGenerateRepairEs
   if (parsed == null) {
     return (result: null, error: 'Estimate totals were invalid. Try again.');
   }
-  return (result: parsed, error: null);
+  return (result: ngmyClampRepairEstimatePricing(parsed), error: null);
 }
 
-/// Gold Herald, Emerald Chronicle, Amber Flash — estimate-only luxury templates.
-const kNgmyEstimateTemplateIds = ['essential_gold', 'essential_emerald', 'essential_amber'];
+/// Modern estimate themes (compact preview).
+const kNgmyEstimateTemplateIds = ['estimate_slate', 'estimate_ocean', 'estimate_mint'];
 
 String ngmyEstimateTemplateLabel(String id) {
   switch (id) {
+    case 'estimate_slate':
     case 'essential_gold':
-      return 'Gold Herald';
+      return 'Slate Pro';
+    case 'estimate_ocean':
     case 'essential_emerald':
-      return 'Emerald Chronicle';
+      return 'Ocean';
+    case 'estimate_mint':
     case 'essential_amber':
-      return 'Amber Flash';
+      return 'Mint';
     default:
       return 'Estimate';
   }

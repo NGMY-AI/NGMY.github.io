@@ -23136,8 +23136,11 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   }
 
   void _openRepairEstimateFromCalculator(BuildContext dialogContext) {
-    showNgmyRepairEstimateFlow(
-      context: dialogContext,
+    Navigator.of(dialogContext, rootNavigator: true).pop();
+    Future.delayed(const Duration(milliseconds: 320), () {
+      if (!mounted) return;
+      showNgmyRepairEstimateFlow(
+      context: context,
       geminiApiKey: widget.config.geminiApiKey,
       refreshApiKey: () async {
         final remote = await _fetchRemoteGeminiApiKey();
@@ -23164,6 +23167,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
         onAddTransaction: widget.onAddTransaction,
       ),
     );
+    });
   }
 
   void _openInvoiceFromGDialog(BuildContext dialogContext) {
