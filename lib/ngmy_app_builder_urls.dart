@@ -1,5 +1,6 @@
 import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
 import 'ngmy_app_builder_models.dart';
+import 'ngmy_app_builder_storage.dart';
 
 /// GitHub Pages base — every user app lives under /app/{unique-slug}
 const kNgmyGithubPagesAppPath = 'app';
@@ -60,23 +61,16 @@ NgmyAppProject ngmyAppProjectWithPublicUrl(
   );
 }
 
-NgmyAppProject? ngmyFindPublishedAppBySlug(dynamic config, String slug) {
-  final raw = config is Map ? config['appBuilderPublished'] : (config as dynamic).appBuilderPublished;
-  if (raw is! List) return null;
+Future<NgmyAppProject?> ngmyFindPublishedAppBySlugLocal(String slug) async {
   final target = slug.trim().toLowerCase();
-  for (final item in raw) {
-    if (item is! Map) continue;
-    final p = NgmyAppProject.fromMap(Map<String, dynamic>.from(item));
+  final apps = await ngmyLoadLocalPublishedApps();
+  for (final p in apps) {
     if (p.slug.toLowerCase() == target || p.id == slug) return p;
   }
   return null;
 }
 
-List<String> ngmyAllPublishedAppSlugs(dynamic config) {
-  final raw = config is Map ? config['appBuilderPublished'] : (config as dynamic).appBuilderPublished;
-  if (raw is! List) return [];
-  return raw
-      .map((e) => e is Map ? NgmyAppProject.fromMap(Map<String, dynamic>.from(e)).slug : '')
-      .where((s) => s.trim().isNotEmpty)
-      .toList();
+Future<List<String>> ngmyAllPublishedAppSlugs() async {
+  final apps = await ngmyLoadLocalPublishedApps();
+  return apps.map((p) => p.slug).where((s) => s.trim().isNotEmpty).toList();
 }

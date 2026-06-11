@@ -17086,7 +17086,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => unawaited(_openCivicRegistryAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications)),
             _menuFrame('Payments', Icons.payments_outlined, const Color(0xFF0D9488), () => unawaited(_openPaymentsAdmin(isDark)), isDark),
             _menuFrame('Communicate', Icons.favorite_rounded, const Color(0xFFEC4899), () => unawaited(_openCommunicateAdmin(isDark)), isDark),
-            _menuFrame('App Builder', Icons.star_rounded, const Color(0xFFF59E0B), () => unawaited(_openAppBuilderAdmin(isDark)), isDark, badgeCount: widget.config.appBuilderReviewQueue.length),
+            _menuFrame('App Builder', Icons.star_rounded, const Color(0xFFF59E0B), () => unawaited(_openAppBuilderAdmin(isDark)), isDark),
             _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => unawaited(_openJobApplicationsAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingJobWorkerApplications(widget.config.jobWorkerApplications)),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => unawaited(_openPopupsAdmin(isDark)), isDark),
             _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => unawaited(_openGamesAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingGameInvites(widget.config.gameInvites)),

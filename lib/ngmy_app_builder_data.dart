@@ -129,4 +129,29 @@ class NgmyAppDataStore extends ChangeNotifier {
   }
 
   int recordCount(String collection) => records(collection).length;
+
+  Map<String, dynamic> snapshot() => {
+        'collections': Map<String, dynamic>.from(_data['collections'] as Map? ?? {}),
+        'settings': Map<String, dynamic>.from(_data['settings'] as Map? ?? {}),
+      };
+
+  Future<void> importSnapshot(Map<String, dynamic> raw) async {
+    await ensureLoaded();
+    _data = {
+      'collections': Map<String, dynamic>.from(raw['collections'] as Map? ?? {}),
+      'settings': Map<String, dynamic>.from(raw['settings'] as Map? ?? {}),
+    };
+    await _persist();
+  }
+
+  static Future<Map<String, dynamic>> exportRawData(String appId) async {
+    final store = NgmyAppDataStore.forApp(appId);
+    await store.ensureLoaded();
+    return store.snapshot();
+  }
+
+  static Future<void> importRawData(String appId, Map<String, dynamic> raw) async {
+    final store = NgmyAppDataStore.forApp(appId);
+    await store.importSnapshot(raw);
+  }
 }

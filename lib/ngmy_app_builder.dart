@@ -8,6 +8,7 @@ import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_data.dart';
+import 'ngmy_app_builder_export.dart';
 import 'ngmy_app_builder_runtime.dart';
 import 'ngmy_app_builder_storage.dart';
 import 'ngmy_app_builder_templates.dart';
@@ -24,7 +25,7 @@ void ngmyTryOpenPublishedAppFromUrl(
   if (slug == null || slug.isEmpty) return;
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     if (!context.mounted) return;
-    var app = ngmyFindPublishedAppBySlug(config, slug);
+    var app = await ngmyFindPublishedAppBySlugLocal(slug);
     app ??= await ngmyFetchPublishedAppBySlug(slug);
     if (!context.mounted || app == null) return;
     NgmyNavigator.push(
@@ -134,7 +135,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
   Future<void> _reload() async {
     setState(() => _loading = true);
     _mine = await ngmyLoadUserAppProjects(_email);
-    _published = ngmyPublishedAppsFromConfig(widget.config);
+    _published = await ngmyLoadLocalPublishedApps();
     if (mounted) setState(() => _loading = false);
   }
 
@@ -185,19 +186,41 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
   Future<void> _submitOrPublish(NgmyAppProject project) async {
     if (_isAdmin) {
       final published = await ngmyPublishAppProject(widget.config, _email, project);
-      await widget.onPersistConfig();
-      widget.onDataChanged();
+      await _exportApp(published);
       if (!mounted) return;
       await _ngmyShowAppPublicUrlDialog(context, published);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('App published with a public link!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Published locally. Backup file downloaded — keep your .ngmy.json file safe!')),
+      );
     } else {
       await ngmySubmitAppForReview(widget.config, _email, project);
-      await widget.onPersistConfig();
-      widget.onDataChanged();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('App submitted for admin review.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved on this device. Admin can review on this device.')));
     }
     await _reload();
+  }
+
+  Future<void> _exportApp(NgmyAppProject project) async {
+    try {
+      final msg = await ngmyDownloadAppBundle(project);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+    }
+  }
+
+  Future<void> _importApp() async {
+    final imported = await ngmyPickAndImportAppBundle(_email);
+    if (!mounted) return;
+    if (imported == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No file selected or invalid backup.')));
+      return;
+    }
+    await _reload();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"${imported.name}" restored from backup!')));
+    await _openEditor(imported);
   }
 
   void _copyUrl(String url) {
@@ -334,6 +357,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
                   NgmyNavigator.push(context, NgmyAppRuntimeScreen(project: p, apiKey: _apiKey, email: _email), routeName: 'NgmyAppRuntimeScreen');
                 }
                 if (v == 'copy' && p.publicUrl.isNotEmpty) _copyUrl(p.publicUrl);
+                if (v == 'export') await _exportApp(p);
                 if (v == 'publish') await _submitOrPublish(p);
                 if (v == 'delete') {
                   await ngmyDeleteUserAppProject(_email, p.id);
@@ -345,6 +369,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
                 const PopupMenuItem(value: 'ai', child: Text('Talk to AI Copilot')),
                 const PopupMenuItem(value: 'preview', child: Text('Preview')),
                 if (p.publicUrl.isNotEmpty) const PopupMenuItem(value: 'copy', child: Text('Copy public link')),
+                const PopupMenuItem(value: 'export', child: Text('Download backup (.ngmy.json)')),
                 PopupMenuItem(value: 'publish', child: Text(_isAdmin ? 'Publish now' : 'Submit for review')),
                 const PopupMenuItem(value: 'delete', child: Text('Delete')),
               ],
@@ -417,6 +442,18 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
             icon: const Icon(Icons.code_rounded),
             label: const Text('Blank canvas + Code Studio'),
             style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _importApp,
+            icon: const Icon(Icons.upload_file_rounded),
+            label: const Text('Import app from backup file'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'All apps stay on your device only — not in NGMY database. Download .ngmy.json backups and re-import anytime.',
+            style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
           ),
           const SizedBox(height: 24),
           Text('What works now', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
@@ -634,6 +671,14 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
     if (mounted) Navigator.pop(context, _project);
   }
 
+  Future<void> _exportCurrent() async {
+    _saveLocal();
+    await ngmySaveUserAppProject(widget.email, _project);
+    final msg = await ngmyDownloadAppBundle(_project);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> _openCopilot() async {
     final updated = await NgmyNavigator.push<NgmyAppProject>(
       context,
@@ -734,10 +779,24 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
           const SizedBox(height: 10),
           TextField(controller: _taglineC, decoration: const InputDecoration(labelText: 'Tagline / Google description'), onChanged: (_) => _saveLocal()),
           const SizedBox(height: 12),
+          Card(
+            color: const Color(0xFF10B981).withValues(alpha: 0.08),
+            child: ListTile(
+              leading: const Icon(Icons.phone_android_rounded, color: Color(0xFF10B981)),
+              title: const Text('Stored on your device only', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: const Text('Not saved to NGMY database. Download backup to keep your app forever.'),
+              trailing: IconButton(
+                icon: const Icon(Icons.download_rounded),
+                onPressed: _exportCurrent,
+                tooltip: 'Download backup',
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Database connection', style: TextStyle(fontWeight: FontWeight.w800)),
-            subtitle: Text(_project.database.isConnected ? _project.database.provider.label : 'Not connected — tap to add Firebase, Supabase, etc.'),
+            title: const Text('External database (optional)', style: TextStyle(fontWeight: FontWeight.w800)),
+            subtitle: Text(_project.database.isConnected ? _project.database.provider.label : 'Optional — connect your own Firebase/Supabase'),
             trailing: const Icon(Icons.storage_rounded),
             onTap: _editDatabase,
           ),
@@ -824,6 +883,7 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
             ],
           ),
           actions: [
+            IconButton(icon: const Icon(Icons.download_rounded), tooltip: 'Download backup', onPressed: _exportCurrent),
             IconButton(icon: const Icon(Icons.smart_toy_rounded), tooltip: 'AI Copilot', onPressed: _openCopilot),
             IconButton(
               icon: const Icon(Icons.preview_rounded),

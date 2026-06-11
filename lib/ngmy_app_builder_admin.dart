@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
 
-/// Admin controls for NGMY App Builder — release to public + review queue.
+/// Admin controls for NGMY App Builder — local storage only, no cloud database.
 Future<void> showNgmyAppBuilderAdminSheet({
   required BuildContext context,
   required dynamic config,
@@ -12,8 +12,8 @@ Future<void> showNgmyAppBuilderAdminSheet({
   required Future<bool> Function() onPersist,
 }) async {
   var enabled = (config as dynamic).appBuilderEnabled == true;
-  var published = ngmyPublishedAppsFromConfig(config);
-  var queue = ngmyReviewQueueFromConfig(config);
+  var published = await ngmyLoadLocalPublishedApps();
+  var queue = await ngmyLoadLocalReviewQueue();
 
   await showModalBottomSheet<void>(
     context: context,
@@ -37,10 +37,10 @@ Future<void> showNgmyAppBuilderAdminSheet({
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text('NGMY App Builder', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+                    const Text('NGMY App Studio', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
                     const SizedBox(height: 6),
                     Text(
-                      'Admin tests the builder first. When ready, open it for all users via the hub center star.',
+                      'Apps are stored on each user\'s device only — not in Supabase. Users download .ngmy.json backups to restore apps.',
                       style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
                     ),
                     const SizedBox(height: 14),
@@ -53,10 +53,10 @@ Future<void> showNgmyAppBuilderAdminSheet({
                       onChanged: (v) => setST(() => enabled = v),
                     ),
                     const SizedBox(height: 12),
-                    Text('Review queue (${queue.length})', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                    Text('Review queue on this device (${queue.length})', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
                     const SizedBox(height: 8),
                     if (queue.isEmpty)
-                      Text('No apps waiting for review.', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54))
+                      Text('No apps waiting on this device.', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54))
                     else
                       ...queue.map((p) {
                         return Card(
@@ -69,11 +69,6 @@ Future<void> showNgmyAppBuilderAdminSheet({
                               children: [
                                 Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800)),
                                 Text('by ${p.ownerEmail} · ${p.screens.length} screens', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
-                                if (p.publicUrl.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: Text(p.publicUrl, style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black45)),
-                                  ),
                                 const SizedBox(height: 8),
                                 Row(
                                   children: [
@@ -81,10 +76,9 @@ Future<void> showNgmyAppBuilderAdminSheet({
                                       child: FilledButton(
                                         onPressed: () async {
                                           await ngmyPublishAppProject(config, p.ownerEmail, p);
-                                          setST(() {
-                                            published = ngmyPublishedAppsFromConfig(config);
-                                            queue = ngmyReviewQueueFromConfig(config);
-                                          });
+                                          published = await ngmyLoadLocalPublishedApps();
+                                          queue = await ngmyLoadLocalReviewQueue();
+                                          setST(() {});
                                         },
                                         style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
                                         child: const Text('Approve'),
@@ -95,7 +89,8 @@ Future<void> showNgmyAppBuilderAdminSheet({
                                       child: OutlinedButton(
                                         onPressed: () async {
                                           await ngmyRejectAppProject(config, p.ownerEmail, p, 'Please improve navigation and copy, then resubmit.');
-                                          setST(() => queue = ngmyReviewQueueFromConfig(config));
+                                          queue = await ngmyLoadLocalReviewQueue();
+                                          setST(() {});
                                         },
                                         child: const Text('Reject'),
                                       ),
@@ -108,10 +103,10 @@ Future<void> showNgmyAppBuilderAdminSheet({
                         );
                       }),
                     const SizedBox(height: 16),
-                    Text('Published apps (${published.length})', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                    Text('Published on this device (${published.length})', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
                     const SizedBox(height: 8),
                     if (published.isEmpty)
-                      Text('No published apps yet.', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54))
+                      Text('No published apps on this device.', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54))
                     else
                       ...published.map((p) {
                         return ListTile(
@@ -122,7 +117,8 @@ Future<void> showNgmyAppBuilderAdminSheet({
                             icon: const Icon(Icons.public_off_outlined, color: Color(0xFFEF4444)),
                             onPressed: () async {
                               await ngmyUnpublishAppProject(config, p.id);
-                              setST(() => published = ngmyPublishedAppsFromConfig(config));
+                              published = await ngmyLoadLocalPublishedApps();
+                              setST(() {});
                             },
                           ),
                         );
@@ -137,14 +133,14 @@ Future<void> showNgmyAppBuilderAdminSheet({
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(ok ? 'App Builder settings saved.' : 'Saved locally — cloud sync pending.'),
+                              content: Text(ok ? 'App Studio settings saved.' : 'Saved locally.'),
                               backgroundColor: ok ? const Color(0xFF16A34A) : Colors.orange,
                             ),
                           );
                         }
                       },
                       style: FilledButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), minimumSize: const Size(double.infinity, 48)),
-                      child: const Text('Save App Builder settings', style: TextStyle(fontWeight: FontWeight.w800)),
+                      child: const Text('Save settings', style: TextStyle(fontWeight: FontWeight.w800)),
                     ),
                   ],
                 ),

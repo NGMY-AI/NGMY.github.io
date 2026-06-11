@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_urls.dart';
 
 String _userProjectsKey(String email) => 'ngmy_app_builder_projects_${email.toLowerCase().trim()}';
+const _kLocalPublishedKey = 'ngmy_app_builder_published_local';
+const _kLocalReviewQueueKey = 'ngmy_app_builder_review_queue_local';
+const _kGuestAppCachePrefix = 'ngmy_guest_app_cache_';
 
 List<NgmyAppProject> ngmyAppBuilderProjectsFromConfigList(List<Map<String, dynamic>> raw) {
   return raw
@@ -16,20 +18,49 @@ List<NgmyAppProject> ngmyAppBuilderProjectsFromConfigList(List<Map<String, dynam
       .toList();
 }
 
-List<NgmyAppProject> ngmyPublishedAppsFromConfig(dynamic config) {
-  final raw = (config as dynamic).appBuilderPublished;
-  if (raw is! List) return [];
-  return ngmyAppBuilderProjectsFromConfigList(
-    raw.map((e) => e is Map ? Map<String, dynamic>.from(e) : <String, dynamic>{}).toList(),
-  );
+Future<List<NgmyAppProject>> _loadLocalList(String key) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(key);
+    if (raw == null || raw.trim().isEmpty) return [];
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return [];
+    return decoded
+        .map((e) => e is Map ? NgmyAppProject.fromMap(Map<String, dynamic>.from(e)) : null)
+        .whereType<NgmyAppProject>()
+        .toList();
+  } catch (e) {
+    debugPrint('[app builder] load $key: $e');
+    return [];
+  }
 }
 
-List<NgmyAppProject> ngmyReviewQueueFromConfig(dynamic config) {
-  final raw = (config as dynamic).appBuilderReviewQueue;
-  if (raw is! List) return [];
-  return ngmyAppBuilderProjectsFromConfigList(
-    raw.map((e) => e is Map ? Map<String, dynamic>.from(e) : <String, dynamic>{}).toList(),
-  );
+Future<void> _saveLocalList(String key, List<NgmyAppProject> list) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, jsonEncode(list.map((p) => p.toMap()).toList()));
+  } catch (e) {
+    debugPrint('[app builder] save $key: $e');
+  }
+}
+
+/// Published apps — device local storage only (never Supabase).
+Future<List<NgmyAppProject>> ngmyLoadLocalPublishedApps() => _loadLocalList(_kLocalPublishedKey);
+
+Future<void> ngmySaveLocalPublishedApps(List<NgmyAppProject> apps) => _saveLocalList(_kLocalPublishedKey, apps);
+
+/// Legacy name used by UI — reads local storage, not cloud config.
+Future<List<NgmyAppProject>> ngmyPublishedAppsFromConfig(dynamic config) => ngmyLoadLocalPublishedApps();
+
+Future<List<NgmyAppProject>> ngmyLoadLocalReviewQueue() => _loadLocalList(_kLocalReviewQueueKey);
+
+Future<void> ngmySaveLocalReviewQueue(List<NgmyAppProject> apps) => _saveLocalList(_kLocalReviewQueueKey, apps);
+
+Future<List<NgmyAppProject>> ngmyReviewQueueFromConfig(dynamic config) => ngmyLoadLocalReviewQueue();
+
+Future<int> ngmyLocalReviewQueueCount() async {
+  final q = await ngmyLoadLocalReviewQueue();
+  return q.length;
 }
 
 Future<List<NgmyAppProject>> ngmyLoadUserAppProjects(String email) async {
@@ -78,16 +109,19 @@ Future<void> _persistUserProjects(String email, List<NgmyAppProject> list) async
   }
 }
 
-void ngmyConfigSetPublishedApps(dynamic config, List<NgmyAppProject> apps) {
-  (config as dynamic).appBuilderPublished = apps.map((p) => p.toMap()).toList();
-}
-
-void ngmyConfigSetReviewQueue(dynamic config, List<NgmyAppProject> apps) {
-  (config as dynamic).appBuilderReviewQueue = apps.map((p) => p.toMap()).toList();
+Future<void> ngmyCachePublishedAppLocally(NgmyAppProject project) async {
+  if (project.slug.trim().isEmpty) return;
+  final slug = project.slug.trim().toLowerCase();
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('$_kGuestAppCachePrefix$slug', jsonEncode(project.toMap()));
+  } catch (e) {
+    debugPrint('[app builder] guest cache $slug: $e');
+  }
 }
 
 Future<void> ngmySubmitAppForReview(dynamic config, String email, NgmyAppProject project) async {
-  final queue = ngmyReviewQueueFromConfig(config);
+  final queue = await ngmyLoadLocalReviewQueue();
   final submitted = project.copyWith(
     status: NgmyAppBuilderStatus.submitted,
     updatedAt: DateTime.now().toUtc().toIso8601String(),
@@ -95,12 +129,12 @@ Future<void> ngmySubmitAppForReview(dynamic config, String email, NgmyAppProject
   );
   queue.removeWhere((p) => p.id == submitted.id);
   queue.insert(0, submitted);
-  ngmyConfigSetReviewQueue(config, queue);
+  await ngmySaveLocalReviewQueue(queue);
   await ngmySaveUserAppProject(email, submitted);
 }
 
 Future<NgmyAppProject> ngmyPublishAppProject(dynamic config, String email, NgmyAppProject project) async {
-  final taken = ngmyAllPublishedAppSlugs(config);
+  final taken = await ngmyAllPublishedAppSlugs();
   final withUrl = ngmyAppProjectWithPublicUrl(project, taken.where((s) => s != project.slug));
   final published = withUrl.copyWith(
     status: NgmyAppBuilderStatus.published,
@@ -108,17 +142,17 @@ Future<NgmyAppProject> ngmyPublishAppProject(dynamic config, String email, NgmyA
     updatedAt: DateTime.now().toUtc().toIso8601String(),
     reviewNote: null,
   );
-  final list = ngmyPublishedAppsFromConfig(config);
+  final list = await ngmyLoadLocalPublishedApps();
   list.removeWhere((p) => p.id == published.id);
   list.insert(0, published);
-  ngmyConfigSetPublishedApps(config, list);
+  await ngmySaveLocalPublishedApps(list);
 
-  final queue = ngmyReviewQueueFromConfig(config);
+  final queue = await ngmyLoadLocalReviewQueue();
   queue.removeWhere((p) => p.id == published.id);
-  ngmyConfigSetReviewQueue(config, queue);
+  await ngmySaveLocalReviewQueue(queue);
 
   await ngmySaveUserAppProject(email, published);
-  await ngmyCloudPersistPublishedApp(published);
+  await ngmyCachePublishedAppLocally(published);
   return published;
 }
 
@@ -128,14 +162,14 @@ Future<void> ngmyRejectAppProject(dynamic config, String email, NgmyAppProject p
     reviewNote: note.trim(),
     updatedAt: DateTime.now().toUtc().toIso8601String(),
   );
-  final queue = ngmyReviewQueueFromConfig(config);
+  final queue = await ngmyLoadLocalReviewQueue();
   queue.removeWhere((p) => p.id == rejected.id);
-  ngmyConfigSetReviewQueue(config, queue);
+  await ngmySaveLocalReviewQueue(queue);
   await ngmySaveUserAppProject(email, rejected);
 }
 
 Future<void> ngmyUnpublishAppProject(dynamic config, String projectId) async {
-  final list = ngmyPublishedAppsFromConfig(config);
+  final list = await ngmyLoadLocalPublishedApps();
   list.removeWhere((p) => p.id == projectId);
-  ngmyConfigSetPublishedApps(config, list);
+  await ngmySaveLocalPublishedApps(list);
 }
