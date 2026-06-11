@@ -17,6 +17,15 @@ class _EssentialLuxuryCtx {
   Color get accent => t.accent;
   Color get accent2 => t.accent2;
 
+  bool get isEstimate => data.documentKind == 'estimate';
+  String get docLabel => isEstimate ? 'ESTIMATE' : 'INVOICE';
+  String get docRibbon => isEstimate ? 'CERTIFIED REPAIR ESTIMATE' : 'BY ROYAL APPOINTMENT · OFFICIAL INVOICE';
+  String get docSuite => isEstimate ? 'NGMY ESTIMATE STUDIO' : 'PREMIUM INVOICE SUITE';
+  String get docWatermark => isEstimate ? 'CERTIFIED ESTIMATE' : 'ROYAL EXCHEQUER';
+  String get docBinding => isEstimate
+      ? 'This estimate is valid for the period stated and subject to on-site verification.'
+      : 'This document constitutes a binding executive agreement.';
+
   String get biz => data.businessName.isEmpty ? 'YOUR EXCELLENCY' : data.businessName.toUpperCase();
   String get invNo => data.invoiceNo.isEmpty ? '1' : data.invoiceNo;
   String get issued => data.issuedDate.isEmpty ? '--/--/----' : data.issuedDate;
@@ -68,7 +77,7 @@ class _EssentialLuxuryCtx {
                   child: Transform.rotate(
                     angle: -0.18,
                     child: Text(
-                      'ROYAL EXCHEQUER',
+                      docWatermark,
                       style: TextStyle(
                         color: _luxGold.withOpacity(0.045),
                         fontSize: 42,
@@ -131,7 +140,7 @@ class _EssentialLuxuryCtx {
             Icon(Icons.workspace_premium_rounded, color: _luxBlack.withOpacity(0.75), size: 16),
             const SizedBox(width: 8),
             Text(
-              'BY ROYAL APPOINTMENT · OFFICIAL INVOICE',
+              docRibbon,
               style: TextStyle(color: _luxBlack.withOpacity(0.88), fontWeight: FontWeight.w900, fontSize: 8, letterSpacing: 2.2),
             ),
             const SizedBox(width: 8),
@@ -349,8 +358,8 @@ class _EssentialLuxuryCtx {
                       style: TextStyle(color: _luxGoldLight, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1.4),
                     ),
                     const SizedBox(height: 2),
-                    Text('Invoice #$invNo · Issued $issued · Due $due', style: TextStyle(color: _luxIvory.withOpacity(0.58), fontSize: 8)),
-                    Text('This document constitutes a binding executive agreement.', style: TextStyle(color: _luxIvory.withOpacity(0.42), fontSize: 7, fontStyle: FontStyle.italic)),
+                    Text('$docLabel #$invNo · Issued $issued · Valid until $due', style: TextStyle(color: _luxIvory.withOpacity(0.58), fontSize: 8)),
+                    Text(docBinding, style: TextStyle(color: _luxIvory.withOpacity(0.42), fontSize: 7, fontStyle: FontStyle.italic)),
                   ],
                 ),
               ),
@@ -358,7 +367,7 @@ class _EssentialLuxuryCtx {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text('POWERED BY NGMY', style: TextStyle(color: _luxGold.withOpacity(0.72), fontSize: 7, letterSpacing: 1.4, fontWeight: FontWeight.w900)),
-                  Text('PREMIUM INVOICE SUITE', style: TextStyle(color: _luxIvory.withOpacity(0.35), fontSize: 6, letterSpacing: 0.8)),
+                  Text(docSuite, style: TextStyle(color: _luxIvory.withOpacity(0.35), fontSize: 6, letterSpacing: 0.8)),
                 ],
               ),
             ],
@@ -396,7 +405,7 @@ class _EssentialLuxuryCtx {
                 border: Border.all(color: _luxGold.withOpacity(0.65)),
                 color: accent.withOpacity(0.15),
               ),
-              child: Text('INV-$invNo', style: TextStyle(color: _luxGoldLight, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
+              child: Text('${isEstimate ? 'EST' : 'INV'}-$invNo', style: TextStyle(color: _luxGoldLight, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
             ),
           ],
         ),
@@ -519,14 +528,14 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
           const SizedBox(height: 6),
           c.photo(size: 86),
           const SizedBox(height: 8),
-          c.royalTitle('ROYAL HERALD', size: 18),
+          c.royalTitle(c.isEstimate ? 'GOLD HERALD ESTIMATE' : 'ROYAL HERALD', size: 18),
           Text(c.biz, style: TextStyle(color: _luxGoldLight, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 2)),
           c.goldRule(),
           Row(
             children: [
               c.metaChip('CLIENT', c.client),
               const SizedBox(width: 6),
-              c.metaChip('INVOICE', '#${c.invNo}'),
+              c.metaChip(c.docLabel, '#${c.invNo}'),
               const SizedBox(width: 6),
               c.metaChip('DUE', c.due),
             ],
@@ -597,7 +606,7 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: c.royalTitle('THE CHRONICLE', size: 17)),
+              Expanded(child: c.royalTitle(c.isEstimate ? 'EMERALD CHRONICLE ESTIMATE' : 'THE CHRONICLE', size: 17)),
               c.photo(size: 54),
             ],
           ),
@@ -743,11 +752,12 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
                 gradient: LinearGradient(colors: [c.accent, c.accent2]),
                 border: Border.all(color: _luxGold, width: 1),
               ),
-              child: const Text('URGENT ROYAL NOTICE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 8, letterSpacing: 1.3)),
+              child: Text(c.isEstimate ? 'ESTIMATE · VALID 30 DAYS' : 'URGENT ROYAL NOTICE', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 8, letterSpacing: 1.3)),
             ),
           ),
           const SizedBox(height: 12),
-          c.royalTitle(c.biz, size: 17),
+          c.royalTitle(c.isEstimate ? 'AMBER FLASH ESTIMATE' : c.biz, size: 17),
+          if (!c.isEstimate) Text(c.biz, style: TextStyle(color: _luxGoldLight.withOpacity(0.85), fontWeight: FontWeight.w700, fontSize: 10, letterSpacing: 1)),
           Text(c.headline.toUpperCase(), style: TextStyle(color: _luxGoldLight, fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.8)),
           const SizedBox(height: 10),
           Row(
@@ -760,7 +770,7 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(c.client, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w900, fontSize: 13)),
-                    Text('Invoice #${c.invNo} · Due ${c.due}', style: TextStyle(color: _luxIvory.withOpacity(0.6), fontSize: 9)),
+                    Text('${c.docLabel} #${c.invNo} · Valid until ${c.due}', style: TextStyle(color: _luxIvory.withOpacity(0.6), fontSize: 9)),
                     const SizedBox(height: 6),
                     Text(c.summary, style: TextStyle(color: _luxIvory.withOpacity(0.72), fontSize: 9, height: 1.35, fontStyle: FontStyle.italic)),
                   ],

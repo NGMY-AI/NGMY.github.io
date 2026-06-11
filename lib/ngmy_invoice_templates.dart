@@ -173,9 +173,12 @@ class NgmyInvoicePreviewData {
   final List<Offset?> providerSignature;
   final List<Offset?> clientSignature;
   final Uint8List? providerPhotoBytes;
+  /// `estimate` uses repair-estimate copy on luxury templates; default `invoice`.
+  final String documentKind;
 
   const NgmyInvoicePreviewData({
     required this.templateId,
+    this.documentKind = 'invoice',
     required this.businessName,
     required this.bizStreet,
     required this.bizCityStateZip,

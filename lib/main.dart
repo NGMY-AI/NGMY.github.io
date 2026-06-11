@@ -35,6 +35,7 @@ import 'ngmy_barcode_lookup.dart';
 import 'ngmy_price_product_scanner.dart';
 import 'ngmy_iron_triangle_panel.dart';
 import 'ngmy_price_calculator_panel.dart';
+import 'ngmy_repair_estimate_flow.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_games.dart';
@@ -22732,6 +22733,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   final List<Offset?> _clientSignaturePoints = [];
 
   final _calcCityC = TextEditingController();
+  final _calcStateC = TextEditingController();
   final _calcServiceC = TextEditingController();
   final _othersPriceC = TextEditingController();
   final _myPriceC = TextEditingController();
@@ -22835,6 +22837,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   void dispose() {
     _animCtrl.dispose();
     _calcCityC.dispose();
+    _calcStateC.dispose();
     _calcServiceC.dispose();
     _othersPriceC.dispose();
     _myPriceC.dispose();
@@ -23037,6 +23040,36 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     final disc = _num(_itemDiscountC.text);
     final gross = price * qty;
     return gross - (gross * (disc.clamp(0, 100) / 100));
+  }
+
+  void _openRepairEstimateFromCalculator(BuildContext dialogContext) {
+    showNgmyRepairEstimateFlow(
+      context: dialogContext,
+      geminiApiKey: widget.config.geminiApiKey,
+      refreshApiKey: () async {
+        final remote = await _fetchRemoteGeminiApiKey();
+        if (remote.isNotEmpty && mounted) {
+          setState(() => widget.config.geminiApiKey = remote);
+        }
+        return widget.config.geminiApiKey.trim();
+      },
+      initialCity: _calcCityC.text.trim(),
+      initialState: _calcStateC.text.trim(),
+      businessName: _bizNameC.text.trim(),
+      businessPhone: _bizPhoneC.text.trim(),
+      businessAddress: _bizStreetC.text.trim(),
+      onApplyToInvoice: (estimate, templateId) {
+        _invoiceTemplate = templateId;
+        _itemNameC.text = estimate.itemName;
+        _itemPriceC.text = estimate.total.toStringAsFixed(2);
+        _itemDescC.text = estimate.combinedDescription;
+        _paymentInfoC.text = estimate.paymentTerms;
+        _myPriceC.text = estimate.total.toStringAsFixed(2);
+        if (_calcServiceC.text.trim().isEmpty && estimate.fixtureType.isNotEmpty) {
+          _calcServiceC.text = estimate.fixtureType;
+        }
+      },
+    );
   }
 
   void _openInvoiceFromGDialog(BuildContext dialogContext) {
@@ -23508,6 +23541,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     const SizedBox(height: 14),
                     NgmyPriceCalculatorPanel(
                       cityController: _calcCityC,
+                      stateController: _calcStateC,
                       serviceController: _calcServiceC,
                       othersPriceController: _othersPriceC,
                       myPriceController: _myPriceC,
@@ -23522,6 +23556,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       discountAmt: discountAmt,
                       belowMarket: belowMarket,
                       showPriceResult: showPriceResult,
+                      onEstimateTap: () => _openRepairEstimateFromCalculator(ctx),
                       onScanTap: () => openNgmyPriceProductScanner(
                         ctx,
                         onApplyPrice: (name, price, type) {

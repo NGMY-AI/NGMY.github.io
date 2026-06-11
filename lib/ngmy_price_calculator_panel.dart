@@ -5,6 +5,7 @@ class NgmyPriceCalculatorPanel extends StatelessWidget {
   const NgmyPriceCalculatorPanel({
     super.key,
     required this.cityController,
+    required this.stateController,
     required this.serviceController,
     required this.othersPriceController,
     required this.myPriceController,
@@ -13,6 +14,7 @@ class NgmyPriceCalculatorPanel extends StatelessWidget {
     required this.onFieldChanged,
     required this.onScanTap,
     required this.onInvoiceTap,
+    required this.onEstimateTap,
     required this.city,
     required this.service,
     required this.others,
@@ -24,6 +26,7 @@ class NgmyPriceCalculatorPanel extends StatelessWidget {
   });
 
   final TextEditingController cityController;
+  final TextEditingController stateController;
   final TextEditingController serviceController;
   final TextEditingController othersPriceController;
   final TextEditingController myPriceController;
@@ -32,6 +35,7 @@ class NgmyPriceCalculatorPanel extends StatelessWidget {
   final VoidCallback onFieldChanged;
   final VoidCallback onScanTap;
   final VoidCallback onInvoiceTap;
+  final VoidCallback onEstimateTap;
   final String city;
   final String service;
   final double others;
@@ -65,14 +69,38 @@ class NgmyPriceCalculatorPanel extends StatelessWidget {
         child: Stack(
           children: [
             Positioned(
-              top: -30,
-              right: -20,
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [_accent2.withValues(alpha: 0.2), Colors.transparent]),
+              top: 8,
+              right: 8,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onEstimateTap,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Ink(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFFD4AF37).withValues(alpha: 0.45),
+                          _accent2.withValues(alpha: 0.15),
+                          Colors.transparent,
+                        ],
+                      ),
+                      border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.55), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(color: const Color(0xFFD4AF37).withValues(alpha: 0.25), blurRadius: 12),
+                      ],
+                    ),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.photo_camera_rounded, color: Colors.white, size: 18),
+                        Icon(Icons.payments_rounded, color: Color(0xFFF5E6B8), size: 12),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -111,9 +139,11 @@ class NgmyPriceCalculatorPanel extends StatelessWidget {
                     children: [
                       Expanded(child: _field(controller: cityController, hint: 'City', icon: Icons.location_city_rounded)),
                       const SizedBox(width: 8),
-                      Expanded(child: _field(controller: serviceController, hint: 'Service', icon: Icons.handyman_rounded)),
+                      Expanded(child: _field(controller: stateController, hint: 'State', icon: Icons.map_rounded)),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  _field(controller: serviceController, hint: 'Service / fixture', icon: Icons.handyman_rounded),
                   const SizedBox(height: 8),
                   Row(
                     children: [
