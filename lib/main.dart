@@ -96,6 +96,7 @@ import 'ngmy_communicate.dart';
 import 'ngmy_communicate_admin.dart';
 import 'ngmy_app_builder.dart';
 import 'ngmy_app_builder_admin.dart';
+import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_invoice_protected_preview.dart';
@@ -6018,6 +6019,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   bool _allowConfigDiffNotifications = false;
   bool _realtimeStarted = false;
   String _appShellSig = '';
+  String? _publishedAppLaunchSlug;
 
   String _computeAppShellSig() {
     final annSig = _allAnnouncements.map((a) => '${a.id}:${a.message.length}').join('|');
@@ -6597,6 +6599,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       );
     };
     NgmyNavigator.install();
+    _publishedAppLaunchSlug = ngmyPublishedAppSlugFromLaunch();
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
     _initLocalNotifications();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -10045,7 +10048,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             child: shell,
           );
         },
-        home: _currentUser == null
+        home: _publishedAppLaunchSlug != null
+            ? NgmyPublishedAppHostScreen(slug: _publishedAppLaunchSlug!)
+            : _currentUser == null
             ? AuthScreen(
                 allUsers: _allUsers,
                 config: _config,

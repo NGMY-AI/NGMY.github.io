@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_urls.dart';
 
@@ -117,6 +118,7 @@ Future<NgmyAppProject> ngmyPublishAppProject(dynamic config, String email, NgmyA
   ngmyConfigSetReviewQueue(config, queue);
 
   await ngmySaveUserAppProject(email, published);
+  await ngmyCloudPersistPublishedApp(published);
   return published;
 }
 

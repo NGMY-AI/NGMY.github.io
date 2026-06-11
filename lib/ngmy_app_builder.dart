@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_app_builder_ai.dart';
+import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
@@ -15,12 +16,13 @@ void ngmyTryOpenPublishedAppFromUrl(
   String apiKey = '',
   String email = '',
 }) {
-  final slug = ngmyReadAppSlugFromLaunchUrl();
+  final slug = ngmyPublishedAppSlugFromLaunch();
   if (slug == null || slug.isEmpty) return;
-  final app = ngmyFindPublishedAppBySlug(config, slug);
-  if (app == null) return;
-  WidgetsBinding.instance.addPostFrameCallback((_) {
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
     if (!context.mounted) return;
+    var app = ngmyFindPublishedAppBySlug(config, slug);
+    app ??= await ngmyFetchPublishedAppBySlug(slug);
+    if (!context.mounted || app == null) return;
     NgmyNavigator.push(
       context,
       NgmyAppRuntimeScreen(project: app, apiKey: apiKey, email: email),
@@ -35,17 +37,19 @@ Future<void> _ngmyShowAppPublicUrlDialog(BuildContext context, NgmyAppProject pr
   await showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Your app is live!'),
+      title: const Text('Your unique GitHub link'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Share this link — anyone can open your app in a browser or find it on Google:'),
+          Text('This link is only for "${project.name}" — hosted on GitHub Pages. Share it anywhere:', style: TextStyle(color: Colors.grey.shade700)),
           const SizedBox(height: 12),
-          SelectableText(url, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF2563EB))),
+          SelectableText(url, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF2563EB), fontSize: 13)),
+          const SizedBox(height: 10),
+          Text('App ID: ${project.slug}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
           if (project.seoDescription.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text('Search description: ${project.seoDescription}', style: const TextStyle(fontSize: 12)),
+            Text('Google description: ${project.seoDescription}', style: const TextStyle(fontSize: 12)),
           ],
         ],
       ),

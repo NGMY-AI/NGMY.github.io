@@ -61,6 +61,10 @@ if ($html -notmatch 'href="/NGMY.github.io/"') {
 }
 Set-Content -Path $indexPath -Value $html -Encoding UTF8 -NoNewline
 
+# SPA routing: /app/{user-slug} GitHub Pages paths load Flutter via 404.html fallback
+Copy-Item -Path $indexPath -Destination (Join-Path $PSScriptRoot "docs\404.html") -Force
+Write-Host "  Wrote 404.html (unique app links on GitHub Pages)" -ForegroundColor DarkGray
+
 # PWA manifest paths for project subfolder
 $manifestPath = Join-Path $PSScriptRoot "docs\manifest.json"
 if (Test-Path $manifestPath) {
