@@ -13,12 +13,11 @@ import 'ngmy_video_studio_models.dart';
 
 const _metaTimeout = Duration(seconds: 18);
 const _maxRecordSeconds = 180.0;
-const _exportCanvasFps = 12;
-const _exportVideoBitsPerSecond = 4500000;
-const _exportAudioBitsPerSecond = 128000;
+const _exportCanvasFps = 30;
+const _exportVideoBitsPerSecond = 8000000;
+const _exportAudioBitsPerSecond = 192000;
 const _recorderTimesliceMs = 500;
 const _exportWallCapSec = 150.0;
-const _exportPlaybackRate = 3.0;
 
 String _ngmyRecordingStatus(double progress) {
   final pct = (progress.clamp(0.0, 1.0) * 100).round();
@@ -143,7 +142,10 @@ void _ngmyDrawImageContained(
 Future<void> _seekVideoTo(html.VideoElement v, double seconds) async {
   final maxT = v.duration.isFinite && v.duration > 0 ? math.max(0.0, v.duration - 0.05) : seconds;
   final target = seconds.clamp(0.0, maxT);
-  if ((v.currentTime - target).abs() < 0.04) return;
+  if ((v.currentTime - target).abs() < 0.02) {
+    await _waitVideoFrameReady(v);
+    return;
+  }
   final done = Completer<void>();
   void onSeeked(html.Event _) {
     v.removeEventListener('seeked', onSeeked);
@@ -152,10 +154,27 @@ Future<void> _seekVideoTo(html.VideoElement v, double seconds) async {
   v.addEventListener('seeked', onSeeked);
   v.currentTime = target;
   try {
-    await done.future.timeout(const Duration(milliseconds: 600));
+    await done.future.timeout(const Duration(milliseconds: 1200));
   } catch (_) {
     v.removeEventListener('seeked', onSeeked);
   }
+  await _waitVideoFrameReady(v);
+}
+
+Future<void> _waitVideoFrameReady(html.VideoElement v) async {
+  if (js_util.hasProperty(v, 'requestVideoFrameCallback')) {
+    final done = Completer<void>();
+    js_util.callMethod(v, 'requestVideoFrameCallback', [
+      js_util.allowInterop((_, __) {
+        if (!done.isCompleted) done.complete();
+      }),
+    ]);
+    try {
+      await done.future.timeout(const Duration(milliseconds: 500));
+      return;
+    } catch (_) {}
+  }
+  await Future<void>.delayed(const Duration(milliseconds: 24));
 }
 
 double _resolveRecordingDuration(Iterable<html.VideoElement> videos) {
@@ -166,11 +185,11 @@ double _resolveRecordingDuration(Iterable<html.VideoElement> videos) {
     final trusted = (d > 240 ? math.min(d, 90.0) : d).toDouble();
     if (trusted > best) best = trusted;
   }
-  final cap = _ngmyIsMobileBrowser() ? 45.0 : 90.0;
+  final cap = _ngmyIsMobileBrowser() ? 90.0 : _maxRecordSeconds;
   return best.clamp(1.0, math.min(cap, _maxRecordSeconds)).toDouble();
 }
 
-int _exportFps() => _ngmyIsMobileBrowser() ? 10 : _exportCanvasFps;
+int _exportFps() => _ngmyIsMobileBrowser() ? 24 : _exportCanvasFps;
 
 bool _ngmyIsAppleMobileBrowser() {
   final ua = html.window.navigator.userAgent.toLowerCase();
@@ -501,7 +520,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   final appleMobile = _ngmyIsAppleMobileBrowser();
   final recorderOptions = <String, dynamic>{
     'mimeType': mimeType,
-    'videoBitsPerSecond': appleMobile ? 2200000 : (_ngmyIsMobileBrowser() ? 3200000 : _exportVideoBitsPerSecond),
+    'videoBitsPerSecond': appleMobile ? 5500000 : (_ngmyIsMobileBrowser() ? 6500000 : _exportVideoBitsPerSecond),
   };
   if (stream.getAudioTracks().isNotEmpty) {
     recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
@@ -540,12 +559,11 @@ Future<List<html.Blob>> _recordCanvasExport({
   paintFrame();
 
   final fps = _exportFps();
-  final deadline = DateTime.now().add(Duration(seconds: _ngmyIsMobileBrowser() ? 75 : 120));
+  final deadline = DateTime.now().add(Duration(seconds: _ngmyIsMobileBrowser() ? 150 : 200));
 
   if (realtimePlayback) {
-    final speed = 2.0;
     for (final v in videoList) {
-      v.playbackRate = speed;
+      v.playbackRate = 1.0;
       v.muted = true;
       v.currentTime = 0;
       try {
@@ -559,19 +577,19 @@ Future<List<html.Blob>> _recordCanvasExport({
     var tick = 0;
     var lastT = -1.0;
     var stallTicks = 0;
-    final wallCapMs = ((durationSec / speed) * 1000).ceil() + 4000;
+    final wallCapMs = (durationSec * 1000).ceil() + 8000;
 
     while (true) {
       paintFrame();
       tick++;
-      if (tick % 4 == 0) {
+      if (tick % 8 == 0) {
         try {
           js_util.callMethod(recorder, 'requestData', const []);
         } catch (_) {}
       }
 
       final t = videoList.isEmpty ? 0.0 : videoList.first.currentTime.toDouble();
-      if ((t - lastT).abs() < 0.01) {
+      if ((t - lastT).abs() < 0.008) {
         stallTicks++;
       } else {
         stallTicks = 0;
@@ -581,13 +599,13 @@ Future<List<html.Blob>> _recordCanvasExport({
       onProgress(p, _ngmyRecordingStatus(p));
 
       final ended = videoList.isNotEmpty &&
-          videoList.every((v) => v.ended || v.currentTime >= durationSec - 0.08);
+          videoList.every((v) => v.ended || v.currentTime >= durationSec - 0.06);
       final wallMs = DateTime.now().difference(wallStart).inMilliseconds;
-      if (ended || t >= durationSec - 0.05 || wallMs > wallCapMs || stallTicks > 90 || DateTime.now().isAfter(deadline)) {
+      if (ended || t >= durationSec - 0.04 || wallMs > wallCapMs || stallTicks > 180 || DateTime.now().isAfter(deadline)) {
         break;
       }
 
-      await Future<void>.delayed(const Duration(milliseconds: 33));
+      await Future<void>.delayed(const Duration(milliseconds: 16));
     }
   } else {
     final frameMs = (1000 / fps).round();
@@ -601,15 +619,14 @@ Future<List<html.Blob>> _recordCanvasExport({
         await _seekVideoTo(v, t);
       }
       paintFrame();
-      if (frame % 3 == 0) {
+      if (frame % 4 == 0) {
         try {
           js_util.callMethod(recorder, 'requestData', const []);
         } catch (_) {}
       }
       final p = (frame + 1) / totalFrames;
       onProgress(p.clamp(0.05, 0.99), _ngmyRecordingStatus(p));
-      await Future.delayed(Duration(milliseconds: frameMs));
-      if (frame % 6 == 0) await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration(milliseconds: frameMs));
     }
   }
 
@@ -637,19 +654,7 @@ bool _webSupportsComposedCapture() {
   }
 }
 
-(int, int) _exportDimensions(NgmyVideoStudioExportConfig config) {
-  var w = config.outputWidth;
-  var h = config.outputHeight;
-  if (_ngmyIsMobileBrowser()) {
-    const maxW = 720;
-    if (w > maxW) {
-      final scale = maxW / w;
-      w = maxW;
-      h = (h * scale).round().clamp(480, config.outputHeight);
-    }
-  }
-  return (w, h);
-}
+(int, int) _exportDimensions(NgmyVideoStudioExportConfig config) => (config.outputWidth, config.outputHeight);
 
 void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video) {
   if (composed.getAudioTracks().isNotEmpty) return;
@@ -872,7 +877,7 @@ Future<String> exportNgmyVideoStudioComposed({
 
     try {
       ctx.imageSmoothingEnabled = true;
-      js_util.setProperty(ctx, 'imageSmoothingQuality', 'medium');
+      js_util.setProperty(ctx, 'imageSmoothingQuality', 'high');
     } catch (_) {}
 
     void paintFrame() {
@@ -956,7 +961,8 @@ Future<String> exportNgmyVideoStudioComposed({
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
 
-    final canvasStream = _safeCaptureStream(canvas, fps: _exportCanvasFps);
+    final recordFps = _exportFps();
+    final canvasStream = _safeCaptureStream(canvas, fps: recordFps);
     if (canvasStream == null || canvasStream.getVideoTracks().isEmpty) {
       exportCanvas?.remove();
       for (final v in videos.values) {
@@ -1008,9 +1014,9 @@ Future<String> exportNgmyVideoStudioComposed({
     final fallbackMime = mimeCandidates.length > 1 ? mimeCandidates[1] : primaryMime;
 
     for (final plan in [
-      (mime: primaryMime, audio: false, realtime: false),
       (mime: primaryMime, audio: false, realtime: true),
-      (mime: fallbackMime, audio: false, realtime: false),
+      (mime: primaryMime, audio: false, realtime: false),
+      (mime: fallbackMime, audio: false, realtime: true),
     ]) {
       chunks = await tryRecord(plan.mime, withAudio: plan.audio, realtime: plan.realtime);
       if (chunks.isNotEmpty) {
