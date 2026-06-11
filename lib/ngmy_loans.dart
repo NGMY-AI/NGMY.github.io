@@ -1784,63 +1784,136 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverAppBar(
-              expandedHeight: 220,
+              expandedHeight: 210,
               pinned: true,
               backgroundColor: _loanGreen,
               foregroundColor: Colors.white,
-              flexibleSpace: FlexibleSpaceBar(
-                title: Text(widget.isAdmin ? 'Loan tracking' : 'My payments', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+              ),
+              flexibleSpace: ClipRRect(
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
+                child: FlexibleSpaceBar(
+                  centerTitle: true,
+                  titlePadding: const EdgeInsets.only(bottom: 14),
+                  title: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      color: Colors.white.withValues(alpha: 0.14),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.38)),
+                    ),
+                    child: Text(
+                      widget.isAdmin ? 'Loan tracking' : 'My payments',
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.white),
+                    ),
                   ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 56, 20, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('\$${ngmyLoanFormatCurrency((loan['amount'] as num?)?.toDouble() ?? 0)} loan', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26)),
-                          Text((loan['scheduleSummary'] ?? '').toString(), style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
-                          const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 56,
-                                    height: 56,
-                                    child: CircularProgressIndicator(value: progress, strokeWidth: 5, backgroundColor: Colors.white24, color: Colors.white),
+                  background: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    ),
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 52, 18, 52),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '\$${ngmyLoanFormatCurrency((loan['amount'] as num?)?.toDouble() ?? 0)}',
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, height: 1),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        const Text('Active loan', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          (loan['scheduleSummary'] ?? '').toString(),
+                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 11, height: 1.3),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                                ),
+                                if (_lastSync != null) ...[
+                                  const SizedBox(width: 10),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.14),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.circle, color: Colors.white, size: 6),
+                                        SizedBox(width: 5),
+                                        Text('Live', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 52,
+                                        height: 52,
+                                        child: CircularProgressIndicator(value: progress, strokeWidth: 4.5, backgroundColor: Colors.white24, color: Colors.white),
+                                      ),
+                                      Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('$paidCount of ${payments.length} received', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          '\$${ngmyLoanFormatCurrency(paidTotal)} paid · \$${ngmyLoanFormatCurrency(remaining)} left',
+                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('$paidCount of ${payments.length} received', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                                    Text('\$${ngmyLoanFormatCurrency(paidTotal)} paid · \$${ngmyLoanFormatCurrency(remaining)} left', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-              actions: [
-                if (_lastSync != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Center(child: Text('Live', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white.withValues(alpha: 0.9)))),
-                  ),
-              ],
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -1895,7 +1968,7 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
                   crossAxisCount: 2,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 1.05,
+                  childAspectRatio: 1.48,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, i) => _paymentGridTile(context, payments[i], isDark: isDark),
@@ -1965,22 +2038,25 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
     final innerBg = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.shade50;
     final innerBorder = statusColor.withValues(alpha: paid ? 0.35 : 0.2);
 
-    return Material(
-      color: Colors.transparent,
-      clipBehavior: Clip.antiAlias,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: widget.isAdmin && !paid ? () => _recordPayment(p) : null,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: paid ? _loanGreen.withValues(alpha: isDark ? 0.12 : 0.06) : (isDark ? const Color(0xFF1A2235) : Colors.white),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: statusColor.withValues(alpha: paid ? 0.4 : 0.22)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Material(
+        color: Colors.transparent,
+        clipBehavior: Clip.antiAlias,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: widget.isAdmin && !paid ? () => _recordPayment(p) : null,
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: paid ? _loanGreen.withValues(alpha: isDark ? 0.12 : 0.06) : (isDark ? const Color(0xFF1A2235) : Colors.white),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: statusColor.withValues(alpha: paid ? 0.4 : 0.22)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                 decoration: BoxDecoration(
@@ -2033,7 +2109,8 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
                   ],
                 ),
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
