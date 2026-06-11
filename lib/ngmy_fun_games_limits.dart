@@ -104,16 +104,21 @@ class NgmyFunGamesLimits {
 
   // ── Confidence ──
 
+  static Future<void> _rollConfidenceDay(SharedPreferences prefs, String today) async {
+    if (prefs.getString(_confDayKey) == today) return;
+    await prefs.setString(_confDayKey, today);
+    await prefs.setInt('${_confDayKey}_used', 0);
+    await prefs.remove(_confTodayQuoteKey);
+    await prefs.remove(_confTodayContentKey);
+  }
+
   static Future<({int contentIndex, int cyclePosition, int cycleTotal, bool canViewToday, String? todayQuote, int todayContentIndex})> confidenceState(
     int totalCount,
   ) async {
     final prefs = await SharedPreferences.getInstance();
     final today = _dayKey(DateTime.now());
-    if (prefs.getString(_confDayKey) != today) {
-      await prefs.setString(_confDayKey, today);
-      await prefs.setInt(_confDayKey + '_used', 0);
-    }
-    final used = prefs.getInt(_confDayKey + '_used') ?? 0;
+    await _rollConfidenceDay(prefs, today);
+    final used = prefs.getInt('${_confDayKey}_used') ?? 0;
     final pos = prefs.getInt(_confPosKey) ?? 0;
     final content = await _contentAt(_catConfidence, totalCount, _confPosKey, _confGenKey);
     return (
@@ -133,13 +138,10 @@ class NgmyFunGamesLimits {
   ) async {
     final prefs = await SharedPreferences.getInstance();
     final today = _dayKey(DateTime.now());
-    if (prefs.getString(_confDayKey) != today) {
-      await prefs.setString(_confDayKey, today);
-      await prefs.setInt(_confDayKey + '_used', 0);
-    }
-    final used = prefs.getInt(_confDayKey + '_used') ?? 0;
+    await _rollConfidenceDay(prefs, today);
+    final used = prefs.getInt('${_confDayKey}_used') ?? 0;
     if (used >= confidenceDailyLimit) return null;
-    await prefs.setInt(_confDayKey + '_used', used + 1);
+    await prefs.setInt('${_confDayKey}_used', used + 1);
     await prefs.setString(_confTodayQuoteKey, quote);
     await prefs.setInt(_confTodayContentKey, contentIndex);
     await prefs.setBool(_confEverKey, true);
@@ -151,13 +153,14 @@ class NgmyFunGamesLimits {
   static Future<bool> hasConfidenceTodayQuote() async {
     final prefs = await SharedPreferences.getInstance();
     final today = _dayKey(DateTime.now());
-    return prefs.getString(_confDayKey) == today && (prefs.getString(_confTodayQuoteKey)?.isNotEmpty ?? false);
+    await _rollConfidenceDay(prefs, today);
+    final used = prefs.getInt('${_confDayKey}_used') ?? 0;
+    return used > 0 && (prefs.getString(_confTodayQuoteKey)?.isNotEmpty ?? false);
   }
 
   static Future<String?> todayConfidenceQuote() async {
+    if (!await hasConfidenceTodayQuote()) return null;
     final prefs = await SharedPreferences.getInstance();
-    final today = _dayKey(DateTime.now());
-    if (prefs.getString(_confDayKey) != today) return null;
     return prefs.getString(_confTodayQuoteKey);
   }
 

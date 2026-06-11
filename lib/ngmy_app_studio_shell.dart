@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import 'ngmy_bottom_nav_frame.dart';
@@ -79,7 +77,7 @@ class NgmyAppStudioBottomNav extends StatelessWidget {
   }
 }
 
-/// Frosted content frame for studio tabs.
+/// Solid content frame — no BackdropFilter (avoids whole-app blur on web/phone).
 class NgmyAppStudioContentFrame extends StatelessWidget {
   const NgmyAppStudioContentFrame({
     super.key,
@@ -92,44 +90,27 @@ class NgmyAppStudioContentFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDark
-                  ? [
-                      Colors.white.withValues(alpha: 0.06),
-                      const Color(0xFF1E293B).withValues(alpha: 0.55),
-                    ]
-                  : [
-                      Colors.white.withValues(alpha: 0.72),
-                      Colors.white.withValues(alpha: 0.42),
-                    ],
-            ),
-            border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        color: isDark ? const Color(0xFF111827) : Colors.white,
+        border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
-          child: child,
-        ),
+        ],
       ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
     );
   }
 }
 
-/// Compact centered top pill — matches bottom nav bar style, text-width only.
+/// Compact centered top pill with back to NGMY Hub.
 class NgmyAppStudioTopBar extends StatelessWidget {
   const NgmyAppStudioTopBar({
     super.key,
@@ -142,71 +123,52 @@ class NgmyAppStudioTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderNeutral = isDark ? Colors.white : Colors.black;
     return SafeArea(
       bottom: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
         child: Center(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(30),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isDark
-                        ? [
-                            Colors.white.withValues(alpha: 0.1),
-                            const Color(0xFF1E293B).withValues(alpha: 0.55),
-                          ]
-                        : [
-                            Colors.white.withValues(alpha: 0.78),
-                            Colors.white.withValues(alpha: 0.5),
-                          ],
-                  ),
-                  border: Border.all(color: borderNeutral.withValues(alpha: 0.12)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.06),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(4, 2, 10, 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Back to NGMY Hub',
+                    onPressed: onBack,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    icon: Icon(
+                      Icons.arrow_back_rounded,
+                      size: 20,
+                      color: isDark ? Colors.white : const Color(0xFF1E293B),
                     ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 2, 10, 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'Back to NGMY Hub',
-                        onPressed: onBack,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                        icon: Icon(
-                          Icons.arrow_back_rounded,
-                          size: 20,
-                          color: isDark ? Colors.white : const Color(0xFF1E293B),
-                        ),
-                      ),
-                      Icon(Icons.hub_rounded, size: 17, color: isDark ? const Color(0xFF818CF8) : const Color(0xFF6366F1)),
-                      const SizedBox(width: 6),
-                      Text(
-                        'App Studio',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                    ],
                   ),
-                ),
+                  Icon(Icons.hub_rounded, size: 17, color: isDark ? const Color(0xFF818CF8) : const Color(0xFF6366F1)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'App Studio',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

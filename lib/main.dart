@@ -11716,9 +11716,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _runScheduledPopups();
       _promptPushNotificationsIfNeeded();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) unawaited(ngmyMaybeShowConfidenceResumePopup(context));
-      });
     }
   }
 

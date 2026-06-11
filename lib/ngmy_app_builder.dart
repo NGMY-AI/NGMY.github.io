@@ -183,11 +183,26 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
     }
   }
 
-  Future<void> _createFromTemplate(NgmyAppTemplate template) async {
-    final p = template.build(_email);
-    await ngmySaveUserAppProject(_email, p);
-    await _reload();
-    await _openEditor(p);
+  Future<void> _previewTemplate(NgmyAppTemplate template) async {
+    final preview = template.build(_email).copyWith(
+      id: 'preview_${template.id}_${DateTime.now().millisecondsSinceEpoch}',
+    );
+    final saved = await NgmyNavigator.push<bool>(
+      context,
+      _NgmyTemplatePreviewScreen(
+        template: template,
+        project: preview,
+        apiKey: _apiKey,
+        email: _email,
+      ),
+      routeName: 'NgmyTemplatePreviewScreen',
+    );
+    if (saved == true && mounted) {
+      await _reload();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('"${template.name}" saved to My Apps — edit and customize anytime.')),
+      );
+    }
   }
 
   Future<void> _submitOrPublish(NgmyAppProject project) async {
@@ -510,42 +525,75 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
   }
 
   Widget _templatesTab(bool isDark) {
-    return GridView.builder(
+    return ListView(
       padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 14, crossAxisSpacing: 14, childAspectRatio: 0.88),
-      itemCount: kNgmyAppTemplates.length,
-      itemBuilder: (_, i) {
-        final t = kNgmyAppTemplates[i];
-        final color = Color(t.themeColor);
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _createFromTemplate(t),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [color.withValues(alpha: 0.15), color.withValues(alpha: 0.05)]),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: color.withValues(alpha: 0.25)),
-                boxShadow: [BoxShadow(color: color.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 4))],
+      children: [
+        Text(
+          'Tap to preview — nothing is saved until you tap "Save to My Apps".',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
+        ),
+        const SizedBox(height: 14),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 14, crossAxisSpacing: 14, childAspectRatio: 0.82),
+          itemCount: kNgmyAppTemplates.length,
+          itemBuilder: (_, i) {
+            final t = kNgmyAppTemplates[i];
+            final color = Color(t.themeColor);
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _previewTemplate(t),
+                borderRadius: BorderRadius.circular(22),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: color.withValues(alpha: 0.35), width: 1.5),
+                    boxShadow: [BoxShadow(color: color.withValues(alpha: 0.15), blurRadius: 14, offset: const Offset(0, 6))],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(t.icon, style: const TextStyle(fontSize: 28)),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                            child: Text('Preview', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: color)),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      Text(t.name, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                      const SizedBox(height: 4),
+                      Text(
+                        t.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 10, color: isDark ? Colors.white60 : Colors.black54, height: 1.3),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.visibility_rounded, size: 13, color: color),
+                          const SizedBox(width: 4),
+                          Text('Tap to try', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(t.icon, style: const TextStyle(fontSize: 32)),
-                  const Spacer(),
-                  Text(t.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-                  const SizedBox(height: 4),
-                  Text(t.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54, height: 1.3)),
-                  const SizedBox(height: 8),
-                  Row(children: [Icon(Icons.bolt_rounded, size: 14, color: color), const SizedBox(width: 4), Text('Interactive', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color))]),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -727,6 +775,81 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  void _quickAddScreen(String kind) {
+    final id = 'scr_${DateTime.now().millisecondsSinceEpoch}';
+    NgmyAppScreen screen;
+    switch (kind) {
+      case 'form':
+        screen = NgmyAppScreen(
+          id: id,
+          title: 'New Form',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'column',
+              'children': [
+                {
+                  'type': 'form',
+                  'collection': 'entries',
+                  'submitLabel': 'Save',
+                  'successMessage': 'Saved!',
+                  'fields': [
+                    {'id': 'name', 'label': 'Name', 'type': 'text'},
+                    {'id': 'notes', 'label': 'Notes', 'type': 'text'},
+                  ],
+                },
+              ],
+            },
+          },
+        );
+      case 'list':
+        screen = NgmyAppScreen(
+          id: id,
+          title: 'My List',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'column',
+              'children': [
+                {
+                  'type': 'dataList',
+                  'collection': 'entries',
+                  'titleField': 'name',
+                  'subtitleField': 'notes',
+                  'emptyText': 'No items yet.',
+                  'addLabel': 'Add item',
+                },
+              ],
+            },
+          },
+        );
+      case 'settings':
+        screen = NgmyAppScreen(
+          id: id,
+          title: 'Settings',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'column',
+              'children': [
+                {'type': 'switch', 'setting': 'notifications', 'label': 'Notifications', 'default': true},
+                {'type': 'switch', 'setting': 'dark_mode', 'label': 'Dark mode', 'subtitle': 'Light when off, dark when on', 'default': false},
+              ],
+            },
+          },
+        );
+      default:
+        screen = NgmyAppScreen.menu(
+          id: id,
+          title: 'Menu',
+          items: [
+            {'label': 'Home', 'targetScreenId': _project.homeScreen.id, 'icon': 'home'},
+          ],
+        );
+    }
+    setState(() => _project = _project.copyWith(screens: [..._project.screens, screen]));
+  }
+
   Future<void> _openCopilot() async {
     final updated = await NgmyNavigator.push<NgmyAppProject>(
       context,
@@ -850,20 +973,6 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
             }).toList(),
           ),
           const SizedBox(height: 12),
-          Card(
-            color: const Color(0xFF10B981).withValues(alpha: 0.08),
-            child: ListTile(
-              leading: const Icon(Icons.cloud_sync_rounded, color: Color(0xFF10B981)),
-              title: const Text('Backup & cloud', style: TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: const Text('Download .ngmy.json backup anytime. Save one app to NGMY cloud from My Apps.'),
-              trailing: IconButton(
-                icon: const Icon(Icons.download_rounded),
-                onPressed: _exportCurrent,
-                tooltip: 'Download backup',
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('External database (optional)', style: TextStyle(fontWeight: FontWeight.w800)),
@@ -872,35 +981,92 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
             onTap: _editDatabase,
           ),
           const SizedBox(height: 16),
-          const Text('Screens', style: TextStyle(fontWeight: FontWeight.w800)),
+          const Text('Quick add', style: TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          ..._project.screens.asMap().entries.map((e) {
-            final s = e.value;
-            return Card(
-              child: ListTile(
-                leading: Icon(s.kind.icon, color: _project.theme),
-                title: Text(s.title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text(s.kind.label),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
-                  onPressed: _project.screens.length <= 1
-                      ? null
-                      : () => setState(() {
-                            final list = [..._project.screens]..removeAt(e.key);
-                            _project = _project.copyWith(screens: list);
-                          }),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ActionChip(
+                  avatar: const Icon(Icons.edit_note_rounded, size: 16),
+                  label: const Text('Form'),
+                  onPressed: () => _quickAddScreen('form'),
                 ),
-                onTap: () async {
-                  final edited = await _editScreenDialog(s);
-                  if (edited != null) {
-                    final list = [..._project.screens];
-                    list[e.key] = edited;
-                    setState(() => _project = _project.copyWith(screens: list));
-                  }
-                },
-              ),
-            );
-          }),
+                const SizedBox(width: 8),
+                ActionChip(
+                  avatar: const Icon(Icons.list_alt_rounded, size: 16),
+                  label: const Text('List'),
+                  onPressed: () => _quickAddScreen('list'),
+                ),
+                const SizedBox(width: 8),
+                ActionChip(
+                  avatar: const Icon(Icons.dashboard_rounded, size: 16),
+                  label: const Text('Menu'),
+                  onPressed: () => _quickAddScreen('menu'),
+                ),
+                const SizedBox(width: 8),
+                ActionChip(
+                  avatar: const Icon(Icons.tune_rounded, size: 16),
+                  label: const Text('Settings'),
+                  onPressed: () => _quickAddScreen('settings'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('Screens — drag to reorder', style: TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _project.screens.length,
+            onReorder: (oldIndex, newIndex) {
+              setState(() {
+                final list = [..._project.screens];
+                if (newIndex > oldIndex) newIndex -= 1;
+                final item = list.removeAt(oldIndex);
+                list.insert(newIndex, item);
+                _project = _project.copyWith(screens: list);
+              });
+            },
+            itemBuilder: (context, e) {
+              final s = _project.screens[e];
+              return Card(
+                key: ValueKey(s.id),
+                child: ListTile(
+                  leading: ReorderableDragStartListener(
+                    index: e,
+                    child: Icon(Icons.drag_handle_rounded, color: _project.theme),
+                  ),
+                  title: Row(
+                    children: [
+                      Icon(s.kind.icon, color: _project.theme, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(s.title, style: const TextStyle(fontWeight: FontWeight.w700))),
+                    ],
+                  ),
+                  subtitle: Text(s.kind.label),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
+                    onPressed: _project.screens.length <= 1
+                        ? null
+                        : () => setState(() {
+                              final list = [..._project.screens]..removeAt(e);
+                              _project = _project.copyWith(screens: list);
+                            }),
+                  ),
+                  onTap: () async {
+                    final edited = await _editScreenDialog(s);
+                    if (edited != null) {
+                      final list = [..._project.screens];
+                      list[e] = edited;
+                      setState(() => _project = _project.copyWith(screens: list));
+                    }
+                  },
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () async {
@@ -1904,5 +2070,81 @@ class _NgmyAppRuntimeScreenState extends State<NgmyAppRuntimeScreen> {
     final actorId = (screen.data['actorId'] ?? 'architect').toString();
     final actor = ngmyAppBuilderActorById(actorId);
     return NgmyAppBuilderActorChatScreen(actor: actor, apiKey: widget.apiKey, email: widget.email, project: widget.project);
+  }
+}
+
+/// Preview template without saving to My Apps until user confirms.
+class _NgmyTemplatePreviewScreen extends StatelessWidget {
+  final NgmyAppTemplate template;
+  final NgmyAppProject project;
+  final String apiKey;
+  final String email;
+
+  const _NgmyTemplatePreviewScreen({
+    required this.template,
+    required this.project,
+    required this.apiKey,
+    required this.email,
+  });
+
+  Future<void> _save(BuildContext context) async {
+    final p = template.build(email);
+    await ngmySaveUserAppProject(email, p);
+    if (context.mounted) Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Preview · ${template.name}', style: const TextStyle(fontWeight: FontWeight.w800)),
+        actions: [
+          TextButton.icon(
+            onPressed: () => _save(context),
+            icon: const Icon(Icons.save_rounded, size: 18),
+            label: const Text('Save to My Apps', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Material(
+            color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF6366F1)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Preview only — not in My Apps until you tap Save.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade800, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: NgmyAppRuntimeScreen(project: project, apiKey: apiKey, email: email),
+          ),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton.icon(
+            onPressed: () => _save(context),
+            icon: const Icon(Icons.rocket_launch_rounded),
+            label: const Text('Save to My Apps & customize'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Color(template.themeColor),
+              minimumSize: const Size(double.infinity, 50),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -86,11 +86,11 @@ const List<NgmyAppBuilderActor> kNgmyAppBuilderActors = [
     icon: Icons.construction_rounded,
     color: Color(0xFFF59E0B),
     systemPrompt:
-        'You are Bolt, the full-power NGMY App Builder AI. You can do ANYTHING the user asks: create apps from scratch, '
-        'add/remove/rename screens, change themes, menus, forms, databases, navigation, copy, icons, and layouts. '
-        'Build WORKING apps — forms save to collections, dataList shows saved items, switches persist settings, '
-        'workoutPlan has checkable exercises. Never ship text-only screens for interactive features. '
-        'When editing, keep stable screen ids. Output complete JSON with data.layout widget trees.',
+        'You are Bolt — unlimited NGMY App Studio AI (free, no limits). Build ANY app users dream of: social, business, '
+        'fitness, e-commerce, school, church, games, portfolios, booking, CRM, dashboards, or custom code notes. '
+        'You write full working JSON layouts AND can put raw code ideas in customCode. Users may also edit Code Studio themselves. '
+        'Never refuse — always deliver ---APP_JSON--- when they want changes. Forms save data, lists show data, switches work, '
+        'dark_mode toggles theme. Keep stable screen ids when editing.',
   ),
   NgmyAppBuilderActor(
     id: 'reviewer',
@@ -348,6 +348,7 @@ class NgmyAppProject {
   bool get isPublished => status == NgmyAppBuilderStatus.published && publicUrl.trim().isNotEmpty;
 
   NgmyAppProject copyWith({
+    String? id,
     String? name,
     String? tagline,
     String? ownerEmail,
@@ -365,7 +366,7 @@ class NgmyAppProject {
     String? appIcon,
   }) {
     return NgmyAppProject(
-      id: id,
+      id: id ?? this.id,
       name: name ?? this.name,
       tagline: tagline ?? this.tagline,
       ownerEmail: ownerEmail ?? this.ownerEmail,

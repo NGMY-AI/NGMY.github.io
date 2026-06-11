@@ -10,7 +10,7 @@ const _confDeep = Color(0xFFB45309);
 const _brainViolet = Color(0xFF8B5CF6);
 const _fortuneCyan = Color(0xFF06B6D4);
 
-/// Confidence quote popup — shown on app resume and after daily reveal.
+/// Confidence quote popup — shown only when user taps Reveal in Fun & Games.
 Future<void> showNgmyConfidencePopup(
   BuildContext context, {
   required String quote,
@@ -257,36 +257,6 @@ class _FortunePopupOverlayState extends State<_FortunePopupOverlay> with TickerP
   }
 }
 
-/// Called on app resume — shows today's confidence quote if user unlocked it today.
-Future<void> ngmyMaybeShowConfidenceResumePopup(BuildContext context) async {
-  if (!context.mounted) return;
-  final quote = await NgmyFunGamesResumeGate.todayQuoteIfAny();
-  if (quote == null || !context.mounted) return;
-  await showNgmyConfidencePopup(
-    context,
-    quote: quote.text,
-  );
-}
-
-/// Prevents duplicate popups within the same resume burst.
-class NgmyFunGamesResumeGate {
-  static DateTime? _lastPopupAt;
-  static String? _cachedQuote;
-
-  static Future<({String text})?> todayQuoteIfAny() async {
-    final has = await NgmyFunGamesLimits.hasConfidenceTodayQuote();
-    if (!has) return null;
-    final quote = await NgmyFunGamesLimits.todayConfidenceQuote();
-    if (quote == null || quote.isEmpty) return null;
-    final now = DateTime.now();
-    if (_lastPopupAt != null && now.difference(_lastPopupAt!) < const Duration(seconds: 8)) {
-      return null;
-    }
-    if (_cachedQuote == quote && _lastPopupAt != null && now.difference(_lastPopupAt!) < const Duration(minutes: 2)) {
-      return null;
-    }
-    _lastPopupAt = now;
-    _cachedQuote = quote;
-    return (text: quote);
-  }
-}
+/// Disabled — confidence popup only appears from Games → Confidence → Reveal.
+@Deprecated('Popup only on Reveal Today\'s Boost button')
+Future<void> ngmyMaybeShowConfidenceResumePopup(BuildContext context) async {}
