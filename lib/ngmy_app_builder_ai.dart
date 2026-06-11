@@ -40,8 +40,14 @@ Future<NgmyAppBuilderCopilotResult> ngmyAppBuilderAiCopilot({
   final prompt = '''
 ${actor.systemPrompt}
 
-You are NOT limited to preset screen types. Users can ask for ANYTHING — five menus, ten tabs, complex layouts, custom forms.
-Use kind "custom" with data.layout widget trees for unlimited UI. You can also use welcome/menu/content/form/aiChat with data.layout overrides.
+You build WORKING apps — not text-only brochures. Every feature must FUNCTION:
+- Forms MUST have "collection" and save data (venues, check-ins, contacts, etc.)
+- Lists MUST use "dataList" widget bound to the same collection
+- Settings MUST use "switch" widgets that persist
+- Workouts MUST use "workoutPlan" with checkable exercises
+- Venues/bookings/products: form + dataList + stat on home screen
+
+Use kind "custom" with data.layout for ALL interactive screens. NEVER use kind "content" with only body text for features users can use.
 
 IMPORTANT RESPONSE FORMAT:
 1) Always write a friendly reply to the user first (2-4 sentences).
@@ -68,7 +74,8 @@ IMPORTANT RESPONSE FORMAT:
    }
 3) If user only asks questions, do NOT include ---APP_JSON---.
 4) Keep screen ids stable when editing. Use target / targetScreenId for navigation.
-5) Prefer data.layout for complex UIs (menuGrid, tabs, row, column, hero, form, list, button, image, etc.).
+5) Use data.layout with form+dataList+switch+workoutPlan+stat widgets. Forms without "collection" are WRONG.
+6) When user asks for settings, venues, workouts, contact — build working UI not placeholder text.
 
 $kNgmyAppBuilderCodeSchemaHelp
 
@@ -212,7 +219,7 @@ Future<NgmyAppProject?> ngmyAppBuilderAiGenerateApp({
 }) async {
   final result = await ngmyAppBuilderAiCopilot(
     apiKey: apiKey,
-    userMessage: 'Create a complete app for this idea: $idea. Use custom layouts (data.layout) with menuGrid, hero, forms, and as many screens as needed. No limits.',
+    userMessage: 'Create a complete WORKING app for: $idea. Use custom layouts with form (collection saves data), dataList (shows saved items), switch (settings), workoutPlan (if fitness). No text-only screens for interactive features.',
     project: base,
   );
   final p = result.updatedProject;

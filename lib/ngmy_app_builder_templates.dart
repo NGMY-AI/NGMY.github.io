@@ -32,271 +32,326 @@ NgmyAppProject _base(String owner, String name, String tagline, int color, List<
   );
 }
 
+NgmyAppScreen _custom(String id, String title, Map<String, dynamic> layout) {
+  return NgmyAppScreen(id: id, title: title, kind: NgmyAppScreenKind.custom, data: {'layout': layout});
+}
+
+Map<String, dynamic> _homeLayout({
+  required String emoji,
+  required String title,
+  required String subtitle,
+  required String statCollection,
+  required String statLabel,
+  required List<Map<String, dynamic>> menuItems,
+}) {
+  return {
+    'type': 'column',
+    'children': [
+      {'type': 'hero', 'emoji': emoji, 'title': title, 'subtitle': subtitle},
+      {'type': 'spacer', 'height': 8},
+      {'type': 'stat', 'collection': statCollection, 'label': statLabel},
+      {'type': 'spacer', 'height': 12},
+      {'type': 'menuGrid', 'columns': 2, 'items': menuItems},
+    ],
+  };
+}
+
 final List<NgmyAppTemplate> kNgmyAppTemplates = [
+  NgmyAppTemplate(
+    id: 'venue',
+    name: 'Venue Manager',
+    description: 'Create venues, manage list, working settings.',
+    icon: '🏟️',
+    themeColor: 0xFF7C3AED,
+    build: (o) => _base(o, 'Venue Manager', 'Create and manage event venues', 0xFF7C3AED, [
+      _custom('home', 'Home', _homeLayout(
+        emoji: '🏟️',
+        title: 'Venue Manager',
+        subtitle: 'Create venues, track capacity, manage settings',
+        statCollection: 'venues',
+        statLabel: 'Venues created',
+        menuItems: [
+          {'label': 'My Venues', 'icon': 'venue', 'target': 'venues_list'},
+          {'label': 'Add Venue', 'icon': 'add', 'target': 'create_venue'},
+          {'label': 'Settings', 'icon': 'settings', 'target': 'settings'},
+          {'label': 'Contact', 'icon': 'mail', 'target': 'contact'},
+        ],
+      )),
+      _custom('venues_list', 'My Venues', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'Your venues', 'style': 'title'},
+          {'type': 'dataList', 'collection': 'venues', 'titleField': 'name', 'subtitleField': 'address',
+            'emptyText': 'No venues yet. Tap Add Venue to create your first one.', 'addTarget': 'create_venue', 'addLabel': 'Add Venue'},
+        ],
+      }),
+      _custom('create_venue', 'Add Venue', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'New venue', 'style': 'title'},
+          {'type': 'form', 'collection': 'venues', 'navigateAfter': 'venues_list', 'submitLabel': 'Create Venue', 'successMessage': 'Venue created!',
+            'fields': [
+              {'id': 'name', 'label': 'Venue name', 'type': 'text'},
+              {'id': 'address', 'label': 'Address', 'type': 'text'},
+              {'id': 'capacity', 'label': 'Capacity', 'type': 'number'},
+              {'id': 'notes', 'label': 'Notes', 'type': 'text'},
+            ]},
+        ],
+      }),
+      _custom('settings', 'Settings', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'App settings', 'style': 'title'},
+          {'type': 'switch', 'setting': 'notifications', 'label': 'Push notifications', 'subtitle': 'Alerts for new bookings', 'default': true},
+          {'type': 'switch', 'setting': 'dark_mode', 'label': 'Dark mode', 'subtitle': 'Easier on the eyes at night', 'default': false},
+          {'type': 'switch', 'setting': 'auto_sync', 'label': 'Auto-sync', 'subtitle': 'Sync venue data when online', 'default': true},
+        ],
+      }),
+      _custom('contact', 'Contact', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'Send us a message', 'style': 'title'},
+          {'type': 'form', 'collection': 'messages', 'submitLabel': 'Send message', 'successMessage': 'Message sent!',
+            'fields': [
+              {'id': 'name', 'label': 'Your name', 'type': 'text'},
+              {'id': 'email', 'label': 'Email', 'type': 'email'},
+              {'id': 'message', 'label': 'Message', 'type': 'text'},
+            ]},
+        ],
+      }),
+    ]),
+  ),
+  NgmyAppTemplate(
+    id: 'fitness',
+    name: 'Fitness Coach',
+    description: 'Interactive workouts, check-ins, AI coach.',
+    icon: '💪',
+    themeColor: 0xFF059669,
+    build: (o) => _base(o, 'Fit Coach', 'Train smarter, feel stronger', 0xFF059669, [
+      _custom('home', 'Home', _homeLayout(
+        emoji: '💪',
+        title: 'Fit Coach',
+        subtitle: 'Your personal training hub',
+        statCollection: 'checkins',
+        statLabel: 'Check-ins logged',
+        menuItems: [
+          {'label': 'Workouts', 'icon': 'fitness', 'target': 'workouts'},
+          {'label': 'Check-in', 'icon': 'add', 'target': 'checkin'},
+          {'label': 'Nutrition', 'icon': 'food', 'target': 'nutrition'},
+          {'label': 'AI Coach', 'icon': 'chat', 'target': 'ai'},
+        ],
+      )),
+      _custom('workouts', 'Workouts', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'Choose your plan', 'style': 'title'},
+          {'type': 'workoutPlan', 'planId': 'strength', 'title': 'Strength Training', 'exercises': [
+            {'id': 'sq', 'name': 'Squats', 'sets': '3x12'},
+            {'id': 'bp', 'name': 'Bench Press', 'sets': '3x10'},
+            {'id': 'dl', 'name': 'Deadlifts', 'sets': '3x8'},
+            {'id': 'row', 'name': 'Barbell Rows', 'sets': '3x10'},
+          ]},
+          {'type': 'spacer', 'height': 16},
+          {'type': 'workoutPlan', 'planId': 'cardio', 'title': 'Cardio Blast', 'exercises': [
+            {'id': 'run', 'name': 'Treadmill Run', 'sets': '20 min'},
+            {'id': 'bike', 'name': 'Cycling', 'sets': '15 min'},
+            {'id': 'jump', 'name': 'Jump Rope', 'sets': '5 min'},
+          ]},
+        ],
+      }),
+      _custom('nutrition', 'Nutrition', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'Daily nutrition goals', 'style': 'title'},
+          {'type': 'checklist', 'id': 'nutrition_daily', 'items': [
+            {'id': 'water', 'label': 'Drink 8 glasses of water'},
+            {'id': 'protein', 'label': 'Protein with every meal'},
+            {'id': 'veggies', 'label': 'Eat 3 servings of vegetables'},
+            {'id': 'sleep', 'label': 'Sleep 7+ hours'},
+          ]},
+        ],
+      }),
+      _custom('checkin', 'Check-in', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'Daily check-in', 'style': 'title'},
+          {'type': 'form', 'collection': 'checkins', 'submitLabel': 'Save check-in', 'successMessage': 'Check-in saved!', 'navigateAfter': 'home',
+            'fields': [
+              {'id': 'weight', 'label': 'Weight (lbs)', 'type': 'number'},
+              {'id': 'energy', 'label': 'Energy 1-10', 'type': 'number'},
+              {'id': 'notes', 'label': 'How are you feeling?', 'type': 'text'},
+            ]},
+        ],
+      }),
+      const NgmyAppScreen(id: 'ai', title: 'AI Coach', kind: NgmyAppScreenKind.aiChat, data: {'actorId': 'architect', 'welcome': 'Ask me for workout or meal ideas.'}),
+    ]),
+  ),
   NgmyAppTemplate(
     id: 'business',
     name: 'Business',
-    description: 'Company site with services, about, and contact form.',
+    description: 'Services, leads, contact — all working.',
     icon: '🏢',
     themeColor: 0xFF2563EB,
     build: (o) => _base(o, 'My Business', 'Professional services you can trust', 0xFF2563EB, [
-      NgmyAppScreen.welcome(id: 'home', title: 'Welcome', subtitle: 'Quality service for your needs', buttonTargetScreenId: 'menu', heroEmoji: '🏢'),
-      NgmyAppScreen.menu(id: 'menu', title: 'Services', items: [
-        {'label': 'Our Services', 'targetScreenId': 'services'},
-        {'label': 'About Us', 'targetScreenId': 'about'},
-        {'label': 'Contact', 'targetScreenId': 'contact'},
-      ]),
-      const NgmyAppScreen(id: 'services', title: 'Services', kind: NgmyAppScreenKind.content, data: {'body': 'List your services and pricing here.'}),
-      const NgmyAppScreen(id: 'about', title: 'About', kind: NgmyAppScreenKind.content, data: {'body': 'Tell customers who you are and why they should choose you.'}),
-      NgmyAppScreen(id: 'contact', title: 'Contact', kind: NgmyAppScreenKind.form, data: {
-        'fields': [
-          {'id': 'name', 'label': 'Name', 'type': 'text'},
-          {'id': 'email', 'label': 'Email', 'type': 'email'},
-          {'id': 'message', 'label': 'Message', 'type': 'text'},
+      _custom('home', 'Home', _homeLayout(
+        emoji: '🏢',
+        title: 'My Business',
+        subtitle: 'Quality service for your needs',
+        statCollection: 'leads',
+        statLabel: 'Leads received',
+        menuItems: [
+          {'label': 'Services', 'icon': 'info', 'target': 'services'},
+          {'label': 'Leads', 'icon': 'mail', 'target': 'leads'},
+          {'label': 'Contact', 'icon': 'phone', 'target': 'contact'},
+          {'label': 'Settings', 'icon': 'settings', 'target': 'settings'},
         ],
-        'submitLabel': 'Send message',
-        'successMessage': 'Thanks! We will reply soon.',
+      )),
+      _custom('services', 'Services', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '⭐', 'title': 'Our Services', 'subtitle': 'What we offer'},
+          {'type': 'list', 'items': [
+            {'label': 'Consulting', 'subtitle': 'From \$99/hr', 'icon': 'star'},
+            {'label': 'Design', 'subtitle': 'From \$500', 'icon': 'star'},
+            {'label': 'Development', 'subtitle': 'Custom quotes', 'icon': 'star'},
+          ]},
+        ],
+      }),
+      _custom('leads', 'Leads', {
+        'type': 'column',
+        'children': [
+          {'type': 'dataList', 'collection': 'leads', 'titleField': 'name', 'subtitleField': 'email',
+            'emptyText': 'No leads yet.', 'addTarget': 'contact', 'addLabel': 'Add lead', 'allowDelete': true},
+        ],
+      }),
+      _custom('contact', 'Contact', {
+        'type': 'column',
+        'children': [
+          {'type': 'form', 'collection': 'leads', 'submitLabel': 'Send message', 'successMessage': 'Thanks! We will reply soon.', 'navigateAfter': 'leads',
+            'fields': [
+              {'id': 'name', 'label': 'Name', 'type': 'text'},
+              {'id': 'email', 'label': 'Email', 'type': 'email'},
+              {'id': 'message', 'label': 'Message', 'type': 'text'},
+            ]},
+        ],
+      }),
+      _custom('settings', 'Settings', {
+        'type': 'column',
+        'children': [
+          {'type': 'switch', 'setting': 'email_alerts', 'label': 'Email alerts', 'default': true},
+          {'type': 'switch', 'setting': 'auto_reply', 'label': 'Auto-reply to leads', 'default': false},
+        ],
       }),
     ]),
   ),
   NgmyAppTemplate(
     id: 'restaurant',
     name: 'Restaurant',
-    description: 'Menu, hours, reservations, and location.',
+    description: 'Menu, reservations, hours — interactive.',
     icon: '🍽️',
     themeColor: 0xFFDC2626,
     build: (o) => _base(o, 'My Restaurant', 'Fresh food, great vibes', 0xFFDC2626, [
-      NgmyAppScreen.welcome(id: 'home', title: 'Welcome', subtitle: 'Order, dine in, or reserve a table', buttonTargetScreenId: 'menu', heroEmoji: '🍽️'),
-      NgmyAppScreen.menu(id: 'menu', title: 'Menu', items: [
-        {'label': 'Food Menu', 'targetScreenId': 'food'},
-        {'label': 'Reserve Table', 'targetScreenId': 'reserve'},
-        {'label': 'Hours & Location', 'targetScreenId': 'hours'},
-      ]),
-      const NgmyAppScreen(id: 'food', title: 'Food Menu', kind: NgmyAppScreenKind.content, data: {'body': 'Starters\nMain dishes\nDrinks\nDesserts'}),
-      NgmyAppScreen(id: 'reserve', title: 'Reserve', kind: NgmyAppScreenKind.form, data: {
-        'fields': [
-          {'id': 'name', 'label': 'Name', 'type': 'text'},
-          {'id': 'party', 'label': 'Party size', 'type': 'number'},
-          {'id': 'time', 'label': 'Preferred time', 'type': 'text'},
+      _custom('home', 'Home', _homeLayout(
+        emoji: '🍽️',
+        title: 'My Restaurant',
+        subtitle: 'Order, dine in, or reserve',
+        statCollection: 'reservations',
+        statLabel: 'Reservations',
+        menuItems: [
+          {'label': 'Menu', 'icon': 'food', 'target': 'food'},
+          {'label': 'Reserve', 'icon': 'calendar', 'target': 'reserve'},
+          {'label': 'Orders', 'icon': 'cart', 'target': 'orders'},
+          {'label': 'Hours', 'icon': 'info', 'target': 'hours'},
         ],
-        'submitLabel': 'Request table',
-        'successMessage': 'Reservation request received!',
-      }),
-      const NgmyAppScreen(id: 'hours', title: 'Hours', kind: NgmyAppScreenKind.content, data: {'body': 'Mon–Fri 11am–10pm\nSat–Sun 10am–11pm\n123 Main Street'}),
-    ]),
-  ),
-  NgmyAppTemplate(
-    id: 'fitness',
-    name: 'Fitness Coach',
-    description: 'Workouts, tips, and client check-ins.',
-    icon: '💪',
-    themeColor: 0xFF059669,
-    build: (o) => _base(o, 'Fit Coach', 'Train smarter, feel stronger', 0xFF059669, [
-      NgmyAppScreen.welcome(id: 'home', title: 'Fit Coach', subtitle: 'Your personal training hub', buttonTargetScreenId: 'menu', heroEmoji: '💪'),
-      NgmyAppScreen.menu(id: 'menu', title: 'Programs', items: [
-        {'label': 'Workouts', 'targetScreenId': 'workouts'},
-        {'label': 'Nutrition Tips', 'targetScreenId': 'nutrition'},
-        {'label': 'Check-in', 'targetScreenId': 'checkin'},
-        {'label': 'Ask AI Coach', 'targetScreenId': 'ai'},
-      ]),
-      const NgmyAppScreen(id: 'workouts', title: 'Workouts', kind: NgmyAppScreenKind.content, data: {'body': 'Monday: Leg day\nWednesday: Upper body\nFriday: Cardio + core'}),
-      const NgmyAppScreen(id: 'nutrition', title: 'Nutrition', kind: NgmyAppScreenKind.content, data: {'body': 'Protein with every meal. Drink water. Sleep 7+ hours.'}),
-      NgmyAppScreen(id: 'checkin', title: 'Check-in', kind: NgmyAppScreenKind.form, data: {
-        'fields': [
-          {'id': 'weight', 'label': 'Weight (lbs)', 'type': 'number'},
-          {'id': 'energy', 'label': 'Energy level 1-10', 'type': 'number'},
-          {'id': 'notes', 'label': 'Notes', 'type': 'text'},
+      )),
+      _custom('food', 'Menu', {
+        'type': 'column',
+        'children': [
+          {'type': 'list', 'items': [
+            {'label': 'Starters', 'subtitle': 'Soup, salad, bruschetta', 'icon': 'food'},
+            {'label': 'Mains', 'subtitle': 'Pasta, steak, seafood', 'icon': 'food'},
+            {'label': 'Drinks', 'subtitle': 'Wine, cocktails, coffee', 'icon': 'food'},
+            {'label': 'Desserts', 'subtitle': 'Cake, ice cream, tiramisu', 'icon': 'food'},
+          ]},
         ],
-        'submitLabel': 'Submit check-in',
-        'successMessage': 'Check-in saved!',
       }),
-      const NgmyAppScreen(id: 'ai', title: 'AI Coach', kind: NgmyAppScreenKind.aiChat, data: {'actorId': 'architect', 'welcome': 'Ask me for workout or meal ideas.'}),
-    ]),
-  ),
-  NgmyAppTemplate(
-    id: 'church',
-    name: 'Church / Community',
-    description: 'Events, sermons, prayer requests, giving.',
-    icon: '⛪',
-    themeColor: 0xFF7C3AED,
-    build: (o) => _base(o, 'Community Hub', 'Faith, fellowship, and service', 0xFF7C3AED, [
-      NgmyAppScreen.welcome(id: 'home', title: 'Welcome', subtitle: 'Join us this Sunday', buttonTargetScreenId: 'menu', heroEmoji: '⛪'),
-      NgmyAppScreen.menu(id: 'menu', title: 'Community', items: [
-        {'label': 'Events', 'targetScreenId': 'events'},
-        {'label': 'Prayer Request', 'targetScreenId': 'prayer'},
-        {'label': 'Give', 'targetScreenId': 'give'},
-      ]),
-      const NgmyAppScreen(id: 'events', title: 'Events', kind: NgmyAppScreenKind.content, data: {'body': 'Sunday Service 10am\nBible Study Wednesday 7pm\nYouth Friday 6pm'}),
-      NgmyAppScreen(id: 'prayer', title: 'Prayer', kind: NgmyAppScreenKind.form, data: {
-        'fields': [{'id': 'request', 'label': 'Prayer request', 'type': 'text'}],
-        'submitLabel': 'Submit',
-        'successMessage': 'We are praying with you.',
-      }),
-      const NgmyAppScreen(id: 'give', title: 'Give', kind: NgmyAppScreenKind.content, data: {'body': 'Support our mission. Add your Cash App, Zelle, or link here.'}),
-    ]),
-  ),
-  NgmyAppTemplate(
-    id: 'portfolio',
-    name: 'Portfolio',
-    description: 'Showcase work, skills, and hire-me form.',
-    icon: '🎨',
-    themeColor: 0xFFEC4899,
-    build: (o) => _base(o, 'My Portfolio', 'Creative work & projects', 0xFFEC4899, [
-      NgmyAppScreen.welcome(id: 'home', title: 'Hello!', subtitle: 'Designer · Developer · Creator', buttonTargetScreenId: 'menu', heroEmoji: '🎨'),
-      NgmyAppScreen.menu(id: 'menu', title: 'Work', items: [
-        {'label': 'Projects', 'targetScreenId': 'projects'},
-        {'label': 'Skills', 'targetScreenId': 'skills'},
-        {'label': 'Hire Me', 'targetScreenId': 'hire'},
-      ]),
-      const NgmyAppScreen(id: 'projects', title: 'Projects', kind: NgmyAppScreenKind.content, data: {'body': 'Project 1 — description\nProject 2 — description'}),
-      const NgmyAppScreen(id: 'skills', title: 'Skills', kind: NgmyAppScreenKind.content, data: {'body': 'Design · Flutter · Video · Branding'}),
-      NgmyAppScreen(id: 'hire', title: 'Hire Me', kind: NgmyAppScreenKind.form, data: {
-        'fields': [
-          {'id': 'name', 'label': 'Your name', 'type': 'text'},
-          {'id': 'project', 'label': 'Project details', 'type': 'text'},
+      _custom('reserve', 'Reserve', {
+        'type': 'column',
+        'children': [
+          {'type': 'form', 'collection': 'reservations', 'submitLabel': 'Request table', 'successMessage': 'Reservation received!', 'navigateAfter': 'orders',
+            'fields': [
+              {'id': 'name', 'label': 'Name', 'type': 'text'},
+              {'id': 'party', 'label': 'Party size', 'type': 'number'},
+              {'id': 'time', 'label': 'Preferred time', 'type': 'text'},
+            ]},
         ],
-        'submitLabel': 'Send inquiry',
-        'successMessage': 'Thanks! I will get back to you.',
       }),
-    ]),
-  ),
-  NgmyAppTemplate(
-    id: 'event',
-    name: 'Event / RSVP',
-    description: 'Event info, schedule, and RSVP form.',
-    icon: '🎉',
-    themeColor: 0xFFF59E0B,
-    build: (o) => _base(o, 'My Event', 'You are invited!', 0xFFF59E0B, [
-      NgmyAppScreen.welcome(id: 'home', title: 'You\'re Invited', subtitle: 'Join us for a special event', buttonTargetScreenId: 'rsvp', heroEmoji: '🎉'),
-      const NgmyAppScreen(id: 'details', title: 'Details', kind: NgmyAppScreenKind.content, data: {'body': 'Date: TBD\nLocation: TBD\nDress code: Casual'}),
-      NgmyAppScreen(id: 'rsvp', title: 'RSVP', kind: NgmyAppScreenKind.form, data: {
-        'fields': [
-          {'id': 'name', 'label': 'Name', 'type': 'text'},
-          {'id': 'guests', 'label': 'Guests', 'type': 'number'},
+      _custom('orders', 'Reservations', {
+        'type': 'dataList', 'collection': 'reservations', 'titleField': 'name', 'subtitleField': 'time',
+        'emptyText': 'No reservations yet.', 'addTarget': 'reserve', 'addLabel': 'New reservation',
+      }),
+      _custom('hours', 'Hours', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '🕐', 'title': 'Hours & Location', 'subtitle': 'Mon–Fri 11am–10pm · Sat–Sun 10am–11pm'},
+          {'type': 'text', 'text': '123 Main Street, Atlanta GA', 'style': 'subtitle'},
         ],
-        'submitLabel': 'Confirm RSVP',
-        'successMessage': 'RSVP received!',
-      }),
-    ]),
-  ),
-  NgmyAppTemplate(
-    id: 'course',
-    name: 'Online Course',
-    description: 'Lessons, resources, and student Q&A.',
-    icon: '📚',
-    themeColor: 0xFF0EA5E9,
-    build: (o) => _base(o, 'My Course', 'Learn at your own pace', 0xFF0EA5E9, [
-      NgmyAppScreen.welcome(id: 'home', title: 'Start Learning', subtitle: 'Module 1 is ready', buttonTargetScreenId: 'menu', heroEmoji: '📚'),
-      NgmyAppScreen.menu(id: 'menu', title: 'Course', items: [
-        {'label': 'Lessons', 'targetScreenId': 'lessons'},
-        {'label': 'Resources', 'targetScreenId': 'resources'},
-        {'label': 'Ask Tutor AI', 'targetScreenId': 'tutor'},
-      ]),
-      const NgmyAppScreen(id: 'lessons', title: 'Lessons', kind: NgmyAppScreenKind.content, data: {'body': 'Lesson 1: Introduction\nLesson 2: Core concepts\nLesson 3: Practice'}),
-      const NgmyAppScreen(id: 'resources', title: 'Resources', kind: NgmyAppScreenKind.content, data: {'body': 'PDFs, links, and downloads go here.'}),
-      const NgmyAppScreen(id: 'tutor', title: 'AI Tutor', kind: NgmyAppScreenKind.aiChat, data: {'actorId': 'architect'}),
-    ]),
-  ),
-  NgmyAppTemplate(
-    id: 'realestate',
-    name: 'Real Estate',
-    description: 'Listings, agent bio, and inquiry form.',
-    icon: '🏠',
-    themeColor: 0xFF14B8A6,
-    build: (o) => _base(o, 'Property Listings', 'Find your next home', 0xFF14B8A6, [
-      NgmyAppScreen.welcome(id: 'home', title: 'Find Home', subtitle: 'Browse listings and book a tour', buttonTargetScreenId: 'menu', heroEmoji: '🏠'),
-      NgmyAppScreen.menu(id: 'menu', title: 'Listings', items: [
-        {'label': 'Available Homes', 'targetScreenId': 'listings'},
-        {'label': 'About Agent', 'targetScreenId': 'agent'},
-        {'label': 'Inquiry', 'targetScreenId': 'inquiry'},
-      ]),
-      const NgmyAppScreen(id: 'listings', title: 'Listings', kind: NgmyAppScreenKind.content, data: {'body': '3 bed · 2 bath — \$320,000\n2 bed · 1 bath — \$210,000'}),
-      const NgmyAppScreen(id: 'agent', title: 'Agent', kind: NgmyAppScreenKind.content, data: {'body': 'Licensed agent. 10+ years experience.'}),
-      NgmyAppScreen(id: 'inquiry', title: 'Inquiry', kind: NgmyAppScreenKind.form, data: {
-        'fields': [
-          {'id': 'name', 'label': 'Name', 'type': 'text'},
-          {'id': 'budget', 'label': 'Budget', 'type': 'text'},
-        ],
-        'submitLabel': 'Send inquiry',
-        'successMessage': 'We will contact you shortly.',
-      }),
-    ]),
-  ),
-  NgmyAppTemplate(
-    id: 'salon',
-    name: 'Salon / Booking',
-    description: 'Services, prices, and appointment booking.',
-    icon: '💇',
-    themeColor: 0xFFDB2777,
-    build: (o) => _base(o, 'Beauty Salon', 'Book your appointment', 0xFFDB2777, [
-      NgmyAppScreen.welcome(id: 'home', title: 'Beauty Salon', subtitle: 'Look your best', buttonTargetScreenId: 'menu', heroEmoji: '💇'),
-      NgmyAppScreen.menu(id: 'menu', title: 'Book', items: [
-        {'label': 'Services', 'targetScreenId': 'services'},
-        {'label': 'Book Now', 'targetScreenId': 'book'},
-      ]),
-      const NgmyAppScreen(id: 'services', title: 'Services', kind: NgmyAppScreenKind.content, data: {'body': 'Haircut \$35\nColor \$80\nStyling \$45'}),
-      NgmyAppScreen(id: 'book', title: 'Book', kind: NgmyAppScreenKind.form, data: {
-        'fields': [
-          {'id': 'name', 'label': 'Name', 'type': 'text'},
-          {'id': 'service', 'label': 'Service', 'type': 'text'},
-          {'id': 'date', 'label': 'Preferred date', 'type': 'text'},
-        ],
-        'submitLabel': 'Request booking',
-        'successMessage': 'Booking request sent!',
-      }),
-    ]),
-  ),
-  NgmyAppTemplate(
-    id: 'nonprofit',
-    name: 'Nonprofit',
-    description: 'Mission, impact stories, and donations.',
-    icon: '❤️',
-    themeColor: 0xFFEF4444,
-    build: (o) => _base(o, 'Our Mission', 'Making a difference together', 0xFFEF4444, [
-      NgmyAppScreen.welcome(id: 'home', title: 'Our Mission', subtitle: 'Help us change lives', buttonTargetScreenId: 'menu', heroEmoji: '❤️'),
-      NgmyAppScreen.menu(id: 'menu', title: 'Support', items: [
-        {'label': 'Our Story', 'targetScreenId': 'story'},
-        {'label': 'Impact', 'targetScreenId': 'impact'},
-        {'label': 'Volunteer', 'targetScreenId': 'volunteer'},
-      ]),
-      const NgmyAppScreen(id: 'story', title: 'Story', kind: NgmyAppScreenKind.content, data: {'body': 'Why we exist and who we serve.'}),
-      const NgmyAppScreen(id: 'impact', title: 'Impact', kind: NgmyAppScreenKind.content, data: {'body': 'Lives helped, meals served, communities supported.'}),
-      NgmyAppScreen(id: 'volunteer', title: 'Volunteer', kind: NgmyAppScreenKind.form, data: {
-        'fields': [{'id': 'name', 'label': 'Name', 'type': 'text'}, {'id': 'skills', 'label': 'How can you help?', 'type': 'text'}],
-        'submitLabel': 'Sign up',
-        'successMessage': 'Thank you for volunteering!',
       }),
     ]),
   ),
   NgmyAppTemplate(
     id: 'store',
     name: 'Online Store',
-    description: 'Products, cart info, and order form.',
-    icon: '🛍️',
-    themeColor: 0xFF8B5CF6,
-    build: (o) => _base(o, 'My Shop', 'Shop our collection', 0xFF8B5CF6, [
-      NgmyAppScreen.welcome(id: 'home', title: 'My Shop', subtitle: 'New arrivals inside', buttonTargetScreenId: 'menu', heroEmoji: '🛍️'),
-      NgmyAppScreen.menu(id: 'menu', title: 'Shop', items: [
-        {'label': 'Products', 'targetScreenId': 'products'},
-        {'label': 'Order', 'targetScreenId': 'order'},
-      ]),
-      const NgmyAppScreen(id: 'products', title: 'Products', kind: NgmyAppScreenKind.content, data: {'body': 'Product A — \$25\nProduct B — \$40\nProduct C — \$15'}),
-      NgmyAppScreen(id: 'order', title: 'Order', kind: NgmyAppScreenKind.form, data: {
-        'fields': [
-          {'id': 'item', 'label': 'Item', 'type': 'text'},
-          {'id': 'qty', 'label': 'Quantity', 'type': 'number'},
-          {'id': 'address', 'label': 'Shipping address', 'type': 'text'},
+    description: 'Products, orders, settings.',
+    icon: '🛒',
+    themeColor: 0xFFEA580C,
+    build: (o) => _base(o, 'My Store', 'Shop our best products', 0xFFEA580C, [
+      _custom('home', 'Home', _homeLayout(
+        emoji: '🛒',
+        title: 'My Store',
+        subtitle: 'Browse and order',
+        statCollection: 'orders',
+        statLabel: 'Orders placed',
+        menuItems: [
+          {'label': 'Products', 'icon': 'shop', 'target': 'products'},
+          {'label': 'Order', 'icon': 'cart', 'target': 'order'},
+          {'label': 'My Orders', 'icon': 'mail', 'target': 'orders'},
+          {'label': 'Settings', 'icon': 'settings', 'target': 'settings'},
         ],
-        'submitLabel': 'Place order',
-        'successMessage': 'Order received!',
+      )),
+      _custom('products', 'Products', {
+        'type': 'menuGrid', 'columns': 2, 'items': [
+          {'label': 'Product A \$25', 'icon': 'shop', 'target': 'order'},
+          {'label': 'Product B \$40', 'icon': 'shop', 'target': 'order'},
+          {'label': 'Product C \$15', 'icon': 'shop', 'target': 'order'},
+          {'label': 'Product D \$30', 'icon': 'shop', 'target': 'order'},
+        ],
+      }),
+      _custom('order', 'Place Order', {
+        'type': 'form', 'collection': 'orders', 'submitLabel': 'Place order', 'successMessage': 'Order placed!', 'navigateAfter': 'orders',
+          'fields': [
+            {'id': 'product', 'label': 'Product', 'type': 'text'},
+            {'id': 'qty', 'label': 'Quantity', 'type': 'number'},
+            {'id': 'address', 'label': 'Delivery address', 'type': 'text'},
+          ],
+      }),
+      _custom('orders', 'My Orders', {
+        'type': 'dataList', 'collection': 'orders', 'titleField': 'product', 'subtitleField': 'address',
+        'emptyText': 'No orders yet.', 'addTarget': 'order', 'addLabel': 'New order',
+      }),
+      _custom('settings', 'Settings', {
+        'type': 'column',
+        'children': [
+          {'type': 'switch', 'setting': 'order_updates', 'label': 'Order updates', 'default': true},
+        ],
       }),
     ]),
   ),
   NgmyAppTemplate(
     id: 'blank',
-    name: 'Blank',
-    description: 'Minimal starter — customize everything.',
-    icon: '📱',
+    name: 'Blank Canvas',
+    description: 'Start fresh — ask AI to build anything.',
+    icon: '✨',
     themeColor: 0xFF6366F1,
     build: (o) => NgmyAppProject.blank(ownerEmail: o),
   ),

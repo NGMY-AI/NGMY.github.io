@@ -7,6 +7,7 @@ import 'ngmy_app_builder_ai.dart';
 import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
 import 'ngmy_app_builder_models.dart';
+import 'ngmy_app_builder_data.dart';
 import 'ngmy_app_builder_runtime.dart';
 import 'ngmy_app_builder_storage.dart';
 import 'ngmy_app_builder_templates.dart';
@@ -207,34 +208,65 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF07080F) : const Color(0xFFF1F5F9);
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B0D14) : const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text('NGMY App Builder', style: TextStyle(fontWeight: FontWeight.w900)),
-        bottom: TabBar(
-          controller: _tabs,
-          isScrollable: true,
-          tabs: const [
-            Tab(text: 'My Apps'),
-            Tab(text: 'Create'),
-            Tab(text: 'Templates'),
-            Tab(text: 'Gallery'),
-            Tab(text: 'AI Copilot'),
-          ],
-        ),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
+      backgroundColor: bg,
+      body: NestedScrollView(
+        headerSliverBuilder: (_, __) => [
+          SliverAppBar(
+            expandedHeight: 120,
+            pinned: true,
+            backgroundColor: const Color(0xFF0F172A),
+            foregroundColor: Colors.white,
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: const EdgeInsets.only(left: 16, bottom: 52),
+              title: const Text('App Studio', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF0F172A), Color(0xFF312E81), Color(0xFF7C3AED)],
+                  ),
+                ),
+                child: const Align(
+                  alignment: Alignment.bottomRight,
+                  child: Padding(
+                    padding: EdgeInsets.only(right: 20, bottom: 48),
+                    child: Icon(Icons.auto_awesome_rounded, color: Colors.white24, size: 56),
+                  ),
+                ),
+              ),
+            ),
+            bottom: TabBar(
               controller: _tabs,
-              children: [
-                _myAppsTab(isDark),
-                _createTab(isDark),
-                _templatesTab(isDark),
-                _galleryTab(isDark),
-                _copilotTab(isDark),
+              isScrollable: true,
+              indicatorColor: const Color(0xFFFBBF24),
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white60,
+              tabs: const [
+                Tab(icon: Icon(Icons.folder_special_rounded, size: 20), text: 'My Apps'),
+                Tab(icon: Icon(Icons.add_circle_outline_rounded, size: 20), text: 'Create'),
+                Tab(icon: Icon(Icons.grid_view_rounded, size: 20), text: 'Templates'),
+                Tab(icon: Icon(Icons.public_rounded, size: 20), text: 'Gallery'),
+                Tab(icon: Icon(Icons.smart_toy_rounded, size: 20), text: 'AI'),
               ],
             ),
+          ),
+        ],
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
+                controller: _tabs,
+                children: [
+                  _myAppsTab(isDark),
+                  _createTab(isDark),
+                  _templatesTab(isDark),
+                  _galleryTab(isDark),
+                  _copilotTab(isDark),
+                ],
+              ),
+      ),
     );
   }
 
@@ -242,15 +274,24 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
     if (_mine.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.apps_rounded, size: 56, color: isDark ? Colors.white24 : Colors.black26),
-              const SizedBox(height: 12),
-              const Text('No apps yet', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)]),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: const Icon(Icons.rocket_launch_rounded, size: 48, color: Colors.white),
+              ),
+              const SizedBox(height: 16),
+              const Text('Build your first app', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
               const SizedBox(height: 8),
-              Text('Create your first app in the Create tab.', textAlign: TextAlign.center, style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),
+              Text('Tap Create or talk to AI — working forms, lists, and settings included.', textAlign: TextAlign.center, style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),
+              const SizedBox(height: 20),
+              FilledButton.icon(onPressed: () => _tabs.animateTo(1), icon: const Icon(Icons.add_rounded), label: const Text('Get started')),
             ],
           ),
         ),
@@ -261,14 +302,28 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
       itemCount: _mine.length,
       itemBuilder: (_, i) {
         final p = _mine[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))],
+          ),
           child: ListTile(
-            leading: CircleAvatar(backgroundColor: p.theme, child: const Icon(Icons.apps_rounded, color: Colors.white)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            leading: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [p.theme, p.theme.withValues(alpha: 0.7)]),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(Icons.apps_rounded, color: Colors.white),
+            ),
             title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800)),
             subtitle: Text(
               p.publicUrl.isNotEmpty
-                  ? '${p.status.label} · ${p.screens.length} screens · Link ready'
+                  ? '${p.status.label} · ${p.screens.length} screens · Live link'
                   : '${p.status.label} · ${p.screens.length} screens',
             ),
             trailing: PopupMenuButton<String>(
@@ -308,41 +363,69 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEC4899)]),
-              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFEC4899)]),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.35), blurRadius: 20, offset: const Offset(0, 8))],
             ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Build your own app', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
-                SizedBox(height: 6),
-                Text('Talk to AI, pick a template, connect Firebase/Supabase, and get a public link.', style: TextStyle(color: Colors.white, fontSize: 13)),
+                Row(children: [Icon(Icons.auto_awesome_rounded, color: Colors.white), SizedBox(width: 8), Text('AI App Studio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22))]),
+                SizedBox(height: 10),
+                Text('Describe your app — Bolt builds working forms, lists, settings, and workouts. Not just text.', style: TextStyle(color: Colors.white, fontSize: 14, height: 1.4)),
               ],
             ),
           ),
           const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: () => _openAiCopilot(),
-            icon: const Icon(Icons.record_voice_over_rounded),
-            label: const Text('Talk to AI — build your app'),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF6366F1), minimumSize: const Size(double.infinity, 52)),
+          Material(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            child: InkWell(
+              onTap: () => _openAiCopilot(),
+              borderRadius: BorderRadius.circular(18),
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: const Color(0xFFF59E0B).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(14)),
+                      child: const Icon(Icons.mic_rounded, color: Color(0xFFF59E0B), size: 28),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Talk to Bolt AI', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                          SizedBox(height: 4),
+                          Text('"Build a venue manager with settings that work"', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  ],
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: _createBlank,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Start from blank'),
-            style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 52)),
+            icon: const Icon(Icons.code_rounded),
+            label: const Text('Blank canvas + Code Studio'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
           ),
           const SizedBox(height: 24),
-          Text('What you get', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
-          const SizedBox(height: 10),
-          _featureRow(Icons.link_rounded, 'Public URL when published — share on Google & social'),
-          _featureRow(Icons.storage_rounded, 'Connect Firebase, Supabase, MongoDB, or custom API'),
-          _featureRow(Icons.dashboard_rounded, 'Welcome, menu, content, form, and AI chat screens'),
-          _featureRow(Icons.smart_toy_rounded, 'Command AI: "add a contact form", "change colors", etc.'),
+          Text('What works now', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
+          const SizedBox(height: 12),
+          _featureRow(Icons.check_circle_rounded, 'Forms that save data (venues, orders, check-ins)'),
+          _featureRow(Icons.check_circle_rounded, 'Lists that show your saved items'),
+          _featureRow(Icons.check_circle_rounded, 'Settings toggles that actually persist'),
+          _featureRow(Icons.check_circle_rounded, 'Interactive workout plans with progress'),
+          _featureRow(Icons.link_rounded, 'Unique public link when published'),
         ],
       ),
     );
@@ -351,29 +434,36 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
   Widget _templatesTab(bool isDark) {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.92),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 14, crossAxisSpacing: 14, childAspectRatio: 0.88),
       itemCount: kNgmyAppTemplates.length,
       itemBuilder: (_, i) {
         final t = kNgmyAppTemplates[i];
-        return InkWell(
-          onTap: () => _createFromTemplate(t),
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Color(t.themeColor).withOpacity(0.12),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Color(t.themeColor).withOpacity(0.35)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(t.icon, style: const TextStyle(fontSize: 28)),
-                const Spacer(),
-                Text(t.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-                const SizedBox(height: 4),
-                Text(t.description, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54)),
-              ],
+        final color = Color(t.themeColor);
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _createFromTemplate(t),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [color.withValues(alpha: 0.15), color.withValues(alpha: 0.05)]),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: color.withValues(alpha: 0.25)),
+                boxShadow: [BoxShadow(color: color.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 4))],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(t.icon, style: const TextStyle(fontSize: 32)),
+                  const Spacer(),
+                  Text(t.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                  const SizedBox(height: 4),
+                  Text(t.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54, height: 1.3)),
+                  const SizedBox(height: 8),
+                  Row(children: [Icon(Icons.bolt_rounded, size: 14, color: color), const SizedBox(width: 4), Text('Interactive', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color))]),
+                ],
+              ),
             ),
           ),
         );
@@ -383,12 +473,13 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
 
   Widget _featureRow(IconData icon, String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: const Color(0xFFF59E0B)),
+          Icon(icon, size: 18, color: const Color(0xFF10B981)),
           const SizedBox(width: 10),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 13, height: 1.35))),
         ],
       ),
     );
@@ -429,26 +520,55 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Card(
-          color: const Color(0xFFF59E0B).withOpacity(0.12),
-          child: ListTile(
-            leading: const CircleAvatar(backgroundColor: Color(0xFFF59E0B), child: Icon(Icons.construction_rounded, color: Colors.white)),
-            title: const Text('Bolt — AI App Copilot', style: TextStyle(fontWeight: FontWeight.w900)),
-            subtitle: const Text('Talk and command: "Create a salon app", "Add pricing screen", "Connect Firebase"'),
-            trailing: const Icon(Icons.arrow_forward_rounded),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEA580C)]),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: InkWell(
             onTap: () => _openAiCopilot(),
+            child: const Row(
+              children: [
+                CircleAvatar(radius: 28, backgroundColor: Colors.white24, child: Icon(Icons.construction_rounded, color: Colors.white, size: 28)),
+                SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Bolt — AI Coder', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                      SizedBox(height: 4),
+                      Text('Build working apps: "Add venue form that saves", "Make settings toggles work"', style: TextStyle(color: Colors.white, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.arrow_forward_rounded, color: Colors.white),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
+        Text('AI Team', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
+        const SizedBox(height: 10),
         ...kNgmyAppBuilderActors.map((actor) {
-          return Card(
+          return Container(
             margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+            ),
             child: ListTile(
-              leading: CircleAvatar(backgroundColor: actor.color, child: Icon(actor.icon, color: Colors.white)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              leading: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(color: actor.color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+                child: Icon(actor.icon, color: actor.color),
+              ),
               title: Text(actor.name, style: const TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: Text('${actor.role}\n${actor.description}', maxLines: 2, overflow: TextOverflow.ellipsis),
-              isThreeLine: true,
-              trailing: const Icon(Icons.chat_rounded),
+              subtitle: Text('${actor.role} · ${actor.description}', maxLines: 2, overflow: TextOverflow.ellipsis),
+              trailing: Icon(Icons.chat_bubble_outline_rounded, color: actor.color),
               onTap: () {
                 NgmyNavigator.push(
                   context,
@@ -1000,11 +1120,11 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
   bool _busy = false;
 
   static const _hints = [
-    'Build a home screen with 5 menu sections and a hero banner',
-    'Add three tabs: Shop, News, and Profile with custom layouts',
-    'Create a restaurant app with menu grid, reservations form, and chat',
-    'Connect my app to Supabase — set database in JSON',
-    'Rewrite the whole app using custom layouts — no limits',
+    'Build a venue manager — forms save venues, list shows them, settings toggles work',
+    'Make my fitness app workouts interactive with checkable exercises',
+    'Add a contact form that saves leads and a list screen to view them',
+    'Fix settings — add working notification and dark mode toggles',
+    'Replace all text-only screens with working forms and data lists',
   ];
 
   @override
@@ -1318,11 +1438,14 @@ class NgmyAppRuntimeScreen extends StatefulWidget {
 class _NgmyAppRuntimeScreenState extends State<NgmyAppRuntimeScreen> {
   late String _screenId;
   final Map<String, TextEditingController> _formControllers = {};
+  late final NgmyAppDataStore _dataStore;
 
   @override
   void initState() {
     super.initState();
     _screenId = widget.project.homeScreen.id;
+    _dataStore = NgmyAppDataStore.forApp(widget.project.id);
+    _dataStore.ensureLoaded();
   }
 
   @override
@@ -1367,6 +1490,7 @@ class _NgmyAppRuntimeScreenState extends State<NgmyAppRuntimeScreen> {
         return NgmyAppLayoutRenderer(
           layout: layout,
           theme: theme,
+          appId: widget.project.id,
           onNavigate: _go,
           onSnack: (msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))),
         );
@@ -1498,12 +1622,23 @@ class _NgmyAppRuntimeScreenState extends State<NgmyAppRuntimeScreen> {
             );
           }),
           FilledButton(
-            onPressed: () {
-              final db = widget.project.database;
-              final msg = db.isConnected
-                  ? '$success (Saved locally — connect ${db.provider.label} in builder to sync to cloud.)'
-                  : success;
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+            onPressed: () async {
+              final data = <String, dynamic>{};
+              for (final f in fields) {
+                final id = f['id'] ?? '';
+                data[id] = _formControllers[id]?.text.trim() ?? '';
+              }
+              final collection = (screen.data['collection'] ?? '').toString();
+              if (collection.isNotEmpty) {
+                await _dataStore.addRecord(collection, data);
+                for (final c in _formControllers.values) {
+                  c.clear();
+                }
+              }
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(success)));
+              final nav = (screen.data['navigateAfter'] ?? '').toString();
+              if (nav.isNotEmpty) _go(nav);
             },
             style: FilledButton.styleFrom(backgroundColor: theme, minimumSize: const Size(double.infinity, 48)),
             child: Text(submitLabel),
