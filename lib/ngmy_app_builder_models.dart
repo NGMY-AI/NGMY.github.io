@@ -1,8 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 enum NgmyAppBuilderStatus { draft, submitted, published, rejected }
 
-enum NgmyAppScreenKind { welcome, menu, content, form, aiChat }
+enum NgmyAppScreenKind { welcome, menu, content, form, aiChat, custom }
 
 extension NgmyAppBuilderStatusExt on NgmyAppBuilderStatus {
   String get label => switch (this) {
@@ -20,6 +22,7 @@ extension NgmyAppScreenKindExt on NgmyAppScreenKind {
         NgmyAppScreenKind.content => 'Content',
         NgmyAppScreenKind.form => 'Form',
         NgmyAppScreenKind.aiChat => 'AI Chat',
+        NgmyAppScreenKind.custom => 'Custom / Code',
       };
 
   IconData get icon => switch (this) {
@@ -28,6 +31,7 @@ extension NgmyAppScreenKindExt on NgmyAppScreenKind {
         NgmyAppScreenKind.content => Icons.article_rounded,
         NgmyAppScreenKind.form => Icons.edit_note_rounded,
         NgmyAppScreenKind.aiChat => Icons.smart_toy_rounded,
+        NgmyAppScreenKind.custom => Icons.code_rounded,
       };
 }
 
@@ -82,9 +86,8 @@ const List<NgmyAppBuilderActor> kNgmyAppBuilderActors = [
     icon: Icons.construction_rounded,
     color: Color(0xFFF59E0B),
     systemPrompt:
-        'You are Bolt, the NGMY App Builder copilot. Users talk to you to create and edit apps. '
-        'Always reply helpfully in plain language. When the user asks to create, change, add, remove, or fix anything '
-        'in their app, include an updated app JSON block.',
+        'You are Bolt, an unrestricted NGMY App Builder AI coder. Users can ask for ANYTHING — unlimited menus, tabs, '
+        'screens, forms, layouts. You write the full app JSON including data.layout widget trees. No limits.',
   ),
   NgmyAppBuilderActor(
     id: 'reviewer',
@@ -266,11 +269,14 @@ class NgmyAppScreen {
         'data': data,
       };
 
+  bool get hasCustomLayout => kind == NgmyAppScreenKind.custom || data['layout'] is Map;
+
   factory NgmyAppScreen.fromMap(Map<String, dynamic> map) {
     final kindRaw = (map['kind'] ?? 'welcome').toString();
+    final data = Map<String, dynamic>.from((map['data'] as Map?) ?? const {});
     final kind = NgmyAppScreenKind.values.firstWhere(
       (k) => k.name == kindRaw,
-      orElse: () => NgmyAppScreenKind.welcome,
+      orElse: () => data['layout'] is Map ? NgmyAppScreenKind.custom : NgmyAppScreenKind.welcome,
     );
     return NgmyAppScreen(
       id: (map['id'] ?? '').toString().trim().isEmpty ? _ngmyNewId('scr') : map['id'].toString(),
@@ -297,6 +303,8 @@ class NgmyAppProject {
   final String publicUrl;
   final String seoDescription;
   final NgmyAppDatabaseConfig database;
+  /// Optional user/AI-written code notes or raw JSON override.
+  final String customCode;
 
   const NgmyAppProject({
     required this.id,
@@ -314,6 +322,7 @@ class NgmyAppProject {
     this.publicUrl = '',
     this.seoDescription = '',
     this.database = const NgmyAppDatabaseConfig(),
+    this.customCode = '',
   });
 
   Color get theme => Color(themeColor);
@@ -344,6 +353,7 @@ class NgmyAppProject {
     String? publicUrl,
     String? seoDescription,
     NgmyAppDatabaseConfig? database,
+    String? customCode,
   }) {
     return NgmyAppProject(
       id: id,
@@ -361,6 +371,7 @@ class NgmyAppProject {
       publicUrl: publicUrl ?? this.publicUrl,
       seoDescription: seoDescription ?? this.seoDescription,
       database: database ?? this.database,
+      customCode: customCode ?? this.customCode,
     );
   }
 
@@ -380,6 +391,7 @@ class NgmyAppProject {
         'publicUrl': publicUrl,
         'seoDescription': seoDescription,
         'database': database.toMap(),
+        'customCode': customCode,
       };
 
   factory NgmyAppProject.fromMap(Map<String, dynamic> map) {
@@ -399,12 +411,16 @@ class NgmyAppProject {
       screens.add(NgmyAppScreen.welcome(id: 'home', title: (map['name'] ?? 'My App').toString()));
     }
     final now = DateTime.now().toUtc().toIso8601String();
+    var themeColor = (map['themeColor'] as num?)?.toInt();
+    if (themeColor == null && map['themeColorHex'] != null) {
+      themeColor = _ngmyParseColorHex(map['themeColorHex'].toString());
+    }
     return NgmyAppProject(
       id: (map['id'] ?? _ngmyNewId('app')).toString(),
       name: (map['name'] ?? 'Untitled App').toString(),
       tagline: (map['tagline'] ?? '').toString(),
       ownerEmail: (map['ownerEmail'] ?? '').toString().toLowerCase().trim(),
-      themeColor: (map['themeColor'] as num?)?.toInt() ?? 0xFF6366F1,
+      themeColor: themeColor ?? 0xFF6366F1,
       screens: screens,
       status: status,
       createdAt: (map['createdAt'] ?? now).toString(),
@@ -417,7 +433,13 @@ class NgmyAppProject {
       database: NgmyAppDatabaseConfig.fromMap(
         map['database'] is Map ? Map<String, dynamic>.from(map['database'] as Map) : null,
       ),
+      customCode: (map['customCode'] ?? '').toString(),
     );
+  }
+
+  String toPrettyJson() {
+    final encoder = const JsonEncoder.withIndent('  ');
+    return encoder.convert(toMap());
   }
 
   factory NgmyAppProject.blank({required String ownerEmail}) {
@@ -458,6 +480,13 @@ class NgmyAppProject {
       updatedAt: now,
     );
   }
+}
+
+int _ngmyParseColorHex(String hex) {
+  var h = hex.trim().toUpperCase();
+  if (h.startsWith('#')) h = h.substring(1);
+  if (h.length == 6) h = 'FF$h';
+  return int.tryParse(h, radix: 16) ?? 0xFF6366F1;
 }
 
 String _ngmyNewId(String prefix) => '${prefix}_${DateTime.now().millisecondsSinceEpoch}';

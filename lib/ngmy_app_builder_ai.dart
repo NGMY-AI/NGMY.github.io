@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_app_builder_models.dart';
+import 'ngmy_app_builder_runtime.dart';
 
 class NgmyAppBuilderCopilotResult {
   final String message;
@@ -39,21 +40,37 @@ Future<NgmyAppBuilderCopilotResult> ngmyAppBuilderAiCopilot({
   final prompt = '''
 ${actor.systemPrompt}
 
+You are NOT limited to preset screen types. Users can ask for ANYTHING — five menus, ten tabs, complex layouts, custom forms.
+Use kind "custom" with data.layout widget trees for unlimited UI. You can also use welcome/menu/content/form/aiChat with data.layout overrides.
+
 IMPORTANT RESPONSE FORMAT:
 1) Always write a friendly reply to the user first (2-4 sentences).
-2) If the user wants to create, edit, add screens, change text/colors, connect database fields, or fix the app,
-   append a line exactly: ---APP_JSON---
-   then valid JSON with keys:
+2) When the user wants to create, edit, add, remove, or change ANY part of the app, append exactly:
+   ---APP_JSON---
+   then valid JSON:
    {
      "name": "string",
      "tagline": "string",
      "themeColorHex": "#6366F1",
      "seoDescription": "short description for Google search",
-     "screens": [{"id":"...","title":"...","kind":"welcome|menu|content|form|aiChat","data":{}}],
-     "database": {"provider":"none|firebase|supabase|mongodb|custom","projectUrl":"","apiKey":"","collectionPath":"","notes":""}
+     "screens": [
+       {
+         "id": "stable-id",
+         "title": "Screen title",
+         "kind": "welcome|menu|content|form|aiChat|custom",
+         "data": {
+           "layout": { "type": "column", "children": [...] }
+         }
+       }
+     ],
+     "database": {"provider":"none|firebase|supabase|mongodb|custom","projectUrl":"","apiKey":"","collectionPath":"","notes":""},
+     "customCode": "optional notes"
    }
 3) If user only asks questions, do NOT include ---APP_JSON---.
-4) Keep screen ids stable when editing. Fix navigation targetScreenId links.
+4) Keep screen ids stable when editing. Use target / targetScreenId for navigation.
+5) Prefer data.layout for complex UIs (menuGrid, tabs, row, column, hero, form, list, button, image, etc.).
+
+$kNgmyAppBuilderCodeSchemaHelp
 
 $projectBlock
 
@@ -135,6 +152,7 @@ NgmyAppProject? _projectFromAiMap(Map<String, dynamic> map, NgmyAppProject? base
     publicUrl: base?.publicUrl ?? '',
     seoDescription: (map['seoDescription'] ?? base?.seoDescription ?? map['tagline'] ?? '').toString(),
     database: database,
+    customCode: (map['customCode'] ?? base?.customCode ?? '').toString(),
     publishedAt: base?.publishedAt,
     reviewNote: base?.reviewNote,
   );
@@ -194,7 +212,7 @@ Future<NgmyAppProject?> ngmyAppBuilderAiGenerateApp({
 }) async {
   final result = await ngmyAppBuilderAiCopilot(
     apiKey: apiKey,
-    userMessage: 'Create a complete app for this idea: $idea. Include welcome, menu, content, and a form screen.',
+    userMessage: 'Create a complete app for this idea: $idea. Use custom layouts (data.layout) with menuGrid, hero, forms, and as many screens as needed. No limits.',
     project: base,
   );
   final p = result.updatedProject;

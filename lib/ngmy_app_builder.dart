@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -5,6 +7,7 @@ import 'ngmy_app_builder_ai.dart';
 import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
 import 'ngmy_app_builder_models.dart';
+import 'ngmy_app_builder_runtime.dart';
 import 'ngmy_app_builder_storage.dart';
 import 'ngmy_app_builder_templates.dart';
 import 'ngmy_app_builder_urls.dart';
@@ -587,31 +590,8 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
     notesC.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit App', style: TextStyle(fontWeight: FontWeight.w900)),
-        actions: [
-          IconButton(icon: const Icon(Icons.smart_toy_rounded), tooltip: 'AI Copilot', onPressed: _openCopilot),
-          IconButton(
-            icon: const Icon(Icons.preview_rounded),
-            onPressed: () => NgmyNavigator.push(
-                  context,
-                  NgmyAppRuntimeScreen(project: _project, apiKey: widget.apiKey, email: widget.email),
-                  routeName: 'NgmyAppRuntimeScreen',
-                ),
-          ),
-          TextButton(onPressed: _persistAndPop, child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800))),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCopilot,
-        backgroundColor: const Color(0xFFF59E0B),
-        icon: const Icon(Icons.mic_rounded),
-        label: const Text('Ask AI'),
-      ),
-      body: ListView(
+  Widget _buildVisualEditor() {
+    return ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
         children: [
           if (_project.publicUrl.isNotEmpty)
@@ -707,6 +687,56 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981), minimumSize: const Size(double.infinity, 48)),
           ),
         ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Edit App', style: TextStyle(fontWeight: FontWeight.w900)),
+          bottom: const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.dashboard_customize_rounded), text: 'Visual'),
+              Tab(icon: Icon(Icons.code_rounded), text: 'Code Studio'),
+            ],
+          ),
+          actions: [
+            IconButton(icon: const Icon(Icons.smart_toy_rounded), tooltip: 'AI Copilot', onPressed: _openCopilot),
+            IconButton(
+              icon: const Icon(Icons.preview_rounded),
+              onPressed: () => NgmyNavigator.push(
+                    context,
+                    NgmyAppRuntimeScreen(project: _project, apiKey: widget.apiKey, email: widget.email),
+                    routeName: 'NgmyAppRuntimeScreen',
+                  ),
+            ),
+            TextButton(onPressed: _persistAndPop, child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800))),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _openCopilot,
+          backgroundColor: const Color(0xFFF59E0B),
+          icon: const Icon(Icons.mic_rounded),
+          label: const Text('Ask AI'),
+        ),
+        body: TabBarView(
+          children: [
+            _buildVisualEditor(),
+            NgmyAppCodeStudioTab(
+              project: _project,
+              onProjectChanged: (p) {
+                setState(() {
+                  _project = p;
+                  _nameC.text = p.name;
+                  _taglineC.text = p.tagline;
+                });
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -772,9 +802,20 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
             FilledButton(
               onPressed: () {
                 final id = 'scr_${DateTime.now().millisecondsSinceEpoch}';
+                final data = kind == NgmyAppScreenKind.custom
+                    ? {
+                        'layout': {
+                          'type': 'column',
+                          'children': [
+                            {'type': 'hero', 'emoji': '✨', 'title': titleC.text.trim(), 'subtitle': 'Edit in Code Studio or ask AI'},
+                            {'type': 'menuGrid', 'columns': 2, 'items': []},
+                          ],
+                        },
+                      }
+                    : const {'body': 'Your content here.'};
                 Navigator.pop(
                   ctx,
-                  NgmyAppScreen(id: id, title: titleC.text.trim(), kind: kind, data: const {'body': 'Your content here.'}),
+                  NgmyAppScreen(id: id, title: titleC.text.trim(), kind: kind, data: data),
                 );
               },
               child: const Text('Add'),
@@ -782,6 +823,155 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class NgmyAppCodeStudioTab extends StatefulWidget {
+  final NgmyAppProject project;
+  final ValueChanged<NgmyAppProject> onProjectChanged;
+
+  const NgmyAppCodeStudioTab({super.key, required this.project, required this.onProjectChanged});
+
+  @override
+  State<NgmyAppCodeStudioTab> createState() => _NgmyAppCodeStudioTabState();
+}
+
+class _NgmyAppCodeStudioTabState extends State<NgmyAppCodeStudioTab> {
+  late TextEditingController _codeC;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _codeC = TextEditingController(text: widget.project.toPrettyJson());
+  }
+
+  @override
+  void didUpdateWidget(covariant NgmyAppCodeStudioTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.project.updatedAt != widget.project.updatedAt && _error == null) {
+      _codeC.text = widget.project.toPrettyJson();
+    }
+  }
+
+  @override
+  void dispose() {
+    _codeC.dispose();
+    super.dispose();
+  }
+
+  void _format() {
+    try {
+      final decoded = jsonDecode(_codeC.text);
+      _codeC.text = const JsonEncoder.withIndent('  ').convert(decoded);
+      setState(() => _error = null);
+    } catch (e) {
+      setState(() => _error = 'Invalid JSON: $e');
+    }
+  }
+
+  void _apply() {
+    try {
+      final decoded = jsonDecode(_codeC.text);
+      if (decoded is! Map) {
+        setState(() => _error = 'Root must be a JSON object.');
+        return;
+      }
+      final map = Map<String, dynamic>.from(decoded);
+      map['id'] = widget.project.id;
+      map['createdAt'] = widget.project.createdAt;
+      map['ownerEmail'] = widget.project.ownerEmail;
+      map['status'] = widget.project.status.name;
+      if (widget.project.slug.isNotEmpty) map['slug'] = widget.project.slug;
+      if (widget.project.publicUrl.isNotEmpty) map['publicUrl'] = widget.project.publicUrl;
+      if (widget.project.publishedAt != null) map['publishedAt'] = widget.project.publishedAt;
+      if (widget.project.reviewNote != null) map['reviewNote'] = widget.project.reviewNote;
+      final updated = NgmyAppProject.fromMap(map);
+      widget.onProjectChanged(updated);
+      setState(() => _error = null);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code applied — check Preview!')));
+    } catch (e) {
+      setState(() => _error = 'Could not apply: $e');
+    }
+  }
+
+  void _showSchema() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Code schema'),
+        content: SingleChildScrollView(child: Text(kNgmyAppBuilderCodeSchemaHelp)),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Material(
+          color: const Color(0xFF1E293B),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Code Studio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                const SizedBox(height: 4),
+                Text(
+                  'Edit full app JSON on your phone — like Android Studio / Xcode. AI writes this too.',
+                  style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(onPressed: _apply, icon: const Icon(Icons.play_arrow_rounded, size: 18), label: const Text('Apply')),
+                    OutlinedButton.icon(
+                      onPressed: _format,
+                      style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white38)),
+                      icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
+                      label: const Text('Format'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _showSchema,
+                      style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white38)),
+                      icon: const Icon(Icons.help_outline_rounded, size: 18),
+                      label: const Text('Schema'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_error != null)
+          Container(
+            color: const Color(0xFFFEE2E2),
+            padding: const EdgeInsets.all(10),
+            child: Text(_error!, style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 12)),
+          ),
+        Expanded(
+          child: TextField(
+            controller: _codeC,
+            maxLines: null,
+            expands: true,
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.all(12),
+              hintText: '{ "name": "My App", "screens": [...] }',
+            ),
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -810,11 +1000,11 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
   bool _busy = false;
 
   static const _hints = [
-    'Create a fitness coaching app with workouts and check-in form',
-    'Add a pricing screen to my app',
-    'Change the welcome message to say Hello Atlanta',
-    'Connect my app to Firebase for form submissions',
-    'Make the theme color purple',
+    'Build a home screen with 5 menu sections and a hero banner',
+    'Add three tabs: Shop, News, and Profile with custom layouts',
+    'Create a restaurant app with menu grid, reservations form, and chat',
+    'Connect my app to Supabase — set database in JSON',
+    'Rewrite the whole app using custom layouts — no limits',
   ];
 
   @override
@@ -824,12 +1014,12 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
     if (_project == null) {
       _messages.add({
         'role': 'ai',
-        'text': 'Hi! I\'m Bolt, your AI app builder. Tell me what app you want — I\'ll create screens, forms, and navigation for you. Try: "Build a restaurant app with menu and reservations"',
+        'text': 'Hi! I\'m Bolt — your unrestricted AI coder. Ask for ANYTHING: five menus, tabs, custom screens, database hooks. I write the full JSON code. Or use Code Studio to edit yourself.',
       });
     } else {
       _messages.add({
         'role': 'ai',
-        'text': 'I have "${_project!.name}" loaded. Tell me what to change — add screens, edit text, connect a database, or fix navigation.',
+        'text': 'I have "${_project!.name}" loaded. Tell me ANY change — unlimited menus, tabs, layouts, database, colors. Nothing is off limits.',
       });
     }
   }
@@ -1171,6 +1361,17 @@ class _NgmyAppRuntimeScreenState extends State<NgmyAppRuntimeScreen> {
   }
 
   Widget _buildScreen(NgmyAppScreen screen, Color theme) {
+    if (ngmyScreenUsesCustomLayout(screen)) {
+      final layout = ngmyScreenLayout(screen);
+      if (layout != null) {
+        return NgmyAppLayoutRenderer(
+          layout: layout,
+          theme: theme,
+          onNavigate: _go,
+          onSnack: (msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))),
+        );
+      }
+    }
     switch (screen.kind) {
       case NgmyAppScreenKind.welcome:
         return _welcome(screen, theme);
@@ -1182,6 +1383,17 @@ class _NgmyAppRuntimeScreenState extends State<NgmyAppRuntimeScreen> {
         return _form(screen, theme);
       case NgmyAppScreenKind.aiChat:
         return _aiChat(screen, theme);
+      case NgmyAppScreenKind.custom:
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'This screen needs a data.layout tree.\nOpen Code Studio or ask AI to build it.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade700),
+            ),
+          ),
+        );
     }
   }
 
