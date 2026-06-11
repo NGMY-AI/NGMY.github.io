@@ -185,11 +185,15 @@ Future<void> ngmyHydrateManagementListsFromAllBackups(AppConfig config) async {
   if (local != null) _applyManagementOperationalListsPayload(config, local);
   await NgmyLoanStatusStore.applyTo(config.loanApplications);
   await NgmyLoanStatusCloud.fetchAndApply(config.loanApplications);
+  await NgmyLoanPaymentsStore.applyTo(config.loanApplications);
+  await NgmyLoanPaymentsCloud.fetchAndApply(config.loanApplications);
   if (await ngmyCanReachCloud()) {
     final cloud = await _fetchManagementOperationalListsCloud();
     if (cloud != null) _applyManagementOperationalListsPayload(config, cloud);
     await NgmyLoanStatusStore.applyTo(config.loanApplications);
     await NgmyLoanStatusCloud.fetchAndApply(config.loanApplications);
+    await NgmyLoanPaymentsStore.applyTo(config.loanApplications);
+    await NgmyLoanPaymentsCloud.fetchAndApply(config.loanApplications);
   }
 }
 
@@ -205,6 +209,7 @@ Future<bool> ngmyUserPersistLoanApplications(AppConfig config) async {
   await _persistManagementOperationalListsLocal(config);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   unawaited(NgmyLoanStatusCloud.pushFromApps(config.loanApplications));
+  unawaited(NgmyLoanPaymentsCloud.pushFromApps(config.loanApplications));
   if (await ngmyCanReachCloud()) {
     return _persistOperationalConfigToCloud(config);
   }
@@ -887,6 +892,7 @@ Future<bool> ngmyAdminPersistManagementConfig(AppConfig config) async {
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   await _persistManagementOperationalListsLocal(config);
   unawaited(NgmyLoanStatusCloud.pushFromApps(config.loanApplications));
+  unawaited(NgmyLoanPaymentsCloud.pushFromApps(config.loanApplications));
 
   var cloudOk = false;
   if (await ngmyCanReachCloud()) {

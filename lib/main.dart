@@ -1840,11 +1840,16 @@ List<Map<String, dynamic>> _mergeLoanApplicationsLists(
       final existingFinal = es == 'approved' || es == 'rejected';
       final remoteFinal = rs == 'approved' || rs == 'rejected';
       if (existingFinal && !remoteFinal) {
+        ngmyLoanMergePaymentsIntoApp(existing, r);
         byId[id] = existing;
       } else if (!existingFinal && remoteFinal) {
+        ngmyLoanMergePaymentsIntoApp(r, existing);
         byId[id] = r;
       } else {
-        byId[id] = ru.compareTo(lu) >= 0 ? r : existing;
+        final winner = ru.compareTo(lu) >= 0 ? r : existing;
+        final loser = identical(winner, r) ? existing : r;
+        ngmyLoanMergePaymentsIntoApp(winner, loser);
+        byId[id] = winner;
       }
     }
   }
@@ -18058,6 +18063,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       config: ngmyLoanConfigBridge(widget.config),
       onDataChanged: widget.onDataChanged,
       onPersistNow: () => _persistManagementConfig(),
+      onRefreshLoans: () => ngmyRefreshUserLoanApplications(widget.config),
       isDark: isDark,
       onEditSettings: () => _showLoanSettingsEditor(isDark),
     );
@@ -19870,7 +19876,10 @@ class LoanServiceScreen extends StatelessWidget {
       config: ngmyLoanConfigBridge(config),
       onDataChanged: onDataChanged,
       onPersistNow: () => ngmyUserPersistLoanApplications(config),
-      onRefreshLoans: () => ngmyRefreshUserLoanApplications(config),
+      onRefreshLoans: () async {
+        await ngmyRefreshUserLoanApplications(config);
+        await NgmyLoanPaymentsCloud.fetchAndApply(config.loanApplications);
+      },
     );
   }
 }

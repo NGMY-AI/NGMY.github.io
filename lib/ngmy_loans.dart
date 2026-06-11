@@ -140,6 +140,203 @@ class NgmyLoanStatusStore {
   }
 }
 
+/// Merge payment rows — paid status always wins (admin recordings survive user stale sync).
+List<Map<String, dynamic>> ngmyLoanMergePaymentsList(
+  List<Map<String, dynamic>> local,
+  List<Map<String, dynamic>> remote,
+) {
+  if (remote.isEmpty) return local.map((e) => Map<String, dynamic>.from(e)).toList();
+  if (local.isEmpty) return remote.map((e) => Map<String, dynamic>.from(e)).toList();
+  final byId = <String, Map<String, dynamic>>{};
+  for (final p in local) {
+    final id = (p['id'] ?? '').toString();
+    if (id.isNotEmpty) byId[id] = Map<String, dynamic>.from(p);
+  }
+  for (final p in remote) {
+    final id = (p['id'] ?? '').toString();
+    if (id.isEmpty) continue;
+    final r = Map<String, dynamic>.from(p);
+    final existing = byId[id];
+    if (existing == null) {
+      byId[id] = r;
+      continue;
+    }
+    final localPaid = (existing['status'] ?? '') == 'paid';
+    final remotePaid = (r['status'] ?? '') == 'paid';
+    if (remotePaid && !localPaid) {
+      byId[id] = r;
+    } else if (localPaid && !remotePaid) {
+      byId[id] = existing;
+    } else {
+      final lp = (existing['paidAt'] ?? '').toString();
+      final rp = (r['paidAt'] ?? '').toString();
+      byId[id] = rp.compareTo(lp) >= 0 ? r : existing;
+    }
+  }
+  final out = byId.values.toList();
+  out.sort((a, b) => (a['id'] ?? '').toString().compareTo((b['id'] ?? '').toString()));
+  return out;
+}
+
+void ngmyLoanMergePaymentsIntoApp(Map<String, dynamic> dst, Map<String, dynamic> src) {
+  final local = (dst['payments'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+  final remote = (src['payments'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+  if (local.isEmpty && remote.isEmpty) return;
+  dst['payments'] = ngmyLoanMergePaymentsList(local, remote);
+}
+
+int ngmyLoanPaidCount(List<dynamic> payments) =>
+    payments.where((p) => p is Map && (p['status'] ?? '') == 'paid').length;
+
+double ngmyLoanPaidTotal(List<dynamic> payments) {
+  var sum = 0.0;
+  for (final p in payments) {
+    if (p is! Map) continue;
+    if ((p['status'] ?? '') != 'paid') continue;
+    sum += (p['paidAmount'] as num?)?.toDouble() ?? (p['amount'] as num?)?.toDouble() ?? 0;
+  }
+  return sum;
+}
+
+/// Cloud + local backup for weekly payment recordings (admin → user in real time).
+class NgmyLoanPaymentsCloud {
+  static const _settingsKey = 'ngmy_loan_payments_map_v1';
+
+  static List<Map<String, dynamic>> paymentsFromLoan(Map<String, dynamic> loan) {
+    return (loan['payments'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+  }
+
+  static Map<String, dynamic> paymentsMapFromApps(List<Map<String, dynamic>> apps) {
+    final map = <String, dynamic>{};
+    for (final loan in apps) {
+      final id = (loan['id'] ?? '').toString().trim();
+      final payments = paymentsFromLoan(loan);
+      if (id.isEmpty || payments.isEmpty) continue;
+      map[id] = {
+        'payments': payments,
+        'updatedAt': loan['paymentsUpdatedAt'] ?? loan['updatedAt'] ?? DateTime.now().toUtc().toIso8601String(),
+      };
+    }
+    return map;
+  }
+
+  static void applyPaymentsMap(List<Map<String, dynamic>> apps, Map<String, dynamic> payMap) {
+    for (var i = 0; i < apps.length; i++) {
+      final id = (apps[i]['id'] ?? '').toString().trim();
+      if (id.isEmpty) continue;
+      final entry = payMap[id];
+      if (entry is! Map) continue;
+      final remote = Map<String, dynamic>.from(entry);
+      final remotePayments = (remote['payments'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+      if (remotePayments.isEmpty) continue;
+      final localPayments = paymentsFromLoan(apps[i]);
+      apps[i]['payments'] = ngmyLoanMergePaymentsList(localPayments, remotePayments);
+      final ru = (remote['updatedAt'] ?? '').toString();
+      if (ru.isNotEmpty) apps[i]['paymentsUpdatedAt'] = ru;
+    }
+  }
+
+  static Future<void> pushLoan(String loanId, Map<String, dynamic> loan) async {
+    if (!await ngmyCanReachCloud() || loanId.trim().isEmpty) return;
+    try {
+      final payments = paymentsFromLoan(loan);
+      if (payments.isEmpty) return;
+      Map<String, dynamic> existing = {};
+      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _settingsKey).maybeSingle();
+      if (row != null) {
+        final value = row['value'];
+        if (value is Map) {
+          final m = value['payments'];
+          if (m is Map) existing = Map<String, dynamic>.from(m);
+        }
+      }
+      existing[loanId] = {
+        'payments': payments,
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      };
+      await Supabase.instance.client.from('ngmy_settings').upsert([
+        {
+          'key': _settingsKey,
+          'value': {'payments': existing, 'savedAt': DateTime.now().toUtc().toIso8601String()},
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        },
+      ], onConflict: 'key');
+    } catch (e) {
+      debugPrint('[loan payments cloud] push: $e');
+    }
+  }
+
+  static Future<void> pushFromApps(List<Map<String, dynamic>> apps) async {
+    if (!await ngmyCanReachCloud()) return;
+    try {
+      await Supabase.instance.client.from('ngmy_settings').upsert([
+        {
+          'key': _settingsKey,
+          'value': {'payments': paymentsMapFromApps(apps), 'savedAt': DateTime.now().toUtc().toIso8601String()},
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        },
+      ], onConflict: 'key');
+    } catch (e) {
+      debugPrint('[loan payments cloud] push all: $e');
+    }
+  }
+
+  static Future<void> fetchAndApply(List<Map<String, dynamic>> apps) async {
+    if (!await ngmyCanReachCloud() || apps.isEmpty) return;
+    try {
+      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _settingsKey).maybeSingle();
+      if (row == null) return;
+      final value = row['value'];
+      if (value is! Map) return;
+      final payments = value['payments'];
+      if (payments is Map) applyPaymentsMap(apps, Map<String, dynamic>.from(payments));
+    } catch (e) {
+      debugPrint('[loan payments cloud] fetch: $e');
+    }
+  }
+
+  static Future<void> fetchAndApplyForLoan(List<Map<String, dynamic>> apps, String loanId) async {
+    await fetchAndApply(apps);
+    await NgmyLoanPaymentsStore.applyTo(apps, loanId: loanId);
+  }
+}
+
+class NgmyLoanPaymentsStore {
+  static String _key(String loanId) => 'ngmy_loan_payments_${loanId.trim()}';
+
+  static Future<void> save(String loanId, List<Map<String, dynamic>> payments) async {
+    if (loanId.trim().isEmpty || payments.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _key(loanId),
+      jsonEncode({
+        'payments': payments,
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      }),
+    );
+  }
+
+  static Future<void> applyTo(List<Map<String, dynamic>> apps, {String? loanId}) async {
+    if (apps.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    for (var i = 0; i < apps.length; i++) {
+      final id = (apps[i]['id'] ?? '').toString().trim();
+      if (id.isEmpty) continue;
+      if (loanId != null && loanId.trim().isNotEmpty && id != loanId.trim()) continue;
+      final raw = prefs.getString(_key(id));
+      if (raw == null || raw.isEmpty) continue;
+      try {
+        final m = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+        final stored = (m['payments'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+        if (stored.isEmpty) continue;
+        final local = NgmyLoanPaymentsCloud.paymentsFromLoan(apps[i]);
+        apps[i]['payments'] = ngmyLoanMergePaymentsList(local, stored);
+        if (m['updatedAt'] != null) apps[i]['paymentsUpdatedAt'] = m['updatedAt'];
+      } catch (_) {}
+    }
+  }
+}
+
 /// Cached loan photo widget — no blink on tap/rebuild.
 class NgmyLoanImage extends StatefulWidget {
   const NgmyLoanImage(this.ref, {super.key, this.fit = BoxFit.cover});
@@ -311,6 +508,8 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
     try {
       await widget.onRefreshLoans?.call();
       await NgmyLoanStatusCloud.fetchAndApply(widget.config.loanApplications);
+      await NgmyLoanPaymentsCloud.fetchAndApply(widget.config.loanApplications);
+      await NgmyLoanPaymentsStore.applyTo(widget.config.loanApplications);
     } finally {
       _refreshing = false;
       if (mounted) setState(() {});
@@ -347,10 +546,8 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: () async {
-          widget.onDataChanged();
-          await Future<void>.delayed(const Duration(milliseconds: 400));
-        },
+        color: _loanGreen,
+        onRefresh: _refreshLoans,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
@@ -456,13 +653,26 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
   Widget _loanTile(BuildContext context, Map<String, dynamic> app, bool isDark) {
     final status = (app['status'] ?? 'pending').toString();
     final amount = (app['amount'] as num?)?.toDouble() ?? 0;
+    final payments = app['payments'] as List? ?? [];
+    final paid = ngmyLoanPaidCount(payments);
+    final total = payments.length;
+    final progress = total > 0 ? paid / total : 0.0;
     Color c = Colors.orange;
-    if (status == 'approved') c = Colors.green;
+    if (status == 'approved') c = _loanGreen;
     if (status == 'rejected') c = Colors.red;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        onTap: status == 'approved'
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151B28) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.withValues(alpha: 0.35)),
+        boxShadow: isDark ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: status == 'approved'
             ? () => Navigator.push(
                   context,
                   MaterialPageRoute<void>(
@@ -472,6 +682,7 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
                       onDataChanged: widget.onDataChanged,
                       isAdmin: false,
                       onPersistNow: widget.onPersistNow,
+                      onRefreshLoans: widget.onRefreshLoans,
                     ),
                   ),
                 )
@@ -488,14 +699,47 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
                     );
                   }
                 : null),
-        title: Text('\$${ngmyLoanFormatCurrency(amount)} · ${status.toUpperCase()}', style: TextStyle(fontWeight: FontWeight.w800, color: c)),
-        subtitle: Text(
-          status == 'rejected' && (app['rejectionReason'] ?? '').toString().isNotEmpty
-              ? 'Rejected: ${app['rejectionReason']}'
-              : (app['scheduleSummary'] ?? app['createdAt'] ?? '').toString(),
-          maxLines: 3,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(color: c.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+                  child: Icon(status == 'approved' ? Icons.payments_rounded : Icons.hourglass_top_rounded, color: c, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('\$${ngmyLoanFormatCurrency(amount)} · ${status.toUpperCase()}', style: TextStyle(fontWeight: FontWeight.w900, color: c, fontSize: 14)),
+                      const SizedBox(height: 4),
+                      Text(
+                        status == 'rejected' && (app['rejectionReason'] ?? '').toString().isNotEmpty
+                            ? 'Rejected: ${app['rejectionReason']}'
+                            : (app['scheduleSummary'] ?? '').toString(),
+                        maxLines: 2,
+                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey.shade600),
+                      ),
+                      if (status == 'approved' && total > 0) ...[
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(value: progress, minHeight: 5, backgroundColor: c.withValues(alpha: 0.15), color: c),
+                        ),
+                        const SizedBox(height: 4),
+                        Text('$paid of $total payments received', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: c)),
+                      ],
+                    ],
+                  ),
+                ),
+                if (status == 'approved') const Icon(Icons.chevron_right_rounded, color: _loanGreen),
+              ],
+            ),
+          ),
         ),
-        trailing: status == 'approved' ? const Icon(Icons.track_changes_rounded, color: Color(0xFF00B25A)) : null,
       ),
     );
   }
@@ -1151,157 +1395,442 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
 }
 
 class NgmyLoanTrackingScreen extends StatefulWidget {
-  const NgmyLoanTrackingScreen({super.key, required this.loanId, required this.config, required this.onDataChanged, required this.isAdmin, this.onPersistNow});
+  const NgmyLoanTrackingScreen({
+    super.key,
+    required this.loanId,
+    required this.config,
+    required this.onDataChanged,
+    required this.isAdmin,
+    this.onPersistNow,
+    this.onRefreshLoans,
+  });
 
   final String loanId;
   final NgmyLoanConfigBridge config;
   final VoidCallback onDataChanged;
   final bool isAdmin;
   final Future<bool> Function()? onPersistNow;
+  final Future<void> Function()? onRefreshLoans;
 
   @override
   State<NgmyLoanTrackingScreen> createState() => _NgmyLoanTrackingScreenState();
 }
 
-class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> {
+class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with WidgetsBindingObserver {
+  Timer? _poll;
+  bool _syncing = false;
+  DateTime? _lastSync;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_pullLatest());
+    _poll = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_pullLatest(silent: true)));
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_pullLatest());
+  }
+
   Map<String, dynamic>? get _loan {
     final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == widget.loanId);
     if (i < 0) return null;
     return widget.config.loanApplications[i];
   }
 
+  Future<void> _pullLatest({bool silent = false}) async {
+    if (_syncing) return;
+    _syncing = true;
+    try {
+      await widget.onRefreshLoans?.call();
+      await NgmyLoanPaymentsCloud.fetchAndApplyForLoan(widget.config.loanApplications, widget.loanId);
+    } finally {
+      _syncing = false;
+      _lastSync = DateTime.now();
+      if (mounted) setState(() {});
+    }
+  }
+
   Future<void> _mutateLoan(void Function(Map<String, dynamic> loan) fn) async {
     final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == widget.loanId);
     if (i < 0) return;
     fn(widget.config.loanApplications[i]);
-    widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
+    widget.config.loanApplications[i]['updatedAt'] = now;
+    widget.config.loanApplications[i]['paymentsUpdatedAt'] = now;
+    final loan = widget.config.loanApplications[i];
+    final payments = NgmyLoanPaymentsCloud.paymentsFromLoan(loan);
+    await NgmyLoanPaymentsStore.save(widget.loanId, payments);
+    await NgmyLoanPaymentsCloud.pushLoan(widget.loanId, loan);
+    final ok = await widget.onPersistNow?.call() ?? false;
     widget.onDataChanged();
-    await widget.onPersistNow?.call();
     if (!mounted) return;
     setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Payment saved — user sees it live.' : 'Saved on this device — syncing…'),
+        backgroundColor: ok ? _loanGreen : Colors.orange,
+      ),
+    );
   }
 
   Future<void> _recordPayment(Map<String, dynamic> payment) async {
     final dueAmt = (payment['amount'] as num?)?.toDouble() ?? 0;
     final amountC = TextEditingController(text: ngmyLoanFormatCurrency(dueAmt));
     final noteC = TextEditingController();
-    final ok = await showDialog<bool>(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ok = await showModalBottomSheet<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Record payment received'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: amountC,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Amount received (\$)', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: noteC,
-              decoration: const InputDecoration(labelText: 'Note (optional)', border: OutlineInputBorder()),
-            ),
-          ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (c) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(c).bottom),
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 22),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF151B28) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _loanGreen.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Record payment received', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+              const SizedBox(height: 6),
+              Text('Week #${payment['id']}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountC,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Amount received (\$)',
+                  prefixIcon: const Icon(Icons.attach_money_rounded, color: _loanGreen),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteC,
+                decoration: InputDecoration(
+                  labelText: 'Note (optional)',
+                  prefixIcon: const Icon(Icons.notes_rounded, color: _loanGreen),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel'))),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(backgroundColor: _loanGreen, padding: const EdgeInsets.symmetric(vertical: 14)),
+                      onPressed: () => Navigator.pop(c, true),
+                      child: const Text('Mark received'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save')),
-        ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true) {
+      amountC.dispose();
+      noteC.dispose();
+      return;
+    }
     final received = double.tryParse(amountC.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? dueAmt;
+    final noteText = noteC.text.trim();
+    amountC.dispose();
+    noteC.dispose();
     final payId = (payment['id'] ?? '').toString();
     await _mutateLoan((loan) {
-      final payments = (loan['payments'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+      final payments = NgmyLoanPaymentsCloud.paymentsFromLoan(loan);
       final idx = payments.indexWhere((p) => (p['id'] ?? '').toString() == payId);
       if (idx < 0) return;
       payments[idx]['status'] = 'paid';
       payments[idx]['paidAmount'] = received;
       payments[idx]['paidAt'] = DateTime.now().toUtc().toIso8601String();
-      if (noteC.text.trim().isNotEmpty) payments[idx]['adminNote'] = noteC.text.trim();
+      if (noteText.isNotEmpty) payments[idx]['adminNote'] = noteText;
       loan['payments'] = payments;
     });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment recorded.')));
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final loan = _loan;
     if (loan == null) {
       return Scaffold(
+        backgroundColor: isDark ? const Color(0xFF0A0E18) : const Color(0xFFF3F4F6),
         appBar: AppBar(title: const Text('Loan tracking')),
         body: const Center(child: Text('Loan not found.')),
       );
     }
-    final payments = (loan['payments'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+    final payments = NgmyLoanPaymentsCloud.paymentsFromLoan(loan);
     final cash = (loan['companyCashApp'] ?? widget.config.officialCashApp).toString();
     final zelle = (loan['companyZelle'] ?? widget.config.loanCompanyZelle).toString();
-    final paidCount = payments.where((p) => (p['status'] ?? '') == 'paid').length;
+    final paidCount = ngmyLoanPaidCount(payments);
+    final paidTotal = ngmyLoanPaidTotal(payments);
+    final totalDue = (loan['totalRepayment'] as num?)?.toDouble() ?? 0;
+    final progress = payments.isEmpty ? 0.0 : paidCount / payments.length;
+    final remaining = (totalDue - paidTotal).clamp(0.0, totalDue).toDouble();
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.isAdmin ? 'Admin loan tracking' : 'My loan payments')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text('\$${ngmyLoanFormatCurrency((loan['amount'] as num?)?.toDouble() ?? 0)} loan', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
-          Text((loan['scheduleSummary'] ?? '').toString(), style: const TextStyle(color: Colors.grey)),
-          Text('Total due: \$${ngmyLoanFormatCurrency((loan['totalRepayment'] as num?)?.toDouble() ?? 0)}', style: const TextStyle(fontWeight: FontWeight.w700)),
-          Text('$paidCount of ${payments.length} weekly payments received', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 16),
-          const Text('Pay the company', style: TextStyle(fontWeight: FontWeight.bold)),
-          if (cash.isNotEmpty)
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.attach_money, color: Colors.green),
-                title: Text('Cash App: \$$cash'),
-                subtitle: const Text('Tap to open Cash App'),
-                trailing: FilledButton(
-                  onPressed: () => NgmyLoanLogic.openCashApp(cash),
-                  child: const Text('Pay'),
+      backgroundColor: isDark ? const Color(0xFF0A0E18) : const Color(0xFFF3F4F6),
+      body: RefreshIndicator(
+        color: _loanGreen,
+        onRefresh: () => _pullLatest(),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverAppBar(
+              expandedHeight: 220,
+              pinned: true,
+              backgroundColor: _loanGreen,
+              foregroundColor: Colors.white,
+              flexibleSpace: FlexibleSpaceBar(
+                title: Text(widget.isAdmin ? 'Loan tracking' : 'My payments', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                background: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 56, 20, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('\$${ngmyLoanFormatCurrency((loan['amount'] as num?)?.toDouble() ?? 0)} loan', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26)),
+                          Text((loan['scheduleSummary'] ?? '').toString(), style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 56,
+                                    height: 56,
+                                    child: CircularProgressIndicator(value: progress, strokeWidth: 5, backgroundColor: Colors.white24, color: Colors.white),
+                                  ),
+                                  Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                                ],
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('$paidCount of ${payments.length} received', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                                    Text('\$${ngmyLoanFormatCurrency(paidTotal)} paid · \$${ngmyLoanFormatCurrency(remaining)} left', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                if (_lastSync != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Center(child: Text('Live', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white.withValues(alpha: 0.9)))),
+                  ),
+              ],
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              sliver: SliverToBoxAdapter(
+                child: Text('Pay the company', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+              ),
+            ),
+            if (cash.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverToBoxAdapter(child: _payMethodCard(
+                  isDark: isDark,
+                  icon: Icons.payments_rounded,
+                  iconColor: const Color(0xFF00D632),
+                  title: 'Cash App',
+                  subtitle: '\$$cash',
+                  actionLabel: 'Open',
+                  onAction: () => NgmyLoanLogic.openCashApp(cash),
+                )),
+              ),
+            if (zelle.isNotEmpty) ...[
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverToBoxAdapter(child: _payMethodCard(
+                  isDark: isDark,
+                  icon: Icons.account_balance_rounded,
+                  iconColor: const Color(0xFF6D28D9),
+                  title: 'Zelle',
+                  subtitle: zelle,
+                  actionLabel: 'Copy',
+                  onAction: () {
+                    Clipboard.setData(ClipboardData(text: zelle));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Zelle copied')));
+                  },
+                )),
+              ),
+            ],
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 22, 16, 8),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  widget.isAdmin ? 'Weekly schedule — tap to record' : 'Your payment schedule',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87),
                 ),
               ),
             ),
-          if (zelle.isNotEmpty)
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.account_balance, color: Colors.blue),
-                title: Text('Zelle: $zelle'),
-                subtitle: const Text('Send payment to this Zelle'),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) => Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: _paymentCard(context, payments[i], isDark: isDark),
+                ),
+                childCount: payments.length,
               ),
             ),
-          const Divider(),
-          Text(widget.isAdmin ? 'Weekly schedule — record when received' : 'Your weekly payment schedule', style: const TextStyle(fontWeight: FontWeight.bold)),
-          ...payments.map((p) => _paymentTile(context, p)),
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _payMethodCard({
+    required bool isDark,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required String actionLabel,
+    required VoidCallback onAction,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151B28) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white12 : Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: iconColor, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade600)),
+              ],
+            ),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _loanGreen, padding: const EdgeInsets.symmetric(horizontal: 16)),
+            onPressed: onAction,
+            child: Text(actionLabel),
+          ),
         ],
       ),
     );
   }
 
-  Widget _paymentTile(BuildContext context, Map<String, dynamic> p) {
+  Widget _paymentCard(BuildContext context, Map<String, dynamic> p, {required bool isDark}) {
     final due = DateTime.tryParse((p['dueDate'] ?? '').toString())?.toLocal();
     final paid = (p['status'] ?? '') == 'paid';
     final paidAmt = (p['paidAmount'] as num?)?.toDouble();
     final dueAmt = (p['amount'] as num?)?.toDouble() ?? 0;
-    return Card(
-      child: ListTile(
-        title: Text('\$${ngmyLoanFormatCurrency(dueAmt)}', style: TextStyle(fontWeight: FontWeight.w800, color: paid ? Colors.green : Colors.orange)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(due != null ? 'Due ${due.month}/${due.day}/${due.year}' : 'Scheduled'),
-            if (paid && paidAmt != null) Text('Received: \$${ngmyLoanFormatCurrency(paidAmt)}', style: const TextStyle(color: Colors.green, fontSize: 12)),
-            if ((p['adminNote'] ?? '').toString().isNotEmpty) Text((p['adminNote'] ?? '').toString(), style: const TextStyle(fontSize: 11)),
-          ],
+    final paidAt = DateTime.tryParse((p['paidAt'] ?? '').toString())?.toLocal();
+    final statusColor = paid ? _loanGreen : Colors.orange;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151B28) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: statusColor.withValues(alpha: paid ? 0.5 : 0.25)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: widget.isAdmin && !paid ? () => _recordPayment(p) : null,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: statusColor.withValues(alpha: 0.15),
+                  ),
+                  child: Icon(paid ? Icons.check_circle_rounded : Icons.schedule_rounded, color: statusColor, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text('Week ${p['id']}', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
+                            child: Text(paid ? 'RECEIVED' : 'DUE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: statusColor)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text('\$${ngmyLoanFormatCurrency(dueAmt)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: statusColor)),
+                      Text(
+                        paid && paidAt != null
+                            ? 'Recorded ${paidAt.month}/${paidAt.day}/${paidAt.year} · \$${ngmyLoanFormatCurrency(paidAmt ?? dueAmt)}'
+                            : (due != null ? 'Due ${due.month}/${due.day}/${due.year}' : 'Scheduled'),
+                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey.shade600),
+                      ),
+                      if ((p['adminNote'] ?? '').toString().isNotEmpty)
+                        Text((p['adminNote'] ?? '').toString(), style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: isDark ? Colors.white38 : Colors.grey)),
+                    ],
+                  ),
+                ),
+                if (widget.isAdmin && !paid)
+                  FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: _loanGreen, minimumSize: const Size(72, 36)),
+                    onPressed: () => _recordPayment(p),
+                    child: const Text('Record', style: TextStyle(fontSize: 11)),
+                  ),
+              ],
+            ),
+          ),
         ),
-        trailing: paid
-            ? const Icon(Icons.check_circle, color: Colors.green)
-            : (widget.isAdmin
-                ? TextButton(onPressed: () => _recordPayment(p), child: const Text('Record'))
-                : const Icon(Icons.schedule)),
       ),
     );
   }
@@ -1374,6 +1903,7 @@ void showNgmyLoanAdminSheet(
   required bool isDark,
   VoidCallback? onEditSettings,
   Future<bool> Function()? onPersistNow,
+  Future<void> Function()? onRefreshLoans,
 }) {
   showModalBottomSheet(
     context: context,
@@ -1390,6 +1920,7 @@ void showNgmyLoanAdminSheet(
         scrollController: scroll,
         onEditSettings: onEditSettings,
         onPersistNow: onPersistNow,
+        onRefreshLoans: onRefreshLoans,
       ),
     ),
   );
@@ -1403,6 +1934,7 @@ class _NgmyLoanAdminPanel extends StatefulWidget {
     required this.scrollController,
     this.onEditSettings,
     this.onPersistNow,
+    this.onRefreshLoans,
   });
   final NgmyLoanConfigBridge config;
   final VoidCallback onDataChanged;
@@ -1410,6 +1942,7 @@ class _NgmyLoanAdminPanel extends StatefulWidget {
   final ScrollController scrollController;
   final VoidCallback? onEditSettings;
   final Future<bool> Function()? onPersistNow;
+  final Future<void> Function()? onRefreshLoans;
 
   @override
   State<_NgmyLoanAdminPanel> createState() => _NgmyLoanAdminPanelState();
@@ -1558,6 +2091,7 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
                         onDataChanged: widget.onDataChanged,
                         isAdmin: true,
                         onPersistNow: widget.onPersistNow,
+                        onRefreshLoans: widget.onRefreshLoans,
                       ),
                     ),
                   ),
