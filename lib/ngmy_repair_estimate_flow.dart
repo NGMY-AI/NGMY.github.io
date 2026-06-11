@@ -11,7 +11,7 @@ import 'ngmy_repair_estimate_business_store.dart';
 import 'ngmy_repair_estimate_payments.dart';
 import 'ngmy_repair_estimate_preview.dart';
 
-/// Photo → AI repair estimate → compact preview → download.
+/// Photo → repair estimate → compact preview → download.
 Future<void> showNgmyRepairEstimateFlow({
   required BuildContext context,
   required String geminiApiKey,
@@ -188,7 +188,7 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
 
   Future<void> _generate() async {
     if (_photoBytes == null) {
-      setState(() => _error = 'Add a photo first — AI scans it even if you skip notes.');
+      setState(() => _error = 'Add a photo first — we scan it even if you skip notes.');
       return;
     }
     if (!await _ensureEstimateAccess()) return;
@@ -384,7 +384,7 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('AI Repair Estimate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                      const Text('Repair Estimate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
                       Text(
                         _business.name.trim().isEmpty ? 'Tap profile to add your business' : _business.name.trim(),
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
@@ -440,7 +440,7 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  _field(_notesC, 'What to fix? (optional — AI reads the photo)', Icons.edit_note_rounded, maxLines: 2),
+                  _field(_notesC, 'What to fix? (optional — we read the photo)', Icons.edit_note_rounded, maxLines: 2),
                   const SizedBox(height: 8),
                   _field(_clientC, 'Customer name (optional)', Icons.person_outline_rounded),
                   const SizedBox(height: 10),

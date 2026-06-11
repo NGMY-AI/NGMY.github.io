@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_music_payments.dart';
 
-/// Monthly wallet subscription for G-Services AI repair estimates (photo → price).
+/// Monthly wallet subscription for G-Services repair estimates (photo → price).
 class NgmyRepairEstimatePayments {
   static const double defaultMonthlyFee = 4.99;
 
@@ -46,7 +46,7 @@ class NgmyRepairEstimatePayments {
     _setAccessMap(config, map);
   }
 
-  /// Paywall when opening AI estimate — unlimited photo estimates for 30 days.
+  /// Paywall when opening repair estimate — unlimited photo estimates for 30 days.
   static Future<bool> confirmAndChargeMonthlyAccess({
     required BuildContext context,
     required dynamic user,
@@ -64,10 +64,10 @@ class NgmyRepairEstimatePayments {
       user: user,
       config: config,
       amount: fee,
-      title: 'AI Repair Estimates — monthly',
+      title: 'Repair Estimates — monthly',
       message:
-          'Unlock AI photo repair estimates for 30 days (\$${fee.toStringAsFixed(2)}/month). '
-          'Snap a fixture photo — AI scans it and quotes labor + materials for your city. '
+          'Unlock photo repair estimates for 30 days (\$${fee.toStringAsFixed(2)}/month). '
+          'Snap a fixture photo — we scan it and quote labor + materials for your city. '
           'Notes are optional.',
       onCharge: onCharge,
     );

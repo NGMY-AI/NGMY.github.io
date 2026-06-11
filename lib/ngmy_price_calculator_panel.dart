@@ -90,25 +90,13 @@ class NgmyPriceCalculatorPanel extends StatelessWidget {
               ),
             ),
             Positioned(
-              left: -8,
-              top: 0,
-              bottom: 0,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: onEstimateTap,
-                    customBorder: const CircleBorder(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Icon(
-                        Icons.account_balance_wallet_rounded,
-                        size: 88,
-                        color: _accent2.withValues(alpha: 0.28),
-                      ),
-                    ),
-                  ),
+              left: -6,
+              top: 36,
+              child: IgnorePointer(
+                child: Icon(
+                  Icons.account_balance_wallet_rounded,
+                  size: 72,
+                  color: _accent2.withValues(alpha: 0.12),
                 ),
               ),
             ),
@@ -119,13 +107,20 @@ class NgmyPriceCalculatorPanel extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: onEstimateTap,
                           borderRadius: BorderRadius.circular(10),
-                          gradient: const LinearGradient(colors: [_accent, _accent2]),
+                          child: Ink(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              gradient: const LinearGradient(colors: [_accent, _accent2]),
+                            ),
+                            child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 18),
+                          ),
                         ),
-                        child: const Icon(Icons.payments_rounded, color: Colors.white, size: 18),
                       ),
                       const SizedBox(width: 10),
                       const Expanded(

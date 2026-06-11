@@ -1018,7 +1018,7 @@ class AppConfig {
   /// Free AI-built apps before payment (default 1).
   int appStudioAiFreeAppLimit;
   Map<String, String> appStudioAiAccessUntilByEmail;
-  /// Monthly wallet fee for G-Services AI repair estimates (photo → price). 0 = free.
+  /// Monthly wallet fee for G-Services repair estimates (photo → price). 0 = free.
   double repairEstimateMonthlyFee;
   Map<String, String> repairEstimateAccessUntilByEmail;
   /// Admin toggle — double-tap Chat reveals Communicate.
@@ -17792,7 +17792,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                       categoryShell(
                         title: 'G-Services Estimates',
-                        subtitle: 'Monthly AI photo repair estimates in Pick Two calculator',
+                        subtitle: 'Monthly photo repair estimates in Pick Two calculator',
                         icon: Icons.account_balance_wallet_rounded,
                         accent: const Color(0xFF06B6D4),
                         expanded: repairEstimateExpanded,
@@ -17811,10 +17811,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             controller: repairEstimateFeeC,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             decoration: const InputDecoration(
-                              labelText: 'AI estimate monthly fee (\$)',
+                              labelText: 'Repair estimate monthly fee (\$)',
                               prefixIcon: Icon(Icons.photo_camera_rounded),
                               helperText:
-                                  'Charged once per 30 days from NGMY wallet. Tap the wallet behind Price Calculator. Set 0 for free.',
+                                  'Charged once per 30 days from NGMY wallet. Tap the wallet icon next to Price Calculator. Set 0 for free.',
                             ),
                           ),
                           const SizedBox(height: 12),
