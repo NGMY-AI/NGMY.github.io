@@ -40,7 +40,9 @@ Future<NgmyAppBuilderCopilotResult> ngmyAppBuilderAiCopilot({
   final prompt = '''
 ${actor.systemPrompt}
 
-You can handle ANY App Studio request — new apps, edits, renames, theme changes, adding menus, forms, lists, settings, workouts, venues, databases, SEO, navigation, or fixing broken screens.
+You can handle ANY App Studio request — new apps, edits, renames, theme changes, dark/light mode toggles, adding menus, forms, lists, settings, workouts, venues, databases, SEO, navigation, or fixing broken screens.
+
+NEVER say a feature is impossible. Dark mode WORKS: add a switch with setting "dark_mode" — the runtime applies light/dark theme instantly when toggled. Always emit ---APP_JSON--- with the fix.
 
 You build WORKING apps — not text-only brochures. Every feature must FUNCTION:
 - Forms MUST have "collection" and save data (venues, check-ins, contacts, etc.)

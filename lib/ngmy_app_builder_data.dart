@@ -97,6 +97,21 @@ class NgmyAppDataStore extends ChangeNotifier {
     return defaultValue;
   }
 
+  /// True when any saved setting key looks like dark mode and is on.
+  bool get darkModeEnabled {
+    final settings = _data['settings'];
+    if (settings is! Map) return false;
+    for (final entry in settings.entries) {
+      final key = entry.key.toString().toLowerCase();
+      final val = entry.value;
+      final isDarkKey = key.contains('dark') || key == 'night_mode' || key == 'nightmode';
+      if (!isDarkKey) continue;
+      if (val is bool) return val;
+      if (val == 'true' || val == 1 || val == '1') return true;
+    }
+    return false;
+  }
+
   Future<void> setSetting(String key, dynamic value) async {
     await ensureLoaded();
     _data['settings'] ??= <String, dynamic>{};

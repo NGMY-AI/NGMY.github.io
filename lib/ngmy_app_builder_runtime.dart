@@ -10,6 +10,7 @@ class NgmyAppLayoutRenderer extends StatefulWidget {
   final Map<String, dynamic> layout;
   final Color theme;
   final String appId;
+  final bool isDarkMode;
   final void Function(String? targetScreenId) onNavigate;
   final void Function(String message) onSnack;
 
@@ -18,6 +19,7 @@ class NgmyAppLayoutRenderer extends StatefulWidget {
     required this.layout,
     required this.theme,
     required this.appId,
+    this.isDarkMode = false,
     required this.onNavigate,
     required this.onSnack,
   });
@@ -112,10 +114,24 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
       case 'text':
         final style = (node['style'] ?? '').toString();
         TextStyle? ts;
-        if (style == 'title') ts = const TextStyle(fontWeight: FontWeight.w900, fontSize: 22);
-        if (style == 'subtitle') ts = TextStyle(fontSize: 14, color: Colors.grey.shade700);
-        if (style == 'caption') ts = const TextStyle(fontSize: 11, color: Colors.grey);
-        return Text((node['text'] ?? '').toString(), style: ts, textAlign: _textAlign(node['align']));
+        if (style == 'title') {
+          ts = TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 22,
+            color: widget.isDarkMode ? Colors.white : Colors.black87,
+          );
+        }
+        if (style == 'subtitle') {
+          ts = TextStyle(fontSize: 14, color: widget.isDarkMode ? Colors.white70 : Colors.grey.shade700);
+        }
+        if (style == 'caption') {
+          ts = TextStyle(fontSize: 11, color: widget.isDarkMode ? Colors.white54 : Colors.grey);
+        }
+        return Text(
+          (node['text'] ?? '').toString(),
+          style: ts ?? TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black87),
+          textAlign: _textAlign(node['align']),
+        );
       case 'button':
         return FilledButton(
           onPressed: () => _handleButton(node),
@@ -768,6 +784,10 @@ DATA LIST (shows saved items):
 
 SETTINGS (working toggles):
 {"type":"switch","setting":"notifications","label":"Push notifications","subtitle":"Get alerts for bookings","default":true}
+
+DARK / LIGHT MODE (works at runtime — use setting key dark_mode):
+{"type":"switch","setting":"dark_mode","label":"Dark mode","subtitle":"Turn off for light theme across the whole app","default":true}
+When user toggles dark_mode, the app instantly switches light/dark backgrounds and text. Always implement this when user asks for theme settings.
 
 WORKOUT PLAN (interactive):
 {"type":"workoutPlan","planId":"strength_day1","title":"Strength Day 1","exercises":[

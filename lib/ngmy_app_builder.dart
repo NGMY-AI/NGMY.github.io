@@ -9,6 +9,7 @@ import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_data.dart';
+import 'ngmy_app_builder_copilot_storage.dart';
 import 'ngmy_app_builder_export.dart';
 import 'ngmy_app_builder_runtime.dart';
 import 'ngmy_app_builder_storage.dart';
@@ -419,23 +420,31 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFEC4899)]),
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.35), blurRadius: 20, offset: const Offset(0, 8))],
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [Icon(Icons.auto_awesome_rounded, color: Colors.white), SizedBox(width: 8), Text('AI App Studio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22))]),
-                SizedBox(height: 10),
-                Text('Describe your app — Bolt builds working forms, lists, settings, and workouts. Not just text.', style: TextStyle(color: Colors.white, fontSize: 14, height: 1.4)),
-              ],
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)]),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.25), blurRadius: 12, offset: const Offset(0, 4))],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
+                  SizedBox(width: 8),
+                  Text('AI App Studio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+          Text(
+            'Describe your app — Bolt builds forms, lists, settings, dark/light mode, and workouts.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
+          ),
+          const SizedBox(height: 16),
           Material(
             color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(18),
@@ -1253,17 +1262,41 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
   void initState() {
     super.initState();
     _project = widget.project;
-    if (_project == null) {
-      _messages.add({
-        'role': 'ai',
-        'text': 'Hi! I\'m Bolt — your unrestricted AI coder. Ask for ANYTHING: five menus, tabs, custom screens, database hooks. I write the full JSON code. Or use Code Studio to edit yourself.',
-      });
-    } else {
-      _messages.add({
-        'role': 'ai',
-        'text': 'I have "${_project!.name}" loaded. Tell me ANY change — unlimited menus, tabs, layouts, database, colors. Nothing is off limits.',
-      });
+    _loadMemory();
+  }
+
+  Future<void> _loadMemory() async {
+    final stored = await NgmyAppBuilderCopilotMemoryStore.load(
+      widget.email,
+      projectId: _project?.id,
+    );
+    if (!mounted) return;
+    if (stored.isNotEmpty) {
+      setState(() => _messages.addAll(stored));
+      return;
     }
+    setState(() {
+      if (_project == null) {
+        _messages.add({
+          'role': 'ai',
+          'text': 'Hi! I\'m Bolt — your unrestricted AI coder. Ask for ANYTHING: menus, tabs, dark/light mode, databases, redesigns. I write full working JSON.',
+        });
+      } else {
+        _messages.add({
+          'role': 'ai',
+          'text': 'I have "${_project!.name}" loaded. Tell me ANY change — dark mode, menus, layouts, colors. Nothing is off limits.',
+        });
+      }
+    });
+    await _persistMemory();
+  }
+
+  Future<void> _persistMemory() async {
+    await NgmyAppBuilderCopilotMemoryStore.save(
+      widget.email,
+      projectId: _project?.id,
+      messages: _messages,
+    );
   }
 
   @override
@@ -1281,6 +1314,7 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
       _messages.add({'role': 'user', 'text': text});
       _busy = true;
     });
+    await _persistMemory();
     final result = await ngmyAppBuilderAiCopilot(
       apiKey: widget.apiKey,
       userMessage: text,
@@ -1312,6 +1346,7 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
       }
       _busy = false;
     });
+    await _persistMemory();
     await Future<void>.delayed(const Duration(milliseconds: 50));
     if (_scrollC.hasClients) _scrollC.jumpTo(_scrollC.position.maxScrollExtent);
   }
@@ -1672,32 +1707,41 @@ class _NgmyAppRuntimeScreenState extends State<NgmyAppRuntimeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screen = widget.project.screenById(_screenId) ?? widget.project.homeScreen;
-    final theme = widget.project.theme;
-    return Scaffold(
-      backgroundColor: theme.withOpacity(0.08),
-      appBar: AppBar(
-        backgroundColor: theme,
-        foregroundColor: Colors.white,
-        title: Text(widget.project.name, style: const TextStyle(fontWeight: FontWeight.w900)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.home_rounded),
-            onPressed: () => setState(() => _screenId = widget.project.homeScreen.id),
+    return ListenableBuilder(
+      listenable: _dataStore,
+      builder: (context, _) {
+        final screen = widget.project.screenById(_screenId) ?? widget.project.homeScreen;
+        final theme = widget.project.theme;
+        final dark = _dataStore.darkModeEnabled;
+        final bg = dark ? const Color(0xFF0F172A) : theme.withValues(alpha: 0.08);
+        final barBg = dark ? const Color(0xFF1E293B) : theme;
+        return Scaffold(
+          backgroundColor: bg,
+          appBar: AppBar(
+            backgroundColor: barBg,
+            foregroundColor: Colors.white,
+            title: Text(widget.project.name, style: const TextStyle(fontWeight: FontWeight.w900)),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.home_rounded),
+                onPressed: () => setState(() => _screenId = widget.project.homeScreen.id),
+              ),
+            ],
           ),
-        ],
-      ),
-      body: SafeArea(child: _buildScreen(screen, theme)),
+          body: SafeArea(child: _buildScreen(screen, theme, dark)),
+        );
+      },
     );
   }
 
-  Widget _buildScreen(NgmyAppScreen screen, Color theme) {
+  Widget _buildScreen(NgmyAppScreen screen, Color theme, bool dark) {
     if (ngmyScreenUsesCustomLayout(screen)) {
       final layout = ngmyScreenLayout(screen);
       if (layout != null) {
         return NgmyAppLayoutRenderer(
           layout: layout,
           theme: theme,
+          isDarkMode: dark,
           appId: widget.project.id,
           onNavigate: _go,
           onSnack: (msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))),

@@ -8,6 +8,7 @@ import 'ngmy_app_builder_data.dart';
 import 'ngmy_app_builder_download_io.dart' if (dart.library.html) 'ngmy_app_builder_download_web.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
+import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 
 const int kNgmyAppBundleVersion = 1;
 const String kNgmyAppBundleMarker = 'ngmyAppBundle';
@@ -29,7 +30,6 @@ class NgmyAppBundle {
   String toPrettyJson() => const JsonEncoder.withIndent('  ').convert(toMap());
 
   static NgmyAppBundle? fromMap(Map<String, dynamic> map) {
-    final marker = map[kNgmyAppBundleMarker];
     final projectRaw = map['project'];
     if (projectRaw is Map) {
       try {
@@ -43,7 +43,7 @@ class NgmyAppBundle {
         debugPrint('[app bundle fromMap project] $e');
       }
     }
-    if (marker == null && map['screens'] is List && map['name'] != null) {
+    if (map['screens'] is List && map['name'] != null) {
       try {
         return NgmyAppBundle(project: NgmyAppProject.fromMap(map));
       } catch (e) {
@@ -100,11 +100,13 @@ Future<NgmyAppProject?> ngmyImportAppBundleFromJson(String email, String raw) as
     debugPrint('[app bundle import runtime] $e');
   }
   final owner = email.toLowerCase().trim();
+  final effectiveOwner = owner.isNotEmpty ? owner : bundle.project.ownerEmail.toLowerCase().trim();
+  if (effectiveOwner.isEmpty) return null;
   final project = bundle.project.copyWith(
-    ownerEmail: owner.isNotEmpty ? owner : bundle.project.ownerEmail,
+    ownerEmail: effectiveOwner,
     updatedAt: DateTime.now().toUtc().toIso8601String(),
   );
-  await ngmySaveUserAppProject(owner.isNotEmpty ? owner : project.ownerEmail, project);
+  await ngmySaveUserAppProject(effectiveOwner, project);
   return project;
 }
 
@@ -136,6 +138,48 @@ Future<String?> _readPickedBackupText(PlatformFile file) async {
   return null;
 }
 
+Future<String?> _pickBackupJsonText() async {
+  try {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['json'],
+      withData: true,
+      allowMultiple: false,
+    );
+    if (result != null && result.files.isNotEmpty) {
+      final raw = await _readPickedBackupText(result.files.first);
+      if (raw != null && raw.trim().isNotEmpty) return raw;
+    }
+  } catch (e) {
+    debugPrint('[app bundle import] file_picker custom: $e');
+  }
+
+  if (kIsWeb) {
+    try {
+      final browser = await ngmyPickBackupJsonViaBrowser();
+      if (browser != null && browser.trim().isNotEmpty) return browser;
+    } catch (e) {
+      debugPrint('[app bundle import] browser picker: $e');
+    }
+  }
+
+  try {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      withData: true,
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty) return null;
+    return _readPickedBackupText(result.files.first);
+  } catch (e) {
+    debugPrint('[app bundle import] file_picker any: $e');
+    if (kIsWeb) {
+      return ngmyPickBackupJsonViaBrowser();
+    }
+    rethrow;
+  }
+}
+
 /// Result of a backup import attempt — clearer errors for the UI.
 class NgmyAppBundleImportResult {
   final NgmyAppProject? project;
@@ -148,26 +192,9 @@ class NgmyAppBundleImportResult {
 
 Future<NgmyAppBundleImportResult> ngmyPickAndImportAppBundleDetailed(String email) async {
   try {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.any,
-      withData: true,
-      allowMultiple: false,
-    );
-    if (result == null || result.files.isEmpty) {
-      return const NgmyAppBundleImportResult(errorMessage: 'No file selected.');
-    }
-    final file = result.files.first;
-    final name = file.name.toLowerCase();
-    if (!name.endsWith('.json') && !name.endsWith('.ngmy')) {
-      return const NgmyAppBundleImportResult(
-        errorMessage: 'Please choose a .json or .ngmy.json backup file from App Studio.',
-      );
-    }
-    final raw = await _readPickedBackupText(file);
+    final raw = await _pickBackupJsonText();
     if (raw == null || raw.trim().isEmpty) {
-      return const NgmyAppBundleImportResult(
-        errorMessage: 'Could not read file. Re-download your .ngmy.json backup from App Studio and try again.',
-      );
+      return const NgmyAppBundleImportResult(errorMessage: 'No file selected.');
     }
     if (!NgmyAppBundle.looksLikeBundle(raw)) {
       return const NgmyAppBundleImportResult(
@@ -182,8 +209,24 @@ Future<NgmyAppBundleImportResult> ngmyPickAndImportAppBundleDetailed(String emai
     }
     return NgmyAppBundleImportResult(project: imported);
   } catch (e) {
-    debugPrint('[app bundle import] $e');
-    return NgmyAppBundleImportResult(errorMessage: 'Import failed: $e');
+    final isLateInit = e.toString().contains('LateInitializationError');
+    if (!isLateInit) {
+      debugPrint('[app bundle import] $e');
+      return NgmyAppBundleImportResult(errorMessage: 'Import failed: $e');
+    }
+    debugPrint('[app bundle import] LateInit: $e');
+    if (kIsWeb) {
+      try {
+        final raw = await ngmyPickBackupJsonViaBrowser();
+        if (raw != null && raw.trim().isNotEmpty && NgmyAppBundle.looksLikeBundle(raw)) {
+          final imported = await ngmyImportAppBundleFromJson(email, raw);
+          if (imported != null) return NgmyAppBundleImportResult(project: imported);
+        }
+      } catch (_) {}
+    }
+    return const NgmyAppBundleImportResult(
+      errorMessage: 'Could not open file picker. Try again or use Chrome/Safari private tab after updating the app.',
+    );
   }
 }
 
