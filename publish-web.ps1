@@ -65,6 +65,33 @@ Set-Content -Path $indexPath -Value $html -Encoding UTF8 -NoNewline
 Copy-Item -Path $indexPath -Destination (Join-Path $PSScriptRoot "docs\404.html") -Force
 Write-Host "  Wrote 404.html (unique app links on GitHub Pages)" -ForegroundColor DarkGray
 
+# Standalone guest apps: static JSON on GitHub Pages (no NGMY login required)
+$appsDir = Join-Path $PSScriptRoot "docs\apps"
+New-Item -ItemType Directory -Path $appsDir -Force | Out-Null
+$supabaseUrl = "https://gvufllqqxjnpicmkxzcg.supabase.co"
+$anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2dWZsbHFxeGpucGljbWt4emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA1OTksImV4cCI6MjA5NTM5NjU5OX0.NoJnis6t_RLSJOHu5iLdjGaCTxVj5ZAFnG3gBZ3XYbM"
+$guestAppCount = 0
+try {
+    $headers = @{
+        apikey = $anonKey
+        Authorization = "Bearer $anonKey"
+    }
+    $restUri = "$supabaseUrl/rest/v1/ngmy_settings?select=key,value&key=like.ngmy_published_app_*"
+    $rows = Invoke-RestMethod -Uri $restUri -Headers $headers -TimeoutSec 30
+    foreach ($row in $rows) {
+        $key = [string]$row.key
+        if (-not $key.StartsWith("ngmy_published_app_")) { continue }
+        $slug = $key.Substring("ngmy_published_app_".Length).Trim().ToLower()
+        if ([string]::IsNullOrWhiteSpace($slug)) { continue }
+        $jsonPath = Join-Path $appsDir "$slug.json"
+        ($row.value | ConvertTo-Json -Depth 30 -Compress) | Set-Content -Path $jsonPath -Encoding UTF8
+        $guestAppCount++
+    }
+    Write-Host "  Exported $guestAppCount published guest app JSON file(s) to docs/apps/" -ForegroundColor DarkGray
+} catch {
+    Write-Warning "  Could not export guest app JSON from Supabase (guest links still use cloud): $($_.Exception.Message)"
+}
+
 # PWA manifest paths for project subfolder
 $manifestPath = Join-Path $PSScriptRoot "docs\manifest.json"
 if (Test-Path $manifestPath) {

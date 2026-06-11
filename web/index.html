@@ -24,6 +24,31 @@
 
   </script>
 
+  <script>
+    (function () {
+      function ngmyExtractGuestAppSlug() {
+        var path = location.pathname || "";
+        var m = path.match(/\/app\/([^/?#]+)/i);
+        if (m && m[1]) return m[1].trim().toLowerCase();
+        try {
+          var q = new URLSearchParams(location.search).get("ngmy_app");
+          if (q) return q.trim().toLowerCase();
+        } catch (e) {}
+        var hash = (location.hash || "").replace(/^#\/?/, "");
+        if (hash.indexOf("app/") === 0) {
+          var part = hash.substring(4).split("/")[0];
+          if (part) return part.trim().toLowerCase();
+        }
+        return "";
+      }
+      var slug = ngmyExtractGuestAppSlug();
+      if (slug) {
+        try { sessionStorage.setItem("ngmy_guest_app_slug", slug); } catch (e) {}
+        try { document.title = "Loading app…"; } catch (e2) {}
+      }
+    })();
+  </script>
+
 
 
   <meta charset="UTF-8">

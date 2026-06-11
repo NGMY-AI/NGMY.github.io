@@ -316,7 +316,14 @@ void main() async {
   _ngmyInitialThemeMode = launchBootstrap.themeMode;
   _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
 
+  final guestAppSlug = kIsWeb ? ngmyPublishedAppSlugFromLaunch() : null;
+  final isGuestPublishedApp = guestAppSlug != null && guestAppSlug.trim().isNotEmpty;
+
   runZonedGuarded(() {
+    if (isGuestPublishedApp) {
+      runApp(NgmyGuestPublishedApp(slug: guestAppSlug.trim().toLowerCase()));
+      return;
+    }
     final app = NGMYApp(launchBootstrap: launchBootstrap);
     runApp(
       kIsWeb ? ExcludeSemantics(child: NgmyWebViewportGuard(child: app)) : app,
@@ -6019,8 +6026,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   bool _allowConfigDiffNotifications = false;
   bool _realtimeStarted = false;
   String _appShellSig = '';
-  String? _publishedAppLaunchSlug;
-
   String _computeAppShellSig() {
     final annSig = _allAnnouncements.map((a) => '${a.id}:${a.message.length}').join('|');
     return '${_currentUser?.email ?? ''}|${_allUsers.length}|${_allTransactions.length}|${_allMedia.length}|$annSig|${_config.ngmyChatClosed}';
@@ -6599,7 +6604,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       );
     };
     NgmyNavigator.install();
-    _publishedAppLaunchSlug = ngmyPublishedAppSlugFromLaunch();
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
     _initLocalNotifications();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -10048,9 +10052,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             child: shell,
           );
         },
-        home: _publishedAppLaunchSlug != null
-            ? NgmyPublishedAppHostScreen(slug: _publishedAppLaunchSlug!)
-            : _currentUser == null
+        home: _currentUser == null
             ? AuthScreen(
                 allUsers: _allUsers,
                 config: _config,
@@ -11784,14 +11786,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _refreshOnlineStatus();
     _runScheduledPopups();
     WidgetsBinding.instance.addPostFrameCallback((_) => _promptPushNotificationsIfNeeded());
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ngmyTryOpenPublishedAppFromUrl(
-        context,
-        config: widget.config,
-        apiKey: widget.config.geminiApiKey,
-        email: widget.user.email,
-      );
-    });
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
