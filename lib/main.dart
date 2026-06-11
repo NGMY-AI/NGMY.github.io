@@ -1841,14 +1841,17 @@ List<Map<String, dynamic>> _mergeLoanApplicationsLists(
       final remoteFinal = rs == 'approved' || rs == 'rejected';
       if (existingFinal && !remoteFinal) {
         ngmyLoanMergePaymentsIntoApp(existing, r);
+        ngmyLoanMergePhotoRefsIntoApp(existing, r);
         byId[id] = existing;
       } else if (!existingFinal && remoteFinal) {
         ngmyLoanMergePaymentsIntoApp(r, existing);
+        ngmyLoanMergePhotoRefsIntoApp(r, existing);
         byId[id] = r;
       } else {
         final winner = ru.compareTo(lu) >= 0 ? r : existing;
         final loser = identical(winner, r) ? existing : r;
         ngmyLoanMergePaymentsIntoApp(winner, loser);
+        ngmyLoanMergePhotoRefsIntoApp(winner, loser);
         byId[id] = winner;
       }
     }

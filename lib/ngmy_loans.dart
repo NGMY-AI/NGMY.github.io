@@ -14,6 +14,67 @@ import 'package:url_launcher/url_launcher.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_offline.dart';
 
+const ngmyLoanPhotoKeys = ['idFrontRef', 'idBackRef', 'selfieRef', 'titleFrontRef', 'titleBackRef'];
+
+/// Local backup for loan photo refs — survives cloud sync that strips base64 blobs.
+class NgmyLoanPhotosStore {
+  static String _key(String loanId) => 'ngmy_loan_photos_${loanId.trim()}';
+
+  static Map<String, String> refsFromApp(Map<String, dynamic> app) {
+    final out = <String, String>{};
+    for (final k in ngmyLoanPhotoKeys) {
+      final v = (app[k] ?? '').toString().trim();
+      if (v.isNotEmpty) out[k] = v;
+    }
+    return out;
+  }
+
+  static Future<void> saveForApp(Map<String, dynamic> app) async {
+    final id = (app['id'] ?? '').toString().trim();
+    if (id.isEmpty) return;
+    final refs = refsFromApp(app);
+    if (refs.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key(id), jsonEncode(refs));
+  }
+
+  static Future<void> applyTo(List<Map<String, dynamic>> apps) async {
+    if (apps.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    for (var i = 0; i < apps.length; i++) {
+      final id = (apps[i]['id'] ?? '').toString().trim();
+      if (id.isEmpty) continue;
+      final raw = prefs.getString(_key(id));
+      if (raw == null || raw.isEmpty) continue;
+      try {
+        final stored = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+        ngmyLoanMergePhotoRefsIntoApp(apps[i], stored);
+      } catch (_) {}
+    }
+  }
+
+  static Future<void> remove(String loanId) async {
+    if (loanId.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key(loanId.trim()));
+  }
+}
+
+void ngmyLoanMergePhotoRefsIntoApp(Map<String, dynamic> dst, Map<String, dynamic> src) {
+  for (final k in ngmyLoanPhotoKeys) {
+    final d = (dst[k] ?? '').toString().trim();
+    final s = (src[k] ?? '').toString().trim();
+    if (s.isEmpty) continue;
+    if (d.isEmpty) {
+      dst[k] = s;
+      continue;
+    }
+    final dCloud = d.startsWith('supabase://');
+    final sCloud = s.startsWith('supabase://');
+    if (!dCloud && sCloud) dst[k] = s;
+  }
+}
+
 /// Lightweight cloud status map — users see approve/reject without re-downloading full loans.
 class NgmyLoanStatusCloud {
   static const _settingsKey = 'ngmy_loan_status_map_v1';
@@ -137,6 +198,12 @@ class NgmyLoanStatusStore {
         if (m['updatedAt'] != null) apps[i]['updatedAt'] = m['updatedAt'];
       } catch (_) {}
     }
+  }
+
+  static Future<void> remove(String loanId) async {
+    if (loanId.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key(loanId.trim()));
   }
 }
 
@@ -314,6 +381,12 @@ class NgmyLoanPaymentsStore {
         'updatedAt': DateTime.now().toUtc().toIso8601String(),
       }),
     );
+  }
+
+  static Future<void> remove(String loanId) async {
+    if (loanId.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key(loanId.trim()));
   }
 
   static Future<void> applyTo(List<Map<String, dynamic>> apps, {String? loanId}) async {
@@ -507,6 +580,7 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
     _refreshing = true;
     try {
       await widget.onRefreshLoans?.call();
+      await NgmyLoanPhotosStore.applyTo(widget.config.loanApplications);
       await NgmyLoanStatusCloud.fetchAndApply(widget.config.loanApplications);
       await NgmyLoanPaymentsCloud.fetchAndApply(widget.config.loanApplications);
       await NgmyLoanPaymentsStore.applyTo(widget.config.loanApplications);
@@ -645,9 +719,31 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
               ],
             ),
             const SizedBox(height: 10),
-            Text(
-              'Call ${widget.config.loanPhone} or apply with collateral.',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13, height: 1.4),
+            RichText(
+              text: TextSpan(
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13, height: 1.4),
+                children: [
+                  const TextSpan(text: 'Call '),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.baseline,
+                    baseline: TextBaseline.alphabetic,
+                    child: GestureDetector(
+                      onTap: () => NgmyLoanLogic.callPhone(widget.config.loanPhone),
+                      child: Text(
+                        widget.config.loanPhone,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          decoration: TextDecoration.underline,
+                          decorationColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const TextSpan(text: ' or apply with collateral.'),
+                ],
+              ),
             ),
             const SizedBox(height: 6),
             Text(
@@ -1326,6 +1422,9 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
         'rejectionReason': '',
         'payments': payments,
       });
+      final submitted = widget.config.loanApplications.first;
+      await NgmyLoanStore.ensureCloudPhotoRefs(submitted);
+      await NgmyLoanPhotosStore.saveForApp(submitted);
       widget.onDataChanged();
       await widget.onPersistNow?.call();
       await NgmyLoanDraftStore.clear(widget.userEmail);
@@ -2395,68 +2494,84 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
       elevation: widget.isDark ? 0 : 2,
       color: widget.isDark ? const Color(0xFF151B28) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: statusColor.withValues(alpha: 0.35))),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => _openLoanDetail(context, app),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(6, 8, 14, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(Icons.delete_outline_rounded, color: Colors.redAccent.withValues(alpha: 0.85), size: 20),
+                  tooltip: 'Delete loan',
+                  onPressed: () => _confirmDeleteLoan(context, app),
+                ),
+                Expanded(
+                  child: Text(
+                    (app['fullLegalName'] ?? app['username'] ?? 'Applicant').toString(),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
+                  child: Text(status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900)),
+                ),
+              ],
+            ),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _openLoanDetail(context, app),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '\$${ngmyLoanFormatCurrency((app['amount'] as num?)?.toDouble() ?? 0)} · ${NgmyLoanLogic.collateralLabel((app['collateralType'] ?? '').toString())}',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                      ),
+                      Text((app['userEmail'] ?? app['email'] ?? '').toString(), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                      const SizedBox(height: 10),
+                      const Row(
+                        children: [
+                          Icon(Icons.touch_app_rounded, size: 14, color: _loanGreen),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Tap to view full application & zoom photos',
+                              style: TextStyle(fontSize: 11, color: _loanGreenDark, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (status == 'pending') ...[
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      (app['fullLegalName'] ?? app['username'] ?? 'Applicant').toString(),
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-                    ),
+                    child: OutlinedButton(onPressed: () => _reject(context, id), child: const Text('Reject')),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
-                    child: Text(status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '\$${ngmyLoanFormatCurrency((app['amount'] as num?)?.toDouble() ?? 0)} · ${NgmyLoanLogic.collateralLabel((app['collateralType'] ?? '').toString())}',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
-              ),
-              Text((app['userEmail'] ?? app['email'] ?? '').toString(), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-              const SizedBox(height: 10),
-              const Row(
-                children: [
-                  Icon(Icons.touch_app_rounded, size: 14, color: _loanGreen),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      'Tap to view full application & zoom photos',
-                      style: TextStyle(fontSize: 11, color: _loanGreenDark, fontWeight: FontWeight.w700),
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(backgroundColor: _loanGreen),
+                      onPressed: () => _approve(id),
+                      child: const Text('Approve'),
                     ),
                   ),
                 ],
               ),
-              if (status == 'pending') ...[
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(onPressed: () => _reject(context, id), child: const Text('Reject')),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(backgroundColor: _loanGreen),
-                        onPressed: () => _approve(id),
-                        child: const Text('Approve'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -2473,6 +2588,11 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
           appBar: AppBar(
             title: Text((app['fullLegalName'] ?? 'Loan application').toString(), style: const TextStyle(fontWeight: FontWeight.w900)),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                tooltip: 'Delete loan',
+                onPressed: () => _confirmDeleteLoan(ctx, app, popDetail: true),
+              ),
               if (status == 'approved')
                 IconButton(
                   icon: const Icon(Icons.payments_outlined),
@@ -2624,6 +2744,43 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
         _ => t,
       };
 
+  Future<bool> _confirmDeleteLoan(BuildContext context, Map<String, dynamic> app, {bool popDetail = false}) async {
+    final id = (app['id'] ?? '').toString();
+    final name = (app['fullLegalName'] ?? app['username'] ?? 'this loan').toString();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Delete loan permanently?'),
+        content: Text(
+          'Remove $name from Loan Center and the user\'s Loan Services? All photos and payment history for this loan will be deleted everywhere. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Delete forever'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || id.isEmpty) return false;
+    final deleted = await NgmyLoanDelete.deleteLoan(apps: widget.config.loanApplications, loanId: id);
+    if (!deleted) return false;
+    final saved = await widget.onPersistNow?.call() ?? false;
+    widget.onDataChanged();
+    if (!context.mounted) return deleted;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(saved ? 'Loan deleted everywhere.' : 'Deleted on this device — sync when online.'),
+        backgroundColor: saved ? _loanGreen : Colors.orange,
+      ),
+    );
+    if (popDetail && context.mounted && Navigator.canPop(context)) Navigator.pop(context);
+    return true;
+  }
+
   Future<void> _approve(String id) async {
     final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == id);
     if (i < 0) return;
@@ -2631,6 +2788,7 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
     widget.config.loanApplications[i]['status'] = 'approved';
     widget.config.loanApplications[i]['approvedAt'] = approvedAt;
     widget.config.loanApplications[i]['updatedAt'] = approvedAt;
+    await NgmyLoanPhotosStore.saveForApp(widget.config.loanApplications[i]);
     await NgmyLoanStatusStore.saveDecision(id, status: 'approved', approvedAt: approvedAt);
     await NgmyLoanStatusCloud.pushFromApps(widget.config.loanApplications);
     final ok = await widget.onPersistNow?.call() ?? false;
@@ -2750,6 +2908,15 @@ class NgmyLoanLogic {
     final uri = Uri.parse('https://cash.app/\$$handle');
     if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
+
+  static Future<void> callPhone(String phone) async {
+    final digits = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (digits.isEmpty) return;
+    final uri = Uri.parse('tel:$digits');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 }
 
 class NgmyLoanDraftStore {
@@ -2780,10 +2947,82 @@ class NgmyLoanDraftStore {
   }
 }
 
+/// Permanently remove a loan and all related data (admin only).
+class NgmyLoanDelete {
+  static Future<void> _deletePhotoRef(String ref) async {
+    final src = ref.trim();
+    if (!src.startsWith('supabase://media/')) return;
+    final path = src.replaceFirst('supabase://media/', '');
+    try {
+      await Supabase.instance.client.storage.from('media').remove([path]);
+    } catch (e) {
+      debugPrint('[loan delete] storage: $e');
+    }
+  }
+
+  static Future<bool> deleteLoan({
+    required List<Map<String, dynamic>> apps,
+    required String loanId,
+  }) async {
+    final id = loanId.trim();
+    if (id.isEmpty) return false;
+    final i = apps.indexWhere((a) => (a['id'] ?? '').toString() == id);
+    if (i < 0) return false;
+    final app = Map<String, dynamic>.from(apps[i]);
+    for (final k in ngmyLoanPhotoKeys) {
+      await _deletePhotoRef((app[k] ?? '').toString());
+    }
+    await NgmyLoanPhotosStore.remove(id);
+    await NgmyLoanStatusStore.remove(id);
+    await NgmyLoanPaymentsStore.remove(id);
+    apps.removeAt(i);
+    await NgmyLoanStatusCloud.pushFromApps(apps);
+    await NgmyLoanPaymentsCloud.pushFromApps(apps);
+    return true;
+  }
+}
+
 class NgmyLoanStore {
   static List<Map<String, dynamic>> appsForUser(List<Map<String, dynamic>> all, String email) {
     final key = email.toLowerCase().trim();
     return all.where((a) => (a['userEmail'] ?? '').toString().toLowerCase().trim() == key).map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  static Future<void> ensureCloudPhotoRefs(Map<String, dynamic> app) async {
+    final loanId = (app['id'] ?? DateTime.now().microsecondsSinceEpoch).toString();
+    for (final k in ngmyLoanPhotoKeys) {
+      final v = (app[k] ?? '').toString().trim();
+      if (v.isEmpty || v.startsWith('supabase://')) continue;
+      if (v.startsWith('data:image')) {
+        try {
+          final comma = v.indexOf(',');
+          if (comma > 0) {
+            final bytes = base64Decode(v.substring(comma + 1));
+            final uploaded = await _upload(bytes, 'loans/$loanId/$k.jpg');
+            if (uploaded != null) app[k] = uploaded;
+          }
+        } catch (e) {
+          debugPrint('[loan] photo upload $k: $e');
+        }
+      } else if (!kIsWeb) {
+        try {
+          final file = File(v);
+          if (await file.exists()) {
+            final uploaded = await _upload(await file.readAsBytes(), 'loans/$loanId/$k.jpg');
+            if (uploaded != null) app[k] = uploaded;
+          }
+        } catch (e) {
+          debugPrint('[loan] photo file $k: $e');
+        }
+      }
+    }
+    await NgmyLoanPhotosStore.saveForApp(app);
+  }
+
+  static Future<void> ensureAllCloudPhotoRefs(List<Map<String, dynamic>> apps) async {
+    for (final app in apps) {
+      await ensureCloudPhotoRefs(app);
+    }
   }
 
   static Future<String> storeImageRef(XFile file) async {

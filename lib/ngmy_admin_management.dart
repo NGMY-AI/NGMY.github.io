@@ -86,13 +86,13 @@ List<Map<String, dynamic>> _managementListFromPayload(dynamic raw) {
 }
 
 List<Map<String, dynamic>> _loanApplicationsForCloudSync(List<Map<String, dynamic>> apps) {
-  const photoKeys = ['idFrontRef', 'idBackRef', 'selfieRef', 'titleFrontRef', 'titleBackRef'];
   return apps.map((raw) {
     final app = Map<String, dynamic>.from(raw);
-    for (final k in photoKeys) {
-      final v = (app[k] ?? '').toString();
-      if (v.startsWith('data:image')) {
-        app[k] = v.startsWith('supabase://') ? v : '';
+    for (final k in ngmyLoanPhotoKeys) {
+      final v = (app[k] ?? '').toString().trim();
+      // Cloud payload keeps only storage URLs — base64/local paths stay in NgmyLoanPhotosStore.
+      if (!v.startsWith('supabase://')) {
+        app[k] = '';
       }
     }
     return app;
@@ -183,6 +183,7 @@ void _applyManagementOperationalListsPayload(AppConfig config, Map<String, dynam
 Future<void> ngmyHydrateManagementListsFromAllBackups(AppConfig config) async {
   final local = await _loadManagementOperationalListsLocal();
   if (local != null) _applyManagementOperationalListsPayload(config, local);
+  await NgmyLoanPhotosStore.applyTo(config.loanApplications);
   await NgmyLoanStatusStore.applyTo(config.loanApplications);
   await NgmyLoanStatusCloud.fetchAndApply(config.loanApplications);
   await NgmyLoanPaymentsStore.applyTo(config.loanApplications);
@@ -190,10 +191,14 @@ Future<void> ngmyHydrateManagementListsFromAllBackups(AppConfig config) async {
   if (await ngmyCanReachCloud()) {
     final cloud = await _fetchManagementOperationalListsCloud();
     if (cloud != null) _applyManagementOperationalListsPayload(config, cloud);
+    await NgmyLoanPhotosStore.applyTo(config.loanApplications);
     await NgmyLoanStatusStore.applyTo(config.loanApplications);
     await NgmyLoanStatusCloud.fetchAndApply(config.loanApplications);
     await NgmyLoanPaymentsStore.applyTo(config.loanApplications);
     await NgmyLoanPaymentsCloud.fetchAndApply(config.loanApplications);
+  }
+  for (final app in config.loanApplications) {
+    await NgmyLoanPhotosStore.saveForApp(app);
   }
 }
 
@@ -230,6 +235,7 @@ Future<bool> _upsertManagementListColumn(String column, dynamic value) async {
 }
 
 Future<bool> _persistManagementOperationalListsAuthoritative(AppConfig config) async {
+  await NgmyLoanStore.ensureAllCloudPhotoRefs(config.loanApplications);
   await _persistManagementOperationalListsLocal(config);
   final payload = _managementOperationalListsPayload(config, forCloud: true);
 
