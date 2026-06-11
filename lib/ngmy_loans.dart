@@ -547,10 +547,6 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
             borderRadius: BorderRadius.circular(20),
             color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.92),
             border: Border.all(color: _loanGreen.withValues(alpha: 0.35)),
-            boxShadow: [
-              BoxShadow(color: _loanGreen.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 4)),
-              BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06), blurRadius: 6),
-            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -586,27 +582,25 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
               ],
               const SizedBox(height: 18),
               Center(
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(28),
-                    onTap: () => _openApplication(context),
-                    child: Ink(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        gradient: const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)]),
-                        boxShadow: [
-                          BoxShadow(color: _loanGreen.withValues(alpha: 0.4), blurRadius: 14, offset: const Offset(0, 5)),
-                        ],
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.description_outlined, color: Colors.white, size: 18),
-                          SizedBox(width: 8),
-                          Text('Apply for a Loan', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 14)),
-                        ],
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _openApplication(context),
+                      child: Ink(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)]),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.description_outlined, color: Colors.white, size: 18),
+                            SizedBox(width: 8),
+                            Text('Apply for a Loan', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 14)),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -751,15 +745,12 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        boxShadow: [
-          BoxShadow(color: _loanGreen.withValues(alpha: 0.45), blurRadius: 22, offset: const Offset(0, 10)),
-          BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8, offset: const Offset(0, 4)),
-        ],
       ),
       child: Material(
         color: Colors.transparent,
+        clipBehavior: Clip.antiAlias,
+        borderRadius: BorderRadius.circular(26),
         child: InkWell(
-          borderRadius: BorderRadius.circular(26),
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute<void>(
@@ -1902,9 +1893,9 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                  childAspectRatio: 1.75,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.05,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, i) => _paymentGridTile(context, payments[i], isDark: isDark),
@@ -1971,54 +1962,77 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
     final dateLabel = paid && paidAt != null
         ? '${paidAt.month}/${paidAt.day}'
         : (due != null ? '${due.month}/${due.day}' : '—');
+    final innerBg = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.shade50;
+    final innerBorder = statusColor.withValues(alpha: paid ? 0.35 : 0.2);
+
     return Material(
       color: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
         onTap: widget.isAdmin && !paid ? () => _recordPayment(p) : null,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: paid ? _loanGreen.withValues(alpha: isDark ? 0.14 : 0.08) : (isDark ? const Color(0xFF1A2235) : Colors.white),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: statusColor.withValues(alpha: paid ? 0.45 : 0.25)),
+            color: paid ? _loanGreen.withValues(alpha: isDark ? 0.12 : 0.06) : (isDark ? const Color(0xFF1A2235) : Colors.white),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: statusColor.withValues(alpha: paid ? 0.4 : 0.22)),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(paid ? Icons.check_circle_rounded : Icons.schedule_rounded, color: statusColor, size: 16),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                decoration: BoxDecoration(
+                  color: innerBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: innerBorder),
+                ),
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Text('Wk ${p['id']}', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : Colors.grey.shade600)),
-                        const SizedBox(width: 6),
-                        Text(dateLabel, style: TextStyle(fontSize: 9, color: isDark ? Colors.white38 : Colors.grey.shade500)),
-                      ],
-                    ),
-                    Text('\$${ngmyLoanFormatCurrency(dueAmt)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87, height: 1.1)),
+                    Icon(paid ? Icons.check_circle_rounded : Icons.schedule_rounded, color: statusColor, size: 18),
+                    const SizedBox(width: 8),
+                    Text('Week ${p['id']}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                    const Spacer(),
+                    Text(dateLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isDark ? Colors.white54 : Colors.grey.shade600)),
                   ],
                 ),
               ),
+              const SizedBox(height: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-                child: Text(paid ? 'PAID' : 'DUE', style: TextStyle(fontSize: 7, fontWeight: FontWeight.w900, color: statusColor)),
-              ),
-              if (widget.isAdmin && !paid) ...[
-                const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: () => _recordPayment(p),
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(color: _loanGreen, borderRadius: BorderRadius.circular(6)),
-                    child: const Icon(Icons.check_rounded, color: Colors.white, size: 12),
-                  ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+                decoration: BoxDecoration(
+                  color: innerBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: innerBorder),
                 ),
-              ],
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '\$${ngmyLoanFormatCurrency(dueAmt)}',
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: isDark ? Colors.white : Colors.black87, height: 1.15),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                      child: Text(paid ? 'PAID' : 'DUE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: statusColor)),
+                    ),
+                    if (widget.isAdmin && !paid) ...[
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: () => _recordPayment(p),
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(color: _loanGreen, borderRadius: BorderRadius.circular(8)),
+                          child: const Icon(Icons.check_rounded, color: Colors.white, size: 14),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ],
           ),
         ),
