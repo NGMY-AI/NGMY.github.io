@@ -177,6 +177,42 @@ Future<void> _waitVideoFrameReady(html.VideoElement v) async {
   await Future<void>.delayed(const Duration(milliseconds: 24));
 }
 
+Future<void> _awaitVideoFramePulse(List<html.VideoElement> videos) async {
+  for (final v in videos) {
+    if (v.readyState >= html.MediaElement.HAVE_CURRENT_DATA && !v.paused) {
+      await _waitVideoFrameReady(v);
+      return;
+    }
+  }
+  await Future<void>.delayed(const Duration(milliseconds: 16));
+}
+
+int? _sampleCanvasPixel(html.CanvasRenderingContext2D ctx, int x, int y) {
+  try {
+    final d = ctx.getImageData(x, y, 1, 1).data;
+    return d[0] + (d[1] << 8) + (d[2] << 16) + (d[3] << 24);
+  } catch (_) {
+    return null;
+  }
+}
+
+void _applyExportVideoStaging(html.VideoElement v, int w, int h) {
+  v.width = w;
+  v.height = h;
+  v
+    ..style.position = 'fixed'
+    ..style.left = '0'
+    ..style.top = '0'
+    ..style.width = '${w}px'
+    ..style.height = '${h}px'
+    ..style.objectFit = 'contain'
+    ..style.opacity = '0.05'
+    ..style.pointerEvents = 'none'
+    ..style.zIndex = '1'
+    ..style.transform = 'translateZ(0)';
+  v.style.setProperty('will-change', 'transform');
+}
+
 double _resolveRecordingDuration(Iterable<html.VideoElement> videos) {
   var best = 3.0;
   for (final v in videos) {
@@ -234,10 +270,11 @@ void _styleExportCanvas(html.CanvasElement canvas, int w, int h) {
     ..style.top = '0'
     ..style.width = '${w}px'
     ..style.height = '${h}px'
-    ..style.opacity = '0.01'
+    ..style.opacity = '0.05'
     ..style.pointerEvents = 'none'
-    ..style.zIndex = '0'
+    ..style.zIndex = '2'
     ..style.transform = 'translateZ(0)';
+  canvas.style.setProperty('will-change', 'transform');
 }
 
 html.MediaStream _videoOnlyStream(html.MediaStream source) {
@@ -512,6 +549,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   required html.MediaStream stream,
   required String mimeType,
   required void Function() paintFrame,
+  required int? Function()? samplePaintFingerprint,
   required List<html.VideoElement> videoList,
   required double durationSec,
   required void Function(double progress, String status) onProgress,
@@ -572,14 +610,20 @@ Future<List<html.Blob>> _recordCanvasExport({
         debugPrint('[studio export] play for record: $e');
       }
     }
+    await _awaitVideoFramePulse(videoList);
+    paintFrame();
 
     final wallStart = DateTime.now();
     var tick = 0;
     var lastT = -1.0;
     var stallTicks = 0;
+    var frozenPaintTicks = 0;
+    int? lastFingerprint;
+    var lastFingerprintT = -1.0;
     final wallCapMs = (durationSec * 1000).ceil() + 8000;
 
     while (true) {
+      await _awaitVideoFramePulse(videoList);
       paintFrame();
       tick++;
       if (tick % 8 == 0) {
@@ -595,17 +639,36 @@ Future<List<html.Blob>> _recordCanvasExport({
         stallTicks = 0;
         lastT = t;
       }
+
+      final fp = samplePaintFingerprint?.call();
+      if (fp != null && t > 0.12) {
+        if (fp == lastFingerprint && (t - lastFingerprintT) > 0.15) {
+          frozenPaintTicks++;
+        } else if (fp != lastFingerprint) {
+          frozenPaintTicks = 0;
+          lastFingerprint = fp;
+          lastFingerprintT = t;
+        }
+      }
+
       final p = durationSec <= 0 ? 1.0 : (t / durationSec).clamp(0.0, 0.99);
       onProgress(p, _ngmyRecordingStatus(p));
 
       final ended = videoList.isNotEmpty &&
           videoList.every((v) => v.ended || v.currentTime >= durationSec - 0.06);
       final wallMs = DateTime.now().difference(wallStart).inMilliseconds;
+      if (frozenPaintTicks > 24) {
+        debugPrint('[studio export] frozen canvas frames — retrying with seek capture');
+        for (final v in videoList) {
+          v.pause();
+          v.playbackRate = 1.0;
+        }
+        await _stopRecorderDrain(recorder, done);
+        return const [];
+      }
       if (ended || t >= durationSec - 0.04 || wallMs > wallCapMs || stallTicks > 180 || DateTime.now().isAfter(deadline)) {
         break;
       }
-
-      await Future<void>.delayed(const Duration(milliseconds: 16));
     }
   } else {
     final frameMs = (1000 / fps).round();
@@ -762,26 +825,18 @@ Future<String> _downloadAllVideoClips(Map<String, String> sources) async {
   return _ngmyDownloadResultMessage(lastMode, clipCount: n);
 }
 
-void _configureVideoElement(html.VideoElement v, String src, {required bool forExport}) {
+void _configureVideoElement(html.VideoElement v, String src) {
   v.src = src;
   v.preload = 'auto';
-  v.muted = forExport;
-  v.defaultMuted = forExport;
+  v.muted = true;
+  v.defaultMuted = true;
   v.autoplay = false;
   v.setAttribute('playsinline', 'true');
   v.setAttribute('webkit-playsinline', 'true');
+  v.setAttribute('muted', 'true');
   if (src.startsWith('http') && !src.startsWith('blob:')) {
     v.crossOrigin = 'anonymous';
   }
-  v
-    ..style.position = 'fixed'
-    ..style.left = '0'
-    ..style.top = '0'
-    ..style.width = '1px'
-    ..style.height = '1px'
-    ..style.opacity = '0.01'
-    ..style.pointerEvents = 'none'
-    ..style.zIndex = '0';
 }
 
 Future<String> exportNgmyVideoStudioComposed({
@@ -804,7 +859,7 @@ Future<String> exportNgmyVideoStudioComposed({
   for (final e in sources.entries) {
     if (e.value.trim().isEmpty) continue;
     final v = html.VideoElement();
-    _configureVideoElement(v, e.value, forExport: true);
+    _configureVideoElement(v, e.value);
     html.document.body?.append(v);
     videos[e.key] = v;
   }
@@ -858,6 +913,9 @@ Future<String> exportNgmyVideoStudioComposed({
     onProgress?.call(0.08, 'Preparing overlay…');
 
     final (w, h) = _exportDimensions(config);
+    for (final v in videos.values) {
+      _applyExportVideoStaging(v, w, h);
+    }
     html.ImageElement? bannerOverlay;
     if (config.newsBannerStyle != null) {
       try {
@@ -879,6 +937,15 @@ Future<String> exportNgmyVideoStudioComposed({
       ctx.imageSmoothingEnabled = true;
       js_util.setProperty(ctx, 'imageSmoothingQuality', 'high');
     } catch (_) {}
+
+    int? paintFingerprint;
+    html.VideoElement? primaryVideo;
+    for (final e in config.slotRects.entries) {
+      if ((config.slotKinds[e.key] ?? NgmySlotKind.video) == NgmySlotKind.video) {
+        primaryVideo = videos[e.key];
+        if (primaryVideo != null) break;
+      }
+    }
 
     void paintFrame() {
       if (backdrop != null) {
@@ -913,7 +980,16 @@ Future<String> exportNgmyVideoStudioComposed({
           ctx.clip();
         }
         try {
-          ctx.drawImageScaled(video, dx, dy, dw, dh);
+          if (video.readyState >= html.MediaElement.HAVE_CURRENT_DATA) {
+            ctx.drawImageScaled(video, dx, dy, dw, dh);
+            if (video == primaryVideo) {
+              paintFingerprint = _sampleCanvasPixel(
+                ctx,
+                (dx + dw / 2).round().clamp(0, w - 1),
+                (dy + dh / 2).round().clamp(0, h - 1),
+              );
+            }
+          }
         } catch (e) {
           debugPrint('[studio export] drawImage failed (CORS?): $e');
         }
@@ -1001,6 +1077,7 @@ Future<String> exportNgmyVideoStudioComposed({
         stream: recordStream,
         mimeType: mime,
         paintFrame: paintFrame,
+        samplePaintFingerprint: () => paintFingerprint,
         videoList: videoList,
         durationSec: durationSec,
         onProgress: (p, s) => onProgress?.call(p, s),
@@ -1013,10 +1090,12 @@ Future<String> exportNgmyVideoStudioComposed({
     final primaryMime = mimeCandidates.first;
     final fallbackMime = mimeCandidates.length > 1 ? mimeCandidates[1] : primaryMime;
 
+    final appleMobile = _ngmyIsAppleMobileBrowser();
     for (final plan in [
-      (mime: primaryMime, audio: false, realtime: true),
+      if (!appleMobile) (mime: primaryMime, audio: false, realtime: true),
       (mime: primaryMime, audio: false, realtime: false),
-      (mime: fallbackMime, audio: false, realtime: true),
+      (mime: primaryMime, audio: false, realtime: true),
+      (mime: fallbackMime, audio: false, realtime: false),
     ]) {
       chunks = await tryRecord(plan.mime, withAudio: plan.audio, realtime: plan.realtime);
       if (chunks.isNotEmpty) {
