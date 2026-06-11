@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -428,4 +429,97 @@ String ngmyAiHelperFailureMessage({
     return 'NGMY Helper could not reach $provider: $err';
   }
   return 'NGMY Helper could not reach $provider. Check the key in Management Hub and reload the app.';
+}
+
+/// Admin image generation — any prompt, no content filter (companion avatars, etc.).
+Future<({Uint8List? bytes, String? error})> ngmyAiGenerateImage(
+  NgmyAiCredentials creds,
+  String prompt,
+) async {
+  final p = prompt.trim();
+  if (creds.apiKey.isEmpty) return (bytes: null, error: 'No API key configured.');
+  if (p.isEmpty) return (bytes: null, error: 'Enter an image description.');
+
+  Future<({Uint8List? bytes, String? error})> openAiImage({String? baseUrl}) async {
+    final root = (baseUrl ?? 'https://api.openai.com/v1').replaceAll(RegExp(r'/+$'), '');
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$root/images/generations'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ${creds.apiKey}',
+            },
+            body: jsonEncode({
+              'model': 'dall-e-3',
+              'prompt': p,
+              'n': 1,
+              'size': '1024x1024',
+              'response_format': 'b64_json',
+            }),
+          )
+          .timeout(const Duration(seconds: 120));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final items = data['data'];
+        if (items is List && items.isNotEmpty) {
+          final b64 = items[0]['b64_json']?.toString();
+          if (b64 != null && b64.isNotEmpty) {
+            return (bytes: base64Decode(b64), error: null);
+          }
+        }
+      }
+      return (bytes: null, error: _extractApiErrorMessage('HTTP ${response.statusCode}', body: response.body));
+    } catch (e) {
+      return (bytes: null, error: _extractApiErrorMessage(e));
+    }
+  }
+
+  Future<({Uint8List? bytes, String? error})> geminiImage() async {
+    const models = ['imagen-3.0-generate-002', 'imagen-3.0-fast-generate-001'];
+    for (final model in models) {
+      try {
+        final url = Uri.parse(
+          'https://generativelanguage.googleapis.com/v1beta/models/$model:predict?key=${Uri.encodeQueryComponent(creds.apiKey)}',
+        );
+        final response = await http
+            .post(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'instances': [
+                  {'prompt': p},
+                ],
+                'parameters': {'sampleCount': 1},
+              }),
+            )
+            .timeout(const Duration(seconds: 120));
+        if (response.statusCode != 200) continue;
+        final data = jsonDecode(response.body);
+        final preds = data['predictions'];
+        if (preds is List && preds.isNotEmpty) {
+          final b64 = preds[0]['bytesBase64Encoded']?.toString() ?? preds[0]['b64_json']?.toString();
+          if (b64 != null && b64.isNotEmpty) {
+            return (bytes: base64Decode(b64), error: null);
+          }
+        }
+      } catch (_) {}
+    }
+    return (bytes: null, error: 'Gemini image models unavailable for this key.');
+  }
+
+  switch (creds.provider) {
+    case NgmyAiProviderKind.openai:
+      return openAiImage();
+    case NgmyAiProviderKind.openaiCompatible:
+      return openAiImage(baseUrl: creds.openAiBaseUrl);
+    case NgmyAiProviderKind.gemini:
+      final g = await geminiImage();
+      if (g.bytes != null) return g;
+      return openAiImage();
+    case NgmyAiProviderKind.anthropic:
+      final o = await openAiImage();
+      if (o.bytes != null) return o;
+      return geminiImage();
+  }
 }

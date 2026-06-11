@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_ai_client.dart';
 import 'ngmy_communicate.dart';
 import 'ngmy_communicate_storage.dart';
 
@@ -13,6 +14,7 @@ Future<void> showNgmyCommunicateAdminSheet({
   required bool isDark,
   required VoidCallback onDataChanged,
   required Future<bool> Function() onPersist,
+  String apiKey = '',
 }) async {
   var profiles = ngmyCommunicateProfilesFromConfig(config);
   final raw = (config as dynamic).communicateProfiles;
@@ -65,7 +67,7 @@ Future<void> showNgmyCommunicateAdminSheet({
                     const SizedBox(height: 8),
                     FilledButton.icon(
                       onPressed: () async {
-                        final created = await _openProfileEditor(ctx, isDark: isDark);
+                        final created = await _openProfileEditor(ctx, isDark: isDark, apiKey: apiKey);
                         if (created != null) setST(() => profiles = [...profiles, created]);
                       },
                       icon: const Icon(Icons.person_add_rounded),
@@ -89,7 +91,7 @@ Future<void> showNgmyCommunicateAdminSheet({
                               IconButton(
                                 icon: const Icon(Icons.edit_outlined, size: 20),
                                 onPressed: () async {
-                                  final edited = await _openProfileEditor(ctx, isDark: isDark, existing: p);
+                                  final edited = await _openProfileEditor(ctx, isDark: isDark, existing: p, apiKey: apiKey);
                                   if (edited != null) {
                                     setST(() {
                                       profiles = profiles.map((x) => x.id == edited.id ? edited : x).toList();
@@ -153,6 +155,7 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
   BuildContext ctx, {
   required bool isDark,
   NgmyCommunicateProfile? existing,
+  String apiKey = '',
 }) async {
   final nameC = TextEditingController(text: existing?.name ?? '');
   final bioC = TextEditingController(text: existing?.bio ?? '');
@@ -162,6 +165,8 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
   var role = existing?.role ?? 'companion';
   var active = existing?.active ?? true;
   var avatarUrl = existing?.avatarUrl ?? '';
+  final aiPromptC = TextEditingController();
+  var aiGenerating = false;
 
   final result = await showModalBottomSheet<NgmyCommunicateProfile>(
     context: ctx,
@@ -278,6 +283,42 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
                                 ),
                               ],
                             ],
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: aiPromptC,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            decoration: _commEditorField('AI image prompt', hint: 'Any look — portrait, romantic, artistic…'),
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: aiGenerating
+                                ? null
+                                : () async {
+                                    final prompt = aiPromptC.text.trim();
+                                    if (prompt.isEmpty || apiKey.trim().isEmpty) return;
+                                    setD(() => aiGenerating = true);
+                                    final creds = ngmyParseAiCredentials(apiKey);
+                                    final result = await ngmyAiGenerateImage(creds, prompt);
+                                    if (!dCtx.mounted) return;
+                                    setD(() => aiGenerating = false);
+                                    if (result.bytes != null) {
+                                      setD(() => avatarUrl = 'data:image/jpeg;base64,${base64Encode(result.bytes!)}');
+                                    } else {
+                                      ScaffoldMessenger.of(dCtx).showSnackBar(
+                                        SnackBar(content: Text(result.error ?? 'Image generation failed')),
+                                      );
+                                    }
+                                  },
+                            icon: aiGenerating
+                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                : const Icon(Icons.auto_awesome_rounded, size: 18, color: Color(0xFFF472B6)),
+                            label: Text(aiGenerating ? 'Creating…' : 'Generate any image with AI', style: const TextStyle(color: Color(0xFFF472B6), fontWeight: FontWeight.w700)),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: const Color(0xFFF472B6).withValues(alpha: 0.5)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
                           ),
                           const SizedBox(height: 18),
                           Text('Basics', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
@@ -440,6 +481,7 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
   bioC.dispose();
   personalityC.dispose();
   emojiC.dispose();
+  aiPromptC.dispose();
   return result;
 }
 

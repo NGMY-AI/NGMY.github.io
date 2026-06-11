@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -6,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -64,7 +66,7 @@ class NgmyLoanServicesScreen extends StatefulWidget {
   final String username;
   final NgmyLoanConfigBridge config;
   final VoidCallback onDataChanged;
-  final Future<void> Function()? onPersistNow;
+  final Future<bool> Function()? onPersistNow;
 
   @override
   State<NgmyLoanServicesScreen> createState() => _NgmyLoanServicesScreenState();
@@ -276,7 +278,7 @@ class NgmyLoanApplicationScreen extends StatefulWidget {
   final String username;
   final NgmyLoanConfigBridge config;
   final VoidCallback onDataChanged;
-  final Future<void> Function()? onPersistNow;
+  final Future<bool> Function()? onPersistNow;
 
   @override
   State<NgmyLoanApplicationScreen> createState() => _NgmyLoanApplicationScreenState();
@@ -301,6 +303,7 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
   int _termMonths = 12;
   DateTime? _dateOfBirth;
   bool _submitting = false;
+  Timer? _draftTimer;
 
   String? _idFront;
   String? _idBack;
@@ -311,7 +314,77 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
   double get _amount => double.tryParse(_amountC.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
 
   @override
+  void initState() {
+    super.initState();
+    _emailC.text = widget.userEmail;
+    _loadDraft();
+    for (final c in [_amountC, _fullNameC, _phoneC, _emailC, _addressC, _govIdC, _idExpC, _ssnC, _receiveDetailC, _customCollateralC]) {
+      c.addListener(_scheduleDraftSave);
+    }
+  }
+
+  void _scheduleDraftSave() {
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 500), _saveDraft);
+  }
+
+  Future<void> _loadDraft() async {
+    final d = await NgmyLoanDraftStore.load(widget.userEmail);
+    if (d == null || !mounted) return;
+    setState(() {
+      _amountC.text = (d['amount'] ?? '').toString();
+      _fullNameC.text = (d['fullLegalName'] ?? '').toString();
+      _phoneC.text = (d['phone'] ?? '').toString();
+      _emailC.text = (d['email'] ?? widget.userEmail).toString();
+      _addressC.text = (d['homeAddress'] ?? '').toString();
+      _govIdC.text = (d['governmentId'] ?? '').toString();
+      _idExpC.text = (d['idExpiration'] ?? '').toString();
+      _ssnC.text = (d['ssn'] ?? '').toString();
+      _receiveDetailC.text = (d['receiveDetails'] ?? d['payoutDestination'] ?? '').toString();
+      _customCollateralC.text = (d['collateralCustomNote'] ?? '').toString();
+      _idType = (d['idType'] ?? 'drivers_license').toString();
+      _paymentMethod = (d['receiveMethod'] as String?)?.isNotEmpty == true ? d['receiveMethod'].toString() : null;
+      _collateralChoice = (d['collateralType'] as String?)?.isNotEmpty == true ? d['collateralType'].toString() : null;
+      _termMonths = (d['termMonths'] as num?)?.toInt() ?? 12;
+      final dob = DateTime.tryParse((d['dateOfBirth'] ?? '').toString());
+      if (dob != null) _dateOfBirth = dob;
+      _idFront = (d['idFrontRef'] as String?)?.isNotEmpty == true ? d['idFrontRef'].toString() : null;
+      _idBack = (d['idBackRef'] as String?)?.isNotEmpty == true ? d['idBackRef'].toString() : null;
+      _selfie = (d['selfieRef'] as String?)?.isNotEmpty == true ? d['selfieRef'].toString() : null;
+      _titleFront = (d['titleFrontRef'] as String?)?.isNotEmpty == true ? d['titleFrontRef'].toString() : null;
+      _titleBack = (d['titleBackRef'] as String?)?.isNotEmpty == true ? d['titleBackRef'].toString() : null;
+    });
+  }
+
+  Future<void> _saveDraft() async {
+    await NgmyLoanDraftStore.save(widget.userEmail, {
+      'amount': _amountC.text.trim(),
+      'fullLegalName': _fullNameC.text.trim(),
+      'phone': _phoneC.text.trim(),
+      'email': _emailC.text.trim(),
+      'homeAddress': _addressC.text.trim(),
+      'governmentId': _govIdC.text.trim(),
+      'idExpiration': _idExpC.text.trim(),
+      'ssn': _ssnC.text.trim(),
+      'receiveDetails': _receiveDetailC.text.trim(),
+      'payoutDestination': _receiveDetailC.text.trim(),
+      'collateralCustomNote': _customCollateralC.text.trim(),
+      'idType': _idType,
+      'receiveMethod': _paymentMethod ?? '',
+      'collateralType': _collateralChoice ?? '',
+      'termMonths': _termMonths,
+      'dateOfBirth': _dateOfBirth?.toUtc().toIso8601String() ?? '',
+      'idFrontRef': _idFront ?? '',
+      'idBackRef': _idBack ?? '',
+      'selfieRef': _selfie ?? '',
+      'titleFrontRef': _titleFront ?? '',
+      'titleBackRef': _titleBack ?? '',
+    });
+  }
+
+  @override
   void dispose() {
+    _draftTimer?.cancel();
     _amountC.dispose();
     _fullNameC.dispose();
     _phoneC.dispose();
@@ -581,6 +654,7 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
       });
       widget.onDataChanged();
       await widget.onPersistNow?.call();
+      await NgmyLoanDraftStore.clear(widget.userEmail);
       if (!mounted) return;
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan application submitted. Admin will review soon.')));
@@ -722,13 +796,13 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
               TextField(controller: _govIdC, style: TextStyle(color: ui.textPrimary), decoration: _fieldDeco(ui, 'ID Number', hint: 'Enter ID number')),
               const SizedBox(height: 10),
               TextField(controller: _idExpC, style: TextStyle(color: ui.textPrimary), decoration: _fieldDeco(ui, 'ID Expiration Date', hint: 'MM/DD/YYYY')),
-              _uploadBox(ui, label: 'ID — front', hint: 'Tap to add front of ID', done: _idFront != null, onTap: () async { final r = await _pickPhoto('ID — front'); if (r != null) setState(() => _idFront = r); }),
-              _uploadBox(ui, label: 'ID — back', hint: 'Tap to add back of ID', done: _idBack != null, onTap: () async { final r = await _pickPhoto('ID — back'); if (r != null) setState(() => _idBack = r); }),
+              _uploadBox(ui, label: 'ID — front', hint: 'Tap to add front of ID', done: _idFront != null, onTap: () async { final r = await _pickPhoto('ID — front'); if (r != null) { setState(() => _idFront = r); _scheduleDraftSave(); } }),
+              _uploadBox(ui, label: 'ID — back', hint: 'Tap to add back of ID', done: _idBack != null, onTap: () async { final r = await _pickPhoto('ID — back'); if (r != null) { setState(() => _idBack = r); _scheduleDraftSave(); } }),
               const SizedBox(height: 6),
               _sectionTitle(ui, 'Identity Verification'),
               Text('Clear selfie for identity verification.', style: TextStyle(fontSize: 12, color: ui.textSecondary)),
               const SizedBox(height: 6),
-              _uploadBox(ui, label: 'Selfie', hint: 'Tap to add selfie', done: _selfie != null, onTap: () async { final r = await _pickPhoto('Selfie'); if (r != null) setState(() => _selfie = r); }),
+              _uploadBox(ui, label: 'Selfie', hint: 'Tap to add selfie', done: _selfie != null, onTap: () async { final r = await _pickPhoto('Selfie'); if (r != null) { setState(() => _selfie = r); _scheduleDraftSave(); } }),
               const SizedBox(height: 10),
               TextField(
                 controller: _ssnC,
@@ -789,8 +863,8 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
                 Text('We will review other collateral before approval — no photos required.', style: TextStyle(fontSize: 11, color: ui.textSecondary)),
               ] else if (_collateralChoice != null) ...[
                 const SizedBox(height: 10),
-                _uploadBox(ui, label: _collateralPhotoLabel('front'), hint: 'Tap to add front photo', done: _titleFront != null, onTap: () async { final r = await _pickPhoto(_collateralPhotoLabel('front')); if (r != null) setState(() => _titleFront = r); }),
-                _uploadBox(ui, label: _collateralPhotoLabel('back'), hint: 'Tap to add back photo', done: _titleBack != null, onTap: () async { final r = await _pickPhoto(_collateralPhotoLabel('back')); if (r != null) setState(() => _titleBack = r); }),
+                _uploadBox(ui, label: _collateralPhotoLabel('front'), hint: 'Tap to add front photo', done: _titleFront != null, onTap: () async { final r = await _pickPhoto(_collateralPhotoLabel('front')); if (r != null) { setState(() => _titleFront = r); _scheduleDraftSave(); } }),
+                _uploadBox(ui, label: _collateralPhotoLabel('back'), hint: 'Tap to add back photo', done: _titleBack != null, onTap: () async { final r = await _pickPhoto(_collateralPhotoLabel('back')); if (r != null) { setState(() => _titleBack = r); _scheduleDraftSave(); } }),
               ],
               const SizedBox(height: 20),
               Row(
@@ -839,7 +913,7 @@ class NgmyLoanTrackingScreen extends StatefulWidget {
   final NgmyLoanConfigBridge config;
   final VoidCallback onDataChanged;
   final bool isAdmin;
-  final Future<void> Function()? onPersistNow;
+  final Future<bool> Function()? onPersistNow;
 
   @override
   State<NgmyLoanTrackingScreen> createState() => _NgmyLoanTrackingScreenState();
@@ -1055,7 +1129,7 @@ void showNgmyLoanAdminSheet(
   required VoidCallback onDataChanged,
   required bool isDark,
   VoidCallback? onEditSettings,
-  Future<void> Function()? onPersistNow,
+  Future<bool> Function()? onPersistNow,
 }) {
   showModalBottomSheet(
     context: context,
@@ -1091,7 +1165,7 @@ class _NgmyLoanAdminPanel extends StatefulWidget {
   final bool isDark;
   final ScrollController scrollController;
   final VoidCallback? onEditSettings;
-  final Future<void> Function()? onPersistNow;
+  final Future<bool> Function()? onPersistNow;
 
   @override
   State<_NgmyLoanAdminPanel> createState() => _NgmyLoanAdminPanelState();
@@ -1140,62 +1214,225 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
   Widget _adminCard(BuildContext context, Map<String, dynamic> app) {
     final status = (app['status'] ?? 'pending').toString();
     final id = (app['id'] ?? '').toString();
+    final statusColor = switch (status) {
+      'approved' => _loanGreen,
+      'rejected' => Colors.redAccent,
+      _ => Colors.orange,
+    };
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${(app['fullLegalName'] ?? app['username'] ?? '').toString()} · \$${ngmyLoanFormatCurrency((app['amount'] as num?)?.toDouble() ?? 0)}',
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-            Text('Status: $status · ${app['collateralType']}', style: const TextStyle(fontSize: 12)),
-            const SizedBox(height: 8),
-            Wrap(spacing: 6, children: [
-              if ((app['idFrontRef'] ?? '').toString().isNotEmpty) _thumb(app['idFrontRef']),
-              if ((app['idBackRef'] ?? '').toString().isNotEmpty) _thumb(app['idBackRef']),
-              if ((app['selfieRef'] ?? '').toString().isNotEmpty) _thumb(app['selfieRef']),
-              if ((app['titleFrontRef'] ?? '').toString().isNotEmpty) _thumb(app['titleFrontRef']),
-              if ((app['titleBackRef'] ?? '').toString().isNotEmpty) _thumb(app['titleBackRef']),
-            ]),
-            Text('SSN: ${app['ssn']} · Gov ID: ${app['governmentId']}', style: const TextStyle(fontSize: 11)),
-            Text('Payout to: ${app['payoutDestination']}', style: const TextStyle(fontSize: 11)),
-            if (status == 'rejected' && (app['rejectionReason'] ?? '').toString().isNotEmpty)
-              Text('Rejected: ${app['rejectionReason']}', style: const TextStyle(color: Colors.red, fontSize: 12)),
-            const SizedBox(height: 8),
-            if (status == 'pending') Row(
-              children: [
-                Expanded(child: OutlinedButton(onPressed: () => _reject(context, id), child: const Text('Reject'))),
-                const SizedBox(width: 8),
-                Expanded(child: FilledButton(onPressed: () => _approve(id), child: const Text('Approve'))),
-              ],
-            ),
-            if (status == 'approved')
-              TextButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => NgmyLoanTrackingScreen(
-                      loanId: id,
-                      config: widget.config,
-                      onDataChanged: widget.onDataChanged,
-                      isAdmin: true,
-                      onPersistNow: widget.onPersistNow,
+      margin: const EdgeInsets.only(bottom: 14),
+      elevation: widget.isDark ? 0 : 2,
+      color: widget.isDark ? const Color(0xFF151B28) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: statusColor.withValues(alpha: 0.35))),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _openLoanDetail(context, app),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      (app['fullLegalName'] ?? app['username'] ?? 'Applicant').toString(),
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                     ),
                   ),
-                ),
-                icon: const Icon(Icons.payments),
-                label: const Text('Track & record payments'),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
+                    child: Text(status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900)),
+                  ),
+                ],
               ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                '\$${ngmyLoanFormatCurrency((app['amount'] as num?)?.toDouble() ?? 0)} · ${NgmyLoanLogic.collateralLabel((app['collateralType'] ?? '').toString())}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+              ),
+              Text((app['userEmail'] ?? app['email'] ?? '').toString(), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.touch_app_rounded, size: 14, color: _loanGreen),
+                  const SizedBox(width: 6),
+                  const Text('Tap to view full application & zoom photos', style: TextStyle(fontSize: 11, color: _loanGreenDark, fontWeight: FontWeight.w700)),
+                  const Spacer(),
+                  if (status == 'pending') ...[
+                    TextButton(onPressed: () => _reject(context, id), child: const Text('Reject')),
+                    FilledButton(style: FilledButton.styleFrom(backgroundColor: _loanGreen), onPressed: () => _approve(id), child: const Text('Approve')),
+                  ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _thumb(dynamic ref) => SizedBox(width: 48, height: 48, child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NgmyLoanStore.imageWidget(ref)));
+  void _openLoanDetail(BuildContext context, Map<String, dynamic> app) {
+    final id = (app['id'] ?? '').toString();
+    final status = (app['status'] ?? 'pending').toString();
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (ctx) => Scaffold(
+          backgroundColor: widget.isDark ? const Color(0xFF0A0E18) : const Color(0xFFF3F4F6),
+          appBar: AppBar(
+            title: Text((app['fullLegalName'] ?? 'Loan application').toString(), style: const TextStyle(fontWeight: FontWeight.w900)),
+            actions: [
+              if (status == 'approved')
+                IconButton(
+                  icon: const Icon(Icons.payments_outlined),
+                  onPressed: () => Navigator.push(
+                    ctx,
+                    MaterialPageRoute<void>(
+                      builder: (_) => NgmyLoanTrackingScreen(
+                        loanId: id,
+                        config: widget.config,
+                        onDataChanged: widget.onDataChanged,
+                        isAdmin: true,
+                        onPersistNow: widget.onPersistNow,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _detailSection('Loan', [
+                _detailRow('Amount', '\$${ngmyLoanFormatCurrency((app['amount'] as num?)?.toDouble() ?? 0)}'),
+                _detailRow('Total repayment', '\$${ngmyLoanFormatCurrency((app['totalRepayment'] as num?)?.toDouble() ?? 0)}'),
+                _detailRow('Schedule', (app['scheduleSummary'] ?? '').toString()),
+                _detailRow('Term weeks', (app['termWeeks'] ?? '').toString()),
+                _detailRow('Status', status),
+              ]),
+              _detailSection('Applicant', [
+                _detailRow('Full legal name', (app['fullLegalName'] ?? '').toString()),
+                _detailRow('Username', (app['username'] ?? '').toString()),
+                _detailRow('Email', (app['email'] ?? app['userEmail'] ?? '').toString()),
+                _detailRow('Phone', (app['phone'] ?? '').toString()),
+                _detailRow('Date of birth', _fmtDate(app['dateOfBirth'])),
+                _detailRow('Home address', (app['homeAddress'] ?? '').toString()),
+              ]),
+              _detailSection('Government ID', [
+                _detailRow('ID type', _idTypeLabel((app['idType'] ?? '').toString())),
+                _detailRow('ID number', (app['governmentId'] ?? '').toString()),
+                _detailRow('ID expiration', (app['idExpiration'] ?? '').toString()),
+                _detailRow('SSN', (app['ssn'] ?? '').toString()),
+              ]),
+              _detailSection('Payout', [
+                _detailRow('Method', (app['receiveMethod'] ?? '').toString()),
+                _detailRow('Details', (app['receiveDetails'] ?? app['payoutDestination'] ?? '').toString()),
+              ]),
+              _detailSection('Collateral', [
+                _detailRow('Type', NgmyLoanLogic.collateralLabel((app['collateralType'] ?? '').toString())),
+                if ((app['collateralCustomNote'] ?? '').toString().isNotEmpty)
+                  _detailRow('Description', (app['collateralCustomNote'] ?? '').toString()),
+              ]),
+              _detailSection('Photos — tap to zoom', [
+                _photoGrid(ctx, [
+                  if ((app['idFrontRef'] ?? '').toString().isNotEmpty) ('ID front', app['idFrontRef']),
+                  if ((app['idBackRef'] ?? '').toString().isNotEmpty) ('ID back', app['idBackRef']),
+                  if ((app['selfieRef'] ?? '').toString().isNotEmpty) ('Selfie', app['selfieRef']),
+                  if ((app['titleFrontRef'] ?? '').toString().isNotEmpty) ('Collateral front', app['titleFrontRef']),
+                  if ((app['titleBackRef'] ?? '').toString().isNotEmpty) ('Collateral back', app['titleBackRef']),
+                ]),
+              ]),
+              if (status == 'rejected' && (app['rejectionReason'] ?? '').toString().isNotEmpty)
+                _detailSection('Rejection', [_detailRow('Reason', (app['rejectionReason'] ?? '').toString())]),
+              if (status == 'pending') ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: OutlinedButton(onPressed: () { Navigator.pop(ctx); _reject(context, id); }, child: const Text('Reject'))),
+                    const SizedBox(width: 10),
+                    Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _loanGreen), onPressed: () { Navigator.pop(ctx); _approve(id); }, child: const Text('Approve loan'))),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailSection(String title, List<Widget> children) => Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: widget.isDark ? const Color(0xFF151B28) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: widget.isDark ? Colors.white12 : Colors.grey.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: _loanGreenDark)),
+            const SizedBox(height: 10),
+            ...children,
+          ],
+        ),
+      );
+
+  Widget _detailRow(String label, String value) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey.shade600, letterSpacing: 0.3)),
+          const SizedBox(height: 2),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, height: 1.35)),
+        ],
+      ),
+    );
+  }
+
+  Widget _photoGrid(BuildContext context, List<(String, dynamic)> items) {
+    if (items.isEmpty) return const Text('No photos attached', style: TextStyle(fontSize: 12, color: Colors.grey));
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: items.map((e) {
+        return GestureDetector(
+          onTap: () => NgmyLoanStore.openZoom(context, e.$2, label: e.$1),
+          child: Column(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(width: 100, height: 100, child: NgmyLoanStore.imageWidget(e.$2)),
+              ),
+              const SizedBox(height: 4),
+              Text(e.$1, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _fmtDate(dynamic raw) {
+    final d = DateTime.tryParse((raw ?? '').toString())?.toLocal();
+    if (d == null) return (raw ?? '').toString();
+    return '${d.month}/${d.day}/${d.year}';
+  }
+
+  String _idTypeLabel(String t) => switch (t) {
+        'drivers_license' => "Driver's License",
+        'passport' => 'Passport',
+        'state_id' => 'State ID',
+        'other' => 'Other',
+        _ => t,
+      };
 
   Future<void> _approve(String id) async {
     final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == id);
@@ -1204,10 +1441,15 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
     widget.config.loanApplications[i]['approvedAt'] = DateTime.now().toUtc().toIso8601String();
     widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     widget.onDataChanged();
-    await widget.onPersistNow?.call();
+    final ok = await widget.onPersistNow?.call() ?? false;
     if (!context.mounted) return;
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan approved and saved for all devices.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Loan approved and saved.' : 'Approved on this device — sync failed. Check internet and open Loan Center again.'),
+        backgroundColor: ok ? _loanGreen : Colors.orange,
+      ),
+    );
   }
 
   Future<void> _reject(BuildContext context, String id) async {
@@ -1223,17 +1465,27 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
         ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true) {
+      reasonC.dispose();
+      return;
+    }
+    final reason = reasonC.text.trim();
+    reasonC.dispose();
     final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == id);
     if (i < 0) return;
     widget.config.loanApplications[i]['status'] = 'rejected';
-    widget.config.loanApplications[i]['rejectionReason'] = reasonC.text.trim();
+    widget.config.loanApplications[i]['rejectionReason'] = reason;
     widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     widget.onDataChanged();
-    await widget.onPersistNow?.call();
+    final saved = await widget.onPersistNow?.call() ?? false;
     if (!context.mounted) return;
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan rejected and saved for all devices.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(saved ? 'Loan rejected and saved.' : 'Rejected locally — cloud sync failed.'),
+        backgroundColor: saved ? _loanGreen : Colors.orange,
+      ),
+    );
   }
 }
 
@@ -1276,6 +1528,34 @@ class NgmyLoanLogic {
   }
 }
 
+class NgmyLoanDraftStore {
+  static String _key(String email) => 'ngmy_loan_draft_${email.toLowerCase().trim()}';
+
+  static Future<Map<String, dynamic>?> load(String email) async {
+    if (email.trim().isEmpty) return null;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key(email));
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final d = jsonDecode(raw);
+      if (d is Map) return Map<String, dynamic>.from(d);
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<void> save(String email, Map<String, dynamic> draft) async {
+    if (email.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key(email), jsonEncode(draft));
+  }
+
+  static Future<void> clear(String email) async {
+    if (email.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key(email));
+  }
+}
+
 class NgmyLoanStore {
   static List<Map<String, dynamic>> appsForUser(List<Map<String, dynamic>> all, String email) {
     final key = email.toLowerCase().trim();
@@ -1284,15 +1564,14 @@ class NgmyLoanStore {
 
   static Future<String> storeImageRef(XFile file) async {
     final bytes = await file.readAsBytes();
-    if (kIsWeb) {
-      return 'data:image/jpeg;base64,${base64Encode(bytes)}';
-    }
-    final path = file.path;
     if (await ngmyDeviceIsOnline()) {
       final uploaded = await _upload(bytes, 'loans/${DateTime.now().microsecondsSinceEpoch}.jpg');
       if (uploaded != null) return uploaded;
     }
-    return path;
+    if (kIsWeb) {
+      return 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    }
+    return file.path;
   }
 
   static Future<String?> _upload(Uint8List bytes, String path) async {
@@ -1306,16 +1585,104 @@ class NgmyLoanStore {
     }
   }
 
+  static Future<String> resolveRef(String ref) async {
+    final src = ref.trim();
+    if (!src.startsWith('supabase://media/')) return src;
+    final path = src.replaceFirst('supabase://media/', '');
+    try {
+      final storage = Supabase.instance.client.storage.from('media');
+      if (await ngmyDeviceIsOnline()) {
+        final signed = await storage.createSignedUrl(path, 60 * 60 * 24).timeout(const Duration(seconds: 10));
+        if (signed.isNotEmpty) return signed;
+      }
+      return storage.getPublicUrl(path);
+    } catch (e) {
+      debugPrint('[loan] resolve: $e');
+      try {
+        return Supabase.instance.client.storage.from('media').getPublicUrl(path);
+      } catch (_) {
+        return src;
+      }
+    }
+  }
+
   static Widget imageWidget(dynamic ref) {
     final src = (ref ?? '').toString();
     if (src.isEmpty) return const Icon(Icons.image_not_supported, size: 32);
     if (src.startsWith('data:image')) {
       try {
-        return Image.memory(base64Decode(src.split(',').last), fit: BoxFit.cover);
+        return Image.memory(base64Decode(src.split(',').last), fit: BoxFit.cover, gaplessPlayback: true);
       } catch (_) {}
     }
-    if (src.startsWith('http')) return Image.network(src, fit: BoxFit.cover);
-    if (!kIsWeb && src.startsWith('/')) return Image.file(File(src), fit: BoxFit.cover);
+    if (src.startsWith('http')) {
+      return Image.network(src, fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, size: 28));
+    }
+    if (!kIsWeb && src.startsWith('/')) {
+      return Image.file(File(src), fit: BoxFit.cover, gaplessPlayback: true);
+    }
+    if (src.startsWith('supabase://')) {
+      return FutureBuilder<String>(
+        future: resolveRef(src),
+        builder: (context, snap) {
+          final url = snap.data ?? '';
+          if (url.startsWith('http')) {
+            return Image.network(url, fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, size: 28));
+          }
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)));
+          }
+          return const Icon(Icons.cloud_off_outlined, size: 28);
+        },
+      );
+    }
     return const Icon(Icons.insert_photo, size: 32);
+  }
+
+  static void openZoom(BuildContext context, dynamic ref, {String label = 'Photo'}) {
+    final src = (ref ?? '').toString();
+    if (src.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (ctx) => _NgmyLoanZoomPage(ref: src, label: label),
+      ),
+    );
+  }
+}
+
+class _NgmyLoanZoomPage extends StatelessWidget {
+  final String ref;
+  final String label;
+  const _NgmyLoanZoomPage({required this.ref, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white, title: Text(label, style: const TextStyle(fontSize: 14))),
+      body: FutureBuilder<String>(
+        future: NgmyLoanStore.resolveRef(ref),
+        builder: (context, snap) {
+          Widget image;
+          final url = snap.data ?? ref;
+          if (url.startsWith('data:image')) {
+            try {
+              image = Image.memory(base64Decode(url.split(',').last), fit: BoxFit.contain);
+            } catch (_) {
+              image = const Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48);
+            }
+          } else if (url.startsWith('http')) {
+            image = Image.network(url, fit: BoxFit.contain);
+          } else if (!kIsWeb && url.startsWith('/')) {
+            image = Image.file(File(url), fit: BoxFit.contain);
+          } else if (snap.connectionState == ConnectionState.waiting) {
+            image = const Center(child: CircularProgressIndicator(color: Colors.white));
+          } else {
+            image = const Icon(Icons.image_not_supported_outlined, color: Colors.white54, size: 48);
+          }
+          return InteractiveViewer(minScale: 0.5, maxScale: 5, child: Center(child: image));
+        },
+      ),
+    );
   }
 }

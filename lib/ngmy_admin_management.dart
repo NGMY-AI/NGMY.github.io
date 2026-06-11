@@ -85,11 +85,28 @@ List<Map<String, dynamic>> _managementListFromPayload(dynamic raw) {
   return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
 }
 
-Map<String, dynamic> _managementOperationalListsPayload(AppConfig config) {
+List<Map<String, dynamic>> _loanApplicationsForCloudSync(List<Map<String, dynamic>> apps) {
+  const photoKeys = ['idFrontRef', 'idBackRef', 'selfieRef', 'titleFrontRef', 'titleBackRef'];
+  return apps.map((raw) {
+    final app = Map<String, dynamic>.from(raw);
+    for (final k in photoKeys) {
+      final v = (app[k] ?? '').toString();
+      if (v.startsWith('data:image')) {
+        app[k] = v.startsWith('supabase://') ? v : '';
+      }
+    }
+    return app;
+  }).toList();
+}
+
+Map<String, dynamic> _managementOperationalListsPayload(AppConfig config, {bool forCloud = false}) {
+  final loans = forCloud
+      ? _loanApplicationsForCloudSync(config.loanApplications)
+      : config.loanApplications.map((e) => Map<String, dynamic>.from(e)).toList();
   return {
     'jobWorkerApplications': config.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
     'jobPosts': config.jobPosts.map((e) => Map<String, dynamic>.from(e)).toList(),
-    'loanApplications': config.loanApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+    'loanApplications': loans,
     'helpHelperApplications': config.helpHelperApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
     'helpRequests': config.helpRequests.map((e) => Map<String, dynamic>.from(e)).toList(),
     'helpBusinesses': config.helpBusinesses.map((e) => Map<String, dynamic>.from(e)).toList(),
@@ -186,8 +203,8 @@ Future<bool> _upsertManagementListColumn(String column, dynamic value) async {
 }
 
 Future<bool> _persistManagementOperationalListsAuthoritative(AppConfig config) async {
-  final payload = _managementOperationalListsPayload(config);
   await _persistManagementOperationalListsLocal(config);
+  final payload = _managementOperationalListsPayload(config, forCloud: true);
 
   var settingsOk = false;
   if (await ngmyCanReachCloud()) {

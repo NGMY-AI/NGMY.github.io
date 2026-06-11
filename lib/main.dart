@@ -1835,7 +1835,17 @@ List<Map<String, dynamic>> _mergeLoanApplicationsLists(
     } else {
       final lu = (existing['updatedAt'] ?? '').toString();
       final ru = (r['updatedAt'] ?? '').toString();
-      byId[id] = ru.compareTo(lu) >= 0 ? r : existing;
+      final es = (existing['status'] ?? 'pending').toString();
+      final rs = (r['status'] ?? 'pending').toString();
+      final existingFinal = es == 'approved' || es == 'rejected';
+      final remoteFinal = rs == 'approved' || rs == 'rejected';
+      if (existingFinal && !remoteFinal) {
+        byId[id] = existing;
+      } else if (!existingFinal && remoteFinal) {
+        byId[id] = r;
+      } else {
+        byId[id] = ru.compareTo(lu) >= 0 ? r : existing;
+      }
     }
   }
   return byId.values.toList()
@@ -17477,6 +17487,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       isDark: isDark,
       onDataChanged: widget.onDataChanged,
       onPersist: () => ngmyPersistCommunicateSettings(widget.config),
+      apiKey: widget.config.geminiApiKey,
     );
     if (mounted) setState(() {});
   }
@@ -18023,7 +18034,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _openLoanAdmin(bool isDark) async {
     _showLoanAdmin(isDark);
-    unawaited(_refreshManagementInBackground());
   }
 
   void _showLoanAdmin(bool isDark) {
@@ -18031,9 +18041,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       context,
       config: ngmyLoanConfigBridge(widget.config),
       onDataChanged: widget.onDataChanged,
-      onPersistNow: () async {
-        await _persistManagementConfig();
-      },
+      onPersistNow: () => _persistManagementConfig(),
       isDark: isDark,
       onEditSettings: () => _showLoanSettingsEditor(isDark),
     );
@@ -19845,7 +19853,7 @@ class LoanServiceScreen extends StatelessWidget {
       username: user.username,
       config: ngmyLoanConfigBridge(config),
       onDataChanged: onDataChanged,
-      onPersistNow: () => ngmyPersistAdminConfigNow(config),
+      onPersistNow: () => ngmyAdminPersistManagementConfig(config),
     );
   }
 }
