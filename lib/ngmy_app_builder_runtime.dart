@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'ngmy_app_builder_data.dart';
@@ -24,14 +26,22 @@ class NgmyAppLayoutRenderer extends StatefulWidget {
   State<NgmyAppLayoutRenderer> createState() => _NgmyAppLayoutRendererState();
 }
 
-class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> {
+class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with SingleTickerProviderStateMixin {
   late final NgmyAppDataStore _store;
+  late AnimationController _menuFx;
 
   @override
   void initState() {
     super.initState();
     _store = NgmyAppDataStore.forApp(widget.appId);
     _store.ensureLoaded();
+    _menuFx = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _menuFx.dispose();
+    super.dispose();
   }
 
   @override
@@ -218,38 +228,74 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> {
   Widget _menuGrid(Map<String, dynamic> node) {
     final items = _parseItems(node['items']);
     final cols = (node['columns'] as num?)?.toInt() ?? 2;
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: cols.clamp(1, 4),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 1.05,
-      children: items.map((item) {
-        return Material(
-          color: widget.theme.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            onTap: () => widget.onNavigate((item['target'] ?? item['targetScreenId'] ?? '').toString()),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
+    final style = (node['style'] ?? 'classic').toString().toLowerCase();
+    return AnimatedBuilder(
+      animation: _menuFx,
+      builder: (context, _) {
+        final pulse = math.sin(_menuFx.value * 2 * math.pi);
+        final shimmer = (pulse + 1) / 2;
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: cols.clamp(1, 4),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 1.05,
+          children: items.map((item) {
+            final customEmoji = (item['emoji'] ?? '').toString().trim();
+            final borderColor = switch (style) {
+              'neon' => Color.lerp(widget.theme, const Color(0xFF38BDF8), shimmer)!,
+              'hologram' => Color.lerp(widget.theme, const Color(0xFFEC4899), shimmer * 0.7)!,
+              'pulse' => widget.theme.withValues(alpha: 0.35 + shimmer * 0.45),
+              _ => widget.theme.withValues(alpha: 0.2),
+            };
+            return Material(
+              color: widget.theme.withValues(alpha: style == 'pulse' ? 0.06 + shimmer * 0.08 : 0.08),
+              borderRadius: BorderRadius.circular(16),
+              elevation: style == 'neon' ? 4 + shimmer * 6 : 0,
+              shadowColor: widget.theme.withValues(alpha: 0.4),
+              child: InkWell(
+                onTap: () => widget.onNavigate((item['target'] ?? item['targetScreenId'] ?? '').toString()),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: widget.theme.withValues(alpha: 0.2)),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor, width: style == 'neon' ? 1.6 : 1),
+                    gradient: style == 'hologram'
+                        ? LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              widget.theme.withValues(alpha: 0.12 + shimmer * 0.1),
+                              const Color(0xFF7C3AED).withValues(alpha: 0.08 + shimmer * 0.12),
+                            ],
+                          )
+                        : null,
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (customEmoji.isNotEmpty)
+                        Text(customEmoji, style: TextStyle(fontSize: 28 + shimmer * (style == 'pulse' ? 4 : 0)))
+                      else
+                        Icon(_iconData(item['icon']), color: widget.theme, size: 30),
+                      const SizedBox(height: 8),
+                      Text(
+                        (item['label'] ?? 'Menu').toString(),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(_iconData(item['icon']), color: widget.theme, size: 30),
-                  const SizedBox(height: 8),
-                  Text((item['label'] ?? 'Menu').toString(), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-                ],
-              ),
-            ),
-          ),
+            );
+          }).toList(),
         );
-      }).toList(),
+      },
     );
   }
 

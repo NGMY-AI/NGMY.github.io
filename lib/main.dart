@@ -92,6 +92,7 @@ import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_invoice_payments.dart';
 import 'ngmy_music_payments.dart';
+import 'ngmy_app_studio_payments.dart';
 import 'ngmy_communicate.dart';
 import 'ngmy_communicate_admin.dart';
 import 'ngmy_app_builder.dart';
@@ -619,8 +620,14 @@ const int kNgmyWalletHistoryDisplayMax = 500;
 bool ngmyIsWalletDepositOrWithdraw(AppTransaction t) =>
     t.type == TransactionType.deposit || t.type == TransactionType.withdrawal;
 
+bool _ngmyIsClockInSessionStartTransaction(AppTransaction t) {
+  if (t.type != TransactionType.reimbursement) return false;
+  return (t.sourceDetails ?? '').toLowerCase().contains('clock-in session started');
+}
+
 bool ngmyIsClockInHistoryTransaction(AppTransaction t) {
   if (t.type != TransactionType.reimbursement) return false;
+  if (_ngmyIsClockInSessionStartTransaction(t)) return false;
   return (t.sourceDetails ?? '').toLowerCase().contains('clock-in');
 }
 
@@ -998,6 +1005,8 @@ class AppConfig {
   Map<String, String> familyTreePhotoAccessUntilByEmail;
   /// Wallet fee per Music Studio AI song generation (0 = free).
   double musicStudioPerSongFee;
+  /// Wallet fee to save one app to NGMY cloud (0 = free). One slot per account.
+  double appStudioCloudSaveFee;
   /// Admin toggle — double-tap Chat reveals Communicate.
   bool communicateEnabled;
   /// Admin toggle — center star in NGMY Hub opens App Builder for all users.
@@ -1076,6 +1085,7 @@ class AppConfig {
     this.familyTreeCreateFee = NgmyFamilyTreePayments.defaultCreateFee,
     this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
     this.musicStudioPerSongFee = NgmyMusicPayments.defaultPerSongFee,
+    this.appStudioCloudSaveFee = NgmyAppStudioPayments.defaultCloudSaveFee,
     this.communicateEnabled = false,
     this.appBuilderEnabled = false,
     List<Map<String, dynamic>>? appBuilderPublished,
@@ -1174,6 +1184,7 @@ class AppConfig {
     'familyTreePhotoMonthlyFee': familyTreePhotoMonthlyFee,
     'familyTreePhotoAccessUntilByEmail': familyTreePhotoAccessUntilByEmail,
     'musicStudioPerSongFee': musicStudioPerSongFee,
+    'appStudioCloudSaveFee': appStudioCloudSaveFee,
     'communicateEnabled': communicateEnabled,
     'appBuilderEnabled': appBuilderEnabled,
     'appBuilderPublished': appBuilderPublished,
@@ -1266,6 +1277,7 @@ class AppConfig {
     familyTreeCreateFee: (json['familyTreeCreateFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultCreateFee,
     familyTreePhotoMonthlyFee: (json['familyTreePhotoMonthlyFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
     musicStudioPerSongFee: (json['musicStudioPerSongFee'] as num?)?.toDouble() ?? NgmyMusicPayments.defaultPerSongFee,
+    appStudioCloudSaveFee: (json['appStudioCloudSaveFee'] as num?)?.toDouble() ?? NgmyAppStudioPayments.defaultCloudSaveFee,
     communicateEnabled: json['communicateEnabled'] == true,
     appBuilderEnabled: json['appBuilderEnabled'] == true,
     appBuilderPublished: List<Map<String, dynamic>>.from(
@@ -2044,6 +2056,16 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     }
   } else {
     next.musicStudioPerSongFee = keep.musicStudioPerSongFee;
+  }
+  if (record.containsKey('appStudioCloudSaveFee')) {
+    if (ngmyShouldDeferRemoteConfigOverwrite()) {
+      next.appStudioCloudSaveFee = keep.appStudioCloudSaveFee;
+    } else {
+      final v = record['appStudioCloudSaveFee'];
+      if (v is num && v >= 0) next.appStudioCloudSaveFee = v.toDouble();
+    }
+  } else {
+    next.appStudioCloudSaveFee = keep.appStudioCloudSaveFee;
   }
   if (record.containsKey('communicateEnabled')) {
     next.communicateEnabled = record['communicateEnabled'] == true;
@@ -4069,6 +4091,60 @@ String _ngmyClockInTransactionId(String email, DateTime day) {
   return 'clock_${key}_${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
 }
 
+/// Earliest active clock-in start today (from synced transactions), if not yet paid out.
+DateTime? _ngmyActiveClockInStartFromTransactions(String email, List<AppTransaction> txs) {
+  final now = DateTime.now();
+  if (_ngmyHasClockInPayoutForDay(email, txs, now)) return null;
+  final key = email.toLowerCase().trim();
+  DateTime? best;
+  for (final t in txs) {
+    if (t.userEmail.toLowerCase().trim() != key) continue;
+    if (t.status != TransactionStatus.approved) continue;
+    if (!_ngmyIsClockInSessionStartTransaction(t)) continue;
+    if (!_ngmySameCalendarDay(t.timestamp, now)) continue;
+    if (best == null || t.timestamp.isBefore(best)) best = t.timestamp;
+  }
+  return best;
+}
+
+void _ngmyMergeClockInSessionAcrossDevices(UserData local, UserData remote, List<AppTransaction> txs) {
+  _ngmyApplyMidnightClockReset(local);
+  _ngmyApplyMidnightClockReset(remote);
+  final now = DateTime.now();
+  final email = remote.email.isNotEmpty ? remote.email : local.email;
+
+  if (_ngmyHasClockInPayoutForDay(email, txs, now) ||
+      _ngmySameCalendarDay(remote.lastClockInEarningsDate, now) ||
+      _ngmySameCalendarDay(local.lastClockInEarningsDate, now)) {
+    remote.isClockedIn = false;
+    remote.clockInStartTime = null;
+    remote.clockInPenaltyPercent = 0;
+    return;
+  }
+
+  DateTime? sessionStart;
+  var penalty = 0.0;
+  var active = false;
+
+  void considerSession(DateTime? start, double pen) {
+    if (start == null) return;
+    if (!_ngmySameCalendarDay(start, now)) return;
+    active = true;
+    if (sessionStart == null || start.isBefore(sessionStart!)) {
+      sessionStart = start;
+    }
+    if (pen > penalty) penalty = pen;
+  }
+
+  considerSession(_ngmyActiveClockInStartFromTransactions(email, txs), 0);
+  if (remote.isClockedIn) considerSession(remote.clockInStartTime, remote.clockInPenaltyPercent);
+  if (local.isClockedIn) considerSession(local.clockInStartTime, local.clockInPenaltyPercent);
+
+  remote.isClockedIn = active;
+  remote.clockInStartTime = active ? sessionStart : null;
+  remote.clockInPenaltyPercent = active ? penalty : 0;
+}
+
 bool _ngmyHasClockInPayoutForDay(String email, List<AppTransaction> txs, DateTime day) {
   final id = _ngmyClockInTransactionId(email, day);
   final key = email.toLowerCase().trim();
@@ -4098,7 +4174,22 @@ void _ngmyReconcileClockInSession(UserData user, List<AppTransaction> txs) {
     if (!_ngmySameCalendarDay(user.lastClockInEarningsDate, now)) {
       user.lastClockInEarningsDate = now;
     }
+    return;
   }
+  final txStart = _ngmyActiveClockInStartFromTransactions(user.email, txs);
+  if (txStart != null) {
+    user.isClockedIn = true;
+    final existing = user.clockInStartTime;
+    user.clockInStartTime = existing == null || txStart.isBefore(existing) ? txStart : existing;
+    return;
+  }
+  if (user.isClockedIn && user.clockInStartTime != null &&
+      _ngmySameCalendarDay(user.clockInStartTime!, now)) {
+    return;
+  }
+  user.isClockedIn = false;
+  user.clockInStartTime = null;
+  user.clockInPenaltyPercent = 0;
 }
 
 bool _storeOrderIsDelivered(Map<String, dynamic> o) =>
@@ -6300,6 +6391,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
     await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
     await ngmyHydrateMusicPaymentsFromAllBackups(_config);
+    await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
     await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
     await ngmyHydrateWalletPaymentsFromAllBackups(_config);
@@ -8299,6 +8391,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _notifyTransactionEvent(AppTransaction t, {bool statusChanged = false}) async {
     if (NgmyGameSession.suppressExternalNotifications) return;
+    if (_ngmyIsClockInSessionStartTransaction(t)) return;
     if (kNgmySuppressWalletTransactionPopups &&
         (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal)) {
       return;
@@ -9004,6 +9097,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore || local.canSellOnStore;
             _preserveLocalSessionState(local, updatedUser);
             _mergeUserMediaProfileFields(local, updatedUser);
+            _ngmyReconcileClockInSession(updatedUser, _allTransactions);
             _allUsers[idx] = updatedUser;
           }
           if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == email) {
@@ -9017,6 +9111,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             } else {
               updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
               _preserveLocalSessionState(_currentUser!, updatedUser);
+              _ngmyReconcileClockInSession(updatedUser, _allTransactions);
               ngmyReconcileUserAccountBalance(updatedUser, _allTransactions);
               _currentUser = updatedUser;
             }
@@ -9115,6 +9210,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           }
           ngmyPlayIncomeSoundForTransaction(tx);
         }
+        if (userIdx >= 0 &&
+            (_ngmyIsClockInSessionStartTransaction(tx) ||
+                ((tx.sourceDetails ?? '').toLowerCase().contains('clock-in daily earnings')))) {
+          _ngmyReconcileClockInSession(_allUsers[userIdx], _allTransactions);
+          if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
+            _currentUser = _allUsers[userIdx];
+          }
+        }
         _reconcileAllUserBalances();
         if (tx.status == TransactionStatus.pending &&
             (tx.type == TransactionType.deposit || tx.type == TransactionType.withdrawal) &&
@@ -9147,15 +9250,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         remote.lastClockInDate = local.lastClockInDate;
       }
     }
-    if (_ngmySameCalendarDay(remote.lastClockInEarningsDate, DateTime.now())) {
-      remote.isClockedIn = false;
-      remote.clockInStartTime = null;
-      remote.clockInPenaltyPercent = 0;
-    } else if (local.isClockedIn && local.clockInStartTime != null) {
-      remote.isClockedIn = true;
-      remote.clockInStartTime = local.clockInStartTime;
-      remote.clockInPenaltyPercent = local.clockInPenaltyPercent;
-    }
+    _ngmyMergeClockInSessionAcrossDevices(local, remote, _allTransactions);
     if (local.activeInvestment != null) {
       if (remote.activeInvestment == null) {
         remote.activeInvestment = local.activeInvestment;
@@ -9274,6 +9369,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
           await ngmyHydrateMusicPaymentsFromAllBackups(_config);
+    await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
           await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
@@ -9534,6 +9630,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
           await ngmyHydrateMusicPaymentsFromAllBackups(_config);
+    await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
           await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
@@ -10149,6 +10246,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     final userKey = ngmyNormalizeEmail(t.userEmail);
                     final userIdx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == userKey);
                     if (userIdx != -1) {
+                      if (_ngmyIsClockInSessionStartTransaction(t) ||
+                          (t.sourceDetails ?? '').toLowerCase().contains('clock-in daily earnings')) {
+                        _ngmyReconcileClockInSession(_allUsers[userIdx], _allTransactions);
+                      }
                       ngmyReconcileUserAccountBalance(_allUsers[userIdx], _allTransactions);
                       syncedUser = _allUsers[userIdx];
                       if (_currentUser != null && ngmyNormalizeEmail(_currentUser!.email) == userKey) {
@@ -10171,8 +10272,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal)) {
                     unawaited(_notifyAdminAboutPendingTransaction(t));
                   }
-                  if (!kNgmySuppressWalletTransactionPopups ||
-                      (t.type != TransactionType.deposit && t.type != TransactionType.withdrawal)) {
+                  if (!_ngmyIsClockInSessionStartTransaction(t) &&
+                      (!kNgmySuppressWalletTransactionPopups ||
+                          (t.type != TransactionType.deposit && t.type != TransactionType.withdrawal))) {
                     unawaited(_notifyTransactionEvent(t));
                   }
                 },
@@ -11790,6 +11892,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
       _ngmyApplyMidnightClockReset(widget.user);
+      final wasClockedIn = widget.user.isClockedIn;
+      _ngmyReconcileClockInSession(widget.user, widget.allTransactions);
+      if (!wasClockedIn && widget.user.isClockedIn) setState(() {});
       final now = DateTime.now();
       if (widget.user.isClockedIn) {
         if (_ngmyHasClockInPayoutForDay(widget.user.email, widget.allTransactions, now) ||
@@ -11846,10 +11951,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           }
           widget.onDataChanged(); // Immediate sync on completion
         } else {
-          // Throttle cloud sync to every 30 seconds to prevent "quick/stuttery" UI
+          // Keep clock-in state synced across devices every 5 seconds while session runs.
           _syncCounter++;
-          if (_syncCounter >= 30) {
+          if (_syncCounter >= 5) {
             _syncCounter = 0;
+            unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
             widget.onDataChanged();
           }
         }
@@ -11903,10 +12009,21 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           );
           return;
         }
-        if (widget.user.isClockedIn) {
+        _ngmyReconcileClockInSession(widget.user, widget.allTransactions);
+        final activeElsewhere =
+            _ngmyActiveClockInStartFromTransactions(widget.user.email, widget.allTransactions);
+        if (widget.user.isClockedIn || activeElsewhere != null) {
+          if (!widget.user.isClockedIn && activeElsewhere != null) {
+            setState(() {
+              widget.user.isClockedIn = true;
+              widget.user.clockInStartTime = activeElsewhere;
+            });
+            unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
+            widget.onDataChanged();
+          }
           _showOfficialNotice(
             title: 'Session Active',
-            message: 'Your clock-in session is already running.',
+            message: 'Your clock-in session is already running on another device.',
             isError: true,
           );
           return;
@@ -11941,6 +12058,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             tag: 'clockin_start_$sessionId',
           ) ?? Future.value());
         }
+        unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
         widget.onDataChanged();
         if (kNgmyShowClockInConfirmDialog) {
           if (!onTrial && _ngmyShowLateClockUi(now)) {
@@ -13513,10 +13631,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _live(BuildContext ctx) {
     final recent = widget.allTransactions
         .where((t) =>
-            t.type == TransactionType.deposit ||
-            t.type == TransactionType.withdrawal ||
-            t.type == TransactionType.adminRemove ||
-            t.type == TransactionType.reimbursement)
+            (t.type == TransactionType.deposit ||
+                t.type == TransactionType.withdrawal ||
+                t.type == TransactionType.adminRemove ||
+                t.type == TransactionType.reimbursement) &&
+            !_ngmyIsClockInSessionStartTransaction(t))
         .toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     List<AppTransaction> shown = [];
@@ -17202,11 +17321,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
     var luxOneOn = widget.config.invoiceLuxuryAllowOneTime;
     var luxMoOn = widget.config.invoiceLuxuryAllowMonthly;
     final musicC = TextEditingController(text: widget.config.musicStudioPerSongFee.toStringAsFixed(2));
+    final appStudioC = TextEditingController(text: widget.config.appStudioCloudSaveFee.toStringAsFixed(2));
     final commFeeC = TextEditingController(text: widget.config.communicateFeeAmount.toStringAsFixed(2));
     final commMinsC = TextEditingController(text: '${widget.config.communicateMinutesPerPayment}');
     var familyExpanded = true;
     var invoicesExpanded = false;
     var musicExpanded = false;
+    var appStudioExpanded = false;
     var communicatePayExpanded = false;
 
     Widget categoryShell({
@@ -17469,6 +17590,55 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             },
                             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEC4899), minimumSize: const Size(double.infinity, 44)),
                             child: const Text('Save Music Studio', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
+                      categoryShell(
+                        title: 'App Studio',
+                        subtitle: 'Fee to save one app to NGMY cloud (syncs on all devices)',
+                        icon: Icons.apps_rounded,
+                        accent: const Color(0xFF6366F1),
+                        expanded: appStudioExpanded,
+                        onToggle: () => setST(() {
+                          appStudioExpanded = !appStudioExpanded;
+                          if (appStudioExpanded) {
+                            familyExpanded = false;
+                            invoicesExpanded = false;
+                            musicExpanded = false;
+                            communicatePayExpanded = false;
+                          }
+                        }),
+                        children: [
+                          TextField(
+                            controller: appStudioC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Cloud save fee per app (\$)',
+                              prefixIcon: Icon(Icons.cloud_upload_rounded),
+                              helperText: 'Charged when user saves their one cloud app slot. Set 0 for free.',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: () async {
+                              final fee = double.tryParse(appStudioC.text.trim());
+                              if (fee == null || fee < 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid dollar amount (0 or more).')));
+                                return;
+                              }
+                              setST(() => widget.config.appStudioCloudSaveFee = fee);
+                              widget.onDataChanged();
+                              final ok = await ngmyPersistAppStudioPaymentSettings(widget.config);
+                              if (!context.mounted) return;
+                              setState(() {});
+                              ngmyAdminShowCloudSaveSnackBar(
+                                context,
+                                cloudOk: ok,
+                                success: 'App Studio payment settings saved.',
+                              );
+                            },
+                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF6366F1), minimumSize: const Size(double.infinity, 44)),
+                            child: const Text('Save App Studio', style: TextStyle(fontWeight: FontWeight.w800)),
                           ),
                         ],
                       ),
@@ -23139,6 +23309,13 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       config: widget.config,
       onDataChanged: widget.onDataChanged,
       onPersistConfig: () => ngmyAdminPersistManagementConfig(widget.config),
+      onChargeWallet: (amount, description) async => ngmyChargeUserWallet(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        amount: amount,
+        description: description,
+        onAddTransaction: widget.onAddTransaction,
+      ),
     );
   }
 

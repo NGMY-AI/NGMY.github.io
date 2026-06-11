@@ -10,6 +10,8 @@ const String _kNgmyInvoicePaymentSettingsKey = 'invoice_payment_settings';
 const String _kNgmyInvoicePaymentPrefsKey = 'ngmy_invoice_payment_settings_v1';
 const String _kNgmyMusicPaymentSettingsKey = 'music_studio_payment_settings';
 const String _kNgmyMusicPaymentPrefsKey = 'ngmy_music_payment_settings_v1';
+const String _kNgmyAppStudioPaymentSettingsKey = 'app_studio_payment_settings';
+const String _kNgmyAppStudioPaymentPrefsKey = 'ngmy_app_studio_payment_settings_v1';
 const String _kNgmyCommunicateSettingsKey = 'communicate_settings';
 const String _kNgmyCommunicatePrefsKey = 'ngmy_communicate_settings_v1';
 const String _kNgmyCommunicatePaymentSettingsKey = 'communicate_payment_settings';
@@ -608,6 +610,62 @@ Future<bool> ngmyPersistMusicPaymentSettings(AppConfig config) async {
   if (await ngmyCanReachCloud()) {
     final payload = _musicPaymentPayload(config);
     cloudOk = await _upsertNgmySettingSafe(_kNgmyMusicPaymentSettingsKey, payload);
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
+Map<String, dynamic> _appStudioPaymentPayload(AppConfig config) => {
+      'appStudioCloudSaveFee': config.appStudioCloudSaveFee,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyAppStudioPaymentPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+  final fee = payload['appStudioCloudSaveFee'];
+  if (fee is num && fee >= 0) config.appStudioCloudSaveFee = fee.toDouble();
+}
+
+Future<void> _persistAppStudioPaymentSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyAppStudioPaymentPrefsKey, jsonEncode(_appStudioPaymentPayload(config)));
+  } catch (e) {
+    debugPrint('[admin app studio payments] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateAppStudioPaymentsFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyAppStudioPaymentPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyAppStudioPaymentPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[admin app studio payments] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyAppStudioPaymentSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      _applyAppStudioPaymentPayload(config, row);
+    }
+  }
+}
+
+/// Authoritative save for Admin → Management → Payments (App Studio cloud save fee).
+Future<bool> ngmyPersistAppStudioPaymentSettings(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  await _persistAppStudioPaymentSettingsLocal(config);
+
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _appStudioPaymentPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyAppStudioPaymentSettingsKey, payload);
     await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
   }
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);

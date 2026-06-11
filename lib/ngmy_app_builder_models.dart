@@ -306,6 +306,8 @@ class NgmyAppProject {
   final NgmyAppDatabaseConfig database;
   /// Optional user/AI-written code notes or raw JSON override.
   final String customCode;
+  /// User-chosen app icon — emoji or short label shown in Studio and runtime.
+  final String appIcon;
 
   const NgmyAppProject({
     required this.id,
@@ -324,9 +326,12 @@ class NgmyAppProject {
     this.seoDescription = '',
     this.database = const NgmyAppDatabaseConfig(),
     this.customCode = '',
+    this.appIcon = '',
   });
 
   Color get theme => Color(themeColor);
+
+  String get displayIcon => appIcon.trim().isNotEmpty ? appIcon.trim() : '✨';
 
   NgmyAppScreen? screenById(String? id) {
     if (id == null || id.trim().isEmpty) return null;
@@ -355,6 +360,7 @@ class NgmyAppProject {
     String? seoDescription,
     NgmyAppDatabaseConfig? database,
     String? customCode,
+    String? appIcon,
   }) {
     return NgmyAppProject(
       id: id,
@@ -373,6 +379,7 @@ class NgmyAppProject {
       seoDescription: seoDescription ?? this.seoDescription,
       database: database ?? this.database,
       customCode: customCode ?? this.customCode,
+      appIcon: appIcon ?? this.appIcon,
     );
   }
 
@@ -393,6 +400,7 @@ class NgmyAppProject {
         'seoDescription': seoDescription,
         'database': database.toMap(),
         'customCode': customCode,
+        'appIcon': appIcon,
       };
 
   factory NgmyAppProject.fromMap(Map<String, dynamic> map) {
@@ -435,6 +443,7 @@ class NgmyAppProject {
         map['database'] is Map ? Map<String, dynamic>.from(map['database'] as Map) : null,
       ),
       customCode: (map['customCode'] ?? '').toString(),
+      appIcon: (map['appIcon'] ?? '').toString(),
     );
   }
 

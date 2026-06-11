@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show File;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -85,21 +86,67 @@ Future<NgmyAppProject?> ngmyImportAppBundleFromJson(String email, String raw) as
   return project;
 }
 
-Future<NgmyAppProject?> ngmyPickAndImportAppBundle(String email) async {
+Future<String?> _readPickedBackupText(PlatformFile file) async {
+  if (file.bytes != null && file.bytes!.isNotEmpty) {
+    return utf8.decode(file.bytes!);
+  }
+  if (!kIsWeb && file.path != null && file.path!.trim().isNotEmpty) {
+    try {
+      return await File(file.path!).readAsString();
+    } catch (e) {
+      debugPrint('[app bundle import] read path: $e');
+    }
+  }
+  return null;
+}
+
+/// Result of a backup import attempt — clearer errors for the UI.
+class NgmyAppBundleImportResult {
+  final NgmyAppProject? project;
+  final String? errorMessage;
+
+  const NgmyAppBundleImportResult({this.project, this.errorMessage});
+
+  bool get ok => project != null;
+}
+
+Future<NgmyAppBundleImportResult> ngmyPickAndImportAppBundleDetailed(String email) async {
   try {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['json', 'ngmy'],
-      withData: true,
+      type: kIsWeb ? FileType.custom : FileType.any,
+      allowedExtensions: kIsWeb ? const ['json', 'ngmy'] : null,
+      withData: kIsWeb,
+      allowMultiple: false,
     );
-    if (result == null || result.files.isEmpty) return null;
+    if (result == null || result.files.isEmpty) {
+      return const NgmyAppBundleImportResult(errorMessage: 'No file selected.');
+    }
     final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) return null;
-    final raw = utf8.decode(bytes);
-    return ngmyImportAppBundleFromJson(email, raw);
+    final raw = await _readPickedBackupText(file);
+    if (raw == null || raw.trim().isEmpty) {
+      return const NgmyAppBundleImportResult(
+        errorMessage: 'Could not read file. Try the .ngmy.json backup you downloaded from App Studio.',
+      );
+    }
+    if (!NgmyAppBundle.looksLikeBundle(raw)) {
+      return const NgmyAppBundleImportResult(
+        errorMessage: 'Invalid backup — choose a .ngmy.json file exported from App Studio.',
+      );
+    }
+    final imported = await ngmyImportAppBundleFromJson(email, raw);
+    if (imported == null) {
+      return const NgmyAppBundleImportResult(
+        errorMessage: 'Invalid backup format. Re-download your app from App Studio and try again.',
+      );
+    }
+    return NgmyAppBundleImportResult(project: imported);
   } catch (e) {
     debugPrint('[app bundle import] $e');
-    return null;
+    return NgmyAppBundleImportResult(errorMessage: 'Import failed: $e');
   }
+}
+
+Future<NgmyAppProject?> ngmyPickAndImportAppBundle(String email) async {
+  final result = await ngmyPickAndImportAppBundleDetailed(email);
+  return result.project;
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_app_builder_ai.dart';
+import 'ngmy_app_builder_cloud.dart';
 import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
 import 'ngmy_app_builder_models.dart';
@@ -13,6 +14,8 @@ import 'ngmy_app_builder_runtime.dart';
 import 'ngmy_app_builder_storage.dart';
 import 'ngmy_app_builder_templates.dart';
 import 'ngmy_app_builder_urls.dart';
+import 'ngmy_app_studio_payments.dart';
+import 'ngmy_app_studio_shell.dart';
 import 'ngmy_nav.dart';
 
 void ngmyTryOpenPublishedAppFromUrl(
@@ -78,6 +81,7 @@ Future<void> showNgmyAppBuilder({
   required dynamic config,
   required VoidCallback onDataChanged,
   required Future<bool> Function() onPersistConfig,
+  Future<bool> Function(double amount, String description)? onChargeWallet,
 }) {
   return NgmyNavigator.push(
     context,
@@ -86,6 +90,7 @@ Future<void> showNgmyAppBuilder({
       config: config,
       onDataChanged: onDataChanged,
       onPersistConfig: onPersistConfig,
+      onChargeWallet: onChargeWallet,
     ),
     routeName: 'NgmyAppBuilderScreen',
   );
@@ -96,6 +101,7 @@ class NgmyAppBuilderScreen extends StatefulWidget {
   final dynamic config;
   final VoidCallback onDataChanged;
   final Future<bool> Function() onPersistConfig;
+  final Future<bool> Function(double amount, String description)? onChargeWallet;
 
   const NgmyAppBuilderScreen({
     super.key,
@@ -103,6 +109,7 @@ class NgmyAppBuilderScreen extends StatefulWidget {
     required this.config,
     required this.onDataChanged,
     required this.onPersistConfig,
+    this.onChargeWallet,
   });
 
   @override
@@ -110,10 +117,12 @@ class NgmyAppBuilderScreen extends StatefulWidget {
 }
 
 class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabs;
+  int _tabIndex = 0;
+  late AnimationController _headerFx;
   List<NgmyAppProject> _mine = [];
   List<NgmyAppProject> _published = [];
   bool _loading = true;
+  String? _cloudSavedProjectId;
 
   bool get _isAdmin => widget.user.isAdmin == true;
   String get _email => widget.user.email.toString().toLowerCase().trim();
@@ -122,19 +131,24 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 5, vsync: this);
+    _headerFx = AnimationController(vsync: this, duration: const Duration(seconds: 5))..repeat();
     _reload();
   }
 
   @override
   void dispose() {
-    _tabs.dispose();
+    _headerFx.dispose();
     super.dispose();
   }
 
   Future<void> _reload() async {
     setState(() => _loading = true);
+    _cloudSavedProjectId = await NgmyAppStudioCloudSlot.fetchSavedProjectId(_email);
+    final cloud = await NgmyAppStudioCloudSlot.pullIntoLocal(_email);
     _mine = await ngmyLoadUserAppProjects(_email);
+    if (cloud != null && !_mine.any((p) => p.id == cloud.id)) {
+      _mine.insert(0, cloud);
+    }
     _published = await ngmyLoadLocalPublishedApps();
     if (mounted) setState(() => _loading = false);
   }
@@ -212,15 +226,47 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
   }
 
   Future<void> _importApp() async {
-    final imported = await ngmyPickAndImportAppBundle(_email);
+    final result = await ngmyPickAndImportAppBundleDetailed(_email);
     if (!mounted) return;
-    if (imported == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No file selected or invalid backup.')));
+    if (!result.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.errorMessage ?? 'Import failed.')));
       return;
     }
+    final imported = result.project!;
     await _reload();
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"${imported.name}" restored from backup!')));
     await _openEditor(imported);
+  }
+
+  Future<void> _saveToCloud(NgmyAppProject project) async {
+    final charge = widget.onChargeWallet;
+    if (charge != null) {
+      final ok = await NgmyAppStudioPayments.confirmAndChargeCloudSave(
+        context: context,
+        user: widget.user,
+        config: widget.config,
+        appName: project.name,
+        onCharge: (amount, description) async {
+          final charged = await charge(amount, description);
+          if (charged) widget.onDataChanged();
+          return charged;
+        },
+      );
+      if (!ok) return;
+    }
+    final saved = await NgmyAppStudioCloudSlot.save(_email, project);
+    if (!mounted) return;
+    if (saved) {
+      setState(() => _cloudSavedProjectId = project.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('"${project.name}" saved to cloud — opens on all your devices.')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cloud save failed. Check your connection and try again.')),
+      );
+    }
   }
 
   void _copyUrl(String url) {
@@ -231,64 +277,38 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF07080F) : const Color(0xFFF1F5F9);
+    final bg = isDark ? const Color(0xFF07080F) : const Color(0xFFE8EDF5);
     return Scaffold(
       backgroundColor: bg,
-      body: NestedScrollView(
-        headerSliverBuilder: (_, __) => [
-          SliverAppBar(
-            expandedHeight: 120,
-            pinned: true,
-            backgroundColor: const Color(0xFF0F172A),
-            foregroundColor: Colors.white,
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 16, bottom: 52),
-              title: const Text('App Studio', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF0F172A), Color(0xFF312E81), Color(0xFF7C3AED)],
+      body: Column(
+        children: [
+          AnimatedBuilder(
+            animation: _headerFx,
+            builder: (_, __) => NgmyAppStudioHeader(animation: _headerFx),
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : NgmyAppStudioContentFrame(
+                    isDark: isDark,
+                    child: IndexedStack(
+                      index: _tabIndex,
+                      children: [
+                        _myAppsTab(isDark),
+                        _createTab(isDark),
+                        _templatesTab(isDark),
+                        _galleryTab(isDark),
+                        _copilotTab(isDark),
+                      ],
+                    ),
                   ),
-                ),
-                child: const Align(
-                  alignment: Alignment.bottomRight,
-                  child: Padding(
-                    padding: EdgeInsets.only(right: 20, bottom: 48),
-                    child: Icon(Icons.auto_awesome_rounded, color: Colors.white24, size: 56),
-                  ),
-                ),
-              ),
-            ),
-            bottom: TabBar(
-              controller: _tabs,
-              isScrollable: true,
-              indicatorColor: const Color(0xFFFBBF24),
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white60,
-              tabs: const [
-                Tab(icon: Icon(Icons.folder_special_rounded, size: 20), text: 'My Apps'),
-                Tab(icon: Icon(Icons.add_circle_outline_rounded, size: 20), text: 'Create'),
-                Tab(icon: Icon(Icons.grid_view_rounded, size: 20), text: 'Templates'),
-                Tab(icon: Icon(Icons.public_rounded, size: 20), text: 'Gallery'),
-                Tab(icon: Icon(Icons.smart_toy_rounded, size: 20), text: 'AI'),
-              ],
-            ),
+          ),
+          NgmyAppStudioBottomNav(
+            index: _tabIndex,
+            isDark: isDark,
+            onChanged: (i) => setState(() => _tabIndex = i),
           ),
         ],
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : TabBarView(
-                controller: _tabs,
-                children: [
-                  _myAppsTab(isDark),
-                  _createTab(isDark),
-                  _templatesTab(isDark),
-                  _galleryTab(isDark),
-                  _copilotTab(isDark),
-                ],
-              ),
       ),
     );
   }
@@ -314,7 +334,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
               const SizedBox(height: 8),
               Text('Tap Create or talk to AI — working forms, lists, and settings included.', textAlign: TextAlign.center, style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),
               const SizedBox(height: 20),
-              FilledButton.icon(onPressed: () => _tabs.animateTo(1), icon: const Icon(Icons.add_rounded), label: const Text('Get started')),
+              FilledButton.icon(onPressed: () => setState(() => _tabIndex = 1), icon: const Icon(Icons.add_rounded), label: const Text('Get started')),
             ],
           ),
         ),
@@ -340,10 +360,25 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
               decoration: BoxDecoration(
                 gradient: LinearGradient(colors: [p.theme, p.theme.withValues(alpha: 0.7)]),
                 borderRadius: BorderRadius.circular(14),
+                boxShadow: [BoxShadow(color: p.theme.withValues(alpha: 0.35), blurRadius: 10)],
               ),
-              child: const Icon(Icons.apps_rounded, color: Colors.white),
+              alignment: Alignment.center,
+              child: Text(p.displayIcon, style: const TextStyle(fontSize: 24)),
             ),
-            title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800)),
+            title: Row(
+              children: [
+                Expanded(child: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800))),
+                if (_cloudSavedProjectId == p.id)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('CLOUD', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Color(0xFF10B981))),
+                  ),
+              ],
+            ),
             subtitle: Text(
               p.publicUrl.isNotEmpty
                   ? '${p.status.label} · ${p.screens.length} screens · Live link'
@@ -353,6 +388,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
               onSelected: (v) async {
                 if (v == 'edit') await _openEditor(p);
                 if (v == 'ai') await _openAiCopilot(project: p);
+                if (v == 'cloud') await _saveToCloud(p);
                 if (v == 'preview') {
                   NgmyNavigator.push(context, NgmyAppRuntimeScreen(project: p, apiKey: _apiKey, email: _email), routeName: 'NgmyAppRuntimeScreen');
                 }
@@ -367,6 +403,10 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'edit', child: Text('Edit')),
                 const PopupMenuItem(value: 'ai', child: Text('Talk to AI Copilot')),
+                PopupMenuItem(
+                  value: 'cloud',
+                  child: Text(_cloudSavedProjectId == p.id ? 'Update cloud save' : 'Save to cloud (1 slot)'),
+                ),
                 const PopupMenuItem(value: 'preview', child: Text('Preview')),
                 if (p.publicUrl.isNotEmpty) const PopupMenuItem(value: 'copy', child: Text('Copy public link')),
                 const PopupMenuItem(value: 'export', child: Text('Download backup (.ngmy.json)')),
@@ -452,7 +492,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> with Single
           ),
           const SizedBox(height: 8),
           Text(
-            'All apps stay on your device only — not in NGMY database. Download .ngmy.json backups and re-import anytime.',
+            'Save one app to NGMY cloud (syncs on every device). Download .ngmy.json backups anytime — import restores your app.',
             style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
           ),
           const SizedBox(height: 24),
@@ -643,6 +683,7 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
   late NgmyAppProject _project;
   late TextEditingController _nameC;
   late TextEditingController _taglineC;
+  late TextEditingController _iconC;
 
   @override
   void initState() {
@@ -650,18 +691,24 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
     _project = widget.project;
     _nameC = TextEditingController(text: _project.name);
     _taglineC = TextEditingController(text: _project.tagline);
+    _iconC = TextEditingController(text: _project.appIcon);
   }
 
   @override
   void dispose() {
     _nameC.dispose();
     _taglineC.dispose();
+    _iconC.dispose();
     super.dispose();
   }
 
   void _saveLocal() {
     setState(() {
-      _project = _project.copyWith(name: _nameC.text.trim(), tagline: _taglineC.text.trim());
+      _project = _project.copyWith(
+        name: _nameC.text.trim(),
+        tagline: _taglineC.text.trim(),
+        appIcon: _iconC.text.trim(),
+      );
     });
   }
 
@@ -778,13 +825,36 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
           TextField(controller: _nameC, decoration: const InputDecoration(labelText: 'App name'), onChanged: (_) => _saveLocal()),
           const SizedBox(height: 10),
           TextField(controller: _taglineC, decoration: const InputDecoration(labelText: 'Tagline / Google description'), onChanged: (_) => _saveLocal()),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _iconC,
+            decoration: const InputDecoration(
+              labelText: 'App icon (emoji)',
+              hintText: '🚀 ✨ 🤖 💎',
+              prefixIcon: Icon(Icons.emoji_emotions_rounded),
+            ),
+            onChanged: (_) => _saveLocal(),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: ['🚀', '✨', '🤖', '💎', '🔥', '⚡', '🎯', '🌟'].map((e) {
+              return ActionChip(
+                label: Text(e, style: const TextStyle(fontSize: 18)),
+                onPressed: () {
+                  _iconC.text = e;
+                  _saveLocal();
+                },
+              );
+            }).toList(),
+          ),
           const SizedBox(height: 12),
           Card(
             color: const Color(0xFF10B981).withValues(alpha: 0.08),
             child: ListTile(
-              leading: const Icon(Icons.phone_android_rounded, color: Color(0xFF10B981)),
-              title: const Text('Stored on your device only', style: TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: const Text('Not saved to NGMY database. Download backup to keep your app forever.'),
+              leading: const Icon(Icons.cloud_sync_rounded, color: Color(0xFF10B981)),
+              title: const Text('Backup & cloud', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: const Text('Download .ngmy.json backup anytime. Save one app to NGMY cloud from My Apps.'),
               trailing: IconButton(
                 icon: const Icon(Icons.download_rounded),
                 onPressed: _exportCurrent,
@@ -1256,20 +1326,48 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF07080F) : const Color(0xFFE8EDF5),
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF0F172A), Color(0xFF312E81)],
+            ),
+          ),
+        ),
+        foregroundColor: Colors.white,
+        title: Row(
           children: [
-            const Text('Bolt AI Copilot', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-            Text(_project?.name ?? 'New app', style: const TextStyle(fontSize: 11)),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.5)),
+                boxShadow: [BoxShadow(color: const Color(0xFFF59E0B).withValues(alpha: 0.35), blurRadius: 12)],
+              ),
+              child: const Icon(Icons.construction_rounded, color: Color(0xFFFBBF24), size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Bolt AI', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  Text(_project?.name ?? 'New app', style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                ],
+              ),
+            ),
           ],
         ),
         actions: [
           if (_project != null)
             TextButton(
               onPressed: () => Navigator.pop(context, _project),
-              child: const Text('Use app', style: TextStyle(fontWeight: FontWeight.w800)),
+              child: const Text('Use app', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
             ),
         ],
       ),
@@ -1278,8 +1376,13 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
           if (_project != null)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFF10B981).withOpacity(0.12),
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [const Color(0xFF10B981).withValues(alpha: 0.2), const Color(0xFF6366F1).withValues(alpha: 0.15)]),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.35)),
+              ),
               child: Text('${_project!.screens.length} screens · ${_project!.name}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
             ),
           Expanded(
@@ -1290,23 +1393,63 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
               itemBuilder: (_, i) {
                 final m = _messages[i];
                 final isUser = m['role'] == 'user';
-                return Align(
-                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.85),
-                    decoration: BoxDecoration(
-                      color: isUser ? const Color(0xFFF59E0B).withOpacity(0.18) : Colors.grey.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text(m['text'] ?? ''),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+                    children: [
+                      if (!isUser) ...[
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                          child: const Icon(Icons.smart_toy_rounded, size: 16, color: Color(0xFFF59E0B)),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            gradient: isUser
+                                ? LinearGradient(colors: [const Color(0xFFF59E0B).withValues(alpha: 0.85), const Color(0xFFEA580C).withValues(alpha: 0.75)])
+                                : null,
+                            color: isUser ? null : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(18),
+                              topRight: const Radius.circular(18),
+                              bottomLeft: Radius.circular(isUser ? 18 : 4),
+                              bottomRight: Radius.circular(isUser ? 4 : 18),
+                            ),
+                            border: Border.all(color: (isUser ? Colors.white : const Color(0xFF6366F1)).withValues(alpha: 0.15)),
+                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 4))],
+                          ),
+                          child: Text(
+                            m['text'] ?? '',
+                            style: TextStyle(
+                              color: isUser ? Colors.white : (isDark ? Colors.white : Colors.black87),
+                              height: 1.4,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (isUser) ...[
+                        const SizedBox(width: 8),
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: const Color(0xFF6366F1).withValues(alpha: 0.2),
+                          child: const Icon(Icons.person_rounded, size: 16, color: Color(0xFF6366F1)),
+                        ),
+                      ],
+                    ],
                   ),
                 );
               },
             ),
           ),
-          if (_busy) const LinearProgressIndicator(minHeight: 2),
+          if (_busy)
+            const LinearProgressIndicator(minHeight: 2, color: Color(0xFFF59E0B), backgroundColor: Color(0xFF1E293B)),
           SizedBox(
             height: 44,
             child: ListView(
@@ -1315,34 +1458,47 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
               children: _hints.map((h) {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: ActionChip(label: Text(h, style: const TextStyle(fontSize: 11)), onPressed: _busy ? null : () => _send(h)),
+                  child: ActionChip(
+                    backgroundColor: const Color(0xFF312E81).withValues(alpha: 0.12),
+                    label: Text(h, style: const TextStyle(fontSize: 11)),
+                    onPressed: _busy ? null : () => _send(h),
+                  ),
                 );
               }).toList(),
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _inputC,
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      hintText: 'Command Bolt: create, edit, connect database…',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.25)),
+                boxShadow: [BoxShadow(color: const Color(0xFF7C3AED).withValues(alpha: 0.12), blurRadius: 16)],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _inputC,
+                      minLines: 1,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        hintText: 'Command Bolt — menus, icons, database…',
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      onSubmitted: (_) => _send(),
                     ),
-                    onSubmitted: (_) => _send(),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  style: IconButton.styleFrom(backgroundColor: const Color(0xFFF59E0B)),
-                  onPressed: _busy ? null : () => _send(),
-                  icon: const Icon(Icons.send_rounded),
-                ),
-              ],
+                  IconButton.filled(
+                    style: IconButton.styleFrom(backgroundColor: const Color(0xFFF59E0B)),
+                    onPressed: _busy ? null : () => _send(),
+                    icon: const Icon(Icons.send_rounded),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

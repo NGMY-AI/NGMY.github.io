@@ -355,4 +355,106 @@ final List<NgmyAppTemplate> kNgmyAppTemplates = [
     themeColor: 0xFF6366F1,
     build: (o) => NgmyAppProject.blank(ownerEmail: o),
   ),
+  NgmyAppTemplate(
+    id: 'neon_robot',
+    name: 'Neon Robot Hub',
+    description: 'Glowing reactive neon menu — futuristic control panel.',
+    icon: '🤖',
+    themeColor: 0xFF38BDF8,
+    build: (o) {
+      final p = _base(o, 'Neon Robot Hub', 'Reactive AI control center', 0xFF38BDF8, [
+        _custom('home', 'Home', {
+          'type': 'column',
+          'children': [
+            {'type': 'hero', 'emoji': '🤖', 'title': 'Neon Robot Hub', 'subtitle': 'Reactive menus · AI powered'},
+            {'type': 'spacer', 'height': 12},
+            {
+              'type': 'menuGrid',
+              'style': 'neon',
+              'columns': 2,
+              'items': [
+                {'label': 'Command', 'emoji': '⚡', 'target': 'command'},
+                {'label': 'Systems', 'emoji': '🔧', 'target': 'systems'},
+                {'label': 'Logs', 'emoji': '📡', 'target': 'logs'},
+                {'label': 'Settings', 'emoji': '⚙️', 'target': 'settings'},
+              ],
+            },
+          ],
+        }),
+        _custom('command', 'Command', {'type': 'text', 'text': 'Send commands to your AI modules.', 'align': 'center'}),
+        _custom('systems', 'Systems', {'type': 'dataList', 'collection': 'systems', 'titleField': 'name', 'emptyText': 'No systems yet.', 'addTarget': 'command', 'addLabel': 'Add'}),
+        _custom('logs', 'Logs', {'type': 'dataList', 'collection': 'logs', 'titleField': 'event', 'emptyText': 'No logs yet.'}),
+        _custom('settings', 'Settings', {'type': 'column', 'children': [{'type': 'switch', 'setting': 'neon_fx', 'label': 'Neon effects', 'default': true}]}),
+      ]);
+      return p.copyWith(appIcon: '🤖');
+    },
+  ),
+  NgmyAppTemplate(
+    id: 'holo_gallery',
+    name: 'Hologram Gallery',
+    description: 'Holographic menu tiles with depth shimmer.',
+    icon: '💎',
+    themeColor: 0xFF7C3AED,
+    build: (o) {
+      final p = _base(o, 'Hologram Gallery', 'Showcase with holographic menus', 0xFF7C3AED, [
+        _custom('home', 'Gallery', {
+          'type': 'column',
+          'children': [
+            {'type': 'hero', 'emoji': '💎', 'title': 'Hologram Gallery', 'subtitle': 'Showcase your world'},
+            {'type': 'spacer', 'height': 10},
+            {
+              'type': 'menuGrid',
+              'style': 'hologram',
+              'columns': 2,
+              'items': [
+                {'label': 'Portfolio', 'emoji': '🖼️', 'target': 'portfolio'},
+                {'label': 'Contact', 'emoji': '📨', 'target': 'contact'},
+                {'label': 'Bookings', 'emoji': '📅', 'target': 'bookings'},
+                {'label': 'About', 'emoji': '✨', 'target': 'about'},
+              ],
+            },
+          ],
+        }),
+        _custom('portfolio', 'Portfolio', {'type': 'dataList', 'collection': 'works', 'titleField': 'title', 'emptyText': 'Add your first work.'}),
+        _custom('contact', 'Contact', {'type': 'form', 'collection': 'leads', 'submitLabel': 'Send', 'fields': [{'id': 'name', 'label': 'Name', 'type': 'text'}, {'id': 'email', 'label': 'Email', 'type': 'text'}]}),
+        _custom('bookings', 'Bookings', {'type': 'form', 'collection': 'bookings', 'submitLabel': 'Book', 'fields': [{'id': 'date', 'label': 'Date', 'type': 'text'}]}),
+        _custom('about', 'About', {'type': 'text', 'text': 'Your holographic story starts here.', 'align': 'center'}),
+      ]);
+      return p.copyWith(appIcon: '💎');
+    },
+  ),
+  NgmyAppTemplate(
+    id: 'pulse_ops',
+    name: 'Pulse Ops',
+    description: 'Pulsing robotic menu — live reactive tiles.',
+    icon: '⚡',
+    themeColor: 0xFF10B981,
+    build: (o) {
+      final p = _base(o, 'Pulse Ops', 'Live operations dashboard', 0xFF10B981, [
+        _custom('home', 'Ops', {
+          'type': 'column',
+          'children': [
+            {'type': 'hero', 'emoji': '⚡', 'title': 'Pulse Ops', 'subtitle': 'Live reactive command deck'},
+            {'type': 'spacer', 'height': 10},
+            {
+              'type': 'menuGrid',
+              'style': 'pulse',
+              'columns': 2,
+              'items': [
+                {'label': 'Tasks', 'emoji': '🎯', 'target': 'tasks'},
+                {'label': 'Team', 'emoji': '👥', 'target': 'team'},
+                {'label': 'Alerts', 'emoji': '🔔', 'target': 'alerts'},
+                {'label': 'Config', 'emoji': '🛠️', 'target': 'config'},
+              ],
+            },
+          ],
+        }),
+        _custom('tasks', 'Tasks', {'type': 'dataList', 'collection': 'tasks', 'titleField': 'title', 'emptyText': 'No tasks yet.', 'addTarget': 'tasks', 'addLabel': 'Add'}),
+        _custom('team', 'Team', {'type': 'text', 'text': 'Your team roster lives here.', 'align': 'center'}),
+        _custom('alerts', 'Alerts', {'type': 'dataList', 'collection': 'alerts', 'titleField': 'message', 'emptyText': 'All clear.'}),
+        _custom('config', 'Config', {'type': 'column', 'children': [{'type': 'switch', 'setting': 'pulse_fx', 'label': 'Pulse effects', 'default': true}]}),
+      ]);
+      return p.copyWith(appIcon: '⚡');
+    },
+  ),
 ];
