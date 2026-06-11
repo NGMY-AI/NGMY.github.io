@@ -69,6 +69,11 @@ Future<void> showNgmyAppBuilderAdminSheet({
                               children: [
                                 Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800)),
                                 Text('by ${p.ownerEmail} · ${p.screens.length} screens', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
+                                if (p.publicUrl.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(p.publicUrl, style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black45)),
+                                  ),
                                 const SizedBox(height: 8),
                                 Row(
                                   children: [
@@ -112,7 +117,7 @@ Future<void> showNgmyAppBuilderAdminSheet({
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                          subtitle: Text('by ${p.ownerEmail}'),
+                          subtitle: Text(p.publicUrl.isNotEmpty ? p.publicUrl : 'by ${p.ownerEmail}'),
                           trailing: IconButton(
                             icon: const Icon(Icons.public_off_outlined, color: Color(0xFFEF4444)),
                             onPressed: () async {

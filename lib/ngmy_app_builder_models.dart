@@ -77,14 +77,14 @@ const List<NgmyAppBuilderActor> kNgmyAppBuilderActors = [
   NgmyAppBuilderActor(
     id: 'builder',
     name: 'Bolt',
-    role: 'App Builder',
-    description: 'Turns ideas into screens you can preview instantly.',
+    role: 'AI App Copilot',
+    description: 'Talk to Bolt — command changes and build screens for you.',
     icon: Icons.construction_rounded,
     color: Color(0xFFF59E0B),
     systemPrompt:
-        'You are Bolt, a builder AI for NGMY. When asked, output JSON only with keys: '
-        'name, tagline, themeColorHex, screens (array of {id, title, kind, data}). '
-        'Kinds: welcome, menu, content, form, aiChat. Keep 3-6 screens.',
+        'You are Bolt, the NGMY App Builder copilot. Users talk to you to create and edit apps. '
+        'Always reply helpfully in plain language. When the user asks to create, change, add, remove, or fix anything '
+        'in their app, include an updated app JSON block.',
   ),
   NgmyAppBuilderActor(
     id: 'reviewer',
@@ -98,6 +98,98 @@ const List<NgmyAppBuilderActor> kNgmyAppBuilderActors = [
         'Give a publish readiness score 0-100 and bullet fixes.',
   ),
 ];
+
+enum NgmyAppDatabaseProvider { none, firebase, supabase, mongodb, custom }
+
+extension NgmyAppDatabaseProviderExt on NgmyAppDatabaseProvider {
+  String get label => switch (this) {
+        NgmyAppDatabaseProvider.none => 'No database',
+        NgmyAppDatabaseProvider.firebase => 'Firebase',
+        NgmyAppDatabaseProvider.supabase => 'Supabase',
+        NgmyAppDatabaseProvider.mongodb => 'MongoDB',
+        NgmyAppDatabaseProvider.custom => 'Custom API',
+      };
+}
+
+class NgmyAppDatabaseConfig {
+  final NgmyAppDatabaseProvider provider;
+  final String projectUrl;
+  final String apiKey;
+  final String collectionPath;
+  final String notes;
+
+  const NgmyAppDatabaseConfig({
+    this.provider = NgmyAppDatabaseProvider.none,
+    this.projectUrl = '',
+    this.apiKey = '',
+    this.collectionPath = '',
+    this.notes = '',
+  });
+
+  bool get isConnected => provider != NgmyAppDatabaseProvider.none && projectUrl.trim().isNotEmpty;
+
+  NgmyAppDatabaseConfig copyWith({
+    NgmyAppDatabaseProvider? provider,
+    String? projectUrl,
+    String? apiKey,
+    String? collectionPath,
+    String? notes,
+  }) {
+    return NgmyAppDatabaseConfig(
+      provider: provider ?? this.provider,
+      projectUrl: projectUrl ?? this.projectUrl,
+      apiKey: apiKey ?? this.apiKey,
+      collectionPath: collectionPath ?? this.collectionPath,
+      notes: notes ?? this.notes,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'provider': provider.name,
+        'projectUrl': projectUrl,
+        'apiKey': apiKey,
+        'collectionPath': collectionPath,
+        'notes': notes,
+      };
+
+  factory NgmyAppDatabaseConfig.fromMap(Map<String, dynamic>? map) {
+    if (map == null) return const NgmyAppDatabaseConfig();
+    final raw = (map['provider'] ?? 'none').toString();
+    final provider = NgmyAppDatabaseProvider.values.firstWhere(
+      (p) => p.name == raw,
+      orElse: () => NgmyAppDatabaseProvider.none,
+    );
+    return NgmyAppDatabaseConfig(
+      provider: provider,
+      projectUrl: (map['projectUrl'] ?? '').toString(),
+      apiKey: (map['apiKey'] ?? '').toString(),
+      collectionPath: (map['collectionPath'] ?? '').toString(),
+      notes: (map['notes'] ?? '').toString(),
+    );
+  }
+}
+
+String ngmySlugifyAppName(String name) {
+  final slug = name
+      .toLowerCase()
+      .trim()
+      .replaceAll(RegExp(r'[^a-z0-9\s-]'), '')
+      .replaceAll(RegExp(r'\s+'), '-')
+      .replaceAll(RegExp(r'-+'), '-')
+      .replaceAll(RegExp(r'^-|-$'), '');
+  return slug.isEmpty ? 'my-app' : slug;
+}
+
+String ngmyEnsureUniqueAppSlug(String name, Iterable<String> taken) {
+  final base = ngmySlugifyAppName(name);
+  final used = taken.map((s) => s.toLowerCase()).toSet();
+  if (!used.contains(base)) return base;
+  for (var i = 2; i < 500; i++) {
+    final candidate = '$base-$i';
+    if (!used.contains(candidate)) return candidate;
+  }
+  return '${base}_${DateTime.now().millisecondsSinceEpoch}';
+}
 
 NgmyAppBuilderActor ngmyAppBuilderActorById(String id) {
   return kNgmyAppBuilderActors.firstWhere(
@@ -201,6 +293,10 @@ class NgmyAppProject {
   final String updatedAt;
   final String? publishedAt;
   final String? reviewNote;
+  final String slug;
+  final String publicUrl;
+  final String seoDescription;
+  final NgmyAppDatabaseConfig database;
 
   const NgmyAppProject({
     required this.id,
@@ -214,6 +310,10 @@ class NgmyAppProject {
     required this.updatedAt,
     this.publishedAt,
     this.reviewNote,
+    this.slug = '',
+    this.publicUrl = '',
+    this.seoDescription = '',
+    this.database = const NgmyAppDatabaseConfig(),
   });
 
   Color get theme => Color(themeColor);
@@ -228,21 +328,28 @@ class NgmyAppProject {
 
   NgmyAppScreen get homeScreen => screens.isNotEmpty ? screens.first : NgmyAppScreen.welcome(id: 'home', title: name);
 
+  bool get isPublished => status == NgmyAppBuilderStatus.published && publicUrl.trim().isNotEmpty;
+
   NgmyAppProject copyWith({
     String? name,
     String? tagline,
+    String? ownerEmail,
     int? themeColor,
     List<NgmyAppScreen>? screens,
     NgmyAppBuilderStatus? status,
     String? updatedAt,
     String? publishedAt,
     String? reviewNote,
+    String? slug,
+    String? publicUrl,
+    String? seoDescription,
+    NgmyAppDatabaseConfig? database,
   }) {
     return NgmyAppProject(
       id: id,
       name: name ?? this.name,
       tagline: tagline ?? this.tagline,
-      ownerEmail: ownerEmail,
+      ownerEmail: ownerEmail ?? this.ownerEmail,
       themeColor: themeColor ?? this.themeColor,
       screens: screens ?? this.screens,
       status: status ?? this.status,
@@ -250,6 +357,10 @@ class NgmyAppProject {
       updatedAt: updatedAt ?? this.updatedAt,
       publishedAt: publishedAt ?? this.publishedAt,
       reviewNote: reviewNote ?? this.reviewNote,
+      slug: slug ?? this.slug,
+      publicUrl: publicUrl ?? this.publicUrl,
+      seoDescription: seoDescription ?? this.seoDescription,
+      database: database ?? this.database,
     );
   }
 
@@ -265,6 +376,10 @@ class NgmyAppProject {
         'updatedAt': updatedAt,
         'publishedAt': publishedAt,
         'reviewNote': reviewNote,
+        'slug': slug,
+        'publicUrl': publicUrl,
+        'seoDescription': seoDescription,
+        'database': database.toMap(),
       };
 
   factory NgmyAppProject.fromMap(Map<String, dynamic> map) {
@@ -296,6 +411,12 @@ class NgmyAppProject {
       updatedAt: (map['updatedAt'] ?? now).toString(),
       publishedAt: map['publishedAt']?.toString(),
       reviewNote: map['reviewNote']?.toString(),
+      slug: (map['slug'] ?? '').toString(),
+      publicUrl: (map['publicUrl'] ?? '').toString(),
+      seoDescription: (map['seoDescription'] ?? map['tagline'] ?? '').toString(),
+      database: NgmyAppDatabaseConfig.fromMap(
+        map['database'] is Map ? Map<String, dynamic>.from(map['database'] as Map) : null,
+      ),
     );
   }
 

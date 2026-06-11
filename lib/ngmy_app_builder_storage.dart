@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_app_builder_models.dart';
+import 'ngmy_app_builder_urls.dart';
 
 String _userProjectsKey(String email) => 'ngmy_app_builder_projects_${email.toLowerCase().trim()}';
 
@@ -97,8 +98,10 @@ Future<void> ngmySubmitAppForReview(dynamic config, String email, NgmyAppProject
   await ngmySaveUserAppProject(email, submitted);
 }
 
-Future<void> ngmyPublishAppProject(dynamic config, String email, NgmyAppProject project) async {
-  final published = project.copyWith(
+Future<NgmyAppProject> ngmyPublishAppProject(dynamic config, String email, NgmyAppProject project) async {
+  final taken = ngmyAllPublishedAppSlugs(config);
+  final withUrl = ngmyAppProjectWithPublicUrl(project, taken.where((s) => s != project.slug));
+  final published = withUrl.copyWith(
     status: NgmyAppBuilderStatus.published,
     publishedAt: DateTime.now().toUtc().toIso8601String(),
     updatedAt: DateTime.now().toUtc().toIso8601String(),
@@ -114,6 +117,7 @@ Future<void> ngmyPublishAppProject(dynamic config, String email, NgmyAppProject 
   ngmyConfigSetReviewQueue(config, queue);
 
   await ngmySaveUserAppProject(email, published);
+  return published;
 }
 
 Future<void> ngmyRejectAppProject(dynamic config, String email, NgmyAppProject project, String note) async {

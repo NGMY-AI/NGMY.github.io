@@ -11779,6 +11779,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _refreshOnlineStatus();
     _runScheduledPopups();
     WidgetsBinding.instance.addPostFrameCallback((_) => _promptPushNotificationsIfNeeded());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ngmyTryOpenPublishedAppFromUrl(
+        context,
+        config: widget.config,
+        apiKey: widget.config.geminiApiKey,
+        email: widget.user.email,
+      );
+    });
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
