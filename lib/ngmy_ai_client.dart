@@ -104,7 +104,29 @@ String _extractApiErrorMessage(Object? err, {String? body}) {
   return text.isEmpty ? 'Unknown AI error' : text;
 }
 
-Future<({String? text, String? error})> _callGeminiDirect(String apiKey, String prompt) async {
+typedef NgmyAiImagePart = ({String mimeType, String data});
+
+List<Map<String, dynamic>> _geminiPartsFor(String prompt, List<NgmyAiImagePart> images) {
+  final parts = <Map<String, dynamic>>[];
+  for (final img in images) {
+    final data = img.data.trim();
+    if (data.isEmpty) continue;
+    parts.add({
+      'inline_data': {
+        'mime_type': img.mimeType.trim().isEmpty ? 'image/jpeg' : img.mimeType.trim(),
+        'data': data,
+      },
+    });
+  }
+  parts.add({'text': prompt});
+  return parts;
+}
+
+Future<({String? text, String? error})> _callGeminiDirect(
+  String apiKey,
+  String prompt, {
+  List<NgmyAiImagePart> images = const [],
+}) async {
   const models = [
     'gemini-2.5-flash',
     'gemini-2.0-flash',
@@ -113,6 +135,7 @@ Future<({String? text, String? error})> _callGeminiDirect(String apiKey, String 
     'gemini-1.5-flash',
     'gemini-1.5-flash-8b',
   ];
+  final geminiParts = _geminiPartsFor(prompt, images);
   Object? lastError;
   String? lastBody;
   for (final model in models) {
@@ -126,11 +149,7 @@ Future<({String? text, String? error})> _callGeminiDirect(String apiKey, String 
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'contents': [
-                {
-                  'parts': [
-                    {'text': prompt},
-                  ],
-                },
+                {'parts': geminiParts},
               ],
             }),
           )
@@ -253,14 +272,23 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
   required String prompt,
   required NgmyAiProviderKind provider,
   String? openAiBaseUrl,
+  List<NgmyAiImagePart> images = const [],
 }) async {
   try {
     final client = Supabase.instance.client;
     final body = <String, dynamic>{
-      'provider': provider.name,
+      'provider': images.isNotEmpty ? NgmyAiProviderKind.gemini.name : provider.name,
       'apiKey': apiKey,
       'prompt': prompt,
       if (openAiBaseUrl != null && openAiBaseUrl.isNotEmpty) 'openAiBaseUrl': openAiBaseUrl,
+      if (images.isNotEmpty)
+        'images': images
+            .where((img) => img.data.trim().isNotEmpty)
+            .map((img) => {
+                  'mimeType': img.mimeType.trim().isEmpty ? 'image/jpeg' : img.mimeType.trim(),
+                  'data': img.data.trim(),
+                })
+            .toList(),
     };
 
     // Preferred: Supabase Functions client (handles auth headers).
@@ -332,13 +360,17 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
 
 Future<({String? text, String? error})> ngmyAiGenerateWithCredentials(
   NgmyAiCredentials creds,
-  String prompt,
-) async {
+  String prompt, {
+  List<NgmyAiImagePart> images = const [],
+}) async {
   if (creds.apiKey.isEmpty) {
     return (text: null, error: 'No API key configured.');
   }
 
   Future<({String? text, String? error})> runDirect() async {
+    if (images.isNotEmpty) {
+      return _callGeminiDirect(creds.apiKey, prompt, images: images);
+    }
     switch (creds.provider) {
       case NgmyAiProviderKind.gemini:
         return _callGeminiDirect(creds.apiKey, prompt);
@@ -361,6 +393,7 @@ Future<({String? text, String? error})> ngmyAiGenerateWithCredentials(
       prompt: prompt,
       provider: creds.provider,
       openAiBaseUrl: creds.openAiBaseUrl,
+      images: images,
     );
     if (proxied.text != null) return proxied;
     final direct = await runDirect();
@@ -374,13 +407,15 @@ Future<({String? text, String? error})> ngmyAiGenerateWithCredentials(
   final direct = await runDirect();
   if (direct.text != null) return direct;
 
-  if (creds.provider != NgmyAiProviderKind.gemini) {
-    final geminiTry = await _callGeminiDirect(creds.apiKey, prompt);
-    if (geminiTry.text != null) return geminiTry;
-  }
-  if (creds.provider != NgmyAiProviderKind.openai) {
-    final openTry = await _callOpenAiDirect(creds.apiKey, prompt);
-    if (openTry.text != null) return openTry;
+  if (images.isEmpty) {
+    if (creds.provider != NgmyAiProviderKind.gemini) {
+      final geminiTry = await _callGeminiDirect(creds.apiKey, prompt);
+      if (geminiTry.text != null) return geminiTry;
+    }
+    if (creds.provider != NgmyAiProviderKind.openai) {
+      final openTry = await _callOpenAiDirect(creds.apiKey, prompt);
+      if (openTry.text != null) return openTry;
+    }
   }
 
   return direct;

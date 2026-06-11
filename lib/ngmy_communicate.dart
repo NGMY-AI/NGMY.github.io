@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_communicate_payments.dart';
@@ -55,6 +58,37 @@ bool ngmyUserRequestedChatImage(String text) {
 }
 
 bool ngmyCommunicateRoleAllowsChatImages(String role) => ngmyCommunicateNormalizeRole(role) == 'romantic';
+
+/// Users can attach homework / worksheet photos for these roles.
+bool ngmyCommunicateRoleAllowsUserPhotoUpload(String role) {
+  switch (ngmyCommunicateNormalizeRole(role)) {
+    case 'teacher':
+    case 'mentor':
+    case 'career_coach':
+    case 'counselor':
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool ngmyUserWantsStraightAnswers(String text) {
+  final t = text.toLowerCase();
+  return RegExp(r'\b(just\s+)?(give|tell)\s+me\s+(the\s+)?answers?\b').hasMatch(t) ||
+      RegExp(r'\banswers?\s+only\b').hasMatch(t) ||
+      RegExp(r'\bno\s+explanation\b').hasMatch(t) ||
+      RegExp(r'\bstraight\s+answers?\b').hasMatch(t);
+}
+
+bool ngmyUserWantsExplanation(String text) {
+  final t = text.toLowerCase();
+  return RegExp(r'\bexplain\b').hasMatch(t) ||
+      RegExp(r'\bstep\s+by\s+step\b').hasMatch(t) ||
+      RegExp(r'\bwalk\s+me\s+through\b').hasMatch(t) ||
+      RegExp(r'\bhelp\s+me\s+understand\b').hasMatch(t) ||
+      RegExp(r'\bsimpler\b').hasMatch(t) ||
+      RegExp(r'\bdifferent\s+way\b').hasMatch(t);
+}
 
 bool ngmyCommunicateRoleIsRomantic(String role) {
   final r = ngmyCommunicateNormalizeRole(role);
@@ -230,7 +264,11 @@ class NgmyCommunicateProfile {
   String _rolePromptBlock() => switch (ngmyCommunicateNormalizeRole(role)) {
         'therapist' =>
           'ROLE: Licensed-style therapist. Professional, comforting, smart. Reflect feelings, ask thoughtful questions, offer coping tools. Never replace emergency care.\n',
-        'teacher' => 'ROLE: Dedicated teacher. Patient, clear, encouraging. Break concepts down, praise effort, guide learning step by step.\n',
+        'teacher' =>
+          'ROLE: Dedicated teacher and homework helper. When users send photos of homework, worksheets, textbooks, or notes, read every visible question carefully.\n'
+          'DEFAULT STYLE: Explain step by step in the simplest words — one question at a time unless they ask for all. Celebrate effort; never shame them.\n'
+          'If they ask for straight answers only, give clear answers. If they ask to explain, teach the method too. When they want a simpler or different explanation, offer another approach.\n'
+          'For math: show each step. For reading/writing: break down the idea. Ask what grade or subject if unclear.\n',
         'lawyer' =>
           'ROLE: Experienced attorney. Professional, analytical, confident. Explain legal concepts, options, and risks clearly. Not a substitute for formal representation.\n',
         'financial_advisor' =>
@@ -239,8 +277,10 @@ class NgmyCommunicateProfile {
         'doctor' =>
           'ROLE: Doctor. Professional, caring, knowledgeable. Health education and reassurance — always note serious symptoms need real medical care.\n',
         'counselor' => 'ROLE: Life counselor. Warm, non-judgmental, skilled listener. Help process emotions and decisions.\n',
-        'mentor' => 'ROLE: Mentor. Experienced guide — honest feedback, accountability, wisdom for their path.\n',
-        'career_coach' => 'ROLE: Career coach. Strategic, motivating — interviews, resumes, workplace skills, career planning.\n',
+        'mentor' =>
+          'ROLE: Mentor and learning guide. Help with school, life skills, and growth. When they send photos (homework, notes), read them and coach step by step in plain language.\n',
+        'career_coach' =>
+          'ROLE: Career coach. Strategic, motivating — interviews, resumes, workplace skills, career planning. They may send photos of resumes or assignments; give clear actionable feedback.\n',
         'fitness_coach' => 'ROLE: Fitness coach. Motivating, disciplined — workouts, form, nutrition, consistency.\n',
         'life_coach' => 'ROLE: Life coach. Positive, structured — goals, habits, confidence, action plans.\n',
         'romantic' =>
@@ -464,6 +504,8 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     _floatCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat(reverse: true);
     final raw = (widget.config as dynamic).communicateProfiles;
     if (raw is List) NgmyCommunicateAvatarCache.cacheAllProfiles(raw);
+    final email = ((widget.user as dynamic).email as String?) ?? '';
+    if (email.isNotEmpty) unawaited(NgmyCommunicateTimeTracker.syncFromCloud(email));
   }
 
   @override
@@ -881,15 +923,19 @@ class _LoveWorldChat extends StatefulWidget {
 class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObserver {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
+  final _photoPicker = ImagePicker();
   final List<Map<String, String>> _messages = [];
   bool _busy = false;
   bool _loaded = false;
   DateTime? _sessionStart;
   int _usedSeconds = 0;
   int _sessionSeconds = 0;
+  String? _pendingImageB64;
+  String _pendingImageMime = 'image/jpeg';
 
   String get _email => ((widget.user as dynamic).email as String?) ?? '';
   bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
+  bool get _allowsPhotoUpload => ngmyCommunicateRoleAllowsUserPhotoUpload(widget.profile.role);
 
   @override
   void initState() {
@@ -917,6 +963,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   }
 
   Future<void> _load() async {
+    await NgmyCommunicateTimeTracker.syncFromCloud(_email);
     final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
     final used = await NgmyCommunicateTimeTracker.getUsedSeconds(_email);
     if (!mounted) return;
@@ -1001,18 +1048,77 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     );
   }
 
+  Future<void> _pickHomeworkPhoto() async {
+    if (_busy || !_allowsPhotoUpload) return;
+    try {
+      final picked = await _photoPicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 82,
+      );
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      if (bytes.isEmpty || !mounted) return;
+      final mime = picked.mimeType?.trim();
+      setState(() {
+        _pendingImageB64 = base64Encode(bytes);
+        _pendingImageMime = (mime != null && mime.isNotEmpty) ? mime : 'image/jpeg';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load photo: $e')),
+      );
+    }
+  }
+
+  void _clearPendingPhoto() {
+    if (_pendingImageB64 == null) return;
+    setState(() {
+      _pendingImageB64 = null;
+      _pendingImageMime = 'image/jpeg';
+    });
+  }
+
+  String _homeworkVisionInstruction(String text, {required bool hasPhoto}) {
+    if (!hasPhoto) return '';
+    final straight = ngmyUserWantsStraightAnswers(text);
+    final explain = ngmyUserWantsExplanation(text);
+    final style = straight && !explain
+        ? 'They want STRAIGHT ANSWERS — give clear answers for each question, then offer to explain if they want.'
+        : explain || text.isEmpty
+            ? 'Explain STEP BY STEP in the SIMPLEST words — one question at a time unless they asked for all. Show your work for math.'
+            : 'Default: explain simply step by step; if they only want answers, give answers clearly.';
+    return 'HOMEWORK PHOTO: Read every visible question on the image carefully. $style '
+        'If something is blurry or cut off, say what you can see and ask them to resend or type the missing part.\n';
+  }
+
   Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty || _busy || !_loaded) return;
+    final imageB64 = _pendingImageB64;
+    if ((text.isEmpty && imageB64 == null) || _busy || !_loaded) return;
     if (!await _ensurePaid()) return;
 
     HapticFeedback.lightImpact();
+    final displayText = text.isEmpty ? '📷 Homework photo' : text;
+    final imageMime = _pendingImageMime;
+    final userRow = <String, String>{'role': 'user', 'text': displayText};
+    if (imageB64 != null) userRow['imageB64'] = imageB64;
     setState(() {
-      _messages.add({'role': 'user', 'text': text});
+      _messages.add(userRow);
       _controller.clear();
+      _pendingImageB64 = null;
+      _pendingImageMime = 'image/jpeg';
       _busy = true;
     });
-    await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'user', text: text);
+    await NgmyCommunicateMemoryStore.append(
+      _email,
+      widget.profile.id,
+      role: 'user',
+      text: displayText,
+      imageB64: imageB64,
+    );
     _scrollBottom();
 
     final apiKey = widget.apiKey.trim();
@@ -1029,10 +1135,30 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       await NgmyCommunicateRelationshipStore.syncFromMemory(widget.profile.id, _email, mem);
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       final creds = ngmyParseAiCredentials(apiKey);
-      final wantsImage = ngmyUserRequestedChatImage(text) &&
+      final wantsImage = text.isNotEmpty &&
+          ngmyUserRequestedChatImage(text) &&
           (_isAdmin || ngmyCommunicateRoleAllowsChatImages(widget.profile.role));
+      final userSentPhoto = imageB64 != null && _allowsPhotoUpload;
 
-      if (wantsImage) {
+      if (userSentPhoto) {
+        final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
+        final visionHint = _homeworkVisionInstruction(text, hasPhoto: true);
+        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner)}\n'
+            '$visionHint'
+            '${transcript.isNotEmpty ? '$transcript\n' : ''}'
+            '${text.isNotEmpty ? 'They also wrote: $text\n' : 'They sent a homework photo.\n'}'
+            'Reply as ${widget.profile.name} — helpful teacher energy, plain language:';
+        final images = <NgmyAiImagePart>[
+          (mimeType: imageMime, data: imageB64),
+        ];
+        final result = await ngmyAiGenerateWithCredentials(creds, prompt, images: images);
+        final reply = (result.text != null && result.text!.trim().isNotEmpty)
+            ? result.text!.trim()
+            : ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: result.error);
+        if (!mounted) return;
+        setState(() => _messages.add({'role': 'ai', 'text': reply}));
+        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
+      } else if (wantsImage) {
         final look = widget.profile.bio.trim().isNotEmpty
             ? widget.profile.bio.trim()
             : (widget.profile.personality.trim().isNotEmpty
@@ -1105,11 +1231,14 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               itemCount: _messages.length + (_busy ? 1 : 0) + (_messages.isEmpty && _loaded ? 1 : 0),
               itemBuilder: (context, i) {
                 if (_messages.isEmpty && _loaded && i == 0) {
+                  final emptyHint = _allowsPhotoUpload
+                      ? 'Ask ${widget.profile.name} anything — tap 📷 to send homework photos for step-by-step help.'
+                      : 'Say something sweet to ${widget.profile.name}… 💜';
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Text(
-                        'Say something sweet to ${widget.profile.name}… 💜',
+                        emptyHint,
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14, fontStyle: FontStyle.italic),
                       ),
@@ -1223,46 +1352,93 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               top: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-                child: _loveGlassPanel(
-                  borderRadius: BorderRadius.circular(26),
-                  fillAlpha: 0.06,
-                  blur: 12,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _controller,
-                            minLines: 1,
-                            maxLines: 4,
-                            style: const TextStyle(color: Colors.white),
-                            decoration: InputDecoration(
-                              hintText: 'Write from the heart…',
-                              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            ),
-                            onSubmitted: (_) => _send(),
-                          ),
-                        ),
-                        NgmyVoiceMicButton(controller: _controller, color: const Color(0xFFEC4899)),
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: _busy ? null : _send,
-                            customBorder: const CircleBorder(),
-                            child: Container(
-                              width: 42,
-                              height: 42,
-                              decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)])),
-                              child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_pendingImageB64 != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _loveGlassPanel(
+                          borderRadius: BorderRadius.circular(16),
+                          fillAlpha: 0.08,
+                          blur: 10,
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: _chatImageBubble(_pendingImageB64!),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Photo ready — add a question or tap send',
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
+                                  onPressed: _busy ? null : _clearPendingPhoto,
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ],
+                      ),
+                    _loveGlassPanel(
+                      borderRadius: BorderRadius.circular(26),
+                      fillAlpha: 0.06,
+                      blur: 12,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                        child: Row(
+                          children: [
+                            if (_allowsPhotoUpload)
+                              IconButton(
+                                tooltip: 'Send homework photo',
+                                onPressed: _busy ? null : _pickHomeworkPhoto,
+                                icon: const Icon(Icons.photo_camera_rounded, color: Color(0xFFEC4899), size: 22),
+                              ),
+                            Expanded(
+                              child: TextField(
+                                controller: _controller,
+                                minLines: 1,
+                                maxLines: 4,
+                                style: const TextStyle(color: Colors.white),
+                                decoration: InputDecoration(
+                                  hintText: _allowsPhotoUpload
+                                      ? 'Ask anything or send a homework photo…'
+                                      : 'Write from the heart…',
+                                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                ),
+                                onSubmitted: (_) => _send(),
+                              ),
+                            ),
+                            NgmyVoiceMicButton(controller: _controller, color: const Color(0xFFEC4899)),
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: _busy ? null : _send,
+                                customBorder: const CircleBorder(),
+                                child: Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)]),
+                                  ),
+                                  child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),

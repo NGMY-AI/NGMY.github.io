@@ -41,8 +41,8 @@ class NgmyCommunicatePayments {
       context: context,
       user: user,
       amount: amount,
-      title: 'Communicate — $mins min block',
-      message: 'Pay for another $mins minutes of companion chat.',
+      title: 'AI chat — $mins min block',
+      message: 'Pay for another $mins minutes of AI chat. Time is shared across NGMY Helper, World of Love, and all assistants on your account (synced on every device).',
       onCharge: onCharge,
     );
     if (ok && email.isNotEmpty) {

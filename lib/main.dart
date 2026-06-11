@@ -100,6 +100,7 @@ import 'ngmy_app_builder_admin.dart';
 import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_communicate_payments.dart';
+import 'ngmy_communicate_storage.dart';
 import 'ngmy_invoice_protected_preview.dart';
 import 'ngmy_web_viewport.dart';
 import 'ngmy_web_status_bar.dart';
@@ -39521,7 +39522,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   Timer? _chatGateTimer;
   Timer? _helperQuotaTimer;
   Timer? _helperCountdownTimer;
+  Timer? _helperAiTimeTimer;
   Timer? _newsPollTimer;
+  DateTime? _helperSessionStart;
+  int _helperAiUsedSeconds = 0;
+  int _helperAiSessionSeconds = 0;
   int _unreadNewsInternal = 0;
   List<Announcement> _newsItems = [];
   RealtimeChannel? _newsChannel;
@@ -39567,6 +39572,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     unawaited(_loadHelperKb());
     _startChatGateWatcher();
     _startHelperQuotaWatcher();
+    _startHelperAiTimeWatcher();
     _subscribeNewsRealtime();
     _newsPollTimer = Timer.periodic(const Duration(minutes: 3), (_) => unawaited(_pollNewsFromCloud()));
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -39836,6 +39842,81 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _helperQuotaTimer = Timer.periodic(const Duration(seconds: 60), (_) => unawaited(_refreshHelperQuota()));
   }
 
+  void _startHelperAiTimeWatcher() {
+    _helperAiTimeTimer?.cancel();
+    if (widget.user.isAdmin) return;
+    _helperSessionStart = DateTime.now();
+    unawaited(_refreshHelperAiTimeUsage());
+    _helperAiTimeTimer = Timer.periodic(const Duration(seconds: 8), (_) => unawaited(_tickHelperAiTime()));
+  }
+
+  Future<void> _refreshHelperAiTimeUsage() async {
+    if (widget.user.isAdmin) return;
+    final used = await NgmyCommunicateTimeTracker.syncFromCloud(widget.user.email);
+    if (!mounted) return;
+    setState(() {
+      _helperAiUsedSeconds = used;
+      _helperAiSessionSeconds = _helperSessionStart == null
+          ? 0
+          : DateTime.now().difference(_helperSessionStart!).inSeconds;
+    });
+  }
+
+  Future<void> _flushHelperSessionTime() async {
+    if (widget.user.isAdmin || _helperSessionStart == null) return;
+    final elapsed = DateTime.now().difference(_helperSessionStart!).inSeconds;
+    if (elapsed > 0) {
+      await NgmyCommunicateTimeTracker.addSeconds(widget.user.email, elapsed);
+      _helperSessionStart = DateTime.now();
+    }
+  }
+
+  Future<void> _tickHelperAiTime() async {
+    if (!mounted || widget.user.isAdmin) return;
+    await _flushHelperSessionTime();
+    final used = await NgmyCommunicateTimeTracker.getUsedSeconds(widget.user.email);
+    if (!mounted) return;
+    setState(() {
+      _helperAiUsedSeconds = used;
+      _helperAiSessionSeconds = _helperSessionStart == null
+          ? 0
+          : DateTime.now().difference(_helperSessionStart!).inSeconds;
+    });
+  }
+
+  Future<bool> _ensureHelperAiTimePaid() async {
+    if (widget.user.isAdmin) return true;
+    if (NgmyCommunicatePayments.feeAmountFromConfig(widget.config) <= 0) return true;
+    await _flushHelperSessionTime();
+    _helperAiUsedSeconds = await NgmyCommunicateTimeTracker.getUsedSeconds(widget.user.email);
+    if (!await NgmyCommunicatePayments.needsPayment(widget.user.email, widget.config)) return true;
+    if (widget.onAddTransaction == null) return false;
+    return NgmyCommunicatePayments.confirmTimeBlockPayment(
+      context: context,
+      user: widget.user,
+      config: widget.config,
+      onCharge: (amount, desc) async {
+        final charged = ngmyChargeUserWallet(
+          user: widget.user,
+          allUsers: widget.allUsers,
+          amount: amount,
+          description: desc,
+          onAddTransaction: widget.onAddTransaction!,
+        );
+        if (charged) widget.onDataChanged?.call();
+        return charged;
+      },
+    );
+  }
+
+  bool get _helperAiTimePaymentActive =>
+      !widget.user.isAdmin && NgmyCommunicatePayments.feeAmountFromConfig(widget.config) > 0;
+
+  int get _helperAiRemainingSeconds {
+    final total = _helperAiUsedSeconds + _helperAiSessionSeconds;
+    return (NgmyCommunicatePayments.thresholdSeconds(widget.config) - total).clamp(0, 999999);
+  }
+
   void _syncHelperCountdownTimer() {
     _helperCountdownTimer?.cancel();
     _helperCountdownTimer = null;
@@ -39943,9 +40024,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   @override
   void dispose() {
+    unawaited(_flushHelperSessionTime());
     _chatGateTimer?.cancel();
     _helperQuotaTimer?.cancel();
     _helperCountdownTimer?.cancel();
+    _helperAiTimeTimer?.cancel();
     _newsPollTimer?.cancel();
     try {
       _newsChannel?.unsubscribe();
@@ -40052,6 +40135,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   Future<void> _sendMessage() async {
     final text = _chatController.text.trim();
     if (text.isEmpty) return;
+
+    if (!await _ensureHelperAiTimePaid()) return;
 
     if (!widget.user.isAdmin) {
       final limit = widget.config.ngmyHelperDailyMessageLimit;
@@ -40369,9 +40454,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                                     ? (_kbLockedByDailyLimit
                                         ? 'Help Topics • AI returns when your 24h limit resets'
                                         : 'Help Topics • Instant answers')
-                                    : (_isBoss
-                                        ? 'Online • Personal assistant for Sir'
-                                        : 'Online • Chat & community updates'),
+                                    : (_helperAiTimePaymentActive
+                                        ? '~${(_helperAiRemainingSeconds / 60).ceil()} min AI left (shared with World of Love)'
+                                        : (_isBoss
+                                            ? 'Online • Personal assistant for Sir'
+                                            : 'Online • Chat & community updates')),
                                 style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w500),
                               ),
                             ),

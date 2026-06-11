@@ -175,15 +175,18 @@ class NgmyCommunicateTimeCloud {
 class NgmyCommunicateTimeTracker {
   static String _key(String email) => 'ngmy_communicate_used_sec_${email.toLowerCase().trim()}';
 
-  static Future<int> getUsedSeconds(String email) async {
+  /// Pull cloud usage into local cache — call when opening any AI chat.
+  static Future<int> syncFromCloud(String email) async {
     if (email.trim().isEmpty) return 0;
     final prefs = await SharedPreferences.getInstance();
     final local = prefs.getInt(_key(email)) ?? 0;
     final cloud = await NgmyCommunicateTimeCloud.fetchSeconds(email);
     final merged = math.max(local, cloud);
-    if (merged > local) await prefs.setInt(_key(email), merged);
+    if (merged != local) await prefs.setInt(_key(email), merged);
     return merged;
   }
+
+  static Future<int> getUsedSeconds(String email) async => syncFromCloud(email);
 
   static Future<void> addSeconds(String email, int seconds) async {
     if (email.trim().isEmpty || seconds <= 0) return;
