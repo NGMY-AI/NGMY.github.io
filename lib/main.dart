@@ -2251,12 +2251,23 @@ Timer? _operationalConfigCloudDebounce;
 /// Admin menu + user requests (loans, help, store messages, registrar apps) — not the full config blob.
 Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
   if (!await ngmyCanReachCloud()) return false;
+  var loans = config.loanApplications.map((e) => Map<String, dynamic>.from(e)).toList();
+  final remoteLists = await _fetchManagementOperationalListsCloud();
+  if (remoteLists != null) {
+    final raw = remoteLists['loanApplications'];
+    if (raw is List && raw.isNotEmpty) {
+      final remoteLoans = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      loans = _mergeLoanApplicationsLists(loans, remoteLoans);
+    }
+  }
+  await NgmyLoanStatusCloud.fetchAndApply(loans);
+  config.loanApplications = loans;
   var row = <String, dynamic>{
     'id': kNgmyConfigRowId,
     'storeInquiries': config.storeInquiries,
     'storeOrders': config.storeOrders,
     'storeListings': config.storeListings,
-    'loanApplications': config.loanApplications,
+    'loanApplications': loans,
     'helpHelperApplications': config.helpHelperApplications,
     'helpRequests': config.helpRequests,
     'helpBusinesses': config.helpBusinesses,
@@ -19858,7 +19869,8 @@ class LoanServiceScreen extends StatelessWidget {
       username: user.username,
       config: ngmyLoanConfigBridge(config),
       onDataChanged: onDataChanged,
-      onPersistNow: () => ngmyAdminPersistManagementConfig(config),
+      onPersistNow: () => ngmyUserPersistLoanApplications(config),
+      onRefreshLoans: () => ngmyRefreshUserLoanApplications(config),
     );
   }
 }

@@ -431,6 +431,37 @@ String ngmyAiHelperFailureMessage({
   return 'NGMY Helper could not reach $provider. Check the key in Management Hub and reload the app.';
 }
 
+/// Free image fallback — works without an API key (romantic chat selfies, etc.).
+Future<({Uint8List? bytes, String? error})> ngmyPollinationsImage(String prompt) async {
+  final p = prompt.trim();
+  if (p.isEmpty) return (bytes: null, error: 'Enter an image description.');
+  try {
+    final url = Uri.parse(
+      'https://image.pollinations.ai/prompt/${Uri.encodeComponent(p)}?width=768&height=768&nologo=true',
+    );
+    final response = await http.get(url).timeout(const Duration(seconds: 90));
+    if (response.statusCode == 200 && response.bodyBytes.length > 2048) {
+      return (bytes: response.bodyBytes, error: null);
+    }
+    return (bytes: null, error: 'Image service returned ${response.statusCode}.');
+  } catch (e) {
+    return (bytes: null, error: _extractApiErrorMessage(e));
+  }
+}
+
+/// Romantic chat images — Pollinations first (no key), then paid APIs if configured.
+Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
+  String prompt, {
+  NgmyAiCredentials? creds,
+}) async {
+  final poll = await ngmyPollinationsImage(prompt);
+  if (poll.bytes != null) return poll;
+  if (creds != null && creds.apiKey.trim().isNotEmpty) {
+    return ngmyAiGenerateImage(creds, prompt);
+  }
+  return (bytes: null, error: poll.error ?? 'Could not generate image.');
+}
+
 /// Admin image generation — any prompt, no content filter (companion avatars, etc.).
 Future<({Uint8List? bytes, String? error})> ngmyAiGenerateImage(
   NgmyAiCredentials creds,
@@ -508,21 +539,6 @@ Future<({Uint8List? bytes, String? error})> ngmyAiGenerateImage(
     return (bytes: null, error: 'Gemini image models unavailable for this key.');
   }
 
-  Future<({Uint8List? bytes, String? error})> pollinationsImage() async {
-    try {
-      final url = Uri.parse(
-        'https://image.pollinations.ai/prompt/${Uri.encodeComponent(p)}?width=768&height=768&nologo=true',
-      );
-      final response = await http.get(url).timeout(const Duration(seconds: 90));
-      if (response.statusCode == 200 && response.bodyBytes.length > 2048) {
-        return (bytes: response.bodyBytes, error: null);
-      }
-      return (bytes: null, error: 'Image service returned ${response.statusCode}.');
-    } catch (e) {
-      return (bytes: null, error: _extractApiErrorMessage(e));
-    }
-  }
-
   ({Uint8List? bytes, String? error}) primary;
   switch (creds.provider) {
     case NgmyAiProviderKind.openai:
@@ -542,7 +558,7 @@ Future<({Uint8List? bytes, String? error})> ngmyAiGenerateImage(
   }
   if (primary.bytes != null) return primary;
 
-  final fallback = await pollinationsImage();
+  final fallback = await ngmyPollinationsImage(p);
   if (fallback.bytes != null) return fallback;
   return (bytes: null, error: primary.error ?? fallback.error ?? 'Could not generate image.');
 }

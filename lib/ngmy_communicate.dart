@@ -47,11 +47,14 @@ bool ngmyUserRequestedChatImage(String text) {
   final t = text.toLowerCase().trim();
   if (t.isEmpty) return false;
   return RegExp(
-    r'\b(pic|picture|photo|selfie|snap|image|portrait|draw|paint|generate|create)\b',
+    r'\b(pic|picture|photo|selfie|snap|image|portrait|draw|paint|generate|created?|make|send)\b',
     caseSensitive: false,
   ).hasMatch(t) ||
-      RegExp(r'\b(send|show)\s+(me\s+)?(a\s+)?(pic|photo|picture|selfie|image)\b', caseSensitive: false).hasMatch(t);
+      RegExp(r'\b(send|show|make|create)\s+(me\s+)?(a\s+)?(pic|photo|picture|selfie|image)\b', caseSensitive: false).hasMatch(t) ||
+      RegExp(r'\bcreate\s+(an?\s+)?image\b', caseSensitive: false).hasMatch(t);
 }
+
+bool ngmyCommunicateRoleAllowsChatImages(String role) => ngmyCommunicateNormalizeRole(role) == 'romantic';
 
 bool ngmyCommunicateRoleIsRomantic(String role) {
   final r = ngmyCommunicateNormalizeRole(role);
@@ -1026,7 +1029,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       await NgmyCommunicateRelationshipStore.syncFromMemory(widget.profile.id, _email, mem);
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       final creds = ngmyParseAiCredentials(apiKey);
-      final wantsImage = ngmyUserRequestedChatImage(text) && (_isAdmin || ngmyCommunicateRoleIsRomantic(widget.profile.role));
+      final wantsImage = ngmyUserRequestedChatImage(text) &&
+          (_isAdmin || ngmyCommunicateRoleAllowsChatImages(widget.profile.role));
 
       if (wantsImage) {
         final look = widget.profile.bio.trim().isNotEmpty
@@ -1034,9 +1038,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             : (widget.profile.personality.trim().isNotEmpty
                 ? widget.profile.personality.trim()
                 : '${widget.profile.genderLabel}, ${widget.profile.name}');
+        final scene = text.length > 120 ? text.substring(0, 120) : text;
         final imgPrompt =
-            'Photorealistic portrait of $look, ${widget.profile.name}, warm natural lighting, dating app profile photo, high quality, no text, no watermark';
-        final imgResult = await ngmyAiGenerateImage(creds, imgPrompt);
+            'Photorealistic portrait of $look, ${widget.profile.name}, $scene, warm natural lighting, dating app photo, high quality, no text, no watermark';
+        final imgResult = await ngmyGenerateRomanticChatImage(imgPrompt, creds: creds);
         if (imgResult.bytes != null && imgResult.bytes!.isNotEmpty) {
           final b64 = base64Encode(imgResult.bytes!);
           await NgmyCommunicateAvatarCache.saveBytes(widget.profile.id, imgResult.bytes!);

@@ -184,11 +184,31 @@ Future<void> ngmyHydrateManagementListsFromAllBackups(AppConfig config) async {
   final local = await _loadManagementOperationalListsLocal();
   if (local != null) _applyManagementOperationalListsPayload(config, local);
   await NgmyLoanStatusStore.applyTo(config.loanApplications);
+  await NgmyLoanStatusCloud.fetchAndApply(config.loanApplications);
   if (await ngmyCanReachCloud()) {
     final cloud = await _fetchManagementOperationalListsCloud();
     if (cloud != null) _applyManagementOperationalListsPayload(config, cloud);
     await NgmyLoanStatusStore.applyTo(config.loanApplications);
+    await NgmyLoanStatusCloud.fetchAndApply(config.loanApplications);
   }
+}
+
+/// User loan screen — pull latest approve/reject from cloud before showing status.
+Future<void> ngmyRefreshUserLoanApplications(AppConfig config) async {
+  await ngmyHydrateManagementListsFromAllBackups(config);
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+}
+
+/// User loan submit — merge cloud first so pending never overwrites admin approval.
+Future<bool> ngmyUserPersistLoanApplications(AppConfig config) async {
+  await ngmyHydrateManagementListsFromAllBackups(config);
+  await _persistManagementOperationalListsLocal(config);
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  unawaited(NgmyLoanStatusCloud.pushFromApps(config.loanApplications));
+  if (await ngmyCanReachCloud()) {
+    return _persistOperationalConfigToCloud(config);
+  }
+  return true;
 }
 
 Future<bool> _upsertManagementListColumn(String column, dynamic value) async {
@@ -863,8 +883,10 @@ Future<void> ngmyAdminRefreshManagementConfigLight(AppConfig config) async {
 /// Full Supabase + local persist for Admin → Management Menus (loans, jobs, civic, payments, etc.).
 Future<bool> ngmyAdminPersistManagementConfig(AppConfig config) async {
   _operationalConfigCloudDebounce?.cancel();
+  await ngmyHydrateManagementListsFromAllBackups(config);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   await _persistManagementOperationalListsLocal(config);
+  unawaited(NgmyLoanStatusCloud.pushFromApps(config.loanApplications));
 
   var cloudOk = false;
   if (await ngmyCanReachCloud()) {

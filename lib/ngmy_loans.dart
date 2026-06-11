@@ -11,7 +11,90 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_network_resilience.dart';
 import 'ngmy_offline.dart';
+
+/// Lightweight cloud status map — users see approve/reject without re-downloading full loans.
+class NgmyLoanStatusCloud {
+  static const _settingsKey = 'ngmy_loan_status_map_v1';
+
+  static Map<String, dynamic> statusMapFromApps(List<Map<String, dynamic>> apps) {
+    final map = <String, dynamic>{};
+    for (final raw in apps) {
+      final id = (raw['id'] ?? '').toString().trim();
+      final status = (raw['status'] ?? '').toString().trim();
+      if (id.isEmpty || status.isEmpty) continue;
+      map[id] = {
+        'status': status,
+        'approvedAt': raw['approvedAt'],
+        'rejectionReason': raw['rejectionReason'],
+        'updatedAt': raw['updatedAt'] ?? DateTime.now().toUtc().toIso8601String(),
+      };
+    }
+    return map;
+  }
+
+  static void applyStatusMap(List<Map<String, dynamic>> apps, Map<String, dynamic> statusMap) {
+    for (var i = 0; i < apps.length; i++) {
+      final id = (apps[i]['id'] ?? '').toString().trim();
+      if (id.isEmpty) continue;
+      final override = statusMap[id];
+      if (override is! Map) continue;
+      final remote = Map<String, dynamic>.from(override);
+      final rs = (remote['status'] ?? '').toString();
+      if (rs.isEmpty) continue;
+      final ls = (apps[i]['status'] ?? 'pending').toString();
+      final remoteFinal = rs == 'approved' || rs == 'rejected';
+      final localFinal = ls == 'approved' || ls == 'rejected';
+      final ru = (remote['updatedAt'] ?? '').toString();
+      final lu = (apps[i]['updatedAt'] ?? '').toString();
+      if (remoteFinal && !localFinal) {
+        apps[i]['status'] = rs;
+        if (remote['approvedAt'] != null) apps[i]['approvedAt'] = remote['approvedAt'];
+        if (remote['rejectionReason'] != null) apps[i]['rejectionReason'] = remote['rejectionReason'];
+        if (ru.isNotEmpty) apps[i]['updatedAt'] = ru;
+      } else if (remoteFinal && localFinal && ru.compareTo(lu) > 0) {
+        apps[i]['status'] = rs;
+        if (remote['approvedAt'] != null) apps[i]['approvedAt'] = remote['approvedAt'];
+        if (remote['rejectionReason'] != null) apps[i]['rejectionReason'] = remote['rejectionReason'];
+        apps[i]['updatedAt'] = ru;
+      }
+    }
+  }
+
+  static Future<void> pushFromApps(List<Map<String, dynamic>> apps) async {
+    if (!await ngmyCanReachCloud()) return;
+    try {
+      final row = {
+        'key': _settingsKey,
+        'value': {
+          'statuses': statusMapFromApps(apps),
+          'savedAt': DateTime.now().toUtc().toIso8601String(),
+        },
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      };
+      await Supabase.instance.client.from('ngmy_settings').upsert([row], onConflict: 'key');
+    } catch (e) {
+      debugPrint('[loan status cloud] push: $e');
+    }
+  }
+
+  static Future<void> fetchAndApply(List<Map<String, dynamic>> apps) async {
+    if (!await ngmyCanReachCloud() || apps.isEmpty) return;
+    try {
+      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _settingsKey).maybeSingle();
+      if (row == null) return;
+      final value = row['value'];
+      if (value is! Map) return;
+      final statuses = value['statuses'];
+      if (statuses is Map) {
+        applyStatusMap(apps, Map<String, dynamic>.from(statuses));
+      }
+    } catch (e) {
+      debugPrint('[loan status cloud] fetch: $e');
+    }
+  }
+}
 
 /// Instant local backup for admin loan approve/reject — survives cloud lag.
 class NgmyLoanStatusStore {
@@ -187,6 +270,7 @@ class NgmyLoanServicesScreen extends StatefulWidget {
     required this.config,
     required this.onDataChanged,
     this.onPersistNow,
+    this.onRefreshLoans,
   });
 
   final String userEmail;
@@ -194,12 +278,45 @@ class NgmyLoanServicesScreen extends StatefulWidget {
   final NgmyLoanConfigBridge config;
   final VoidCallback onDataChanged;
   final Future<bool> Function()? onPersistNow;
+  final Future<void> Function()? onRefreshLoans;
 
   @override
   State<NgmyLoanServicesScreen> createState() => _NgmyLoanServicesScreenState();
 }
 
-class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> {
+class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with WidgetsBindingObserver {
+  bool _refreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_refreshLoans());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_refreshLoans());
+  }
+
+  Future<void> _refreshLoans() async {
+    if (_refreshing) return;
+    _refreshing = true;
+    try {
+      await widget.onRefreshLoans?.call();
+      await NgmyLoanStatusCloud.fetchAndApply(widget.config.loanApplications);
+    } finally {
+      _refreshing = false;
+      if (mounted) setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1587,6 +1704,7 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
     widget.config.loanApplications[i]['approvedAt'] = approvedAt;
     widget.config.loanApplications[i]['updatedAt'] = approvedAt;
     await NgmyLoanStatusStore.saveDecision(id, status: 'approved', approvedAt: approvedAt);
+    await NgmyLoanStatusCloud.pushFromApps(widget.config.loanApplications);
     final ok = await widget.onPersistNow?.call() ?? false;
     widget.onDataChanged();
     if (!context.mounted) return;
@@ -1625,6 +1743,7 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
     widget.config.loanApplications[i]['rejectionReason'] = reason;
     widget.config.loanApplications[i]['updatedAt'] = updatedAt;
     await NgmyLoanStatusStore.saveDecision(id, status: 'rejected', rejectionReason: reason);
+    await NgmyLoanStatusCloud.pushFromApps(widget.config.loanApplications);
     final saved = await widget.onPersistNow?.call() ?? false;
     widget.onDataChanged();
     if (!context.mounted) return;
