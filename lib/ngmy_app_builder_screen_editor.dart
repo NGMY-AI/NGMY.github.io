@@ -642,6 +642,13 @@ class _AddWidgetSheet extends StatelessWidget {
       ('qrCode', 'Static QR', Icons.qr_code),
       ('invoiceBuilder', 'Invoice', Icons.receipt_long),
     ],
+    'Social & Video': [
+      ('reelFeed', 'TikTok feed', Icons.smart_display_rounded),
+      ('socialFeed', 'Social feed', Icons.dynamic_feed_rounded),
+      ('postComposer', 'Post / reel', Icons.video_call_rounded),
+      ('searchHub', 'Search hub', Icons.search_rounded),
+      ('profile', 'Profile', Icons.person_rounded),
+    ],
     'Layout': [
       ('spacer', 'Spacer', Icons.space_bar),
       ('divider', 'Divider', Icons.horizontal_rule),

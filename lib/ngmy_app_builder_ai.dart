@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_runtime.dart';
+import 'ngmy_app_builder_social_blueprints.dart';
 
 class NgmyAppBuilderCopilotResult {
   final String message;
@@ -17,6 +18,7 @@ Future<NgmyAppBuilderCopilotResult> ngmyAppBuilderAiCopilot({
   required String apiKey,
   required String userMessage,
   NgmyAppProject? project,
+  String ownerEmail = '',
   List<Map<String, String>> history = const [],
 }) async {
   final creds = ngmyParseAiCredentials(apiKey);
@@ -52,7 +54,14 @@ If the user asks to CREATE, BUILD, MAKE, GENERATE, or "give me" an app (QR code,
 QR CODE APPS: use {"type":"qrGenerator","mode":"url"} and {"type":"qrGenerator","mode":"text"} screens + dataList of saved codes.
 INVOICE APPS: use {"type":"invoiceBuilder","collection":"invoices"} + dataList of invoices.
 VIDEO / DOWNLOAD LINK APPS: form saves url field + dataList with urlField:"url" so tapping opens the link.
-MEDIA / SOCIAL APPS: post form (collection: posts) with imageUrl/caption fields + feed dataList + profile stat + settings. Wire home menuGrid to Post, Feed, Profile.
+
+TIKTOK / REELS: NEVER hero+menuGrid. Use reelFeed on home (fullBleed+hideAppBar), postComposer, profile, shell.bottomNav. Real vertical video swipe.
+
+FACEBOOK: socialFeed home + postComposer + bottomNav. NOT menu hub.
+
+GOOGLE: searchHub home (fullBleed) + bookmark form.
+
+MEDIA / SOCIAL: use socialFeed or reelFeed widgets — NOT plain dataList as home.
 
 You build WORKING apps — not text-only brochures. Every feature must FUNCTION:
 - Forms MUST have "collection" and save data (venues, check-ins, contacts, etc.)
@@ -98,7 +107,8 @@ IMPORTANT RESPONSE FORMAT:
        }
      ],
      "database": {"provider":"none|firebase|supabase|mongodb|custom","projectUrl":"","apiKey":"","collectionPath":"","notes":""},
-     "customCode": "optional notes"
+     "customCode": "optional notes",
+     "shell": {"bottomNav":[{"icon":"home","label":"Home","target":"feed"}]}
    }
 3) If user only asks questions, do NOT include ---APP_JSON---.
 4) Keep screen ids stable when editing. Use target / targetScreenId for navigation.
@@ -121,14 +131,56 @@ User: $userMessage
     if (text == null || text.isEmpty) {
       return NgmyAppBuilderCopilotResult(message: reply.error ?? 'AI returned an empty reply. Try again.');
     }
-    return _parseCopilotReply(text, project);
+    final email = ownerEmail.isNotEmpty ? ownerEmail : (project?.ownerEmail ?? '');
+    final parsed = _parseCopilotReply(text, project, email);
+    return _applySocialBlueprintIfNeeded(parsed, userMessage, parsed.updatedProject ?? project, email);
   } catch (e) {
     debugPrint('[app builder copilot] $e');
     return NgmyAppBuilderCopilotResult(message: 'AI error: $e');
   }
 }
 
-NgmyAppBuilderCopilotResult _parseCopilotReply(String raw, NgmyAppProject? base) {
+NgmyAppBuilderCopilotResult _applySocialBlueprintIfNeeded(
+  NgmyAppBuilderCopilotResult result,
+  String userMessage,
+  NgmyAppProject? base,
+  String ownerEmail,
+) {
+  final kind = NgmyAppSocialBlueprints.detectKind(userMessage);
+  if (kind == null) return result;
+  final email = ownerEmail.isNotEmpty ? ownerEmail : (base?.ownerEmail ?? '');
+  if (result.updatedProject != null && !NgmyAppSocialBlueprints.looksLikeGenericDemo(result.updatedProject)) {
+    return result;
+  }
+  final blueprint = NgmyAppSocialBlueprints.build(
+    kind,
+    ownerEmail: email,
+    name: result.updatedProject?.name,
+  );
+  if (blueprint == null) return result;
+  final merged = blueprint.copyWith(
+    id: result.updatedProject?.id ?? base?.id ?? blueprint.id,
+    ownerEmail: email.isNotEmpty ? email : blueprint.ownerEmail,
+    status: base?.status ?? result.updatedProject?.status ?? NgmyAppBuilderStatus.draft,
+    slug: base?.slug ?? result.updatedProject?.slug ?? '',
+    publicUrl: base?.publicUrl ?? result.updatedProject?.publicUrl ?? '',
+  );
+  final label = switch (kind) {
+    'tiktok' => 'TikTok-style',
+    'facebook' => 'Facebook-style',
+    'google' => 'Google-style',
+    'instagram' => 'Instagram-style',
+    _ => kind,
+  };
+  return NgmyAppBuilderCopilotResult(
+    message: result.updatedProject == null
+        ? 'Built a full $label app — vertical video feed, post screen, profile, and bottom navigation. Preview it now!'
+        : '${result.message}\n\n(Replaced generic menu with a real $label app — swipe videos, post reels, use bottom tabs.)',
+    updatedProject: merged,
+  );
+}
+
+NgmyAppBuilderCopilotResult _parseCopilotReply(String raw, NgmyAppProject? base, [String ownerEmail = '']) {
   final marker = '---APP_JSON---';
   if (!raw.contains(marker)) {
     final fallback = _extractJson(raw);
@@ -136,7 +188,7 @@ NgmyAppBuilderCopilotResult _parseCopilotReply(String raw, NgmyAppProject? base)
       try {
         final decoded = jsonDecode(fallback);
         if (decoded is Map) {
-          final updated = _projectFromAiMap(Map<String, dynamic>.from(decoded), base);
+          final updated = _projectFromAiMap(Map<String, dynamic>.from(decoded), base, ownerEmail);
           if (updated != null && _projectHasUsableScreens(updated)) {
             return NgmyAppBuilderCopilotResult(
               message: '${raw.trim()}\n\n(Done — I applied the app JSON from your reply.)',
@@ -164,7 +216,7 @@ NgmyAppBuilderCopilotResult _parseCopilotReply(String raw, NgmyAppProject? base)
     if (decoded is! Map) {
       return NgmyAppBuilderCopilotResult(message: message.isEmpty ? raw.trim() : message);
     }
-    final updated = _projectFromAiMap(Map<String, dynamic>.from(decoded), base);
+    final updated = _projectFromAiMap(Map<String, dynamic>.from(decoded), base, ownerEmail);
     if (updated == null) {
       return NgmyAppBuilderCopilotResult(message: message.isEmpty ? 'Could not parse app changes.' : message);
     }
@@ -184,7 +236,7 @@ bool _projectHasUsableScreens(NgmyAppProject p) {
   return s.kind != NgmyAppScreenKind.content;
 }
 
-NgmyAppProject? _projectFromAiMap(Map<String, dynamic> map, NgmyAppProject? base) {
+NgmyAppProject? _projectFromAiMap(Map<String, dynamic> map, NgmyAppProject? base, [String ownerEmail = '']) {
   final screensRaw = map['screens'];
   final screens = <NgmyAppScreen>[];
   if (screensRaw is List) {
@@ -205,7 +257,7 @@ NgmyAppProject? _projectFromAiMap(Map<String, dynamic> map, NgmyAppProject? base
     id: base?.id ?? 'app_${DateTime.now().millisecondsSinceEpoch}',
     name: (map['name'] ?? base?.name ?? 'My App').toString(),
     tagline: (map['tagline'] ?? base?.tagline ?? '').toString(),
-    ownerEmail: base?.ownerEmail ?? '',
+    ownerEmail: ownerEmail.isNotEmpty ? ownerEmail : (base?.ownerEmail ?? ''),
     themeColor: _parseColorHex(map['themeColorHex']?.toString() ?? '#6366F1'),
     screens: screens.isEmpty ? (base?.screens ?? [NgmyAppScreen.welcome(id: 'home', title: 'Welcome')]) : screens,
     status: base?.status ?? NgmyAppBuilderStatus.draft,
@@ -217,6 +269,9 @@ NgmyAppProject? _projectFromAiMap(Map<String, dynamic> map, NgmyAppProject? base
     database: database,
     customCode: (map['customCode'] ?? base?.customCode ?? '').toString(),
     appIcon: (map['appIcon'] ?? base?.appIcon ?? '').toString(),
+    shell: map['shell'] is Map
+        ? Map<String, dynamic>.from(map['shell'] as Map)
+        : (base?.shell ?? const {}),
     publishedAt: base?.publishedAt,
     reviewNote: base?.reviewNote,
   );

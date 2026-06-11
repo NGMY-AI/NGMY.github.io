@@ -165,6 +165,16 @@ Map<String, dynamic> ngmyNewWidget(String type, {List<NgmyAppScreen> screens = c
       return {'type': 'qrGenerator', 'mode': 'url', 'placeholder': 'https://your-site.com', 'collection': 'qr_codes', 'allowSave': true};
     case 'invoiceBuilder':
       return {'type': 'invoiceBuilder', 'collection': 'invoices', 'title': 'Create invoice'};
+    case 'reelFeed':
+      return {'type': 'reelFeed', 'collection': 'reels'};
+    case 'socialFeed':
+      return {'type': 'socialFeed', 'collection': 'posts'};
+    case 'postComposer':
+      return {'type': 'postComposer', 'mode': 'reel', 'collection': 'reels', 'navigateAfter': 'feed'};
+    case 'searchHub':
+      return {'type': 'searchHub', 'collection': 'bookmarks'};
+    case 'profile':
+      return {'type': 'profile', 'collection': 'reels', 'handle': '@you'};
     default:
       return {'type': 'text', 'text': 'Widget', 'style': 'subtitle'};
   }
@@ -213,6 +223,20 @@ String ngmyWidgetTypeLabel(String type) {
     case 'invoicebuilder':
     case 'invoice_builder':
       return 'Invoice builder';
+    case 'reelfeed':
+    case 'reel_feed':
+      return 'Reel feed (TikTok)';
+    case 'socialfeed':
+    case 'social_feed':
+      return 'Social feed';
+    case 'postcomposer':
+    case 'post_composer':
+      return 'Post composer';
+    case 'searchhub':
+    case 'search_hub':
+      return 'Search hub';
+    case 'profile':
+      return 'Profile';
     case 'tabs':
       return 'Tabs';
     default:

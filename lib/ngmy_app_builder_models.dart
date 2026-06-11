@@ -98,7 +98,9 @@ const List<NgmyAppBuilderActor> kNgmyAppBuilderActors = [
         'Understand intent: "add a button that..." means create button widget + target screen + wire navigation. '
         '"Build a store" means checkout, cart, add product form, product list — full app not one screen. '
         '"QR code app" means qrGenerator (url+text screens) + saved list. "Invoice app" means invoiceBuilder + invoice list. '
-        '"Video/download app" means form saving URLs + dataList with urlField. ALWAYS output ---APP_JSON---.',
+        '"Video/download app" means form saving URLs + dataList with urlField. '
+        '"TikTok/reels" means reelFeed home + postComposer + shell.bottomNav — NEVER hero+menuGrid. '
+        '"Facebook" means socialFeed + postComposer. "Google search" means searchHub. ALWAYS output ---APP_JSON---.',
   ),
   NgmyAppBuilderActor(
     id: 'reviewer',
@@ -318,6 +320,8 @@ class NgmyAppProject {
   final String customCode;
   /// User-chosen app icon — emoji or short label shown in Studio and runtime.
   final String appIcon;
+  /// Optional shell: bottomNav, theme overrides (TikTok/Facebook-style apps).
+  final Map<String, dynamic> shell;
 
   const NgmyAppProject({
     required this.id,
@@ -337,6 +341,7 @@ class NgmyAppProject {
     this.database = const NgmyAppDatabaseConfig(),
     this.customCode = '',
     this.appIcon = '',
+    this.shell = const {},
   });
 
   Color get theme => Color(themeColor);
@@ -386,6 +391,7 @@ class NgmyAppProject {
     NgmyAppDatabaseConfig? database,
     String? customCode,
     String? appIcon,
+    Map<String, dynamic>? shell,
   }) {
     return NgmyAppProject(
       id: id ?? this.id,
@@ -405,6 +411,7 @@ class NgmyAppProject {
       database: database ?? this.database,
       customCode: customCode ?? this.customCode,
       appIcon: appIcon ?? this.appIcon,
+      shell: shell ?? Map<String, dynamic>.from(this.shell),
     );
   }
 
@@ -426,6 +433,7 @@ class NgmyAppProject {
         'database': database.toMap(),
         'customCode': customCode,
         'appIcon': appIcon,
+        if (shell.isNotEmpty) 'shell': shell,
       };
 
   factory NgmyAppProject.fromMap(Map<String, dynamic> map) {
@@ -469,6 +477,7 @@ class NgmyAppProject {
       ),
       customCode: (map['customCode'] ?? '').toString(),
       appIcon: (map['appIcon'] ?? '').toString(),
+      shell: map['shell'] is Map ? Map<String, dynamic>.from(map['shell'] as Map) : const {},
     );
   }
 

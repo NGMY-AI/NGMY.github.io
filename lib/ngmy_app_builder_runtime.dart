@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_app_builder_data.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_runtime_extras.dart';
+import 'ngmy_app_builder_runtime_social.dart';
 
 /// Renders interactive app screens from JSON — forms save, lists show data, settings work.
 class NgmyAppLayoutRenderer extends StatefulWidget {
@@ -14,6 +15,7 @@ class NgmyAppLayoutRenderer extends StatefulWidget {
   final bool isDarkMode;
   final void Function(String? targetScreenId) onNavigate;
   final void Function(String message) onSnack;
+  final bool fullBleed;
 
   const NgmyAppLayoutRenderer({
     super.key,
@@ -21,6 +23,7 @@ class NgmyAppLayoutRenderer extends StatefulWidget {
     required this.theme,
     required this.appId,
     this.isDarkMode = false,
+    this.fullBleed = false,
     required this.onNavigate,
     required this.onSnack,
   });
@@ -47,14 +50,37 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
     super.dispose();
   }
 
+  bool _isImmersiveRoot(String type) {
+    switch (type) {
+      case 'reelfeed':
+      case 'reel_feed':
+      case 'reels':
+      case 'socialfeed':
+      case 'social_feed':
+      case 'searchhub':
+      case 'search_hub':
+        return true;
+      default:
+        return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final rootType = (widget.layout['type'] ?? 'column').toString().toLowerCase();
+    final immersive = widget.fullBleed || _isImmersiveRoot(rootType);
     return ListenableBuilder(
       listenable: _store,
-      builder: (context, _) => SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: _buildNode(context, widget.layout),
-      ),
+      builder: (context, _) {
+        final node = _buildNode(context, widget.layout);
+        if (immersive) {
+          return SizedBox.expand(child: node);
+        }
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: node,
+        );
+      },
     );
   }
 
@@ -229,6 +255,51 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
           store: _store,
           isDark: widget.isDarkMode,
           onSnack: widget.onSnack,
+        );
+      case 'reelfeed':
+      case 'reel_feed':
+      case 'reels':
+        return NgmyRuntimeReelFeed(
+          node: node,
+          theme: widget.theme,
+          store: _store,
+          isDark: widget.isDarkMode,
+          onSnack: widget.onSnack,
+        );
+      case 'socialfeed':
+      case 'social_feed':
+        return NgmyRuntimeSocialFeed(
+          node: node,
+          theme: widget.theme,
+          store: _store,
+          isDark: widget.isDarkMode,
+          onSnack: widget.onSnack,
+        );
+      case 'postcomposer':
+      case 'post_composer':
+        return NgmyRuntimePostComposer(
+          node: node,
+          theme: widget.theme,
+          store: _store,
+          isDark: widget.isDarkMode,
+          onSnack: widget.onSnack,
+          onNavigate: widget.onNavigate,
+        );
+      case 'searchhub':
+      case 'search_hub':
+        return NgmyRuntimeSearchHub(
+          node: node,
+          theme: widget.theme,
+          store: _store,
+          isDark: widget.isDarkMode,
+          onSnack: widget.onSnack,
+        );
+      case 'profile':
+        return NgmyRuntimeProfile(
+          node: node,
+          theme: widget.theme,
+          store: _store,
+          isDark: widget.isDarkMode,
         );
       default:
         if (children.isNotEmpty) {
@@ -888,4 +959,17 @@ Plus dataList screen: collection invoices, titleField client, subtitleField amou
 VIDEO / LINK HUB: form saves video URLs to collection "videos", dataList shows them, button {"action":"openUrl","url":"{{field}}"} or per-item open button on list screen with link field.
 
 WHEN USER ASKS FOR QR / INVOICE / VIDEO APP — you MUST use qrGenerator, qrCode, invoiceBuilder widgets. Never reply without ---APP_JSON--- when they want to create or change an app.
+
+TIKTOK / REELS / SHORT VIDEO (NEVER use hero+stat+menuGrid — that is WRONG):
+Home screen MUST be: {"id":"feed","kind":"custom","data":{"fullBleed":true,"hideAppBar":true,"layout":{"type":"reelFeed","collection":"reels"}}}
+Include shell.bottomNav: Home→feed, Discover→discover, Post→create, Inbox→inbox, Profile→profile
+Screens: feed (reelFeed), create (postComposer mode reel), profile (profile widget). Theme #FE2C55.
+
+FACEBOOK / SOCIAL FEED:
+Home: {"type":"socialFeed","collection":"posts"} with fullBleed. Create screen: postComposer mode post. shell.bottomNav.
+
+GOOGLE / SEARCH:
+Home: {"type":"searchHub","collection":"bookmarks"} fullBleed hideAppBar. Form screen to save bookmarks.
+
+FORBIDDEN for TikTok/Facebook/Google requests: hero + menuGrid hub as the only home screen.
 ''';

@@ -16,6 +16,7 @@ import 'ngmy_app_builder_data.dart';
 import 'ngmy_app_builder_copilot_storage.dart';
 import 'ngmy_app_builder_export.dart';
 import 'ngmy_app_builder_runtime.dart';
+import 'ngmy_app_builder_runtime_social.dart';
 import 'ngmy_app_builder_storage.dart';
 import 'ngmy_app_builder_templates.dart';
 import 'ngmy_app_builder_urls.dart';
@@ -1805,6 +1806,7 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
       apiKey: widget.apiKey,
       userMessage: text,
       project: _project,
+      ownerEmail: widget.email,
       history: _messages,
     );
     if (!mounted) return;
@@ -1829,6 +1831,7 @@ class _NgmyAppBuilderCopilotScreenState extends State<NgmyAppBuilderCopilotScree
           database: base.database,
           customCode: base.customCode,
           appIcon: base.appIcon,
+          shell: base.shell.isNotEmpty ? base.shell : (_project?.shell ?? const {}),
           publishedAt: _project?.publishedAt,
           reviewNote: _project?.reviewNote,
         );
@@ -2237,22 +2240,46 @@ class _NgmyAppRuntimeScreenState extends State<NgmyAppRuntimeScreen> {
         final screen = widget.project.screenById(_screenId) ?? widget.project.homeScreen;
         final theme = widget.project.theme;
         final dark = _dataStore.darkModeEnabled;
-        final bg = dark ? const Color(0xFF0F172A) : theme.withValues(alpha: 0.08);
+        final hideBar = screen.data['hideAppBar'] == true;
+        final fullBleed = screen.data['fullBleed'] == true;
+        final bg = fullBleed ? Colors.black : (dark ? const Color(0xFF0F172A) : theme.withValues(alpha: 0.08));
         final barBg = dark ? const Color(0xFF1E293B) : theme;
+        final navItems = ngmyParseBottomNavItems(widget.project.shell['bottomNav']);
         return Scaffold(
           backgroundColor: bg,
-          appBar: AppBar(
-            backgroundColor: barBg,
-            foregroundColor: Colors.white,
-            title: Text(widget.project.name, style: const TextStyle(fontWeight: FontWeight.w900)),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.home_rounded),
-                onPressed: () => setState(() => _screenId = widget.project.homeScreen.id),
-              ),
-            ],
-          ),
-          body: SafeArea(child: _buildScreen(screen, theme, dark)),
+          extendBodyBehindAppBar: fullBleed && hideBar,
+          appBar: hideBar
+              ? null
+              : AppBar(
+                  backgroundColor: barBg,
+                  foregroundColor: Colors.white,
+                  title: Text(screen.title.isNotEmpty ? screen.title : widget.project.name, style: const TextStyle(fontWeight: FontWeight.w900)),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.home_rounded),
+                      onPressed: () => setState(() => _screenId = widget.project.homeScreen.id),
+                    ),
+                  ],
+                ),
+          body: fullBleed ? _buildScreen(screen, theme, dark) : SafeArea(child: _buildScreen(screen, theme, dark)),
+          bottomNavigationBar: navItems == null
+              ? null
+              : NavigationBar(
+                  selectedIndex: navItems.indexWhere((e) => (e['target'] ?? '').toString() == _screenId).clamp(0, navItems.length - 1),
+                  onDestinationSelected: (i) {
+                    final t = (navItems[i]['target'] ?? '').toString();
+                    if (t.isNotEmpty) _go(t);
+                  },
+                  backgroundColor: dark ? const Color(0xFF0F172A) : Colors.white,
+                  indicatorColor: theme.withValues(alpha: 0.2),
+                  destinations: [
+                    for (final item in navItems)
+                      NavigationDestination(
+                        icon: Icon(ngmyShellNavIcon(item['icon']?.toString())),
+                        label: (item['label'] ?? '').toString(),
+                      ),
+                  ],
+                ),
         );
       },
     );
@@ -2266,6 +2293,7 @@ class _NgmyAppRuntimeScreenState extends State<NgmyAppRuntimeScreen> {
           layout: layout,
           theme: theme,
           isDarkMode: dark,
+          fullBleed: screen.data['fullBleed'] == true,
           appId: widget.project.id,
           onNavigate: _go,
           onSnack: (msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))),
