@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Inline blob preview on web — no native controls (iOS Safari fullscreen safe).
@@ -17,6 +19,8 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
   late final String _viewType;
   html.VideoElement? _video;
   bool _playing = false;
+  bool _ready = false;
+  String? _error;
 
   @override
   void initState() {
@@ -26,9 +30,9 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
       _video = html.VideoElement()
         ..src = widget.source
         ..controls = false
-        ..preload = 'metadata'
+        ..preload = 'auto'
         ..loop = true
-        ..muted = true
+        ..muted = false
         ..setAttribute('playsinline', 'true')
         ..setAttribute('webkit-playsinline', 'true')
         ..setAttribute('x-webkit-airplay', 'deny')
@@ -37,41 +41,79 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
         ..style.objectFit = 'cover'
         ..style.backgroundColor = '#000'
         ..style.pointerEvents = 'none';
+      _video!.onLoadedData.listen((_) {
+        if (mounted) setState(() => _ready = true);
+      });
       _video!.onPlay.listen((_) {
         if (mounted) setState(() => _playing = true);
       });
       _video!.onPause.listen((_) {
         if (mounted) setState(() => _playing = false);
       });
+      _video!.onError.listen((_) {
+        if (mounted) setState(() => _error = 'Could not load this video clip.');
+      });
+      _video!.load();
       return _video!;
     });
   }
 
-  void _togglePlay() {
+  Future<void> _togglePlay() async {
     final v = _video;
     if (v == null) return;
-    if (v.paused) {
-      v.play();
-    } else {
-      v.pause();
+    try {
+      if (v.paused) {
+        await v.play();
+        if (mounted) setState(() => _playing = true);
+      } else {
+        v.pause();
+        if (mounted) setState(() => _playing = false);
+      }
+    } catch (e) {
+      debugPrint('[studio html video] play: $e');
+      if (mounted) setState(() => _error = 'Tap Play again — browser blocked autoplay.');
     }
   }
 
-  void _replay() {
+  Future<void> _replay() async {
     final v = _video;
     if (v == null) return;
-    v.currentTime = 0;
-    v.play();
+    try {
+      v.currentTime = 0;
+      await v.play();
+      if (mounted) setState(() => _playing = true);
+    } catch (e) {
+      debugPrint('[studio html video] replay: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      return ColoredBox(
+        color: Colors.black87,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+          ),
+        ),
+      );
+    }
     return Stack(
       fit: StackFit.expand,
       clipBehavior: Clip.hardEdge,
       children: [
         const ColoredBox(color: Colors.black, child: SizedBox.expand()),
         HtmlElementView(viewType: _viewType),
+        if (!_ready)
+          const Center(
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+            ),
+          ),
         Positioned(
           left: 8,
           right: 8,
@@ -79,13 +121,17 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _ctrl(Icons.play_arrow_rounded, 'Play', _togglePlay),
+              _ctrl(
+                _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                _playing ? 'Pause' : 'Play',
+                () => unawaited(_togglePlay()),
+              ),
               const SizedBox(width: 8),
-              _ctrl(Icons.replay_rounded, 'Replay', _replay),
+              _ctrl(Icons.replay_rounded, 'Replay', () => unawaited(_replay())),
             ],
           ),
         ),
-        if (!_playing)
+        if (!_playing && _ready)
           Center(
             child: Material(
               color: Colors.black45,
@@ -94,7 +140,7 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
                 iconSize: 36,
                 color: Colors.white,
                 icon: const Icon(Icons.play_circle_fill_rounded),
-                onPressed: _togglePlay,
+                onPressed: () => unawaited(_togglePlay()),
               ),
             ),
           ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -100,23 +101,31 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
     if (playing != _playing) setState(() => _playing = playing);
   }
 
-  void _togglePlay() {
+  Future<void> _togglePlay() async {
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
-    if (c.value.isPlaying) {
-      c.pause();
-    } else {
-      c.play();
+    try {
+      if (c.value.isPlaying) {
+        await c.pause();
+      } else {
+        await c.play();
+      }
+      if (mounted) setState(() => _playing = c.value.isPlaying);
+    } catch (e) {
+      debugPrint('[studio slot video] play: $e');
     }
-    setState(() => _playing = c.value.isPlaying);
   }
 
-  void _replay() {
+  Future<void> _replay() async {
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
-    c.seekTo(Duration.zero);
-    c.play();
-    setState(() => _playing = true);
+    try {
+      await c.seekTo(Duration.zero);
+      await c.play();
+      if (mounted) setState(() => _playing = true);
+    } catch (e) {
+      debugPrint('[studio slot video] replay: $e');
+    }
   }
 
   @override
@@ -142,10 +151,10 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
           _ctrlBtn(
             icon: _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
             label: _playing ? 'Pause' : 'Play',
-            onTap: _togglePlay,
+            onTap: () => unawaited(_togglePlay()),
           ),
           const SizedBox(width: 8),
-          _ctrlBtn(icon: Icons.replay_rounded, label: 'Replay', onTap: _replay),
+          _ctrlBtn(icon: Icons.replay_rounded, label: 'Replay', onTap: () => unawaited(_replay())),
         ],
       ),
     );
@@ -227,7 +236,7 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
               final w = value.size.width > 0 ? value.size.width : 16.0;
               final h = value.size.height > 0 ? value.size.height : 9.0;
               return GestureDetector(
-                onTap: _togglePlay,
+                onTap: () => unawaited(_togglePlay()),
                 child: FittedBox(
                   fit: BoxFit.cover,
                   clipBehavior: Clip.hardEdge,
@@ -246,7 +255,7 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
                 iconSize: 40,
                 color: Colors.white,
                 icon: const Icon(Icons.play_circle_fill_rounded),
-                onPressed: _togglePlay,
+                onPressed: () => unawaited(_togglePlay()),
               ),
             ),
           ),

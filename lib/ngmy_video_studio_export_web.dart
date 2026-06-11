@@ -520,17 +520,25 @@ html.MediaStream? _safeCaptureStream(dynamic element, {int fps = _exportCanvasFp
   return null;
 }
 
+bool _studioAllowsRawFallback(NgmyVideoStudioExportConfig config) {
+  return config.newsBannerStyle == null &&
+      !config.showTextOverlay &&
+      config.logoDataUrlBySlot.isEmpty &&
+      (config.backgroundAsset == null || config.backgroundAsset!.trim().isEmpty);
+}
+
 Future<String> _fallbackComposedExport(
   NgmyVideoStudioExportConfig config,
   Map<String, String> sources, {
   String? reason,
-  bool allowRawFallback = true,
+  bool? allowRawFallback,
 }) async {
+  final allowRaw = allowRawFallback ?? _studioAllowsRawFallback(config);
   if (config.needsComposedExport) {
-    if (!allowRawFallback) {
+    if (!allowRaw) {
       final detail = reason?.trim();
       final suffix = detail != null && detail.isNotEmpty ? ' ($detail)' : '';
-      return 'Export failed: templates could not be merged$suffix. Try Chrome on a computer.';
+      return 'Export failed: templates could not be merged$suffix. Try Chrome on a computer, or wait until the preview loads fully and tap Download again.';
     }
     final raw = await _downloadAllVideoClips(sources);
     if (raw.toLowerCase().contains('failed') || raw.contains('No video')) return raw;
@@ -581,10 +589,6 @@ Future<String> exportNgmyVideoStudioComposed({
   final sources = config.videoSourcesBySlot;
   if (sources.isEmpty || sources.values.every((s) => s.trim().isEmpty)) {
     return 'Upload at least one video into a screen frame before downloading.';
-  }
-
-  if (config.canDirectDownload) {
-    return exportNgmyVideoStudioDirect(videoSourceUrl: sources.values.first);
   }
 
   if (!_webSupportsComposedCapture()) {
@@ -760,9 +764,10 @@ Future<String> exportNgmyVideoStudioComposed({
       v.pause();
       await _seekVideoTo(v, 0);
     }
-    paintFrame();
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    paintFrame();
+    for (var i = 0; i < 6; i++) {
+      paintFrame();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
 
     final canvasStream = _safeCaptureStream(canvas, fps: _exportCanvasFps);
     if (canvasStream != null) {
@@ -773,6 +778,21 @@ Future<String> exportNgmyVideoStudioComposed({
     }
 
     if (!usedCanvasStream) {
+      if (config.needsComposedExport) {
+        exportCanvas?.remove();
+        for (final v in videos.values) {
+          v.remove();
+        }
+        for (final i in logos.values) {
+          i.remove();
+        }
+        return _fallbackComposedExport(
+          config,
+          sources,
+          reason: 'canvas capture unavailable',
+          allowRawFallback: false,
+        );
+      }
       final vStream = _safeCaptureStream(videos.values.first);
       if (vStream != null) {
         for (final t in vStream.getVideoTracks()) {
@@ -904,7 +924,12 @@ Future<String> exportNgmyVideoStudioComposed({
 
     if (chunks.isEmpty) {
       debugPrint('[studio export] empty chunks (mime=$mimeType)');
-      return _fallbackComposedExport(config, sources, reason: 'recording produced no data', allowRawFallback: true);
+      return _fallbackComposedExport(
+        config,
+        sources,
+        reason: 'recording produced no data',
+        allowRawFallback: _studioAllowsRawFallback(config),
+      );
     }
 
     final apple = _ngmyIsAppleMobileBrowser();
@@ -913,7 +938,12 @@ Future<String> exportNgmyVideoStudioComposed({
     if (apple) {
       if (blobType.contains('webm')) {
         debugPrint('[studio export] WebM on iOS — falling back to original MP4 clip(s)');
-        return _fallbackComposedExport(config, sources, reason: 'iPhone needs MP4 export');
+        return _fallbackComposedExport(
+          config,
+          sources,
+          reason: 'iPhone needs MP4 export',
+          allowRawFallback: _studioAllowsRawFallback(config),
+        );
       }
       blobType = 'video/mp4';
       ext = 'mp4';
@@ -934,8 +964,8 @@ Future<String> exportNgmyVideoStudioComposed({
     }
     final url = html.Url.createObjectUrlFromBlob(blob);
     final mode = await ngmyTriggerBrowserDownload(url, filename);
-    if (!usedCanvasStream) {
-      return '${_ngmyDownloadResultMessage(mode)} (video track — full studio merge needs Chrome/Edge on desktop.)';
+    if (!usedCanvasStream && config.needsComposedExport) {
+      return 'Export failed: templates were not baked into the file. Use Chrome on a computer and try again.';
     }
     return _ngmyDownloadResultMessage(mode);
   } catch (e, st) {

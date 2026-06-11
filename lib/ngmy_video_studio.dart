@@ -14,6 +14,7 @@ import 'ngmy_video_studio_models.dart';
 import 'ngmy_video_studio_painter.dart';
 import 'ngmy_video_studio_picker.dart';
 import 'ngmy_studio_slot_video.dart';
+import 'ngmy_studio_html_video_stub.dart' if (dart.library.html) 'ngmy_studio_html_video.dart' as studio_html_video;
 import 'ngmy_banner_text_style.dart';
 import 'ngmy_news_banner_painter.dart';
 
@@ -820,16 +821,18 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           }
           children.add(
             Positioned.fill(
-              child: CustomPaint(
-                painter: NgmyNewsBannerPainter(
-                  style: _def.newsBannerStyle!,
-                  headline: _headlineC.text,
-                  title: _titleC.text,
-                  subtitle: _subtitleC.text,
-                  liveLabel: _liveC.text,
-                  topAccent: _def.newsTopAccent,
-                  scale: _headlineScale,
-                  textStyle: _bannerTextStyle,
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: NgmyNewsBannerPainter(
+                    style: _def.newsBannerStyle!,
+                    headline: _headlineC.text,
+                    title: _titleC.text,
+                    subtitle: _subtitleC.text,
+                    liveLabel: _liveC.text,
+                    topAccent: _def.newsTopAccent,
+                    scale: _headlineScale,
+                    textStyle: _bannerTextStyle,
+                  ),
                 ),
               ),
             ),
@@ -849,42 +852,46 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
 
         if (!_def.usesPhotoBackdrop) {
           children.add(
-            CustomPaint(
-              painter: NgmyVideoTemplatePainter(
-                templateId: _templateId,
-                format: _format,
-                slotRects: _slotRects,
-                slotShapes: _slotShapes,
-                headline: _headlineC.text,
-                title: _titleC.text,
-                subtitle: _subtitleC.text,
-                liveLabel: _liveC.text,
-                headlineFontScale: _headlineScale,
-                titleFontScale: _titleScale,
-                layer: NgmyTemplatePaintLayer.foreground,
+            IgnorePointer(
+              child: CustomPaint(
+                painter: NgmyVideoTemplatePainter(
+                  templateId: _templateId,
+                  format: _format,
+                  slotRects: _slotRects,
+                  slotShapes: _slotShapes,
+                  headline: _headlineC.text,
+                  title: _titleC.text,
+                  subtitle: _subtitleC.text,
+                  liveLabel: _liveC.text,
+                  headlineFontScale: _headlineScale,
+                  titleFontScale: _titleScale,
+                  layer: NgmyTemplatePaintLayer.foreground,
+                ),
+                child: const SizedBox.expand(),
               ),
-              child: const SizedBox.expand(),
             ),
           );
         }
 
         if (!_def.usesPhotoBackdrop) {
           children.add(
-            CustomPaint(
-              painter: NgmyVideoTemplatePainter(
-                templateId: _templateId,
-                format: _format,
-                slotRects: _slotRects,
-                slotShapes: _slotShapes,
-                headline: _headlineC.text,
-                title: _titleC.text,
-                subtitle: _subtitleC.text,
-                liveLabel: _liveC.text,
-                headlineFontScale: _headlineScale,
-                titleFontScale: _titleScale,
-                layer: NgmyTemplatePaintLayer.frameBorders,
+            IgnorePointer(
+              child: CustomPaint(
+                painter: NgmyVideoTemplatePainter(
+                  templateId: _templateId,
+                  format: _format,
+                  slotRects: _slotRects,
+                  slotShapes: _slotShapes,
+                  headline: _headlineC.text,
+                  title: _titleC.text,
+                  subtitle: _subtitleC.text,
+                  liveLabel: _liveC.text,
+                  headlineFontScale: _headlineScale,
+                  titleFontScale: _titleScale,
+                  layer: NgmyTemplatePaintLayer.frameBorders,
+                ),
+                child: const SizedBox.expand(),
               ),
-              child: const SizedBox.expand(),
             ),
           );
         }
@@ -925,7 +932,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     final src = media?.source;
     Widget child;
     if (src != null && src.isNotEmpty) {
-      child = NgmyStudioSlotVideo(key: ValueKey('${slot.id}|$src'), source: src);
+      child = kIsWeb
+          ? studio_html_video.NgmyStudioHtmlVideo(key: ValueKey('${slot.id}|$src'), source: src)
+          : NgmyStudioSlotVideo(key: ValueKey('${slot.id}|$src'), source: src);
     } else {
       child = Container(
         color: Colors.black87,
@@ -973,21 +982,72 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       });
     }
 
+    if (hasVideo) {
+      return Positioned.fromRect(
+        rect: px,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            if (active)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFFFF3B8A), width: 2),
+                    ),
+                  ),
+                ),
+              ),
+            if (active)
+              Positioned(
+                right: 2,
+                bottom: 2,
+                child: GestureDetector(
+                  onPanUpdate: onDrag,
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(Icons.open_with, color: Colors.white, size: 16),
+                  ),
+                ),
+              ),
+            Positioned(
+              left: 4,
+              top: 4,
+              child: Material(
+                color: Colors.black45,
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => setState(() => _activeSlotId = slot.id),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.touch_app_rounded, color: Colors.white70, size: 14),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Positioned.fromRect(
       rect: px,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
-            child: IgnorePointer(
-              ignoring: active && hasVideo,
-              child: GestureDetector(
-                onTap: () => setState(() => _activeSlotId = slot.id),
-                onPanUpdate: active && !hasVideo ? onDrag : null,
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: active ? const Color(0xFFFF3B8A) : Colors.transparent, width: 2),
-                  ),
+            child: GestureDetector(
+              onTap: () => setState(() => _activeSlotId = slot.id),
+              onPanUpdate: active ? onDrag : null,
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: active ? const Color(0xFFFF3B8A) : Colors.transparent, width: 2),
                 ),
               ),
             ),
