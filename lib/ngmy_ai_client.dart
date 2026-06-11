@@ -508,18 +508,41 @@ Future<({Uint8List? bytes, String? error})> ngmyAiGenerateImage(
     return (bytes: null, error: 'Gemini image models unavailable for this key.');
   }
 
+  Future<({Uint8List? bytes, String? error})> pollinationsImage() async {
+    try {
+      final url = Uri.parse(
+        'https://image.pollinations.ai/prompt/${Uri.encodeComponent(p)}?width=768&height=768&nologo=true',
+      );
+      final response = await http.get(url).timeout(const Duration(seconds: 90));
+      if (response.statusCode == 200 && response.bodyBytes.length > 2048) {
+        return (bytes: response.bodyBytes, error: null);
+      }
+      return (bytes: null, error: 'Image service returned ${response.statusCode}.');
+    } catch (e) {
+      return (bytes: null, error: _extractApiErrorMessage(e));
+    }
+  }
+
+  ({Uint8List? bytes, String? error}) primary;
   switch (creds.provider) {
     case NgmyAiProviderKind.openai:
-      return openAiImage();
+      primary = await openAiImage();
+      break;
     case NgmyAiProviderKind.openaiCompatible:
-      return openAiImage(baseUrl: creds.openAiBaseUrl);
+      primary = await openAiImage(baseUrl: creds.openAiBaseUrl);
+      break;
     case NgmyAiProviderKind.gemini:
-      final g = await geminiImage();
-      if (g.bytes != null) return g;
-      return openAiImage();
+      primary = await geminiImage();
+      if (primary.bytes == null) primary = await openAiImage();
+      break;
     case NgmyAiProviderKind.anthropic:
-      final o = await openAiImage();
-      if (o.bytes != null) return o;
-      return geminiImage();
+      primary = await openAiImage();
+      if (primary.bytes == null) primary = await geminiImage();
+      break;
   }
+  if (primary.bytes != null) return primary;
+
+  final fallback = await pollinationsImage();
+  if (fallback.bytes != null) return fallback;
+  return (bytes: null, error: primary.error ?? fallback.error ?? 'Could not generate image.');
 }

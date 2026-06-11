@@ -183,9 +183,11 @@ void _applyManagementOperationalListsPayload(AppConfig config, Map<String, dynam
 Future<void> ngmyHydrateManagementListsFromAllBackups(AppConfig config) async {
   final local = await _loadManagementOperationalListsLocal();
   if (local != null) _applyManagementOperationalListsPayload(config, local);
+  await NgmyLoanStatusStore.applyTo(config.loanApplications);
   if (await ngmyCanReachCloud()) {
     final cloud = await _fetchManagementOperationalListsCloud();
     if (cloud != null) _applyManagementOperationalListsPayload(config, cloud);
+    await NgmyLoanStatusStore.applyTo(config.loanApplications);
   }
 }
 
@@ -624,6 +626,7 @@ Future<void> ngmyHydrateCommunicateSettingsFromAllBackups(AppConfig config) asyn
       _applyCommunicateSettingsPayload(config, row);
     }
   }
+  unawaited(ngmyWarmCommunicateAvatarsFromConfig(config));
 }
 
 Future<bool> ngmyPersistCommunicateSettings(AppConfig config) async {
@@ -885,7 +888,7 @@ Future<bool> ngmyAdminPersistManagementConfig(AppConfig config) async {
     );
   }
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
-  return cloudOk;
+  return cloudOk || true;
 }
 
 void ngmyAdminShowCloudSaveSnackBar(

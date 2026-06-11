@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -30,8 +31,12 @@ class NgmyCommunicateMemoryStore {
         if (at != null && at.isBefore(cutoff)) continue;
         final role = (map['role'] ?? '').toString();
         final text = (map['text'] ?? '').toString().trim();
-        if (text.isEmpty || (role != 'user' && role != 'ai')) continue;
-        kept.add({'role': role, 'text': text, 'at': (at ?? now).toUtc().toIso8601String()});
+        final imageB64 = (map['imageB64'] ?? '').toString().trim();
+        if (text.isEmpty && imageB64.isEmpty) continue;
+        if (role != 'user' && role != 'ai') continue;
+        final row = <String, dynamic>{'role': role, 'text': text, 'at': (at ?? now).toUtc().toIso8601String()};
+        if (imageB64.isNotEmpty) row['imageB64'] = imageB64;
+        kept.add(row);
       }
       if (kept.length != decoded.length) await _persist(email, profileId, kept);
       return kept;
@@ -40,14 +45,25 @@ class NgmyCommunicateMemoryStore {
     }
   }
 
-  static Future<void> append(String email, String profileId, {required String role, required String text}) async {
-    if (email.trim().isEmpty || profileId.trim().isEmpty || text.trim().isEmpty) return;
+  static Future<void> append(
+    String email,
+    String profileId, {
+    required String role,
+    required String text,
+    String? imageB64,
+  }) async {
+    if (email.trim().isEmpty || profileId.trim().isEmpty) return;
+    final trimmed = text.trim();
+    final img = (imageB64 ?? '').trim();
+    if (trimmed.isEmpty && img.isEmpty) return;
     final list = await load(email, profileId);
-    list.add({
+    final row = <String, dynamic>{
       'role': role,
-      'text': text.trim(),
+      'text': trimmed,
       'at': DateTime.now().toUtc().toIso8601String(),
-    });
+    };
+    if (img.isNotEmpty) row['imageB64'] = img;
+    list.add(row);
     await saveAll(email, profileId, list);
   }
 
@@ -59,10 +75,13 @@ class NgmyCommunicateMemoryStore {
     for (final m in messages) {
       final role = (m['role'] ?? '').toString();
       final text = (m['text'] ?? '').toString().trim();
-      if (text.isEmpty) continue;
+      final imageB64 = (m['imageB64'] ?? '').toString().trim();
+      if (text.isEmpty && imageB64.isEmpty) continue;
       final at = DateTime.tryParse((m['at'] ?? '').toString()) ?? now;
       if (at.isBefore(cutoff)) continue;
-      cleaned.add({'role': role, 'text': text, 'at': at.toUtc().toIso8601String()});
+      final row = <String, dynamic>{'role': role, 'text': text, 'at': at.toUtc().toIso8601String()};
+      if (imageB64.isNotEmpty) row['imageB64'] = imageB64;
+      cleaned.add(row);
     }
     while (cleaned.length > maxStoredMessages) {
       cleaned.removeAt(0);
@@ -113,15 +132,28 @@ class NgmyCommunicateTimeTracker {
 
 /// Offline avatar cache — companion photos stay on device when Wi‑Fi drops.
 class NgmyCommunicateAvatarCache {
+  static final Map<String, Uint8List> _ram = {};
+
   static String _key(String profileId) => 'ngmy_comm_avatar_${profileId.trim()}';
+
+  static Uint8List? bytesInRam(String profileId) {
+    final id = profileId.trim();
+    if (id.isEmpty) return null;
+    return _ram[id];
+  }
 
   static Future<Uint8List?> loadBytes(String profileId) async {
     if (profileId.trim().isEmpty) return null;
+    final id = profileId.trim();
+    final cached = _ram[id];
+    if (cached != null && cached.isNotEmpty) return cached;
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key(profileId));
+    final raw = prefs.getString(_key(id));
     if (raw == null || raw.isEmpty) return null;
     try {
-      return base64Decode(raw);
+      final bytes = base64Decode(raw);
+      if (bytes.isNotEmpty) _ram[id] = bytes;
+      return bytes;
     } catch (_) {
       return null;
     }
@@ -129,8 +161,10 @@ class NgmyCommunicateAvatarCache {
 
   static Future<void> saveBytes(String profileId, Uint8List bytes) async {
     if (profileId.trim().isEmpty || bytes.isEmpty) return;
+    final id = profileId.trim();
+    _ram[id] = bytes;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key(profileId), base64Encode(bytes));
+    await prefs.setString(_key(id), base64Encode(bytes));
   }
 
   static Future<void> saveFromDataUrl(String profileId, String dataUrl) async {
@@ -144,6 +178,8 @@ class NgmyCommunicateAvatarCache {
 
   static Future<void> ensureCached(String profileId, String avatarUrl) async {
     if (profileId.trim().isEmpty) return;
+    final ram = bytesInRam(profileId);
+    if (ram != null && ram.isNotEmpty) return;
     final existing = await loadBytes(profileId);
     if (existing != null && existing.isNotEmpty) return;
 

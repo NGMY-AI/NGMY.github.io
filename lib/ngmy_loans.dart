@@ -13,6 +13,133 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_offline.dart';
 
+/// Instant local backup for admin loan approve/reject — survives cloud lag.
+class NgmyLoanStatusStore {
+  static String _key(String loanId) => 'ngmy_loan_status_${loanId.trim()}';
+
+  static Future<void> saveDecision(
+    String loanId, {
+    required String status,
+    String? approvedAt,
+    String? rejectionReason,
+  }) async {
+    if (loanId.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _key(loanId),
+      jsonEncode({
+        'status': status,
+        if (approvedAt != null) 'approvedAt': approvedAt,
+        if (rejectionReason != null) 'rejectionReason': rejectionReason,
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      }),
+    );
+  }
+
+  static Future<void> applyTo(List<Map<String, dynamic>> apps) async {
+    if (apps.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    for (var i = 0; i < apps.length; i++) {
+      final id = (apps[i]['id'] ?? '').toString().trim();
+      if (id.isEmpty) continue;
+      final raw = prefs.getString(_key(id));
+      if (raw == null || raw.isEmpty) continue;
+      try {
+        final m = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+        final status = (m['status'] ?? '').toString();
+        if (status.isEmpty) continue;
+        apps[i]['status'] = status;
+        if (m['approvedAt'] != null) apps[i]['approvedAt'] = m['approvedAt'];
+        if (m['rejectionReason'] != null) apps[i]['rejectionReason'] = m['rejectionReason'];
+        if (m['updatedAt'] != null) apps[i]['updatedAt'] = m['updatedAt'];
+      } catch (_) {}
+    }
+  }
+}
+
+/// Cached loan photo widget — no blink on tap/rebuild.
+class NgmyLoanImage extends StatefulWidget {
+  const NgmyLoanImage(this.ref, {super.key, this.fit = BoxFit.cover});
+  final dynamic ref;
+  final BoxFit fit;
+
+  @override
+  State<NgmyLoanImage> createState() => _NgmyLoanImageState();
+}
+
+class _NgmyLoanImageState extends State<NgmyLoanImage> {
+  static final Map<String, String> _resolvedUrls = {};
+  static final Map<String, Uint8List> _memoryBytes = {};
+
+  String? _display;
+  Uint8List? _bytes;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  Future<void> _resolve() async {
+    final src = (widget.ref ?? '').toString().trim();
+    if (src.isEmpty) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+    if (src.startsWith('data:image')) {
+      try {
+        final b = base64Decode(src.split(',').last);
+        _memoryBytes[src] = b;
+        if (mounted) setState(() { _bytes = b; _loading = false; });
+        return;
+      } catch (_) {}
+    }
+    if (_memoryBytes.containsKey(src)) {
+      if (mounted) setState(() { _bytes = _memoryBytes[src]; _loading = false; });
+      return;
+    }
+    if (_resolvedUrls.containsKey(src)) {
+      if (mounted) setState(() { _display = _resolvedUrls[src]; _loading = false; });
+      return;
+    }
+    if (src.startsWith('http')) {
+      _resolvedUrls[src] = src;
+      if (mounted) setState(() { _display = src; _loading = false; });
+      return;
+    }
+    final resolved = await NgmyLoanStore.resolveRef(src);
+    _resolvedUrls[src] = resolved;
+    if (resolved.startsWith('data:image')) {
+      try {
+        final b = base64Decode(resolved.split(',').last);
+        _memoryBytes[src] = b;
+        if (mounted) setState(() { _bytes = b; _loading = false; });
+        return;
+      } catch (_) {}
+    }
+    if (mounted) setState(() { _display = resolved; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_bytes != null && _bytes!.isNotEmpty) {
+      return Image.memory(_bytes!, fit: widget.fit, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, size: 28));
+    }
+    final url = _display ?? '';
+    if (url.startsWith('http')) {
+      return Image.network(url, fit: widget.fit, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, size: 28));
+    }
+    if (!kIsWeb && url.startsWith('/')) {
+      return Image.file(File(url), fit: widget.fit, gaplessPlayback: true);
+    }
+    if (_loading) {
+      return const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)));
+    }
+    return const Icon(Icons.image_not_supported, size: 32);
+  }
+}
+
 /// Bridge to app config without importing main.dart (avoids circular imports).
 class NgmyLoanConfigBridge {
   NgmyLoanConfigBridge({
@@ -1254,18 +1381,36 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
               ),
               Text((app['userEmail'] ?? app['email'] ?? '').toString(), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
               const SizedBox(height: 10),
-              Row(
+              const Row(
                 children: [
-                  const Icon(Icons.touch_app_rounded, size: 14, color: _loanGreen),
-                  const SizedBox(width: 6),
-                  const Text('Tap to view full application & zoom photos', style: TextStyle(fontSize: 11, color: _loanGreenDark, fontWeight: FontWeight.w700)),
-                  const Spacer(),
-                  if (status == 'pending') ...[
-                    TextButton(onPressed: () => _reject(context, id), child: const Text('Reject')),
-                    FilledButton(style: FilledButton.styleFrom(backgroundColor: _loanGreen), onPressed: () => _approve(id), child: const Text('Approve')),
-                  ],
+                  Icon(Icons.touch_app_rounded, size: 14, color: _loanGreen),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Tap to view full application & zoom photos',
+                      style: TextStyle(fontSize: 11, color: _loanGreenDark, fontWeight: FontWeight.w700),
+                    ),
+                  ),
                 ],
               ),
+              if (status == 'pending') ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(onPressed: () => _reject(context, id), child: const Text('Reject')),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(backgroundColor: _loanGreen),
+                        onPressed: () => _approve(id),
+                        child: const Text('Approve'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -1409,7 +1554,7 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: SizedBox(width: 100, height: 100, child: NgmyLoanStore.imageWidget(e.$2)),
+                child: SizedBox(width: 100, height: 100, child: NgmyLoanImage(e.$2)),
               ),
               const SizedBox(height: 4),
               Text(e.$1, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
@@ -1437,11 +1582,13 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
   Future<void> _approve(String id) async {
     final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == id);
     if (i < 0) return;
+    final approvedAt = DateTime.now().toUtc().toIso8601String();
     widget.config.loanApplications[i]['status'] = 'approved';
-    widget.config.loanApplications[i]['approvedAt'] = DateTime.now().toUtc().toIso8601String();
-    widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-    widget.onDataChanged();
+    widget.config.loanApplications[i]['approvedAt'] = approvedAt;
+    widget.config.loanApplications[i]['updatedAt'] = approvedAt;
+    await NgmyLoanStatusStore.saveDecision(id, status: 'approved', approvedAt: approvedAt);
     final ok = await widget.onPersistNow?.call() ?? false;
+    widget.onDataChanged();
     if (!context.mounted) return;
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1473,11 +1620,13 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
     reasonC.dispose();
     final i = widget.config.loanApplications.indexWhere((a) => (a['id'] ?? '').toString() == id);
     if (i < 0) return;
+    final updatedAt = DateTime.now().toUtc().toIso8601String();
     widget.config.loanApplications[i]['status'] = 'rejected';
     widget.config.loanApplications[i]['rejectionReason'] = reason;
-    widget.config.loanApplications[i]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-    widget.onDataChanged();
+    widget.config.loanApplications[i]['updatedAt'] = updatedAt;
+    await NgmyLoanStatusStore.saveDecision(id, status: 'rejected', rejectionReason: reason);
     final saved = await widget.onPersistNow?.call() ?? false;
+    widget.onDataChanged();
     if (!context.mounted) return;
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1606,37 +1755,7 @@ class NgmyLoanStore {
     }
   }
 
-  static Widget imageWidget(dynamic ref) {
-    final src = (ref ?? '').toString();
-    if (src.isEmpty) return const Icon(Icons.image_not_supported, size: 32);
-    if (src.startsWith('data:image')) {
-      try {
-        return Image.memory(base64Decode(src.split(',').last), fit: BoxFit.cover, gaplessPlayback: true);
-      } catch (_) {}
-    }
-    if (src.startsWith('http')) {
-      return Image.network(src, fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, size: 28));
-    }
-    if (!kIsWeb && src.startsWith('/')) {
-      return Image.file(File(src), fit: BoxFit.cover, gaplessPlayback: true);
-    }
-    if (src.startsWith('supabase://')) {
-      return FutureBuilder<String>(
-        future: resolveRef(src),
-        builder: (context, snap) {
-          final url = snap.data ?? '';
-          if (url.startsWith('http')) {
-            return Image.network(url, fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, size: 28));
-          }
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)));
-          }
-          return const Icon(Icons.cloud_off_outlined, size: 28);
-        },
-      );
-    }
-    return const Icon(Icons.insert_photo, size: 32);
-  }
+  static Widget imageWidget(dynamic ref) => NgmyLoanImage(ref);
 
   static void openZoom(BuildContext context, dynamic ref, {String label = 'Photo'}) {
     final src = (ref ?? '').toString();
@@ -1660,28 +1779,10 @@ class _NgmyLoanZoomPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white, title: Text(label, style: const TextStyle(fontSize: 14))),
-      body: FutureBuilder<String>(
-        future: NgmyLoanStore.resolveRef(ref),
-        builder: (context, snap) {
-          Widget image;
-          final url = snap.data ?? ref;
-          if (url.startsWith('data:image')) {
-            try {
-              image = Image.memory(base64Decode(url.split(',').last), fit: BoxFit.contain);
-            } catch (_) {
-              image = const Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48);
-            }
-          } else if (url.startsWith('http')) {
-            image = Image.network(url, fit: BoxFit.contain);
-          } else if (!kIsWeb && url.startsWith('/')) {
-            image = Image.file(File(url), fit: BoxFit.contain);
-          } else if (snap.connectionState == ConnectionState.waiting) {
-            image = const Center(child: CircularProgressIndicator(color: Colors.white));
-          } else {
-            image = const Icon(Icons.image_not_supported_outlined, color: Colors.white54, size: 48);
-          }
-          return InteractiveViewer(minScale: 0.5, maxScale: 5, child: Center(child: image));
-        },
+      body: InteractiveViewer(
+        minScale: 0.5,
+        maxScale: 5,
+        child: Center(child: NgmyLoanImage(ref, fit: BoxFit.contain)),
       ),
     );
   }

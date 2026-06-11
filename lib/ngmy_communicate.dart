@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -35,6 +36,22 @@ String ngmyCommunicateNormalizeRole(String raw) {
 }
 
 String ngmyCommunicateRoleLabel(String role) => kNgmyCommunicateRoles[ngmyCommunicateNormalizeRole(role)] ?? 'Companion';
+
+/// Pre-cache companion avatars from config (call after settings hydrate).
+Future<void> ngmyWarmCommunicateAvatarsFromConfig(dynamic config) async {
+  final raw = (config as dynamic).communicateProfiles;
+  if (raw is List) await NgmyCommunicateAvatarCache.cacheAllProfiles(raw);
+}
+
+bool ngmyUserRequestedChatImage(String text) {
+  final t = text.toLowerCase().trim();
+  if (t.isEmpty) return false;
+  return RegExp(
+    r'\b(pic|picture|photo|selfie|snap|image|portrait|draw|paint|generate|create)\b',
+    caseSensitive: false,
+  ).hasMatch(t) ||
+      RegExp(r'\b(send|show)\s+(me\s+)?(a\s+)?(pic|photo|picture|selfie|image)\b', caseSensitive: false).hasMatch(t);
+}
 
 bool ngmyCommunicateRoleIsRomantic(String role) {
   final r = ngmyCommunicateNormalizeRole(role);
@@ -294,6 +311,11 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   @override
   void initState() {
     super.initState();
+    final ram = NgmyCommunicateAvatarCache.bytesInRam(widget.profile.id);
+    if (ram != null && ram.isNotEmpty) {
+      _bytes = ram;
+      _loading = false;
+    }
     _resolve();
   }
 
@@ -301,6 +323,9 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   void didUpdateWidget(covariant NgmyCommunicateAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profile.id != widget.profile.id || oldWidget.profile.avatarUrl != widget.profile.avatarUrl) {
+      final ram = NgmyCommunicateAvatarCache.bytesInRam(widget.profile.id);
+      _bytes = ram;
+      _loading = ram == null;
       _resolve();
     }
   }
@@ -308,7 +333,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   Future<void> _resolve() async {
     final id = widget.profile.id.trim();
     final url = widget.profile.avatarUrl.trim();
-    Uint8List? bytes = await NgmyCommunicateAvatarCache.loadBytes(id);
+    Uint8List? bytes = NgmyCommunicateAvatarCache.bytesInRam(id) ?? await NgmyCommunicateAvatarCache.loadBytes(id);
     if (bytes == null || bytes.isEmpty) {
       if (url.startsWith('data:image')) {
         try {
@@ -337,7 +362,15 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     Widget inner;
     if (_bytes != null && _bytes!.isNotEmpty) {
       inner = ClipOval(
-        child: Image.memory(_bytes!, width: widget.size, height: widget.size, fit: BoxFit.cover, gaplessPlayback: true),
+        child: Image.memory(
+          _bytes!,
+          width: widget.size,
+          height: widget.size,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (_, __, ___) => _emojiFallback(),
+        ),
       );
     } else if (!_loading) {
       inner = _emojiFallback();
@@ -532,7 +565,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                 child: Column(
                   children: [
-                    const Text('💕', style: TextStyle(fontSize: 28)),
+                    const Icon(Icons.favorite_rounded, color: Color(0xFFEC4899), size: 30),
                     const SizedBox(height: 6),
                     const Text(
                       'Welcome — you belong here',
@@ -723,7 +756,14 @@ class _Companion3DCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(20),
                               gradient: const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)]),
                             ),
-                            child: const Text('Say hi 💬', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Text('Say hi', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                                SizedBox(width: 4),
+                                Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 11),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -880,7 +920,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     setState(() {
       _messages.clear();
       for (final m in mem) {
-        _messages.add({'role': m['role'].toString(), 'text': m['text'].toString()});
+        final row = <String, String>{
+          'role': m['role'].toString(),
+          'text': m['text'].toString(),
+        };
+        final img = (m['imageB64'] ?? '').toString().trim();
+        if (img.isNotEmpty) row['imageB64'] = img;
+        _messages.add(row);
       }
       _usedSeconds = used;
       _loaded = true;
@@ -920,6 +966,22 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       if (!_scroll.hasClients) return;
       _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
     });
+  }
+
+  Widget _chatImageBubble(String b64) {
+    try {
+      final bytes = base64Decode(b64);
+      if (bytes.isEmpty) throw StateError('empty');
+      return Image.memory(
+        bytes,
+        width: 200,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.white54),
+      );
+    } catch (_) {
+      return const Icon(Icons.broken_image_outlined, color: Colors.white54);
+    }
   }
 
   Future<bool> _ensurePaid() async {
@@ -963,19 +1025,52 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
       await NgmyCommunicateRelationshipStore.syncFromMemory(widget.profile.id, _email, mem);
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
-      final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
-      final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner)}\n'
-          '${transcript.isNotEmpty ? '$transcript\n' : ''}'
-          'They just texted: $text\n'
-          'Reply as ${widget.profile.name} only — natural human text, not overly eager:';
       final creds = ngmyParseAiCredentials(apiKey);
-      final result = await ngmyAiGenerateWithCredentials(creds, prompt);
-      final reply = (result.text != null && result.text!.trim().isNotEmpty)
-          ? result.text!.trim()
-          : ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: result.error);
-      if (!mounted) return;
-      setState(() => _messages.add({'role': 'ai', 'text': reply}));
-      await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
+      final wantsImage = ngmyUserRequestedChatImage(text) && (_isAdmin || ngmyCommunicateRoleIsRomantic(widget.profile.role));
+
+      if (wantsImage) {
+        final look = widget.profile.bio.trim().isNotEmpty
+            ? widget.profile.bio.trim()
+            : (widget.profile.personality.trim().isNotEmpty
+                ? widget.profile.personality.trim()
+                : '${widget.profile.genderLabel}, ${widget.profile.name}');
+        final imgPrompt =
+            'Photorealistic portrait of $look, ${widget.profile.name}, warm natural lighting, dating app profile photo, high quality, no text, no watermark';
+        final imgResult = await ngmyAiGenerateImage(creds, imgPrompt);
+        if (imgResult.bytes != null && imgResult.bytes!.isNotEmpty) {
+          final b64 = base64Encode(imgResult.bytes!);
+          await NgmyCommunicateAvatarCache.saveBytes(widget.profile.id, imgResult.bytes!);
+          const reply = 'Here — just for you.';
+          if (!mounted) return;
+          setState(() => _messages.add({'role': 'ai', 'text': reply, 'imageB64': b64}));
+          await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply, imageB64: b64);
+        } else {
+          final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
+          final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner)}\n'
+              '${transcript.isNotEmpty ? '$transcript\n' : ''}'
+              'They asked for a picture but image generation failed (${imgResult.error ?? 'try again'}). Reply naturally in text only:';
+          final result = await ngmyAiGenerateWithCredentials(creds, prompt);
+          final reply = (result.text != null && result.text!.trim().isNotEmpty)
+              ? result.text!.trim()
+              : 'I tried to send a pic but it glitched — ask me again in a sec.';
+          if (!mounted) return;
+          setState(() => _messages.add({'role': 'ai', 'text': reply}));
+          await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
+        }
+      } else {
+        final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
+        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner)}\n'
+            '${transcript.isNotEmpty ? '$transcript\n' : ''}'
+            'They just texted: $text\n'
+            'Reply as ${widget.profile.name} only — natural human text, not overly eager:';
+        final result = await ngmyAiGenerateWithCredentials(creds, prompt);
+        final reply = (result.text != null && result.text!.trim().isNotEmpty)
+            ? result.text!.trim()
+            : ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: result.error);
+        if (!mounted) return;
+        setState(() => _messages.add({'role': 'ai', 'text': reply}));
+        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
+      }
     } catch (_) {
       if (mounted) setState(() => _messages.add({'role': 'ai', 'text': 'Glitch — check internet and try again.'}));
     } finally {
@@ -1050,7 +1145,21 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                       border: Border.all(color: Colors.white.withValues(alpha: user ? 0.2 : 0.1)),
                       boxShadow: [BoxShadow(color: (user ? const Color(0xFFEC4899) : const Color(0xFF9333EA)).withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
                     ),
-                    child: Text(m['text'] ?? '', style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.white)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if ((m['imageB64'] ?? '').toString().isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(14),
+                              child: _chatImageBubble((m['imageB64'] ?? '').toString()),
+                            ),
+                          ),
+                        if ((m['text'] ?? '').toString().isNotEmpty)
+                          Text(m['text'] ?? '', style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.white)),
+                      ],
+                    ),
                   ),
                 );
               },

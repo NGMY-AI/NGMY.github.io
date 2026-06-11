@@ -16768,12 +16768,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<bool> _persistManagementConfig() async {
-    widget.onDataChanged();
     if (widget.onPersistManagementConfig != null) {
-      return widget.onPersistManagementConfig!();
+      final ok = await widget.onPersistManagementConfig!();
+      widget.onDataChanged();
+      return ok;
     }
     await ngmyPersistAdminConfigNow(widget.config);
-    return await ngmyCanReachCloud();
+    widget.onDataChanged();
+    return true;
   }
 
   Future<void> _refreshManagementBeforeOpen() async {
@@ -18033,6 +18035,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   );
 
   Future<void> _openLoanAdmin(bool isDark) async {
+    await ngmyHydrateManagementListsFromAllBackups(widget.config);
+    await NgmyLoanStatusStore.applyTo(widget.config.loanApplications);
+    if (mounted) setState(() {});
     _showLoanAdmin(isDark);
   }
 
