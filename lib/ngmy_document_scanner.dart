@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_document_translate_chat.dart';
 import 'ngmy_gemini_vision.dart';
 import 'ngmy_modern_chat_prefix.dart';
 
@@ -615,10 +616,22 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     );
   }
 
-  Widget _modernChatPrefix() {
-    return const Padding(
-      padding: EdgeInsets.only(left: 10, right: 6),
-      child: NgmyModernChatPrefixIcon(size: 26),
+  Future<void> _openTranslateChat() async {
+    await showNgmyDocumentTranslateChat(
+      context,
+      geminiApiKey: widget.geminiApiKey,
+      refreshApiKey: widget.refreshApiKey,
+      initialMyLanguage: _responseLanguage,
+    );
+  }
+
+  Widget _translateChatButton() {
+    return IconButton(
+      tooltip: 'Translate messages (English ↔ Swahili)',
+      onPressed: _analyzing ? null : _openTranslateChat,
+      padding: const EdgeInsets.only(left: 6, right: 2),
+      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+      icon: const NgmyModernChatPrefixIcon(size: 26),
     );
   }
 
@@ -835,16 +848,33 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                             ),
                             const SizedBox(height: 14),
                             _glassCard(
-                              child: TextField(
-                                controller: _questionC,
-                                maxLines: 2,
-                                style: const TextStyle(color: Colors.white, fontSize: 14),
-                                decoration: InputDecoration(
-                                  hintText: 'Ask anything about your document(s)…',
-                                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.38)),
-                                  border: InputBorder.none,
-                                  prefixIcon: _modernChatPrefix(),
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      _translateChatButton(),
+                                      Expanded(
+                                        child: Text(
+                                          'Tap message icon to translate chats',
+                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10, fontWeight: FontWeight.w600),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  TextField(
+                                    controller: _questionC,
+                                    maxLines: 2,
+                                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                                    decoration: InputDecoration(
+                                      hintText: 'Ask anything about your document(s)…',
+                                      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.38)),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 14),
