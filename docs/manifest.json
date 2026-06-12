@@ -1,5 +1,5 @@
 ﻿{
-    "id":  "/NGMY.github.io/",
+    "id":  "/",
     "short_name":  "NGMY",
     "background_color":  "#ffffff",
     "icons":  [
@@ -31,7 +31,7 @@
     "display":  "standalone",
     "name":  "NGMY",
     "description":  "Next Generation - Make Yours",
-    "scope":  "/NGMY.github.io/",
-    "start_url":  "/NGMY.github.io/",
+    "scope":  "/",
+    "start_url":  "/",
     "orientation":  "portrait-primary"
 }

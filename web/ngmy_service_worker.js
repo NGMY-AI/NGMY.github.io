@@ -2,7 +2,11 @@
 'use strict';
 
 const CACHE_PREFIX = 'ngmy-pwa-';
-const SCOPE_PATH = '/NGMY.github.io/';
+function ngmySwBasePath() {
+  var p = self.location.pathname || '/';
+  return p.replace(/[^/]*$/, '') || '/';
+}
+const SCOPE_PATH = ngmySwBasePath();
 const CACHE_NAME = CACHE_PREFIX + '__NGMY_DEPLOY_ID__';
 
 const PRECACHE_URLS = __NGMY_PRECACHE_URLS__;

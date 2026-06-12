@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'ngmy_banner_text_style.dart';
@@ -202,8 +203,17 @@ NgmyVideoTemplateId ngmyDefaultTemplateFor(NgmyVideoFormat format) =>
 
 /// Web export loads backdrop from deployed assets folder.
 String ngmyStudioAssetWebUrl(String assetPath) {
-  const base = '/NGMY.github.io/';
-  return '$base$assetPath';
+  if (kIsWeb) {
+    try {
+      var p = Uri.base.path;
+      if (!p.endsWith('/')) {
+        final i = p.lastIndexOf('/');
+        p = i >= 0 ? p.substring(0, i + 1) : '/';
+      }
+      return '$p$assetPath';
+    } catch (_) {}
+  }
+  return '/$assetPath';
 }
 
 class NgmyVideoStudioExportConfig {

@@ -7,14 +7,21 @@ import 'package:url_launcher/url_launcher.dart';
 import 'ngmy_oauth_nav_stub.dart' if (dart.library.html) 'ngmy_oauth_nav_web.dart';
 import 'ngmy_supabase_config.dart';
 
-/// Canonical GitHub Pages URL — must be in Supabase Auth → Redirect URLs.
-const String kNgmyOAuthRedirectUrl = 'https://ngmy-ai.github.io/NGMY.github.io/';
+/// Canonical production URLs — add both in Supabase Auth → Redirect URLs.
+const String kNgmyOAuthRedirectUrl = 'https://ngmy.org/';
+const String kNgmyOAuthLegacyRedirectUrl = 'https://ngmy-ai.github.io/NGMY.github.io/';
 
 String? _cachedGoogleClientId;
 
 /// Resolves the OAuth callback URL Supabase should redirect to after login.
 String ngmyOAuthRedirectUrl() {
-  if (kIsWeb) return kNgmyOAuthRedirectUrl;
+  if (kIsWeb) {
+    try {
+      final uri = Uri.base;
+      if (uri.origin.isNotEmpty) return '${uri.origin}${uri.path.endsWith('/') ? uri.path : '${uri.path}/'}';
+    } catch (_) {}
+    return kNgmyOAuthRedirectUrl;
+  }
   return 'io.supabase.flutter://login-callback';
 }
 
@@ -140,7 +147,8 @@ String _oauthSetupError(OAuthProvider provider, Object e) {
       'Fix in Supabase → Authentication → URL Configuration:\n'
       '• Site URL: $kNgmyOAuthRedirectUrl\n'
       '• Redirect URLs: $kNgmyOAuthRedirectUrl\n'
-      '• Also add: https://ngmy-ai.github.io/NGMY.github.io/**\n\n'
+      '• Also add: $kNgmyOAuthLegacyRedirectUrl\n'
+      '• Also add: $kNgmyOAuthLegacyRedirectUrl**\n\n'
       'Error: $e';
 }
 

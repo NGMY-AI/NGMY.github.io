@@ -7,10 +7,11 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
-# Live app URL (project site) — must match base-href
-$BaseHref = "/NGMY.github.io/"
+# Root base-href for custom domain (ngmy.org). index.html adjusts for github.io subpath at runtime.
+$BaseHref = "/"
 $DeployId = Get-Date -Format "yyyyMMddHHmmss"
-$LiveUrl = "https://ngmy-ai.github.io/NGMY.github.io/"
+$LiveUrl = "https://ngmy.org/"
+$LegacyUrl = "https://ngmy-ai.github.io/NGMY.github.io/"
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host " NGMY Web Publish" -ForegroundColor Cyan
@@ -39,6 +40,9 @@ Copy-Item -Path "build\web\*" -Destination "docs" -Recurse -Force
 # GitHub Pages: allow Flutter assets (underscore paths)
 New-Item -ItemType File -Path "docs\.nojekyll" -Force | Out-Null
 
+# Custom domain (GitHub Pages reads CNAME from published folder)
+Set-Content -Path "docs\CNAME" -Value "ngmy.org" -Encoding ASCII -NoNewline
+
 Write-Host "`n[4/6] Stamp deploy id (cache bust for phones) ..."
 $versionObj = @{
     app_name    = "ngmy"
@@ -53,11 +57,9 @@ Set-Content -Path "docs\version.json" -Value $versionJson -Encoding UTF8
 $indexPath = Join-Path $PSScriptRoot "docs\index.html"
 $html = Get-Content $indexPath -Raw
 $html = $html.Replace("__NGMY_DEPLOY_ID__", $DeployId)
-# Ensure base href matches project path (fixes black screen / failed to load app)
-$html = $html -replace '<base href="/">', '<base href="/NGMY.github.io/">'
-$html = $html -replace '<base href="/NGMY.github.io/">', '<base href="/NGMY.github.io/">'
-if ($html -notmatch 'href="/NGMY.github.io/"') {
-    $html = $html -replace '<base href="[^"]*">', '<base href="/NGMY.github.io/">'
+# Keep base href="/" — web/index.html script sets __NGMY_BASE_PATH__ for github.io subpath
+if ($html -notmatch '<base href="/">') {
+    $html = $html -replace '<base href="[^"]*">', '<base href="/">'
 }
 Set-Content -Path $indexPath -Value $html -Encoding UTF8 -NoNewline
 
@@ -77,9 +79,9 @@ if (Test-Path $manifestPath) {
     $manifest = @{
         name = "NGMY"
         short_name = "NGMY"
-        id = "/NGMY.github.io/"
-        start_url = "/NGMY.github.io/"
-        scope = "/NGMY.github.io/"
+        id = "/"
+        start_url = "/"
+        scope = "/"
         display = "standalone"
         background_color = "#ffffff"
         theme_color = "#ffffff"
@@ -115,16 +117,15 @@ if (Test-Path $flutterSw) {
 $swTemplate = Join-Path $PSScriptRoot "web\ngmy_service_worker.js"
 $swOut = Join-Path $PSScriptRoot "docs\ngmy_service_worker.js"
 $docsPath = Join-Path $PSScriptRoot "docs"
-$base = $BaseHref.TrimEnd('/')
 if (Test-Path $swTemplate) {
     $urlSet = [System.Collections.Generic.HashSet[string]]::new()
-    [void]$urlSet.Add("$base/")
-    [void]$urlSet.Add("$base/index.html")
+    [void]$urlSet.Add('./')
+    [void]$urlSet.Add('./index.html')
     Get-ChildItem $docsPath -Recurse -File | ForEach-Object {
         if ($_.Name -eq 'ngmy_service_worker.js') { return }
         $rel = $_.FullName.Substring($docsPath.Length).Replace('\', '/')
-        if (-not $rel.StartsWith('/')) { $rel = "/$rel" }
-        [void]$urlSet.Add("$base$rel")
+        if ($rel.StartsWith('/')) { $rel = $rel.Substring(1) }
+        [void]$urlSet.Add("./$rel")
     }
     $jsonUrls = (($urlSet | Sort-Object) | ForEach-Object { "'$_'" }) -join ","
     $sw = Get-Content $swTemplate -Raw
@@ -152,6 +153,7 @@ Write-Host "  git push origin main" -ForegroundColor White
 Write-Host ""
 Write-Host "Live URL (after push, wait 1-3 min):" -ForegroundColor Green
 Write-Host "  $LiveUrl" -ForegroundColor Green
+Write-Host "  Legacy: $LegacyUrl" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "Verify deploy from PC:" -ForegroundColor Green
 Write-Host ('  Invoke-WebRequest "' + $LiveUrl + 'version.json?d=' + $DeployId + '" -UseBasicParsing | Select-Object -Expand Content') -ForegroundColor White

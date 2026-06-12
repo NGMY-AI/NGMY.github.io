@@ -1,9 +1,9 @@
 {
   "name": "NGMY",
   "short_name": "NGMY",
-  "id": "/NGMY.github.io/",
-  "start_url": "/NGMY.github.io/",
-  "scope": "/NGMY.github.io/",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#080B16",
   "theme_color": "#7C3AED",

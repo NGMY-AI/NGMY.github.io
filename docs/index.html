@@ -4,24 +4,22 @@
 
 <head>
 
-  <base href="/NGMY.github.io/">
+  <base href="/">
 
   <script>
-
     (function () {
-
-      var p = location.pathname || "/";
-
-      if (p.indexOf("/NGMY.github.io") === 0) {
-
-        var b = document.querySelector("base");
-
-        if (b) b.setAttribute("href", "/NGMY.github.io/");
-
+      function ngmyBasePath() {
+        var host = (location.hostname || '').toLowerCase();
+        if (host === 'ngmy.org' || host === 'www.ngmy.org') return '/';
+        var p = location.pathname || '/';
+        if (p.indexOf('/NGMY.github.io') === 0) return '/NGMY.github.io/';
+        if (host.indexOf('github.io') !== -1) return '/NGMY.github.io/';
+        return '/';
       }
-
+      window.__NGMY_BASE_PATH__ = ngmyBasePath();
+      var b = document.querySelector('base');
+      if (b) b.setAttribute('href', window.__NGMY_BASE_PATH__);
     })();
-
   </script>
 
   <script>
@@ -278,7 +276,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260611152010";
+      var CURRENT = "20260611204324";
 
       function showError(msg) {
 
@@ -341,16 +339,15 @@
 
   <script>
     (function () {
-      var deployId = '20260611152010';
+      var deployId = '20260611204324';
       var bootstrapSrc = 'flutter_bootstrap.js';
       var loadAttempts = 0;
 
       function showBootstrapError() {
-        window.__ngmyShowLoadError && window.__ngmyShowLoadError(
-          navigator.onLine
-            ? 'Could not load the app. Use this exact link: https://ngmy-ai.github.io/NGMY.github.io/'
-            : 'You are offline. Open NGMY once while online so it can save for offline use, then try again.'
-        );
+        var hint = navigator.onLine
+            ? 'Could not load the app. Try https://ngmy.org/ or clear site data and reload.'
+            : 'You are offline. Open NGMY once while online so it can save for offline use, then try again.';
+        window.__ngmyShowLoadError && window.__ngmyShowLoadError(hint);
       }
 
       function loadFlutterBootstrap() {
@@ -398,7 +395,8 @@
         return;
       }
 
-      navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: '/NGMY.github.io/' })
+      var swScope = window.__NGMY_BASE_PATH__ || '/';
+      navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: swScope })
         .catch(function (e) {
           console.warn('[ngmy] service worker register failed', e);
         });

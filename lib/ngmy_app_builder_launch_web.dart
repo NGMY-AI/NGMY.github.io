@@ -102,7 +102,7 @@ String? ngmyReadAppSlugFromLaunchUrl() {
 
 String ngmyAppBuilderBaseUrl() {
 
-  const fallback = 'https://ngmy-ai.github.io/NGMY.github.io/';
+  const fallback = 'https://ngmy.org/';
 
   try {
 
@@ -123,8 +123,6 @@ String ngmyAppBuilderBaseUrl() {
     }
 
     if (!basePath.endsWith('/')) basePath = '$basePath/';
-
-    if (basePath == '/') return '$origin/NGMY.github.io/';
 
     return '$origin$basePath';
 
