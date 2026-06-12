@@ -102,6 +102,8 @@ import 'ngmy_app_builder.dart';
 import 'ngmy_app_builder_admin.dart';
 import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_models.dart';
+import 'ngmy_app_studio_access.dart';
+import 'ngmy_clock_in_investment_dialog.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_storage.dart';
 import 'ngmy_invoice_protected_preview.dart';
@@ -6477,6 +6479,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
     await ngmyHydrateMusicPaymentsFromAllBackups(_config);
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
+    await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
     await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
@@ -9471,6 +9474,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
           await ngmyHydrateMusicPaymentsFromAllBackups(_config);
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
+    await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
           await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
@@ -9733,6 +9737,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
           await ngmyHydrateMusicPaymentsFromAllBackups(_config);
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
+    await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
           await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
@@ -12090,11 +12095,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         _ngmyApplyMidnightClockReset(widget.user);
         final onTrial = widget.user.isOnFreeTrial;
         if (!onTrial && widget.user.activeInvestment == null) {
-          _showOfficialNotice(
-            title: 'Plan Required',
-            message: 'You need an active investment plan to start clock-in earnings.',
-            isError: true,
-          );
+          await NgmyClockInInvestmentDialog.show(context, onGoToInvest: () => setState(() => _idx = 1));
           return;
         }
         if (!kNgmySuppressClockInPopups && !onTrial && _ngmyIsWeekend(now)) {
@@ -12172,7 +12173,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             await _showClockInConfirmedDialog();
           }
         }
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData, onDeleteMedia: widget.onDeleteMedia, onPushUserToCloud: widget.onPushUserToCloud, onSaveWalletPayments: widget.onSaveWalletPayments, onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan, onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan, onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans, onArchiveWalletTransaction: widget.onArchiveWalletTransaction, onPersistManagementConfig: widget.onPersistManagementConfig, onRefreshManagementData: widget.onRefreshManagementData, onRefreshAdminMedia: widget.onRefreshAdminMedia, onPurgeBrokenMedia: widget.onPurgeBrokenMedia),
+      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData, onDeleteMedia: widget.onDeleteMedia, onPushUserToCloud: widget.onPushUserToCloud, onSaveWalletPayments: widget.onSaveWalletPayments, onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan, onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan, onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans, onArchiveWalletTransaction: widget.onArchiveWalletTransaction, onPersistManagementConfig: widget.onPersistManagementConfig, onRefreshManagementData: widget.onRefreshManagementData, onRefreshAdminMedia: widget.onRefreshAdminMedia, onPurgeBrokenMedia: widget.onPurgeBrokenMedia, onOpenInvest: () => setState(() => _idx = 1)),
       InvestScreen(
         user: widget.user,
         plans: widget.globalPlans,
@@ -12501,7 +12502,8 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function()? onRefreshManagementData;
   final Future<void> Function()? onRefreshAdminMedia;
   final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia});
+  final VoidCallback? onOpenInvest;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -13254,10 +13256,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       onTap: (active || alreadyDone || blocked || (!onTrial && widget.user.activeInvestment == null))
         ? () {
             if (!onTrial && widget.user.activeInvestment == null) {
-              _showOfficialNotice(
-                'Plan Required',
-                'You need an active investment plan to start clock-in earnings.',
-              );
+              NgmyClockInInvestmentDialog.show(context, onGoToInvest: widget.onOpenInvest);
             } else if (weekend && !alreadyDone && !active) {
               NgmyWeekendClockOverlay.show(context);
             } else if (missedWindow && !alreadyDone && !active) {
@@ -22873,6 +22872,11 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     for (final c in [_bizNameC, _bizStreetC, _bizCityStateZipC, _bizPhoneC, _paymentInfoC]) {
       c.addListener(_persistInvoiceProviderProfile);
     }
+    unawaited(() async {
+      await NgmyAppStudioAccess.hydrate(widget.config);
+      widget.onDataChanged();
+      if (mounted) setState(() {});
+    }());
   }
 
   bool _loadingInvoiceProvider = false;

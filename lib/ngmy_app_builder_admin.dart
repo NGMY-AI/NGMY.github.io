@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
 import 'ngmy_app_builder_urls.dart';
+import 'ngmy_app_studio_access.dart';
 
 /// Admin controls for NGMY App Builder — local storage only, no cloud database.
 Future<void> showNgmyAppBuilderAdminSheet({
@@ -48,7 +48,7 @@ Future<void> showNgmyAppBuilderAdminSheet({
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Open App Builder for all users', style: TextStyle(fontWeight: FontWeight.w800)),
-                      subtitle: const Text('When on, everyone can tap the center star in NGMY Hub'),
+                      subtitle: const Text('When on, everyone can tap the center star in NGMY Hub. Tap Save to sync for all users.'),
                       value: enabled,
                       activeThumbColor: const Color(0xFFF59E0B),
                       onChanged: (v) => setST(() => enabled = v),
@@ -129,13 +129,18 @@ Future<void> showNgmyAppBuilderAdminSheet({
                       onPressed: () async {
                         (config as dynamic).appBuilderEnabled = enabled;
                         onDataChanged();
-                        final ok = await onPersist();
+                        final cloudOk = await NgmyAppStudioAccess.persist(config);
+                        await onPersist();
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(ok ? 'App Studio settings saved.' : 'Saved locally.'),
-                              backgroundColor: ok ? const Color(0xFF16A34A) : Colors.orange,
+                              content: Text(
+                                cloudOk
+                                    ? 'App Studio is ${enabled ? 'open' : 'closed'} for all users.'
+                                    : 'Saved on this device — connect and save again to sync for everyone.',
+                              ),
+                              backgroundColor: cloudOk ? const Color(0xFF16A34A) : Colors.orange,
                             ),
                           );
                         }

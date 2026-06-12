@@ -1072,6 +1072,7 @@ Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
   await ngmyHydrateInvoicePaymentsFromAllBackups(config);
   await ngmyHydrateWalletPaymentsFromAllBackups(config);
   await ngmyHydrateRepairEstimatePaymentsFromAllBackups(config);
+  await NgmyAppStudioAccess.hydrate(config);
   final snapshot = AppConfig.fromJson(config.toJson());
 
   if (await ngmyCanReachCloud()) {
