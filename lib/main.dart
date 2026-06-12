@@ -1061,6 +1061,7 @@ class AppConfig {
   String helpCampaignId;
   String helpCampaignStartedAt;
   List<Map<String, dynamic>> helpCampaignClosures;
+  List<Map<String, dynamic>> helpCampaignSpendings;
   List<String> openedContributionReceiptKeys;
   List<String> dismissedContributionReceiptKeys;
   List<Map<String, dynamic>> jobPosts;
@@ -1165,6 +1166,7 @@ class AppConfig {
     this.helpCampaignId = '',
     this.helpCampaignStartedAt = '',
     this.helpCampaignClosures = const [],
+    this.helpCampaignSpendings = const [],
     this.openedContributionReceiptKeys = const [],
     this.dismissedContributionReceiptKeys = const [],
     this.jobPosts = const [],
@@ -1279,6 +1281,7 @@ class AppConfig {
     'helpCampaignId': helpCampaignId,
     'helpCampaignStartedAt': helpCampaignStartedAt,
     'helpCampaignClosures': helpCampaignClosures,
+    'helpCampaignSpendings': helpCampaignSpendings,
     'openedContributionReceiptKeys': openedContributionReceiptKeys,
     'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys,
     'jobPosts': jobPosts,
@@ -1376,6 +1379,7 @@ class AppConfig {
     helpCampaignId: json['helpCampaignId'] ?? '',
     helpCampaignStartedAt: json['helpCampaignStartedAt'] ?? '',
     helpCampaignClosures: List<Map<String, dynamic>>.from((json['helpCampaignClosures'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
+    helpCampaignSpendings: List<Map<String, dynamic>>.from((json['helpCampaignSpendings'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     openedContributionReceiptKeys: List<String>.from(json['openedContributionReceiptKeys'] ?? const []),
     dismissedContributionReceiptKeys: List<String>.from(json['dismissedContributionReceiptKeys'] ?? const []),
     jobPosts: List<Map<String, dynamic>>.from((json['jobPosts'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
@@ -24966,6 +24970,168 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   }
 }
 
+class _HelpCampaignSpendingLedgerSheet extends StatefulWidget {
+  const _HelpCampaignSpendingLedgerSheet({
+    required this.config,
+    required this.campaignId,
+    this.campaignTitle,
+    this.campaignTxs,
+  });
+
+  final AppConfig config;
+  final String campaignId;
+  final String? campaignTitle;
+  final List<AppTransaction>? campaignTxs;
+
+  @override
+  State<_HelpCampaignSpendingLedgerSheet> createState() => _HelpCampaignSpendingLedgerSheetState();
+}
+
+class _HelpCampaignSpendingLedgerSheetState extends State<_HelpCampaignSpendingLedgerSheet> {
+  @override
+  void initState() {
+    super.initState();
+    NgmyAdminLiveRefresh.addListener(_onLiveRefresh);
+  }
+
+  @override
+  void dispose() {
+    NgmyAdminLiveRefresh.removeListener(_onLiveRefresh);
+    super.dispose();
+  }
+
+  void _onLiveRefresh() {
+    if (mounted) setState(() {});
+  }
+
+  List<Map<String, dynamic>> _spendings() {
+    final id = widget.campaignId.trim();
+    return widget.config.helpCampaignSpendings
+        .where((e) => (e['campaignId'] ?? '').toString().trim() == id)
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList()
+      ..sort((a, b) {
+        final at = DateTime.tryParse((a['recordedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bt = DateTime.tryParse((b['recordedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bt.compareTo(at);
+      });
+  }
+
+  double _collected() {
+    final txs = widget.campaignTxs;
+    if (txs == null) return 0;
+    return txs.fold<double>(0.0, (s, t) => s + t.amount);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF111827) : Colors.white;
+    final soft = isDark ? Colors.white70 : Colors.black54;
+    final spendings = _spendings();
+    final spent = spendings.fold<double>(0.0, (s, e) => s + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+    final collected = _collected();
+    final remaining = collected - spent;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.78,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.35), borderRadius: BorderRadius.circular(8))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.receipt_long_rounded, color: Color(0xFF2563EB)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Spending Ledger', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                      Text(
+                        (widget.campaignTitle ?? 'Contribution campaign').trim(),
+                        style: TextStyle(fontSize: 12, color: soft),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Row(
+              children: [
+                Expanded(child: _ledgerStat('Collected', '\$${formatCurrency(collected)}', Colors.green.shade700)),
+                const SizedBox(width: 8),
+                Expanded(child: _ledgerStat('Spent', '\$${formatCurrency(spent)}', Colors.orange.shade800)),
+                const SizedBox(width: 8),
+                Expanded(child: _ledgerStat('Left', '\$${formatCurrency(remaining)}', Colors.blue.shade800)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: spendings.isEmpty
+                ? Center(child: Text('No spending recorded yet.', style: TextStyle(color: soft)))
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                    itemCount: spendings.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final e = spendings[i];
+                      final amount = (e['amount'] as num?)?.toDouble() ?? 0.0;
+                      final desc = (e['description'] ?? '').toString();
+                      final by = (e['recordedByName'] ?? e['recordedByEmail'] ?? 'Registrar').toString();
+                      final when = DateTime.tryParse((e['recordedAt'] ?? '').toString());
+                      final whenLabel = when == null ? '' : '${when.month}/${when.day}/${when.year} ${when.hour}:${when.minute.toString().padLeft(2, '0')}';
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.orange.withOpacity(0.15),
+                          child: const Icon(Icons.payments_outlined, color: Colors.orange, size: 20),
+                        ),
+                        title: Text(desc.isEmpty ? 'Spending' : desc, style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
+                        subtitle: Text('$by${whenLabel.isEmpty ? '' : ' • $whenLabel'}', style: TextStyle(fontSize: 11, color: soft)),
+                        trailing: Text('\$${formatCurrency(amount)}', style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _ledgerStat(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+          const SizedBox(height: 2),
+          Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: color)),
+        ],
+      ),
+    );
+  }
+}
+
 class CivicRegistryScreen extends StatefulWidget {
   final UserData user;
   final List<UserData> allUsers;
@@ -25075,6 +25241,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     } else {
       unawaited(_syncSelfEnrollmentFlag());
     }
+    if (!_canBypassCivicGate()) {
+      unawaited(_checkRegistryUnlock());
+    }
   }
 
   Future<void> _hydrateReceiptReadState() async {
@@ -25124,7 +25293,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       });
       return;
     }
-    final ok = await civicRegistryIsUnlocked(widget.user.email, _selectedState);
+    final ok = await civicRegistryIsUnlocked(
+      widget.user.email,
+      state: _selectedState,
+      globalPin: widget.config.civicRegistryPin,
+      pinsByState: widget.config.civicRegistryPinsByState,
+    );
     if (mounted) {
       setState(() {
         _registryUnlocked = ok;
@@ -25197,7 +25371,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     unawaited(_pushUserAuthorizedRegistrar(widget.user));
     widget.onDataChanged();
     if (!_canBypassCivicGate()) {
-      final unlocked = await civicRegistryIsUnlocked(widget.user.email, newState);
+      final unlocked = await civicRegistryIsUnlocked(
+        widget.user.email,
+        state: newState,
+        globalPin: widget.config.civicRegistryPin,
+        pinsByState: widget.config.civicRegistryPinsByState,
+      );
       if (!unlocked) {
         if (!mounted) return false;
         setState(() {
@@ -26314,6 +26493,198 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (mounted) setState(() {});
   }
 
+  List<Map<String, dynamic>> _spendingsForCampaign(String campaignId) {
+    final id = campaignId.trim();
+    if (id.isEmpty) return const [];
+    return widget.config.helpCampaignSpendings
+        .where((e) => (e['campaignId'] ?? '').toString().trim() == id)
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList()
+      ..sort((a, b) {
+        final at = DateTime.tryParse((a['recordedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bt = DateTime.tryParse((b['recordedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bt.compareTo(at);
+      });
+  }
+
+  double _totalCollectedForCampaign(String campaignId, List<AppTransaction> txs) {
+    return txs.fold<double>(0.0, (s, t) => s + t.amount);
+  }
+
+  double _totalSpentForCampaign(String campaignId) {
+    return _spendingsForCampaign(campaignId).fold<double>(0.0, (s, e) => s + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+  }
+
+  void _recordHelpCampaignSpending({String? campaignId, String? campaignTitle}) {
+    if (!_canManageCivicRegistry()) return;
+    final cid = (campaignId ?? _activeHelpCampaignId()).trim();
+    if (cid.isEmpty) return;
+    final amountC = TextEditingController();
+    final noteC = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          title: const Text('Record Spending', style: TextStyle(fontWeight: FontWeight.w900)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if ((campaignTitle ?? '').trim().isNotEmpty)
+                Text(campaignTitle!.trim(), style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54)),
+              const SizedBox(height: 10),
+              TextField(
+                controller: amountC,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Amount spent (\$)'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: noteC,
+                maxLines: 2,
+                decoration: const InputDecoration(labelText: 'What was purchased / paid for?'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                final amount = double.tryParse(amountC.text.trim().replaceAll(',', '')) ?? 0.0;
+                final note = noteC.text.trim();
+                if (amount <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount.')));
+                  return;
+                }
+                if (note.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Describe what the money was used for.')));
+                  return;
+                }
+                final record = {
+                  'id': 'spend_${DateTime.now().microsecondsSinceEpoch}',
+                  'campaignId': cid,
+                  'amount': amount,
+                  'description': note,
+                  'recordedAt': DateTime.now().toUtc().toIso8601String(),
+                  'recordedByEmail': widget.user.email.toLowerCase().trim(),
+                  'recordedByName': (widget.user.fullName ?? widget.user.username).trim(),
+                  'state': widget.user.state.trim(),
+                };
+                setState(() {
+                  widget.config.helpCampaignSpendings = [
+                    ...widget.config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)),
+                    record,
+                  ];
+                });
+                widget.onDataChanged();
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Spending recorded — members can view it live.')));
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  List<AppTransaction> _contributionTxForCampaign(String campaignId) {
+    final id = campaignId.trim();
+    if (id.isEmpty) return const [];
+    return _visibleContributionTx().where((t) {
+      final meta = _decodeContributionMeta(t);
+      final cid = (meta['campaignId'] ?? '').toString().trim();
+      if (cid.isNotEmpty) return cid == id;
+      final fallback = '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|${meta['state'] ?? widget.user.state}';
+      return fallback == id;
+    }).toList();
+  }
+
+  void _showHelpCampaignSpendingLedger({
+    required String campaignId,
+    String? campaignTitle,
+    List<AppTransaction>? campaignTxs,
+  }) {
+    final cid = campaignId.trim();
+    if (cid.isEmpty) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return _HelpCampaignSpendingLedgerSheet(
+          config: widget.config,
+          campaignId: cid,
+          campaignTitle: campaignTitle,
+          campaignTxs: campaignTxs ?? _contributionTxForCampaign(cid),
+        );
+      },
+    );
+  }
+
+  Widget _campaignReceiptCornerActions({
+    required String campaignKey,
+    required String receiptState,
+    required String campaignTitle,
+    required List<AppTransaction> campaignTxs,
+    required bool canDelete,
+    VoidCallback? onDeleted,
+  }) {
+    return Positioned(
+      top: 0,
+      right: 0,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Material(
+            color: const Color(0xFF2563EB),
+            borderRadius: BorderRadius.only(
+              topRight: Radius.circular(canDelete ? 0 : 12),
+              bottomLeft: const Radius.circular(10),
+            ),
+            child: InkWell(
+              onTap: () => _showHelpCampaignSpendingLedger(
+                campaignId: campaignKey,
+                campaignTitle: campaignTitle,
+                campaignTxs: campaignTxs,
+              ),
+              borderRadius: BorderRadius.only(
+                topRight: Radius.circular(canDelete ? 0 : 12),
+                bottomLeft: const Radius.circular(10),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(7),
+                child: Icon(Icons.receipt_long_rounded, color: Colors.white, size: 18),
+              ),
+            ),
+          ),
+          if (canDelete)
+            Material(
+              color: Colors.red.shade600,
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(12),
+                bottomLeft: Radius.circular(10),
+              ),
+              child: InkWell(
+                onTap: () {
+                  _deleteContributionReceipt(campaignKey);
+                  onDeleted?.call();
+                },
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(12),
+                  bottomLeft: Radius.circular(10),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(7),
+                  child: Icon(Icons.delete_outline, color: Colors.white, size: 18),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Map<String, List<AppTransaction>> _groupContributionReceipts(List<AppTransaction> txs, {bool unreadOnly = false}) {
     final groups = <String, List<AppTransaction>>{};
     for (final t in txs) {
@@ -27275,6 +27646,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         final c = txs.map((e) => e.userEmail).toSet().length;
                         final receiptState = (m['state'] ?? widget.user.state).toString();
                         final canDelete = _canDeleteReceiptForState(receiptState);
+                        final title = (m['purpose'] ?? 'Contribution Campaign').toString();
                         return Stack(
                           clipBehavior: Clip.none,
                           children: [
@@ -27285,8 +27657,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (canDelete) const SizedBox(height: 4),
-                              Text((m['purpose'] ?? 'Contribution Campaign').toString(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22 * 0.7, color: strongText)),
+                              const SizedBox(height: 4),
+                              Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22 * 0.7, color: strongText)),
                               const SizedBox(height: 4),
                               Text('${m['state'] ?? widget.user.state} • ${m['scopeType'] == 'all' ? 'All members' : '${m['scopeType']}: ${m['scopeValue']}'}', style: TextStyle(color: softText)),
                               const SizedBox(height: 4),
@@ -27318,44 +27690,23 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             ],
                           ),
                         ),
-                            if (canDelete)
-                              Positioned(
-                                top: 0,
-                                right: 0,
-                                child: Material(
-                                  color: Colors.red.shade600,
-                                  borderRadius: const BorderRadius.only(
-                                    topRight: Radius.circular(12),
-                                    bottomLeft: Radius.circular(10),
-                                  ),
-                                  child: InkWell(
-                                    onTap: () {
-                                      _deleteContributionReceipt(k);
-                                      setDialog(() {
-                                        selectedKey = null;
-                                      });
-                                      if (_groupContributionReceipts(_visibleContributionTx()).isEmpty) {
-                                        Navigator.pop(ctx);
-                                      }
-                                    },
-                                    borderRadius: const BorderRadius.only(
-                                      topRight: Radius.circular(12),
-                                      bottomLeft: Radius.circular(10),
-                                    ),
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(7),
-                                      child: Icon(Icons.delete_outline, color: Colors.white, size: 18),
-                                    ),
-                                  ),
-                                ),
-                              ),
+                            _campaignReceiptCornerActions(
+                              campaignKey: k,
+                              receiptState: receiptState,
+                              campaignTitle: title,
+                              campaignTxs: txs,
+                              canDelete: canDelete,
+                              onDeleted: () {
+                                setDialog(() => selectedKey = null);
+                                if (_groupContributionReceipts(_visibleContributionTx()).isEmpty) {
+                                  Navigator.pop(ctx);
+                                }
+                              },
+                            ),
                           ],
                         );
                       })
                     else
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(14),
@@ -27412,38 +27763,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             ),
                           ],
                         ),
-                      ),
-                      if (selectedKey != null && _canDeleteReceiptForState((meta['state'] ?? widget.user.state).toString()))
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: Material(
-                            color: Colors.red.shade600,
-                            borderRadius: const BorderRadius.only(
-                              topRight: Radius.circular(14),
-                              bottomLeft: Radius.circular(10),
-                            ),
-                            child: InkWell(
-                              onTap: () {
-                                final key = selectedKey!;
-                                _deleteContributionReceipt(key);
-                                setDialog(() => selectedKey = null);
-                                if (_groupContributionReceipts(_visibleContributionTx()).isEmpty) {
-                                  Navigator.pop(ctx);
-                                }
-                              },
-                              borderRadius: const BorderRadius.only(
-                                topRight: Radius.circular(14),
-                                bottomLeft: Radius.circular(10),
-                              ),
-                              child: const Padding(
-                                padding: EdgeInsets.all(8),
-                                child: Icon(Icons.delete_outline, color: Colors.white, size: 20),
-                              ),
-                            ),
-                          ),
-                        ),
-                        ],
                       ),
                   ],
                 ),
@@ -27976,6 +28295,44 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                             ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _showHelpCampaignSpendingLedger(
+                                    campaignId: _activeHelpCampaignId(),
+                                    campaignTitle: widget.config.helpPurpose,
+                                  ),
+                                  icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                                  label: const Text('View Spending', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    side: const BorderSide(color: Colors.white70),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                  ),
+                                ),
+                              ),
+                              if (_canManageCivicRegistry()) ...[
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: () => _recordHelpCampaignSpending(
+                                      campaignId: _activeHelpCampaignId(),
+                                      campaignTitle: widget.config.helpPurpose,
+                                    ),
+                                    icon: const Icon(Icons.folder_open_rounded, size: 16),
+                                    label: const Text('Record Spending', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: const Color(0xFF4F2FD6),
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ],
                       ),
@@ -28665,6 +29022,44 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ),
                     ),
                   ),
+                  if (widget.config.helpModeActive) ...[
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _recordHelpCampaignSpending(
+                              campaignId: _activeHelpCampaignId(),
+                              campaignTitle: widget.config.helpPurpose,
+                            ),
+                            icon: const Icon(Icons.folder_open_rounded, size: 14),
+                            label: const Text('Record Spending', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF2563EB),
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showHelpCampaignSpendingLedger(
+                              campaignId: _activeHelpCampaignId(),
+                              campaignTitle: widget.config.helpPurpose,
+                            ),
+                            icon: const Icon(Icons.receipt_long_rounded, size: 14),
+                            label: const Text('Spending Ledger', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF059669),
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ] else if (slotsLeft > 0 && slotsLeft < kNgmyMaxRegistrarsPerState) ...[
                   const SizedBox(height: 3),
                   Text('$slotsLeft slot${slotsLeft == 1 ? '' : 's'} left', style: TextStyle(fontSize: 9, color: muted)),
