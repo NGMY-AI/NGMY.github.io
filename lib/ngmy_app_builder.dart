@@ -47,17 +47,17 @@ void ngmyTryOpenPublishedAppFromUrl(
 }
 
 Future<void> _ngmyShowAppPublicUrlDialog(BuildContext context, NgmyAppProject project) async {
-  final url = project.publicUrl.trim();
+  final url = ngmyResolvedPublicUrl(project);
   if (url.isEmpty) return;
   await showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Your unique GitHub link'),
+      title: const Text('Your unique ngmy.org link'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('This link is only for "${project.name}" — hosted on GitHub Pages. Share it anywhere:', style: TextStyle(color: Colors.grey.shade700)),
+          Text('This link is only for "${project.name}" — hosted on ngmy.org. Share it anywhere:', style: TextStyle(color: Colors.grey.shade700)),
           const SizedBox(height: 12),
           SelectableText(url, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF2563EB), fontSize: 13)),
           const SizedBox(height: 10),
@@ -313,9 +313,11 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
     }
   }
 
-  void _copyUrl(String url) {
+  void _copyUrl(NgmyAppProject project) {
+    final url = ngmyResolvedPublicUrl(project);
+    if (url.isEmpty) return;
     Clipboard.setData(ClipboardData(text: url));
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied to clipboard')));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ngmy.org link copied')));
   }
 
   @override
@@ -414,8 +416,8 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
               ],
             ),
             subtitle: Text(
-              p.publicUrl.isNotEmpty
-                  ? '${p.status.label} · ${p.screens.length} screens · Live link'
+              ngmyResolvedPublicUrl(p).isNotEmpty
+                  ? '${p.status.label} · ${p.screens.length} screens · ngmy.org link'
                   : '${p.status.label} · ${p.screens.length} screens',
             ),
             trailing: PopupMenuButton<String>(
@@ -426,7 +428,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
                 if (v == 'preview') {
                   NgmyNavigator.push(context, NgmyAppRuntimeScreen(project: p, apiKey: _apiKey, email: _email), routeName: 'NgmyAppRuntimeScreen');
                 }
-                if (v == 'copy' && p.publicUrl.isNotEmpty) _copyUrl(p.publicUrl);
+                if (v == 'copy' && ngmyResolvedPublicUrl(p).isNotEmpty) _copyUrl(p);
                 if (v == 'export') await _exportApp(p);
                 if (v == 'publish') await _submitOrPublish(p);
                 if (v == 'delete') {
@@ -446,7 +448,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
                   ),
                 ),
                 const PopupMenuItem(value: 'preview', child: Text('Preview')),
-                if (p.publicUrl.isNotEmpty) const PopupMenuItem(value: 'copy', child: Text('Copy public link')),
+                if (ngmyResolvedPublicUrl(p).isNotEmpty) const PopupMenuItem(value: 'copy', child: Text('Copy ngmy.org link')),
                 const PopupMenuItem(value: 'export', child: Text('Download backup (.ngmy.json)')),
                 PopupMenuItem(value: 'publish', child: Text(_isAdmin ? 'Publish now' : 'Submit for review')),
                 const PopupMenuItem(value: 'delete', child: Text('Delete')),
@@ -548,7 +550,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
           _featureRow(Icons.check_circle_rounded, 'Lists that show your saved items'),
           _featureRow(Icons.check_circle_rounded, 'Settings toggles that actually persist'),
           _featureRow(Icons.check_circle_rounded, 'Interactive workout plans with progress'),
-          _featureRow(Icons.link_rounded, 'Unique public link when published'),
+          _featureRow(Icons.link_rounded, 'Unique ngmy.org link when published'),
         ],
       ),
     );
@@ -677,10 +679,16 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
           child: ListTile(
             leading: CircleAvatar(backgroundColor: p.theme, child: const Icon(Icons.star_rounded, color: Colors.white)),
             title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800)),
-            subtitle: Text(p.publicUrl.isNotEmpty ? p.publicUrl : (p.tagline.isEmpty ? 'by ${p.ownerEmail}' : p.tagline), maxLines: 2, overflow: TextOverflow.ellipsis),
+            subtitle: Text(
+              ngmyResolvedPublicUrl(p).isNotEmpty
+                  ? ngmyResolvedPublicUrl(p)
+                  : (p.tagline.isEmpty ? 'by ${p.ownerEmail}' : p.tagline),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
             trailing: IconButton(
               icon: const Icon(Icons.link_rounded),
-              onPressed: p.publicUrl.isEmpty ? null : () => _copyUrl(p.publicUrl),
+              onPressed: ngmyResolvedPublicUrl(p).isEmpty ? null : () => _copyUrl(p),
             ),
             onTap: () => NgmyNavigator.push(context, NgmyAppRuntimeScreen(project: p, apiKey: _apiKey, email: _email), routeName: 'NgmyAppRuntimeScreen'),
           ),
@@ -1054,7 +1062,7 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
       children: [
-        if (_project.publicUrl.isNotEmpty)
+        if (ngmyResolvedPublicUrl(_project).isNotEmpty)
           _editorCard(
             isDark: isDark,
             child: ListTile(
@@ -1064,13 +1072,14 @@ class _NgmyAppEditorScreenState extends State<NgmyAppEditorScreen> {
                 decoration: BoxDecoration(color: const Color(0xFF2563EB).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
                 child: const Icon(Icons.public_rounded, color: Color(0xFF2563EB)),
               ),
-              title: Text('Public link', style: TextStyle(fontWeight: FontWeight.w800, color: titleColor)),
-              subtitle: Text(_project.publicUrl, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: subText)),
+              title: Text('ngmy.org link', style: TextStyle(fontWeight: FontWeight.w800, color: titleColor)),
+              subtitle: Text(ngmyResolvedPublicUrl(_project), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: subText)),
               trailing: IconButton(
                 icon: const Icon(Icons.copy_rounded),
                 onPressed: () {
-                  Clipboard.setData(ClipboardData(text: _project.publicUrl));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied!')));
+                  final link = ngmyResolvedPublicUrl(_project);
+                  Clipboard.setData(ClipboardData(text: link));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ngmy.org link copied!')));
                 },
               ),
             ),

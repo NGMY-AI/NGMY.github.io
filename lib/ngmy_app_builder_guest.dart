@@ -9,6 +9,7 @@ import 'ngmy_app_builder.dart';
 import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
+import 'ngmy_app_builder_urls.dart';
 
 const _kGuestAppCachePrefix = 'ngmy_guest_app_cache_';
 
@@ -23,15 +24,21 @@ NgmyAppProject? _projectFromPayload(dynamic value) {
 
 Future<NgmyAppProject?> _fetchStaticGuestAppJson(String slug) async {
   if (!kIsWeb) return null;
-  try {
-    final base = ngmyAppBuilderBaseUrl();
-    final url = '${base}apps/$slug.json';
-    final resp = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
-    if (resp.statusCode == 200 && resp.body.isNotEmpty) {
-      return _projectFromPayload(jsonDecode(resp.body));
+  final bases = <String>{
+    ngmyAppStudioCanonicalBaseUrl(),
+    ngmyAppBuilderBaseUrl(),
+  };
+  for (final base in bases) {
+    try {
+      final url = '${base}apps/$slug.json';
+      final resp = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
+      if (resp.statusCode == 200 && resp.body.isNotEmpty) {
+        final p = _projectFromPayload(jsonDecode(resp.body));
+        if (p != null) return ngmyRefreshAppProjectPublicUrl(p);
+      }
+    } catch (e) {
+      debugPrint('[app builder] static json $slug @ $base: $e');
     }
-  } catch (e) {
-    debugPrint('[app builder] static json $slug: $e');
   }
   return null;
 }
@@ -60,8 +67,9 @@ Future<NgmyAppProject?> ngmyFetchPublishedAppBySlug(String slug) async {
   final published = await ngmyLoadLocalPublishedApps();
   for (final p in published) {
     if (p.slug.toLowerCase() == target) {
-      _guestAppMemoryCache[target] = p;
-      return p;
+      final refreshed = ngmyRefreshAppProjectPublicUrl(p);
+      _guestAppMemoryCache[target] = refreshed;
+      return refreshed;
     }
   }
 

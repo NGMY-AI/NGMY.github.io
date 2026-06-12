@@ -28,6 +28,7 @@ Future<List<NgmyAppProject>> _loadLocalList(String key) async {
     return decoded
         .map((e) => e is Map ? NgmyAppProject.fromMap(Map<String, dynamic>.from(e)) : null)
         .whereType<NgmyAppProject>()
+        .map(ngmyRefreshAppProjectPublicUrl)
         .toList();
   } catch (e) {
     debugPrint('[app builder] load $key: $e');
@@ -74,6 +75,7 @@ Future<List<NgmyAppProject>> ngmyLoadUserAppProjects(String email) async {
     return decoded
         .map((e) => e is Map ? NgmyAppProject.fromMap(Map<String, dynamic>.from(e)) : null)
         .whereType<NgmyAppProject>()
+        .map(ngmyRefreshAppProjectPublicUrl)
         .toList();
   } catch (e) {
     debugPrint('[app builder] load user projects: $e');

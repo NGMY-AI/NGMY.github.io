@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
+import 'ngmy_app_builder_urls.dart';
 
 /// Admin controls for NGMY App Builder — local storage only, no cloud database.
 Future<void> showNgmyAppBuilderAdminSheet({
@@ -112,7 +113,7 @@ Future<void> showNgmyAppBuilderAdminSheet({
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                          subtitle: Text(p.publicUrl.isNotEmpty ? p.publicUrl : 'by ${p.ownerEmail}'),
+                          subtitle: Text(ngmyResolvedPublicUrl(p).isNotEmpty ? ngmyResolvedPublicUrl(p) : 'by ${p.ownerEmail}'),
                           trailing: IconButton(
                             icon: const Icon(Icons.public_off_outlined, color: Color(0xFFEF4444)),
                             onPressed: () async {

@@ -1,9 +1,18 @@
-import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
 
-/// GitHub Pages base — every user app lives under /app/{unique-slug}
+/// Production domain for App Studio public links (custom domain).
+const String kNgmyAppStudioCanonicalBaseUrl = 'https://ngmy.org/';
+
+/// Every published app opens at /app/{unique-slug} on the live site.
 const kNgmyGithubPagesAppPath = 'app';
+
+String ngmyAppStudioCanonicalBaseUrl() => kNgmyAppStudioCanonicalBaseUrl;
+
+bool ngmyIsLegacyAppStudioUrl(String url) {
+  final u = url.toLowerCase();
+  return u.contains('ngmy-ai.github.io') || u.contains('/ngmy.github.io');
+}
 
 String ngmyOwnerSlugPrefix(String ownerEmail) {
   final email = ownerEmail.toLowerCase().trim();
@@ -34,9 +43,27 @@ String ngmyBuildUniqueAppSlug({
 
 String ngmyAppPublicUrlForSlug(String slug) {
   final clean = slug.trim().toLowerCase();
-  final base = ngmyAppBuilderBaseUrl();
-  return '${base}$kNgmyGithubPagesAppPath/$clean';
+  final base = ngmyAppStudioCanonicalBaseUrl();
+  return '$base$kNgmyGithubPagesAppPath/$clean';
 }
+
+/// Maps old github.io links to ngmy.org when a slug exists.
+NgmyAppProject ngmyRefreshAppProjectPublicUrl(NgmyAppProject project) {
+  final slug = project.slug.trim().toLowerCase();
+  if (slug.isEmpty) return project;
+  final hasLink = project.publicUrl.trim().isNotEmpty;
+  final published = project.isPublished || hasLink;
+  if (!published) return project;
+  final canonical = ngmyAppPublicUrlForSlug(slug);
+  if (project.publicUrl.trim() == canonical) return project;
+  if (!hasLink || ngmyIsLegacyAppStudioUrl(project.publicUrl)) {
+    return project.copyWith(publicUrl: canonical);
+  }
+  return project;
+}
+
+String ngmyResolvedPublicUrl(NgmyAppProject project) =>
+    ngmyRefreshAppProjectPublicUrl(project).publicUrl.trim();
 
 NgmyAppProject ngmyAppProjectWithPublicUrl(
   NgmyAppProject project,
