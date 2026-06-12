@@ -22,6 +22,8 @@ const String _kNgmyRepairEstimatePaymentSettingsKey = 'repair_estimate_payment_s
 const String _kNgmyRepairEstimatePaymentPrefsKey = 'ngmy_repair_estimate_payment_settings_v1';
 const String _kNgmyTranslatePaymentSettingsKey = 'translate_message_payment_settings';
 const String _kNgmyTranslatePaymentPrefsKey = 'ngmy_translate_message_payment_settings_v1';
+const String _kNgmyCivicSelfEnrollmentSettingsKey = 'civic_self_enrollment_settings';
+const String _kNgmyCivicSelfEnrollmentPrefsKey = 'ngmy_civic_self_enrollment_settings_v1';
 const String _kNgmyHelperAiSettingsKey = 'ngmy_helper_ai_settings';
 const String _kNgmyHelperAiPrefsKey = 'ngmy_helper_ai_settings_v1';
 const String _kNgmyAppBrandingSettingsKey = 'ngmy_app_branding';
@@ -782,6 +784,54 @@ Future<bool> ngmyPersistTranslatePaymentSettings(AppConfig config) async {
   return cloudOk;
 }
 
+Future<void> ngmyHydrateCivicSelfEnrollmentFromAllBackups(AppConfig config) async {
+  await NgmyCivicSelfEnrollment.hydrateLocal(config);
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyCivicSelfEnrollmentSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      NgmyCivicSelfEnrollment.applyPayload(config, row);
+    }
+  }
+}
+
+Future<bool> ngmyPersistCivicSelfEnrollmentSettings(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await NgmyCivicSelfEnrollment.saveLocalBackup(config);
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyCivicSelfEnrollmentSettingsKey, NgmyCivicSelfEnrollment.payload(config));
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
+Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(AppConfig config, List<UserData> allUsers) async {
+  await NgmyCivicRegistryMembers.hydrateLocal(config);
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(NgmyCivicRegistryMembers.cloudSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      NgmyCivicRegistryMembers.applyPayload(config, row);
+    }
+  }
+  NgmyCivicRegistryMembers.migrateFromLegacyUsers(config, allUsers);
+}
+
+Future<bool> ngmyPersistCivicRegistryMembers(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await NgmyCivicRegistryMembers.saveLocalBackup(config);
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    cloudOk = await _upsertNgmySettingSafe(NgmyCivicRegistryMembers.cloudSettingsKey, NgmyCivicRegistryMembers.payload(config));
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
 Future<bool> ngmyPersistRepairEstimatePaymentSettings(AppConfig config) async {
   ngmyAdminConfigMutationAt = DateTime.now();
   NgmyAdminLiveRefresh.notify();
@@ -1133,6 +1183,7 @@ Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
   await ngmyHydrateWalletPaymentsFromAllBackups(config);
   await ngmyHydrateRepairEstimatePaymentsFromAllBackups(config);
   await ngmyHydrateTranslatePaymentsFromAllBackups(config);
+  await ngmyHydrateCivicSelfEnrollmentFromAllBackups(config);
   await NgmyAppStudioAccess.hydrate(config);
   final snapshot = AppConfig.fromJson(config.toJson());
 

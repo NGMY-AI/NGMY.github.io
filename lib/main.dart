@@ -92,6 +92,8 @@ import 'ngmy_civic_registry_admin.dart';
 import 'ngmy_civic_registry_pins.dart';
 import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_enrollment.dart';
+import 'ngmy_civic_self_enrollment.dart';
+import 'ngmy_civic_registry_members.dart';
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_invoice_payments.dart';
 import 'ngmy_music_payments.dart';
@@ -1014,6 +1016,8 @@ class AppConfig {
   /// One PIN for all Civic Registry users (set in Growth Income / Admin Management).
   String civicRegistryPin;
   List<Map<String, dynamic>> civicRegistrarApplications;
+  /// Civic Registry members only — not general app user profiles.
+  List<Map<String, dynamic>> civicRegistryMembers;
   /// When true, members see self-enroll on the Civic Registry header (admin toggle).
   bool civicSelfEnrollmentEnabled;
   double familyTreeCreateFee;
@@ -1113,6 +1117,7 @@ class AppConfig {
     Map<String, String>? civicRegistryPinsByState,
     this.civicRegistryPin = '',
     List<Map<String, dynamic>>? civicRegistrarApplications,
+    List<Map<String, dynamic>>? civicRegistryMembers,
     this.civicSelfEnrollmentEnabled = false,
     this.familyTreeCreateFee = NgmyFamilyTreePayments.defaultCreateFee,
     this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
@@ -1166,6 +1171,7 @@ class AppConfig {
         invoiceLuxuryLifetimeEmails = invoiceLuxuryLifetimeEmails ?? const [],
         civicRegistryPinsByState = civicRegistryPinsByState ?? const {},
         civicRegistrarApplications = civicRegistrarApplications ?? const [],
+        civicRegistryMembers = civicRegistryMembers ?? const [],
         storeSellAccessEmails = storeSellAccessEmails ?? const [],
         appBuilderPublished = appBuilderPublished ?? const [],
         appBuilderReviewQueue = appBuilderReviewQueue ?? const [],
@@ -1225,6 +1231,7 @@ class AppConfig {
     'civicRegistryPinsByState': civicRegistryPinsByState,
     'civicRegistryPin': civicRegistryPin,
     'civicRegistrarApplications': civicRegistrarApplications,
+    'civicRegistryMembers': civicRegistryMembers,
     'civicSelfEnrollmentEnabled': civicSelfEnrollmentEnabled,
     'familyTreeCreateFee': familyTreeCreateFee,
     'familyTreePhotoMonthlyFee': familyTreePhotoMonthlyFee,
@@ -1328,6 +1335,9 @@ class AppConfig {
     civicRegistryPin: (json['civicRegistryPin'] ?? '').toString(),
     civicRegistrarApplications: List<Map<String, dynamic>>.from(
       (json['civicRegistrarApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
+    ),
+    civicRegistryMembers: List<Map<String, dynamic>>.from(
+      (json['civicRegistryMembers'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
     ),
     civicSelfEnrollmentEnabled: json['civicSelfEnrollmentEnabled'] == true,
     familyTreeCreateFee: (json['familyTreeCreateFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultCreateFee,
@@ -1816,24 +1826,61 @@ Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
   }
 }
 
-Map<String, dynamic> _userRowForRegistryUpsert(UserData u) {
-  final row = <String, dynamic>{
-    'email': u.email.trim(),
-    'username': u.username,
-    'phone': u.phone,
-    'state': u.state,
-    'isEnrolledInRegistry': u.isEnrolledInRegistry,
-    'helps': u.helps,
-    'missed': u.missed,
-  };
-  if ((u.fullName ?? '').trim().isNotEmpty) row['fullName'] = u.fullName;
-  if ((u.dob ?? '').trim().isNotEmpty) row['dob'] = u.dob;
-  if ((u.idType ?? '').trim().isNotEmpty) row['idType'] = u.idType;
-  if ((u.registryId ?? '').trim().isNotEmpty) row['registryId'] = u.registryId;
-  if ((u.homeAddress ?? '').trim().isNotEmpty) row['homeAddress'] = u.homeAddress;
-  if ((u.city ?? '').trim().isNotEmpty) row['city'] = u.city;
-  if ((u.room ?? '').trim().isNotEmpty) row['room'] = u.room;
-  return row;
+Map<String, dynamic> _userRowForRegistryEnrollmentFlag(UserData u) => {
+      'email': u.email.trim(),
+      'isEnrolledInRegistry': u.isEnrolledInRegistry,
+    };
+
+bool _userIsCivicRegistryEnrolled(AppConfig config, UserData user) =>
+    user.isEnrolledInRegistry || NgmyCivicRegistryMembers.isEnrolled(config, user.email);
+
+UserData _civicMemberRecordToDisplayUser(Map<String, dynamic> m, List<UserData> allUsers) {
+  final email = NgmyCivicRegistryMembers.emailKey((m['email'] ?? '').toString());
+  final idx = allUsers.indexWhere((u) => NgmyCivicRegistryMembers.emailKey(u.email) == email);
+  final u = idx >= 0 ? UserData.fromJson(allUsers[idx].toJson()) : UserData(email: email, username: email.split('@').first);
+  u.isEnrolledInRegistry = true;
+  u.fullName = (m['fullName'] ?? u.fullName ?? u.username).toString();
+  u.dob = (m['dob'] ?? u.dob ?? '').toString();
+  u.idType = (m['idType'] ?? u.idType ?? '').toString();
+  u.registryId = (m['registryId'] ?? u.registryId ?? '').toString();
+  u.homeAddress = (m['homeAddress'] ?? u.homeAddress ?? '').toString();
+  u.phone = (m['phone'] ?? u.phone).toString();
+  u.city = (m['city'] ?? '').toString();
+  u.room = (m['room'] ?? '').toString();
+  u.state = (m['state'] ?? u.state).toString();
+  u.helps = m['helps'] is num ? (m['helps'] as num).toInt() : u.helps;
+  u.missed = m['missed'] is num ? (m['missed'] as num).toInt() : u.missed;
+  return u;
+}
+
+List<UserData> _civicRegistryMembersForDisplay(AppConfig config, List<UserData> allUsers) {
+  NgmyCivicRegistryMembers.migrateFromLegacyUsers(config, allUsers);
+  return NgmyCivicRegistryMembers.listFrom(config).map((m) => _civicMemberRecordToDisplayUser(m, allUsers)).toList();
+}
+
+void _syncCivicMemberRecordFromUser(AppConfig config, UserData u) {
+  NgmyCivicRegistryMembers.syncFromFields(
+    config,
+    email: u.email,
+    fullName: u.fullName ?? u.username,
+    dob: u.dob ?? '',
+    idType: u.idType ?? '',
+    homeAddress: u.homeAddress ?? '',
+    phone: u.phone,
+    city: u.city ?? '',
+    room: u.room ?? '',
+    state: u.state,
+    registryId: u.registryId ?? '',
+    helps: u.helps,
+    missed: u.missed,
+  );
+}
+
+void _setCivicEnrollmentFlagForAccount(List<UserData> allUsers, String email, bool enrolled) {
+  final key = NgmyCivicRegistryMembers.emailKey(email);
+  if (key.isEmpty) return;
+  final idx = allUsers.indexWhere((u) => NgmyCivicRegistryMembers.emailKey(u.email) == key);
+  if (idx >= 0) allUsers[idx].isEnrolledInRegistry = enrolled;
 }
 
 void _preserveRegistryEnrollmentFromLocal(UserData local, UserData remote) {
@@ -2065,7 +2112,7 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
         keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
-  if (record.containsKey('civicSelfEnrollmentEnabled')) {
+  if (record.containsKey('civicSelfEnrollmentEnabled') && !ngmyShouldDeferRemoteConfigOverwrite()) {
     next.civicSelfEnrollmentEnabled = record['civicSelfEnrollmentEnabled'] == true;
   } else {
     next.civicSelfEnrollmentEnabled = keep.civicSelfEnrollmentEnabled;
@@ -6518,6 +6565,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
+    await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
+    await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
     await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
     await ngmyHydrateWalletPaymentsFromAllBackups(_config);
@@ -7645,6 +7694,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             }
           },
         );
+        if (next.civicRegistryMembers.isEmpty && keepConfig.civicRegistryMembers.isNotEmpty) {
+          next.civicRegistryMembers = keepConfig.civicRegistryMembers;
+        }
+        await ngmyHydrateCivicSelfEnrollmentFromAllBackups(next);
+        await ngmyHydrateCivicRegistryMembersFromAllBackups(next, _allUsers);
         if (_appConfigSig(_config) == _appConfigSig(next)) return;
         setState(() {
           _config = next;
@@ -9514,7 +9568,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
-          await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
+    await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
+    await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
+    await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
@@ -9778,7 +9834,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
-          await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
+    await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
+    await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
+    await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
@@ -18110,9 +18168,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 value: widget.config.civicSelfEnrollmentEnabled,
                 onChanged: (v) async {
                   setST(() => widget.config.civicSelfEnrollmentEnabled = v);
-                  final ok = await _persistManagementConfig();
+                  ngmyAdminConfigMutationAt = DateTime.now();
                   widget.onDataChanged();
+                  await NgmyCivicSelfEnrollment.saveLocalBackup(widget.config);
+                  final ok = await ngmyPersistCivicSelfEnrollmentSettings(widget.config);
                   if (!context.mounted) return;
+                  setState(() {});
                   ngmyAdminShowCloudSaveSnackBar(
                     context,
                     cloudOk: ok,
@@ -24564,6 +24625,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   void initState() {
     super.initState();
     _selectedState = widget.user.state;
+    unawaited(ngmyHydrateCivicSelfEnrollmentFromAllBackups(widget.config));
+    unawaited(ngmyHydrateCivicRegistryMembersFromAllBackups(widget.config, widget.allUsers));
     _ensureUniqueRegistryIds();
     unawaited(_hydrateReceiptReadState());
     unawaited(_hydrateRegistrarApplication());
@@ -25037,10 +25100,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           u.fullName?.toLowerCase().contains(_searchQuery) == true ||
           u.registryId?.toLowerCase().contains(_searchQuery) == true ||
           u.city?.toLowerCase().contains(_searchQuery) == true;
-      return u.isEnrolledInRegistry && stateMatch && textMatch;
+      return stateMatch && textMatch;
     }
 
-    return widget.allUsers.where(matchesFilters).toList();
+    return _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where(matchesFilters).toList();
   }
 
   Future<void> _persistReceiptReadState() async {
@@ -25134,12 +25197,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   void _ensureUniqueRegistryIds() {
     final seen = <String>{};
-    for (final u in widget.allUsers.where((u) => u.isEnrolledInRegistry)) {
-      final id = (u.registryId ?? '').trim();
+    for (final m in NgmyCivicRegistryMembers.listFrom(widget.config)) {
+      var id = (m['registryId'] ?? '').toString().trim();
+      final state = (m['state'] ?? _selectedState).toString();
       if (id.isEmpty || seen.contains(id)) {
-        u.registryId = _generateUniqueRegistryId(u.state);
+        id = _generateUniqueRegistryId(state);
+        NgmyCivicRegistryMembers.upsert(widget.config, {...m, 'registryId': id});
       }
-      seen.add((u.registryId ?? '').trim());
+      seen.add(id);
     }
   }
 
@@ -25157,7 +25222,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showSelfEnrollmentSheet() {
-    if (widget.user.isEnrolledInRegistry) {
+    if (_userIsCivicRegistryEnrolled(widget.config, widget.user)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are already enrolled in the registry.')));
       return;
     }
@@ -25340,8 +25405,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
-    final duplicate = NgmyCivicRegistryEnrollment.findDuplicateEnrolledUser(
-      users: widget.allUsers,
+    if (targetUser != null && email.isNotEmpty && targetUser.email.toLowerCase().trim() != email) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Use your account email for self-enrollment.')));
+      return;
+    }
+
+    final duplicate = NgmyCivicRegistryMembers.findDuplicateRecord(
+      config: widget.config,
       fullName: fullName,
       dob: dob,
       city: city,
@@ -25349,51 +25419,39 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
     if (duplicate != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(NgmyCivicRegistryEnrollment.duplicateMessage(duplicate))),
+        SnackBar(content: Text(NgmyCivicRegistryMembers.duplicateMessage(duplicate))),
       );
       return;
     }
 
-    UserData enrolledUser;
-    if (targetUser != null) {
-      enrolledUser = targetUser;
-      if (email.isNotEmpty && enrolledUser.email.toLowerCase().trim() != email) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Use your account email for self-enrollment.')));
-        return;
-      }
-    } else {
-      final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-      if (idx != -1) {
-        enrolledUser = widget.allUsers[idx];
-      } else {
-        enrolledUser = UserData(
-          email: email,
-          username: fullName.split(' ').first,
-          phone: phone,
-          state: _selectedState,
-        );
-        widget.allUsers.add(enrolledUser);
-      }
-    }
+    final accountIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+    var registryId = accountIdx >= 0 ? (widget.allUsers[accountIdx].registryId ?? '').trim() : '';
+    if (registryId.isEmpty) registryId = _generateUniqueRegistryId(_selectedState);
+    final existingIds = NgmyCivicRegistryMembers.listFrom(widget.config)
+        .map((m) => (m['registryId'] ?? '').toString().trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    if (existingIds.contains(registryId)) registryId = _generateUniqueRegistryId(_selectedState);
+
+    final member = NgmyCivicRegistryMembers.buildRecord(
+      email: email,
+      fullName: fullName,
+      dob: dob,
+      idType: idType,
+      homeAddress: address,
+      phone: phone,
+      city: city,
+      room: room,
+      state: _selectedState,
+      registryId: registryId,
+    );
 
     setState(() {
-      enrolledUser.isEnrolledInRegistry = true;
-      enrolledUser.fullName = fullName;
-      enrolledUser.dob = dob;
-      enrolledUser.idType = idType;
-      enrolledUser.homeAddress = address;
-      enrolledUser.phone = phone;
-      if (email.isNotEmpty) enrolledUser.email = email;
-      enrolledUser.city = city;
-      enrolledUser.room = room;
-      enrolledUser.state = _selectedState;
-      enrolledUser.registryId = enrolledUser.registryId?.isNotEmpty == true
-          ? enrolledUser.registryId
-          : _generateUniqueRegistryId(_selectedState);
-      if (widget.allUsers.any((u) => u != enrolledUser && (u.registryId ?? '').trim() == (enrolledUser.registryId ?? '').trim())) {
-        enrolledUser.registryId = _generateUniqueRegistryId(_selectedState);
+      NgmyCivicRegistryMembers.upsert(widget.config, member);
+      if (accountIdx >= 0) widget.allUsers[accountIdx].isEnrolledInRegistry = true;
+      if (targetUser != null && NgmyCivicRegistryMembers.emailKey(targetUser.email) == NgmyCivicRegistryMembers.emailKey(email)) {
+        widget.user.isEnrolledInRegistry = true;
       }
-
       if (targetUser == null) {
         _fullNameC.clear();
         _dobC.clear();
@@ -25405,7 +25463,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         _activeTab = 2;
       }
     });
-    final saved = await _persistRegistryMember(enrolledUser);
+    final displayUser = _civicMemberRecordToDisplayUser(member, widget.allUsers);
+    final saved = await _persistRegistryMember(displayUser);
     widget.onDataChanged();
     if (closeSelfSheet != null && closeSelfSheet.mounted) Navigator.pop(closeSelfSheet);
     if (!mounted) return;
@@ -25422,30 +25481,81 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<bool> _persistRegistryMember(UserData member) async {
-    var cloudOk = true;
-    if (await ngmyCanReachCloud()) {
+    _syncCivicMemberRecordFromUser(widget.config, member);
+    _setCivicEnrollmentFlagForAccount(widget.allUsers, member.email, true);
+    if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == NgmyCivicRegistryMembers.emailKey(member.email)) {
+      widget.user.isEnrolledInRegistry = true;
+    }
+
+    var membersCloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
+    var userCloudOk = true;
+    final accountIdx = widget.allUsers.indexWhere(
+      (u) => NgmyCivicRegistryMembers.emailKey(u.email) == NgmyCivicRegistryMembers.emailKey(member.email),
+    );
+    if (await ngmyCanReachCloud() && accountIdx >= 0) {
       try {
         await Supabase.instance.client
             .from('users')
-            .upsert(_userRowForRegistryUpsert(member))
+            .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]))
             .timeout(kNgmyCloudWriteTimeout);
       } catch (e) {
-        cloudOk = false;
-        debugPrint('Registry member upsert failed: $e');
+        userCloudOk = false;
+        debugPrint('Registry enrollment flag upsert failed: $e');
       }
-    } else {
-      cloudOk = false;
     }
+
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
       await prefs.setString('all_users', jsonEncode(widget.allUsers.map((e) => e.toJson()).toList()));
-      if (widget.user.email.toLowerCase().trim() == member.email.toLowerCase().trim()) {
+      if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == NgmyCivicRegistryMembers.emailKey(member.email)) {
         await prefs.setString('current_user', jsonEncode(widget.user.toJson()));
       }
     } catch (e) {
       debugPrint('Registry member local save failed: $e');
     }
-    return cloudOk;
+    return membersCloudOk && userCloudOk;
+  }
+
+  Future<bool> _removeRegistryMember(UserData member) async {
+    NgmyCivicRegistryMembers.removeByEmail(widget.config, member.email);
+    _setCivicEnrollmentFlagForAccount(widget.allUsers, member.email, false);
+    if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == NgmyCivicRegistryMembers.emailKey(member.email)) {
+      widget.user.isEnrolledInRegistry = false;
+    }
+    final membersCloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
+    var userCloudOk = true;
+    final accountIdx = widget.allUsers.indexWhere(
+      (u) => NgmyCivicRegistryMembers.emailKey(u.email) == NgmyCivicRegistryMembers.emailKey(member.email),
+    );
+    if (await ngmyCanReachCloud() && accountIdx >= 0) {
+      try {
+        await Supabase.instance.client
+            .from('users')
+            .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]))
+            .timeout(kNgmyCloudWriteTimeout);
+      } catch (e) {
+        userCloudOk = false;
+      }
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+      await prefs.setString('all_users', jsonEncode(widget.allUsers.map((e) => e.toJson()).toList()));
+      if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == NgmyCivicRegistryMembers.emailKey(member.email)) {
+        await prefs.setString('current_user', jsonEncode(widget.user.toJson()));
+      }
+    } catch (_) {}
+    return membersCloudOk && userCloudOk;
+  }
+
+  Future<void> _persistCivicMemberActivity(UserData member) async {
+    _syncCivicMemberRecordFromUser(widget.config, member);
+    await ngmyPersistCivicRegistryMembers(widget.config);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+    } catch (_) {}
   }
 
   void _showStatePicker() {
@@ -25637,8 +25747,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   List<UserData> _membersInCurrentHelpScope() {
-    return widget.allUsers.where((m) {
-      if (!m.isEnrolledInRegistry) return false;
+    return _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where((m) {
       if (!_memberMatchesHelpScope(m)) return false;
       return (m.state.trim().isEmpty || m.state == widget.user.state);
     }).toList();
@@ -25659,6 +25768,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final key = m.email.toLowerCase().trim();
       if (!contributors.contains(key)) {
         m.missed += 1;
+        unawaited(_persistCivicMemberActivity(m));
       }
     }
   }
@@ -26852,6 +26962,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   u.missed -= 1;
                 }
               });
+              unawaited(_persistCivicMemberActivity(u));
               widget.onDataChanged();
               Navigator.pop(ctx);
             },
@@ -26899,6 +27010,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 ),
               );
               setState(() => u.missed += 1);
+              unawaited(_persistCivicMemberActivity(u));
               widget.onDataChanged();
               Navigator.pop(ctx);
             },
@@ -26938,6 +27050,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       c.status = TransactionStatus.rejected;
                       if (u.missed > 0) u.missed -= 1;
                     });
+                    unawaited(_persistCivicMemberActivity(u));
                     widget.onDataChanged();
                     Navigator.pop(ctx);
                   },
@@ -27211,13 +27324,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   if (widget.config.civicSelfEnrollmentEnabled)
                     SelectionContainer.disabled(
                       child: IconButton(
-                        onPressed: widget.user.isEnrolledInRegistry ? null : _showSelfEnrollmentSheet,
+                        onPressed: _userIsCivicRegistryEnrolled(widget.config, widget.user) ? null : _showSelfEnrollmentSheet,
                         icon: Icon(
-                          widget.user.isEnrolledInRegistry ? Icons.verified_rounded : Icons.person_add_alt_1_rounded,
+                          _userIsCivicRegistryEnrolled(widget.config, widget.user) ? Icons.verified_rounded : Icons.person_add_alt_1_rounded,
                           color: Colors.white,
                           size: 28,
                         ),
-                        tooltip: widget.user.isEnrolledInRegistry ? 'You are enrolled' : 'Enroll yourself',
+                        tooltip: _userIsCivicRegistryEnrolled(widget.config, widget.user) ? 'You are enrolled' : 'Enroll yourself',
                       ),
                     ),
                 ],
@@ -27431,7 +27544,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _enrollSection(bool isDark) {
     final availableAppUsers = widget.allUsers.where((u) =>
-      !u.isEnrolledInRegistry &&
+      !NgmyCivicRegistryMembers.isEnrolled(widget.config, u.email) &&
       (u.username.toLowerCase().contains(_enrollSearchC.text.toLowerCase()) ||
        u.email.toLowerCase().contains(_enrollSearchC.text.toLowerCase()))
     ).toList();
@@ -27595,24 +27708,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           u.city?.toLowerCase().contains(_searchQuery) == true;
       final cityMatch = _selectedCity == 'All Cities' || (u.city ?? '').trim() == _selectedCity;
       final roomMatch = _selectedRoom == 'All Rooms' || (u.room ?? '').trim() == _selectedRoom;
-      return u.isEnrolledInRegistry && stateMatch && textMatch && cityMatch && roomMatch;
+      return stateMatch && textMatch && cityMatch && roomMatch;
     }
 
-    final members = widget.allUsers.where(matchesFilters).toList();
-    if (members.isEmpty) {
-      final fallback = widget.allUsers.where((u) {
-        final textMatch = u.username.toLowerCase().contains(_searchQuery) ||
-            u.fullName?.toLowerCase().contains(_searchQuery) == true ||
-            u.registryId?.toLowerCase().contains(_searchQuery) == true ||
-            u.city?.toLowerCase().contains(_searchQuery) == true;
-        final cityMatch = _selectedCity == 'All Cities' || (u.city ?? '').trim() == _selectedCity;
-        final roomMatch = _selectedRoom == 'All Rooms' || (u.room ?? '').trim() == _selectedRoom;
-        return u.isEnrolledInRegistry && textMatch && cityMatch && roomMatch;
-      }).toList();
-      members.addAll(fallback);
-    }
+    final members = _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where(matchesFilters).toList();
     final userOrder = <String, int>{
-      for (int i = 0; i < widget.allUsers.length; i++) widget.allUsers[i].email.toLowerCase().trim(): i,
+      for (int i = 0; i < members.length; i++) members[i].email.toLowerCase().trim(): i,
     };
     members.sort((a, b) {
       final aIndex = userOrder[a.email.toLowerCase().trim()] ?? -1;
@@ -27747,8 +27848,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ),
                   );
                   if (confirm != true) return;
-                  setState(() => u.isEnrolledInRegistry = false);
-                  await _persistRegistryMember(u);
+                  setState(() {});
+                  await _removeRegistryMember(u);
                   widget.onDataChanged();
                 }),
               ],
@@ -28012,8 +28113,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _rankingsSection(bool isDark) {
     final st = _selectedState.trim();
-    final enrolled = widget.allUsers
-        .where((u) => u.isEnrolledInRegistry && u.state.trim().toLowerCase() == st.toLowerCase())
+    final enrolled = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
+        .where((u) => u.state.trim().toLowerCase() == st.toLowerCase())
         .toList();
 
     final topHelpers = enrolled.where((u) => u.helps > 0).toList()..sort((a, b) => b.helps.compareTo(a.helps));
