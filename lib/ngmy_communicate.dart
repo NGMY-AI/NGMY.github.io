@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +12,7 @@ import 'ngmy_ai_client.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_storage.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_platform_graphics.dart';
 import 'ngmy_voice_input.dart';
 
 /// All admin-selectable companion roles.
@@ -292,25 +292,23 @@ class NgmyCommunicateProfile {
       };
 }
 
-/// Frosted glass — see content scroll behind.
+/// Solid panel — no backdrop blur (keeps text sharp on web & mobile).
 Widget _loveGlassPanel({
   required Widget child,
   BorderRadius borderRadius = const BorderRadius.all(Radius.circular(20)),
   double blur = 16,
   double fillAlpha = 0.08,
 }) {
-  return ClipRRect(
+  return ngmyClipBackdrop(
     borderRadius: borderRadius,
-    child: BackdropFilter(
-      filter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: fillAlpha),
-          borderRadius: borderRadius,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-        ),
-        child: child,
+    sigma: blur,
+    child: Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A2235).withValues(alpha: fillAlpha < 0.2 ? 0.94 : fillAlpha),
+        borderRadius: borderRadius,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
       ),
+      child: child,
     ),
   );
 }

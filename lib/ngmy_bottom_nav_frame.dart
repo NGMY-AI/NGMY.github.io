@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
@@ -51,7 +50,6 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final useBlur = !ngmyPreferLightGraphics;
     final card = theme.cardColor;
     final borderNeutral = isDark ? Colors.white : Colors.black;
 
@@ -69,14 +67,14 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
                 end: Alignment.bottomRight,
                 colors: isDark
                     ? [
-                        card.withValues(alpha: 0.52 + shimmer * 0.04),
-                        Colors.white.withValues(alpha: 0.05),
-                        card.withValues(alpha: 0.38),
+                        card.withValues(alpha: ngmyPreferLightGraphics ? 0.94 : 0.52 + shimmer * 0.04),
+                        card.withValues(alpha: ngmyPreferLightGraphics ? 0.88 : 0.05),
+                        card.withValues(alpha: ngmyPreferLightGraphics ? 0.92 : 0.38),
                       ]
                     : [
-                        Colors.white.withValues(alpha: 0.62 + shimmer * 0.06),
-                        card.withValues(alpha: 0.28),
-                        Colors.white.withValues(alpha: 0.48),
+                        Colors.white.withValues(alpha: ngmyPreferLightGraphics ? 0.96 : 0.62 + shimmer * 0.06),
+                        card.withValues(alpha: ngmyPreferLightGraphics ? 0.90 : 0.28),
+                        Colors.white.withValues(alpha: ngmyPreferLightGraphics ? 0.94 : 0.48),
                       ],
               ),
               border: Border.all(
@@ -132,14 +130,10 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
                 transform: GradientRotation(_glassCtrl.value * 2 * math.pi),
               ),
             ),
-            child: ClipRRect(
+            child: ngmyClipBackdrop(
               borderRadius: BorderRadius.circular(30),
-              child: useBlur
-                  ? BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                      child: glassPanel,
-                    )
-                  : glassPanel,
+              sigma: 20,
+              child: glassPanel,
             ),
           );
         },

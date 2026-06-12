@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
 import 'models.dart';
+import 'ngmy_platform_graphics.dart';
 import 'utils.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
@@ -39,18 +39,15 @@ Widget ngmyLogoCircle(String? logoUrl, {double size = 48}) {
 
 Widget ngmyGlassComposerBar({required bool isDark, required Widget child, BorderRadius? borderRadius}) {
   final radius = borderRadius ?? const BorderRadius.vertical(top: Radius.circular(26));
-  return ClipRRect(
+  return ngmyClipBackdrop(
     borderRadius: radius,
-    child: BackdropFilter(
-      filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-      child: Container(
-        decoration: BoxDecoration(
-          color: (isDark ? const Color(0xFF121726) : Colors.white).withOpacity(0.55),
-          borderRadius: radius,
-          border: Border.all(color: isDark ? Colors.white.withOpacity(0.16) : Colors.black.withOpacity(0.07)),
-        ),
-        child: child,
+    child: Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF121726) : Colors.white,
+        borderRadius: radius,
+        border: Border.all(color: isDark ? Colors.white.withOpacity(0.16) : Colors.black.withOpacity(0.07)),
       ),
+      child: child,
     ),
   );
 }

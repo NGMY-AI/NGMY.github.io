@@ -5352,48 +5352,43 @@ Widget _ngmyLogoCircle(String? logoUrl, {double size = 48}) {
 
 Widget _ngmyGlassComposerBar({required bool isDark, required Widget child, BorderRadius? borderRadius}) {
   final radius = borderRadius ?? const BorderRadius.vertical(top: Radius.circular(26));
-  return ClipRRect(
+  return ngmyClipBackdrop(
     borderRadius: radius,
-    child: BackdropFilter(
-      filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-      child: Container(
-        decoration: BoxDecoration(
-          color: (isDark ? const Color(0xFF121726) : Colors.white).withOpacity(0.55),
-          borderRadius: radius,
-          border: Border.all(color: isDark ? Colors.white.withOpacity(0.16) : Colors.black.withOpacity(0.07)),
-        ),
-        child: child,
+    child: Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF121726) : Colors.white,
+        borderRadius: radius,
+        border: Border.all(color: isDark ? Colors.white.withOpacity(0.16) : Colors.black.withOpacity(0.07)),
       ),
+      child: child,
     ),
   );
 }
 
 /// Frosted pill frame — matches bottom nav / menu bar styling.
 Widget _ngmyMenuPillFrame(BuildContext context, {required bool isDark, required Widget child}) {
-  final fillColor = Theme.of(context).cardColor.withValues(alpha: isDark ? 0.50 : 0.56);
-  return ClipRRect(
+  final fillColor = Theme.of(context).cardColor;
+  return ngmyClipBackdrop(
     borderRadius: BorderRadius.circular(30),
-    child: BackdropFilter(
-      filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-        decoration: BoxDecoration(
-          color: fillColor,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(
-            color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.07),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
-            ),
-          ],
+    sigma: 16,
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: fillColor,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06),
         ),
-        child: child,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.07),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
+      child: child,
     ),
   );
 }
@@ -5453,13 +5448,7 @@ Widget _ngmyGlassGreenShell({
       ),
     );
     if (!useBlur || ngmyPreferLightGraphics) return inner;
-    return ClipRRect(
-      borderRadius: borderRadius,
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: inner,
-      ),
-    );
+    return ngmyClipBackdrop(borderRadius: borderRadius, sigma: 12, child: inner);
   }
 
   return Container(
@@ -13175,13 +13164,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ),
       );
       if (!useGlassBlur) return tag;
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(9),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: tag,
-        ),
-      );
+      return ngmyClipBackdrop(borderRadius: BorderRadius.circular(9), sigma: 10, child: tag);
     }
 
     return AnimatedBuilder(
@@ -30659,19 +30642,16 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   Widget _storeGlassFrame({required bool isDark, required Widget child}) {
     final border = isDark ? Colors.white.withOpacity(0.22) : Colors.black.withOpacity(0.1);
-    return ClipRRect(
+    return ngmyClipBackdrop(
       borderRadius: BorderRadius.circular(28),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          decoration: BoxDecoration(
-            color: (isDark ? const Color(0xFF121726) : Colors.white).withOpacity(0.62),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: border, width: 1.2),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.25 : 0.08), blurRadius: 12, offset: const Offset(0, 4))],
-          ),
-          child: child,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF121726) : Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: border, width: 1.2),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.25 : 0.08), blurRadius: 12, offset: const Offset(0, 4))],
         ),
+        child: child,
       ),
     );
   }
@@ -38383,26 +38363,24 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
               bottom: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(15, 8, 15, 0),
-                child: ClipRRect(
+                child: ngmyClipBackdrop(
                   borderRadius: BorderRadius.circular(35),
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                    child: Container(
-                      height: 64,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface.withOpacity(isDark ? 0.52 : 0.72),
-                        borderRadius: BorderRadius.circular(35),
-                        border: Border.all(color: Colors.white.withOpacity(0.12)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.12),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
+                  child: Container(
+                    height: 64,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(35),
+                      border: Border.all(color: Colors.white.withOpacity(0.12)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.12),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
                         children: [
                           Padding(
                             padding: const EdgeInsets.only(left: 4),
@@ -38498,7 +38476,6 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                 ),
               ),
             ),
-          ),
           if (_mediaSearchOpen)
             Positioned(
               top: searchPanelTop,
