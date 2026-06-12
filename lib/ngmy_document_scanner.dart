@@ -15,6 +15,11 @@ void showNgmyDocumentScanner(
   BuildContext context, {
   required String geminiApiKey,
   required Future<String> Function() refreshApiKey,
+  dynamic user,
+  dynamic config,
+  Future<bool> Function(double amount, String description)? onCharge,
+  VoidCallback? onDataChanged,
+  Future<bool> Function()? onPersistConfig,
 }) {
   Navigator.of(context).push(
     PageRouteBuilder<void>(
@@ -24,6 +29,11 @@ void showNgmyDocumentScanner(
       pageBuilder: (context, animation, secondaryAnimation) => _NgmyDocumentScannerPage(
         geminiApiKey: geminiApiKey,
         refreshApiKey: refreshApiKey,
+        user: user,
+        config: config,
+        onCharge: onCharge,
+        onDataChanged: onDataChanged,
+        onPersistConfig: onPersistConfig,
       ),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         final slide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
@@ -46,10 +56,20 @@ class _NgmyDocumentScannerPage extends StatefulWidget {
   const _NgmyDocumentScannerPage({
     required this.geminiApiKey,
     required this.refreshApiKey,
+    this.user,
+    this.config,
+    this.onCharge,
+    this.onDataChanged,
+    this.onPersistConfig,
   });
 
   final String geminiApiKey;
   final Future<String> Function() refreshApiKey;
+  final dynamic user;
+  final dynamic config;
+  final Future<bool> Function(double amount, String description)? onCharge;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
 
   @override
   State<_NgmyDocumentScannerPage> createState() => _NgmyDocumentScannerPageState();
@@ -622,6 +642,11 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       geminiApiKey: widget.geminiApiKey,
       refreshApiKey: widget.refreshApiKey,
       initialMyLanguage: _responseLanguage,
+      user: widget.user,
+      config: widget.config,
+      onCharge: widget.onCharge,
+      onDataChanged: widget.onDataChanged,
+      onPersistConfig: widget.onPersistConfig,
     );
   }
 

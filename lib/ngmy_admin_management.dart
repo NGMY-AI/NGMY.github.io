@@ -20,6 +20,8 @@ const String _kNgmyWalletPaymentSettingsKey = 'wallet_payment_settings';
 const String _kNgmyWalletPaymentPrefsKey = 'ngmy_wallet_payment_settings_v1';
 const String _kNgmyRepairEstimatePaymentSettingsKey = 'repair_estimate_payment_settings';
 const String _kNgmyRepairEstimatePaymentPrefsKey = 'ngmy_repair_estimate_payment_settings_v1';
+const String _kNgmyTranslatePaymentSettingsKey = 'translate_message_payment_settings';
+const String _kNgmyTranslatePaymentPrefsKey = 'ngmy_translate_message_payment_settings_v1';
 const String _kNgmyHelperAiSettingsKey = 'ngmy_helper_ai_settings';
 const String _kNgmyHelperAiPrefsKey = 'ngmy_helper_ai_settings_v1';
 const String _kNgmyAppBrandingSettingsKey = 'ngmy_app_branding';
@@ -722,6 +724,64 @@ Future<void> ngmyHydrateRepairEstimatePaymentsFromAllBackups(AppConfig config) a
   }
 }
 
+Map<String, dynamic> _translatePaymentPayload(AppConfig config) => {
+      'translateWeeklyFreeLimit': config.translateWeeklyFreeLimit,
+      'translateWeeklyUnlockFee': config.translateWeeklyUnlockFee,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyTranslatePaymentPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+  final limit = payload['translateWeeklyFreeLimit'];
+  if (limit is num && limit >= 0) config.translateWeeklyFreeLimit = limit.toInt();
+  final fee = payload['translateWeeklyUnlockFee'];
+  if (fee is num && fee >= 0) config.translateWeeklyUnlockFee = fee.toDouble();
+}
+
+Future<void> _persistTranslatePaymentSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyTranslatePaymentPrefsKey, jsonEncode(_translatePaymentPayload(config)));
+  } catch (e) {
+    debugPrint('[admin translate payments] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateTranslatePaymentsFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyTranslatePaymentPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyTranslatePaymentPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[admin translate payments] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyTranslatePaymentSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      _applyTranslatePaymentPayload(config, row);
+    }
+  }
+}
+
+Future<bool> ngmyPersistTranslatePaymentSettings(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  await _persistTranslatePaymentSettingsLocal(config);
+
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _translatePaymentPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyTranslatePaymentSettingsKey, payload);
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
 Future<bool> ngmyPersistRepairEstimatePaymentSettings(AppConfig config) async {
   ngmyAdminConfigMutationAt = DateTime.now();
   NgmyAdminLiveRefresh.notify();
@@ -1072,6 +1132,7 @@ Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
   await ngmyHydrateInvoicePaymentsFromAllBackups(config);
   await ngmyHydrateWalletPaymentsFromAllBackups(config);
   await ngmyHydrateRepairEstimatePaymentsFromAllBackups(config);
+  await ngmyHydrateTranslatePaymentsFromAllBackups(config);
   await NgmyAppStudioAccess.hydrate(config);
   final snapshot = AppConfig.fromJson(config.toJson());
 

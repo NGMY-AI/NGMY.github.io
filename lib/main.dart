@@ -37,6 +37,7 @@ import 'ngmy_iron_triangle_panel.dart';
 import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_repair_estimate_flow.dart';
 import 'ngmy_repair_estimate_payments.dart';
+import 'ngmy_translate_payments.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_games.dart';
@@ -1033,6 +1034,11 @@ class AppConfig {
   /// Monthly wallet fee for G-Services repair estimates (photo → price). 0 = free.
   double repairEstimateMonthlyFee;
   Map<String, String> repairEstimateAccessUntilByEmail;
+  /// Free message translations per week in Document Scanner (0 = unlimited).
+  int translateWeeklyFreeLimit;
+  /// Wallet fee to unlock unlimited translations for the rest of the week.
+  double translateWeeklyUnlockFee;
+  Map<String, String> translateWeekPassByEmail;
   /// Admin toggle — double-tap Chat reveals Communicate.
   bool communicateEnabled;
   /// Admin toggle — center star in NGMY Hub opens App Builder for all users.
@@ -1119,6 +1125,9 @@ class AppConfig {
     Map<String, String>? appStudioAiAccessUntilByEmail,
     this.repairEstimateMonthlyFee = NgmyRepairEstimatePayments.defaultMonthlyFee,
     Map<String, String>? repairEstimateAccessUntilByEmail,
+    this.translateWeeklyFreeLimit = NgmyTranslatePayments.defaultWeeklyFreeLimit,
+    this.translateWeeklyUnlockFee = NgmyTranslatePayments.defaultWeeklyUnlockFee,
+    Map<String, String>? translateWeekPassByEmail,
     this.communicateEnabled = false,
     this.appBuilderEnabled = false,
     List<Map<String, dynamic>>? appBuilderPublished,
@@ -1150,6 +1159,7 @@ class AppConfig {
         appStudioCloudAccessUntilByEmail = appStudioCloudAccessUntilByEmail ?? const {},
         appStudioAiAccessUntilByEmail = appStudioAiAccessUntilByEmail ?? const {},
         repairEstimateAccessUntilByEmail = repairEstimateAccessUntilByEmail ?? const {},
+        translateWeekPassByEmail = translateWeekPassByEmail ?? const {},
         invoicePremiumAccessUntilByEmail = invoicePremiumAccessUntilByEmail ?? const {},
         invoiceLuxuryAccessUntilByEmail = invoiceLuxuryAccessUntilByEmail ?? const {},
         invoicePremiumLifetimeEmails = invoicePremiumLifetimeEmails ?? const [],
@@ -1228,6 +1238,9 @@ class AppConfig {
     'appStudioAiAccessUntilByEmail': appStudioAiAccessUntilByEmail,
     'repairEstimateMonthlyFee': repairEstimateMonthlyFee,
     'repairEstimateAccessUntilByEmail': repairEstimateAccessUntilByEmail,
+    'translateWeeklyFreeLimit': translateWeeklyFreeLimit,
+    'translateWeeklyUnlockFee': translateWeeklyUnlockFee,
+    'translateWeekPassByEmail': translateWeekPassByEmail,
     'communicateEnabled': communicateEnabled,
     'appBuilderEnabled': appBuilderEnabled,
     'appBuilderPublished': appBuilderPublished,
@@ -1328,6 +1341,9 @@ class AppConfig {
     appStudioAiAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['appStudioAiAccessUntilByEmail']),
     repairEstimateMonthlyFee: (json['repairEstimateMonthlyFee'] as num?)?.toDouble() ?? NgmyRepairEstimatePayments.defaultMonthlyFee,
     repairEstimateAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['repairEstimateAccessUntilByEmail']),
+    translateWeeklyFreeLimit: (json['translateWeeklyFreeLimit'] as num?)?.toInt() ?? NgmyTranslatePayments.defaultWeeklyFreeLimit,
+    translateWeeklyUnlockFee: (json['translateWeeklyUnlockFee'] as num?)?.toDouble() ?? NgmyTranslatePayments.defaultWeeklyUnlockFee,
+    translateWeekPassByEmail: _familyTreePhotoAccessFromJson(json['translateWeekPassByEmail']),
     communicateEnabled: json['communicateEnabled'] == true,
     appBuilderEnabled: json['appBuilderEnabled'] == true,
     appBuilderPublished: List<Map<String, dynamic>>.from(
@@ -2213,6 +2229,26 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     };
   } else if (keep.repairEstimateAccessUntilByEmail.isNotEmpty) {
     next.repairEstimateAccessUntilByEmail = Map<String, String>.from(keep.repairEstimateAccessUntilByEmail);
+  }
+  if (record.containsKey('translateWeeklyFreeLimit') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['translateWeeklyFreeLimit'];
+    if (v is num && v >= 0) next.translateWeeklyFreeLimit = v.toInt();
+  } else {
+    next.translateWeeklyFreeLimit = keep.translateWeeklyFreeLimit;
+  }
+  if (record.containsKey('translateWeeklyUnlockFee') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['translateWeeklyUnlockFee'];
+    if (v is num && v >= 0) next.translateWeeklyUnlockFee = v.toDouble();
+  } else {
+    next.translateWeeklyUnlockFee = keep.translateWeeklyUnlockFee;
+  }
+  if (record.containsKey('translateWeekPassByEmail') && record['translateWeekPassByEmail'] is Map) {
+    next.translateWeekPassByEmail = {
+      ..._familyTreePhotoAccessFromJson(record['translateWeekPassByEmail']),
+      ...keep.translateWeekPassByEmail,
+    };
+  } else if (keep.translateWeekPassByEmail.isNotEmpty) {
+    next.translateWeekPassByEmail = Map<String, String>.from(keep.translateWeekPassByEmail);
   }
 
   if (record.containsKey('invoicePremiumOneTimeFee') && !ngmyShouldDeferRemoteConfigOverwrite()) {
@@ -6481,6 +6517,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
+    await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
     await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
     await ngmyHydrateWalletPaymentsFromAllBackups(_config);
@@ -9476,6 +9513,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
+    await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
           await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
@@ -9739,6 +9777,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
+    await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
           await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
@@ -17421,6 +17460,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final appStudioAiPromptsC = TextEditingController(text: '${widget.config.appStudioAiPromptLimit}');
     final appStudioAiAppsC = TextEditingController(text: '${widget.config.appStudioAiFreeAppLimit}');
     final repairEstimateFeeC = TextEditingController(text: widget.config.repairEstimateMonthlyFee.toStringAsFixed(2));
+    final translateLimitC = TextEditingController(text: '${widget.config.translateWeeklyFreeLimit}');
+    final translateFeeC = TextEditingController(text: widget.config.translateWeeklyUnlockFee.toStringAsFixed(2));
     final commFeeC = TextEditingController(text: widget.config.communicateFeeAmount.toStringAsFixed(2));
     final commMinsC = TextEditingController(text: '${widget.config.communicateMinutesPerPayment}');
     var familyExpanded = true;
@@ -17428,6 +17469,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     var musicExpanded = false;
     var appStudioExpanded = false;
     var repairEstimateExpanded = false;
+    var translateExpanded = false;
     var communicatePayExpanded = false;
 
     Widget categoryShell({
@@ -17538,6 +17580,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             appStudioExpanded = false;
                             repairEstimateExpanded = false;
                             communicatePayExpanded = false;
+                            translateExpanded = false;
                           }
                         }),
                         children: [
@@ -17598,6 +17641,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             appStudioExpanded = false;
                             repairEstimateExpanded = false;
                             communicatePayExpanded = false;
+                            translateExpanded = false;
                           }
                         }),
                         children: [
@@ -17666,6 +17710,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             appStudioExpanded = false;
                             repairEstimateExpanded = false;
                             communicatePayExpanded = false;
+                            translateExpanded = false;
                           }
                         }),
                         children: [
@@ -17716,6 +17761,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             musicExpanded = false;
                             repairEstimateExpanded = false;
                             communicatePayExpanded = false;
+                            translateExpanded = false;
                           }
                         }),
                         children: [
@@ -17813,6 +17859,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             musicExpanded = false;
                             appStudioExpanded = false;
                             communicatePayExpanded = false;
+                            translateExpanded = false;
                           }
                         }),
                         children: [
@@ -17851,6 +17898,75 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ],
                       ),
                       categoryShell(
+                        title: 'Message translator',
+                        subtitle: 'Free translations per week in Document Scanner chat',
+                        icon: Icons.translate_rounded,
+                        accent: const Color(0xFF8B5CF6),
+                        expanded: translateExpanded,
+                        onToggle: () => setST(() {
+                          translateExpanded = !translateExpanded;
+                          if (translateExpanded) {
+                            familyExpanded = false;
+                            invoicesExpanded = false;
+                            musicExpanded = false;
+                            appStudioExpanded = false;
+                            repairEstimateExpanded = false;
+                            communicatePayExpanded = false;
+                          }
+                        }),
+                        children: [
+                          TextField(
+                            controller: translateLimitC,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Free translations per week',
+                              prefixIcon: Icon(Icons.chat_bubble_outline_rounded),
+                              helperText: 'After this limit, users pay for unlimited translations until the week resets. Set 0 for unlimited free.',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: translateFeeC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Weekly unlock fee (\$)',
+                              prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                              helperText: 'One payment unlocks message translation for the rest of the calendar week.',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: () async {
+                              final limit = int.tryParse(translateLimitC.text.trim());
+                              final fee = double.tryParse(translateFeeC.text.trim());
+                              if (limit == null || limit < 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid weekly limit (0 or more).')));
+                                return;
+                              }
+                              if (fee == null || fee < 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid dollar amount (0 or more).')));
+                                return;
+                              }
+                              setST(() {
+                                widget.config.translateWeeklyFreeLimit = limit;
+                                widget.config.translateWeeklyUnlockFee = fee;
+                              });
+                              widget.onDataChanged();
+                              final ok = await ngmyPersistTranslatePaymentSettings(widget.config);
+                              if (!context.mounted) return;
+                              setState(() {});
+                              ngmyAdminShowCloudSaveSnackBar(
+                                context,
+                                cloudOk: ok,
+                                success: 'Message translator payment settings saved.',
+                              );
+                            },
+                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6), minimumSize: const Size(double.infinity, 44)),
+                            child: const Text('Save Message Translator', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
+                      categoryShell(
                         title: 'Communicate',
                         subtitle: 'Time-based fee for companion chat (double-tap Chat)',
                         icon: Icons.favorite_rounded,
@@ -17864,6 +17980,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             musicExpanded = false;
                             appStudioExpanded = false;
                             repairEstimateExpanded = false;
+                            translateExpanded = false;
                           }
                         }),
                         children: [
@@ -23584,6 +23701,17 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
         }
         return widget.config.geminiApiKey.trim();
       },
+      user: widget.user,
+      config: widget.config,
+      onCharge: (amount, description) async => ngmyChargeUserWallet(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        amount: amount,
+        description: description,
+        onAddTransaction: widget.onAddTransaction,
+      ),
+      onDataChanged: widget.onDataChanged,
+      onPersistConfig: () => ngmyAdminPersistManagementConfig(widget.config),
     );
   }
 

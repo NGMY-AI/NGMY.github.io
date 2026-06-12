@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_modern_chat_prefix.dart';
+import 'ngmy_translate_payments.dart';
 
 String ngmyLangLabel(String code) => code == 'sw' ? 'Swahili' : 'English';
 
@@ -21,41 +22,68 @@ String _translatePrompt({
       'Message:\n$text';
 }
 
-/// Paste foreign messages → read in your language. Write your reply → copy in their language.
+/// Full-screen chat translator — paste foreign messages or write replies.
 Future<void> showNgmyDocumentTranslateChat(
   BuildContext context, {
   required String geminiApiKey,
   required Future<String> Function() refreshApiKey,
   String initialMyLanguage = 'en',
+  dynamic user,
+  dynamic config,
+  Future<bool> Function(double amount, String description)? onCharge,
+  VoidCallback? onDataChanged,
+  Future<bool> Function()? onPersistConfig,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => _NgmyDocumentTranslateSheet(
-      geminiApiKey: geminiApiKey,
-      refreshApiKey: refreshApiKey,
-      initialMyLanguage: initialMyLanguage,
+  return Navigator.of(context).push(
+    PageRouteBuilder<void>(
+      fullscreenDialog: true,
+      transitionDuration: const Duration(milliseconds: 420),
+      reverseTransitionDuration: const Duration(milliseconds: 320),
+      pageBuilder: (context, animation, secondaryAnimation) => _NgmyDocumentTranslatePage(
+        geminiApiKey: geminiApiKey,
+        refreshApiKey: refreshApiKey,
+        initialMyLanguage: initialMyLanguage,
+        user: user,
+        config: config,
+        onCharge: onCharge,
+        onDataChanged: onDataChanged,
+        onPersistConfig: onPersistConfig,
+      ),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final slide = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
+            .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+        return FadeTransition(opacity: animation, child: SlideTransition(position: slide, child: child));
+      },
     ),
   );
 }
 
-class _NgmyDocumentTranslateSheet extends StatefulWidget {
-  const _NgmyDocumentTranslateSheet({
+class _NgmyDocumentTranslatePage extends StatefulWidget {
+  const _NgmyDocumentTranslatePage({
     required this.geminiApiKey,
     required this.refreshApiKey,
     required this.initialMyLanguage,
+    this.user,
+    this.config,
+    this.onCharge,
+    this.onDataChanged,
+    this.onPersistConfig,
   });
 
   final String geminiApiKey;
   final Future<String> Function() refreshApiKey;
   final String initialMyLanguage;
+  final dynamic user;
+  final dynamic config;
+  final Future<bool> Function(double amount, String description)? onCharge;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
 
   @override
-  State<_NgmyDocumentTranslateSheet> createState() => _NgmyDocumentTranslateSheetState();
+  State<_NgmyDocumentTranslatePage> createState() => _NgmyDocumentTranslatePageState();
 }
 
-class _NgmyDocumentTranslateSheetState extends State<_NgmyDocumentTranslateSheet> {
+class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> {
   static const _mint = Color(0xFF34D399);
   static const _cyan = Color(0xFF22D3EE);
   static const _violet = Color(0xFF8B5CF6);
@@ -67,12 +95,17 @@ class _NgmyDocumentTranslateSheetState extends State<_NgmyDocumentTranslateSheet
   String? _output;
   String? _error;
   bool _busy = false;
+  int? _remainingFree;
+
+  bool get _paymentsEnabled =>
+      widget.user != null && widget.config != null && widget.onCharge != null && widget.onDataChanged != null && widget.onPersistConfig != null;
 
   @override
   void initState() {
     super.initState();
     _myLang = widget.initialMyLanguage == 'sw' ? 'sw' : 'en';
     _theirLang = _myLang == 'en' ? 'sw' : 'en';
+    _refreshRemaining();
   }
 
   @override
@@ -81,10 +114,27 @@ class _NgmyDocumentTranslateSheetState extends State<_NgmyDocumentTranslateSheet
     super.dispose();
   }
 
+  Future<void> _refreshRemaining() async {
+    if (!_paymentsEnabled) return;
+    final email = ((widget.user as dynamic).email as String?) ?? '';
+    final isAdmin = (widget.user as dynamic).isAdmin == true;
+    final remaining = await NgmyTranslatePayments.remainingFree(widget.config, email, isAdmin: isAdmin);
+    if (mounted) setState(() => _remainingFree = remaining);
+  }
+
   void _setMyLang(String code) {
     setState(() {
       _myLang = code;
       _theirLang = code == 'en' ? 'sw' : 'en';
+      _output = null;
+      _error = null;
+    });
+  }
+
+  void _setTheirLang(String code) {
+    setState(() {
+      _theirLang = code;
+      _myLang = code == 'en' ? 'sw' : 'en';
       _output = null;
       _error = null;
     });
@@ -106,6 +156,19 @@ class _NgmyDocumentTranslateSheetState extends State<_NgmyDocumentTranslateSheet
       setState(() => _error = 'Paste or type a message first.');
       return;
     }
+
+    if (_paymentsEnabled) {
+      final ok = await NgmyTranslatePayments.ensureAccess(
+        context: context,
+        user: widget.user,
+        config: widget.config,
+        onCharge: widget.onCharge!,
+        onDataChanged: widget.onDataChanged!,
+        onPersistConfig: widget.onPersistConfig!,
+      );
+      if (!ok || !mounted) return;
+    }
+
     setState(() {
       _busy = true;
       _error = null;
@@ -129,14 +192,22 @@ class _NgmyDocumentTranslateSheetState extends State<_NgmyDocumentTranslateSheet
     final result = await ngmyAiGenerateWithCredentials(creds, _translatePrompt(text: text, fromCode: from, toCode: to));
 
     if (!mounted) return;
-    setState(() {
-      _busy = false;
-      if (result.text != null && result.text!.trim().isNotEmpty) {
-        _output = result.text!.trim();
-      } else {
-        _error = result.error ?? 'Could not translate. Try again.';
+    if (result.text != null && result.text!.trim().isNotEmpty) {
+      if (_paymentsEnabled) {
+        final email = ((widget.user as dynamic).email as String?) ?? '';
+        await NgmyTranslatePayments.recordTranslation(email);
+        await _refreshRemaining();
       }
-    });
+      setState(() {
+        _busy = false;
+        _output = result.text!.trim();
+      });
+    } else {
+      setState(() {
+        _busy = false;
+        _error = result.error ?? 'Could not translate. Try again.';
+      });
+    }
   }
 
   void _copy(String text) {
@@ -150,35 +221,59 @@ class _NgmyDocumentTranslateSheetState extends State<_NgmyDocumentTranslateSheet
     );
   }
 
-  Widget _langChip(String code, bool selected, VoidCallback onTap) {
+  Widget _langChip(String code, {required String caption, required VoidCallback onTap}) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: selected ? _violet.withValues(alpha: 0.35) : Colors.white.withValues(alpha: 0.06),
-            border: Border.all(color: selected ? _cyan.withValues(alpha: 0.7) : Colors.white24),
+            borderRadius: BorderRadius.circular(14),
+            color: Colors.white.withValues(alpha: 0.08),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
           ),
-          child: Row(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(ngmyLangFlag(code), style: const TextStyle(fontSize: 18)),
-              const SizedBox(width: 6),
-              Text(
-                ngmyLangLabel(code),
-                style: TextStyle(
-                  color: selected ? Colors.white : Colors.white70,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
-                ),
+              Text(caption, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(ngmyLangFlag(code), style: const TextStyle(fontSize: 22)),
+                  const SizedBox(width: 8),
+                  Text(
+                    ngmyLangLabel(code),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                  ),
+                ],
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _swapButton() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _swapLanguages,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _cyan.withValues(alpha: 0.15),
+            border: Border.all(color: _cyan.withValues(alpha: 0.55)),
+            boxShadow: [BoxShadow(color: _cyan.withValues(alpha: 0.25), blurRadius: 12)],
+          ),
+          child: const Icon(Icons.swap_horiz_rounded, color: _cyan, size: 26),
         ),
       ),
     );
@@ -190,194 +285,197 @@ class _NgmyDocumentTranslateSheetState extends State<_NgmyDocumentTranslateSheet
     final fromLabel = _replyMode ? ngmyLangLabel(_myLang) : ngmyLangLabel(_theirLang);
     final toLabel = _replyMode ? ngmyLangLabel(_theirLang) : ngmyLangLabel(_myLang);
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottom),
-      child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.92),
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: const LinearGradient(
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+      resizeToAvoidBottomInset: true,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [Color(0xFF0F172A), Color(0xFF1E1B4B), Color(0xFF134E4A)],
           ),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 24, offset: const Offset(0, 12))],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(4))),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 8, 0),
-              child: Row(
-                children: [
-                  const NgmyModernChatPrefixIcon(size: 28),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Message translator', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                        Text('Paste chats · copy replies', style: TextStyle(color: Colors.white60, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _modeTab(
-                            selected: !_replyMode,
-                            icon: Icons.mark_chat_read_rounded,
-                            label: 'They wrote',
-                            sub: 'Paste what you don\'t understand',
-                            onTap: () => setState(() {
-                              _replyMode = false;
-                              _output = null;
-                              _error = null;
-                            }),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _modeTab(
-                            selected: _replyMode,
-                            icon: Icons.reply_rounded,
-                            label: 'You reply',
-                            sub: 'Write in your language',
-                            onTap: () => setState(() {
-                              _replyMode = true;
-                              _output = null;
-                              _error = null;
-                            }),
-                          ),
-                        ),
-                      ],
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70),
                     ),
-                    const SizedBox(height: 14),
-                    Text('I understand', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontWeight: FontWeight.w800, fontSize: 11)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        _langChip('en', _myLang == 'en', () => _setMyLang('en')),
-                        const SizedBox(width: 8),
-                        _langChip('sw', _myLang == 'sw', () => _setMyLang('sw')),
-                        const Spacer(),
-                        IconButton(
-                          tooltip: 'Swap languages',
-                          onPressed: _swapLanguages,
-                          icon: const Icon(Icons.swap_horiz_rounded, color: _cyan),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Other person speaks: ${ngmyLangLabel(_theirLang)}',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _inputC,
-                      maxLines: 4,
-                      minLines: 3,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: _replyMode
-                            ? 'Type your reply in ${ngmyLangLabel(_myLang)}…'
-                            : 'Paste their message in ${ngmyLangLabel(_theirLang)}…',
-                        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 13),
-                        filled: true,
-                        fillColor: Colors.white.withValues(alpha: 0.06),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                    const NgmyModernChatPrefixIcon(size: 28),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Message translator', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                          Text('Paste chats · copy replies', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    FilledButton.icon(
-                      onPressed: _busy ? null : _translate,
-                      icon: _busy
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Icon(Icons.translate_rounded, size: 20),
-                      label: Text(_busy ? 'Translating…' : 'Translate ($fromLabel → $toLabel)'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _violet,
-                        minimumSize: const Size(double.infinity, 46),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 10),
-                      Text(_error!, style: const TextStyle(color: Color(0xFFF87171), fontSize: 12)),
-                    ],
-                    if (_output != null) ...[
-                      const SizedBox(height: 14),
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () => _copy(_output!),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Ink(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              color: _mint.withValues(alpha: 0.12),
-                              border: Border.all(color: _mint.withValues(alpha: 0.45)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      'In $toLabel',
-                                      style: const TextStyle(color: _mint, fontWeight: FontWeight.w800, fontSize: 11),
-                                    ),
-                                    const Spacer(),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                      tooltip: 'Copy',
-                                      onPressed: () => _copy(_output!),
-                                      icon: const Icon(Icons.copy_rounded, color: _mint, size: 20),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                SelectableText(
-                                  _output!,
-                                  style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.45, fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Tap message or copy icon to copy · paste in your chat app',
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10),
-                                ),
-                              ],
-                            ),
-                          ),
+                    if (_remainingFree != null && _remainingFree! < 999999)
+                      Container(
+                        margin: const EdgeInsets.only(right: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _violet.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: _violet.withValues(alpha: 0.5)),
+                        ),
+                        child: Text(
+                          '$_remainingFree free left',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
                         ),
                       ),
-                    ],
                   ],
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _modeTab(
+                              selected: !_replyMode,
+                              icon: Icons.mark_chat_read_rounded,
+                              label: 'They wrote',
+                              sub: 'Paste what you don\'t understand',
+                              onTap: () => setState(() {
+                                _replyMode = false;
+                                _output = null;
+                                _error = null;
+                              }),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _modeTab(
+                              selected: _replyMode,
+                              icon: Icons.reply_rounded,
+                              label: 'You reply',
+                              sub: 'Write in your language',
+                              onTap: () => setState(() {
+                                _replyMode = true;
+                                _output = null;
+                                _error = null;
+                              }),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
+                      Text(
+                        'Languages',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontWeight: FontWeight.w800, fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _langChip(_theirLang, caption: 'They speak', onTap: () => _setTheirLang(_theirLang == 'en' ? 'sw' : 'en')),
+                          const SizedBox(width: 14),
+                          _swapButton(),
+                          const SizedBox(width: 14),
+                          _langChip(_myLang, caption: 'I understand', onTap: () => _setMyLang(_myLang == 'en' ? 'sw' : 'en')),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
+                      TextField(
+                        controller: _inputC,
+                        maxLines: 6,
+                        minLines: 5,
+                        style: const TextStyle(color: Colors.white, fontSize: 15),
+                        decoration: InputDecoration(
+                          hintText: _replyMode
+                              ? 'Type your reply in ${ngmyLangLabel(_myLang)}…'
+                              : 'Paste their message in ${ngmyLangLabel(_theirLang)}…',
+                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 14),
+                          filled: true,
+                          fillColor: Colors.white.withValues(alpha: 0.07),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      FilledButton.icon(
+                        onPressed: _busy ? null : _translate,
+                        icon: _busy
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.translate_rounded, size: 22),
+                        label: Text(_busy ? 'Translating…' : 'Translate ($fromLabel → $toLabel)'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _violet,
+                          minimumSize: const Size(double.infinity, 52),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 12),
+                        Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFF87171), fontSize: 13)),
+                      ],
+                      if (_output != null) ...[
+                        const SizedBox(height: 20),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _copy(_output!),
+                            borderRadius: BorderRadius.circular(18),
+                            child: Ink(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(18),
+                                color: _mint.withValues(alpha: 0.12),
+                                border: Border.all(color: _mint.withValues(alpha: 0.45)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text('In $toLabel', style: const TextStyle(color: _mint, fontWeight: FontWeight.w800, fontSize: 12)),
+                                      const Spacer(),
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                        tooltip: 'Copy',
+                                        onPressed: () => _copy(_output!),
+                                        icon: const Icon(Icons.copy_rounded, color: _mint, size: 22),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SelectableText(
+                                    _output!,
+                                    style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.5, fontWeight: FontWeight.w600),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'Tap message or copy icon to copy · paste in your chat app',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -394,13 +492,13 @@ class _NgmyDocumentTranslateSheetState extends State<_NgmyDocumentTranslateSheet
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            color: selected ? _cyan.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(16),
+            color: selected ? _cyan.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.05),
             border: Border.all(color: selected ? _cyan.withValues(alpha: 0.55) : Colors.white12),
           ),
           child: Column(
@@ -408,13 +506,13 @@ class _NgmyDocumentTranslateSheetState extends State<_NgmyDocumentTranslateSheet
             children: [
               Row(
                 children: [
-                  Icon(icon, size: 16, color: selected ? _cyan : Colors.white54),
-                  const SizedBox(width: 6),
-                  Text(label, style: TextStyle(color: selected ? Colors.white : Colors.white70, fontWeight: FontWeight.w900, fontSize: 12)),
+                  Icon(icon, size: 18, color: selected ? _cyan : Colors.white54),
+                  const SizedBox(width: 8),
+                  Text(label, style: TextStyle(color: selected ? Colors.white : Colors.white70, fontWeight: FontWeight.w900, fontSize: 13)),
                 ],
               ),
-              const SizedBox(height: 2),
-              Text(sub, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 9, height: 1.2)),
+              const SizedBox(height: 4),
+              Text(sub, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10, height: 1.25)),
             ],
           ),
         ),
