@@ -1183,7 +1183,6 @@ Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
   await ngmyHydrateWalletPaymentsFromAllBackups(config);
   await ngmyHydrateRepairEstimatePaymentsFromAllBackups(config);
   await ngmyHydrateTranslatePaymentsFromAllBackups(config);
-  await ngmyHydrateCivicSelfEnrollmentFromAllBackups(config);
   await NgmyAppStudioAccess.hydrate(config);
   final snapshot = AppConfig.fromJson(config.toJson());
 
@@ -1208,6 +1207,7 @@ Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
 
   await ngmyHydrateManagementListsFromAllBackups(config);
   await ngmyHydrateAppBrandingFromAllBackups(config);
+  await ngmyHydrateCivicSelfEnrollmentFromAllBackups(config);
   _mergeOperationalManagementListsIntoConfig(config, snapshot);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
 }

@@ -95,6 +95,7 @@ import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_civic_self_enrollment.dart';
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_enroll_link.dart';
+import 'ngmy_referral_link.dart';
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_invoice_payments.dart';
 import 'ngmy_music_payments.dart';
@@ -379,6 +380,7 @@ void main() async {
   }
 
   ngmyCaptureCivicEnrollLaunchIntent();
+  ngmyCaptureReferralLaunchIntent();
   _ngmyInitialThemeMode = launchBootstrap.themeMode;
   _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
 
@@ -2161,11 +2163,8 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
         keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
-  if (record.containsKey('civicSelfEnrollmentEnabled') && !ngmyShouldDeferRemoteConfigOverwrite()) {
-    next.civicSelfEnrollmentEnabled = record['civicSelfEnrollmentEnabled'] == true;
-  } else {
-    next.civicSelfEnrollmentEnabled = keep.civicSelfEnrollmentEnabled;
-  }
+  // Authoritative source is ngmy_settings (civic_self_enrollment_settings), not config row.
+  next.civicSelfEnrollmentEnabled = keep.civicSelfEnrollmentEnabled;
 
   if (record.containsKey('officialCashApp') || record.containsKey('official_cash_app')) {
     final remote = (record['officialCashApp'] ?? record['official_cash_app'] ?? '').toString().trim();
@@ -6260,7 +6259,49 @@ DateTime? ngmyAdminConfigMutationAt;
 bool ngmyShouldDeferRemoteConfigOverwrite() {
   final t = ngmyAdminConfigMutationAt;
   if (t == null) return false;
-  return DateTime.now().difference(t) < const Duration(seconds: 12);
+  return DateTime.now().difference(t) < const Duration(seconds: 45);
+}
+
+String ngmyReferralCodeForEmail(String email) =>
+    'REFD${email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
+
+/// Links [user] to [code]'s referrer. Returns the referrer email when applied.
+String? ngmyApplyReferralCodeToUser({
+  required String code,
+  required UserData user,
+  required List<UserData> allUsers,
+}) {
+  final normalized = code.trim().toUpperCase();
+  if (normalized.isEmpty) return null;
+  if (user.referredByCode.trim().isNotEmpty) return null;
+  if (normalized == ngmyReferralCodeForEmail(user.email).toUpperCase()) return null;
+
+  UserData? referrer;
+  for (final u in allUsers) {
+    if (ngmyReferralCodeForEmail(u.email).toUpperCase() == normalized) {
+      referrer = u;
+      break;
+    }
+  }
+  if (referrer == null) return null;
+
+  final currentEmail = user.email.toLowerCase().trim();
+  final currentIdx = allUsers.indexWhere((u) => u.email.toLowerCase().trim() == currentEmail);
+  final refEmail = referrer.email.toLowerCase().trim();
+  final refIdx = allUsers.indexWhere((u) => u.email.toLowerCase().trim() == refEmail);
+
+  user.referredByCode = normalized;
+  if (currentIdx != -1) {
+    allUsers[currentIdx].referredByCode = normalized;
+  }
+  if (refIdx != -1) {
+    allUsers[refIdx].referralCount += 1;
+    allUsers[refIdx].points += 100;
+    return allUsers[refIdx].email;
+  }
+  referrer.referralCount += 1;
+  referrer.points += 100;
+  return referrer.email;
 }
 
 class NGMYApp extends StatefulWidget {
@@ -6703,9 +6744,49 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       debugPrint('[login] local session save: $e');
     }
     await _persistSessionImmediately();
+    await _applyPendingReferralLink(_currentUser!);
     unawaited(_pushUserToCloudFast(_currentUser!, includeFreeTrial: true));
     _restartSyncLoopsForCurrentUser();
     unawaited(_refreshUserTransactionsFromCloud(force: true));
+  }
+
+  Future<void> _pushReferralPairToCloud(UserData invitee, String referrerEmail) async {
+    try {
+      final refKey = referrerEmail.toLowerCase().trim();
+      final inviteeKey = invitee.email.toLowerCase().trim();
+      final inviteeIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == inviteeKey);
+      final refIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == refKey);
+      final rows = <Map<String, dynamic>>[];
+      if (inviteeIdx != -1) {
+        rows.add(Map<String, dynamic>.from(_allUsers[inviteeIdx].toJson()));
+      } else {
+        rows.add(Map<String, dynamic>.from(invitee.toJson()));
+      }
+      if (refIdx != -1) {
+        rows.add(Map<String, dynamic>.from(_allUsers[refIdx].toJson()));
+      }
+      if (rows.isEmpty) return;
+      final canWriteTrial = invitee.isAdmin;
+      await Supabase.instance.client.from('users').upsert(rows.map((r) {
+        final u = UserData.fromJson(r);
+        return _userRowForBulkSync(u, includeFreeTrial: canWriteTrial);
+      }).toList());
+    } catch (e) {
+      debugPrint('[referral] cloud sync: $e');
+    }
+  }
+
+  Future<void> _applyPendingReferralLink(UserData user) async {
+    final code = ngmyPeekPendingReferralCode();
+    if (code == null || code.isEmpty) return;
+    final referrerEmail = ngmyApplyReferralCodeToUser(code: code, user: user, allUsers: _allUsers);
+    if (referrerEmail == null) return;
+    ngmyClearPendingReferralCode();
+    if (!mounted) return;
+    setState(() {});
+    await _persistLocalOnly();
+    unawaited(_pushReferralPairToCloud(user, referrerEmail));
+    unawaited(_pushUserToCloudFast(user));
   }
 
   Future<void> _startBackgroundServicesWhenReady() async {
@@ -8729,6 +8810,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     });
     await _saveData();
     await _persistSessionImmediately();
+    if (_currentUser != null) {
+      await _applyPendingReferralLink(_currentUser!);
+    }
     _restartSyncLoopsForCurrentUser();
     unawaited(_refreshUserTransactionsFromCloud(force: true));
   }
@@ -9055,35 +9139,41 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         } else if (next.geminiApiKey.trim().isEmpty && keepGeminiKey.isNotEmpty) {
           next.geminiApiKey = keepGeminiKey;
         }
-        if (_appConfigSig(_config) != _appConfigSig(next)) {
-          if (_allowConfigDiffNotifications) {
-            _notifySellerOfNewStoreOrders(_config, next);
-            _notifyPendingGameInvites(_config, next);
-            _notifyApprovedWorkersOfNewJobs(_config, next);
-            _notifyAdminOnNewPendingRegistrarApps(_config, next);
-            _notifyAdminOnNewPendingJobApps(_config, next);
-          }
-          setState(() {
-            _config = next;
-            _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
-            _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
-          });
-          NgmyAdminLiveRefresh.notify();
-          SharedPreferences.getInstance().then((prefs) {
-            prefs.setString('app_config', jsonEncode(_config.toJson()));
-            prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
-            prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
-            if (_currentUser != null) {
-              prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
-            }
-          }).catchError((_) {});
-          unawaited(_processMediaDeliveryQueue());
-        }
-        _scheduleLegalPlansRefreshFromCloud();
+        unawaited(_finishRemoteConfigChangeApply(next));
       }
     } catch (e) {
       debugPrint('Config realtime apply error: $e');
     }
+  }
+
+  Future<void> _finishRemoteConfigChangeApply(AppConfig next) async {
+    await ngmyHydrateCivicSelfEnrollmentFromAllBackups(next);
+    if (!mounted) return;
+    if (_appConfigSig(_config) != _appConfigSig(next)) {
+      if (_allowConfigDiffNotifications) {
+        _notifySellerOfNewStoreOrders(_config, next);
+        _notifyPendingGameInvites(_config, next);
+        _notifyApprovedWorkersOfNewJobs(_config, next);
+        _notifyAdminOnNewPendingRegistrarApps(_config, next);
+        _notifyAdminOnNewPendingJobApps(_config, next);
+      }
+      setState(() {
+        _config = next;
+        _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
+        _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
+      });
+      NgmyAdminLiveRefresh.notify();
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('app_config', jsonEncode(_config.toJson()));
+        prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+        prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
+        if (_currentUser != null) {
+          prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+        }
+      }).catchError((_) {});
+      unawaited(_processMediaDeliveryQueue());
+    }
+    _scheduleLegalPlansRefreshFromCloud();
   }
 
   void _onNgmySettingsChange(PostgresChangePayload payload) {
@@ -9210,6 +9300,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (value is Map) {
           if (ngmyShouldDeferRemoteConfigOverwrite()) return;
           setState(() => _applyAppBrandingPayload(_config, Map<String, dynamic>.from(value)));
+          unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
+          NgmyAdminLiveRefresh.notify();
+        }
+        return;
+      }
+      if (key == _kNgmyCivicSelfEnrollmentSettingsKey) {
+        final value = payload.newRecord['value'];
+        if (value is Map) {
+          setState(() => NgmyCivicSelfEnrollment.applyPayload(_config, Map<String, dynamic>.from(value)));
+          unawaited(NgmyCivicSelfEnrollment.saveLocalBackup(_config));
           unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
           NgmyAdminLiveRefresh.notify();
         }
@@ -10478,6 +10578,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     _currentUser = user;
                     _allUsers.add(user);
                   });
+                  await _applyPendingReferralLink(user);
                   await _persistLocalOnly();
                   for (var i = 0; i < 4; i++) {
                     await _pushUserToCloudFast(_currentUser!, includeFreeTrial: true);
@@ -10879,6 +10980,94 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Widget _buildAuthModeSwitchGlassCard(bool isDark) {
+    final isLoginMode = _isLogin;
+    final frameGradient = isDark
+        ? [
+            Colors.white.withOpacity(0.16),
+            Colors.white.withOpacity(0.07),
+            const Color(0xFF6200EE).withOpacity(0.12),
+          ]
+        : [
+            Colors.white.withOpacity(0.92),
+            const Color(0xFFEDE9FE).withOpacity(0.88),
+            const Color(0xFF6200EE).withOpacity(0.10),
+          ];
+    final borderColor = isDark ? Colors.white.withOpacity(0.34) : const Color(0xFF6200EE).withOpacity(0.42);
+    final baseTextColor = isDark ? Colors.white : const Color(0xFF111827);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() => _isLogin = !isLoginMode),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: frameGradient,
+                ),
+                border: Border.all(color: borderColor, width: 1.6),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isDark ? Colors.black : const Color(0xFF6200EE)).withOpacity(isDark ? 0.35 : 0.14),
+                    blurRadius: 22,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: isLoginMode
+                  ? RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.25,
+                          color: baseTextColor,
+                          height: 1.35,
+                        ),
+                        children: const [
+                          TextSpan(text: "Don't have an account? "),
+                          TextSpan(
+                            text: 'Sign Up',
+                            style: TextStyle(
+                              color: Color(0xFF7C3AED),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                              decoration: TextDecoration.underline,
+                              decorationThickness: 2,
+                              decorationColor: Color(0xFF7C3AED),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Text(
+                      'Already have an account? Back to Login',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.25,
+                        color: baseTextColor,
+                        height: 1.35,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showForgotPassword() {
     final emailCtl = TextEditingController(text: _e.text);
     final codeCtl = TextEditingController();
@@ -11184,9 +11373,10 @@ class _AuthScreenState extends State<AuthScreen> {
       if (_isLogin)
         TextButton(
           onPressed: _showForgotPassword,
-          child: const Text('Forgot Password?', style: TextStyle(color: Color(0xFF6200EE), fontWeight: FontWeight.w600)),
+          child: const Text('Forgot Password?', style: TextStyle(color: Color(0xFF6200EE), fontWeight: FontWeight.w700, fontSize: 15)),
         ),
-      TextButton(onPressed: () => setState(() => _isLogin = !_isLogin), child: Text(_isLogin ? "Don't have an account? Sign Up" : "Back to Login")),
+      const SizedBox(height: 8),
+      _buildAuthModeSwitchGlassCard(isDark),
       const SizedBox(height: 50),
       TextButton(
         onPressed: () async {
@@ -22201,6 +22391,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral code copied.')));
   }
 
+  Future<void> _copyReferralInviteLink() async {
+    final link = ngmyReferralInviteUrl(_referralCode);
+    await Clipboard.setData(ClipboardData(text: link));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Invite link copied — share it so friends join with your referral'),
+        backgroundColor: Color(0xFF059669),
+      ),
+    );
+  }
+
   void _convertPointsToCash() {
     final dollars = (widget.user.points ~/ 100).toDouble();
     if (dollars <= 0) {
@@ -22231,8 +22433,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     widget.onDataChanged();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Converted to \$${dollars.toStringAsFixed(2)}.')));
   }
-
-  String _refCodeForUser(UserData u) => 'REFD${u.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
 
   List<UserData> _myInvitees() {
     return widget.allUsers.where((u) {
@@ -22299,47 +22499,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You cannot use your own referral code.')));
       return;
     }
-
-    UserData? referrer;
-    for (final u in widget.allUsers) {
-      if (_refCodeForUser(u).toUpperCase() == code) {
-        referrer = u;
-        break;
-      }
-    }
-    if (referrer == null) {
+    final referrerEmail = ngmyApplyReferralCodeToUser(code: code, user: widget.user, allUsers: widget.allUsers);
+    if (referrerEmail == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid referral code.')));
       return;
     }
-
-    final currentEmail = widget.user.email.toLowerCase().trim();
-    final currentIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == currentEmail);
-    final refIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == referrer!.email.toLowerCase().trim());
-    setState(() {
-      widget.user.referredByCode = code;
-      if (currentIdx != -1) {
-        widget.allUsers[currentIdx].referredByCode = code;
-      } else {
-        widget.allUsers.add(widget.user);
-      }
-      if (refIdx != -1) {
-        widget.allUsers[refIdx].referralCount += 1;
-        widget.allUsers[refIdx].points += 100;
-      } else {
-        referrer!.referralCount += 1;
-        referrer.points += 100;
-      }
-    });
+    setState(() {});
     _referralInputC.clear();
     try {
+      final currentEmail = widget.user.email.toLowerCase().trim();
+      final refKey = referrerEmail.toLowerCase().trim();
+      final currentIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == currentEmail);
+      final refIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == refKey);
       final rows = <Map<String, dynamic>>[];
       if (currentIdx != -1) {
         rows.add(Map<String, dynamic>.from(widget.allUsers[currentIdx].toJson()));
       } else {
         rows.add(Map<String, dynamic>.from(widget.user.toJson()));
       }
-      final resolvedRef = refIdx != -1 ? widget.allUsers[refIdx] : referrer!;
-      rows.add(Map<String, dynamic>.from(resolvedRef.toJson()));
+      if (refIdx != -1) {
+        rows.add(Map<String, dynamic>.from(widget.allUsers[refIdx].toJson()));
+      }
       if (rows.isNotEmpty) {
         final canWriteTrial = widget.user.isAdmin;
         Supabase.instance.client.from('users').upsert(rows.map((r) {
@@ -22479,7 +22659,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('🎁  Invite & Earn', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: primaryText)),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text('🎁  Invite & Earn', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: primaryText)),
+                  ),
+                  IconButton(
+                    tooltip: 'Copy invite link to share',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    onPressed: _copyReferralInviteLink,
+                    icon: Icon(Icons.link_rounded, color: isDark ? const Color(0xFF8B5CF6) : const Color(0xFF6200EE)),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -24732,6 +24926,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   final Set<String> _openedReceiptKeys = {};
   Map<String, dynamic>? _localRegistrarBackup;
   bool _maintenanceQueued = false;
+  bool _selfEnrollmentEnabled = false;
 
   final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -24745,7 +24940,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   void initState() {
     super.initState();
     _selectedState = widget.user.state;
-    unawaited(ngmyHydrateCivicSelfEnrollmentFromAllBackups(widget.config));
+    _selfEnrollmentEnabled = widget.config.civicSelfEnrollmentEnabled;
+    unawaited(_syncSelfEnrollmentFlag());
     unawaited(ngmyHydrateCivicRegistryMembersFromAllBackups(widget.config, widget.allUsers));
     _ensureUniqueRegistryIds();
     unawaited(_hydrateReceiptReadState());
@@ -24753,10 +24949,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _runHelpModeLifecycleMaintenance();
       _checkRegistryUnlock();
-      if (widget.openSelfEnrollmentOnStart && widget.config.civicSelfEnrollmentEnabled) {
+      if (widget.openSelfEnrollmentOnStart && _selfEnrollmentEnabled) {
         _showSelfEnrollmentSheet();
       }
     });
+  }
+
+  Future<void> _syncSelfEnrollmentFlag() async {
+    await ngmyHydrateCivicSelfEnrollmentFromAllBackups(widget.config);
+    if (!mounted) return;
+    final enabled = widget.config.civicSelfEnrollmentEnabled;
+    if (_selfEnrollmentEnabled != enabled) {
+      setState(() => _selfEnrollmentEnabled = enabled);
+    }
   }
 
   Future<void> _copyCivicEnrollShareLink() async {
@@ -24777,6 +24982,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (oldWidget.user.email != widget.user.email) {
       unawaited(_hydrateReceiptReadState());
       unawaited(_hydrateRegistrarApplication());
+    }
+    if (oldWidget.config.civicSelfEnrollmentEnabled != widget.config.civicSelfEnrollmentEnabled) {
+      _selfEnrollmentEnabled = widget.config.civicSelfEnrollmentEnabled;
+    } else {
+      unawaited(_syncSelfEnrollmentFlag());
     }
   }
 
@@ -25369,7 +25579,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are already enrolled in the registry.')));
       return;
     }
-    if (!widget.config.civicSelfEnrollmentEnabled) {
+    if (!_selfEnrollmentEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Self-enrollment is not available right now.')));
       return;
     }
@@ -27590,7 +27800,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ],
                     ),
                   ),
-                  if (widget.config.civicSelfEnrollmentEnabled)
+                  if (_selfEnrollmentEnabled)
                     SelectionContainer.disabled(
                       child: IconButton(
                         onPressed: _userIsCivicRegistryEnrolled(widget.config, widget.user) ? null : _showSelfEnrollmentSheet,
