@@ -376,9 +376,13 @@
             loadFlutterBootstrap();
           }
         };
+        if (!navigator.onLine) {
+          go();
+          return;
+        }
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.ready.then(go).catch(go);
-          setTimeout(go, 2500);
+          setTimeout(go, 1200);
         } else {
           go();
         }

@@ -7,7 +7,7 @@ function ngmySwBasePath() {
   return p.replace(/[^/]*$/, '') || '/';
 }
 const SCOPE_PATH = ngmySwBasePath();
-const CACHE_NAME = CACHE_PREFIX + '20260611210549';
+const CACHE_NAME = CACHE_PREFIX + '20260611212455';
 
 const PRECACHE_URLS = ['./','./.last_build_id','./.nojekyll','./404.html','./assets/AssetManifest.bin','./assets/AssetManifest.bin.json','./assets/assets/sounds/income_cash.mp3','./assets/assets/sounds/README.md','./assets/assets/sounds/YTMP3GG_YouTube_Kaching-sound-effect-sound-sounds-sounde_Media_a7Vue-A0BOY_007_128k.mp3','./assets/assets/video_studio/yt_news_desk.png','./assets/assets/video_studio/yt_studio_curved.png','./assets/FontManifest.json','./assets/fonts/MaterialIcons-Regular.otf','./assets/NOTICES','./assets/packages/cupertino_icons/assets/CupertinoIcons.ttf','./assets/shaders/ink_sparkle.frag','./assets/shaders/stretch_effect.frag','./canvaskit/canvaskit.js','./canvaskit/canvaskit.js.symbols','./canvaskit/canvaskit.wasm','./canvaskit/chromium/canvaskit.js','./canvaskit/chromium/canvaskit.js.symbols','./canvaskit/chromium/canvaskit.wasm','./canvaskit/experimental_webparagraph/canvaskit.js','./canvaskit/experimental_webparagraph/canvaskit.js.symbols','./canvaskit/experimental_webparagraph/canvaskit.wasm','./canvaskit/skwasm.js','./canvaskit/skwasm.js.symbols','./canvaskit/skwasm.wasm','./canvaskit/skwasm_heavy.js','./canvaskit/skwasm_heavy.js.symbols','./canvaskit/skwasm_heavy.wasm','./canvaskit/wimp.js','./canvaskit/wimp.js.symbols','./canvaskit/wimp.wasm','./CNAME','./favicon.png','./flutter.js','./flutter_bootstrap.js','./icons/Icon-192.png','./icons/Icon-512.png','./icons/Icon-maskable-192.png','./icons/Icon-maskable-512.png','./index.html','./main.dart.js','./manifest.json','./version.json'];
 
@@ -79,6 +79,7 @@ async function offlineDocument() {
 }
 
 function isInScope(url) {
+  if (SCOPE_PATH === '/' || SCOPE_PATH === '') return true;
   return url.pathname.startsWith(SCOPE_PATH) || url.pathname === '/' || url.pathname.endsWith('index.html');
 }
 
@@ -122,23 +123,19 @@ self.addEventListener('fetch', (event) => {
       }
 
       if (event.request.mode === 'navigate') {
+        const cachedNav = await offlineDocument();
         try {
           const net = await fetch(event.request);
           if (net && net.status === 200) {
             cache.put(event.request, net.clone());
+            return net;
           }
-          return net;
-        } catch (_) {
-          const offline = await offlineDocument();
-          if (offline) return offline;
-          return (
-            cached ||
-            new Response(
-              '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NGMY Offline</title></head><body style="font-family:system-ui;background:#121212;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px"><div><h2>NGMY is offline</h2><p>Open the app once while online so it can cache for offline use.</p><button onclick="location.reload()" style="margin-top:16px;padding:12px 24px;border:none;border-radius:8px;background:#00B25A;color:#fff;font-weight:700">Retry</button></div></body></html>',
-              { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
-            )
-          );
-        }
+        } catch (_) {}
+        if (cachedNav) return cachedNav;
+        return new Response(
+          '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NGMY Offline</title></head><body style="font-family:system-ui;background:#121212;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px"><div><h2>NGMY is offline</h2><p>Open the app once while online so it can cache for offline use.</p><button onclick="location.reload()" style="margin-top:16px;padding:12px 24px;border:none;border-radius:8px;background:#00B25A;color:#fff;font-weight:700">Retry</button></div></body></html>',
+          { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+        );
       }
 
       if (cached) {

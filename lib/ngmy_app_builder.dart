@@ -47,17 +47,18 @@ void ngmyTryOpenPublishedAppFromUrl(
 }
 
 Future<void> _ngmyShowAppPublicUrlDialog(BuildContext context, NgmyAppProject project) async {
-  final url = ngmyResolvedPublicUrl(project);
+  final refreshed = ngmyRefreshAppProjectPublicUrl(project);
+  final url = ngmyAppPublicUrlForSlug(refreshed.slug.isNotEmpty ? refreshed.slug : project.slug);
   if (url.isEmpty) return;
   await showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Your unique ngmy.org link'),
+      title: const Text('Your unique NGMY link'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('This link is only for "${project.name}" — hosted on ngmy.org. Share it anywhere:', style: TextStyle(color: Colors.grey.shade700)),
+          Text('Share this link for "${project.name}" — it opens on ngmy.org:', style: TextStyle(color: Colors.grey.shade700)),
           const SizedBox(height: 12),
           SelectableText(url, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF2563EB), fontSize: 13)),
           const SizedBox(height: 10),
@@ -230,7 +231,9 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
 
   Future<void> _submitOrPublish(NgmyAppProject project) async {
     if (_isAdmin) {
-      final published = await ngmyPublishAppProject(widget.config, _email, project);
+      final published = ngmyRefreshAppProjectPublicUrl(await ngmyPublishAppProject(widget.config, _email, project));
+      await ngmySaveUserAppProject(_email, published);
+      await ngmyCachePublishedAppLocally(published);
       await _exportApp(published);
       if (!mounted) return;
       await _ngmyShowAppPublicUrlDialog(context, published);

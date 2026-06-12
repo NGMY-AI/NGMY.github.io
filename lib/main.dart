@@ -95,6 +95,7 @@ import 'ngmy_family_tree_payments.dart';
 import 'ngmy_invoice_payments.dart';
 import 'ngmy_music_payments.dart';
 import 'ngmy_app_studio_payments.dart';
+import 'ngmy_admin_domain_calendar.dart';
 import 'ngmy_communicate.dart';
 import 'ngmy_communicate_admin.dart';
 import 'ngmy_app_builder.dart';
@@ -6594,7 +6595,22 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshPendingTransactionsFromCloud());
       unawaited(_refreshAdminDashboardFromCloud());
+      unawaited(_maybeDomainRenewalReminder());
     }
+  }
+
+  Future<void> _maybeDomainRenewalReminder() async {
+    if (_currentUser == null || !_ngmySessionIsAdmin(_currentUser)) return;
+    await ngmyRunDomainRenewalReminderIfNeeded(
+      isAdmin: true,
+      onNotify: (title, body) => _pushInAppNotification(
+        title: title,
+        body: body,
+        tag: 'domain_renewal_${DateTime.now().millisecondsSinceEpoch}',
+        cooldown: Duration.zero,
+        showInAppBanner: true,
+      ),
+    );
   }
 
   void _startUserTransactionSync() {
@@ -16969,10 +16985,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _adminWallet(isDark),
       _adminMedia(isDark),
       _adminStore(isDark),
+      NgmyAdminDomainCalendarPanel(isDark: isDark),
     ];
     return NgmyTabBackScope(
       activeTab: _idx,
-      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 6)),
+      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 7)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
       appBar: AppBar(
@@ -17020,6 +17037,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
             _navItem(5, Icons.play_circle_outline, 'Media', isDark, frameBg, frameBorder),
             _navItem(6, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
+            _navItem(7, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
           ],
         ),
       ),
@@ -17134,7 +17152,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "MEDIA", "STORE"][_idx];
+  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "MEDIA", "STORE", "CALENDAR"][_idx];
 
   Widget _adminStore(bool isDark) {
     final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);

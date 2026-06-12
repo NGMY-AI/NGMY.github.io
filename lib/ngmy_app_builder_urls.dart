@@ -47,19 +47,15 @@ String ngmyAppPublicUrlForSlug(String slug) {
   return '$base$kNgmyGithubPagesAppPath/$clean';
 }
 
-/// Maps old github.io links to ngmy.org when a slug exists.
+/// Always uses canonical ngmy.org URL when the app has a slug.
 NgmyAppProject ngmyRefreshAppProjectPublicUrl(NgmyAppProject project) {
   final slug = project.slug.trim().toLowerCase();
   if (slug.isEmpty) return project;
   final hasLink = project.publicUrl.trim().isNotEmpty;
-  final published = project.isPublished || hasLink;
-  if (!published) return project;
+  if (!project.isPublished && !hasLink) return project;
   final canonical = ngmyAppPublicUrlForSlug(slug);
   if (project.publicUrl.trim() == canonical) return project;
-  if (!hasLink || ngmyIsLegacyAppStudioUrl(project.publicUrl)) {
-    return project.copyWith(publicUrl: canonical);
-  }
-  return project;
+  return project.copyWith(publicUrl: canonical);
 }
 
 String ngmyResolvedPublicUrl(NgmyAppProject project) =>

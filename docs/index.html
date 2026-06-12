@@ -276,7 +276,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260611210549";
+      var CURRENT = "20260611212455";
 
       function showError(msg) {
 
@@ -339,7 +339,7 @@
 
   <script>
     (function () {
-      var deployId = '20260611210549';
+      var deployId = '20260611212455';
       var bootstrapSrc = 'flutter_bootstrap.js';
       var loadAttempts = 0;
 
@@ -376,9 +376,13 @@
             loadFlutterBootstrap();
           }
         };
+        if (!navigator.onLine) {
+          go();
+          return;
+        }
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.ready.then(go).catch(go);
-          setTimeout(go, 2500);
+          setTimeout(go, 1200);
         } else {
           go();
         }
