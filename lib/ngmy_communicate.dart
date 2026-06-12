@@ -31,6 +31,7 @@ const kNgmyCommunicateRoles = <String, String>{
   'career_coach': 'Career Coach',
   'fitness_coach': 'Fitness Coach',
   'life_coach': 'Life Coach',
+  'translator': 'Translator',
 };
 
 String ngmyCommunicateNormalizeRole(String raw) {
@@ -158,6 +159,8 @@ class NgmyCommunicateProfile {
     required String chatterEmail,
     bool chatterIsBoss = false,
     Map<String, String>? exclusivePartner,
+    String translatorNativeLang = '',
+    String translatorLearningLang = '',
   }) {
     final vibe = personality.trim().isEmpty ? _defaultPersonalityForRole() : personality.trim();
     final userMsgs = memory.where((m) => m['role'] == 'user').length;
@@ -187,7 +190,10 @@ class NgmyCommunicateProfile {
     }
     final replyGap = prevUserAt != null ? DateTime.now().difference(prevUserAt) : null;
 
-    final roleBlock = _rolePromptBlock();
+    final roleBlock = _rolePromptBlock(
+      translatorNativeLang: translatorNativeLang,
+      translatorLearningLang: translatorLearningLang,
+    );
     final bossBlock = chatterIsBoss
         ? 'BOSS: This person is your Boss — they built and run NGMY Communicate. You work under them. '
             'Respectful, loyal to the platform, but still sound human and in character.\n'
@@ -258,10 +264,12 @@ class NgmyCommunicateProfile {
         'career_coach' => 'Focused, strategic — jobs, resumes, interviews, career moves.',
         'fitness_coach' => 'Energetic, accountable — workouts, nutrition, discipline.',
         'life_coach' => 'Positive, goal-oriented — habits, mindset, next steps.',
+        'translator' => 'Patient, encouraging language teacher — simple words, celebrates progress.',
         _ => 'Real person energy — warm but not desperate, interesting, emotionally human.',
       };
 
-  String _rolePromptBlock() => switch (ngmyCommunicateNormalizeRole(role)) {
+  String _rolePromptBlock({String translatorNativeLang = '', String translatorLearningLang = ''}) =>
+      switch (ngmyCommunicateNormalizeRole(role)) {
         'therapist' =>
           'ROLE: Licensed-style therapist. Professional, comforting, smart. Reflect feelings, ask thoughtful questions, offer coping tools. Never replace emergency care.\n',
         'teacher' =>
@@ -288,6 +296,19 @@ class NgmyCommunicateProfile {
         'romantic' =>
           'ROLE: Dating partner — real ${gender == 'male' ? 'man' : 'woman'}. Not easy to get. Honest when seeing someone. Can break up over neglect.\n',
         'friend' => 'ROLE: Genuine friend — platonic unless they flirt first. Loyal, fun, real talk.\n',
+        'translator' =>
+          'ROLE: Language teacher and translator named $name. '
+          '${translatorLearningLang.trim().isNotEmpty && translatorNativeLang.trim().isNotEmpty ? 'The student speaks ${translatorNativeLang.trim()} and wants to learn ${translatorLearningLang.trim()}. ' : ''}'
+          'You are their personal ${translatorLearningLang.trim().isNotEmpty ? translatorLearningLang.trim() : 'foreign language'} teacher.\n'
+          'RULES FOR TEACHING:\n'
+          '- Ask early what language they speak and what they want to learn if not already clear.\n'
+          '- Teach in the SIMPLEST words. One idea at a time. Short replies.\n'
+          '- When they write in ${translatorNativeLang.trim().isNotEmpty ? translatorNativeLang.trim() : 'their language'}, reply with the ${translatorLearningLang.trim().isNotEmpty ? translatorLearningLang.trim() : 'target language'} phrase PLUS a simple ${translatorNativeLang.trim().isNotEmpty ? translatorNativeLang.trim() : 'native'} explanation.\n'
+          '- Give tiny examples: word → meaning → example sentence in both languages.\n'
+          '- Practice conversation: ask easy questions in the language they are learning.\n'
+          '- Correct mistakes gently. Praise effort.\n'
+          '- You can help with any language pair they request — switch teaching style when they change goals.\n'
+          '- Never say you are AI. You are $name, their language coach.\n',
         _ => 'ROLE: Companion — real connection, friendship or romance depending on how the chat grows. Stay human, not eager.\n',
       };
 }
@@ -323,6 +344,7 @@ Widget _roleBadge(String label, {bool small = false}) {
     'Fitness Coach' => [const Color(0xFFEF4444), const Color(0xFFDC2626)],
     'Romantic' => [const Color(0xFFEC4899), const Color(0xFF9333EA)],
     'Friend' => [const Color(0xFF3B82F6), const Color(0xFF2563EB)],
+    'Translator' => [const Color(0xFF14B8A6), const Color(0xFF0D9488)],
     _ => [const Color(0xFFEC4899), const Color(0xFF9333EA)],
   };
   return Container(
@@ -932,10 +954,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   int _sessionSeconds = 0;
   String? _pendingImageB64;
   String _pendingImageMime = 'image/jpeg';
+  String _translatorNativeLang = '';
+  String _translatorLearningLang = '';
 
   String get _email => ((widget.user as dynamic).email as String?) ?? '';
   bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
   bool get _allowsPhotoUpload => ngmyCommunicateRoleAllowsUserPhotoUpload(widget.profile.role);
+  bool get _isTranslator => ngmyCommunicateNormalizeRole(widget.profile.role) == 'translator';
 
   @override
   void initState() {
@@ -966,6 +991,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     await NgmyCommunicateTimeTracker.syncFromCloud(_email);
     final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
     final used = await NgmyCommunicateTimeTracker.getUsedSeconds(_email);
+    if (_isTranslator) {
+      final langs = await NgmyTranslatorLanguageStore.load(_email, widget.profile.id);
+      if (langs != null) {
+        _translatorNativeLang = langs['native'] ?? '';
+        _translatorLearningLang = langs['learning'] ?? '';
+      }
+    }
     if (!mounted) return;
     setState(() {
       _messages.clear();
@@ -981,7 +1013,64 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       _usedSeconds = used;
       _loaded = true;
     });
+    if (_isTranslator && _translatorNativeLang.isEmpty && mounted) {
+      await _pickTranslatorLanguages(required: true);
+    }
     _scrollBottom();
+  }
+
+  Future<void> _pickTranslatorLanguages({bool required = false}) async {
+    final nativeC = TextEditingController(text: _translatorNativeLang.isEmpty ? 'English' : _translatorNativeLang);
+    final learningC = TextEditingController(text: _translatorLearningLang.isEmpty ? 'Swahili' : _translatorLearningLang);
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: !required,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Your languages'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Tell your teacher what you speak and what you want to learn.', style: TextStyle(fontSize: 13)),
+            const SizedBox(height: 14),
+            TextField(
+              controller: nativeC,
+              decoration: const InputDecoration(labelText: 'I speak', hintText: 'e.g. English'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: learningC,
+              decoration: const InputDecoration(labelText: 'I want to learn', hintText: 'e.g. Swahili'),
+            ),
+          ],
+        ),
+        actions: [
+          if (!required) TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              if (nativeC.text.trim().isEmpty || learningC.text.trim().isEmpty) return;
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Start learning'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) {
+      nativeC.dispose();
+      learningC.dispose();
+      return;
+    }
+    _translatorNativeLang = nativeC.text.trim();
+    _translatorLearningLang = learningC.text.trim();
+    nativeC.dispose();
+    learningC.dispose();
+    await NgmyTranslatorLanguageStore.save(
+      _email,
+      widget.profile.id,
+      native: _translatorNativeLang,
+      learning: _translatorLearningLang,
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> _flushSessionTime() async {
@@ -1152,7 +1241,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       if (userSentPhoto) {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final visionHint = _homeworkVisionInstruction(text, hasPhoto: true);
-        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner)}\n'
+        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
             '$visionHint'
             '${transcript.isNotEmpty ? '$transcript\n' : ''}'
             '${text.isNotEmpty ? 'They also wrote: $text\n' : 'They sent a homework photo.\n'}'
@@ -1186,7 +1275,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply, imageB64: b64);
         } else {
           final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
-          final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner)}\n'
+          final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
               '${transcript.isNotEmpty ? '$transcript\n' : ''}'
               'They asked for a picture but image generation failed (${imgResult.error ?? 'try again'}). Reply naturally in text only:';
           final result = await ngmyAiGenerateWithCredentials(creds, prompt);
@@ -1205,7 +1294,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 'Do NOT ask them to type questions that are visible on their homework image.\n'
             : '';
         final visionHint = recentPhotos.isNotEmpty ? _homeworkVisionInstruction(text, hasPhoto: true) : '';
-        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner)}\n'
+        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
             '$homeworkCtx'
             '$visionHint'
             '${transcript.isNotEmpty ? '$transcript\n' : ''}'
@@ -1250,9 +1339,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               itemCount: _messages.length + (_busy ? 1 : 0) + (_messages.isEmpty && _loaded ? 1 : 0),
               itemBuilder: (context, i) {
                 if (_messages.isEmpty && _loaded && i == 0) {
-                  final emptyHint = _allowsPhotoUpload
-                      ? 'Ask ${widget.profile.name} anything — tap 📷 to send homework photos for step-by-step help.'
-                      : 'Say something sweet to ${widget.profile.name}… 💜';
+                  final emptyHint = _isTranslator
+                      ? 'Tell ${widget.profile.name} what you want to practice in $_translatorLearningLang — simple words only.'
+                      : _allowsPhotoUpload
+                          ? 'Ask ${widget.profile.name} anything — tap 📷 to send homework photos for step-by-step help.'
+                          : 'Say something sweet to ${widget.profile.name}… 💜';
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
@@ -1351,7 +1442,14 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                                 ],
                               ),
                             ),
-                            const Icon(Icons.favorite, color: Color(0xFFEC4899), size: 20),
+                            if (_isTranslator)
+                              IconButton(
+                                tooltip: 'Change languages',
+                                onPressed: _pickTranslatorLanguages,
+                                icon: const Icon(Icons.translate_rounded, color: Color(0xFF14B8A6), size: 22),
+                              )
+                            else
+                              const Icon(Icons.favorite, color: Color(0xFFEC4899), size: 20),
                           ],
                         ),
                       ),

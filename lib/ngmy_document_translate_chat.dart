@@ -22,6 +22,27 @@ String _translatePrompt({
       'Message:\n$text';
 }
 
+String _wordLessonPrompt({
+  required String word,
+  required String sentence,
+  required String wordLangCode,
+  required String explainLangCode,
+}) {
+  final wordLang = ngmyLangLabel(wordLangCode);
+  final explainLang = ngmyLangLabel(explainLangCode);
+  return 'You are a friendly language teacher. A student tapped ONE word to learn it.\n'
+      'Word language: $wordLang\n'
+      'Explain in: $explainLang\n'
+      'Full sentence context: $sentence\n'
+      'Word they tapped: $word\n\n'
+      'Reply in this exact format (plain text, keep it short and simple):\n'
+      'MEANING: (one simple line in $explainLang)\n'
+      'IN $wordLang: (the word again)\n'
+      'EXAMPLE: (one easy example sentence in $wordLang)\n'
+      'TRANSLATION: (that example in $explainLang)\n'
+      'TIP: (one tiny usage tip for beginners)';
+}
+
 /// Full-screen chat translator — paste foreign messages or write replies.
 Future<void> showNgmyDocumentTranslateChat(
   BuildContext context, {
@@ -93,8 +114,12 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
   bool _replyMode = false;
   final _inputC = TextEditingController();
   String? _output;
+  String? _lastSourceText;
   String? _error;
   bool _busy = false;
+  bool _wordBusy = false;
+  String? _wordLesson;
+  String? _wordLessonTitle;
   int? _remainingFree;
 
   bool get _paymentsEnabled =>
@@ -200,7 +225,10 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
       }
       setState(() {
         _busy = false;
+        _lastSourceText = text;
         _output = result.text!.trim();
+        _wordLesson = null;
+        _wordLessonTitle = null;
       });
     } else {
       setState(() {
@@ -218,6 +246,110 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
         backgroundColor: Color(0xFF059669),
         duration: Duration(seconds: 2),
       ),
+    );
+  }
+
+  Future<void> _learnWord({
+    required String word,
+    required String sentence,
+    required String wordLangCode,
+    required String explainLangCode,
+  }) async {
+    if (_wordBusy || word.trim().isEmpty) return;
+    setState(() {
+      _wordBusy = true;
+      _wordLesson = null;
+      _wordLessonTitle = word;
+    });
+
+    var apiKey = widget.geminiApiKey.trim();
+    if (apiKey.isEmpty) apiKey = (await widget.refreshApiKey()).trim();
+    if (apiKey.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _wordBusy = false;
+        _wordLesson = 'AI is not connected. Ask admin to save an API key.';
+      });
+      return;
+    }
+
+    final creds = ngmyParseAiCredentials(apiKey);
+    final result = await ngmyAiGenerateWithCredentials(
+      creds,
+      _wordLessonPrompt(
+        word: word,
+        sentence: sentence,
+        wordLangCode: wordLangCode,
+        explainLangCode: explainLangCode,
+      ),
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _wordBusy = false;
+      _wordLesson = (result.text != null && result.text!.trim().isNotEmpty)
+          ? result.text!.trim()
+          : (result.error ?? 'Could not load word lesson. Try again.');
+    });
+  }
+
+  Widget _clickableSentence({
+    required String text,
+    required String wordLangCode,
+    required String explainLangCode,
+    required Color accent,
+    String caption = 'Tap any word to learn it',
+  }) {
+    final re = RegExp(r"[\w\u00C0-\u024F\u0400-\u04FF\u0600-\u06FF\u0900-\u097F']+");
+    final spans = <InlineSpan>[];
+    var last = 0;
+    for (final m in re.allMatches(text)) {
+      if (m.start > last) {
+        spans.add(TextSpan(text: text.substring(last, m.start)));
+      }
+      final word = m.group(0) ?? '';
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          child: GestureDetector(
+            onTap: () => _learnWord(
+              word: word,
+              sentence: text,
+              wordLangCode: wordLangCode,
+              explainLangCode: explainLangCode,
+            ),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 1, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: accent.withValues(alpha: 0.35)),
+              ),
+              child: Text(word, style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 15)),
+            ),
+          ),
+        ),
+      );
+      last = m.end;
+    }
+    if (last < text.length) {
+      spans.add(TextSpan(text: text.substring(last)));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(caption, style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.55, fontWeight: FontWeight.w500),
+            children: spans,
+          ),
+        ),
+      ],
     );
   }
 
@@ -422,8 +554,26 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
                         const SizedBox(height: 12),
                         Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFF87171), fontSize: 13)),
                       ],
+                      if (_lastSourceText != null && _output != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            color: Colors.white.withValues(alpha: 0.06),
+                            border: Border.all(color: Colors.white12),
+                          ),
+                          child: _clickableSentence(
+                            text: _lastSourceText!,
+                            wordLangCode: _replyMode ? _myLang : _theirLang,
+                            explainLangCode: _replyMode ? _theirLang : _myLang,
+                            accent: _cyan,
+                            caption: 'Original ($fromLabel) — tap a word',
+                          ),
+                        ),
+                      ],
                       if (_output != null) ...[
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 14),
                         Material(
                           color: Colors.transparent,
                           child: InkWell(
@@ -454,19 +604,65 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
                                     ],
                                   ),
                                   const SizedBox(height: 8),
-                                  SelectableText(
-                                    _output!,
-                                    style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.5, fontWeight: FontWeight.w600),
+                                  _clickableSentence(
+                                    text: _output!,
+                                    wordLangCode: _replyMode ? _theirLang : _myLang,
+                                    explainLangCode: _replyMode ? _myLang : _theirLang,
+                                    accent: _mint,
+                                    caption: 'Translation — tap a word to learn it',
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
-                                    'Tap message or copy icon to copy · paste in your chat app',
+                                    'Tap a word for meaning + example · or copy the full message',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11),
                                   ),
                                 ],
                               ),
                             ),
+                          ),
+                        ),
+                      ],
+                      if (_wordBusy || _wordLesson != null) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            color: _violet.withValues(alpha: 0.14),
+                            border: Border.all(color: _violet.withValues(alpha: 0.45)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _wordLessonTitle != null ? 'Word: $_wordLessonTitle' : 'Word lesson',
+                                      style: const TextStyle(color: _violet, fontWeight: FontWeight.w900, fontSize: 13),
+                                    ),
+                                  ),
+                                  if (_wordLesson != null)
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () => setState(() {
+                                        _wordLesson = null;
+                                        _wordLessonTitle = null;
+                                      }),
+                                      icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              if (_wordBusy)
+                                const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: _violet)))
+                              else if (_wordLesson != null)
+                                SelectableText(
+                                  _wordLesson!,
+                                  style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+                                ),
+                            ],
                           ),
                         ),
                       ],

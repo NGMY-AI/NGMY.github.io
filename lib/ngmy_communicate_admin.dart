@@ -385,6 +385,7 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
                               hint: switch (ngmyCommunicateNormalizeRole(role)) {
                                 'romantic' => 'Hard to get, loyal when official…',
                                 'therapist' => 'Warm, professional…',
+                                'translator' => 'Patient, simple, celebrates small wins…',
                                 _ => 'How they talk and act…',
                               },
                             ),

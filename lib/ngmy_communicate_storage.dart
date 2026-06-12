@@ -394,3 +394,35 @@ class NgmyCommunicateRelationshipStore {
     }
   }
 }
+
+/// Per-user language pair for Translator companions (World of Love).
+class NgmyTranslatorLanguageStore {
+  static String _key(String email, String profileId) =>
+      'ngmy_translator_langs_${email.toLowerCase().trim()}_${profileId.trim()}';
+
+  static Future<Map<String, String>?> load(String email, String profileId) async {
+    if (email.trim().isEmpty || profileId.trim().isEmpty) return null;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key(email, profileId));
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final map = jsonDecode(raw);
+      if (map is! Map) return null;
+      final native = (map['native'] ?? '').toString().trim();
+      final learning = (map['learning'] ?? '').toString().trim();
+      if (native.isEmpty || learning.isEmpty) return null;
+      return {'native': native, 'learning': learning};
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> save(String email, String profileId, {required String native, required String learning}) async {
+    if (email.trim().isEmpty || profileId.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _key(email, profileId),
+      jsonEncode({'native': native.trim(), 'learning': learning.trim()}),
+    );
+  }
+}

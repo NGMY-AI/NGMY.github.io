@@ -33,19 +33,12 @@ bool ngmyUriHasOAuthCallback() {
   return false;
 }
 
-/// Resolves the OAuth callback URL Supabase should redirect to after login.
-/// On ngmy.org always uses https://ngmy.org/ — never localhost from Supabase Site URL.
+/// OAuth callback URL — real users on ngmy.org always get https://ngmy.org/ (never localhost).
 String ngmyOAuthRedirectUrl() {
   if (!kIsWeb) return 'io.supabase.flutter://login-callback';
 
   final host = ngmyWebHostname().toLowerCase().trim();
-  if (host == 'ngmy.org' || host == 'www.ngmy.org') {
-    return kNgmyOAuthRedirectUrl;
-  }
-  if (host.contains('github.io')) {
-    return kNgmyOAuthLegacyRedirectUrl;
-  }
-  if (_isLocalDevHost(host)) {
+  if (host.isNotEmpty && _isLocalDevHost(host)) {
     try {
       final origin = ngmyWebOrigin();
       if (origin.isNotEmpty) {
@@ -56,25 +49,14 @@ String ngmyOAuthRedirectUrl() {
     } catch (_) {}
     return 'http://localhost:8080/';
   }
-
-  // Custom domain / unknown host: prefer HTTPS origin, else production default.
-  try {
-    final origin = ngmyWebOrigin();
-    if (origin.startsWith('https://')) {
-      var path = Uri.base.path;
-      if (!path.endsWith('/')) path = '$path/';
-      return '$origin$path';
-    }
-  } catch (_) {}
+  if (host.contains('github.io')) {
+    return kNgmyOAuthLegacyRedirectUrl;
+  }
   return kNgmyOAuthRedirectUrl;
 }
 
-String ngmyOAuthCleanTargetUrl() {
-  if (!kIsWeb) return kNgmyOAuthRedirectUrl;
-  return ngmyOAuthRedirectUrl();
-}
+String ngmyOAuthCleanTargetUrl() => ngmyOAuthRedirectUrl();
 
-/// Initialize Supabase auth once (safe to call multiple times).
 Future<void> ngmyEnsureSupabaseAuthInitialized() async {
   if (_supabaseAuthInitialized) return;
   try {
@@ -98,7 +80,6 @@ Future<void> ngmyEnsureSupabaseAuthInitialized() async {
   }
 }
 
-/// After OAuth, Supabase redirects back with ?code= or #access_token=.
 Future<void> ngmyRecoverOAuthSessionIfNeeded() async {
   if (!kIsWeb) return;
   final uri = Uri.base;
@@ -114,8 +95,7 @@ Future<void> ngmyRecoverOAuthSessionIfNeeded() async {
   } catch (e) {
     debugPrint('[ngmy_oauth] session recovery failed: $e');
     try {
-      final session = Supabase.instance.client.auth.currentSession;
-      if (session != null) {
+      if (Supabase.instance.client.auth.currentSession != null) {
         ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
       }
     } catch (_) {}
@@ -129,10 +109,7 @@ Future<String?> _fetchGoogleClientIdFromSupabase() async {
   try {
     final redirectTo = ngmyOAuthRedirectUrl();
     final uri = Uri.parse('$kNgmySupabaseUrl/auth/v1/authorize').replace(
-      queryParameters: {
-        'provider': 'google',
-        'redirect_to': redirectTo,
-      },
+      queryParameters: {'provider': 'google', 'redirect_to': redirectTo},
     );
     final request = http.Request('GET', uri)
       ..headers['apikey'] = kNgmySupabaseAnonKey
@@ -153,16 +130,33 @@ Future<String?> _fetchGoogleClientIdFromSupabase() async {
   return null;
 }
 
-String _sanitizeOAuthAuthorizeUrl(String oauthUrl, String redirectTo) {
+String _forceRedirectInOAuthUrl(String oauthUrl, String redirectTo) {
   try {
     final uri = Uri.parse(oauthUrl);
     final params = Map<String, String>.from(uri.queryParameters);
-    // Always force our redirect — Supabase Site URL often defaults to localhost.
     params['redirect_to'] = redirectTo;
-    return uri.replace(queryParameters: params).toString();
+    var out = uri.replace(queryParameters: params).toString();
+    final encoded = Uri.encodeComponent(redirectTo);
+    out = out.replaceAll(RegExp(r'redirect_to=[^&]*'), 'redirect_to=$encoded');
+    out = out.replaceAll('redirect_to=http%3A%2F%2Flocalhost', 'redirect_to=$encoded');
+    out = out.replaceAll('redirect_to=http%3A%2F%2F127.0.0.1', 'redirect_to=$encoded');
+    return out;
   } catch (_) {
     return oauthUrl;
   }
+}
+
+String? _localhostRedirectUserError(String url) {
+  if (!kIsWeb) return null;
+  final host = ngmyWebHostname().toLowerCase();
+  if (_isLocalDevHost(host)) return null;
+  if (!url.contains('localhost') && !url.contains('127.0.0.1')) return null;
+  return 'Google/GitHub login is pointing to localhost instead of ngmy.org.\n\n'
+      'Fix in Supabase → Authentication → URL Configuration:\n'
+      '• Site URL: $kNgmyOAuthRedirectUrl\n'
+      '• Redirect URLs: $kNgmyOAuthRedirectUrl\n'
+      '• Also add: $kNgmyOAuthLegacyRedirectUrl\n\n'
+      'Remove any localhost URL from Site URL, then try again.';
 }
 
 Future<String?> _signInWithGoogleIdToken() async {
@@ -198,13 +192,18 @@ Future<String?> _signInWithGoogleIdToken() async {
 Future<String?> _signInWithOAuthRedirect(OAuthProvider provider) async {
   await ngmyEnsureSupabaseAuthInitialized();
   final redirectTo = ngmyOAuthRedirectUrl();
-  debugPrint('[ngmy_oauth] ${provider.name} redirect_to=$redirectTo');
+  debugPrint('[ngmy_oauth] ${provider.name} host=${ngmyWebHostname()} redirect_to=$redirectTo');
   try {
     final res = await Supabase.instance.client.auth.getOAuthSignInUrl(
       provider: provider,
       redirectTo: redirectTo,
     );
-    final url = _sanitizeOAuthAuthorizeUrl(res.url, redirectTo);
+    final url = _forceRedirectInOAuthUrl(res.url, redirectTo);
+    final localhostErr = _localhostRedirectUserError(url);
+    if (localhostErr != null) {
+      debugPrint('[ngmy_oauth] blocked localhost redirect: $url');
+      return localhostErr;
+    }
     if (kIsWeb) {
       ngmyOAuthNavigateSameTab(url);
       return null;
@@ -221,15 +220,12 @@ Future<String?> _signInWithOAuthRedirect(OAuthProvider provider) async {
 
 String _oauthSetupError(OAuthProvider provider, Object e) {
   return '${provider.name.toUpperCase()} login failed.\n\n'
-      'Fix in Supabase → Authentication → URL Configuration:\n'
+      'In Supabase → Authentication → URL Configuration set:\n'
       '• Site URL: $kNgmyOAuthRedirectUrl\n'
-      '• Redirect URLs:\n'
-      '  - $kNgmyOAuthRedirectUrl\n'
-      '  - $kNgmyOAuthLegacyRedirectUrl\n\n'
+      '• Redirect URLs: $kNgmyOAuthRedirectUrl and $kNgmyOAuthLegacyRedirectUrl\n\n'
       'Error: $e';
 }
 
-/// Google/GitHub login entry point.
 Future<String?> ngmyStartOAuthSignIn(OAuthProvider provider) async {
   if (kIsWeb) {
     return _signInWithOAuthRedirect(provider);
