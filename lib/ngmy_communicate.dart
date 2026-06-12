@@ -1045,6 +1045,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       user: widget.user,
       config: widget.config,
       onCharge: widget.onChargeWallet!,
+      productName: 'World of Love',
     );
   }
 

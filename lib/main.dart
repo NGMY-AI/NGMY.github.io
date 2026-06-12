@@ -94,6 +94,7 @@ import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_civic_self_enrollment.dart';
 import 'ngmy_civic_registry_members.dart';
+import 'ngmy_civic_enroll_link.dart';
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_invoice_payments.dart';
 import 'ngmy_music_payments.dart';
@@ -323,6 +324,7 @@ void main() async {
   };
 
   final launchBootstrap = await ngmyLoadLaunchBootstrap();
+  ngmyCaptureCivicEnrollLaunchIntent();
   _ngmyInitialThemeMode = launchBootstrap.themeMode;
   _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
 
@@ -6690,11 +6692,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (_currentUser == null || !_ngmySessionIsAdmin(_currentUser)) return;
     await ngmyRunDomainRenewalReminderIfNeeded(
       isAdmin: true,
-      onNotify: (title, body) => _pushInAppNotification(
+      onNotify: (title, body, {required String tag}) => _pushInAppNotification(
         title: title,
         body: body,
-        tag: 'domain_renewal_${DateTime.now().millisecondsSinceEpoch}',
-        cooldown: Duration.zero,
+        tag: tag,
+        cooldown: const Duration(days: 1),
         showInAppBanner: true,
       ),
     );
@@ -12072,6 +12074,32 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _maybeOpenCivicEnrollDeepLink() async {
+    if (!ngmyTakePendingCivicSelfEnrollmentOpen()) return;
+    if (!mounted) return;
+    await ngmyHydrateCivicSelfEnrollmentFromAllBackups(widget.config);
+    if (!mounted) return;
+    if (!widget.config.civicSelfEnrollmentEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Self-enrollment is not open right now. Ask an admin to turn it on.')),
+      );
+      return;
+    }
+    await NgmyNavigator.push(
+      context,
+      CivicRegistryScreen(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        allTransactions: widget.allTransactions,
+        onAddTransaction: widget.onAddTransaction,
+        onDataChanged: widget.onDataChanged,
+        config: widget.config,
+        openSelfEnrollmentOnStart: true,
+      ),
+      routeName: 'CivicRegistryScreen',
+    );
+  }
+
   void _onAdminLiveRefresh() {
     if (!mounted) return;
     _tabPages = null;
@@ -12090,6 +12118,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _refreshOnlineStatus();
     _runScheduledPopups();
     WidgetsBinding.instance.addPostFrameCallback((_) => _promptPushNotificationsIfNeeded());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenCivicEnrollDeepLink());
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
@@ -24574,6 +24603,7 @@ class CivicRegistryScreen extends StatefulWidget {
   final Function(AppTransaction) onAddTransaction;
   final VoidCallback onDataChanged;
   final AppConfig config;
+  final bool openSelfEnrollmentOnStart;
   const CivicRegistryScreen({
     super.key,
     required this.user,
@@ -24582,6 +24612,7 @@ class CivicRegistryScreen extends StatefulWidget {
     required this.onAddTransaction,
     required this.onDataChanged,
     required this.config,
+    this.openSelfEnrollmentOnStart = false,
   });
 
   @override
@@ -24633,7 +24664,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _runHelpModeLifecycleMaintenance();
       _checkRegistryUnlock();
+      if (widget.openSelfEnrollmentOnStart && widget.config.civicSelfEnrollmentEnabled) {
+        _showSelfEnrollmentSheet();
+      }
     });
+  }
+
+  Future<void> _copyCivicEnrollShareLink() async {
+    final link = ngmyCivicSelfEnrollmentShareUrl();
+    await Clipboard.setData(ClipboardData(text: link));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Enrollment link copied — share it with friends'),
+        backgroundColor: Color(0xFF059669),
+      ),
+    );
   }
 
   @override
@@ -27321,7 +27367,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ],
                     ),
                   ),
-                  if (widget.config.civicSelfEnrollmentEnabled)
+                  if (widget.config.civicSelfEnrollmentEnabled) ...[
+                    SelectionContainer.disabled(
+                      child: IconButton(
+                        tooltip: 'Copy enrollment link',
+                        onPressed: _copyCivicEnrollShareLink,
+                        icon: const Icon(Icons.link_rounded, color: Colors.white, size: 24),
+                      ),
+                    ),
                     SelectionContainer.disabled(
                       child: IconButton(
                         onPressed: _userIsCivicRegistryEnrolled(widget.config, widget.user) ? null : _showSelfEnrollmentSheet,
@@ -27333,9 +27386,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         tooltip: _userIsCivicRegistryEnrolled(widget.config, widget.user) ? 'You are enrolled' : 'Enroll yourself',
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
+            if (widget.config.civicSelfEnrollmentEnabled) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _copyCivicEnrollShareLink,
+                  icon: const Icon(Icons.share_rounded, size: 16, color: Colors.white70),
+                  label: const Text(
+                    'Copy link to enroll',
+                    style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
 
             if (_canCurrentUserSeeHelpMode()) ...[
@@ -40371,6 +40439,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       context: context,
       user: widget.user,
       config: widget.config,
+      productName: 'NGMY Helper',
       onCharge: (amount, desc) async {
         final charged = ngmyChargeUserWallet(
           user: widget.user,

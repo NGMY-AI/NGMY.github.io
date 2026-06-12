@@ -32,17 +32,21 @@ class NgmyCommunicatePayments {
     required dynamic user,
     required dynamic config,
     required Future<bool> Function(double amount, String description) onCharge,
+    String productName = 'Chat',
   }) async {
     final amount = feeAmountFromConfig(config);
     final mins = minutesPerPaymentFromConfig(config);
     if (amount <= 0) return true;
     final email = ((user as dynamic).email as String?) ?? '';
+    final label = productName.trim().isEmpty ? 'Chat' : productName.trim();
     final ok = await NgmyFamilyTreeStyleCharge.confirmAndCharge(
       context: context,
       user: user,
       amount: amount,
-      title: 'AI chat — $mins min block',
-      message: 'Pay for another $mins minutes of AI chat. Time is shared across NGMY Helper, World of Love, and all assistants on your account (synced on every device).',
+      title: '$label — $mins min',
+      message:
+          'Add $mins more minutes in $label for \$${amount.toStringAsFixed(2)}. '
+          'Your time stays on your account and syncs when you sign in on another device.',
       onCharge: onCharge,
     );
     if (ok && email.isNotEmpty) {
