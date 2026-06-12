@@ -1876,16 +1876,17 @@ void _mergeRegistrarApplicationsIntoConfig(AppConfig config, List<Map<String, dy
 }
 
 Future<bool> _persistCivicRegistrarApplications(AppConfig config) async {
-  _mergeRegistrarApplicationsIntoConfig(config, await _fetchRemoteCivicRegistrarApplications());
   try {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('app_config', jsonEncode(config.toJson()));
   } catch (e) {
     debugPrint('[registrar] local config save: $e');
   }
+  await _persistManagementOperationalListsLocal(config);
   if (!await ngmyCanReachCloud()) return false;
-  await _persistCriticalConfigFields(config);
-  return true;
+  _operationalConfigCloudDebounce?.cancel();
+  _mergeRegistrarApplicationsIntoConfig(config, await _fetchRemoteCivicRegistrarApplications());
+  return await _persistManagementOperationalListsAuthoritative(config);
 }
 
 Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
@@ -1996,6 +1997,7 @@ Future<void> _syncRegistrarStateAfterConfigChange(
   List<UserData> users, {
   UserData? currentUser,
 }) async {
+  // Revoke/approve only updates registrar access — civicRegistryMembers, spendings, and cities stay.
   _applyRegistrarGrantsFromConfig(config, users, currentUser: currentUser);
   final targets = <UserData>[];
   if (currentUser != null) targets.add(currentUser);
@@ -2134,6 +2136,31 @@ void _mergeOperationalManagementListsIntoConfig(AppConfig next, AppConfig keep) 
   } else if (keepHelpBiz.isNotEmpty || next.helpBusinesses.isNotEmpty) {
     next.helpBusinesses = _mergeJobWorkerApplicationsLists(keepHelpBiz, next.helpBusinesses);
   }
+  final keepSpendings = keep.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)).toList();
+  if (next.helpCampaignSpendings.isEmpty && keepSpendings.isNotEmpty) {
+    next.helpCampaignSpendings = keepSpendings;
+  } else if (keepSpendings.isNotEmpty || next.helpCampaignSpendings.isNotEmpty) {
+    next.helpCampaignSpendings = _mergeHelpCampaignSpendingsLists(keepSpendings, next.helpCampaignSpendings);
+  }
+}
+
+List<Map<String, dynamic>> _mergeHelpCampaignSpendingsLists(
+  List<Map<String, dynamic>> local,
+  List<Map<String, dynamic>> remote,
+) {
+  final byId = <String, Map<String, dynamic>>{};
+  for (final raw in [...local, ...remote]) {
+    final row = Map<String, dynamic>.from(raw);
+    final id = (row['id'] ?? '').toString();
+    if (id.isEmpty) continue;
+    byId[id] = row;
+  }
+  return byId.values.toList()
+    ..sort((a, b) {
+      final at = DateTime.tryParse((a['recordedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bt = DateTime.tryParse((b['recordedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bt.compareTo(at);
+    });
 }
 
 /// Keeps local civic/game admin settings when Supabase row is missing jsonb columns.
@@ -2584,6 +2611,7 @@ Future<void> _persistStoreSellAccessEmails(AppConfig config) async {
 }
 
 Timer? _operationalConfigCloudDebounce;
+String? _lastOperationalConfigCloudSig;
 
 /// Admin menu + user requests (loans, help, store messages, registrar apps) — not the full config blob.
 Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
@@ -2608,6 +2636,7 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
     'helpHelperApplications': config.helpHelperApplications,
     'helpRequests': config.helpRequests,
     'helpBusinesses': config.helpBusinesses,
+    'helpCampaignSpendings': config.helpCampaignSpendings,
     'civicRegistrarApplications': config.civicRegistrarApplications,
     'jobPosts': config.jobPosts,
     'jobWorkerApplications': config.jobWorkerApplications,
@@ -2628,9 +2657,12 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
     'ngmyHelperDailyMessageLimit': config.ngmyHelperDailyMessageLimit,
     'logoUrl': config.logoUrl.trim(),
   };
+  final sig = jsonEncode(row);
+  if (sig == _lastOperationalConfigCloudSig) return true;
   for (var i = 0; i < 12; i++) {
     try {
       await Supabase.instance.client.from('config').upsert(row);
+      _lastOperationalConfigCloudSig = sig;
       return true;
     } catch (e) {
       final missing = _missingColumnFromPostgrestError(e);
@@ -2996,6 +3028,15 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                           onDataChanged();
                                           onParentSetState?.call();
                                           setST(() {});
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Registrar access removed. All enrolled members and civic records are preserved.',
+                                                ),
+                                              ),
+                                            );
+                                          }
                                         },
                                         child: const Text('Revoke Registrar Access'),
                                       ),
@@ -6423,6 +6464,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return user.isAdmin || ngmyEmailIsAdmin(key);
   }
 
+  /// Admin dashboard + Civic Registry reviewers who must see new applications instantly.
+  bool _ngmyReceivesAdminDashboardAlerts(UserData? user) {
+    if (user == null) return false;
+    if (_ngmySessionIsAdmin(user)) return true;
+    return user.isCivicRegistryKing || user.isCivicRegistryAdmin;
+  }
+
   List<UserData> _mergeAllUsersWithRemote(
     Map<String, UserData> localByEmail,
     List<UserData> remote,
@@ -6537,8 +6585,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       unawaited(_startBackgroundServicesWhenReady());
       return;
     }
+    _subscribeToRealtime();
     _startUserTransactionSync();
     _startAdminPendingTransactionPoll();
+    _startAdminOperationalRequestsPoll();
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshAdminDashboardFromCloud());
       unawaited(_refreshPendingTransactionsFromCloud());
@@ -6877,6 +6927,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startGameSettingsRefreshLoop();
     _startMediaDeliveryLoop();
     _startAdminPendingTransactionPoll();
+    _startAdminOperationalRequestsPoll();
     _startUserTransactionSync();
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshPendingTransactionsFromCloud());
@@ -7267,6 +7318,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try { _saveDebounceTimer?.cancel(); } catch (_) {}
     try { _heavySaveTimer?.cancel(); } catch (_) {}
     try { _userTxnSyncTimer?.cancel(); } catch (_) {}
+    try { _adminPendingTxnPoll?.cancel(); } catch (_) {}
+    try { _adminOperationalRequestsPoll?.cancel(); } catch (_) {}
     NgmySupabaseSyncThrottle.reset();
     try { _legalPlansRefreshDebounce?.cancel(); } catch (_) {}
     try { _appSyncChannel?.unsubscribe(); } catch (_) {}
@@ -7472,6 +7525,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Timer? _adminPendingTxnPoll;
+  Timer? _adminOperationalRequestsPoll;
 
   void _startAdminPendingTransactionPoll() {
     _adminPendingTxnPoll?.cancel();
@@ -7480,6 +7534,37 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (!mounted || !_ngmySessionIsAdmin(_currentUser)) return;
       unawaited(_refreshPendingTransactionsFromCloud());
     });
+  }
+
+  void _startAdminOperationalRequestsPoll() {
+    _adminOperationalRequestsPoll?.cancel();
+    if (!_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
+    unawaited(_refreshAdminOperationalRequestsFromCloud());
+    _adminOperationalRequestsPoll = Timer.periodic(const Duration(seconds: 45), (_) {
+      if (!mounted || !_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
+      unawaited(_refreshAdminOperationalRequestsFromCloud());
+    });
+  }
+
+  Future<void> _refreshAdminOperationalRequestsFromCloud() async {
+    if (!_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
+    if (!await ngmyCanReachCloud()) return;
+    if (_shouldDeferRemoteConfigOverwrite()) return;
+    try {
+      final prev = AppConfig.fromJson(_config.toJson());
+      await ngmyAdminRefreshManagementConfig(_config);
+      if (!mounted) return;
+      if (_appConfigSig(prev) == _appConfigSig(_config)) return;
+      if (_allowConfigDiffNotifications) {
+        _notifyAdminOnNewPendingRegistrarApps(prev, _config);
+        _notifyAdminOnNewPendingJobApps(prev, _config);
+      }
+      setState(() {});
+      NgmyAdminLiveRefresh.notify();
+      unawaited(_persistLocalOnly());
+    } catch (e) {
+      debugPrint('[admin] operational requests poll: $e');
+    }
   }
 
   Future<void> _refreshPendingTransactionsFromCloud() async {
@@ -7654,11 +7739,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _onDataChanged({String? dirtyUserEmail, String? dirtyTransactionId}) {
     _markUserDirty(dirtyUserEmail ?? _currentUser?.email);
     _markTransactionDirty(dirtyTransactionId);
-    unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: true));
-    if (_ngmySessionIsAdmin(_currentUser)) {
+    final isAdmin = _ngmySessionIsAdmin(_currentUser);
+    if (isAdmin) {
+      unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: true));
       _scheduleAdminConfigPersist();
     } else {
-      _scheduleOperationalConfigCloudPersist(_config);
+      unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
     }
     _pendingHeavySave = true;
     _saveDebounceTimer?.cancel();
@@ -8753,7 +8839,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _notifyAdminOnNewPendingRegistrarApps(AppConfig prev, AppConfig next) {
-    if (_currentUser?.isAdmin != true) return;
+    if (!_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
     final prevIds = prev.civicRegistrarApplications
         .where((a) => (a['status'] ?? 'pending').toString() == 'pending')
         .map((a) => (a['id'] ?? '').toString())
@@ -8775,7 +8861,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _notifyAdminOnNewPendingJobApps(AppConfig prev, AppConfig next) {
-    if (_currentUser?.isAdmin != true) return;
+    if (!_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
     final prevIds = prev.jobWorkerApplications
         .where((a) => (a['status'] ?? 'pending').toString() == 'pending')
         .map((a) => (a['id'] ?? '').toString())
@@ -8909,20 +8995,55 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _subscribeToRealtime() {
     try {
-      _appSyncChannel = supabase
-          .channel('ngmy-app-sync')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'users',
-            callback: (payload) => _onUsersChange(payload),
-          )
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'transactions',
-            callback: (payload) => _onTransactionsChange(payload),
-          )
+      _appSyncChannel?.unsubscribe();
+      final isAdmin = _ngmySessionIsAdmin(_currentUser);
+      final sessionEmail = (_currentUser?.email ?? '').trim();
+      final channelName = isAdmin
+          ? 'ngmy-app-sync-admin'
+          : 'ngmy-app-sync-${sessionEmail.toLowerCase().hashCode}';
+      var channel = supabase.channel(channelName);
+
+      if (isAdmin) {
+        channel = channel
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'users',
+              callback: (payload) => _onUsersChange(payload),
+            )
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'transactions',
+              callback: (payload) => _onTransactionsChange(payload),
+            );
+      } else if (sessionEmail.isNotEmpty) {
+        channel = channel
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'users',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'email',
+                value: sessionEmail,
+              ),
+              callback: (payload) => _onUsersChange(payload),
+            )
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'transactions',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'userEmail',
+                value: sessionEmail,
+              ),
+              callback: (payload) => _onTransactionsChange(payload),
+            );
+      }
+
+      _appSyncChannel = channel
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
@@ -8960,7 +9081,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             callback: (payload) => _onNgmySettingsChange(payload),
           )
           .subscribe();
-      debugPrint('Realtime subscription active (single channel)');
+      debugPrint('Realtime subscription active ($channelName)');
     } catch (e) {
       debugPrint('Realtime subscribe error: $e');
     }
@@ -9277,6 +9398,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final keep = AppConfig.fromJson(_config.toJson());
           _applyManagementOperationalListsPayload(_config, Map<String, dynamic>.from(value));
           _mergeOperationalManagementListsIntoConfig(_config, keep);
+          if (_allowConfigDiffNotifications) {
+            _notifyAdminOnNewPendingRegistrarApps(keep, _config);
+            _notifyAdminOnNewPendingJobApps(keep, _config);
+          }
           setState(() {});
           NgmyAdminLiveRefresh.notify();
           unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
@@ -9722,7 +9847,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (local.isApprovedWorker && !remote.isApprovedWorker) remote.isApprovedWorker = true;
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
-    if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) remote.isAuthorizedRegistrar = true;
+    if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) {
+      final key = local.email.toLowerCase().trim();
+      if (!NgmyCivicRegistrarApplication.isRevokedForEmail(_config.civicRegistrarApplications, key)) {
+        remote.isAuthorizedRegistrar = true;
+      }
+    }
     _preserveRegistryEnrollmentFromLocal(local, remote);
     ngmyReconcileUserAccountBalance(remote, _allTransactions);
   }
@@ -12536,12 +12666,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           }
           widget.onDataChanged(); // Immediate sync on completion
         } else {
-          // Keep clock-in state synced across devices every 5 seconds while session runs.
+          // Sync clock-in across devices — user row only; never push full config from background.
           _syncCounter++;
-          if (_syncCounter >= 5) {
+          if (_syncCounter >= 120) {
             _syncCounter = 0;
             unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
-            widget.onDataChanged();
           }
         }
       }
@@ -21458,7 +21587,7 @@ class _StatsScreenState extends State<StatsScreen> {
       setState(() => _now = DateTime.now());
     });
     unawaited(_refreshPlatformStats(force: true));
-    _platformPoll = Timer.periodic(const Duration(seconds: 4), (_) {
+    _platformPoll = Timer.periodic(const Duration(seconds: 60), (_) {
       if (!mounted) return;
       unawaited(_refreshPlatformStats());
     });
@@ -21482,19 +21611,12 @@ class _StatsScreenState extends State<StatsScreen> {
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'ngmy_settings',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'key',
+              value: kNgmyPlatformLiveStatsKey,
+            ),
             callback: (_) => unawaited(_refreshPlatformStats()),
-          )
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'transactions',
-            callback: (_) => unawaited(_refreshPlatformStats(force: true)),
-          )
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'users',
-            callback: (_) => unawaited(_refreshPlatformStats(force: true)),
           )
           .subscribe();
     } catch (e) {
@@ -30330,7 +30452,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       widget.config.storeInquiries = merged;
       _ensurePaymentReviewInquiriesFromOrders();
       _ensureStoreThreadsFromOrders();
-      _scheduleOperationalConfigCloudPersist(widget.config);
       await ngmyFlushCriticalConfigLocalAndCloud(widget.config, cloud: false);
       if (!mounted) return;
       if (!silent) {

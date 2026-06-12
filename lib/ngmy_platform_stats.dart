@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -150,11 +152,27 @@ Future<NgmyPlatformLiveStats?> ngmyFetchPlatformLiveStats({bool forceRefresh = f
   }
   try {
     final cached = await ngmyLoadPlatformLiveStatsFromSettings();
-    final stale = cached == null || DateTime.now().difference(cached.updatedAt) > const Duration(seconds: 8);
+    final stale = cached == null || DateTime.now().difference(cached.updatedAt) > const Duration(minutes: 5);
     if (!forceRefresh && cached != null && !stale) return cached;
 
     final computed = await ngmyComputePlatformLiveStatsFromCloud();
-    await ngmyPublishPlatformLiveStats(computed);
+    final computedSig = jsonEncode({
+      'totalVolume': computed.totalVolume,
+      'totalProfit': computed.totalProfit,
+      'totalPayout': computed.totalPayout,
+      'platformUsers': computed.platformUsers,
+    });
+    final cachedSig = cached == null
+        ? ''
+        : jsonEncode({
+            'totalVolume': cached.totalVolume,
+            'totalProfit': cached.totalProfit,
+            'totalPayout': cached.totalPayout,
+            'platformUsers': cached.platformUsers,
+          });
+    if (computedSig != cachedSig) {
+      await ngmyPublishPlatformLiveStats(computed);
+    }
     return computed;
   } catch (e) {
     debugPrint('[platform_stats] fetch: $e');

@@ -2,6 +2,7 @@ part of 'main.dart';
 
 const String _kNgmyManagementListsCloudKey = 'management_operational_lists';
 const String _kNgmyManagementListsPrefsKey = 'ngmy_management_operational_lists_v1';
+String? _lastManagementOperationalListsCloudSig;
 const String _kNgmyStoreSellAccessSettingsKey = 'store_sell_access_emails';
 const String _kNgmyDeletedMediaSettingsKey = 'deleted_media_ids';
 const String _kNgmyFamilyTreePaymentSettingsKey = 'family_tree_payment_settings';
@@ -246,6 +247,9 @@ Future<bool> _persistManagementOperationalListsAuthoritative(AppConfig config) a
   await NgmyLoanStore.ensureAllCloudPhotoRefs(config.loanApplications);
   await _persistManagementOperationalListsLocal(config);
   final payload = _managementOperationalListsPayload(config, forCloud: true);
+  final sigPayload = Map<String, dynamic>.from(payload)..remove('savedAt');
+  final sig = jsonEncode(sigPayload);
+  if (sig == _lastManagementOperationalListsCloudSig) return true;
 
   var settingsOk = false;
   if (await ngmyCanReachCloud()) {
@@ -289,6 +293,7 @@ Future<bool> _persistManagementOperationalListsAuthoritative(AppConfig config) a
     }
   }
 
+  if (settingsOk || configOk) _lastManagementOperationalListsCloudSig = sig;
   return settingsOk || configOk;
 }
 
