@@ -127,6 +127,21 @@ part 'ngmy_admin_panels.dart';
 part 'ngmy_admin_management.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
+const String kNgmyUserLoggedOutKey = 'ngmy_user_logged_out';
+
+Future<bool> ngmyReadUserLoggedOutFlag([SharedPreferences? prefs]) async {
+  final p = prefs ?? await SharedPreferences.getInstance();
+  return p.getBool(kNgmyUserLoggedOutKey) == true;
+}
+
+Future<void> ngmyWriteUserLoggedOutFlag(bool loggedOut, [SharedPreferences? prefs]) async {
+  final p = prefs ?? await SharedPreferences.getInstance();
+  if (loggedOut) {
+    await p.setBool(kNgmyUserLoggedOutKey, true);
+  } else {
+    await p.remove(kNgmyUserLoggedOutKey);
+  }
+}
 
 ThemeMode _ngmyInitialThemeMode = ThemeMode.light;
 
@@ -269,22 +284,25 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
     }
 
     UserData? currentUser;
-    final userJson = _ngmyPrefsJson(prefs, 'current_user');
-    if (userJson != null) {
-      try {
-        final map = jsonDecode(userJson);
-        if (map is Map<String, dynamic>) {
-          final localUser = UserData.fromJson(map);
-          final index = users.indexWhere((u) => u.email.toLowerCase().trim() == localUser.email.toLowerCase().trim());
-          currentUser = index != -1 ? users[index] : localUser;
+    final loggedOut = prefs.getBool(kNgmyUserLoggedOutKey) == true;
+    if (!loggedOut) {
+      final userJson = _ngmyPrefsJson(prefs, 'current_user');
+      if (userJson != null) {
+        try {
+          final map = jsonDecode(userJson);
+          if (map is Map<String, dynamic>) {
+            final localUser = UserData.fromJson(map);
+            final index = users.indexWhere((u) => u.email.toLowerCase().trim() == localUser.email.toLowerCase().trim());
+            currentUser = index != -1 ? users[index] : localUser;
+          }
+        } catch (_) {}
+      }
+      if (currentUser == null) {
+        final lastEmail = (prefs.getString('ngmy_last_session_email') ?? '').toLowerCase().trim();
+        if (lastEmail.isNotEmpty) {
+          final index = users.indexWhere((u) => u.email.toLowerCase().trim() == lastEmail);
+          if (index != -1) currentUser = users[index];
         }
-      } catch (_) {}
-    }
-    if (currentUser == null) {
-      final lastEmail = (prefs.getString('ngmy_last_session_email') ?? '').toLowerCase().trim();
-      if (lastEmail.isNotEmpty) {
-        final index = users.indexWhere((u) => u.email.toLowerCase().trim() == lastEmail);
-        if (index != -1) currentUser = users[index];
       }
     }
 
@@ -331,7 +349,14 @@ void main() async {
   }
 
   var launchBootstrap = await ngmyLoadLaunchBootstrap();
-  if (oauthReturn) {
+  final launchLoggedOut = await ngmyReadUserLoggedOutFlag();
+  if (launchLoggedOut) {
+    try {
+      await ngmyEnsureSupabaseAuthInitialized();
+      await Supabase.instance.client.auth.signOut();
+    } catch (_) {}
+  }
+  if (oauthReturn && !launchLoggedOut) {
     try {
       final authUser = Supabase.instance.client.auth.currentUser;
       final email = authUser?.email?.toLowerCase().trim() ?? '';
@@ -6381,6 +6406,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   final Set<String> _notifiedTransactionKeys = {};
   bool _allowConfigDiffNotifications = false;
   bool _realtimeStarted = false;
+  bool _userExplicitlyLoggedOut = false;
   String _appShellSig = '';
   String _computeAppShellSig() {
     final annSig = _allAnnouncements.map((a) => '${a.id}:${a.message.length}').join('|');
@@ -6427,9 +6453,35 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _persistLocalOnly();
   }
 
+  Future<void> _clearLoggedOutFlag() async {
+    _userExplicitlyLoggedOut = false;
+    await ngmyWriteUserLoggedOutFlag(false);
+  }
+
+  Future<void> _performLogout() async {
+    _userExplicitlyLoggedOut = true;
+    await ngmyWriteUserLoggedOutFlag(true);
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.remove('current_user');
+      await p.remove('ngmy_last_session_email');
+    } catch (_) {}
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      debugPrint('[logout] supabase signOut: $e');
+    }
+    if (!mounted) return;
+    setState(() => _currentUser = null);
+  }
+
   Future<void> _restoreSessionFromLocalCache({SharedPreferences? prefs}) async {
-    if (_currentUser != null) return;
+    if (_currentUser != null || _userExplicitlyLoggedOut) return;
     final p = prefs ?? await SharedPreferences.getInstance();
+    if (p.getBool(kNgmyUserLoggedOutKey) == true) {
+      _userExplicitlyLoggedOut = true;
+      return;
+    }
     final userJson = _ngmyPrefsJson(p, 'current_user');
     if (userJson != null) {
       try {
@@ -6455,7 +6507,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _tryRestoreSessionFromSupabaseAuth() async {
-    if (_currentUser != null) return;
+    if (_currentUser != null || _userExplicitlyLoggedOut) return;
+    if (await ngmyReadUserLoggedOutFlag()) {
+      _userExplicitlyLoggedOut = true;
+      try {
+        if (supabase.auth.currentSession != null) await supabase.auth.signOut();
+      } catch (_) {}
+      return;
+    }
     try {
       final authUser = supabase.auth.currentUser;
       final email = authUser?.email?.toLowerCase().trim();
@@ -6698,6 +6757,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _completePasswordLogin(String email, String passwordHash) async {
     final key = email.toLowerCase().trim();
     if (key.isEmpty) return;
+    await _clearLoggedOutFlag();
 
     var index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
     if (index >= 0) {
@@ -6966,6 +7026,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   bool _notificationsReady = false;
   int _nextNotificationId = 1;
 
+  Future<void> _initLoggedOutGuard() async {
+    _userExplicitlyLoggedOut = await ngmyReadUserLoggedOutFlag();
+    if (!_userExplicitlyLoggedOut) return;
+    try {
+      if (supabase.auth.currentSession != null) await supabase.auth.signOut();
+    } catch (_) {}
+    if (!mounted) return;
+    if (_currentUser != null) setState(() => _currentUser = null);
+  }
+
   void _hydrateFromLaunchBootstrap(NgmyLaunchBootstrap b) {
     _themeMode = b.themeMode;
     _currentUser = b.currentUser;
@@ -7022,6 +7092,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     };
     NgmyNavigator.install();
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
+    unawaited(_initLoggedOutGuard());
     _initLocalNotifications();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_startBackgroundServicesWhenReady());
@@ -7293,6 +7364,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<String?> _startOAuthSignIn(OAuthProvider provider) async {
+    await _clearLoggedOutFlag();
     if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
       return _startDesktopOAuthSignIn(provider);
     }
@@ -8769,24 +8841,38 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _subscribeToAuthState() {
     _authSub = supabase.auth.onAuthStateChange.listen((data) {
-      final authUser = data.session?.user;
-      final email = authUser?.email?.toLowerCase().trim();
-      if (email == null || email.isEmpty) return;
-      final fullName = (authUser?.userMetadata?['full_name'] ?? '').toString().trim();
-      _signInOrCreateFromGoogle(email, fullName: fullName);
+      unawaited(_handleSupabaseAuthStateChange(data));
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final current = supabase.auth.currentUser;
-      final email = current?.email?.toLowerCase().trim();
-      if (email == null || email.isEmpty) return;
-      final fullName = (current?.userMetadata?['full_name'] ?? '').toString().trim();
-      _signInOrCreateFromGoogle(email, fullName: fullName);
+      unawaited(_handleSupabaseAuthStateChange(null));
     });
+  }
+
+  Future<void> _handleSupabaseAuthStateChange(AuthState? data) async {
+    if (_userExplicitlyLoggedOut || await ngmyReadUserLoggedOutFlag()) {
+      _userExplicitlyLoggedOut = true;
+      try {
+        if (supabase.auth.currentSession != null) await supabase.auth.signOut();
+      } catch (_) {}
+      return;
+    }
+    final authUser = data?.session?.user ?? supabase.auth.currentUser;
+    final email = authUser?.email?.toLowerCase().trim();
+    if (email == null || email.isEmpty) return;
+    final fullName = (authUser?.userMetadata?['full_name'] ?? authUser?.userMetadata?['name'] ?? '').toString().trim();
+    await _signInOrCreateFromGoogle(email, fullName: fullName);
   }
 
   Future<void> _signInOrCreateFromGoogle(String email, {String fullName = ''}) async {
     final emailNorm = email.toLowerCase().trim();
     if (emailNorm.isEmpty) return;
+    if (_userExplicitlyLoggedOut || await ngmyReadUserLoggedOutFlag()) {
+      _userExplicitlyLoggedOut = true;
+      try {
+        if (supabase.auth.currentSession != null) await supabase.auth.signOut();
+      } catch (_) {}
+      return;
+    }
     if (_currentUser?.email.toLowerCase().trim() == emailNorm) return;
     final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
     var idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailNorm);
@@ -9673,6 +9759,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _loadData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      _userExplicitlyLoggedOut = prefs.getBool(kNgmyUserLoggedOutKey) == true;
       // Theme is already loaded before first frame to prevent startup flashing.
 
       String? safeGet(String key) {
@@ -9776,22 +9863,24 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       _seedNotificationSeenIds();
       await _seedTransactionNotificationBaseline();
-      final userJsonEarly = safeGet('current_user');
-      if (userJsonEarly != null) {
-        try {
-          final map = jsonDecode(userJsonEarly);
-          if (map is Map<String, dynamic>) {
-            final localUser = UserData.fromJson(map);
-            final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == localUser.email.toLowerCase().trim());
-            _currentUser = index != -1 ? _allUsers[index] : localUser;
+      if (!_userExplicitlyLoggedOut) {
+        final userJsonEarly = safeGet('current_user');
+        if (userJsonEarly != null) {
+          try {
+            final map = jsonDecode(userJsonEarly);
+            if (map is Map<String, dynamic>) {
+              final localUser = UserData.fromJson(map);
+              final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == localUser.email.toLowerCase().trim());
+              _currentUser = index != -1 ? _allUsers[index] : localUser;
+            }
+          } catch (_) {}
+        }
+        if (_currentUser == null) {
+          final lastEmail = (prefs.getString('ngmy_last_session_email') ?? '').toLowerCase().trim();
+          if (lastEmail.isNotEmpty) {
+            final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == lastEmail);
+            if (index >= 0) _currentUser = _allUsers[index];
           }
-        } catch (_) {}
-      }
-      if (_currentUser == null) {
-        final lastEmail = (prefs.getString('ngmy_last_session_email') ?? '').toLowerCase().trim();
-        if (lastEmail.isNotEmpty) {
-          final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == lastEmail);
-          if (index >= 0) _currentUser = _allUsers[index];
         }
       }
       _reconcileAllUserBalances();
@@ -10090,20 +10179,24 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }, timeout: kNgmyCloudLoadTimeout);
 
       // 3. Handle Current User Session
-      final userJson = safeGet('current_user');
-      if (userJson != null) {
-        try {
-          final map = jsonDecode(userJson);
-          if (map is Map<String, dynamic>) {
-            final localUser = UserData.fromJson(map);
-            final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == localUser.email.toLowerCase().trim());
-            if (index != -1) {
-              _currentUser = _allUsers[index];
-            } else {
-              _currentUser = localUser;
+      if (!_userExplicitlyLoggedOut) {
+        final userJson = safeGet('current_user');
+        if (userJson != null) {
+          try {
+            final map = jsonDecode(userJson);
+            if (map is Map<String, dynamic>) {
+              final localUser = UserData.fromJson(map);
+              final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == localUser.email.toLowerCase().trim());
+              if (index != -1) {
+                _currentUser = _allUsers[index];
+              } else {
+                _currentUser = localUser;
+              }
             }
-          }
-        } catch (_) {}
+          } catch (_) {}
+        }
+      } else {
+        _currentUser = null;
       }
 
       _reconcileAllUserBalances();
@@ -10309,7 +10402,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
       await _archiveAndPurgeOldApprovedWalletRequests(online: online);
 
-      if (_currentUser != null) {
+      if (_currentUser != null && !_userExplicitlyLoggedOut) {
         final email = _currentUser!.email.toLowerCase().trim();
         if (email.isNotEmpty) {
           final merged = mergedByEmail[email];
@@ -10567,6 +10660,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     await _completePasswordLogin(email, passwordHash);
                     return;
                   }
+                  await _clearLoggedOutFlag();
                   final user = UserData(
                     email: email,
                     phone: p,
@@ -10595,14 +10689,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 allAnnouncements: _allAnnouncements,
                 config: _config,
                 onThemeChanged: (m) => _setThemeMode(m), currentThemeMode: _themeMode,
-                onLogout: () async {
-                  try {
-                    final p = await SharedPreferences.getInstance();
-                    await p.remove('current_user');
-                    await p.remove('ngmy_last_session_email');
-                  } catch (_) {}
-                  setState(() => _currentUser = null);
-                },
+                onLogout: _performLogout,
                 onDataChanged: _onDataChanged,
                 onAddTransaction: (t) {
                   if (_allTransactions.any((x) => x.id == t.id)) return;
@@ -10984,83 +11071,83 @@ class _AuthScreenState extends State<AuthScreen> {
     final isLoginMode = _isLogin;
     final frameGradient = isDark
         ? [
-            Colors.white.withOpacity(0.16),
-            Colors.white.withOpacity(0.07),
-            const Color(0xFF6200EE).withOpacity(0.12),
+            Colors.white.withOpacity(0.12),
+            Colors.white.withOpacity(0.05),
           ]
         : [
-            Colors.white.withOpacity(0.92),
-            const Color(0xFFEDE9FE).withOpacity(0.88),
-            const Color(0xFF6200EE).withOpacity(0.10),
+            Colors.white.withOpacity(0.78),
+            const Color(0xFFEDE9FE).withOpacity(0.55),
           ];
-    final borderColor = isDark ? Colors.white.withOpacity(0.34) : const Color(0xFF6200EE).withOpacity(0.42);
+    final borderColor = isDark ? Colors.white.withOpacity(0.26) : const Color(0xFF6200EE).withOpacity(0.32);
     final baseTextColor = isDark ? Colors.white : const Color(0xFF111827);
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => setState(() => _isLogin = !isLoginMode),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: frameGradient,
-                ),
-                border: Border.all(color: borderColor, width: 1.6),
-                boxShadow: [
-                  BoxShadow(
-                    color: (isDark ? Colors.black : const Color(0xFF6200EE)).withOpacity(isDark ? 0.35 : 0.14),
-                    blurRadius: 22,
-                    offset: const Offset(0, 10),
+    return Center(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => setState(() => _isLogin = !isLoginMode),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: frameGradient,
                   ),
-                ],
-              ),
-              child: isLoginMode
-                  ? RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.25,
-                          color: baseTextColor,
-                          height: 1.35,
-                        ),
-                        children: const [
-                          TextSpan(text: "Don't have an account? "),
-                          TextSpan(
-                            text: 'Sign Up',
-                            style: TextStyle(
-                              color: Color(0xFF7C3AED),
-                              fontWeight: FontWeight.w900,
-                              fontSize: 18,
-                              decoration: TextDecoration.underline,
-                              decorationThickness: 2,
-                              decorationColor: Color(0xFF7C3AED),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : Text(
-                      'Already have an account? Back to Login',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.25,
-                        color: baseTextColor,
-                        height: 1.35,
-                      ),
+                  border: Border.all(color: borderColor, width: 1.1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isDark ? Colors.black : const Color(0xFF6200EE)).withOpacity(isDark ? 0.22 : 0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
+                  ],
+                ),
+                child: isLoginMode
+                    ? RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.15,
+                            color: baseTextColor,
+                            height: 1.25,
+                          ),
+                          children: const [
+                            TextSpan(text: "Don't have an account? "),
+                            TextSpan(
+                              text: 'Sign Up',
+                              style: TextStyle(
+                                color: Color(0xFF7C3AED),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                decoration: TextDecoration.underline,
+                                decorationThickness: 1.5,
+                                decorationColor: Color(0xFF7C3AED),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Text(
+                        'Already have an account? Back to Login',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.15,
+                          color: baseTextColor,
+                          height: 1.25,
+                        ),
+                      ),
+              ),
             ),
           ),
         ),
@@ -11375,7 +11462,7 @@ class _AuthScreenState extends State<AuthScreen> {
           onPressed: _showForgotPassword,
           child: const Text('Forgot Password?', style: TextStyle(color: Color(0xFF6200EE), fontWeight: FontWeight.w700, fontSize: 15)),
         ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 6),
       _buildAuthModeSwitchGlassCard(isDark),
       const SizedBox(height: 50),
       TextButton(
