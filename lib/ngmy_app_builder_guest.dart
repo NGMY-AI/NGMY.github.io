@@ -10,6 +10,8 @@ import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_buil
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
 import 'ngmy_app_builder_urls.dart';
+import 'ngmy_app_studio_published_registry.dart';
+import 'ngmy_supabase_auth.dart';
 
 const _kGuestAppCachePrefix = 'ngmy_guest_app_cache_';
 
@@ -73,6 +75,18 @@ Future<NgmyAppProject?> ngmyFetchPublishedAppBySlug(String slug) async {
     }
   }
 
+  await ngmyWaitForSupabaseReady();
+  try {
+    final cloudApp = await NgmyAppStudioPublishedRegistry.fetchBySlug(target);
+    if (cloudApp != null) {
+      await ngmyCachePublishedAppLocally(cloudApp);
+      _guestAppMemoryCache[target] = cloudApp;
+      return cloudApp;
+    }
+  } catch (e) {
+    debugPrint('[app builder] cloud registry $target: $e');
+  }
+
   final staticApp = await _fetchStaticGuestAppJson(target);
   if (staticApp != null) {
     await ngmyCachePublishedAppLocally(staticApp);
@@ -128,7 +142,8 @@ class _NgmyPublishedAppHostScreenState extends State<NgmyPublishedAppHostScreen>
       _loading = true;
       _error = null;
     });
-    for (var attempt = 0; attempt < 4; attempt++) {
+    await ngmyWaitForSupabaseReady();
+    for (var attempt = 0; attempt < 6; attempt++) {
       final app = await ngmyFetchPublishedAppBySlug(widget.slug);
       if (!mounted) return;
       if (app != null) {
@@ -138,12 +153,13 @@ class _NgmyPublishedAppHostScreenState extends State<NgmyPublishedAppHostScreen>
         });
         return;
       }
-      if (attempt < 3) await Future<void>.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+      if (attempt < 5) await Future<void>.delayed(Duration(milliseconds: 600 * (attempt + 1)));
     }
     if (!mounted) return;
     setState(() {
       _loading = false;
-      _error = 'This app link was not found on this device. Import your .ngmy.json backup file in App Builder.';
+      _error =
+          'We could not open this app link. If you just published, open App Studio and tap Publish again while online so the link syncs. Otherwise check the URL or ask the owner to re-share it.';
     });
   }
 

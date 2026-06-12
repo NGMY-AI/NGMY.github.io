@@ -231,14 +231,18 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
 
   Future<void> _submitOrPublish(NgmyAppProject project) async {
     if (_isAdmin) {
-      final published = ngmyRefreshAppProjectPublicUrl(await ngmyPublishAppProject(widget.config, _email, project));
+      final result = await ngmyPublishAppProject(widget.config, _email, project);
+      final published = ngmyRefreshAppProjectPublicUrl(result.project);
       await ngmySaveUserAppProject(_email, published);
       await ngmyCachePublishedAppLocally(published);
       await _exportApp(published);
       if (!mounted) return;
       await _ngmyShowAppPublicUrlDialog(context, published);
+      final cloudNote = result.cloudWarning == null
+          ? 'Your link works on any phone or browser.'
+          : '${result.cloudWarning} Link may not open on other devices until publish succeeds online.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Published locally. Backup file downloaded — keep your .ngmy.json file safe!')),
+        SnackBar(content: Text('Published. $cloudNote Backup .ngmy.json downloaded.')),
       );
     } else {
       await ngmySubmitAppForReview(widget.config, _email, project);

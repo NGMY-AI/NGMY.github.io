@@ -117,6 +117,7 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
   final _clientC = TextEditingController();
   final _previewKey = GlobalKey();
   Uint8List? _photoBytes;
+  MemoryImage? _photoImage;
   String _mime = 'image/jpeg';
   String _templateId = kNgmyEstimateTemplateIds.first;
   NgmyRepairEstimateResult? _estimate;
@@ -164,6 +165,7 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
     if (!mounted) return;
     setState(() {
       _photoBytes = bytes;
+      _photoImage = MemoryImage(bytes);
       _mime = img.mimeType ?? 'image/jpeg';
       _estimate = null;
       _error = null;
@@ -409,26 +411,33 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                 children: [
                   GestureDetector(
                     onTap: _showPhotoOptions,
-                    child: Container(
-                      height: 130,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: _accent.withValues(alpha: 0.45)),
-                        color: const Color(0xFF131B2E),
-                        image: _photoBytes != null
-                            ? DecorationImage(image: MemoryImage(_photoBytes!), fit: BoxFit.cover)
-                            : null,
+                    child: RepaintBoundary(
+                      child: Container(
+                        height: 130,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: _accent.withValues(alpha: 0.45)),
+                          color: const Color(0xFF131B2E),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: _photoImage == null
+                            ? Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_a_photo_rounded, color: _accent.withValues(alpha: 0.9), size: 36),
+                                  const SizedBox(height: 6),
+                                  Text('Tap to photograph the item', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontWeight: FontWeight.w700, fontSize: 12)),
+                                ],
+                              )
+                            : Image(
+                                image: _photoImage!,
+                                width: double.infinity,
+                                height: 130,
+                                fit: BoxFit.cover,
+                                gaplessPlayback: true,
+                                filterQuality: FilterQuality.medium,
+                              ),
                       ),
-                      child: _photoBytes == null
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_a_photo_rounded, color: _accent.withValues(alpha: 0.9), size: 36),
-                                const SizedBox(height: 6),
-                                Text('Tap to photograph the item', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontWeight: FontWeight.w700, fontSize: 12)),
-                              ],
-                            )
-                          : null,
                     ),
                   ),
                   const SizedBox(height: 10),

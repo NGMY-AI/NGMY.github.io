@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_urls.dart';
+import 'ngmy_app_studio_published_registry.dart';
 
 String _userProjectsKey(String email) => 'ngmy_app_builder_projects_${email.toLowerCase().trim()}';
 const _kLocalPublishedKey = 'ngmy_app_builder_published_local';
@@ -135,7 +136,11 @@ Future<void> ngmySubmitAppForReview(dynamic config, String email, NgmyAppProject
   await ngmySaveUserAppProject(email, submitted);
 }
 
-Future<NgmyAppProject> ngmyPublishAppProject(dynamic config, String email, NgmyAppProject project) async {
+Future<({NgmyAppProject project, String? cloudWarning})> ngmyPublishAppProject(
+  dynamic config,
+  String email,
+  NgmyAppProject project,
+) async {
   final taken = await ngmyAllPublishedAppSlugs();
   final withUrl = ngmyAppProjectWithPublicUrl(project, taken.where((s) => s != project.slug));
   final published = withUrl.copyWith(
@@ -155,7 +160,11 @@ Future<NgmyAppProject> ngmyPublishAppProject(dynamic config, String email, NgmyA
 
   await ngmySaveUserAppProject(email, published);
   await ngmyCachePublishedAppLocally(published);
-  return published;
+  final cloudErr = await NgmyAppStudioPublishedRegistry.publish(published);
+  if (cloudErr != null) {
+    debugPrint('[app builder] cloud publish ${published.slug}: $cloudErr');
+  }
+  return (project: published, cloudWarning: cloudErr);
 }
 
 Future<void> ngmyRejectAppProject(dynamic config, String email, NgmyAppProject project, String note) async {
@@ -172,6 +181,10 @@ Future<void> ngmyRejectAppProject(dynamic config, String email, NgmyAppProject p
 
 Future<void> ngmyUnpublishAppProject(dynamic config, String projectId) async {
   final list = await ngmyLoadLocalPublishedApps();
+  final removed = list.where((p) => p.id == projectId).toList();
   list.removeWhere((p) => p.id == projectId);
   await ngmySaveLocalPublishedApps(list);
+  for (final p in removed) {
+    await NgmyAppStudioPublishedRegistry.unpublishSlug(p.slug);
+  }
 }

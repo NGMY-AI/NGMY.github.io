@@ -324,21 +324,7 @@ void main() async {
   final guestAppSlug = kIsWeb ? ngmyPublishedAppSlugFromLaunch() : null;
   final isGuestPublishedApp = guestAppSlug != null && guestAppSlug.trim().isNotEmpty;
 
-  runZonedGuarded(() {
-    if (isGuestPublishedApp) {
-      runApp(NgmyGuestPublishedApp(slug: guestAppSlug.trim().toLowerCase()));
-      return;
-    }
-    final app = NGMYApp(launchBootstrap: launchBootstrap);
-    runApp(
-      kIsWeb ? ExcludeSemantics(child: NgmyWebViewportGuard(child: app)) : app,
-    );
-  }, (e, st) {
-    debugPrint('[zone] $e\n$st');
-  });
-
-  // Never block first frame on cloud — cold start offline must show cached home immediately.
-  unawaited(ngmyIgnoreTimeout(() async {
+  Future<void> initSupabase() async {
     try {
       await Supabase.initialize(
         url: kNgmySupabaseUrl,
@@ -354,7 +340,30 @@ void main() async {
     } finally {
       ngmyMarkSupabaseReady();
     }
-  }, timeout: const Duration(seconds: 12)));
+  }
+
+  // Guest app links need cloud registry — init Supabase before first load attempt.
+  if (isGuestPublishedApp) {
+    await ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 12));
+  }
+
+  runZonedGuarded(() {
+    if (isGuestPublishedApp) {
+      runApp(NgmyGuestPublishedApp(slug: guestAppSlug.trim().toLowerCase()));
+      return;
+    }
+    final app = NGMYApp(launchBootstrap: launchBootstrap);
+    runApp(
+      kIsWeb ? ExcludeSemantics(child: NgmyWebViewportGuard(child: app)) : app,
+    );
+  }, (e, st) {
+    debugPrint('[zone] $e\n$st');
+  });
+
+  if (!isGuestPublishedApp) {
+    // Never block first frame on cloud — cold start offline must show cached home immediately.
+    unawaited(ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 12)));
+  }
 }
 
 // --- DATA MODELS ---

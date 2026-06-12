@@ -135,9 +135,19 @@ class NgmyRepairEstimatePreview extends StatelessWidget {
                   ),
                   if (data.photoBytes != null) ...[
                     const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.memory(data.photoBytes!, height: 72, width: double.infinity, fit: BoxFit.cover),
+                    RepaintBoundary(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.memory(
+                          data.photoBytes!,
+                          key: ValueKey<int>(data.photoBytes!.lengthInBytes),
+                          height: 72,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                          filterQuality: FilterQuality.medium,
+                        ),
+                      ),
                     ),
                   ],
                   const SizedBox(height: 10),
