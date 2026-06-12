@@ -323,7 +323,61 @@ void main() async {
     return true;
   };
 
-  final launchBootstrap = await ngmyLoadLaunchBootstrap();
+  final oauthReturn = kIsWeb && ngmyUriHasOAuthCallback();
+  if (oauthReturn) {
+    await ngmyIgnoreTimeout(ngmyEnsureSupabaseAuthInitialized, timeout: const Duration(seconds: 15));
+    await ngmyRecoverOAuthSessionIfNeeded();
+  }
+
+  var launchBootstrap = await ngmyLoadLaunchBootstrap();
+  if (oauthReturn) {
+    try {
+      final authUser = Supabase.instance.client.auth.currentUser;
+      final email = authUser?.email?.toLowerCase().trim() ?? '';
+      if (email.isNotEmpty) {
+        final fullName = (authUser?.userMetadata?['full_name'] ?? authUser?.userMetadata?['name'] ?? '').toString().trim();
+        final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
+        final users = List<UserData>.from(launchBootstrap.users);
+        final idx = users.indexWhere((u) => u.email.toLowerCase().trim() == email);
+        if (idx == -1) {
+          users.add(UserData(
+            email: email,
+            username: fullName.isNotEmpty ? fullName : email.split('@').first,
+            isAdmin: admins.contains(email),
+            passwordHash: '',
+          ));
+        } else if (fullName.isNotEmpty) {
+          users[idx].username = fullName;
+        }
+        final currentIdx = users.indexWhere((u) => u.email.toLowerCase().trim() == email);
+        launchBootstrap = NgmyLaunchBootstrap(
+          themeMode: launchBootstrap.themeMode,
+          currentUser: users[currentIdx],
+          users: users,
+          transactions: launchBootstrap.transactions,
+          media: launchBootstrap.media,
+          announcements: launchBootstrap.announcements,
+          config: launchBootstrap.config,
+          plans: launchBootstrap.plans,
+        );
+      }
+    } catch (e) {
+      debugPrint('[ngmy_oauth] bootstrap session merge: $e');
+    }
+    if (launchBootstrap.currentUser != null) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final u = launchBootstrap.currentUser!;
+        await prefs.setString('current_user', jsonEncode(u.toJson()));
+        await prefs.setString('ngmy_last_session_email', u.email.toLowerCase().trim());
+        await prefs.setString('all_users', jsonEncode(launchBootstrap.users.map((e) => e.toJson()).toList()));
+      } catch (e) {
+        debugPrint('[ngmy_oauth] session persist: $e');
+      }
+    }
+    ngmyMarkSupabaseReady();
+  }
+
   ngmyCaptureCivicEnrollLaunchIntent();
   _ngmyInitialThemeMode = launchBootstrap.themeMode;
   _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
@@ -333,14 +387,7 @@ void main() async {
 
   Future<void> initSupabase() async {
     try {
-      await Supabase.initialize(
-        url: kNgmySupabaseUrl,
-        anonKey: kNgmySupabaseAnonKey,
-        authOptions: const FlutterAuthClientOptions(
-          authFlowType: AuthFlowType.pkce,
-          detectSessionInUri: true,
-        ),
-      );
+      await ngmyEnsureSupabaseAuthInitialized();
       await ngmyRecoverOAuthSessionIfNeeded();
     } catch (e) {
       debugPrint('Supabase init failed (app still starts): $e');
@@ -4441,13 +4488,14 @@ String ngmyUserDisplayAccountId(UserData u) {
   return 'GV${u.email.hashCode.abs().toString().padLeft(8, '0').substring(0, 8)}';
 }
 
-ImageProvider? ngmyAdminUserAvatar(dynamic u) {
-  final path = (u as dynamic).profilePicturePath;
+final Map<String, ImageProvider> _ngmyProfileImageCache = {};
+
+ImageProvider? ngmyCachedProfileImage(String? path) {
   if (path == null || path.trim().isEmpty) return null;
   final src = path.trim();
   if (src.startsWith('data:image')) {
     try {
-      return MemoryImage(base64Decode(src.split(',').last));
+      return _ngmyProfileImageCache.putIfAbsent(src, () => MemoryImage(base64Decode(src.split(',').last)));
     } catch (_) {
       return null;
     }
@@ -4458,6 +4506,10 @@ ImageProvider? ngmyAdminUserAvatar(dynamic u) {
   }
   if (!kIsWeb) return FileImage(File(src));
   return null;
+}
+
+ImageProvider? ngmyAdminUserAvatar(dynamic u) {
+  return ngmyCachedProfileImage((u as dynamic).profilePicturePath?.toString());
 }
 
 List<Map<String, dynamic>> _mergeNgmyPopupsFromRemote(
@@ -6367,7 +6419,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final authUser = supabase.auth.currentUser;
       final email = authUser?.email?.toLowerCase().trim();
       if (email == null || email.isEmpty) return;
-      final fullName = (authUser?.userMetadata?['full_name'] ?? '').toString().trim();
+      final fullName = (authUser?.userMetadata?['full_name'] ?? authUser?.userMetadata?['name'] ?? '').toString().trim();
       await _signInOrCreateFromGoogle(email, fullName: fullName);
       await _persistSessionImmediately();
     } catch (e) {
@@ -8653,17 +8705,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _signInOrCreateFromGoogle(String email, {String fullName = ''}) async {
     final emailNorm = email.toLowerCase().trim();
+    if (emailNorm.isEmpty) return;
     if (_currentUser?.email.toLowerCase().trim() == emailNorm) return;
     final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
-    final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailNorm);
+    var idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailNorm);
     if (!mounted) return;
     setState(() {
       if (idx == -1) {
         final user = UserData(
           email: emailNorm,
           username: fullName.isNotEmpty ? fullName : emailNorm.split('@').first,
-          isAdmin: admins.contains(email),
-          // Google users do not need local password flow.
+          isAdmin: admins.contains(emailNorm),
           passwordHash: '',
         );
         _allUsers.add(user);
@@ -8678,6 +8730,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _saveData();
     await _persistSessionImmediately();
     _restartSyncLoopsForCurrentUser();
+    unawaited(_refreshUserTransactionsFromCloud(force: true));
   }
 
   void _subscribeToRealtime() {
@@ -9464,6 +9517,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     // NGMY points are earned locally during games — never let stale cloud rows drop them.
     if (local.points > remote.points) {
       remote.points = local.points;
+    }
+    final localPhoto = (local.profilePicturePath ?? '').trim();
+    final remotePhoto = (remote.profilePicturePath ?? '').trim();
+    if (localPhoto.isNotEmpty && (remotePhoto.isEmpty || (localPhoto.startsWith('data:image') && remotePhoto != localPhoto))) {
+      remote.profilePicturePath = local.profilePicturePath;
     }
     _mergeUserMediaProfileFields(local, remote);
     if (local.savedCashAppTag.trim().isNotEmpty && remote.savedCashAppTag.trim().isEmpty) {
@@ -10702,6 +10760,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
   bool _showPassword = false;
   bool _authBusy = false;
+  bool _oauthBusy = false;
   final _e = TextEditingController();
   final _p = TextEditingController();
   final _s = TextEditingController();
@@ -11082,12 +11141,19 @@ class _AuthScreenState extends State<AuthScreen> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () async {
-                  final err = await widget.onGoogleLogin();
-                  if (!mounted || err == null) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
-                },
-                icon: const Icon(Icons.g_mobiledata_rounded, size: 26),
+                onPressed: _oauthBusy
+                    ? null
+                    : () async {
+                        setState(() => _oauthBusy = true);
+                        final err = await widget.onGoogleLogin();
+                        if (!mounted) return;
+                        setState(() => _oauthBusy = false);
+                        if (err == null) return;
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+                      },
+                icon: _oauthBusy
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.g_mobiledata_rounded, size: 26),
                 label: const Text('Google', style: TextStyle(fontWeight: FontWeight.w600)),
                 style: OutlinedButton.styleFrom(minimumSize: const Size(0, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
               ),
@@ -11095,12 +11161,19 @@ class _AuthScreenState extends State<AuthScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () async {
-                  final err = await widget.onGithubLogin();
-                  if (!mounted || err == null) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
-                },
-                icon: const Icon(Icons.code_rounded, size: 20),
+                onPressed: _oauthBusy
+                    ? null
+                    : () async {
+                        setState(() => _oauthBusy = true);
+                        final err = await widget.onGithubLogin();
+                        if (!mounted) return;
+                        setState(() => _oauthBusy = false);
+                        if (err == null) return;
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+                      },
+                icon: _oauthBusy
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.code_rounded, size: 20),
                 label: const Text('GitHub', style: TextStyle(fontWeight: FontWeight.w600)),
                 style: OutlinedButton.styleFrom(minimumSize: const Size(0, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
               ),
@@ -22079,9 +22152,32 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _referralInputC = TextEditingController();
+  ImageProvider? _profileAvatar;
+  String _profileAvatarPath = '';
 
   String get _accountId => 'NGMY/USR/${widget.user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
   String get _referralCode => 'REFD${widget.user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
+
+  void _syncProfileAvatarCache() {
+    final path = (widget.user.profilePicturePath ?? '').trim();
+    if (path == _profileAvatarPath) return;
+    _profileAvatarPath = path;
+    _profileAvatar = ngmyCachedProfileImage(path.isEmpty ? null : path);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _syncProfileAvatarCache();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user.profilePicturePath != widget.user.profilePicturePath) {
+      _syncProfileAvatarCache();
+    }
+  }
 
   Future<void> _confirmLogout() async {
     final ok = await showDialog<bool>(
@@ -22091,20 +22187,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (ctx) => const _NgmyLogoutConfirmDialog(),
     );
     if (ok == true && mounted) widget.onLogout();
-  }
-
-  ImageProvider? _profileImageProvider() {
-    final path = widget.user.profilePicturePath;
-    if (path == null || path.trim().isEmpty) return null;
-    if (path.startsWith('data:image')) {
-      try {
-        return MemoryImage(base64Decode(path.split(',').last));
-      } catch (_) {
-        return null;
-      }
-    }
-    if (kIsWeb) return null;
-    return FileImage(File(path));
   }
 
   @override
@@ -22296,11 +22378,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (img != null) {
             final bytes = await img.readAsBytes();
             final value = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-            setState(() { widget.user.profilePicturePath = value; });
+            setState(() {
+              widget.user.profilePicturePath = value;
+              _profileAvatarPath = value;
+              _profileAvatar = ngmyCachedProfileImage(value);
+            });
             widget.onDataChanged();
           }
         },
-        child: Stack(alignment: Alignment.center, children: [
+        child: RepaintBoundary(
+          child: Stack(alignment: Alignment.center, children: [
           Container(
             width: 112,
             height: 112,
@@ -22322,16 +22409,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: isDark ? const Color(0xFF0F172A) : Colors.white,
               ),
               child: CircleAvatar(
+                key: ValueKey(_profileAvatarPath),
                 radius: 50,
                 backgroundColor: Colors.grey.shade300,
-                backgroundImage: _profileImageProvider(),
-                child: _profileImageProvider() == null ? const Icon(Icons.person, size: 40, color: Colors.white) : null,
+                backgroundImage: _profileAvatar,
+                child: _profileAvatar == null ? const Icon(Icons.person, size: 40, color: Colors.white) : null,
               ),
             ),
           ),
           if (widget.user.status == 'verified') Positioned(bottom: 0, right: 0, child: Container(padding: const EdgeInsets.all(2), decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: const Icon(Icons.verified, color: Colors.blue, size: 24))),
           if (widget.user.status != 'active' && widget.user.status != 'verified') Positioned(top: 0, right: 0, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)), child: Text(widget.user.status.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)))),
         ]),
+        ),
       ),
       const SizedBox(height: 20),
       _box(context, 'Contact', [
@@ -25218,6 +25307,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         final ageDays = now.difference(closedAt).inDays;
         if (ageDays >= 5) {
           _dismissedReceiptKeys.add(campaignId);
+          if (!widget.config.dismissedContributionReceiptKeys.contains(campaignId)) {
+            widget.config.dismissedContributionReceiptKeys = [
+              ...widget.config.dismissedContributionReceiptKeys,
+              campaignId,
+            ];
+          }
           changed = true;
         } else {
           retained.add(c);
@@ -25228,6 +25323,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
     if (changed) {
       unawaited(_persistReceiptReadState());
+      widget.onDataChanged();
+      if (mounted) setState(() {});
     }
   }
 
@@ -25306,11 +25403,28 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text('Enroll Yourself', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Same enrollment as a registrar would complete for you in $_selectedState.',
-                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Enroll Yourself', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Same enrollment as a registrar would complete for you in $_selectedState.',
+                                style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Copy enrollment link to share',
+                          onPressed: _copyCivicEnrollShareLink,
+                          icon: Icon(Icons.link_rounded, color: isDark ? const Color(0xFF8B5CF6) : const Color(0xFF6200EE)),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 14),
                     TextField(
@@ -25856,6 +25970,53 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
   }
 
+  DateTime? _contributionCampaignClosedAt(String receiptKey, Map<String, dynamic> meta) {
+    final campaignId = (meta['campaignId'] ?? '').toString().trim();
+    final lookup = campaignId.isNotEmpty ? campaignId : receiptKey;
+    for (final c in widget.config.helpCampaignClosures) {
+      if ((c['campaignId'] ?? '').toString().trim() != lookup) continue;
+      final closedAtRaw = (c['closedAt'] ?? '').toString().trim();
+      if (closedAtRaw.isEmpty) continue;
+      try {
+        return DateTime.parse(closedAtRaw).toLocal();
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  bool _contributionReceiptExpired(String receiptKey, Map<String, dynamic> meta) {
+    final closedAt = _contributionCampaignClosedAt(receiptKey, meta);
+    if (closedAt == null) return false;
+    return DateTime.now().difference(closedAt).inDays >= 5;
+  }
+
+  bool _canDeleteReceiptForState(String receiptState) {
+    if (!widget.user.isAuthorizedRegistrar) return false;
+    final st = receiptState.trim().isEmpty ? widget.user.state.trim() : receiptState.trim();
+    if (st.isEmpty) return false;
+    return NgmyCivicRegistryStats.isRegistrarAssignedToState(
+      email: widget.user.email,
+      userState: widget.user.state,
+      isAuthorizedRegistrar: widget.user.isAuthorizedRegistrar,
+      applications: widget.config.civicRegistrarApplications,
+      state: st,
+    );
+  }
+
+  void _deleteContributionReceipt(String key) {
+    if (key.trim().isEmpty) return;
+    _dismissedReceiptKeys.add(key);
+    if (!widget.config.dismissedContributionReceiptKeys.contains(key)) {
+      widget.config.dismissedContributionReceiptKeys = [
+        ...widget.config.dismissedContributionReceiptKeys,
+        key,
+      ];
+    }
+    unawaited(_persistReceiptReadState());
+    widget.onDataChanged();
+    if (mounted) setState(() {});
+  }
+
   Map<String, List<AppTransaction>> _groupContributionReceipts(List<AppTransaction> txs, {bool unreadOnly = false}) {
     final groups = <String, List<AppTransaction>>{};
     for (final t in txs) {
@@ -25863,6 +26024,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final key = (meta['campaignId'] ?? '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|${meta['state'] ?? widget.user.state}')
           .toString();
       if (_dismissedReceiptKeys.contains(key)) continue;
+      if (widget.config.dismissedContributionReceiptKeys.contains(key)) continue;
+      if (_contributionReceiptExpired(key, meta)) continue;
       if (unreadOnly && _openedReceiptKeys.contains(key)) continue;
       groups.putIfAbsent(key, () => []).add(t);
     }
@@ -26738,11 +26901,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showContributionReceipts() {
-    final visible = _visibleContributionTx();
-    final groups = _groupContributionReceipts(visible);
-    final keys = groups.keys.toList();
+    final initialGroups = _groupContributionReceipts(_visibleContributionTx());
     setState(() {
-      _openedReceiptKeys.addAll(keys);
+      _openedReceiptKeys.addAll(initialGroups.keys);
     });
     unawaited(_persistReceiptReadState());
     String? selectedKey;
@@ -26751,6 +26912,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) {
+          final groups = _groupContributionReceipts(_visibleContributionTx());
+          final keys = groups.keys.toList();
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           final panelBg = isDark ? const Color(0xFF232A2E) : const Color(0xFFE9F7EF);
           final tileBg = isDark ? const Color(0xFF1B2025) : Colors.white;
@@ -26813,13 +26976,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         final m = _decodeContributionMeta(seed);
                         final t = txs.fold<double>(0.0, (s, e) => s + e.amount);
                         final c = txs.map((e) => e.userEmail).toSet().length;
-                        return Container(
+                        final receiptState = (m['state'] ?? widget.user.state).toString();
+                        final canDelete = _canDeleteReceiptForState(receiptState);
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
                           margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                           decoration: BoxDecoration(color: panelBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.greenAccent.shade400)),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              if (canDelete) const SizedBox(height: 4),
                               Text((m['purpose'] ?? 'Contribution Campaign').toString(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22 * 0.7, color: strongText)),
                               const SizedBox(height: 4),
                               Text('${m['state'] ?? widget.user.state} • ${m['scopeType'] == 'all' ? 'All members' : '${m['scopeType']}: ${m['scopeValue']}'}', style: TextStyle(color: softText)),
@@ -26851,9 +27020,45 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               ),
                             ],
                           ),
+                        ),
+                            if (canDelete)
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: Material(
+                                  color: Colors.red.shade600,
+                                  borderRadius: const BorderRadius.only(
+                                    topRight: Radius.circular(12),
+                                    bottomLeft: Radius.circular(10),
+                                  ),
+                                  child: InkWell(
+                                    onTap: () {
+                                      _deleteContributionReceipt(k);
+                                      setDialog(() {
+                                        selectedKey = null;
+                                      });
+                                      if (_groupContributionReceipts(_visibleContributionTx()).isEmpty) {
+                                        Navigator.pop(ctx);
+                                      }
+                                    },
+                                    borderRadius: const BorderRadius.only(
+                                      topRight: Radius.circular(12),
+                                      bottomLeft: Radius.circular(10),
+                                    ),
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(7),
+                                      child: Icon(Icons.delete_outline, color: Colors.white, size: 18),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         );
                       })
                     else
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(14),
@@ -26865,20 +27070,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               children: [
                                 SelectionContainer.disabled(
                                   child: TextButton(onPressed: () => setDialog(() => selectedKey = null), child: const Text('← Back to All Receipts')),
-                                ),
-                                const Spacer(),
-                                SelectionContainer.disabled(
-                                  child: TextButton(
-                                    onPressed: () {
-                                      if (selectedKey == null) return;
-                                      setState(() => _dismissedReceiptKeys.add(selectedKey!));
-                                      unawaited(_persistReceiptReadState());
-                                      setDialog(() {
-                                        selectedKey = null;
-                                      });
-                                    },
-                                    child: const Text('Delete Receipt'),
-                                  ),
                                 ),
                               ],
                             ),
@@ -26924,6 +27115,38 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             ),
                           ],
                         ),
+                      ),
+                      if (selectedKey != null && _canDeleteReceiptForState((meta['state'] ?? widget.user.state).toString()))
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Material(
+                            color: Colors.red.shade600,
+                            borderRadius: const BorderRadius.only(
+                              topRight: Radius.circular(14),
+                              bottomLeft: Radius.circular(10),
+                            ),
+                            child: InkWell(
+                              onTap: () {
+                                final key = selectedKey!;
+                                _deleteContributionReceipt(key);
+                                setDialog(() => selectedKey = null);
+                                if (_groupContributionReceipts(_visibleContributionTx()).isEmpty) {
+                                  Navigator.pop(ctx);
+                                }
+                              },
+                              borderRadius: const BorderRadius.only(
+                                topRight: Radius.circular(14),
+                                bottomLeft: Radius.circular(10),
+                              ),
+                              child: const Padding(
+                                padding: EdgeInsets.all(8),
+                                child: Icon(Icons.delete_outline, color: Colors.white, size: 20),
+                              ),
+                            ),
+                          ),
+                        ),
+                        ],
                       ),
                   ],
                 ),
@@ -27367,14 +27590,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ],
                     ),
                   ),
-                  if (widget.config.civicSelfEnrollmentEnabled) ...[
-                    SelectionContainer.disabled(
-                      child: IconButton(
-                        tooltip: 'Copy enrollment link',
-                        onPressed: _copyCivicEnrollShareLink,
-                        icon: const Icon(Icons.link_rounded, color: Colors.white, size: 24),
-                      ),
-                    ),
+                  if (widget.config.civicSelfEnrollmentEnabled)
                     SelectionContainer.disabled(
                       child: IconButton(
                         onPressed: _userIsCivicRegistryEnrolled(widget.config, widget.user) ? null : _showSelfEnrollmentSheet,
@@ -27386,24 +27602,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         tooltip: _userIsCivicRegistryEnrolled(widget.config, widget.user) ? 'You are enrolled' : 'Enroll yourself',
                       ),
                     ),
-                  ],
                 ],
               ),
             ),
-            if (widget.config.civicSelfEnrollmentEnabled) ...[
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: _copyCivicEnrollShareLink,
-                  icon: const Icon(Icons.share_rounded, size: 16, color: Colors.white70),
-                  label: const Text(
-                    'Copy link to enroll',
-                    style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ],
             const SizedBox(height: 20),
 
             if (_canCurrentUserSeeHelpMode()) ...[
@@ -32578,18 +32779,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final key = email.toLowerCase().trim();
     for (final u in widget.allUsers) {
       if (u.email.toLowerCase().trim() != key) continue;
-      final path = u.profilePicturePath;
-      if (path == null || path.trim().isEmpty) return null;
-      final src = path.trim();
-      if (src.startsWith('data:image')) {
-        try {
-          return MemoryImage(base64Decode(src.split(',').last));
-        } catch (_) {
-          return null;
-        }
-      }
-      if (src.startsWith('http')) return NetworkImage(src);
-      if (!kIsWeb) return FileImage(File(src));
+      return ngmyCachedProfileImage(u.profilePicturePath);
     }
     return null;
   }
@@ -40774,26 +40964,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   ImageProvider? _avatarForEmail(String email) {
     final key = email.toLowerCase().trim();
-    UserData? u;
     for (final candidate in widget.allUsers) {
       if (candidate.email.toLowerCase().trim() == key) {
-        u = candidate;
-        break;
+        return ngmyCachedProfileImage(candidate.profilePicturePath);
       }
     }
-    if (u == null) return null;
-    final path = u.profilePicturePath;
-    if (path == null || path.trim().isEmpty) return null;
-    final src = path.trim();
-    if (src.startsWith('data:image')) {
-      try {
-        return MemoryImage(base64Decode(src.split(',').last));
-      } catch (_) {
-        return null;
-      }
-    }
-    if (src.startsWith('http')) return NetworkImage(src);
-    if (!kIsWeb) return FileImage(File(src));
     return null;
   }
 

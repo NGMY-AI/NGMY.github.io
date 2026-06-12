@@ -1,0 +1,3 @@
+String ngmyWebHostname() => '';
+
+String ngmyWebOrigin() => '';
