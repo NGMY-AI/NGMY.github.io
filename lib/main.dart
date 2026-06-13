@@ -28322,8 +28322,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Send Contributions To:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                              Text(_helpScopeLabel(), style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                              const Text(
+                                'Send Contributions To:',
+                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF0F172A)),
+                              ),
+                              Text(
+                                _helpScopeLabel(),
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -28357,43 +28363,65 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           Container(
                             margin: const EdgeInsets.only(top: 8),
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
-                            decoration: BoxDecoration(color: Colors.amber.shade400, borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFD97706), width: 1),
+                            ),
                             child: const Text(
                               'Include your NAME & PHONE in payment memo.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: _showContributionReceipts,
-                              icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                              label: const Text('View contribution receipts', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                side: const BorderSide(color: Colors.white70),
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                                height: 1.25,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           Row(
                             children: [
                               Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _showHelpCampaignSpendingLedger(
-                                    campaignId: _activeHelpCampaignId(),
-                                    campaignTitle: widget.config.helpPurpose,
-                                  ),
-                                  icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                                  label: const Text('View Spending', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                    side: const BorderSide(color: Colors.white70),
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () => _showHelpCampaignSpendingLedger(
+                                      campaignId: _activeHelpCampaignId(),
+                                      campaignTitle: widget.config.helpPurpose,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Ink(
+                                      padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0F172A),
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.18),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: const [
+                                          Icon(Icons.receipt_long_rounded, size: 18, color: Colors.white),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            'View Spending',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 12,
+                                              letterSpacing: 0.2,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
