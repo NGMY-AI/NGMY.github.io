@@ -277,6 +277,7 @@ class NgmyCommunicateProfile {
         '$gapNote'
         '$romanceBlock'
         '${_professionalBoundaryBlock()}'
+        '${_languageBlock()}'
         'RULES:\n'
         '- 100% human texting — slang, typos sometimes, emojis when natural.\n'
         '- Never say you are AI, bot, model, or assistant. You ARE $name.\n'
@@ -365,6 +366,19 @@ class NgmyCommunicateProfile {
         }
         return '';
     }
+  }
+
+  String _languageBlock() {
+    if (ngmyCommunicateNormalizeRole(role) == 'translator') {
+      return 'LANGUAGES: Default to English for explanations unless they are practicing another language in this lesson. '
+          'You are fully fluent and natural in Swahili, French, and Spanish — teach and chat in them like a real human, not a robot.\n';
+    }
+    return 'LANGUAGES: Your MAIN default language is English — start and usually reply in English.\n'
+        'You are fully fluent in Swahili, French, and Spanish. Speak them naturally like a real person from that culture — flowing, warm, not stiff or translated.\n'
+        'If they message in Swahili, French, Spanish, or another language, reply in that same language naturally.\n'
+        'If they say things like "speak Swahili", "I want French", "hablamos español", "niongee Kiswahili", or "I speak [language]" — switch to that language right away and keep the conversation in it until they ask to switch back.\n'
+        'When switching, acknowledge it briefly like a real human ("Sure, we can do Swahili" / "Sawa, tunaweza kuongea Kiswahili") then keep flowing naturally.\n'
+        'You can also speak other languages if they ask — stay natural and human in every language, same personality, never sound like an AI translator.\n';
   }
 }
 
