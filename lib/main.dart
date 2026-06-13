@@ -6941,7 +6941,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _userTxnSyncTimer?.cancel();
     if (_currentUser == null) return;
     unawaited(_refreshUserTransactionsFromCloud(force: true));
-    _userTxnSyncTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+    _userTxnSyncTimer = Timer.periodic(const Duration(seconds: 90), (_) {
       if (!mounted || _currentUser == null) return;
       unawaited(_refreshUserTransactionsFromCloud());
     });
@@ -7531,7 +7531,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _startAdminPendingTransactionPoll() {
     _adminPendingTxnPoll?.cancel();
     if (!_ngmySessionIsAdmin(_currentUser)) return;
-    _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 15), (_) {
+    _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 60), (_) {
       if (!mounted || !_ngmySessionIsAdmin(_currentUser)) return;
       unawaited(_refreshPendingTransactionsFromCloud());
     });
@@ -7907,8 +7907,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _startConfigRefreshLoop() {
     _configRefreshTimer?.cancel();
-    // Fallback only — realtime config + debounced saves handle most updates.
-    _configRefreshTimer = Timer.periodic(const Duration(minutes: 8), (_) async {
+    final isAdmin = _ngmySessionIsAdmin(_currentUser);
+    // Fallback for non-admin users (no config/ngmy_settings realtime subscription).
+    _configRefreshTimer = Timer.periodic(Duration(minutes: isAdmin ? 8 : 3), (_) async {
       if (_isSyncing) return;
       await _refreshLegalAndPlansFromCloud();
       try {
@@ -8990,22 +8991,30 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               ),
               callback: (payload) => _onTransactionsChange(payload),
             );
+        // Regular users: skip config + ngmy_settings realtime (every row change
+        // broadcasts to all clients and burns quota). Fallback polls handle those.
       }
 
-      _appSyncChannel = channel
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'config',
-            callback: (payload) => _onConfigChange(payload),
-          )
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'ngmy_settings',
-            callback: (payload) => _onNgmySettingsChange(payload),
-          )
-          .subscribe();
+      if (isAdmin) {
+        _appSyncChannel = channel
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'config',
+              callback: (payload) => _onConfigChange(payload),
+            )
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'ngmy_settings',
+              callback: (payload) => _onNgmySettingsChange(payload),
+            )
+            .subscribe();
+      } else if (sessionEmail.isNotEmpty) {
+        _appSyncChannel = channel.subscribe();
+      } else {
+        _appSyncChannel = null;
+      }
       debugPrint('Realtime subscription active ($channelName)');
     } catch (e) {
       debugPrint('Realtime subscribe error: $e');
@@ -20185,7 +20194,7 @@ class _WalletScreenState extends State<WalletScreen> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [10, 50, 100, 200, 300].map((v) {
+              children: [10, 50, 100, 200].map((v) {
                 final selected = _amt.text.trim() == v.toString();
                 return GestureDetector(
                   onTap: () => setState(() => _amt.text = v.toString()),
