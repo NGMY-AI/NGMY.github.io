@@ -7,7 +7,7 @@ function ngmySwBasePath() {
   return p.replace(/[^/]*$/, '') || '/';
 }
 const SCOPE_PATH = ngmySwBasePath();
-const CACHE_NAME = CACHE_PREFIX + '20260612223813';
+const CACHE_NAME = CACHE_PREFIX + '20260612224941';
 
 const PRECACHE_URLS = ['./','./.last_build_id','./.nojekyll','./404.html','./assets/AssetManifest.bin','./assets/AssetManifest.bin.json','./assets/assets/sounds/income_cash.mp3','./assets/assets/sounds/README.md','./assets/assets/sounds/YTMP3GG_YouTube_Kaching-sound-effect-sound-sounds-sounde_Media_a7Vue-A0BOY_007_128k.mp3','./assets/assets/video_studio/yt_news_desk.png','./assets/assets/video_studio/yt_studio_curved.png','./assets/FontManifest.json','./assets/fonts/MaterialIcons-Regular.otf','./assets/NOTICES','./assets/packages/cupertino_icons/assets/CupertinoIcons.ttf','./assets/shaders/ink_sparkle.frag','./assets/shaders/stretch_effect.frag','./canvaskit/canvaskit.js','./canvaskit/canvaskit.js.symbols','./canvaskit/canvaskit.wasm','./canvaskit/chromium/canvaskit.js','./canvaskit/chromium/canvaskit.js.symbols','./canvaskit/chromium/canvaskit.wasm','./canvaskit/experimental_webparagraph/canvaskit.js','./canvaskit/experimental_webparagraph/canvaskit.js.symbols','./canvaskit/experimental_webparagraph/canvaskit.wasm','./canvaskit/skwasm.js','./canvaskit/skwasm.js.symbols','./canvaskit/skwasm.wasm','./canvaskit/skwasm_heavy.js','./canvaskit/skwasm_heavy.js.symbols','./canvaskit/skwasm_heavy.wasm','./canvaskit/wimp.js','./canvaskit/wimp.js.symbols','./canvaskit/wimp.wasm','./CNAME','./favicon.png','./flutter.js','./flutter_bootstrap.js','./icons/Icon-192.png','./icons/Icon-512.png','./icons/Icon-maskable-192.png','./icons/Icon-maskable-512.png','./index.html','./main.dart.js','./manifest.json','./version.json'];
 
@@ -65,6 +65,15 @@ self.addEventListener('activate', (event) => {
           .map((k) => caches.delete(k)),
       );
       await self.clients.claim();
+      const cache = await caches.open(CACHE_NAME);
+      for (const url of CRITICAL_OFFLINE_URLS) {
+        const hit = await cache.match(url);
+        if (!hit) await precacheUrl(cache, url);
+      }
+      const clients = await self.clients.matchAll({ type: 'window' });
+      for (const client of clients) {
+        client.postMessage({ type: 'CACHE_READY' });
+      }
     })(),
   );
 });
@@ -163,22 +172,14 @@ self.addEventListener('fetch', (event) => {
         if (cached) return cached;
         const offlineFallback = await cacheLookupByPathname(url);
         if (offlineFallback) return offlineFallback;
+        return new Response('Offline â€” asset not cached: ' + url.pathname, {
+          status: 503,
+          statusText: 'Offline cache miss',
+        });
       }
 
       if (shellAsset && cached) {
-        event.waitUntil(
-          fetch(event.request)
-            .then((res) => {
-              if (res && res.status === 200) return cache.put(event.request, res.clone());
-            })
-            .catch(() => {}),
-        );
-        return cached;
-      }
-
-      if (event.request.mode === 'navigate') {
-        const cachedNav = await offlineDocument();
-        if (cachedNav) {
+        if (self.navigator.onLine) {
           event.waitUntil(
             fetch(event.request)
               .then((res) => {
@@ -186,6 +187,22 @@ self.addEventListener('fetch', (event) => {
               })
               .catch(() => {}),
           );
+        }
+        return cached;
+      }
+
+      if (event.request.mode === 'navigate') {
+        const cachedNav = await offlineDocument();
+        if (cachedNav) {
+          if (self.navigator.onLine) {
+            event.waitUntil(
+              fetch(event.request)
+                .then((res) => {
+                  if (res && res.status === 200) return cache.put(event.request, res.clone());
+                })
+                .catch(() => {}),
+            );
+          }
           return cachedNav;
         }
         try {
@@ -202,13 +219,15 @@ self.addEventListener('fetch', (event) => {
       }
 
       if (cached) {
-        event.waitUntil(
-          fetch(event.request)
-            .then((res) => {
-              if (res && res.status === 200) return cache.put(event.request, res.clone());
-            })
-            .catch(() => {}),
-        );
+        if (self.navigator.onLine) {
+          event.waitUntil(
+            fetch(event.request)
+              .then((res) => {
+                if (res && res.status === 200) return cache.put(event.request, res.clone());
+              })
+              .catch(() => {}),
+          );
+        }
         return cached;
       }
 

@@ -65,6 +65,15 @@ self.addEventListener('activate', (event) => {
           .map((k) => caches.delete(k)),
       );
       await self.clients.claim();
+      const cache = await caches.open(CACHE_NAME);
+      for (const url of CRITICAL_OFFLINE_URLS) {
+        const hit = await cache.match(url);
+        if (!hit) await precacheUrl(cache, url);
+      }
+      const clients = await self.clients.matchAll({ type: 'window' });
+      for (const client of clients) {
+        client.postMessage({ type: 'CACHE_READY' });
+      }
     })(),
   );
 });
@@ -163,22 +172,14 @@ self.addEventListener('fetch', (event) => {
         if (cached) return cached;
         const offlineFallback = await cacheLookupByPathname(url);
         if (offlineFallback) return offlineFallback;
+        return new Response('Offline — asset not cached: ' + url.pathname, {
+          status: 503,
+          statusText: 'Offline cache miss',
+        });
       }
 
       if (shellAsset && cached) {
-        event.waitUntil(
-          fetch(event.request)
-            .then((res) => {
-              if (res && res.status === 200) return cache.put(event.request, res.clone());
-            })
-            .catch(() => {}),
-        );
-        return cached;
-      }
-
-      if (event.request.mode === 'navigate') {
-        const cachedNav = await offlineDocument();
-        if (cachedNav) {
+        if (self.navigator.onLine) {
           event.waitUntil(
             fetch(event.request)
               .then((res) => {
@@ -186,6 +187,22 @@ self.addEventListener('fetch', (event) => {
               })
               .catch(() => {}),
           );
+        }
+        return cached;
+      }
+
+      if (event.request.mode === 'navigate') {
+        const cachedNav = await offlineDocument();
+        if (cachedNav) {
+          if (self.navigator.onLine) {
+            event.waitUntil(
+              fetch(event.request)
+                .then((res) => {
+                  if (res && res.status === 200) return cache.put(event.request, res.clone());
+                })
+                .catch(() => {}),
+            );
+          }
           return cachedNav;
         }
         try {
@@ -202,13 +219,15 @@ self.addEventListener('fetch', (event) => {
       }
 
       if (cached) {
-        event.waitUntil(
-          fetch(event.request)
-            .then((res) => {
-              if (res && res.status === 200) return cache.put(event.request, res.clone());
-            })
-            .catch(() => {}),
-        );
+        if (self.navigator.onLine) {
+          event.waitUntil(
+            fetch(event.request)
+              .then((res) => {
+                if (res && res.status === 200) return cache.put(event.request, res.clone());
+              })
+              .catch(() => {}),
+          );
+        }
         return cached;
       }
 
