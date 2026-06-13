@@ -17421,12 +17421,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _adminInvest(isDark),
       _adminLegal(isDark),
       _adminWallet(isDark),
-      _adminStore(isDark),
       NgmyAdminDomainCalendarPanel(isDark: isDark),
     ];
     return NgmyTabBackScope(
       activeTab: _idx,
-      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 6)),
+      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 5)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
       appBar: AppBar(
@@ -17472,8 +17471,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               frameBorder,
               badgeCount: _adminWalletPendingCount(),
             ),
-            _navItem(5, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
-            _navItem(6, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
+            _navItem(5, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
           ],
         ),
       ),
@@ -17588,7 +17586,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "STORE", "CALENDAR"][_idx];
+  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "CALENDAR"][_idx];
 
   Widget _adminRetiredPanel({
     required bool isDark,
@@ -31051,11 +31049,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   Timer? _chatGateTimer;
   Timer? _helperQuotaTimer;
   Timer? _helperCountdownTimer;
-  Timer? _helperAiTimeTimer;
   Timer? _newsPollTimer;
-  DateTime? _helperSessionStart;
-  int _helperAiUsedSeconds = 0;
-  int _helperAiSessionSeconds = 0;
   int _unreadNewsInternal = 0;
   List<Announcement> _newsItems = [];
   RealtimeChannel? _newsChannel;
@@ -31101,7 +31095,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     unawaited(_loadHelperKb());
     _startChatGateWatcher();
     _startHelperQuotaWatcher();
-    _startHelperAiTimeWatcher();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshGeminiKeyFromCloud();
       _refreshHelperQuota();
@@ -31367,82 +31360,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _helperQuotaTimer = Timer.periodic(const Duration(seconds: 60), (_) => unawaited(_refreshHelperQuota()));
   }
 
-  void _startHelperAiTimeWatcher() {
-    _helperAiTimeTimer?.cancel();
-    if (widget.user.isAdmin) return;
-    _helperSessionStart = DateTime.now();
-    unawaited(_refreshHelperAiTimeUsage());
-    _helperAiTimeTimer = Timer.periodic(const Duration(seconds: 8), (_) => unawaited(_tickHelperAiTime()));
-  }
-
-  Future<void> _refreshHelperAiTimeUsage() async {
-    if (widget.user.isAdmin) return;
-    final used = await NgmyCommunicateTimeTracker.syncFromCloud(widget.user.email);
-    if (!mounted) return;
-    setState(() {
-      _helperAiUsedSeconds = used;
-      _helperAiSessionSeconds = _helperSessionStart == null
-          ? 0
-          : DateTime.now().difference(_helperSessionStart!).inSeconds;
-    });
-  }
-
-  Future<void> _flushHelperSessionTime() async {
-    if (widget.user.isAdmin || _helperSessionStart == null) return;
-    final elapsed = DateTime.now().difference(_helperSessionStart!).inSeconds;
-    if (elapsed > 0) {
-      await NgmyCommunicateTimeTracker.addSeconds(widget.user.email, elapsed);
-      _helperSessionStart = DateTime.now();
-    }
-  }
-
-  Future<void> _tickHelperAiTime() async {
-    if (!mounted || widget.user.isAdmin) return;
-    await _flushHelperSessionTime();
-    final used = await NgmyCommunicateTimeTracker.getUsedSeconds(widget.user.email);
-    if (!mounted) return;
-    setState(() {
-      _helperAiUsedSeconds = used;
-      _helperAiSessionSeconds = _helperSessionStart == null
-          ? 0
-          : DateTime.now().difference(_helperSessionStart!).inSeconds;
-    });
-  }
-
-  Future<bool> _ensureHelperAiTimePaid() async {
-    if (widget.user.isAdmin) return true;
-    if (NgmyCommunicatePayments.feeAmountFromConfig(widget.config) <= 0) return true;
-    await _flushHelperSessionTime();
-    _helperAiUsedSeconds = await NgmyCommunicateTimeTracker.getUsedSeconds(widget.user.email);
-    if (!await NgmyCommunicatePayments.needsPayment(widget.user.email, widget.config)) return true;
-    if (widget.onAddTransaction == null) return false;
-    return NgmyCommunicatePayments.confirmTimeBlockPayment(
-      context: context,
-      user: widget.user,
-      config: widget.config,
-      productName: 'NGMY Helper',
-      onCharge: (amount, desc) async {
-        final charged = ngmyChargeUserWallet(
-          user: widget.user,
-          allUsers: widget.allUsers,
-          amount: amount,
-          description: desc,
-          onAddTransaction: widget.onAddTransaction!,
-        );
-        if (charged) widget.onDataChanged?.call();
-        return charged;
-      },
-    );
-  }
-
-  bool get _helperAiTimePaymentActive =>
-      !widget.user.isAdmin && NgmyCommunicatePayments.feeAmountFromConfig(widget.config) > 0;
-
-  int get _helperAiRemainingSeconds {
-    final total = _helperAiUsedSeconds + _helperAiSessionSeconds;
-    return (NgmyCommunicatePayments.thresholdSeconds(widget.config) - total).clamp(0, 999999);
-  }
-
   void _syncHelperCountdownTimer() {
     _helperCountdownTimer?.cancel();
     _helperCountdownTimer = null;
@@ -31542,11 +31459,9 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   @override
   void dispose() {
-    unawaited(_flushHelperSessionTime());
     _chatGateTimer?.cancel();
     _helperQuotaTimer?.cancel();
     _helperCountdownTimer?.cancel();
-    _helperAiTimeTimer?.cancel();
     _newsPollTimer?.cancel();
     try {
       _newsChannel?.unsubscribe();
@@ -31605,8 +31520,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   Future<void> _sendMessage() async {
     final text = _chatController.text.trim();
     if (text.isEmpty) return;
-
-    if (!await _ensureHelperAiTimePaid()) return;
 
     if (!widget.user.isAdmin) {
       final limit = widget.config.ngmyHelperDailyMessageLimit;
@@ -31909,10 +31822,10 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                                     ? (_kbLockedByDailyLimit
                                         ? 'Help Topics • AI returns when your 24h limit resets'
                                         : 'Help Topics • Instant answers')
-                                    : (_helperAiTimePaymentActive
-                                        ? '~${(_helperAiRemainingSeconds / 60).ceil()} min AI left (shared with $kNgmyAdvisorsHubTitle)'
-                                        : (_isBoss
-                                            ? 'Online • Personal assistant for Sir'
+                                    : (_isBoss
+                                        ? 'Online • Personal assistant for Sir'
+                                        : (widget.config.ngmyHelperDailyMessageLimit > 0 && _helperRemaining >= 0
+                                            ? 'Online • $_helperRemaining messages left today'
                                             : 'Online • Chat & community updates')),
                                 style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w500),
                               ),
