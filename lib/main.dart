@@ -1120,7 +1120,7 @@ class AppConfig {
   /// Wallet fee to unlock unlimited translations for the rest of the week.
   double translateWeeklyUnlockFee;
   Map<String, String> translateWeekPassByEmail;
-  /// Admin toggle — double-tap Chat reveals Communicate.
+  /// Admin toggle — Communicate lives in Media Hub when enabled.
   bool communicateEnabled;
   /// Admin toggle — center star in NGMY Hub opens App Builder for all users.
   bool appBuilderEnabled;
@@ -29735,6 +29735,30 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
   Timer? _mediaSyncTimer;
   String _lastFeedSig = '';
 
+  bool get _canCommunicate => widget.config.communicateEnabled || widget.user.isAdmin;
+
+  void _openCommunicate() {
+    ngmyOpenCommunicateWorld(
+      context,
+      user: widget.user,
+      config: widget.config,
+      apiKey: widget.config.geminiApiKey,
+      onChargeWallet: widget.user.isAdmin
+          ? null
+          : (amount, desc) async {
+              final charged = ngmyChargeUserWallet(
+                user: widget.user,
+                allUsers: widget.allUsers,
+                amount: amount,
+                description: desc,
+                onAddTransaction: widget.onAddTransaction,
+              );
+              if (charged) widget.onDataChanged();
+              return charged;
+            },
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -29794,7 +29818,16 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 48),
+                      if (_canCommunicate)
+                        _mediaHubHeaderIcon(
+                          isDark: isDark,
+                          icon: Icons.favorite_rounded,
+                          onTap: _openCommunicate,
+                          backgroundColor: const Color(0xFFEC4899).withValues(alpha: isDark ? 0.28 : 0.16),
+                          iconColor: const Color(0xFFEC4899),
+                        )
+                      else
+                        const SizedBox(width: 48),
                     ],
                   ),
                 ),
@@ -29802,26 +29835,82 @@ class _MediaHubScreenState extends State<MediaHubScreen> {
             ),
           ),
           Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ngmyComingSoonFrame(
-                      context: context,
-                      title: 'NGMY Studio',
-                      icon: Icons.auto_fix_high_rounded,
-                      message: 'Tap the sparkle icon above to open NGMY Studio. The social feed is being rebuilt.',
-                    ),
-                    const SizedBox(height: 20),
-                    FilledButton.icon(
-                      onPressed: () => showNgmyVideoStudio(context),
-                      icon: const Icon(Icons.auto_fix_high_rounded),
-                      label: const Text('Open NGMY Studio'),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  ngmyComingSoonFrame(
+                    context: context,
+                    title: 'NGMY Studio',
+                    icon: Icons.auto_fix_high_rounded,
+                    message: 'Tap the sparkle icon above to open NGMY Studio. The social feed is being rebuilt.',
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: () => showNgmyVideoStudio(context),
+                    icon: const Icon(Icons.auto_fix_high_rounded),
+                    label: const Text('Open NGMY Studio'),
+                  ),
+                  if (_canCommunicate) ...[
+                    const SizedBox(height: 28),
+                    Material(
+                      elevation: 6,
+                      shadowColor: const Color(0xFFEC4899).withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(20),
+                      color: isDark ? const Color(0xFF1A2030) : Colors.white,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: _openCommunicate,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFEC4899).withValues(alpha: 0.45)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEC4899).withValues(alpha: isDark ? 0.22 : 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.favorite_rounded, color: Color(0xFFEC4899), size: 26),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Communicate',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 18,
+                                        color: isDark ? Colors.white : const Color(0xFF111827),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Connect, chat, and share in the NGMY world.',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        height: 1.35,
+                                        color: isDark ? Colors.white70 : Colors.black54,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFFEC4899)),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ],
-                ),
+                ],
               ),
             ),
           ),
@@ -31107,8 +31196,6 @@ class AnnouncementScreen extends StatefulWidget {
 class _AnnouncementScreenState extends State<AnnouncementScreen> {
   int _activeTab = 0; // 0: Chat, 1: Music
   late final PageController _hubPageController;
-  DateTime? _lastChatTabTap;
-  bool _communicateDropdownOpen = false;
   final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _chatController = TextEditingController();
   final TextEditingController _newsController = TextEditingController();
@@ -31636,52 +31723,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     super.dispose();
   }
 
-  void _onChatTabTap() {
-    final now = DateTime.now();
-    final canCommunicate = widget.config.communicateEnabled || widget.user.isAdmin;
-    if (_lastChatTabTap != null && now.difference(_lastChatTabTap!) < const Duration(milliseconds: 450) && canCommunicate) {
-      setState(() {
-        _communicateDropdownOpen = !_communicateDropdownOpen;
-        _lastChatTabTap = null;
-      });
-      return;
-    }
-    _lastChatTabTap = now;
-    setState(() => _communicateDropdownOpen = false);
-    _goToHubTab(0);
-  }
-
-  void _openCommunicateMode() {
-    setState(() => _communicateDropdownOpen = false);
-    ngmyOpenCommunicateWorld(
-      context,
-      user: widget.user,
-      config: widget.config,
-      apiKey: widget.config.geminiApiKey,
-      onChargeWallet: widget.user.isAdmin
-          ? null
-          : (amount, desc) async {
-              if (widget.onAddTransaction == null) return false;
-              final charged = ngmyChargeUserWallet(
-                user: widget.user,
-                allUsers: widget.allUsers,
-                amount: amount,
-                description: desc,
-                onAddTransaction: widget.onAddTransaction!,
-              );
-              if (charged) widget.onDataChanged?.call();
-              return charged;
-            },
-    );
-  }
-
   void _goToHubTab(int idx, {bool animate = true}) {
-    setState(() {
-      _activeTab = idx;
-      if (idx != 0) {
-        _communicateDropdownOpen = false;
-      }
-    });
+    setState(() => _activeTab = idx);
     if (_hubPageController.hasClients) {
       if (animate) {
         _hubPageController.animateToPage(
@@ -32068,38 +32111,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                 ),
               ),
             ),
-            if (_communicateDropdownOpen && (widget.config.communicateEnabled || widget.user.isAdmin))
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
-                child: Material(
-                  elevation: 10,
-                  shadowColor: const Color(0xFFEC4899).withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(14),
-                  color: isDark ? const Color(0xFF1A2030) : Colors.white,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: _openCommunicateMode,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFEC4899).withValues(alpha: 0.45)),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.favorite_rounded, size: 18, color: Color(0xFFEC4899)),
-                          SizedBox(width: 10),
-                          Text('Communicate', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFFEC4899))),
-                          SizedBox(width: 6),
-                          Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFEC4899)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             const SizedBox(height: 8),
             Expanded(
               child: PageView(
@@ -32311,7 +32322,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: GestureDetector(
-        onTap: _onChatTabTap,
+        onTap: () => _goToHubTab(0),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 11),
