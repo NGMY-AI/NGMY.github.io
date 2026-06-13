@@ -36,7 +36,7 @@ const kNgmyCommunicateRoles = <String, String>{
 
 /// Bottom-nav + hub branding (teachers, lawyers, advisors, therapists, and more).
 const String kNgmyAdvisorsHubTitle = 'NGMY Advisors';
-const IconData kNgmyAdvisorsHubNavIcon = Icons.psychology_rounded;
+const IconData kNgmyAdvisorsHubNavIcon = Icons.support_agent_rounded;
 const Color kNgmyAdvisorsHubAccent = Color(0xFF6366F1);
 const Color kNgmyAdvisorsHubAccent2 = Color(0xFF8B5CF6);
 
@@ -383,29 +383,48 @@ bool ngmyCommunicateProfileMatchesSearch(NgmyCommunicateProfile profile, String 
   return aliases.any((a) => a.contains(q) || q.contains(a));
 }
 
-/// Solid panel — no backdrop blur (keeps text sharp on web & mobile).
+/// Frosted glass panel — semi-transparent so the background shows through.
 Widget _loveGlassPanel({
   required Widget child,
   BuildContext? context,
   bool? isDark,
   BorderRadius borderRadius = const BorderRadius.all(Radius.circular(20)),
   double blur = 16,
-  double fillAlpha = 0.08,
+  double fillAlpha = 0.48,
 }) {
   final dark = isDark ?? (context != null && Theme.of(context!).brightness == Brightness.dark);
+  // Callers often pass 0.06–0.08 — map to a readable glass opacity.
+  final opacity = fillAlpha < 0.2 ? (dark ? 0.44 : 0.52) : fillAlpha.clamp(0.32, 0.72);
   return ngmyClipBackdrop(
     borderRadius: borderRadius,
     sigma: blur,
     child: Container(
       decoration: BoxDecoration(
-        color: dark
-            ? const Color(0xFF1A2235).withValues(alpha: fillAlpha < 0.2 ? 0.94 : fillAlpha)
-            : const Color(0xFFF8FAFF).withValues(alpha: fillAlpha < 0.2 ? 0.97 : 0.92),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: dark
+              ? [
+                  const Color(0xFF2A3448).withValues(alpha: opacity),
+                  const Color(0xFF141A26).withValues(alpha: opacity * 0.9),
+                ]
+              : [
+                  Colors.white.withValues(alpha: opacity + 0.06),
+                  const Color(0xFFEEF2FF).withValues(alpha: opacity),
+                ],
+        ),
         borderRadius: borderRadius,
-        border: Border.all(color: dark ? Colors.white.withValues(alpha: 0.14) : Colors.black.withValues(alpha: 0.1)),
-        boxShadow: dark
-            ? null
-            : [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))],
+        border: Border.all(
+          color: dark ? Colors.white.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.78),
+          width: 1.1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (dark ? Colors.black : const Color(0xFF6366F1)).withValues(alpha: dark ? 0.22 : 0.07),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: child,
     ),
@@ -679,7 +698,6 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
   Widget _worldTopFrame(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : Colors.black87;
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08);
     final mutedIcon = isDark ? Colors.white70 : Colors.black54;
 
     return Padding(
@@ -687,41 +705,17 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ngmyClipBackdrop(
+          _loveGlassPanel(
+            context: context,
+            isDark: isDark,
             borderRadius: BorderRadius.circular(35),
-            child: Container(
+            fillAlpha: 0.5,
+            blur: 14,
+            child: SizedBox(
               height: 64,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(35),
-                border: Border.all(color: borderColor),
-              ),
               child: Row(
                 children: [
-                  Material(
-                    color: kNgmyAdvisorsHubAccent.withValues(alpha: isDark ? 0.24 : 0.14),
-                    shape: const StadiumBorder(),
-                    child: InkWell(
-                      customBorder: const StadiumBorder(),
-                      onTap: () => setState(() {
-                        _searchOpen = false;
-                        _searchQuery = '';
-                        _searchCtrl.clear();
-                      }),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.explore_rounded, size: 17, color: kNgmyAdvisorsHubAccent),
-                            SizedBox(width: 6),
-                            Text('Discover', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: kNgmyAdvisorsHubAccent)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(width: 44),
                   Expanded(
                     child: Center(
                       child: Text(
@@ -757,37 +751,35 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
           ),
           if (_searchOpen) ...[
             const SizedBox(height: 10),
-            TextField(
-              controller: _searchCtrl,
-              onChanged: (v) => setState(() => _searchQuery = v),
-              style: TextStyle(color: titleColor, fontSize: 14),
-              decoration: InputDecoration(
-                hintText: 'Search name or role (teacher, lawyer, therapist…)',
-                hintStyle: TextStyle(color: mutedIcon),
-                prefixIcon: Icon(Icons.badge_outlined, color: mutedIcon, size: 22),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.close_rounded, color: mutedIcon, size: 20),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.surface,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide(color: borderColor),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide(color: borderColor),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: const BorderSide(color: kNgmyAdvisorsHubAccent, width: 1.4),
+            _loveGlassPanel(
+              context: context,
+              isDark: isDark,
+              borderRadius: BorderRadius.circular(18),
+              fillAlpha: 0.5,
+              blur: 12,
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (v) => setState(() => _searchQuery = v),
+                style: TextStyle(color: titleColor, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Search name or role (teacher, lawyer, therapist…)',
+                  hintStyle: TextStyle(color: mutedIcon),
+                  prefixIcon: Icon(Icons.badge_outlined, color: mutedIcon, size: 22),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.close_rounded, color: mutedIcon, size: 20),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: Colors.transparent,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                 ),
               ),
             ),
@@ -835,8 +827,10 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
 
     return _loveGlassPanel(
       context: context,
+      isDark: isDark,
       borderRadius: BorderRadius.circular(18),
-      fillAlpha: 0.08,
+      fillAlpha: 0.46,
+      blur: 12,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         child: Row(children: [chip('all', 'All', Icons.grid_view_rounded), chip('female', 'Girls', Icons.female_rounded), chip('male', 'Guys', Icons.male_rounded)]),
