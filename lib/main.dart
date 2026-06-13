@@ -6885,6 +6885,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _startBackgroundServicesWhenReady() async {
+    if (!await ngmyDeviceIsOnline()) {
+      if (!mounted) return;
+      await _restoreSessionFromLocalCache();
+      if (mounted) setState(() => _appOffline = true);
+      return;
+    }
     for (var i = 0; i < 80; i++) {
       try {
         final _ = Supabase.instance.client;
@@ -7136,12 +7142,22 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     });
     unawaited(_loadData());
     unawaited(_probeOfflineAtLaunch());
+    if (kIsWeb) {
+      unawaited(ngmyDeviceIsOnline().then((online) {
+        if (!online && mounted) setState(() => _appOffline = true);
+      }));
+    }
     ngmyRegisterPageHiddenHandler(() {
       unawaited(_persistSessionImmediately());
     });
   }
 
   Future<void> _probeOfflineAtLaunch() async {
+    if (!await ngmyDeviceIsOnline()) {
+      if (mounted) setState(() => _appOffline = true);
+      await _persistLocalSnapshot();
+      return;
+    }
     final online = await ngmyCanReachCloud();
     if (!mounted) return;
     if (!online) {
@@ -7214,6 +7230,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (state == AppLifecycleState.resumed) {
       unawaited(_restoreSessionFromLocalCache());
+      unawaited(_probeOfflineAtLaunch());
+      if (!_realtimeStarted) {
+        unawaited(_startBackgroundServicesWhenReady());
+      }
       if (_currentUser != null) {
         _ngmyReconcileClockInSession(_currentUser!, _allTransactions);
       }
@@ -10590,7 +10610,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         themeMode: _effectiveThemeMode,
         builder: (context, child) {
           final body = child ?? const SizedBox.shrink();
-          final shell = _currentUser != null && _appOffline
+          final shell = _appOffline
               ? Stack(
                   clipBehavior: Clip.none,
                   children: [

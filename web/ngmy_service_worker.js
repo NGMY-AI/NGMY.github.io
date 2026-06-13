@@ -124,6 +124,16 @@ self.addEventListener('fetch', (event) => {
 
       if (event.request.mode === 'navigate') {
         const cachedNav = await offlineDocument();
+        if (cachedNav) {
+          event.waitUntil(
+            fetch(event.request)
+              .then((res) => {
+                if (res && res.status === 200) return cache.put(event.request, res.clone());
+              })
+              .catch(() => {}),
+          );
+          return cachedNav;
+        }
         try {
           const net = await fetch(event.request);
           if (net && net.status === 200) {
@@ -131,7 +141,6 @@ self.addEventListener('fetch', (event) => {
             return net;
           }
         } catch (_) {}
-        if (cachedNav) return cachedNav;
         return new Response(
           '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NGMY Offline</title></head><body style="font-family:system-ui;background:#121212;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px"><div><h2>NGMY is offline</h2><p>Open the app once while online so it can cache for offline use.</p><button onclick="location.reload()" style="margin-top:16px;padding:12px 24px;border:none;border-radius:8px;background:#00B25A;color:#fff;font-weight:700">Retry</button></div></body></html>',
           { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },

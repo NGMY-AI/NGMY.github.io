@@ -226,6 +226,64 @@
 
     }
 
+    #ngmy-splash {
+
+      position: fixed;
+
+      inset: 0;
+
+      z-index: 9999;
+
+      display: flex;
+
+      flex-direction: column;
+
+      align-items: center;
+
+      justify-content: center;
+
+      gap: 16px;
+
+      background: inherit;
+
+      font-family: system-ui, sans-serif;
+
+    }
+
+    #ngmy-splash .ngmy-spin {
+
+      width: 40px;
+
+      height: 40px;
+
+      border: 3px solid rgba(0, 178, 90, 0.25);
+
+      border-top-color: #00B25A;
+
+      border-radius: 50%;
+
+      animation: ngmy-spin 0.9s linear infinite;
+
+    }
+
+    @keyframes ngmy-spin {
+
+      to { transform: rotate(360deg); }
+
+    }
+
+    #ngmy-splash p {
+
+      margin: 0;
+
+      font-size: 14px;
+
+      font-weight: 600;
+
+      opacity: 0.72;
+
+    }
+
     #ngmy-error {
 
       display: none;
@@ -260,6 +318,14 @@
 
 <body>
 
+  <div id="ngmy-splash">
+
+    <div class="ngmy-spin"></div>
+
+    <p id="ngmy-splash-msg">Loading NGMYâ€¦</p>
+
+  </div>
+
   <div id="ngmy-error">
 
     <p style="font-size:18px;font-weight:800">NGMY could not start</p>
@@ -276,9 +342,13 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260612202200";
+      var CURRENT = "20260612221341";
 
       function showError(msg) {
+
+        var splash = document.getElementById("ngmy-splash");
+
+        if (splash) splash.style.display = "none";
 
         var err = document.getElementById("ngmy-error");
 
@@ -290,7 +360,16 @@
 
       }
 
+      function hideSplash() {
+
+        var splash = document.getElementById("ngmy-splash");
+
+        if (splash) splash.style.display = "none";
+
+      }
+
       window.__ngmyShowLoadError = showError;
+      window.__ngmyHideSplash = hideSplash;
 
       try {
 
@@ -339,7 +418,7 @@
 
   <script>
     (function () {
-      var deployId = '20260612202200';
+      var deployId = '20260612221341';
       var bootstrapSrc = 'flutter_bootstrap.js';
       var loadAttempts = 0;
 
@@ -355,6 +434,16 @@
         var s = document.createElement('script');
         s.src = bootstrapSrc;
         s.async = false;
+        s.onload = function () {
+          var obs = new MutationObserver(function () {
+            if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane') || window._flutter) {
+              window.__ngmyHideSplash && window.__ngmyHideSplash();
+              obs.disconnect();
+            }
+          });
+          obs.observe(document.body, { childList: true, subtree: true });
+          setTimeout(function () { window.__ngmyHideSplash && window.__ngmyHideSplash(); }, 12000);
+        };
         s.onerror = function () {
           if (loadAttempts < 3) {
             setTimeout(loadFlutterBootstrap, loadAttempts === 1 ? 400 : 1200);
@@ -363,6 +452,22 @@
           showBootstrapError();
         };
         document.body.appendChild(s);
+      }
+
+      function cacheHasBootstrap() {
+        if (!('caches' in window)) return Promise.resolve(false);
+        return caches.keys().then(function (keys) {
+          var ngmyKeys = keys.filter(function (k) { return k.indexOf('ngmy-pwa-') === 0; });
+          if (!ngmyKeys.length) return false;
+          return Promise.all(ngmyKeys.map(function (key) {
+            return caches.open(key).then(function (cache) {
+              var candidates = ['./flutter_bootstrap.js', 'flutter_bootstrap.js'];
+              return Promise.all(candidates.map(function (u) {
+                return cache.match(u).then(function (hit) { return !!hit; });
+              })).then(function (hits) { return hits.some(Boolean); });
+            });
+          })).then(function (results) { return results.some(Boolean); });
+        }).catch(function () { return false; });
       }
 
       function startApp() {
@@ -377,7 +482,20 @@
           }
         };
         if (!navigator.onLine) {
-          go();
+          var splashMsg = document.getElementById('ngmy-splash-msg');
+          if (splashMsg) splashMsg.textContent = 'Opening offlineâ€¦';
+          var offlineGo = function () {
+            cacheHasBootstrap().then(function (has) {
+              if (has) go();
+              else showBootstrapError();
+            });
+          };
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(offlineGo).catch(offlineGo);
+            setTimeout(offlineGo, 2500);
+          } else {
+            offlineGo();
+          }
           return;
         }
         if ('serviceWorker' in navigator) {
@@ -392,7 +510,7 @@
         if (!document.querySelector('flutter-view') && !window._flutter) {
           if (!navigator.onLine) showBootstrapError();
         }
-      }, 50000);
+      }, 22000);
 
       if (!('serviceWorker' in navigator)) {
         startApp();
