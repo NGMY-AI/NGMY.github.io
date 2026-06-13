@@ -400,9 +400,12 @@ Widget _loveGlassPanel({
       decoration: BoxDecoration(
         color: dark
             ? const Color(0xFF1A2235).withValues(alpha: fillAlpha < 0.2 ? 0.94 : fillAlpha)
-            : Colors.white.withValues(alpha: fillAlpha < 0.2 ? 0.96 : 0.88),
+            : const Color(0xFFF8FAFF).withValues(alpha: fillAlpha < 0.2 ? 0.97 : 0.92),
         borderRadius: borderRadius,
-        border: Border.all(color: dark ? Colors.white.withValues(alpha: 0.14) : Colors.black.withValues(alpha: 0.08)),
+        border: Border.all(color: dark ? Colors.white.withValues(alpha: 0.14) : Colors.black.withValues(alpha: 0.1)),
+        boxShadow: dark
+            ? null
+            : [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))],
       ),
       child: child,
     ),
@@ -872,7 +875,12 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
         isDark: isDark,
         onTap: () {
           HapticFeedback.lightImpact();
-          setState(() => _selected = profiles[i]);
+          setState(() {
+            _searchOpen = false;
+            _searchQuery = '';
+            _searchCtrl.clear();
+            _selected = profiles[i];
+          });
         },
       ),
     );
@@ -1460,6 +1468,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     final bottomPad = MediaQuery.paddingOf(context).bottom + 88;
     final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF3F7FF);
     final mutedText = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black45;
+    final panelFg = isDark ? Colors.white : const Color(0xFF111827);
+    final panelFgMuted = isDark ? Colors.white.withValues(alpha: 0.7) : Colors.black54;
+    final panelHint = isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black38;
+    final accent = ngmyCommunicateRoleIsRomantic(widget.profile.role) ? const Color(0xFFEC4899) : kNgmyAdvisorsHubAccent;
+    final accent2 = ngmyCommunicateRoleIsRomantic(widget.profile.role) ? const Color(0xFF9333EA) : kNgmyAdvisorsHubAccent2;
 
     return Scaffold(
       backgroundColor: scaffoldBg,
@@ -1477,14 +1490,16 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                       ? 'Tell ${widget.profile.name} what you want to practice in $_translatorLearningLang — simple words only.'
                       : _allowsPhotoUpload
                           ? 'Ask ${widget.profile.name} anything — tap 📷 to send homework photos for step-by-step help.'
-                          : 'Say something sweet to ${widget.profile.name}… 💜';
+                          : ngmyCommunicateRoleIsRomantic(widget.profile.role)
+                              ? 'Say something sweet to ${widget.profile.name}… 💜'
+                              : 'Start a conversation with ${widget.profile.name}…';
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Text(
                         emptyHint,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14, fontStyle: FontStyle.italic),
+                        style: TextStyle(color: mutedText, fontSize: 14, fontStyle: FontStyle.italic),
                       ),
                     ),
                   );
@@ -1495,9 +1510,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                     padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
-                        Text('${widget.profile.name} is typing', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontStyle: FontStyle.italic, fontSize: 12)),
+                        Text('${widget.profile.name} is typing', style: TextStyle(color: mutedText, fontStyle: FontStyle.italic, fontSize: 12)),
                         const SizedBox(width: 6),
-                        const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFEC4899))),
+                        SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: accent)),
                       ],
                     ),
                   );
@@ -1552,6 +1567,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                 child: _loveGlassPanel(
+                  context: context,
+                  isDark: isDark,
                   borderRadius: BorderRadius.circular(20),
                   fillAlpha: 0.06,
                   blur: 12,
@@ -1561,17 +1578,17 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                         child: Row(
                           children: [
-                            IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 22), onPressed: widget.onBack),
+                            IconButton(icon: Icon(Icons.arrow_back_rounded, color: panelFgMuted, size: 22), onPressed: widget.onBack),
                             NgmyCommunicateAvatar(profile: widget.profile, size: 44, glow: true),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(widget.profile.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                                  Text(widget.profile.name, style: TextStyle(color: panelFg, fontWeight: FontWeight.w900, fontSize: 16)),
                                   Text(
-                                    _isAdmin ? 'Unlimited love chat 💕' : '~$remMin min left · $mins min block',
-                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 10),
+                                    _isAdmin ? 'Unlimited chat' : '~$remMin min left · $mins min block',
+                                    style: TextStyle(color: panelFgMuted, fontSize: 10),
                                   ),
                                 ],
                               ),
@@ -1612,6 +1629,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: _loveGlassPanel(
+                          context: context,
+                          isDark: isDark,
                           borderRadius: BorderRadius.circular(16),
                           fillAlpha: 0.08,
                           blur: 10,
@@ -1627,11 +1646,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                                 Expanded(
                                   child: Text(
                                     'Photo ready — add a question or tap send',
-                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12),
+                                    style: TextStyle(color: panelFgMuted, fontSize: 12),
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
+                                  icon: Icon(Icons.close_rounded, color: panelFgMuted, size: 20),
                                   onPressed: _busy ? null : _clearPendingPhoto,
                                 ),
                               ],
@@ -1640,6 +1659,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                         ),
                       ),
                     _loveGlassPanel(
+                      context: context,
+                      isDark: isDark,
                       borderRadius: BorderRadius.circular(26),
                       fillAlpha: 0.06,
                       blur: 12,
@@ -1651,26 +1672,28 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                               IconButton(
                                 tooltip: 'Send homework photo',
                                 onPressed: _busy ? null : _pickHomeworkPhoto,
-                                icon: const Icon(Icons.photo_camera_rounded, color: Color(0xFFEC4899), size: 22),
+                                icon: Icon(Icons.photo_camera_rounded, color: accent, size: 22),
                               ),
                             Expanded(
                               child: TextField(
                                 controller: _controller,
                                 minLines: 1,
                                 maxLines: 4,
-                                style: const TextStyle(color: Colors.white),
+                                style: TextStyle(color: panelFg),
                                 decoration: InputDecoration(
                                   hintText: _allowsPhotoUpload
                                       ? 'Ask anything or send a homework photo…'
-                                      : 'Write from the heart…',
-                                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
+                                      : ngmyCommunicateRoleIsRomantic(widget.profile.role)
+                                          ? 'Write from the heart…'
+                                          : 'Type your message…',
+                                  hintStyle: TextStyle(color: panelHint),
                                   border: InputBorder.none,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                 ),
                                 onSubmitted: (_) => _send(),
                               ),
                             ),
-                            NgmyVoiceMicButton(controller: _controller, color: const Color(0xFFEC4899)),
+                            NgmyVoiceMicButton(controller: _controller, color: accent),
                             Material(
                               color: Colors.transparent,
                               child: InkWell(
@@ -1679,9 +1702,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                                 child: Container(
                                   width: 42,
                                   height: 42,
-                                  decoration: const BoxDecoration(
+                                  decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)]),
+                                    gradient: LinearGradient(colors: [accent, accent2]),
                                   ),
                                   child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
                                 ),
