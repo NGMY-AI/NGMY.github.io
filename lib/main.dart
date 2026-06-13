@@ -1046,6 +1046,8 @@ class AppConfig {
   String loanPhone;
   String loanHowItWorks;
   String geminiApiKey;
+  /// ElevenLabs API key for message translator text-to-speech (starts with sk_).
+  String elevenLabsApiKey;
   String logoUrl;
   List<String> cities;
   /// State name → city names for Civic Registry (registrars manage their state only).
@@ -1152,6 +1154,7 @@ class AppConfig {
     this.loanPhone = '706-623-7963',
     this.loanHowItWorks = '1. Submit your loan application with collateral details\n2. Your application will be reviewed within a few hours\n3. If approved, the loan amount will be credited to your account\n4. Make payments over 2 months (total repayment: loan + 36% interest)\n5. Upon full repayment, your collateral is released',
     this.geminiApiKey = '',
+    this.elevenLabsApiKey = '',
     this.logoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
     this.cities = const ['Stone Mountain', 'Atlanta', 'Savannah'],
     Map<String, List<String>>? civicCitiesByState,
@@ -1268,6 +1271,7 @@ class AppConfig {
     'loanPhone': loanPhone,
     'loanHowItWorks': loanHowItWorks,
     'geminiApiKey': geminiApiKey,
+    'elevenLabsApiKey': elevenLabsApiKey,
     'logoUrl': logoUrl,
     'cities': cities,
     'rooms': rooms,
@@ -1363,6 +1367,7 @@ class AppConfig {
     loanPhone: json['loanPhone'] ?? '706-623-7963',
     loanHowItWorks: json['loanHowItWorks'] ?? '1. Submit your loan application with collateral details\n2. Your application will be reviewed within a few hours\n3. If approved, the loan amount will be credited to your account\n4. Make payments over 2 months (total repayment: loan + 36% interest)\n5. Upon full repayment, your collateral is released',
     geminiApiKey: _geminiKeyFromMap(json),
+    elevenLabsApiKey: (json['elevenLabsApiKey'] ?? '').toString().trim(),
     logoUrl: json['logoUrl'] ?? 'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
     cities: byState.isNotEmpty
         ? NgmyCivicRegistryStats.allCitiesUnion(byState)
@@ -21388,17 +21393,20 @@ class _NgmyAiAdminSheet extends StatefulWidget {
 
 class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
   late final TextEditingController _apiC;
+  late final TextEditingController _elevenLabsC;
   late final TextEditingController _helperLimitC;
   late final TextEditingController _logoC;
   final ImagePicker _picker = ImagePicker();
   Uint8List? _pendingLogoBytes;
   bool _logoUploading = false;
   bool _apiKeyVisible = false;
+  bool _elevenLabsKeyVisible = false;
 
   @override
   void initState() {
     super.initState();
     _apiC = TextEditingController(text: widget.config.geminiApiKey);
+    _elevenLabsC = TextEditingController(text: widget.config.elevenLabsApiKey);
     _helperLimitC = TextEditingController(text: widget.config.ngmyHelperDailyMessageLimit.toString());
     _logoC = TextEditingController(text: widget.config.logoUrl);
   }
@@ -21406,6 +21414,7 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
   @override
   void dispose() {
     _apiC.dispose();
+    _elevenLabsC.dispose();
     _helperLimitC.dispose();
     _logoC.dispose();
     super.dispose();
@@ -21507,6 +21516,7 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
   Future<void> _saveSettings() async {
     widget.config.logoUrl = await _resolveLogoForSave();
     widget.config.geminiApiKey = _apiC.text.trim();
+    widget.config.elevenLabsApiKey = _elevenLabsC.text.trim();
     final helperLimit = int.tryParse(_helperLimitC.text.trim());
     if (helperLimit == null || helperLimit < 0) {
       if (!context.mounted) return;
@@ -21538,7 +21548,7 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
       SnackBar(
         content: Text(
           allCloudOk
-              ? 'AI settings saved to cloud ($detected). Helper, Advisors, and Scanner will use this key.'
+              ? 'AI settings saved to cloud ($detected). Helper, Advisors, Scanner, and translator voice will use these keys.'
               : 'Saved locally. Supabase sync failed — check connection.',
         ),
         backgroundColor: allCloudOk ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
@@ -21652,6 +21662,28 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
                       Text(
                         'Auto-detects provider. Optional prefix: gemini:, openai:, anthropic:. '
                         'For other APIs: compat:https://api.example.com/v1|your-key',
+                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _elevenLabsC,
+                        obscureText: !_elevenLabsKeyVisible,
+                        decoration: widget.adminInputDecoration(
+                          label: 'ElevenLabs API Key (translator voice)',
+                          hint: 'sk_… from elevenlabs.io',
+                          isDark: isDark,
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(_elevenLabsKeyVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+                            tooltip: _elevenLabsKeyVisible ? 'Hide key' : 'Show key',
+                            onPressed: () => setState(() => _elevenLabsKeyVisible = !_elevenLabsKeyVisible),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Lets users tap a speaker icon in Message translator to hear translations aloud (English & Swahili). '
+                        'On web, deploy the ngmy-elevenlabs-tts Supabase Edge Function.',
                         style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
                       ),
                       const SizedBox(height: 14),

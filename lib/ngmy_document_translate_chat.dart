@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_ai_client.dart';
+import 'ngmy_elevenlabs_tts.dart';
 import 'ngmy_modern_chat_prefix.dart';
 import 'ngmy_translate_payments.dart';
 
@@ -121,6 +122,13 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
   String? _wordLesson;
   String? _wordLessonTitle;
   int? _remainingFree;
+  String? _speakingKey;
+  bool _speakingBusy = false;
+
+  String get _elevenLabsKey {
+    final fromConfig = widget.config != null ? ((widget.config as dynamic).elevenLabsApiKey as String?) : null;
+    return (fromConfig ?? '').trim();
+  }
 
   bool get _paymentsEnabled =>
       widget.user != null && widget.config != null && widget.onCharge != null && widget.onDataChanged != null && widget.onPersistConfig != null;
@@ -136,6 +144,7 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
   @override
   void dispose() {
     _inputC.dispose();
+    NgmyElevenLabsTts.stop();
     super.dispose();
   }
 
@@ -249,6 +258,64 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
     );
   }
 
+  Future<void> _speakText({
+    required String text,
+    required String langCode,
+    required String key,
+  }) async {
+    if (_speakingBusy) return;
+    if (NgmyElevenLabsTts.isSpeaking(key)) {
+      await NgmyElevenLabsTts.stop();
+      if (mounted) setState(() => _speakingKey = null);
+      return;
+    }
+
+    setState(() {
+      _speakingBusy = true;
+      _speakingKey = key;
+    });
+
+    final result = await NgmyElevenLabsTts.speak(
+      apiKey: _elevenLabsKey,
+      text: text,
+      langCode: langCode,
+      key: key,
+    );
+
+    if (!mounted) return;
+    setState(() => _speakingBusy = false);
+    if (result.error != null) {
+      setState(() => _speakingKey = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error!), backgroundColor: const Color(0xFFDC2626)),
+      );
+    } else if (!NgmyElevenLabsTts.isSpeaking(key)) {
+      setState(() => _speakingKey = null);
+    }
+  }
+
+  Widget _speakButton({
+    required String text,
+    required String langCode,
+    required String key,
+    required Color color,
+    String tooltip = 'Listen',
+  }) {
+    final active = _speakingKey == key && (NgmyElevenLabsTts.isSpeaking(key) || _speakingBusy);
+    return IconButton(
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      tooltip: active ? 'Stop' : tooltip,
+      onPressed: (_speakingBusy && _speakingKey != key) || text.trim().isEmpty
+          ? null
+          : () => _speakText(text: text, langCode: langCode, key: key),
+      icon: _speakingBusy && _speakingKey == key
+          ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: color))
+          : Icon(active ? Icons.stop_circle_outlined : Icons.volume_up_rounded, color: color, size: 22),
+    );
+  }
+
   Future<void> _learnWord({
     required String word,
     required String sentence,
@@ -341,8 +408,10 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(caption, style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
+        if (caption.isNotEmpty) ...[
+          Text(caption, style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+        ],
         RichText(
           text: TextSpan(
             style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.55, fontWeight: FontWeight.w500),
@@ -535,7 +604,18 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
                           filled: true,
                           fillColor: Colors.white.withValues(alpha: 0.07),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                          suffixIcon: Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: _speakButton(
+                              text: _inputC.text,
+                              langCode: _replyMode ? _myLang : _theirLang,
+                              key: 'input',
+                              color: _cyan,
+                              tooltip: 'Listen to your message',
+                            ),
+                          ),
                         ),
+                        onChanged: (_) => setState(() {}),
                       ),
                       const SizedBox(height: 14),
                       FilledButton.icon(
@@ -563,12 +643,34 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
                             color: Colors.white.withValues(alpha: 0.06),
                             border: Border.all(color: Colors.white12),
                           ),
-                          child: _clickableSentence(
-                            text: _lastSourceText!,
-                            wordLangCode: _replyMode ? _myLang : _theirLang,
-                            explainLangCode: _replyMode ? _theirLang : _myLang,
-                            accent: _cyan,
-                            caption: 'Original ($fromLabel) — tap a word',
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    'Original ($fromLabel) — tap a word',
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w700),
+                                  ),
+                                  const Spacer(),
+                                  _speakButton(
+                                    text: _lastSourceText!,
+                                    langCode: _replyMode ? _myLang : _theirLang,
+                                    key: 'source',
+                                    color: _cyan,
+                                    tooltip: 'Listen to original',
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              _clickableSentence(
+                                text: _lastSourceText!,
+                                wordLangCode: _replyMode ? _myLang : _theirLang,
+                                explainLangCode: _replyMode ? _theirLang : _myLang,
+                                accent: _cyan,
+                                caption: '',
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -593,6 +695,13 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
                                     children: [
                                       Text('In $toLabel', style: const TextStyle(color: _mint, fontWeight: FontWeight.w800, fontSize: 12)),
                                       const Spacer(),
+                                      _speakButton(
+                                        text: _output!,
+                                        langCode: _replyMode ? _theirLang : _myLang,
+                                        key: 'translation',
+                                        color: _mint,
+                                        tooltip: 'Listen to translation',
+                                      ),
                                       IconButton(
                                         visualDensity: VisualDensity.compact,
                                         padding: EdgeInsets.zero,
@@ -613,7 +722,7 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
-                                    'Tap a word for meaning + example · or copy the full message',
+                                    'Tap speaker to hear · tap a word to learn · or copy the full message',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11),
                                   ),

@@ -976,6 +976,7 @@ Future<bool> ngmyPersistCommunicatePaymentSettings(AppConfig config) async {
 Map<String, dynamic> _helperAiSettingsPayload(AppConfig config) => {
       'ngmyHelperDailyMessageLimit': config.ngmyHelperDailyMessageLimit,
       'maxMediaPostsPerWeek': config.maxMediaPostsPerWeek,
+      'elevenLabsApiKey': config.elevenLabsApiKey.trim(),
       'savedAt': DateTime.now().toUtc().toIso8601String(),
     };
 
@@ -985,6 +986,9 @@ void _applyHelperAiSettingsPayload(AppConfig config, Map<String, dynamic> payloa
   if (helper is num && helper >= 0) config.ngmyHelperDailyMessageLimit = helper.toInt();
   final media = payload['maxMediaPostsPerWeek'];
   if (media is num && media >= 0) config.maxMediaPostsPerWeek = media.toInt();
+  if (payload.containsKey('elevenLabsApiKey')) {
+    config.elevenLabsApiKey = (payload['elevenLabsApiKey'] ?? '').toString().trim();
+  }
 }
 
 Future<void> _persistHelperAiSettingsLocal(AppConfig config) async {
