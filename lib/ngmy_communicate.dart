@@ -496,6 +496,7 @@ Future<void> ngmyOpenCommunicateWorld(
 
 /// Full-screen love world — companions hub + chat.
 class NgmyCommunicateWorldScreen extends StatefulWidget {
+  final bool embedded;
   final dynamic user;
   final dynamic config;
   final String apiKey;
@@ -503,6 +504,7 @@ class NgmyCommunicateWorldScreen extends StatefulWidget {
 
   const NgmyCommunicateWorldScreen({
     super.key,
+    this.embedded = false,
     required this.user,
     required this.config,
     required this.apiKey,
@@ -590,18 +592,21 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
       padding: const EdgeInsets.fromLTRB(8, 8, 14, 0),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => NgmyNavigator.pop(context),
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.08),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+          if (widget.embedded)
+            const SizedBox(width: 48)
+          else
+            IconButton(
+              onPressed: () => NgmyNavigator.pop(context),
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.08),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
               ),
-              child: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
             ),
-          ),
           const Expanded(
             child: Column(
               children: [

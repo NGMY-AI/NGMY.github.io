@@ -1120,7 +1120,7 @@ class AppConfig {
   /// Wallet fee to unlock unlimited translations for the rest of the week.
   double translateWeeklyUnlockFee;
   Map<String, String> translateWeekPassByEmail;
-  /// Admin toggle — Communicate lives in Media Hub when enabled.
+  /// Admin toggle — World of Love tab (formerly Media Hub).
   bool communicateEnabled;
   /// Admin toggle — center star in NGMY Hub opens App Builder for all users.
   bool appBuilderEnabled;
@@ -12886,7 +12886,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               _nav(1, Icons.trending_up_rounded),
               _nav(2, Icons.account_balance_wallet_rounded),
               _navC(3),
-              _nav(4, Icons.play_circle_fill_rounded),
+              _nav(4, Icons.favorite_rounded, selectedColor: const Color(0xFFEC4899)),
               _nav(5, Icons.bar_chart_rounded),
               _nav(6, Icons.person_rounded),
             ],
@@ -12896,14 +12896,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _nav(int i, IconData icon) => Expanded(
+  Widget _nav(int i, IconData icon, {Color? selectedColor}) => Expanded(
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: () {
               setState(() => _idx = i);
               if (i == 1 || i == 6) unawaited(widget.onRefreshLegalAndPlans?.call());
-              if (i == 4) unawaited(widget.onRefreshMediaFromCloud?.call());
             },
             customBorder: const CircleBorder(),
             child: SizedBox(
@@ -12911,7 +12910,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               child: Center(
                 child: Icon(
                   icon,
-                  color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey,
+                  color: _idx == i ? (selectedColor ?? Theme.of(context).colorScheme.primary) : Colors.grey,
                   size: NgmyBottomNavMetrics.sideIconSize,
                 ),
               ),
@@ -29689,7 +29688,7 @@ class JobMarketplaceScreen extends StatelessWidget {
   }
 }
 
-class MediaHubScreen extends StatefulWidget {
+class MediaHubScreen extends StatelessWidget {
   final UserData user;
   final List<UserData> allUsers;
   final List<MediaPost> allMedia;
@@ -29721,222 +29720,59 @@ class MediaHubScreen extends StatefulWidget {
     this.onSyncUserMedia,
   });
 
-  @override
-  State<MediaHubScreen> createState() => _MediaHubScreenState();
-}
-
-class _MediaHubScreenState extends State<MediaHubScreen> {
-  final _captionController = TextEditingController();
-  final _mediaSearchCtrl = TextEditingController();
-  final _mediaSearchFocus = FocusNode();
-  bool _isPosting = false;
-  bool _mediaSearchOpen = false;
-  OverlayEntry? _noticeEntry;
-  Timer? _mediaSyncTimer;
-  String _lastFeedSig = '';
-
-  bool get _canCommunicate => widget.config.communicateEnabled || widget.user.isAdmin;
-
-  void _openCommunicate() {
-    ngmyOpenCommunicateWorld(
-      context,
-      user: widget.user,
-      config: widget.config,
-      apiKey: widget.config.geminiApiKey,
-      onChargeWallet: widget.user.isAdmin
-          ? null
-          : (amount, desc) async {
-              final charged = ngmyChargeUserWallet(
-                user: widget.user,
-                allUsers: widget.allUsers,
-                amount: amount,
-                description: desc,
-                onAddTransaction: widget.onAddTransaction,
-              );
-              if (charged) widget.onDataChanged();
-              return charged;
-            },
-    );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    _mediaSyncTimer?.cancel();
-    _captionController.dispose();
-    _mediaSearchCtrl.dispose();
-    _mediaSearchFocus.dispose();
-    _noticeEntry?.remove();
-    super.dispose();
-  }
+  bool get _canOpenWorld => config.communicateEnabled || user.isAdmin;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF080B16) : const Color(0xFFF3F7FF),
-      body: Column(
-        children: [
-          SafeArea(
-            bottom: false,
+    if (!_canOpenWorld) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0A0612),
+        body: SafeArea(
+          child: Center(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(15, 8, 15, 0),
-              child: ngmyClipBackdrop(
-                borderRadius: BorderRadius.circular(35),
-                child: Container(
-                  height: 64,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(35),
-                    border: Border.all(color: Colors.white.withOpacity(0.12)),
-                  ),
-                  child: Row(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: _mediaHubHeaderIcon(
-                          isDark: isDark,
-                          icon: Icons.auto_fix_high_rounded,
-                          onTap: () => showNgmyVideoStudio(context),
-                        ),
-                      ),
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            'MEDIA HUB',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 22,
-                              letterSpacing: 1.4,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (_canCommunicate)
-                        _mediaHubHeaderIcon(
-                          isDark: isDark,
-                          icon: Icons.favorite_rounded,
-                          onTap: _openCommunicate,
-                          backgroundColor: const Color(0xFFEC4899).withValues(alpha: isDark ? 0.28 : 0.16),
-                          iconColor: const Color(0xFFEC4899),
-                        )
-                      else
-                        const SizedBox(width: 48),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(24),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  ngmyComingSoonFrame(
-                    context: context,
-                    title: 'NGMY Studio',
-                    icon: Icons.auto_fix_high_rounded,
-                    message: 'Tap the sparkle icon above to open NGMY Studio. The social feed is being rebuilt.',
+                  Icon(Icons.favorite_rounded, color: Color(0xFFEC4899), size: 48),
+                  SizedBox(height: 16),
+                  Text(
+                    'World of Love',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
                   ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: () => showNgmyVideoStudio(context),
-                    icon: const Icon(Icons.auto_fix_high_rounded),
-                    label: const Text('Open NGMY Studio'),
+                  SizedBox(height: 8),
+                  Text(
+                    'Opens when your admin enables World of Love.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
                   ),
-                  if (_canCommunicate) ...[
-                    const SizedBox(height: 28),
-                    Material(
-                      elevation: 6,
-                      shadowColor: const Color(0xFFEC4899).withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(20),
-                      color: isDark ? const Color(0xFF1A2030) : Colors.white,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: _openCommunicate,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFEC4899).withValues(alpha: 0.45)),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEC4899).withValues(alpha: isDark ? 0.22 : 0.12),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.favorite_rounded, color: Color(0xFFEC4899), size: 26),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Communicate',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 18,
-                                        color: isDark ? Colors.white : const Color(0xFF111827),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Connect, chat, and share in the NGMY world.',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        height: 1.35,
-                                        color: isDark ? Colors.white70 : Colors.black54,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFFEC4899)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _mediaHubHeaderIcon({
-    required bool isDark,
-    required IconData icon,
-    required VoidCallback onTap,
-    Color? backgroundColor,
-    Color? iconColor,
-  }) {
-    return Material(
-      color: backgroundColor ?? (isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB)),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Icon(icon, color: iconColor ?? (isDark ? Colors.white : Colors.black87), size: 20),
         ),
-      ),
+      );
+    }
+
+    return NgmyCommunicateWorldScreen(
+      embedded: true,
+      user: user,
+      config: config,
+      apiKey: config.geminiApiKey,
+      onChargeWallet: user.isAdmin
+          ? null
+          : (amount, desc) async {
+              final charged = ngmyChargeUserWallet(
+                user: user,
+                allUsers: allUsers,
+                amount: amount,
+                description: desc,
+                onAddTransaction: onAddTransaction,
+              );
+              if (charged) onDataChanged();
+              return charged;
+            },
     );
   }
 }
