@@ -7,21 +7,49 @@ function ngmySwBasePath() {
   return p.replace(/[^/]*$/, '') || '/';
 }
 const SCOPE_PATH = ngmySwBasePath();
-const CACHE_NAME = CACHE_PREFIX + '20260612221341';
+const CACHE_NAME = CACHE_PREFIX + '20260612223813';
 
 const PRECACHE_URLS = ['./','./.last_build_id','./.nojekyll','./404.html','./assets/AssetManifest.bin','./assets/AssetManifest.bin.json','./assets/assets/sounds/income_cash.mp3','./assets/assets/sounds/README.md','./assets/assets/sounds/YTMP3GG_YouTube_Kaching-sound-effect-sound-sounds-sounde_Media_a7Vue-A0BOY_007_128k.mp3','./assets/assets/video_studio/yt_news_desk.png','./assets/assets/video_studio/yt_studio_curved.png','./assets/FontManifest.json','./assets/fonts/MaterialIcons-Regular.otf','./assets/NOTICES','./assets/packages/cupertino_icons/assets/CupertinoIcons.ttf','./assets/shaders/ink_sparkle.frag','./assets/shaders/stretch_effect.frag','./canvaskit/canvaskit.js','./canvaskit/canvaskit.js.symbols','./canvaskit/canvaskit.wasm','./canvaskit/chromium/canvaskit.js','./canvaskit/chromium/canvaskit.js.symbols','./canvaskit/chromium/canvaskit.wasm','./canvaskit/experimental_webparagraph/canvaskit.js','./canvaskit/experimental_webparagraph/canvaskit.js.symbols','./canvaskit/experimental_webparagraph/canvaskit.wasm','./canvaskit/skwasm.js','./canvaskit/skwasm.js.symbols','./canvaskit/skwasm.wasm','./canvaskit/skwasm_heavy.js','./canvaskit/skwasm_heavy.js.symbols','./canvaskit/skwasm_heavy.wasm','./canvaskit/wimp.js','./canvaskit/wimp.js.symbols','./canvaskit/wimp.wasm','./CNAME','./favicon.png','./flutter.js','./flutter_bootstrap.js','./icons/Icon-192.png','./icons/Icon-512.png','./icons/Icon-maskable-192.png','./icons/Icon-maskable-512.png','./index.html','./main.dart.js','./manifest.json','./version.json'];
+
+const CRITICAL_OFFLINE_URLS = [
+  './',
+  './index.html',
+  './flutter_bootstrap.js',
+  './flutter.js',
+  './main.dart.js',
+  './canvaskit/canvaskit.js',
+  './canvaskit/canvaskit.wasm',
+  './assets/AssetManifest.bin.json',
+  './assets/FontManifest.json',
+  './assets/fonts/MaterialIcons-Regular.otf',
+  './assets/packages/cupertino_icons/assets/CupertinoIcons.ttf',
+  './manifest.json',
+  './favicon.png',
+  './icons/Icon-192.png',
+];
+
+async function precacheUrl(cache, url) {
+  try {
+    const res = await fetch(new Request(url, { cache: 'reload' }));
+    if (res && res.ok) {
+      await cache.put(url, res.clone());
+      return true;
+    }
+  } catch (e) {
+    console.warn('[ngmy-sw] precache skip', url, e);
+  }
+  return false;
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      await Promise.allSettled(
-        PRECACHE_URLS.map((url) =>
-          cache.add(new Request(url, { cache: 'reload' })).catch((e) => {
-            console.warn('[ngmy-sw] precache skip', url, e);
-          }),
-        ),
-      );
+      for (const url of CRITICAL_OFFLINE_URLS) {
+        await precacheUrl(cache, url);
+      }
+      const rest = PRECACHE_URLS.filter((u) => CRITICAL_OFFLINE_URLS.indexOf(u) === -1);
+      await Promise.allSettled(rest.map((url) => precacheUrl(cache, url)));
       await self.skipWaiting();
     })(),
   );
@@ -96,6 +124,23 @@ function isCriticalFont(url) {
   return /MaterialIcons-Regular\.otf|CupertinoIcons\.ttf/i.test(url.pathname);
 }
 
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (!data || data.type !== 'ENSURE_CACHED') return;
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const urls = Array.isArray(data.urls) ? data.urls : [];
+      for (const raw of urls) {
+        const rel = raw.startsWith('./') ? raw : './' + raw;
+        const hit = await cache.match(rel);
+        if (hit) continue;
+        await precacheUrl(cache, rel);
+      }
+    })(),
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
@@ -111,7 +156,16 @@ self.addEventListener('fetch', (event) => {
         cached = await cacheLookupByPathname(url);
       }
 
-      if ((isAppShellAsset(url) || isCriticalScript(url) || isCriticalFont(url)) && cached) {
+      const shellAsset =
+        isAppShellAsset(url) || isCriticalScript(url) || isCriticalFont(url);
+
+      if (!self.navigator.onLine && shellAsset) {
+        if (cached) return cached;
+        const offlineFallback = await cacheLookupByPathname(url);
+        if (offlineFallback) return offlineFallback;
+      }
+
+      if (shellAsset && cached) {
         event.waitUntil(
           fetch(event.request)
             .then((res) => {

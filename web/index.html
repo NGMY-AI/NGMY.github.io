@@ -375,27 +375,8 @@
 
         var prev = localStorage.getItem(KEY);
 
-        if (prev && prev !== CURRENT && navigator.onLine && "serviceWorker" in navigator) {
-
-          navigator.serviceWorker.getRegistrations().then(function (regs) {
-
-            return Promise.all(regs.map(function (r) { return r.unregister(); }));
-
-          }).then(function () {
-
-            if ("caches" in window) {
-
-              return caches.keys().then(function (keys) {
-
-                return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-
-              });
-
-            }
-
-          }).catch(function () {});
-
-        }
+        // New deploy: let the service worker swap caches on activate — do not wipe
+        // storage here or offline cold start breaks before the new shell is cached.
 
         try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
 
@@ -421,12 +402,105 @@
       var deployId = '__NGMY_DEPLOY_ID__';
       var bootstrapSrc = 'flutter_bootstrap.js';
       var loadAttempts = 0;
+      var flutterStarted = false;
+      var swScope = window.__NGMY_BASE_PATH__ || '/';
 
-      function showBootstrapError() {
-        var hint = navigator.onLine
+      var OFFLINE_CRITICAL = [
+        'flutter_bootstrap.js',
+        'flutter.js',
+        'main.dart.js',
+        'canvaskit/canvaskit.js',
+        'canvaskit/canvaskit.wasm',
+        'assets/AssetManifest.bin.json',
+        'assets/FontManifest.json',
+      ];
+
+      function showBootstrapError(hint) {
+        var msg = hint || (navigator.onLine
             ? 'Could not load the app. Try https://ngmy.org/ or clear site data and reload.'
-            : 'You are offline. Open NGMY once while online so it can save for offline use, then try again.';
-        window.__ngmyShowLoadError && window.__ngmyShowLoadError(hint);
+            : 'Open NGMY once with Wi‑Fi, wait until the home screen appears, then you can use it offline.');
+        window.__ngmyShowLoadError && window.__ngmyShowLoadError(msg);
+      }
+
+      function warmOfflineCache() {
+        if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+        try {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'ENSURE_CACHED',
+            urls: OFFLINE_CRITICAL,
+          });
+        } catch (e) {}
+      }
+
+      function waitForServiceWorker() {
+        if (!('serviceWorker' in navigator)) return Promise.resolve();
+        return navigator.serviceWorker
+          .register('ngmy_service_worker.js?v=' + deployId, { scope: swScope })
+          .then(function () { return navigator.serviceWorker.ready; })
+          .then(function () {
+            if (navigator.serviceWorker.controller) return;
+            return new Promise(function (resolve) {
+              var done = false;
+              function finish() {
+                if (!done) {
+                  done = true;
+                  resolve();
+                }
+              }
+              navigator.serviceWorker.addEventListener('controllerchange', finish, { once: true });
+              setTimeout(finish, 6000);
+            });
+          })
+          .catch(function (e) {
+            console.warn('[ngmy] service worker register failed', e);
+          });
+      }
+
+      function cacheHasPath(cache, path) {
+        var candidates = ['./' + path, path];
+        return Promise.all(candidates.map(function (u) {
+          return cache.match(u).then(function (hit) { return !!hit; });
+        })).then(function (hits) { return hits.some(Boolean); });
+      }
+
+      function offlineShellReady() {
+        if (!('caches' in window)) return Promise.resolve(false);
+        return caches.keys().then(function (keys) {
+          var ngmyKeys = keys.filter(function (k) { return k.indexOf('ngmy-pwa-') === 0; });
+          if (!ngmyKeys.length) return false;
+          return caches.open(ngmyKeys[ngmyKeys.length - 1]).then(function (cache) {
+            return Promise.all(OFFLINE_CRITICAL.map(function (p) {
+              return cacheHasPath(cache, p);
+            })).then(function (results) { return results.every(Boolean); });
+          });
+        }).catch(function () { return false; });
+      }
+
+      function watchFlutterStart() {
+        var obs = new MutationObserver(function () {
+          if (
+            document.querySelector('flutter-view') ||
+            document.querySelector('flt-glass-pane') ||
+            (window._flutter && document.querySelector('canvas'))
+          ) {
+            flutterStarted = true;
+            window.__ngmyHideSplash && window.__ngmyHideSplash();
+            warmOfflineCache();
+            obs.disconnect();
+          }
+        });
+        if (document.body) {
+          obs.observe(document.body, { childList: true, subtree: true });
+        }
+        setTimeout(function () {
+          if (flutterStarted) return;
+          if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane')) return;
+          showBootstrapError(
+            navigator.onLine
+              ? 'The app is taking too long to start. Check your connection and reload.'
+              : 'Offline startup failed. Open NGMY once with Wi‑Fi, wait for the home screen, then try again offline.'
+          );
+        }, 45000);
       }
 
       function loadFlutterBootstrap() {
@@ -435,14 +509,7 @@
         s.src = bootstrapSrc;
         s.async = false;
         s.onload = function () {
-          var obs = new MutationObserver(function () {
-            if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane') || window._flutter) {
-              window.__ngmyHideSplash && window.__ngmyHideSplash();
-              obs.disconnect();
-            }
-          });
-          obs.observe(document.body, { childList: true, subtree: true });
-          setTimeout(function () { window.__ngmyHideSplash && window.__ngmyHideSplash(); }, 12000);
+          watchFlutterStart();
         };
         s.onerror = function () {
           if (loadAttempts < 3) {
@@ -454,75 +521,35 @@
         document.body.appendChild(s);
       }
 
-      function cacheHasBootstrap() {
-        if (!('caches' in window)) return Promise.resolve(false);
-        return caches.keys().then(function (keys) {
-          var ngmyKeys = keys.filter(function (k) { return k.indexOf('ngmy-pwa-') === 0; });
-          if (!ngmyKeys.length) return false;
-          return Promise.all(ngmyKeys.map(function (key) {
-            return caches.open(key).then(function (cache) {
-              var candidates = ['./flutter_bootstrap.js', 'flutter_bootstrap.js'];
-              return Promise.all(candidates.map(function (u) {
-                return cache.match(u).then(function (hit) { return !!hit; });
-              })).then(function (hits) { return hits.some(Boolean); });
-            });
-          })).then(function (results) { return results.some(Boolean); });
-        }).catch(function () { return false; });
+      function bootApp() {
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', loadFlutterBootstrap);
+        } else {
+          loadFlutterBootstrap();
+        }
       }
 
       function startApp() {
-        var bootStarted = false;
-        var go = function () {
-          if (bootStarted) return;
-          bootStarted = true;
-          if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', loadFlutterBootstrap);
-          } else {
-            loadFlutterBootstrap();
-          }
-        };
+        var splashMsg = document.getElementById('ngmy-splash-msg');
         if (!navigator.onLine) {
-          var splashMsg = document.getElementById('ngmy-splash-msg');
           if (splashMsg) splashMsg.textContent = 'Opening offline…';
-          var offlineGo = function () {
-            cacheHasBootstrap().then(function (has) {
-              if (has) go();
-              else showBootstrapError();
-            });
-          };
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.ready.then(offlineGo).catch(offlineGo);
-            setTimeout(offlineGo, 2500);
-          } else {
-            offlineGo();
-          }
+          offlineShellReady().then(function (ready) {
+            if (!ready) {
+              showBootstrapError(
+                'Not saved for offline yet. Open NGMY once with Wi‑Fi, wait until you see the home screen, then close and try offline again.'
+              );
+              return;
+            }
+            bootApp();
+          });
           return;
         }
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.ready.then(go).catch(go);
-          setTimeout(go, 1200);
-        } else {
-          go();
-        }
+        if (splashMsg) splashMsg.textContent = 'Loading NGMY…';
+        warmOfflineCache();
+        bootApp();
       }
 
-      setTimeout(function () {
-        if (!document.querySelector('flutter-view') && !window._flutter) {
-          if (!navigator.onLine) showBootstrapError();
-        }
-      }, 22000);
-
-      if (!('serviceWorker' in navigator)) {
-        startApp();
-        return;
-      }
-
-      var swScope = window.__NGMY_BASE_PATH__ || '/';
-      navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: swScope })
-        .catch(function (e) {
-          console.warn('[ngmy] service worker register failed', e);
-        });
-      startApp();
+      waitForServiceWorker().then(startApp);
     })();
   </script>
 

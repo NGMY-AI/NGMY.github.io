@@ -11,17 +11,45 @@ const CACHE_NAME = CACHE_PREFIX + '__NGMY_DEPLOY_ID__';
 
 const PRECACHE_URLS = __NGMY_PRECACHE_URLS__;
 
+const CRITICAL_OFFLINE_URLS = [
+  './',
+  './index.html',
+  './flutter_bootstrap.js',
+  './flutter.js',
+  './main.dart.js',
+  './canvaskit/canvaskit.js',
+  './canvaskit/canvaskit.wasm',
+  './assets/AssetManifest.bin.json',
+  './assets/FontManifest.json',
+  './assets/fonts/MaterialIcons-Regular.otf',
+  './assets/packages/cupertino_icons/assets/CupertinoIcons.ttf',
+  './manifest.json',
+  './favicon.png',
+  './icons/Icon-192.png',
+];
+
+async function precacheUrl(cache, url) {
+  try {
+    const res = await fetch(new Request(url, { cache: 'reload' }));
+    if (res && res.ok) {
+      await cache.put(url, res.clone());
+      return true;
+    }
+  } catch (e) {
+    console.warn('[ngmy-sw] precache skip', url, e);
+  }
+  return false;
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      await Promise.allSettled(
-        PRECACHE_URLS.map((url) =>
-          cache.add(new Request(url, { cache: 'reload' })).catch((e) => {
-            console.warn('[ngmy-sw] precache skip', url, e);
-          }),
-        ),
-      );
+      for (const url of CRITICAL_OFFLINE_URLS) {
+        await precacheUrl(cache, url);
+      }
+      const rest = PRECACHE_URLS.filter((u) => CRITICAL_OFFLINE_URLS.indexOf(u) === -1);
+      await Promise.allSettled(rest.map((url) => precacheUrl(cache, url)));
       await self.skipWaiting();
     })(),
   );
@@ -96,6 +124,23 @@ function isCriticalFont(url) {
   return /MaterialIcons-Regular\.otf|CupertinoIcons\.ttf/i.test(url.pathname);
 }
 
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (!data || data.type !== 'ENSURE_CACHED') return;
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const urls = Array.isArray(data.urls) ? data.urls : [];
+      for (const raw of urls) {
+        const rel = raw.startsWith('./') ? raw : './' + raw;
+        const hit = await cache.match(rel);
+        if (hit) continue;
+        await precacheUrl(cache, rel);
+      }
+    })(),
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
@@ -111,7 +156,16 @@ self.addEventListener('fetch', (event) => {
         cached = await cacheLookupByPathname(url);
       }
 
-      if ((isAppShellAsset(url) || isCriticalScript(url) || isCriticalFont(url)) && cached) {
+      const shellAsset =
+        isAppShellAsset(url) || isCriticalScript(url) || isCriticalFont(url);
+
+      if (!self.navigator.onLine && shellAsset) {
+        if (cached) return cached;
+        const offlineFallback = await cacheLookupByPathname(url);
+        if (offlineFallback) return offlineFallback;
+      }
+
+      if (shellAsset && cached) {
         event.waitUntil(
           fetch(event.request)
             .then((res) => {
