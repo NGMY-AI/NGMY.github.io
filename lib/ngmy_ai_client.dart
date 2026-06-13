@@ -98,7 +98,7 @@ String _extractApiErrorMessage(Object? err, {String? body}) {
   }
   final text = err?.toString() ?? '';
   if (text.contains('XMLHttpRequest') || text.contains('Failed to fetch')) {
-    return 'Network or browser security blocked the AI request. Save the API key in Admin → Management Hub, then reload. On web, ensure the Supabase AI proxy function is deployed.';
+    return 'Network or browser security blocked the AI request. Save the API key in Admin → Management Menus → NGMY AI, then reload. On web, ensure the Supabase AI proxy function is deployed.';
   }
   if (text.length > 200) return '${text.substring(0, 200)}…';
   return text.isEmpty ? 'Unknown AI error' : text;
@@ -453,7 +453,7 @@ String ngmyAiHelperFailureMessage({
 }) {
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
-    return 'NGMY Helper is not connected yet. An admin must save the AI API key in Management Hub → Save Global Settings, then reload the app.';
+    return 'NGMY Helper is not connected yet. An admin must save the AI API key in Management Menus → NGMY AI → Save AI Settings, then reload the app.';
   }
   final provider = ngmyAiProviderLabel(creds.provider);
   final err = (lastError ?? '').trim();
@@ -463,7 +463,7 @@ String ngmyAiHelperFailureMessage({
   if (err.isNotEmpty) {
     return 'NGMY Helper could not reach $provider: $err';
   }
-  return 'NGMY Helper could not reach $provider. Check the key in Management Hub and reload the app.';
+  return 'NGMY Helper could not reach $provider. Check the key in Management Menus → NGMY AI and reload the app.';
 }
 
 /// Free image fallback — works without an API key (romantic chat selfies, etc.).

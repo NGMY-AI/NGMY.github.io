@@ -39,7 +39,7 @@ class NgmyAppKnowledge {
         ..writeln('- Wallet: approve/reject deposits & withdrawals, payment tags (Cash App / Bitcoin)')
         ..writeln('- Media: moderate posts, delivery tools')
         ..writeln('- Store: listings, orders, inquiries')
-        ..writeln('- Management Hub: global settings, AI API key, config sync')
+        ..writeln('- NGMY AI (Management Menus): API key, Helper limits, app logo')
         ..writeln();
     }
 

@@ -218,7 +218,7 @@ Future<({String? text, String? error})> geminiAnalyzeImages({
   if (creds.provider != NgmyAiProviderKind.gemini) {
     return (
       text: null,
-      error: 'Document Scanner needs a Google Gemini API key (AIza… or gemini: prefix in Management Hub).',
+      error: 'Document Scanner needs a Google Gemini API key (AIza… or gemini: prefix in Management Menus → NGMY AI).',
     );
   }
 

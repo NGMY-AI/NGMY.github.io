@@ -206,7 +206,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       if (apiKey.isEmpty) apiKey = (await widget.refreshApiKey()).trim();
       if (apiKey.isEmpty) {
         setState(() {
-          _error = 'AI is not connected. Ask an admin to save an AI API key in Admin → Management Hub.';
+          _error = 'AI is not connected. Ask an admin to save an AI API key in Admin → Management Menus → NGMY AI.';
           _analyzing = false;
         });
         return;

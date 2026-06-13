@@ -24,7 +24,7 @@ Future<NgmyAppBuilderCopilotResult> ngmyAppBuilderAiCopilot({
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
     return const NgmyAppBuilderCopilotResult(
-      message: 'Add an AI API key in Admin → Management Hub → Global Settings, then try again.',
+      message: 'Add an AI API key in Admin → Management Menus → NGMY AI, then try again.',
     );
   }
 
@@ -290,7 +290,7 @@ Future<String> ngmyAppBuilderAiChat({
   }
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
-    return 'Add an AI API key in Admin → Management Hub → Global Settings, then try again.';
+    return 'Add an AI API key in Admin → Management Menus → NGMY AI, then try again.';
   }
 
   final projectBlock = project == null
@@ -340,7 +340,7 @@ Future<NgmyAppScreenAiResult> ngmyAppBuilderAiEditScreen({
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
     return const NgmyAppScreenAiResult(
-      message: 'Add an AI API key in Admin → Management Hub → Global Settings, then try again.',
+      message: 'Add an AI API key in Admin → Management Menus → NGMY AI, then try again.',
     );
   }
 

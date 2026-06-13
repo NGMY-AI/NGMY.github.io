@@ -17776,6 +17776,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => unawaited(_openCivicRegistryAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications)),
             _menuFrame('Payments', Icons.payments_outlined, const Color(0xFF0D9488), () => unawaited(_openPaymentsAdmin(isDark)), isDark),
             _menuFrame('Communicate', Icons.favorite_rounded, const Color(0xFFEC4899), () => unawaited(_openCommunicateAdmin(isDark)), isDark),
+            _menuFrame('NGMY AI', Icons.auto_awesome_rounded, const Color(0xFF3B82F6), () => unawaited(_openNgmyAiAdmin(isDark)), isDark),
             _menuFrame('App Builder', Icons.star_rounded, const Color(0xFFF59E0B), () => unawaited(_openAppBuilderAdmin(isDark)), isDark),
             _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => unawaited(_openJobApplicationsAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingJobWorkerApplications(widget.config.jobWorkerApplications)),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => unawaited(_openPopupsAdmin(isDark)), isDark),
@@ -18918,6 +18919,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _openNgmyAiAdmin(bool isDark) async {
+    _showNgmyAiAdmin(isDark);
+    unawaited(_refreshManagementInBackground());
+  }
+
+  void _showNgmyAiAdmin(bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _NgmyAiAdminSheet(
+        isDark: isDark,
+        config: widget.config,
+        onDataChanged: widget.onDataChanged,
+        persistGeminiKey: _persistGeminiApiKeyToSupabase,
+        onPersistManagement: _persistManagementConfig,
+        adminInputDecoration: _adminInputDecoration,
       ),
     );
   }
@@ -21339,6 +21361,333 @@ class StatsScreen extends StatelessWidget {
       transparentBackground: true,
       floatingTitle: 'PLATFORM STATS',
       bottomPadding: 120,
+    );
+  }
+}
+
+class _NgmyAiAdminSheet extends StatefulWidget {
+  final bool isDark;
+  final AppConfig config;
+  final VoidCallback onDataChanged;
+  final Future<bool> Function(String apiKey) persistGeminiKey;
+  final Future<bool> Function()? onPersistManagement;
+  final InputDecoration Function({required String label, required bool isDark, String? hint}) adminInputDecoration;
+
+  const _NgmyAiAdminSheet({
+    required this.isDark,
+    required this.config,
+    required this.onDataChanged,
+    required this.persistGeminiKey,
+    this.onPersistManagement,
+    required this.adminInputDecoration,
+  });
+
+  @override
+  State<_NgmyAiAdminSheet> createState() => _NgmyAiAdminSheetState();
+}
+
+class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
+  late final TextEditingController _apiC;
+  late final TextEditingController _helperLimitC;
+  late final TextEditingController _logoC;
+  final ImagePicker _picker = ImagePicker();
+  Uint8List? _pendingLogoBytes;
+  bool _logoUploading = false;
+  bool _apiKeyVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _apiC = TextEditingController(text: widget.config.geminiApiKey);
+    _helperLimitC = TextEditingController(text: widget.config.ngmyHelperDailyMessageLimit.toString());
+    _logoC = TextEditingController(text: widget.config.logoUrl);
+  }
+
+  @override
+  void dispose() {
+    _apiC.dispose();
+    _helperLimitC.dispose();
+    _logoC.dispose();
+    super.dispose();
+  }
+
+  Future<void> _showAiApiKeyHelp() async {
+    final key = _apiC.text.trim();
+    final provider = key.isEmpty ? 'Not set' : ngmyAiProviderLabel(ngmyParseAiCredentials(key).provider);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Color(0xFF3B82F6)),
+            SizedBox(width: 8),
+            Text('AI API Key'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Detected provider: $provider', style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 10),
+              if (key.isNotEmpty) ...[
+                const Text('Current key:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 4),
+                SelectableText(key, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                const SizedBox(height: 12),
+              ],
+              const Text(
+                'Supported keys:\n'
+                '• Google Gemini — starts with AIza…\n'
+                '• OpenAI — starts with sk-…\n'
+                '• Claude — starts with sk-ant-…\n'
+                '• Other APIs — compat:https://api.example.com/v1|your-key\n\n'
+                'Tap the eye icon on the field to show or hide the key while editing.',
+                style: TextStyle(fontSize: 13, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickAppLogoImage() async {
+    final img = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 512);
+    if (img == null) return;
+    final bytes = await img.readAsBytes();
+    setState(() {
+      _pendingLogoBytes = bytes;
+      _logoC.text = '';
+    });
+  }
+
+  Future<String> _resolveLogoForSave() async {
+    final urlText = _logoC.text.trim();
+    if (_pendingLogoBytes != null) {
+      setState(() => _logoUploading = true);
+      try {
+        final path = 'branding/app_logo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final upload = await _uploadNgmyMediaBytes(
+          bytes: _pendingLogoBytes!,
+          storagePath: path,
+          contentType: 'image/jpeg',
+        );
+        if (upload.ref != null) return upload.ref!;
+        return 'data:image/jpeg;base64,${base64Encode(_pendingLogoBytes!)}';
+      } finally {
+        if (mounted) setState(() => _logoUploading = false);
+      }
+    }
+    return urlText.isNotEmpty ? urlText : widget.config.logoUrl;
+  }
+
+  Widget _appLogoPreview(bool isDark) {
+    const size = 56.0;
+    if (_pendingLogoBytes != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.memory(_pendingLogoBytes!, width: size, height: size, fit: BoxFit.cover),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: _ngmyLogoImage(
+        _logoC.text.trim().isNotEmpty ? _logoC.text.trim() : widget.config.logoUrl,
+        width: size,
+        height: size,
+      ),
+    );
+  }
+
+  Future<void> _saveSettings() async {
+    widget.config.logoUrl = await _resolveLogoForSave();
+    widget.config.geminiApiKey = _apiC.text.trim();
+    final helperLimit = int.tryParse(_helperLimitC.text.trim());
+    if (helperLimit == null || helperLimit < 0) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid daily message limit (0 or more).')),
+      );
+      return;
+    }
+    widget.config.ngmyHelperDailyMessageLimit = helperLimit;
+    var geminiSynced = true;
+    if (widget.config.geminiApiKey.isNotEmpty) {
+      geminiSynced = await widget.persistGeminiKey(widget.config.geminiApiKey);
+    }
+    await ngmyFlushCriticalConfigLocalAndCloud(widget.config, cloud: false);
+    final brandingOk = await ngmyPersistAppBrandingSettings(widget.config);
+    final helperOk = await ngmyPersistHelperAiSettings(widget.config);
+    if (mounted) {
+      setState(() {
+        _pendingLogoBytes = null;
+        _logoC.text = widget.config.logoUrl;
+      });
+    }
+    widget.onDataChanged();
+    final mgmtOk = await widget.onPersistManagement?.call() ?? await ngmyAdminPersistManagementConfig(widget.config);
+    if (!mounted) return;
+    final detected = ngmyAiProviderLabel(ngmyParseAiCredentials(widget.config.geminiApiKey).provider);
+    final allCloudOk = geminiSynced && mgmtOk && helperOk && brandingOk;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          allCloudOk
+              ? 'AI settings saved to cloud ($detected). Helper, Advisors, and Scanner will use this key.'
+              : 'Saved locally. Supabase sync failed — check connection.',
+        ),
+        backgroundColor: allCloudOk ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
+      ),
+    );
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final panel = isDark ? const Color(0xFF0F111A) : Colors.white;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+        margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+        decoration: BoxDecoration(
+          color: panel,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 10, 22, 18),
+        child: Column(
+          children: [
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10))),
+            const SizedBox(height: 15),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text('NGMY AI Settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                ),
+                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Powers NGMY Helper, NGMY Advisors, Document Scanner, App Builder AI, and more.',
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
+            ),
+            const SizedBox(height: 14),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.auto_awesome_rounded, color: Colors.blue, size: 20),
+                          SizedBox(width: 10),
+                          Text('AI & App Configuration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      Row(
+                        children: [
+                          _appLogoPreview(isDark),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _logoUploading ? null : _pickAppLogoImage,
+                              icon: const Icon(Icons.photo_library_rounded, size: 18),
+                              label: Text(_pendingLogoBytes != null ? 'Change logo' : 'Upload logo image'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _logoC,
+                        decoration: widget.adminInputDecoration(
+                          label: 'App logo URL (optional)',
+                          hint: 'Or paste an image link',
+                          isDark: isDark,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _apiC,
+                        obscureText: !_apiKeyVisible,
+                        decoration: widget.adminInputDecoration(
+                          label: 'AI API Key (any provider)',
+                          hint: 'Gemini (AIza…), OpenAI (sk-…), Claude (sk-ant-…)',
+                          isDark: isDark,
+                        ).copyWith(
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(_apiKeyVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+                                tooltip: _apiKeyVisible ? 'Hide API key' : 'Show API key',
+                                onPressed: () => setState(() => _apiKeyVisible = !_apiKeyVisible),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.info_outline, size: 20),
+                                tooltip: 'View API key info',
+                                onPressed: _showAiApiKeyHelp,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Auto-detects provider. Optional prefix: gemini:, openai:, anthropic:. '
+                        'For other APIs: compat:https://api.example.com/v1|your-key',
+                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _helperLimitC,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: widget.adminInputDecoration(
+                          label: 'NGMY Helper messages per 24 hours',
+                          hint: '0 = unlimited',
+                          isDark: isDark,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'How many messages each user can send to NGMY Helper in a rolling 24-hour window. Admins are not limited. NGMY Advisors use separate time settings in Communicate.',
+                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
+                      ),
+                      const SizedBox(height: 15),
+                      ElevatedButton(
+                        onPressed: _logoUploading ? null : _saveSettings,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 45),
+                        ),
+                        child: const Text('SAVE AI SETTINGS', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
