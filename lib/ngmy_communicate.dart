@@ -316,18 +316,23 @@ class NgmyCommunicateProfile {
 /// Solid panel — no backdrop blur (keeps text sharp on web & mobile).
 Widget _loveGlassPanel({
   required Widget child,
+  BuildContext? context,
+  bool? isDark,
   BorderRadius borderRadius = const BorderRadius.all(Radius.circular(20)),
   double blur = 16,
   double fillAlpha = 0.08,
 }) {
+  final dark = isDark ?? (context != null && Theme.of(context!).brightness == Brightness.dark);
   return ngmyClipBackdrop(
     borderRadius: borderRadius,
     sigma: blur,
     child: Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2235).withValues(alpha: fillAlpha < 0.2 ? 0.94 : fillAlpha),
+        color: dark
+            ? const Color(0xFF1A2235).withValues(alpha: fillAlpha < 0.2 ? 0.94 : fillAlpha)
+            : Colors.white.withValues(alpha: fillAlpha < 0.2 ? 0.96 : 0.88),
         borderRadius: borderRadius,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        border: Border.all(color: dark ? Colors.white.withValues(alpha: 0.14) : Colors.black.withValues(alpha: 0.08)),
       ),
       child: child,
     ),
@@ -518,6 +523,9 @@ class NgmyCommunicateWorldScreen extends StatefulWidget {
 class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen> with TickerProviderStateMixin {
   NgmyCommunicateProfile? _selected;
   String _filter = 'all';
+  String _searchQuery = '';
+  bool _searchOpen = false;
+  final _searchCtrl = TextEditingController();
   late final AnimationController _bgCtrl;
   late final AnimationController _floatCtrl;
 
@@ -534,20 +542,36 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
 
   @override
   void dispose() {
+    _searchCtrl.dispose();
     _bgCtrl.dispose();
     _floatCtrl.dispose();
     super.dispose();
   }
 
+  void _toggleSearch() {
+    setState(() {
+      _searchOpen = !_searchOpen;
+      if (!_searchOpen) {
+        _searchQuery = '';
+        _searchCtrl.clear();
+      }
+    });
+  }
+
   List<NgmyCommunicateProfile> get _profiles {
-    final all = ngmyCommunicateProfilesFromConfig(widget.config);
-    if (_filter == 'female') return all.where((p) => p.gender == 'female').toList();
-    if (_filter == 'male') return all.where((p) => p.gender == 'male').toList();
+    var all = ngmyCommunicateProfilesFromConfig(widget.config);
+    if (_filter == 'female') all = all.where((p) => p.gender == 'female').toList();
+    if (_filter == 'male') all = all.where((p) => p.gender == 'male').toList();
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      all = all.where((p) => p.name.toLowerCase().contains(q)).toList();
+    }
     return all;
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (_selected != null) {
       return _LoveWorldChat(
         user: widget.user,
@@ -555,112 +579,158 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
         apiKey: widget.apiKey,
         profile: _selected!,
         bgCtrl: _bgCtrl,
+        floatCtrl: _floatCtrl,
         onBack: () => setState(() => _selected = null),
         onChargeWallet: widget.onChargeWallet,
       );
     }
-    final topPad = MediaQuery.paddingOf(context).top + 300;
-    final bottomPad = MediaQuery.paddingOf(context).bottom + 96;
+    final topPad = MediaQuery.paddingOf(context).top + (_searchOpen ? 210 : 178);
+    final bottomPad = MediaQuery.paddingOf(context).bottom + 12;
+    final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF3F7FF);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0612),
+      backgroundColor: scaffoldBg,
       body: Stack(
         children: [
-          _LoveWorldBackground(ctrl: _bgCtrl, floatCtrl: _floatCtrl),
-          Positioned.fill(child: _companionGrid(topPad: topPad, bottomPad: bottomPad)),
+          _LoveWorldBackground(ctrl: _bgCtrl, floatCtrl: _floatCtrl, isDark: isDark),
+          Positioned.fill(child: _companionGrid(context, topPad: topPad, bottomPad: bottomPad)),
           SafeArea(
             bottom: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _worldHeader(),
-                _welcomeBanner(),
-                _filterMenu(),
-                const SizedBox(height: 22),
-              ],
-            ),
+            child: _worldTopFrame(context),
           ),
-          Positioned(left: 0, right: 0, bottom: 0, child: SafeArea(top: false, child: _worldBottomMenu())),
         ],
       ),
     );
   }
 
-  Widget _worldHeader() {
+  Widget _worldTopFrame(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : Colors.black87;
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08);
+    final mutedIcon = isDark ? Colors.white70 : Colors.black54;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 14, 0),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(15, 8, 15, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (widget.embedded)
-            const SizedBox(width: 48)
-          else
-            IconButton(
-              onPressed: () => NgmyNavigator.pop(context),
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.08),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                ),
-                child: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
+          ngmyClipBackdrop(
+            borderRadius: BorderRadius.circular(35),
+            child: Container(
+              height: 64,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(35),
+                border: Border.all(color: borderColor),
+              ),
+              child: Row(
+                children: [
+                  Material(
+                    color: const Color(0xFFEC4899).withValues(alpha: isDark ? 0.24 : 0.14),
+                    shape: const StadiumBorder(),
+                    child: InkWell(
+                      customBorder: const StadiumBorder(),
+                      onTap: () => setState(() {
+                        _searchOpen = false;
+                        _searchQuery = '';
+                        _searchCtrl.clear();
+                      }),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.explore_rounded, size: 17, color: Color(0xFFEC4899)),
+                            SizedBox(width: 6),
+                            Text('Discover', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFFEC4899))),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        'WORLD OF LOVE',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                          letterSpacing: 1.2,
+                          color: titleColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Material(
+                    color: _searchOpen ? const Color(0xFFEC4899).withValues(alpha: isDark ? 0.22 : 0.12) : Colors.transparent,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: _toggleSearch,
+                      child: Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Icon(
+                          Icons.search_rounded,
+                          size: 22,
+                          color: _searchOpen ? const Color(0xFFEC4899) : mutedIcon,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          const Expanded(
-            child: Column(
-              children: [
-                Text('NGMY', style: TextStyle(color: Color(0xFFF9A8D4), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 3)),
-                Text('World of Love', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-              ],
-            ),
           ),
-          const Icon(Icons.favorite_rounded, color: Color(0xFFEC4899), size: 26),
+          if (_searchOpen) ...[
+            const SizedBox(height: 10),
+            TextField(
+              controller: _searchCtrl,
+              onChanged: (v) => setState(() => _searchQuery = v),
+              style: TextStyle(color: titleColor, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search by name...',
+                hintStyle: TextStyle(color: mutedIcon),
+                prefixIcon: Icon(Icons.person_search_rounded, color: mutedIcon, size: 22),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.close_rounded, color: mutedIcon, size: 20),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surface,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide(color: borderColor),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide(color: borderColor),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: const BorderSide(color: Color(0xFFEC4899), width: 1.4),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          _filterMenu(context),
         ],
       ),
     );
   }
+  Widget _filterMenu(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final idleBg = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04);
+    final idleBorder = isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08);
+    final idleFg = isDark ? Colors.white54 : Colors.black45;
 
-  Widget _welcomeBanner() {
-    return AnimatedBuilder(
-      animation: _floatCtrl,
-      builder: (context, _) {
-        final lift = _floatCtrl.value * 6;
-        return Transform.translate(
-          offset: Offset(0, -lift),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
-            child: _loveGlassPanel(
-              borderRadius: BorderRadius.circular(22),
-              fillAlpha: 0.1,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                child: Column(
-                  children: [
-                    const Icon(Icons.favorite_rounded, color: Color(0xFFEC4899), size: 30),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Welcome — you belong here',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, height: 1.3),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Another world of love. Real conversations, real feelings.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12, height: 1.4),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _filterMenu() {
     Widget chip(String id, String label, IconData icon) {
       final sel = _filter == id;
       return Expanded(
@@ -672,19 +742,17 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              gradient: sel
-                  ? const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)])
-                  : null,
-              color: sel ? null : Colors.white.withValues(alpha: 0.06),
-              border: Border.all(color: sel ? Colors.transparent : Colors.white.withValues(alpha: 0.12)),
+              gradient: sel ? const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)]) : null,
+              color: sel ? null : idleBg,
+              border: Border.all(color: sel ? Colors.transparent : idleBorder),
               boxShadow: sel ? [BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.35), blurRadius: 12)] : null,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 14, color: sel ? Colors.white : Colors.white54),
+                Icon(icon, size: 14, color: sel ? Colors.white : idleFg),
                 const SizedBox(width: 5),
-                Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: sel ? Colors.white : Colors.white54)),
+                Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: sel ? Colors.white : idleFg)),
               ],
             ),
           ),
@@ -692,26 +760,29 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
-      child: _loveGlassPanel(
-        borderRadius: BorderRadius.circular(18),
-        fillAlpha: 0.08,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-          child: Row(children: [chip('all', 'All', Icons.grid_view_rounded), chip('female', 'Girls', Icons.female_rounded), chip('male', 'Guys', Icons.male_rounded)]),
-        ),
+    return _loveGlassPanel(
+      context: context,
+      borderRadius: BorderRadius.circular(18),
+      fillAlpha: 0.08,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        child: Row(children: [chip('all', 'All', Icons.grid_view_rounded), chip('female', 'Girls', Icons.female_rounded), chip('male', 'Guys', Icons.male_rounded)]),
       ),
     );
   }
 
-  Widget _companionGrid({required double topPad, required double bottomPad}) {
+  Widget _companionGrid(BuildContext context, {required double topPad, required double bottomPad}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final emptyColor = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black45;
     final profiles = _profiles;
     if (profiles.isEmpty) {
       return Center(
         child: Padding(
           padding: EdgeInsets.only(top: topPad),
-          child: Text('No one here yet — check back soon 💜', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14)),
+          child: Text(
+            _searchQuery.trim().isNotEmpty ? 'No match for "$_searchQuery"' : 'No one here yet — check back soon',
+            style: TextStyle(color: emptyColor, fontSize: 14),
+          ),
         ),
       );
     }
@@ -728,43 +799,12 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
         profile: profiles[i],
         index: i,
         floatCtrl: _floatCtrl,
+        isDark: isDark,
         onTap: () {
           HapticFeedback.lightImpact();
           setState(() => _selected = profiles[i]);
         },
       ),
-    );
-  }
-
-  Widget _worldBottomMenu() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: _loveGlassPanel(
-        borderRadius: BorderRadius.circular(20),
-        fillAlpha: 0.06,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _menuItem(Icons.explore_rounded, 'Discover', true),
-              _menuItem(Icons.chat_bubble_rounded, 'Chats', false),
-              _menuItem(Icons.favorite_border_rounded, 'Loved', false),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _menuItem(IconData icon, String label, bool active) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 22, color: active ? const Color(0xFFF472B6) : Colors.white38),
-        const SizedBox(height: 4),
-        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: active ? const Color(0xFFF472B6) : Colors.white38)),
-      ],
     );
   }
 }
@@ -773,12 +813,21 @@ class _Companion3DCard extends StatelessWidget {
   final NgmyCommunicateProfile profile;
   final int index;
   final AnimationController floatCtrl;
+  final bool isDark;
   final VoidCallback onTap;
 
-  const _Companion3DCard({required this.profile, required this.index, required this.floatCtrl, required this.onTap});
+  const _Companion3DCard({
+    required this.profile,
+    required this.index,
+    required this.floatCtrl,
+    required this.isDark,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final nameColor = isDark ? Colors.white : const Color(0xFF111827);
+    final subColor = isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black54;
     return AnimatedBuilder(
       animation: floatCtrl,
       builder: (context, _) {
@@ -794,6 +843,7 @@ class _Companion3DCard extends StatelessWidget {
           child: GestureDetector(
             onTap: onTap,
             child: _loveGlassPanel(
+              context: context,
               borderRadius: BorderRadius.circular(22),
               fillAlpha: 0.1,
               child: Stack(
@@ -813,13 +863,13 @@ class _Companion3DCard extends StatelessWidget {
                           Text(
                             profile.name,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15),
+                            style: TextStyle(color: nameColor, fontWeight: FontWeight.w900, fontSize: 15),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             profile.genderLabel,
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
+                            style: TextStyle(color: subColor, fontSize: 11),
                           ),
                           const SizedBox(height: 10),
                           Container(
@@ -854,8 +904,9 @@ class _Companion3DCard extends StatelessWidget {
 class _LoveWorldBackground extends StatelessWidget {
   final AnimationController ctrl;
   final AnimationController floatCtrl;
+  final bool isDark;
 
-  const _LoveWorldBackground({required this.ctrl, required this.floatCtrl});
+  const _LoveWorldBackground({required this.ctrl, required this.floatCtrl, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -863,6 +914,7 @@ class _LoveWorldBackground extends StatelessWidget {
       animation: Listenable.merge([ctrl, floatCtrl]),
       builder: (context, _) {
         final t = ctrl.value;
+        final emojiOpacity = isDark ? 0.18 : 0.34;
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -871,11 +923,9 @@ class _LoveWorldBackground extends StatelessWidget {
                 gradient: RadialGradient(
                   center: Alignment(0.2 + math.sin(t * math.pi * 2) * 0.3, -0.3 + math.cos(t * math.pi * 2) * 0.2),
                   radius: 1.2,
-                  colors: [
-                    const Color(0xFF4C1D95),
-                    const Color(0xFF1E0A28),
-                    const Color(0xFF0A0612),
-                  ],
+                  colors: isDark
+                      ? [const Color(0xFF4C1D95), const Color(0xFF1E0A28), const Color(0xFF121212)]
+                      : [const Color(0xFFFCE7F3), const Color(0xFFF3F7FF), const Color(0xFFFFFFFF)],
                 ),
               ),
             ),
@@ -888,7 +938,7 @@ class _LoveWorldBackground extends StatelessWidget {
                 left: MediaQuery.sizeOf(context).width * x - 8,
                 top: MediaQuery.sizeOf(context).height * y,
                 child: Opacity(
-                  opacity: 0.15 + (i % 4) * 0.08,
+                  opacity: emojiOpacity + (i % 4) * (isDark ? 0.06 : 0.08),
                   child: Text(['💕', '✨', '💜', '🌸', '💖'][i % 5], style: TextStyle(fontSize: 12 + (i % 3) * 4.0)),
                 ),
               );
@@ -901,7 +951,9 @@ class _LoveWorldBackground extends StatelessWidget {
                 height: 200,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [const Color(0xFFEC4899).withValues(alpha: 0.25), Colors.transparent]),
+                  gradient: RadialGradient(
+                    colors: [const Color(0xFFEC4899).withValues(alpha: isDark ? 0.25 : 0.14), Colors.transparent],
+                  ),
                 ),
               ),
             ),
@@ -913,7 +965,9 @@ class _LoveWorldBackground extends StatelessWidget {
                 height: 180,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [const Color(0xFF9333EA).withValues(alpha: 0.2), Colors.transparent]),
+                  gradient: RadialGradient(
+                    colors: [const Color(0xFF9333EA).withValues(alpha: isDark ? 0.2 : 0.1), Colors.transparent],
+                  ),
                 ),
               ),
             ),
@@ -930,6 +984,7 @@ class _LoveWorldChat extends StatefulWidget {
   final String apiKey;
   final NgmyCommunicateProfile profile;
   final AnimationController bgCtrl;
+  final AnimationController floatCtrl;
   final VoidCallback onBack;
   final Future<bool> Function(double amount, String description)? onChargeWallet;
 
@@ -939,6 +994,7 @@ class _LoveWorldChat extends StatefulWidget {
     required this.apiKey,
     required this.profile,
     required this.bgCtrl,
+    required this.floatCtrl,
     required this.onBack,
     this.onChargeWallet,
   });
@@ -1325,18 +1381,21 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final mins = NgmyCommunicatePayments.minutesPerPaymentFromConfig(widget.config);
     final totalSec = _usedSeconds + _sessionSeconds;
     final remaining = (NgmyCommunicatePayments.thresholdSeconds(widget.config) - totalSec).clamp(0, 999999);
     final remMin = (remaining / 60).ceil();
     final topPad = MediaQuery.paddingOf(context).top + 76;
     final bottomPad = MediaQuery.paddingOf(context).bottom + 88;
+    final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF3F7FF);
+    final mutedText = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black45;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0612),
+      backgroundColor: scaffoldBg,
       body: Stack(
         children: [
-          _LoveWorldBackground(ctrl: widget.bgCtrl, floatCtrl: widget.bgCtrl),
+          _LoveWorldBackground(ctrl: widget.bgCtrl, floatCtrl: widget.floatCtrl, isDark: isDark),
           Positioned.fill(
             child: ListView.builder(
               controller: _scroll,
