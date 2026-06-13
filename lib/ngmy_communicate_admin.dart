@@ -220,7 +220,7 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'World of Love · ${ngmyCommunicateRoleLabel(role)}',
+                                '$kNgmyAdvisorsHubTitle · ${ngmyCommunicateRoleLabel(role)}',
                                 style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12, fontWeight: FontWeight.w600),
                               ),
                             ],
@@ -405,7 +405,7 @@ Future<NgmyCommunicateProfile?> _openProfileEditor(
                               border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                             ),
                             child: SwitchListTile(
-                              title: const Text('Visible in World of Love', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                              title: Text('Visible in $kNgmyAdvisorsHubTitle', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                               subtitle: Text('Off = hidden from users', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11)),
                               value: active,
                               activeThumbColor: const Color(0xFFEC4899),

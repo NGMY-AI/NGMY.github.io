@@ -1120,7 +1120,7 @@ class AppConfig {
   /// Wallet fee to unlock unlimited translations for the rest of the week.
   double translateWeeklyUnlockFee;
   Map<String, String> translateWeekPassByEmail;
-  /// Admin toggle — World of Love tab (formerly Media Hub).
+  /// Admin toggle — NGMY Advisors tab (formerly Media Hub).
   bool communicateEnabled;
   /// Admin toggle — center star in NGMY Hub opens App Builder for all users.
   bool appBuilderEnabled;
@@ -12886,7 +12886,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               _nav(1, Icons.trending_up_rounded),
               _nav(2, Icons.account_balance_wallet_rounded),
               _navC(3),
-              _nav(4, Icons.favorite_rounded, selectedColor: const Color(0xFFEC4899)),
+              _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
               _nav(5, Icons.bar_chart_rounded),
               _nav(6, Icons.person_rounded),
             ],
@@ -29725,27 +29725,27 @@ class MediaHubScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!_canOpenWorld) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF0A0612),
+      return Scaffold(
+        backgroundColor: const Color(0xFF0A0612),
         body: SafeArea(
           child: Center(
             child: Padding(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.favorite_rounded, color: Color(0xFFEC4899), size: 48),
-                  SizedBox(height: 16),
+                  Icon(kNgmyAdvisorsHubNavIcon, color: kNgmyAdvisorsHubAccent, size: 48),
+                  const SizedBox(height: 16),
                   Text(
-                    'World of Love',
+                    kNgmyAdvisorsHubTitle,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
-                    'Opens when your admin enables World of Love.',
+                    'Opens when your admin enables $kNgmyAdvisorsHubTitle.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+                    style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
                   ),
                 ],
               ),
@@ -31910,7 +31910,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                                         ? 'Help Topics • AI returns when your 24h limit resets'
                                         : 'Help Topics • Instant answers')
                                     : (_helperAiTimePaymentActive
-                                        ? '~${(_helperAiRemainingSeconds / 60).ceil()} min AI left (shared with World of Love)'
+                                        ? '~${(_helperAiRemainingSeconds / 60).ceil()} min AI left (shared with $kNgmyAdvisorsHubTitle)'
                                         : (_isBoss
                                             ? 'Online • Personal assistant for Sir'
                                             : 'Online • Chat & community updates')),

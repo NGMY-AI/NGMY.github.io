@@ -395,7 +395,7 @@ class NgmyCommunicateRelationshipStore {
   }
 }
 
-/// Per-user language pair for Translator companions (World of Love).
+/// Per-user language pair for Translator companions (NGMY Advisors).
 class NgmyTranslatorLanguageStore {
   static String _key(String email, String profileId) =>
       'ngmy_translator_langs_${email.toLowerCase().trim()}_${profileId.trim()}';

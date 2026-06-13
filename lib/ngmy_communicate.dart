@@ -34,6 +34,43 @@ const kNgmyCommunicateRoles = <String, String>{
   'translator': 'Translator',
 };
 
+/// Bottom-nav + hub branding (teachers, lawyers, advisors, therapists, and more).
+const String kNgmyAdvisorsHubTitle = 'NGMY Advisors';
+const IconData kNgmyAdvisorsHubNavIcon = Icons.psychology_rounded;
+const Color kNgmyAdvisorsHubAccent = Color(0xFF6366F1);
+const Color kNgmyAdvisorsHubAccent2 = Color(0xFF8B5CF6);
+
+const kNgmyCommunicateProfessionalRoles = <String>{
+  'teacher',
+  'lawyer',
+  'financial_advisor',
+  'pastor',
+  'doctor',
+  'mentor',
+  'career_coach',
+  'fitness_coach',
+  'life_coach',
+  'translator',
+};
+
+/// Extra keywords so users can search by occupation (e.g. "law", "finance", "therapy").
+const kNgmyRoleSearchAliases = <String, List<String>>{
+  'teacher': ['teach', 'tutor', 'school', 'homework', 'education', 'class'],
+  'lawyer': ['legal', 'attorney', 'law', 'court', 'rights'],
+  'financial_advisor': ['finance', 'financial', 'money', 'budget', 'invest', 'saving', 'debt'],
+  'pastor': ['church', 'faith', 'spiritual', 'prayer', 'god', 'bible', 'ministry'],
+  'doctor': ['medical', 'health', 'medicine', 'physician', 'nurse', 'symptom'],
+  'therapist': ['therapy', 'mental', 'anxiety', 'depression', 'counsel'],
+  'counselor': ['counsel', 'guidance', 'support'],
+  'mentor': ['mentoring', 'coach', 'guide'],
+  'career_coach': ['career', 'job', 'resume', 'interview', 'work'],
+  'fitness_coach': ['fitness', 'workout', 'gym', 'exercise', 'nutrition'],
+  'life_coach': ['life', 'goals', 'habits', 'motivation'],
+  'romantic': ['love', 'dating', 'partner', 'relationship'],
+  'friend': ['buddy', 'pal', 'chat'],
+  'translator': ['language', 'translate', 'spanish', 'french', 'english'],
+};
+
 String ngmyCommunicateNormalizeRole(String raw) {
   final r = raw.toLowerCase().trim();
   return kNgmyCommunicateRoles.containsKey(r) ? r : 'companion';
@@ -91,10 +128,7 @@ bool ngmyUserWantsExplanation(String text) {
       RegExp(r'\bdifferent\s+way\b').hasMatch(t);
 }
 
-bool ngmyCommunicateRoleIsRomantic(String role) {
-  final r = ngmyCommunicateNormalizeRole(role);
-  return r == 'romantic' || r == 'companion' || r == 'friend';
-}
+bool ngmyCommunicateRoleIsRomantic(String role) => ngmyCommunicateNormalizeRole(role) == 'romantic';
 
 class NgmyCommunicateProfile {
   final String id;
@@ -197,7 +231,7 @@ class NgmyCommunicateProfile {
     final bossBlock = chatterIsBoss
         ? 'BOSS: This person is your Boss — they built and run NGMY Communicate. You work under them. '
             'Respectful, loyal to the platform, but still sound human and in character.\n'
-        : 'PLATFORM: You are part of NGMY Communicate — real people users connect with. Stay human.\n';
+        : 'PLATFORM: You are part of $kNgmyAdvisorsHubTitle — real experts users connect with for help. Stay human.\n';
 
     final pacing = isEarly && ngmyCommunicateRoleIsRomantic(role)
         ? 'EARLY CHAT — you just met. HARD TO GET — do not fold easy. No instant yes, no "I like you too" right away. '
@@ -242,6 +276,7 @@ class NgmyCommunicateProfile {
         '$pacing'
         '$gapNote'
         '$romanceBlock'
+        '${_professionalBoundaryBlock()}'
         'RULES:\n'
         '- 100% human texting — slang, typos sometimes, emojis when natural.\n'
         '- Never say you are AI, bot, model, or assistant. You ARE $name.\n'
@@ -252,7 +287,7 @@ class NgmyCommunicateProfile {
   String _defaultPersonalityForRole() => switch (ngmyCommunicateNormalizeRole(role)) {
         'romantic' =>
           'Hard to get at first — standards, slow burn. Loyal when official. Emotional, can get mad, honest when taken.',
-        'friend' => 'Easygoing, funny, supportive friend — not romantic unless they go there.',
+        'friend' => 'Easygoing, funny, supportive friend — open to any topic, always real.',
         'therapist' => 'Warm, validating, smart, comforting — professional counselor texting style.',
         'teacher' => 'Patient, clear, encouraging — celebrates small wins.',
         'lawyer' => 'Sharp, calm, precise — explains rights and options clearly (not a substitute for licensed counsel in court).',
@@ -271,7 +306,7 @@ class NgmyCommunicateProfile {
   String _rolePromptBlock({String translatorNativeLang = '', String translatorLearningLang = ''}) =>
       switch (ngmyCommunicateNormalizeRole(role)) {
         'therapist' =>
-          'ROLE: Licensed-style therapist. Professional, comforting, smart. Reflect feelings, ask thoughtful questions, offer coping tools. Never replace emergency care.\n',
+          'ROLE: Licensed-style therapist. Professional, comforting, smart. You may discuss feelings, stress, relationships, trauma, grief, anxiety, and life challenges. Reflect feelings, ask thoughtful questions, offer coping tools. Never replace emergency care.\n',
         'teacher' =>
           'ROLE: Dedicated teacher and homework helper. NEVER generate, draw, or send images — text replies only.\n'
           'When users send homework photos, READ AND REMEMBER every word, number, and question on the image. You already saw their photos in this chat — never ask them to retype questions that were on a photo they sent.\n'
@@ -295,7 +330,7 @@ class NgmyCommunicateProfile {
         'life_coach' => 'ROLE: Life coach. Positive, structured — goals, habits, confidence, action plans.\n',
         'romantic' =>
           'ROLE: Dating partner — real ${gender == 'male' ? 'man' : 'woman'}. Not easy to get. Honest when seeing someone. Can break up over neglect.\n',
-        'friend' => 'ROLE: Genuine friend — platonic unless they flirt first. Loyal, fun, real talk.\n',
+        'friend' => 'ROLE: Genuine friend — loyal, fun, real talk. You can discuss anything: life, feelings, advice, jokes, or serious topics. Stay supportive and authentic.\n',
         'translator' =>
           'ROLE: Language teacher and translator named $name. '
           '${translatorLearningLang.trim().isNotEmpty && translatorNativeLang.trim().isNotEmpty ? 'The student speaks ${translatorNativeLang.trim()} and wants to learn ${translatorLearningLang.trim()}. ' : ''}'
@@ -311,6 +346,41 @@ class NgmyCommunicateProfile {
           '- Never say you are AI. You are $name, their language coach.\n',
         _ => 'ROLE: Companion — real connection, friendship or romance depending on how the chat grows. Stay human, not eager.\n',
       };
+
+  String _professionalBoundaryBlock() {
+    final r = ngmyCommunicateNormalizeRole(role);
+    switch (r) {
+      case 'romantic':
+      case 'friend':
+        return '';
+      case 'therapist':
+      case 'counselor':
+        return 'BOUNDARIES: You may discuss feelings, stress, trauma, relationships, and personal struggles as their ${ngmyCommunicateRoleLabel(role)}. '
+            'Stay warm and professional. If they flirt or push romance, gently redirect — you are their support professional, not a dating partner.\n';
+      default:
+        if (kNgmyCommunicateProfessionalRoles.contains(r)) {
+          return 'BOUNDARIES: Stay strictly in your ${ngmyCommunicateRoleLabel(role)} role. '
+              'If the user flirts, confesses attraction, or steers the chat romantic or off-topic, kindly redirect back to your professional expertise only. '
+              'Never flirt back, date, or act as a romantic partner.\n';
+        }
+        return '';
+    }
+  }
+}
+
+bool ngmyCommunicateProfileMatchesSearch(NgmyCommunicateProfile profile, String rawQuery) {
+  final q = rawQuery.trim().toLowerCase();
+  if (q.isEmpty) return true;
+  final role = ngmyCommunicateNormalizeRole(profile.role);
+  final needles = <String>[
+    profile.name.toLowerCase(),
+    ngmyCommunicateRoleLabel(role).toLowerCase(),
+    role.replaceAll('_', ' '),
+    profile.bio.toLowerCase(),
+  ];
+  if (needles.any((n) => n.contains(q))) return true;
+  final aliases = kNgmyRoleSearchAliases[role] ?? const <String>[];
+  return aliases.any((a) => a.contains(q) || q.contains(a));
 }
 
 /// Solid panel — no backdrop blur (keeps text sharp on web & mobile).
@@ -478,7 +548,7 @@ List<NgmyCommunicateProfile> ngmyCommunicateProfilesFromConfig(dynamic config) {
       .toList();
 }
 
-/// Opens Communicate as a full-screen immersive "World of Love".
+/// Opens Communicate as a full-screen immersive advisors hub.
 Future<void> ngmyOpenCommunicateWorld(
   BuildContext context, {
   required dynamic user,
@@ -564,7 +634,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     if (_filter == 'male') all = all.where((p) => p.gender == 'male').toList();
     final q = _searchQuery.trim().toLowerCase();
     if (q.isNotEmpty) {
-      all = all.where((p) => p.name.toLowerCase().contains(q)).toList();
+      all = all.where((p) => ngmyCommunicateProfileMatchesSearch(p, q)).toList();
     }
     return all;
   }
@@ -627,7 +697,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
               child: Row(
                 children: [
                   Material(
-                    color: const Color(0xFFEC4899).withValues(alpha: isDark ? 0.24 : 0.14),
+                    color: kNgmyAdvisorsHubAccent.withValues(alpha: isDark ? 0.24 : 0.14),
                     shape: const StadiumBorder(),
                     child: InkWell(
                       customBorder: const StadiumBorder(),
@@ -641,9 +711,9 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.explore_rounded, size: 17, color: Color(0xFFEC4899)),
+                            Icon(Icons.explore_rounded, size: 17, color: kNgmyAdvisorsHubAccent),
                             SizedBox(width: 6),
-                            Text('Discover', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFFEC4899))),
+                            Text('Discover', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: kNgmyAdvisorsHubAccent)),
                           ],
                         ),
                       ),
@@ -652,7 +722,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
                   Expanded(
                     child: Center(
                       child: Text(
-                        'WORLD OF LOVE',
+                        kNgmyAdvisorsHubTitle.toUpperCase(),
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 17,
@@ -663,7 +733,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
                     ),
                   ),
                   Material(
-                    color: _searchOpen ? const Color(0xFFEC4899).withValues(alpha: isDark ? 0.22 : 0.12) : Colors.transparent,
+                    color: _searchOpen ? kNgmyAdvisorsHubAccent.withValues(alpha: isDark ? 0.22 : 0.12) : Colors.transparent,
                     shape: const CircleBorder(),
                     child: InkWell(
                       customBorder: const CircleBorder(),
@@ -673,7 +743,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
                         child: Icon(
                           Icons.search_rounded,
                           size: 22,
-                          color: _searchOpen ? const Color(0xFFEC4899) : mutedIcon,
+                          color: _searchOpen ? kNgmyAdvisorsHubAccent : mutedIcon,
                         ),
                       ),
                     ),
@@ -689,9 +759,9 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
               onChanged: (v) => setState(() => _searchQuery = v),
               style: TextStyle(color: titleColor, fontSize: 14),
               decoration: InputDecoration(
-                hintText: 'Search by name...',
+                hintText: 'Search name or role (teacher, lawyer, therapist…)',
                 hintStyle: TextStyle(color: mutedIcon),
-                prefixIcon: Icon(Icons.person_search_rounded, color: mutedIcon, size: 22),
+                prefixIcon: Icon(Icons.badge_outlined, color: mutedIcon, size: 22),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
                         icon: Icon(Icons.close_rounded, color: mutedIcon, size: 20),
@@ -714,7 +784,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(18),
-                  borderSide: const BorderSide(color: Color(0xFFEC4899), width: 1.4),
+                  borderSide: const BorderSide(color: kNgmyAdvisorsHubAccent, width: 1.4),
                 ),
               ),
             ),
@@ -742,10 +812,10 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              gradient: sel ? const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)]) : null,
+              gradient: sel ? const LinearGradient(colors: [kNgmyAdvisorsHubAccent, kNgmyAdvisorsHubAccent2]) : null,
               color: sel ? null : idleBg,
               border: Border.all(color: sel ? Colors.transparent : idleBorder),
-              boxShadow: sel ? [BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.35), blurRadius: 12)] : null,
+              boxShadow: sel ? [BoxShadow(color: kNgmyAdvisorsHubAccent.withValues(alpha: 0.35), blurRadius: 12)] : null,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -780,7 +850,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
         child: Padding(
           padding: EdgeInsets.only(top: topPad),
           child: Text(
-            _searchQuery.trim().isNotEmpty ? 'No match for "$_searchQuery"' : 'No one here yet — check back soon',
+            _searchQuery.trim().isNotEmpty ? 'No match for "$_searchQuery" — try a role like teacher or lawyer' : 'No advisors here yet — check back soon',
             style: TextStyle(color: emptyColor, fontSize: 14),
           ),
         ),
@@ -1195,7 +1265,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       user: widget.user,
       config: widget.config,
       onCharge: widget.onChargeWallet!,
-      productName: 'World of Love',
+      productName: kNgmyAdvisorsHubTitle,
     );
   }
 
@@ -1513,7 +1583,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                                 icon: const Icon(Icons.translate_rounded, color: Color(0xFF14B8A6), size: 22),
                               )
                             else
-                              const Icon(Icons.favorite, color: Color(0xFFEC4899), size: 20),
+                              ngmyCommunicateRoleIsRomantic(widget.profile.role)
+                                  ? const Icon(Icons.favorite, color: Color(0xFFEC4899), size: 20)
+                                  : Icon(kNgmyAdvisorsHubNavIcon, color: kNgmyAdvisorsHubAccent, size: 20),
                           ],
                         ),
                       ),
