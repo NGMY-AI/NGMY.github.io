@@ -9,7 +9,8 @@ class NgmySupabaseColumns {
       'civicRegistrarApplications,ngmyPopups,ngmyVideoPopups,jobPosts,jobWorkerApplications,'
       'gameInvites,civicSelfEnrollmentEnabled,civicRegistryPin,civicRegistryPinsByState,'
       'openedContributionReceiptKeys,dismissedContributionReceiptKeys,storeSellAccessEmails,'
-      'helpCampaignSpendings,'
+      'helpCampaignSpendings,helpModeActive,helpPurpose,helpCashApp,helpZelle,helpPhone,'
+      'helpScopeType,helpScopeValue,helpState,helpCampaignId,helpCampaignStartedAt,helpCampaignClosures,'
       'geminiApiKey,gemini_api_key,aiApiKey,ai_api_key,gameTimeLimits,diceSettings,'
       'familyTreeCreateFee,familyTreePhotoMonthlyFee,familyTreePhotoAccessUntilByEmail,logoUrl,'
       'officialCashApp,officialBitcoin,loanPhone,loanHowItWorks,loanCompanyZelle';

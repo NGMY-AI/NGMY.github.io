@@ -24,6 +24,8 @@ import 'ngmy_popups.dart';
 import 'ngmy_media_profile.dart';
 import 'ngmy_ai_memory.dart';
 import 'ngmy_ai_client.dart';
+import 'ngmy_civic_help_mode_storage.dart';
+import 'ngmy_elevenlabs_tts.dart';
 import 'ngmy_app_knowledge.dart';
 import 'ngmy_wallet_decisions.dart';
 import 'ngmy_news_retention.dart';
@@ -1060,6 +1062,8 @@ class AppConfig {
   String helpPhone;
   String helpScopeType; // all, city, room
   String helpScopeValue;
+  /// US state where help mode campaign is active (empty = legacy / any state).
+  String helpState;
   String helpCampaignId;
   String helpCampaignStartedAt;
   List<Map<String, dynamic>> helpCampaignClosures;
@@ -1166,6 +1170,7 @@ class AppConfig {
     this.helpPhone = '',
     this.helpScopeType = 'all',
     this.helpScopeValue = '',
+    this.helpState = '',
     this.helpCampaignId = '',
     this.helpCampaignStartedAt = '',
     this.helpCampaignClosures = const [],
@@ -1282,6 +1287,7 @@ class AppConfig {
     'helpPhone': helpPhone,
     'helpScopeType': helpScopeType,
     'helpScopeValue': helpScopeValue,
+    'helpState': helpState,
     'helpCampaignId': helpCampaignId,
     'helpCampaignStartedAt': helpCampaignStartedAt,
     'helpCampaignClosures': helpCampaignClosures,
@@ -1381,6 +1387,7 @@ class AppConfig {
     helpPhone: json['helpPhone'] ?? '',
     helpScopeType: json['helpScopeType'] ?? 'all',
     helpScopeValue: json['helpScopeValue'] ?? '',
+    helpState: (json['helpState'] ?? '').toString(),
     helpCampaignId: json['helpCampaignId'] ?? '',
     helpCampaignStartedAt: json['helpCampaignStartedAt'] ?? '',
     helpCampaignClosures: List<Map<String, dynamic>>.from((json['helpCampaignClosures'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
@@ -2642,6 +2649,17 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
     'helpRequests': config.helpRequests,
     'helpBusinesses': config.helpBusinesses,
     'helpCampaignSpendings': config.helpCampaignSpendings,
+    'helpModeActive': config.helpModeActive,
+    'helpPurpose': config.helpPurpose,
+    'helpCashApp': config.helpCashApp,
+    'helpZelle': config.helpZelle,
+    'helpPhone': config.helpPhone,
+    'helpScopeType': config.helpScopeType,
+    'helpScopeValue': config.helpScopeValue,
+    'helpState': config.helpState,
+    'helpCampaignId': config.helpCampaignId,
+    'helpCampaignStartedAt': config.helpCampaignStartedAt,
+    'helpCampaignClosures': config.helpCampaignClosures,
     'civicRegistrarApplications': config.civicRegistrarApplications,
     'jobPosts': config.jobPosts,
     'jobWorkerApplications': config.jobWorkerApplications,
@@ -6360,6 +6378,28 @@ String? ngmyApplyReferralCodeToUser({
   return referrer.email;
 }
 
+Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud() async {
+  if (!await ngmyCanReachCloud()) return [];
+  try {
+    final transData = await Supabase.instance.client
+        .from('transactions')
+        .select()
+        .eq('type', TransactionType.contribution.index)
+        .eq('status', TransactionStatus.approved.index)
+        .order('timestamp', ascending: false)
+        .limit(400)
+        .timeout(kNgmyCloudLoadTimeout);
+    if (transData == null) return [];
+    return (transData as List)
+        .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e as Map)))
+        .where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
+        .toList();
+  } catch (e) {
+    debugPrint('[civic] approved contributions fetch: $e');
+    return [];
+  }
+}
+
 class NGMYApp extends StatefulWidget {
   const NGMYApp({super.key, required this.launchBootstrap});
 
@@ -6766,6 +6806,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateWalletPaymentsFromAllBackups(_config);
     await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
     await ngmyHydrateAppBrandingFromAllBackups(_config);
+    await ngmyHydrateCivicHelpModeFromAllBackups(_config);
     await ngmyApplyStoreSellAccessFromSettings(_config);
     _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
     await _persistLocalOnly();
@@ -6982,6 +7023,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         .toList();
   }
 
+  Future<List<AppTransaction>> _fetchCloudApprovedContributions() => ngmyFetchApprovedContributionsFromCloud();
+
   Future<void> _refreshUserTransactionsFromCloud({bool force = false}) async {
     if (_currentUser == null || !await ngmyCanReachCloud()) return;
     final now = DateTime.now();
@@ -6992,7 +7035,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     _lastUserTxnCloudRefresh = now;
     try {
-      final remote = await _fetchCloudTransactionsForEmail(_currentUser!.email);
+      final own = await _fetchCloudTransactionsForEmail(_currentUser!.email);
+      final contributions = await _fetchCloudApprovedContributions();
+      final byId = <String, AppTransaction>{};
+      for (final t in own) {
+        if (t.id.isNotEmpty) byId[t.id] = t;
+      }
+      for (final t in contributions) {
+        if (t.id.isNotEmpty) byId[t.id] = t;
+      }
+      final remote = byId.values.toList();
       if (!mounted) return;
       await _refreshWalletDecisionLedger();
       setState(() {
@@ -7005,9 +7057,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _seedWithdrawalHoldTxnIds();
         if (!_ngmySessionIsAdmin(_currentUser)) {
           final key = ngmyNormalizeEmail(_currentUser!.email);
-          _allTransactions = _allTransactions
-              .where((t) => ngmyNormalizeEmail(t.userEmail) == key)
-              .toList();
+          _allTransactions = _allTransactions.where((t) {
+            if (ngmyNormalizeEmail(t.userEmail) == key) return true;
+            return t.type == TransactionType.contribution && t.status == TransactionStatus.approved;
+          }).toList();
         }
         _reconcileAllUserBalances();
       });
@@ -8003,6 +8056,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         await ngmyHydrateCivicSelfEnrollmentFromAllBackups(next);
         await ngmyHydrateCivicRegistryMembersFromAllBackups(next, _allUsers);
+        await ngmyHydrateCivicHelpModeFromAllBackups(next);
         if (_appConfigSig(_config) == _appConfigSig(next)) return;
         setState(() {
           _config = next;
@@ -9639,15 +9693,26 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _onTransactionsChange(PostgresChangePayload payload) {
     try {
       if (!_ngmySessionIsAdmin(_currentUser) && _currentUser != null) {
-        final sessionKey = ngmyNormalizeEmail(_currentUser!.email);
         if (payload.eventType != PostgresChangeEvent.delete) {
           final row = payload.newRecord;
-          final txEmail = ngmyNormalizeEmail((row['userEmail'] ?? row['user_email'] ?? '').toString());
-          if (txEmail.isNotEmpty && txEmail != sessionKey) return;
+          final type = row['type'];
+          final status = row['status'];
+          final isCommunityContribution = type == TransactionType.contribution.index &&
+              status == TransactionStatus.approved.index;
+          if (!isCommunityContribution) {
+            final sessionKey = ngmyNormalizeEmail(_currentUser!.email);
+            final txEmail = ngmyNormalizeEmail((row['userEmail'] ?? row['user_email'] ?? '').toString());
+            if (txEmail.isNotEmpty && txEmail != sessionKey) return;
+          }
         } else {
           final row = payload.oldRecord;
-          final txEmail = ngmyNormalizeEmail((row['userEmail'] ?? row['user_email'] ?? '').toString());
-          if (txEmail.isNotEmpty && txEmail != sessionKey) return;
+          final type = row['type'];
+          final isCommunityContribution = type == TransactionType.contribution.index;
+          if (!isCommunityContribution) {
+            final sessionKey = ngmyNormalizeEmail(_currentUser!.email);
+            final txEmail = ngmyNormalizeEmail((row['userEmail'] ?? row['user_email'] ?? '').toString());
+            if (txEmail.isNotEmpty && txEmail != sessionKey) return;
+          }
         }
       }
       if (payload.eventType == PostgresChangeEvent.delete) {
@@ -9894,6 +9959,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
+          await ngmyHydrateCivicHelpModeFromAllBackups(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
         } catch (_) {}
       }
@@ -10137,6 +10203,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
+          await ngmyHydrateCivicHelpModeFromAllBackups(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
           _mergeOperationalManagementListsIntoConfig(_config, localConfigSnapshot);
           await ngmyApplyStoreSellAccessFromSettings(_config);
@@ -21397,6 +21464,9 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
   late final TextEditingController _helperLimitC;
   late final TextEditingController _logoC;
   final ImagePicker _picker = ImagePicker();
+  final ScrollController _scrollC = ScrollController();
+  final FocusNode _elevenLabsFocus = FocusNode();
+  final GlobalKey _elevenLabsFieldKey = GlobalKey();
   Uint8List? _pendingLogoBytes;
   bool _logoUploading = false;
   bool _apiKeyVisible = false;
@@ -21409,10 +21479,30 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
     _elevenLabsC = TextEditingController(text: widget.config.elevenLabsApiKey);
     _helperLimitC = TextEditingController(text: widget.config.ngmyHelperDailyMessageLimit.toString());
     _logoC = TextEditingController(text: widget.config.logoUrl);
+    _elevenLabsFocus.addListener(_onElevenLabsFocus);
+  }
+
+  void _onElevenLabsFocus() {
+    if (!_elevenLabsFocus.hasFocus) return;
+    Future<void>.delayed(const Duration(milliseconds: 320), () {
+      if (!mounted) return;
+      final ctx = _elevenLabsFieldKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+          alignment: 0.35,
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
+    _elevenLabsFocus.removeListener(_onElevenLabsFocus);
+    _elevenLabsFocus.dispose();
+    _scrollC.dispose();
     _apiC.dispose();
     _elevenLabsC.dispose();
     _helperLimitC.dispose();
@@ -21517,6 +21607,7 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
     widget.config.logoUrl = await _resolveLogoForSave();
     widget.config.geminiApiKey = _apiC.text.trim();
     widget.config.elevenLabsApiKey = _elevenLabsC.text.trim();
+    await NgmyElevenLabsTts.persistLocalKey(widget.config.elevenLabsApiKey);
     final helperLimit = int.tryParse(_helperLimitC.text.trim());
     if (helperLimit == null || helperLimit < 0) {
       if (!context.mounted) return;
@@ -21561,10 +21652,14 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
     final panel = isDark ? const Color(0xFF0F111A) : Colors.white;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final maxSheetHeight = (MediaQuery.sizeOf(context).height * 0.88 - keyboardInset).clamp(280.0, MediaQuery.sizeOf(context).height * 0.92);
     return Align(
       alignment: Alignment.bottomCenter,
-      child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: Container(
+        constraints: BoxConstraints(maxHeight: maxSheetHeight),
         margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
         decoration: BoxDecoration(
           color: panel,
@@ -21592,6 +21687,9 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
             const SizedBox(height: 14),
             Expanded(
               child: SingleChildScrollView(
+                controller: _scrollC,
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.only(bottom: keyboardInset > 0 ? 12 : 0),
                 child: Container(
                   padding: const EdgeInsets.all(15),
                   decoration: BoxDecoration(
@@ -21665,8 +21763,11 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
                         style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
                       ),
                       const SizedBox(height: 14),
-                      TextField(
+                      KeyedSubtree(
+                        key: _elevenLabsFieldKey,
+                        child: TextField(
                         controller: _elevenLabsC,
+                        focusNode: _elevenLabsFocus,
                         obscureText: !_elevenLabsKeyVisible,
                         decoration: widget.adminInputDecoration(
                           label: 'ElevenLabs API Key (translator voice)',
@@ -21680,10 +21781,11 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
                           ),
                         ),
                       ),
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         'Lets users tap a speaker icon in Message translator to hear translations aloud (English & Swahili). '
-                        'On web, deploy the ngmy-elevenlabs-tts Supabase Edge Function.',
+                        'On web, redeploy Supabase function ngmy-ai-chat after updates.',
                         style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
                       ),
                       const SizedBox(height: 14),
@@ -21719,6 +21821,7 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -25057,6 +25160,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Map<String, dynamic>? _localRegistrarBackup;
   bool _maintenanceQueued = false;
   bool _selfEnrollmentEnabled = false;
+  Timer? _helpModePoll;
+  List<AppTransaction> _communityContributions = [];
 
   final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -25069,6 +25174,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   @override
   void initState() {
     super.initState();
+    NgmyAdminLiveRefresh.addListener(_onCivicLiveRefresh);
     _selectedState = widget.user.state;
     _selfEnrollmentEnabled = widget.config.civicSelfEnrollmentEnabled;
     unawaited(_syncSelfEnrollmentFlag());
@@ -25083,6 +25189,40 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         _showSelfEnrollmentSheet();
       }
     });
+    unawaited(_refreshCivicHelpModeAndContributions());
+    _helpModePoll = Timer.periodic(const Duration(seconds: 75), (_) {
+      if (!mounted) return;
+      unawaited(_refreshCivicHelpModeAndContributions());
+    });
+  }
+
+  Future<void> _refreshCivicHelpModeAndContributions() async {
+    await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
+    final contributions = await ngmyFetchApprovedContributionsFromCloud();
+    if (!mounted) return;
+    setState(() => _communityContributions = contributions);
+  }
+
+  void _onCivicLiveRefresh() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _helpModePoll?.cancel();
+    NgmyAdminLiveRefresh.removeListener(_onCivicLiveRefresh);
+    _searchController.dispose();
+    _enrollSearchC.dispose();
+    _fullNameC.dispose();
+    _dobC.dispose();
+    _idTypeC.dispose();
+    _addressC.dispose();
+    _phoneC.dispose();
+    _emailC.dispose();
+    _cityC.dispose();
+    _roomC.dispose();
+    super.dispose();
   }
 
   Future<void> _syncSelfEnrollmentFlag() async {
@@ -26288,6 +26428,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   bool _canCurrentUserSeeHelpMode() {
     if (!widget.config.helpModeActive) return false;
+    final helpState = widget.config.helpState.trim();
+    if (helpState.isNotEmpty &&
+        widget.user.state.trim().isNotEmpty &&
+        widget.user.state.trim() != helpState &&
+        !_canManageCivicRegistry()) {
+      return false;
+    }
     if (_canManageCivicRegistry()) return true;
     return _memberMatchesHelpScope(widget.user);
   }
@@ -26310,8 +26457,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return true;
   }
 
+  List<AppTransaction> _civicTransactionsForDisplay() {
+    final byId = <String, AppTransaction>{};
+    for (final t in widget.allTransactions) {
+      if (t.id.isNotEmpty) byId[t.id] = t;
+    }
+    for (final t in _communityContributions) {
+      if (t.id.isNotEmpty) byId[t.id] = t;
+    }
+    return byId.values.toList();
+  }
+
   List<AppTransaction> _visibleContributionTx() {
-    return widget.allTransactions.where((t) {
+    return _civicTransactionsForDisplay().where((t) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
       final meta = _decodeContributionMeta(t);
       final scopeType = (meta['scopeType'] ?? 'all').toString();
@@ -26608,13 +26766,31 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label copied')));
   }
 
-  void _showHelpModeDialog() {
-    final purposeC = TextEditingController(text: widget.config.helpPurpose);
-    final cashC = TextEditingController(text: widget.config.helpCashApp);
-    final zelleC = TextEditingController(text: widget.config.helpZelle);
-    final phoneC = TextEditingController(text: widget.config.helpPhone);
-    String scopeType = widget.config.helpScopeType;
-    String scopeValue = widget.config.helpScopeValue;
+  Future<void> _showHelpModeDialog() async {
+    final savedDraft = await NgmyCivicHelpModeStorage.loadDraft(
+      email: widget.user.email,
+      state: _selectedState,
+    );
+    final purposeC = TextEditingController(
+      text: widget.config.helpPurpose.trim().isNotEmpty
+          ? widget.config.helpPurpose
+          : (savedDraft?.purpose ?? ''),
+    );
+    final cashC = TextEditingController(
+      text: widget.config.helpCashApp.trim().isNotEmpty ? widget.config.helpCashApp : (savedDraft?.cashApp ?? ''),
+    );
+    final zelleC = TextEditingController(
+      text: widget.config.helpZelle.trim().isNotEmpty ? widget.config.helpZelle : (savedDraft?.zelle ?? ''),
+    );
+    final phoneC = TextEditingController(
+      text: widget.config.helpPhone.trim().isNotEmpty ? widget.config.helpPhone : (savedDraft?.phone ?? ''),
+    );
+    String scopeType = widget.config.helpScopeType.trim().isNotEmpty
+        ? widget.config.helpScopeType
+        : (savedDraft?.scopeType ?? 'all');
+    String scopeValue = widget.config.helpScopeValue.trim().isNotEmpty
+        ? widget.config.helpScopeValue
+        : (savedDraft?.scopeValue ?? '');
 
     showDialog(
       context: context,
@@ -26755,7 +26931,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           if (widget.config.helpModeActive) ...[
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: () {
+                                onPressed: () async {
                                   final activeCampaignId = _activeHelpCampaignId();
                                   setState(() {
                                     _markMissedForNonContributorsInCampaign(activeCampaignId);
@@ -26764,8 +26940,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     widget.config.helpCampaignStartedAt = '';
                                     _markCampaignClosed(activeCampaignId, DateTime.now());
                                   });
+                                  await ngmyPersistCivicHelpModeSettings(widget.config);
                                   widget.onDataChanged();
-                                  Navigator.pop(ctx);
+                                  if (ctx.mounted) Navigator.pop(ctx);
                                 },
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.red.shade500,
@@ -26786,7 +26963,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () {
+                              onPressed: () async {
                                 if (purposeC.text.trim().isEmpty) {
                                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter purpose for contribution.')));
                                   return;
@@ -26810,6 +26987,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 final nextPurpose = purposeC.text.trim();
                                 final nextScopeType = scopeType;
                                 final nextScopeValue = scopeType == 'all' ? '' : scopeValue.trim();
+                                final draft = NgmyHelpModeDraft(
+                                  purpose: nextPurpose,
+                                  cashApp: cashC.text.trim(),
+                                  zelle: zelleC.text.trim(),
+                                  phone: phoneC.text.trim(),
+                                  scopeType: nextScopeType,
+                                  scopeValue: nextScopeValue,
+                                );
+                                await NgmyCivicHelpModeStorage.saveDraft(
+                                  email: widget.user.email,
+                                  state: _selectedState,
+                                  draft: draft,
+                                );
                                 setState(() {
                                   widget.config.helpModeActive = true;
                                   widget.config.helpPurpose = nextPurpose;
@@ -26818,6 +27008,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   widget.config.helpPhone = phoneC.text.trim();
                                   widget.config.helpScopeType = nextScopeType;
                                   widget.config.helpScopeValue = nextScopeValue;
+                                  widget.config.helpState = _selectedState;
                                   final shouldStartNewCampaign = !wasActive ||
                                       previousPurpose != nextPurpose ||
                                       previousScopeType != nextScopeType ||
@@ -26827,8 +27018,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     widget.config.helpCampaignStartedAt = DateTime.now().toUtc().toIso8601String();
                                   }
                                 });
+                                await ngmyPersistCivicHelpModeSettings(widget.config);
                                 widget.onDataChanged();
-                                Navigator.pop(ctx);
+                                if (ctx.mounted) Navigator.pop(ctx);
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF4F46E5),
@@ -28116,7 +28308,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(color: Colors.red.shade400, borderRadius: BorderRadius.circular(10)),
                       child: Text(
-                        'HELP MODE ACTIVE in ${widget.user.state} - ${widget.config.helpPurpose}',
+                        'HELP MODE ACTIVE in ${widget.config.helpState.trim().isNotEmpty ? widget.config.helpState : widget.user.state} - ${widget.config.helpPurpose}',
                         style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -28171,6 +28363,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               'Include your NAME & PHONE in payment memo.',
                               textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: _showContributionReceipts,
+                              icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                              label: const Text('View contribution receipts', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(color: Colors.white70),
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 8),

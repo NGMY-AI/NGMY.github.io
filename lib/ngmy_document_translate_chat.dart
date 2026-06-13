@@ -125,11 +125,6 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
   String? _speakingKey;
   bool _speakingBusy = false;
 
-  String get _elevenLabsKey {
-    final fromConfig = widget.config != null ? ((widget.config as dynamic).elevenLabsApiKey as String?) : null;
-    return (fromConfig ?? '').trim();
-  }
-
   bool get _paymentsEnabled =>
       widget.user != null && widget.config != null && widget.onCharge != null && widget.onDataChanged != null && widget.onPersistConfig != null;
 
@@ -275,8 +270,9 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
       _speakingKey = key;
     });
 
+    final apiKey = await NgmyElevenLabsTts.resolveApiKey(config: widget.config);
     final result = await NgmyElevenLabsTts.speak(
-      apiKey: _elevenLabsKey,
+      apiKey: apiKey,
       text: text,
       langCode: langCode,
       key: key,

@@ -28,6 +28,8 @@ const String _kNgmyCivicSelfEnrollmentPrefsKey = 'ngmy_civic_self_enrollment_set
 const String _kNgmyHelperAiSettingsKey = 'ngmy_helper_ai_settings';
 const String _kNgmyHelperAiPrefsKey = 'ngmy_helper_ai_settings_v1';
 const String _kNgmyAppBrandingSettingsKey = 'ngmy_app_branding';
+const String _kNgmyCivicHelpModeSettingsKey = 'civic_help_mode_settings';
+const String _kNgmyCivicHelpModePrefsKey = 'ngmy_civic_help_mode_settings_v1';
 const String _kNgmyAppBrandingPrefsKey = 'ngmy_app_branding_v1';
 
 Future<Set<String>> _fetchDeletedMediaIdsFromCloud() async {
@@ -995,6 +997,7 @@ Future<void> _persistHelperAiSettingsLocal(AppConfig config) async {
   try {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kNgmyHelperAiPrefsKey, jsonEncode(_helperAiSettingsPayload(config)));
+    await NgmyElevenLabsTts.persistLocalKey(config.elevenLabsApiKey);
   } catch (e) {
     debugPrint('[admin helper ai] local backup: $e');
   }
@@ -1124,6 +1127,135 @@ Future<bool> ngmyPersistHelperAiSettings(AppConfig config) async {
       debugPrint('[admin helper ai] config save: $e');
     }
   }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
+Map<String, dynamic> _civicHelpModeSettingsPayload(AppConfig config) => {
+      'helpModeActive': config.helpModeActive,
+      'helpPurpose': config.helpPurpose.trim(),
+      'helpCashApp': config.helpCashApp.trim(),
+      'helpZelle': config.helpZelle.trim(),
+      'helpPhone': config.helpPhone.trim(),
+      'helpScopeType': config.helpScopeType.trim().isEmpty ? 'all' : config.helpScopeType.trim(),
+      'helpScopeValue': config.helpScopeValue.trim(),
+      'helpState': config.helpState.trim(),
+      'helpCampaignId': config.helpCampaignId.trim(),
+      'helpCampaignStartedAt': config.helpCampaignStartedAt.trim(),
+      'helpCampaignClosures': config.helpCampaignClosures,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyCivicHelpModeSettingsPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (payload.isEmpty) return;
+  if (payload.containsKey('helpModeActive')) {
+    config.helpModeActive = payload['helpModeActive'] == true;
+  }
+  if (payload.containsKey('helpPurpose')) {
+    config.helpPurpose = (payload['helpPurpose'] ?? '').toString().trim();
+  }
+  if (payload.containsKey('helpCashApp')) {
+    config.helpCashApp = (payload['helpCashApp'] ?? '').toString().trim();
+  }
+  if (payload.containsKey('helpZelle')) {
+    config.helpZelle = (payload['helpZelle'] ?? '').toString().trim();
+  }
+  if (payload.containsKey('helpPhone')) {
+    config.helpPhone = (payload['helpPhone'] ?? '').toString().trim();
+  }
+  if (payload.containsKey('helpScopeType')) {
+    final v = (payload['helpScopeType'] ?? 'all').toString().trim();
+    config.helpScopeType = v.isEmpty ? 'all' : v;
+  }
+  if (payload.containsKey('helpScopeValue')) {
+    config.helpScopeValue = (payload['helpScopeValue'] ?? '').toString().trim();
+  }
+  if (payload.containsKey('helpState')) {
+    config.helpState = (payload['helpState'] ?? '').toString().trim();
+  }
+  if (payload.containsKey('helpCampaignId')) {
+    config.helpCampaignId = (payload['helpCampaignId'] ?? '').toString().trim();
+  }
+  if (payload.containsKey('helpCampaignStartedAt')) {
+    config.helpCampaignStartedAt = (payload['helpCampaignStartedAt'] ?? '').toString().trim();
+  }
+  if (payload.containsKey('helpCampaignClosures') && payload['helpCampaignClosures'] is List) {
+    config.helpCampaignClosures = (payload['helpCampaignClosures'] as List)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+}
+
+Future<void> _persistCivicHelpModeSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyCivicHelpModePrefsKey, jsonEncode(_civicHelpModeSettingsPayload(config)));
+  } catch (e) {
+    debugPrint('[civic help mode] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateCivicHelpModeFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyCivicHelpModePrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyCivicHelpModeSettingsPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[civic help mode] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyCivicHelpModeSettingsKey);
+    if (row != null) _applyCivicHelpModeSettingsPayload(config, row);
+  }
+}
+
+Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
+  await _persistCivicHelpModeSettingsLocal(config);
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _civicHelpModeSettingsPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyCivicHelpModeSettingsKey, payload);
+    try {
+      var row = <String, dynamic>{
+        'id': kNgmyConfigRowId,
+        'helpModeActive': config.helpModeActive,
+        'helpPurpose': config.helpPurpose,
+        'helpCashApp': config.helpCashApp,
+        'helpZelle': config.helpZelle,
+        'helpPhone': config.helpPhone,
+        'helpScopeType': config.helpScopeType,
+        'helpScopeValue': config.helpScopeValue,
+        'helpState': config.helpState,
+        'helpCampaignId': config.helpCampaignId,
+        'helpCampaignStartedAt': config.helpCampaignStartedAt,
+        'helpCampaignClosures': config.helpCampaignClosures,
+      };
+      for (var i = 0; i < 8; i++) {
+        try {
+          await Supabase.instance.client.from('config').upsert(row);
+          cloudOk = true;
+          break;
+        } catch (e) {
+          final missing = _missingColumnFromPostgrestError(e);
+          if (missing != null && missing.isNotEmpty && row.containsKey(missing)) {
+            row = Map<String, dynamic>.from(row)..remove(missing);
+            if (row.length <= 1) break;
+            continue;
+          }
+          debugPrint('[civic help mode] config upsert: $e');
+          break;
+        }
+      }
+    } catch (e) {
+      debugPrint('[civic help mode] config save: $e');
+    }
+  }
+  _scheduleOperationalConfigCloudPersist(config);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   return cloudOk;
 }

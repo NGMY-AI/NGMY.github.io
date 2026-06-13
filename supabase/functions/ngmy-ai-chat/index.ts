@@ -107,6 +107,48 @@ async function anthropicChat(apiKey: string, prompt: string): Promise<string> {
   return String(text).trim();
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+async function elevenLabsTts(
+  apiKey: string,
+  text: string,
+  voiceId: string,
+  modelId: string,
+): Promise<string> {
+  const models = modelId
+    ? [modelId, "eleven_turbo_v2_5", "eleven_flash_v2_5", "eleven_multilingual_v2"]
+    : ["eleven_turbo_v2_5", "eleven_flash_v2_5", "eleven_multilingual_v2"];
+  const tried = new Set<string>();
+  let lastErr = "ElevenLabs request failed";
+
+  for (const model of models) {
+    if (tried.has(model)) continue;
+    tried.add(model);
+    const url =
+      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        accept: "audio/mpeg",
+        "content-type": "application/json",
+        "xi-api-key": apiKey,
+      },
+      body: JSON.stringify({ text, model_id: model }),
+    });
+    if (res.ok) {
+      const audio = new Uint8Array(await res.arrayBuffer());
+      if (audio.length > 0) return bytesToBase64(audio);
+    } else {
+      lastErr = await res.text();
+    }
+  }
+  throw new Error(lastErr);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -120,7 +162,28 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
+    const action = String(body?.action ?? "chat").trim();
     const apiKey = String(body?.apiKey ?? "").trim();
+
+    if (action === "elevenlabsTts") {
+      const text = String(body?.text ?? "").trim();
+      const voiceId = String(body?.voiceId ?? "21m00Tcm4TlvDq8ikWAM").trim();
+      const modelId = String(body?.modelId ?? "eleven_turbo_v2_5").trim();
+      if (!apiKey || !text) {
+        return new Response(
+          JSON.stringify({ error: "apiKey and text are required for TTS" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const audioBase64 = await elevenLabsTts(apiKey, text, voiceId, modelId);
+      return new Response(JSON.stringify({ audioBase64 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const prompt = String(body?.prompt ?? "").trim();
     const provider = String(body?.provider ?? "gemini") as Provider;
     const openAiBaseUrl = body?.openAiBaseUrl

@@ -32,7 +32,7 @@ serve(async (req) => {
     const apiKey = String(body?.apiKey ?? "").trim();
     const text = String(body?.text ?? "").trim();
     const voiceId = String(body?.voiceId ?? "21m00Tcm4TlvDq8ikWAM").trim();
-    const modelId = String(body?.modelId ?? "eleven_multilingual_v2").trim();
+    const modelId = String(body?.modelId ?? "eleven_turbo_v2_5").trim();
 
     if (!apiKey || !text) {
       return new Response(
@@ -45,29 +45,42 @@ serve(async (req) => {
     }
 
     const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        accept: "audio/mpeg",
-        "content-type": "application/json",
-        "xi-api-key": apiKey,
-      },
-      body: JSON.stringify({ text, model_id: modelId }),
-    });
+    const models = modelId
+      ? [modelId, "eleven_turbo_v2_5", "eleven_flash_v2_5", "eleven_multilingual_v2"]
+      : ["eleven_turbo_v2_5", "eleven_flash_v2_5", "eleven_multilingual_v2"];
+    const tried = new Set<string>();
+    let lastErr = "ElevenLabs request failed";
 
-    if (!res.ok) {
-      const errText = await res.text();
-      return new Response(JSON.stringify({ error: errText || `ElevenLabs HTTP ${res.status}` }), {
-        status: res.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    for (const model of models) {
+      if (tried.has(model)) continue;
+      tried.add(model);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          accept: "audio/mpeg",
+          "content-type": "application/json",
+          "xi-api-key": apiKey,
+        },
+        body: JSON.stringify({ text, model_id: model }),
       });
+
+      if (res.ok) {
+        const audio = new Uint8Array(await res.arrayBuffer());
+        if (audio.length > 0) {
+          return new Response(
+            JSON.stringify({ audioBase64: bytesToBase64(audio) }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      } else {
+        lastErr = await res.text();
+      }
     }
 
-    const audio = new Uint8Array(await res.arrayBuffer());
-    return new Response(
-      JSON.stringify({ audioBase64: bytesToBase64(audio) }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: lastErr }), {
+      status: 502,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return new Response(JSON.stringify({ error: msg }), {
