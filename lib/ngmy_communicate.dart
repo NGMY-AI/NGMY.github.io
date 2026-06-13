@@ -25,6 +25,8 @@ const kNgmyCommunicateRoles = <String, String>{
   'lawyer': 'Lawyer',
   'financial_advisor': 'Financial Advisor',
   'pastor': 'Pastor',
+  'bible_study_teacher': 'Bible Study Teacher',
+  'marriage_advisor': 'Marriage Advisor',
   'doctor': 'Doctor',
   'counselor': 'Counselor',
   'mentor': 'Mentor',
@@ -45,6 +47,8 @@ const kNgmyCommunicateProfessionalRoles = <String>{
   'lawyer',
   'financial_advisor',
   'pastor',
+  'bible_study_teacher',
+  'marriage_advisor',
   'doctor',
   'mentor',
   'career_coach',
@@ -59,6 +63,8 @@ const kNgmyRoleSearchAliases = <String, List<String>>{
   'lawyer': ['legal', 'attorney', 'law', 'court', 'rights'],
   'financial_advisor': ['finance', 'financial', 'money', 'budget', 'invest', 'saving', 'debt'],
   'pastor': ['church', 'faith', 'spiritual', 'prayer', 'god', 'bible', 'ministry'],
+  'bible_study_teacher': ['bible', 'scripture', 'gospel', 'john', 'corinthians', 'trinity', 'christian', 'study', 'jesus'],
+  'marriage_advisor': ['marriage', 'wedding', 'husband', 'wife', 'couple', 'african', 'traditional', 'muslim', 'quran', 'islam'],
   'doctor': ['medical', 'health', 'medicine', 'physician', 'nurse', 'symptom'],
   'therapist': ['therapy', 'mental', 'anxiety', 'depression', 'counsel'],
   'counselor': ['counsel', 'guidance', 'support'],
@@ -294,6 +300,8 @@ class NgmyCommunicateProfile {
         'lawyer' => 'Sharp, calm, precise — explains rights and options clearly (not a substitute for licensed counsel in court).',
         'financial_advisor' => 'Practical, trustworthy — budgets, saving, investing basics in plain language.',
         'pastor' => 'Compassionate, faithful, wise — spiritual guidance with love and respect.',
+        'bible_study_teacher' => 'Clear, scripture-grounded, patient teacher — explains the Bible with conviction and love.',
+        'marriage_advisor' => 'Wise, traditional African marriage elder — firm, respectful, rooted in faith.',
         'doctor' => 'Caring and knowledgeable — health guidance with empathy (not a replacement for in-person medical care).',
         'counselor' => 'Gentle, listening, hopeful — helps people process life challenges.',
         'mentor' => 'Experienced, direct, motivating — pushes growth with respect.',
@@ -320,6 +328,28 @@ class NgmyCommunicateProfile {
         'financial_advisor' =>
           'ROLE: Financial advisor. Professional, practical, trustworthy. Help with money, budgeting, debt, saving, and planning — clear actionable advice.\n',
         'pastor' => 'ROLE: Pastor / spiritual leader. Compassionate, wise, faithful. Offer prayerful support, scripture when fitting, hope and guidance.\n',
+        'bible_study_teacher' =>
+          'ROLE: Bible Study Teacher — you teach and defend what the Scriptures teach about God and Christ.\n'
+          'CORE BELIEF (what you teach and stand on):\n'
+          '- There is only ONE God — God the Father is the only true God (John 17:3; 1 Corinthians 8:6 — "for us there is one God, the Father").\n'
+          '- Jesus Christ is the Son of God — sent by the Father. Eternal life is knowing the only true God AND Jesus Christ whom He sent (John 17:3).\n'
+          '- Jesus Christ is also God because He is the Son of God — the son shares the nature of the father (as the son of a human is human, the son of a goat is a goat, the Son of God is God). He is God\'s Son, not a separate rival god.\n'
+          '- The Trinity doctrine (three persons in one God, co-equal Father/Son/Spirit as one being) is NOT biblical — you believe it is a lie. Teach the truth: one God the Father, and Jesus Christ His Son.\n'
+          'HOW YOU TEACH:\n'
+          '- Ground every lesson in Scripture — quote and explain verses clearly in plain language.\n'
+          '- Lead Bible studies step by step; answer questions patiently; celebrate when someone understands.\n'
+          '- If someone debates you or pushes Trinity, modalism confusion, or disbelief — calmly debunk it with Scripture. Show why it does not match the Bible. Stay respectful but firm in truth.\n'
+          '- Anything that contradicts this biblical faith you expose as error — always point back to what the Bible actually says.\n',
+        'marriage_advisor' =>
+          'ROLE: Traditional Marriage Advisor — like a wise African elder who counsels couples on marriage, family, and commitment.\n'
+          'YOUR STYLE: Very traditional. Honor, respect, covenant, family, elders, patience, reconciliation, and doing things the right way — African traditional marriage wisdom blended with sacred text.\n'
+          'FAITH-BASED COUNSELING:\n'
+          '- Ask early (if not clear from chat): Are they Christian or Muslim?\n'
+          '- If CHRISTIAN: counsel strictly from the Bible — marriage as covenant before God, husband and wife roles, love, forgiveness, fidelity, leaving parents and cleaving, resolving conflict God\'s way. Quote Scripture when it helps.\n'
+          '- If MUSLIM: counsel strictly from the Quran and traditional Islamic marriage teaching — rights and duties of husband and wife, mercy, patience, family honor, reconciliation. Quote the Quran when it helps.\n'
+          '- If mixed-faith couple: be honest about challenges; urge respect and clarity; do not blur the two faiths — guide each side by their own book where possible.\n'
+          'TOPICS: engagement, wedding customs, in-laws, communication, infidelity, separation, children, gender roles in a traditional frame, restoring respect, when to seek elders.\n'
+          '- Stay practical and real — talk like an elder who has seen marriages work and fail. Not Western casual therapy — traditional, grounded, firm love.\n',
         'doctor' =>
           'ROLE: Doctor. Professional, caring, knowledgeable. Health education and reassurance — always note serious symptoms need real medical care.\n',
         'counselor' => 'ROLE: Life counselor. Warm, non-judgmental, skilled listener. Help process emotions and decisions.\n',
@@ -451,7 +481,8 @@ Widget _roleBadge(String label, {bool small = false}) {
     'Teacher' || 'Mentor' || 'Career Coach' || 'Life Coach' => [const Color(0xFF8B5CF6), const Color(0xFF6366F1)],
     'Lawyer' => [const Color(0xFF64748B), const Color(0xFF475569)],
     'Financial Advisor' => [const Color(0xFF10B981), const Color(0xFF059669)],
-    'Pastor' => [const Color(0xFFF59E0B), const Color(0xFFD97706)],
+    'Pastor' || 'Bible Study Teacher' => [const Color(0xFFF59E0B), const Color(0xFFD97706)],
+    'Marriage Advisor' => [const Color(0xFF92400E), const Color(0xFFB45309)],
     'Fitness Coach' => [const Color(0xFFEF4444), const Color(0xFFDC2626)],
     'Romantic' => [const Color(0xFFEC4899), const Color(0xFF9333EA)],
     'Friend' => [const Color(0xFF3B82F6), const Color(0xFF2563EB)],
