@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'ngmy_app_builder_layout_utils.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_templates.dart';
 import 'ngmy_app_builder_icon.dart';
+import 'ngmy_app_studio_ai_panel.dart';
 
 /// Screenshot-style showcase cards → existing template ids.
 class NgmyStudioShowcaseTemplate {
@@ -98,17 +100,24 @@ class NgmyAppStudioDashboard extends StatefulWidget {
     required this.published,
     required this.activeProject,
     required this.isAdmin,
+    required this.apiKey,
+    required this.config,
+    required this.user,
     required this.onBack,
     required this.onSelectProject,
-    required this.onOpenEditor,
     required this.onCreateBlank,
-    required this.onOpenAi,
-    required this.onPreviewTemplate,
+    required this.onUseTemplate,
     required this.onImport,
     required this.onPreviewRuntime,
     required this.onPublish,
     required this.onIntegrations,
     required this.onOpenScreenEditor,
+    required this.onProjectUpdated,
+    required this.onSaveProject,
+    required this.onExportProject,
+    this.onChargeWallet,
+    this.onDataChanged,
+    this.onPersistConfig,
     this.initialNav = NgmyStudioNav.buildDesign,
   });
 
@@ -120,17 +129,24 @@ class NgmyAppStudioDashboard extends StatefulWidget {
   final List<NgmyAppProject> published;
   final NgmyAppProject? activeProject;
   final bool isAdmin;
+  final String apiKey;
+  final dynamic config;
+  final dynamic user;
   final VoidCallback onBack;
   final ValueChanged<NgmyAppProject> onSelectProject;
-  final ValueChanged<NgmyAppProject> onOpenEditor;
   final Future<void> Function() onCreateBlank;
-  final Future<void> Function({NgmyAppProject? project}) onOpenAi;
-  final ValueChanged<NgmyAppTemplate> onPreviewTemplate;
+  final ValueChanged<NgmyAppTemplate> onUseTemplate;
   final Future<void> Function() onImport;
   final ValueChanged<NgmyAppProject> onPreviewRuntime;
   final ValueChanged<NgmyAppProject> onPublish;
   final VoidCallback onIntegrations;
   final void Function(NgmyAppProject project, int screenIndex) onOpenScreenEditor;
+  final ValueChanged<NgmyAppProject> onProjectUpdated;
+  final Future<void> Function(NgmyAppProject) onSaveProject;
+  final Future<void> Function(NgmyAppProject) onExportProject;
+  final Future<bool> Function(double amount, String description)? onChargeWallet;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
   final NgmyStudioNav initialNav;
 
   @override
@@ -147,13 +163,67 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
   int _activeScreenIndex = 0;
   int? _selectedWidgetIndex;
   String _treeQuery = '';
-  bool _sidebarOpen = true;
-  bool _inspectorOpen = true;
+  bool _sidebarOpen = false;
+  bool _inspectorOpen = false;
 
   @override
   void initState() {
     super.initState();
     _nav = widget.initialNav;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final w = MediaQuery.sizeOf(context).width;
+      if (w >= 960) {
+        setState(() {
+          _sidebarOpen = true;
+          _inspectorOpen = true;
+        });
+      }
+    });
+  }
+
+  bool _isCompact(BuildContext context) => MediaQuery.sizeOf(context).width < 960;
+
+  void _openDragDropEditor() {
+    final p = widget.activeProject;
+    if (p == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Open or create a project first (My Projects or Templates).')),
+      );
+      return;
+    }
+    setState(() {
+      _buildMode = NgmyStudioBuildMode.dragDrop;
+      _nav = NgmyStudioNav.buildDesign;
+      _showBuildFlyout = false;
+    });
+    widget.onOpenScreenEditor(p, _activeScreenIndex.clamp(0, p.screens.length - 1));
+  }
+
+  Future<void> _confirmPublish() async {
+    final p = widget.activeProject;
+    if (p == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Open a project to publish.')));
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1F2937),
+        title: const Text('Publish app', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        content: Text(
+          widget.isAdmin
+              ? 'Publish "${p.name}" to ngmy.org? A backup file will download and your public link will be ready.'
+              : 'Submit "${p.name}" for review? It stays on this device until approved.',
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.85)),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(widget.isAdmin ? 'Publish' : 'Submit')),
+        ],
+      ),
+    );
+    if (ok == true && mounted) widget.onPublish(p);
   }
 
   @override
@@ -172,23 +242,42 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
   }
 
   void _pickNav(NgmyStudioNav item) {
+    if (compactSidebarClose(item)) return;
     setState(() {
       _nav = item;
       _showBuildFlyout = item == NgmyStudioNav.buildDesign;
       if (item == NgmyStudioNav.templates) _showTemplatesOverlay = true;
-      if (item == NgmyStudioNav.aiAssistant) {
-        widget.onOpenAi(project: widget.activeProject);
-      }
       if (item == NgmyStudioNav.previewTest && widget.activeProject != null) {
         widget.onPreviewRuntime(widget.activeProject!);
       }
-      if (item == NgmyStudioNav.publishApp && widget.activeProject != null) {
-        widget.onPublish(widget.activeProject!);
+      if (item == NgmyStudioNav.publishApp) {
+        _confirmPublish();
       }
       if (item == NgmyStudioNav.integrations) widget.onIntegrations();
       if (item == NgmyStudioNav.componentLibrary) _showComponentLibrary();
       if (item == NgmyStudioNav.settings) _showSettings();
     });
+  }
+
+  bool compactSidebarClose(NgmyStudioNav item) {
+    final compact = _isCompact(context);
+    if (compact && _sidebarOpen) {
+      setState(() {
+        _nav = item;
+        _sidebarOpen = false;
+        _showBuildFlyout = item == NgmyStudioNav.buildDesign;
+        if (item == NgmyStudioNav.templates) _showTemplatesOverlay = true;
+      });
+      if (item == NgmyStudioNav.publishApp) _confirmPublish();
+      if (item == NgmyStudioNav.integrations) widget.onIntegrations();
+      if (item == NgmyStudioNav.componentLibrary) _showComponentLibrary();
+      if (item == NgmyStudioNav.settings) _showSettings();
+      if (item == NgmyStudioNav.previewTest && widget.activeProject != null) {
+        widget.onPreviewRuntime(widget.activeProject!);
+      }
+      return true;
+    }
+    return false;
   }
 
   void _showComponentLibrary() {
@@ -281,8 +370,9 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
   }
 
   Widget _topBar({required bool compact}) {
+    final p = widget.activeProject;
     return Container(
-      padding: EdgeInsets.fromLTRB(compact ? 8 : 16, 8, compact ? 8 : 16, 8),
+      padding: EdgeInsets.fromLTRB(compact ? 4 : 16, 6, compact ? 4 : 16, 6),
       decoration: BoxDecoration(
         color: const Color(0xFF111827),
         border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
@@ -291,7 +381,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
         children: [
           if (compact)
             IconButton(
-              icon: const Icon(Icons.menu_rounded, color: Colors.white70),
+              icon: const Icon(Icons.menu_rounded, color: Colors.white70, size: 22),
               onPressed: () => setState(() => _sidebarOpen = true),
             ),
           IconButton(
@@ -299,42 +389,75 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
             onPressed: widget.onBack,
             icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 20),
           ),
-          const SizedBox(width: 8),
-          _modeToggle(),
+          if (!compact) ...[
+            const SizedBox(width: 8),
+            _modeToggle(compact: compact),
+          ],
           const Spacer(),
-          IconButton(tooltip: 'Undo', onPressed: () {}, icon: Icon(Icons.undo_rounded, color: Colors.white.withValues(alpha: 0.5))),
-          IconButton(tooltip: 'Redo', onPressed: () {}, icon: Icon(Icons.redo_rounded, color: Colors.white.withValues(alpha: 0.5))),
+          if (compact) _modeToggle(compact: true),
           IconButton(
-            tooltip: 'Device',
-            onPressed: () {},
-            icon: Icon(Icons.phone_iphone_rounded, color: Colors.white.withValues(alpha: 0.7)),
+            tooltip: 'View app',
+            onPressed: p == null ? null : () => widget.onPreviewRuntime(p),
+            icon: Icon(Icons.phone_iphone_rounded, color: p == null ? Colors.white24 : const Color(0xFF60A5FA), size: 22),
           ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: widget.activeProject == null ? null : () => widget.onOpenEditor(widget.activeProject!),
-            icon: const Icon(Icons.add_rounded, size: 16),
-            label: const Text('Builds'),
+          if (!compact) ...[
+            IconButton(
+              tooltip: 'Save',
+              onPressed: p == null ? null : () => widget.onSaveProject(p),
+              icon: Icon(Icons.save_outlined, color: p == null ? Colors.white24 : Colors.white70, size: 20),
+            ),
+            IconButton(
+              tooltip: 'Download code',
+              onPressed: p == null ? null : () => widget.onExportProject(p),
+              icon: Icon(Icons.download_rounded, color: p == null ? Colors.white24 : Colors.white70, size: 20),
+            ),
+          ],
+          FilledButton(
+            onPressed: p == null ? null : () => widget.onSaveProject(p),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF2563EB),
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: 8),
+              minimumSize: Size(compact ? 0 : 64, 36),
             ),
+            child: Text(compact ? '+ Build' : '+ Builds', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
           ),
-          const SizedBox(width: 8),
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: const Color(0xFF6366F1),
-            child: Text(
-              widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+          if (compact)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert_rounded, color: Colors.white70, size: 20),
+              color: const Color(0xFF1F2937),
+              onSelected: (v) {
+                if (p == null) return;
+                if (v == 'save') widget.onSaveProject(p);
+                if (v == 'download') widget.onExportProject(p);
+                if (v == 'publish') _confirmPublish();
+                if (v == 'inspector') setState(() => _inspectorOpen = !_inspectorOpen);
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'save', child: Text('Save project')),
+                const PopupMenuItem(value: 'download', child: Text('Download code')),
+                const PopupMenuItem(value: 'publish', child: Text('Publish app')),
+                const PopupMenuItem(value: 'inspector', child: Text('Toggle components')),
+              ],
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: CircleAvatar(
+                radius: 15,
+                backgroundColor: const Color(0xFF6366F1),
+                child: Text(
+                  widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _modeToggle() {
+  Widget _modeToggle({required bool compact}) {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
@@ -347,16 +470,16 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
         children: [
           _modeChip('Design', Icons.brush_outlined, _canvasMode == NgmyStudioCanvasMode.design, () {
             setState(() => _canvasMode = NgmyStudioCanvasMode.design);
-          }),
+          }, compact: compact),
           _modeChip('Code', Icons.code_rounded, _canvasMode == NgmyStudioCanvasMode.code, () {
             setState(() => _canvasMode = NgmyStudioCanvasMode.code);
-          }),
+          }, compact: compact),
         ],
       ),
     );
   }
 
-  Widget _modeChip(String label, IconData icon, bool on, VoidCallback tap) {
+  Widget _modeChip(String label, IconData icon, bool on, VoidCallback tap, {required bool compact}) {
     return Material(
       color: on ? const Color(0xFF374151) : Colors.transparent,
       borderRadius: BorderRadius.circular(8),
@@ -364,13 +487,15 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
         onTap: tap,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12, vertical: compact ? 6 : 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16, color: on ? Colors.white : Colors.white54),
-              const SizedBox(width: 6),
-              Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: on ? Colors.white : Colors.white54)),
+              Icon(icon, size: compact ? 14 : 16, color: on ? Colors.white : Colors.white54),
+              if (!compact) ...[
+                const SizedBox(width: 6),
+                Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: on ? Colors.white : Colors.white54)),
+              ],
             ],
           ),
         ),
@@ -431,7 +556,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
                         ),
                         Text(
-                          'Flutter AI Builder',
+                          'NGMY AI Builder',
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11),
                         ),
                       ],
@@ -510,15 +635,17 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
 
   Widget _buildFlyout(bool compact) {
     final left = compact ? 288.0 : 280.0;
+    final top = compact ? 56.0 : 72.0;
     return Positioned(
       left: left + 8,
-      top: 72,
+      top: top,
+      right: compact ? 12 : null,
       child: Material(
         elevation: 12,
         borderRadius: BorderRadius.circular(16),
-        color: const Color(0xFF1F2937).withValues(alpha: 0.96),
+        color: const Color(0xFF1F2937).withValues(alpha: 0.98),
         child: Container(
-          width: 260,
+          width: compact ? null : 260,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
@@ -531,7 +658,10 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                 'Drag-and-Drop Editor',
                 Icons.open_with_rounded,
                 _buildMode == NgmyStudioBuildMode.dragDrop,
-                () => setState(() => _buildMode = NgmyStudioBuildMode.dragDrop),
+                () {
+                  setState(() => _buildMode = NgmyStudioBuildMode.dragDrop);
+                  _openDragDropEditor();
+                },
               ),
               const SizedBox(height: 6),
               _flyoutOption(
@@ -539,8 +669,11 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                 Icons.psychology_outlined,
                 _buildMode == NgmyStudioBuildMode.aiLayout,
                 () {
-                  setState(() => _buildMode = NgmyStudioBuildMode.aiLayout);
-                  widget.onOpenAi(project: widget.activeProject);
+                  setState(() {
+                    _buildMode = NgmyStudioBuildMode.aiLayout;
+                    _nav = NgmyStudioNav.aiAssistant;
+                    _showBuildFlyout = false;
+                  });
                 },
               ),
             ],
@@ -574,35 +707,59 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
   }
 
   Widget _centerWorkspace({required bool compact}) {
-    if (_nav == NgmyStudioNav.myProjects) return _myProjectsPanel();
-    if (_canvasMode == NgmyStudioCanvasMode.code) return _codePanel();
+    if (_nav == NgmyStudioNav.myProjects) return _myProjectsPanel(compact: compact);
+    if (_nav == NgmyStudioNav.aiAssistant) {
+      return NgmyAppStudioAiPanel(
+        project: widget.activeProject,
+        apiKey: widget.apiKey,
+        email: widget.userEmail,
+        config: widget.config,
+        user: widget.user,
+        isAdmin: widget.isAdmin,
+        compact: compact,
+        onChargeWallet: widget.onChargeWallet,
+        onDataChanged: widget.onDataChanged,
+        onPersistConfig: widget.onPersistConfig,
+        onProjectUpdated: (p) {
+          widget.onProjectUpdated(p);
+          setState(() {
+            _nav = NgmyStudioNav.buildDesign;
+            _activeScreenIndex = 0;
+          });
+        },
+      );
+    }
+    if (_canvasMode == NgmyStudioCanvasMode.code) return _codePanel(compact: compact);
 
-    return Container(
-      color: const Color(0xFF9CA3AF),
-      child: Stack(
-        children: [
-          if (_showGrid)
-            CustomPaint(painter: _GridPainter(), size: Size.infinite),
-          Center(
-            child: widget.loading
-                ? const CircularProgressIndicator(color: Colors.white)
-                : _phoneCanvas(compact),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Container(
+          color: const Color(0xFF9CA3AF),
+          child: Stack(
+            children: [
+              if (_showGrid) CustomPaint(painter: _GridPainter(), size: Size.infinite),
+              Center(
+                child: widget.loading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : _phoneCanvas(compact, maxW: constraints.maxWidth, maxH: constraints.maxHeight),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: compact ? 8 : 16,
+                child: Center(child: _canvasBottomBar(compact)),
+              ),
+            ],
           ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 16,
-            child: Center(child: _canvasBottomBar(compact)),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _phoneCanvas(bool compact) {
+  Widget _phoneCanvas(bool compact, {required double maxW, required double maxH}) {
     final p = widget.activeProject;
-    final phoneW = compact ? 260.0 : 300.0;
-    final phoneH = compact ? 520.0 : 580.0;
+    final phoneW = math.min(compact ? maxW * 0.88 : 300.0, maxW - 24);
+    final phoneH = math.min(phoneW * 1.85, maxH - (compact ? 72 : 88));
 
     if (p == null) {
       return Container(
@@ -610,19 +767,29 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
         height: phoneH,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(36),
+          borderRadius: BorderRadius.circular(compact ? 28 : 36),
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 24, offset: const Offset(0, 12))],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.phone_iphone_rounded, size: 48, color: Color(0xFF9CA3AF)),
+            Icon(Icons.phone_iphone_rounded, size: compact ? 36 : 48, color: const Color(0xFF9CA3AF)),
             const SizedBox(height: 12),
-            const Text('App screen', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF374151))),
+            Text('App screen', style: TextStyle(fontWeight: FontWeight.w800, color: const Color(0xFF374151), fontSize: compact ? 14 : 16)),
             const SizedBox(height: 8),
-            Text('Open a project from My Projects', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-            const SizedBox(height: 20),
-            FilledButton(onPressed: () => _pickNav(NgmyStudioNav.myProjects), child: const Text('My Projects')),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text('Open a project from My Projects or Templates', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              children: [
+                FilledButton(onPressed: () => _pickNav(NgmyStudioNav.myProjects), child: const Text('My Projects')),
+                OutlinedButton(onPressed: () => setState(() => _showTemplatesOverlay = true), child: const Text('Templates')),
+              ],
+            ),
           ],
         ),
       );
@@ -638,7 +805,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
         height: phoneH,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(36),
+          borderRadius: BorderRadius.circular(compact ? 28 : 36),
           border: Border.all(color: Colors.black.withValues(alpha: 0.08), width: 2),
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 24, offset: const Offset(0, 12))],
         ),
@@ -742,22 +909,22 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
     );
   }
 
-  Widget _myProjectsPanel() {
+  Widget _myProjectsPanel({required bool compact}) {
     return Container(
       color: const Color(0xFF111827),
       child: widget.loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(compact ? 14 : 20),
               children: [
                 Row(
                   children: [
-                    const Text('My Projects', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
+                    Text('My Projects', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: compact ? 18 : 22)),
                     const Spacer(),
                     FilledButton.icon(
                       onPressed: widget.onCreateBlank,
                       icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('New app'),
+                      label: Text(compact ? 'New' : 'New app'),
                     ),
                   ],
                 ),
@@ -786,7 +953,8 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                         trailing: PopupMenuButton<String>(
                           icon: const Icon(Icons.more_horiz_rounded, color: Colors.white54),
                           onSelected: (v) {
-                            if (v == 'edit') widget.onOpenEditor(p);
+                            if (v == 'view') widget.onPreviewRuntime(p);
+                            if (v == 'edit') widget.onOpenScreenEditor(p, 0);
                             if (v == 'canvas') {
                               widget.onSelectProject(p);
                               setState(() => _nav = NgmyStudioNav.buildDesign);
@@ -794,7 +962,8 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                           },
                           itemBuilder: (_) => [
                             const PopupMenuItem(value: 'canvas', child: Text('Open in canvas')),
-                            const PopupMenuItem(value: 'edit', child: Text('Full editor')),
+                            const PopupMenuItem(value: 'edit', child: Text('Edit screen')),
+                            const PopupMenuItem(value: 'view', child: Text('View app')),
                           ],
                         ),
                         onTap: () {
@@ -813,20 +982,20 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
     );
   }
 
-  Widget _codePanel() {
+  Widget _codePanel({required bool compact}) {
     final p = widget.activeProject;
     final code = p == null
         ? '// Open a project to view generated Flutter layout JSON'
         : const JsonEncoder.withIndent('  ').convert(p.toMap());
     return Container(
       color: const Color(0xFF0F172A),
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(compact ? 10 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const Text('Generated project', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+              Text('Generated code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: compact ? 14 : 16)),
               const Spacer(),
               TextButton.icon(
                 onPressed: p == null
@@ -835,14 +1004,19 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                         Clipboard.setData(ClipboardData(text: code));
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied JSON')));
                       },
-                icon: const Icon(Icons.copy_rounded, size: 16),
-                label: const Text('Copy'),
+                icon: const Icon(Icons.copy_rounded, size: 16, color: Colors.white70),
+                label: const Text('Copy', style: TextStyle(color: Colors.white70)),
+              ),
+              TextButton.icon(
+                onPressed: p == null ? null : () => widget.onExportProject(p),
+                icon: const Icon(Icons.download_rounded, size: 16, color: Color(0xFF60A5FA)),
+                label: const Text('Download', style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w700)),
               ),
             ],
           ),
           Expanded(
             child: SingleChildScrollView(
-              child: SelectableText(code, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFFCBD5E1), height: 1.4)),
+              child: SelectableText(code, style: TextStyle(fontFamily: 'monospace', fontSize: compact ? 10 : 11, color: const Color(0xFFCBD5E1), height: 1.4)),
             ),
           ),
         ],
@@ -952,78 +1126,101 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
   }
 
   Widget _templatesOverlay() {
+    final size = MediaQuery.sizeOf(context);
+    final compact = size.width < 600;
+    final cols = compact ? 1 : (size.width < 900 ? 2 : 3);
     return Material(
       color: Colors.black.withValues(alpha: 0.55),
-      child: Center(
-        child: Container(
-          width: MediaQuery.sizeOf(context).width.clamp(320, 920),
-          margin: const EdgeInsets.all(20),
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1F2937).withValues(alpha: 0.97),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+      child: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: math.min(size.width - 16, 920), maxHeight: size.height * 0.88),
+            child: Container(
+              margin: const EdgeInsets.all(12),
+              padding: EdgeInsets.fromLTRB(compact ? 14 : 24, compact ? 14 : 20, compact ? 14 : 24, compact ? 14 : 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1F2937).withValues(alpha: 0.98),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('Project Templates', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => setState(() {
-                      _showTemplatesOverlay = false;
-                      if (_nav == NgmyStudioNav.templates) _nav = NgmyStudioNav.buildDesign;
-                    }),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  Row(
+                    children: [
+                      Text('Project Templates', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: compact ? 18 : 22)),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => setState(() {
+                          _showTemplatesOverlay = false;
+                          if (_nav == NgmyStudioNav.templates) _nav = NgmyStudioNav.buildDesign;
+                        }),
+                        icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: cols,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: compact ? 2.6 : 1.15,
+                        ),
+                        itemCount: kNgmyStudioShowcaseTemplates.length,
+                        itemBuilder: (_, i) => _templateCard(kNgmyStudioShowcaseTemplates[i], compact),
+                      ),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 14,
-                  crossAxisSpacing: 14,
-                  childAspectRatio: 0.92,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _templateCard(NgmyStudioShowcaseTemplate s, bool compact) {
+    return Material(
+      color: const Color(0xFF374151),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: () {
+          final t = _templateById(s.templateId);
+          if (t != null) widget.onUseTemplate(t);
+          setState(() {
+            _showTemplatesOverlay = false;
+            _nav = NgmyStudioNav.buildDesign;
+          });
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: EdgeInsets.all(compact ? 10 : 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: EdgeInsets.all(compact ? 8 : 10),
+                decoration: BoxDecoration(color: s.accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(10)),
+                child: Icon(s.icon, color: s.accent, size: compact ? 22 : 24),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: compact ? 12 : 13)),
+                    const SizedBox(height: 3),
+                    Text(s.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: compact ? 10 : 11, height: 1.25)),
+                  ],
                 ),
-                itemCount: kNgmyStudioShowcaseTemplates.length,
-                itemBuilder: (_, i) {
-                  final s = kNgmyStudioShowcaseTemplates[i];
-                  return Material(
-                    color: const Color(0xFF374151),
-                    borderRadius: BorderRadius.circular(16),
-                    child: InkWell(
-                      onTap: () {
-                        final t = _templateById(s.templateId);
-                        if (t != null) widget.onPreviewTemplate(t);
-                        setState(() => _showTemplatesOverlay = false);
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(color: s.accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12)),
-                              child: Icon(s.icon, color: s.accent, size: 26),
-                            ),
-                            const Spacer(),
-                            Text(s.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-                            const SizedBox(height: 4),
-                            Text(s.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 10, height: 1.3)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
               ),
             ],
           ),

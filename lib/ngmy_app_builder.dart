@@ -184,53 +184,42 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
     final p = NgmyAppProject.blank(ownerEmail: _email);
     await ngmySaveUserAppProject(_email, p);
     await _reload();
-    await _openEditor(p);
+    if (mounted) setState(() => _activeProject = p);
   }
 
-  Future<void> _openAiCopilot({NgmyAppProject? project}) async {
-    final updated = await NgmyNavigator.push<NgmyAppProject>(
-      context,
-      NgmyAppBuilderCopilotScreen(
-        project: project,
-        apiKey: _apiKey,
-        email: _email,
-        config: widget.config,
-        user: widget.user,
-        isAdmin: _isAdmin,
-        onChargeWallet: widget.onChargeWallet,
-        onDataChanged: widget.onDataChanged,
-        onPersistConfig: widget.onPersistConfig,
-      ),
-      routeName: 'NgmyAppBuilderCopilotScreen',
+  Future<void> _useTemplate(NgmyAppTemplate template) async {
+    final p = template.build(_email);
+    await ngmySaveUserAppProject(_email, p);
+    await _reload();
+    if (!mounted) return;
+    setState(() => _activeProject = p);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('"${template.name}" added to My Projects — edit on the canvas.')),
     );
-    if (updated != null) {
-      await ngmySaveUserAppProject(_email, updated);
-      await _reload();
-      await _openEditor(updated);
-    }
   }
 
-  Future<void> _previewTemplate(NgmyAppTemplate template) async {
-    final preview = template.build(_email).copyWith(
-      id: 'preview_${template.id}_${DateTime.now().millisecondsSinceEpoch}',
-    );
-    final saved = await NgmyNavigator.push<bool>(
-      context,
-      _NgmyTemplatePreviewScreen(
-        template: template,
-        project: preview,
-        apiKey: _apiKey,
-        email: _email,
-      ),
-      routeName: 'NgmyTemplatePreviewScreen',
-    );
-    if (saved == true && mounted) {
-      await _reload();
+  Future<void> _saveActiveProject(NgmyAppProject project) async {
+    await ngmySaveUserAppProject(_email, project);
+    if (mounted) {
+      setState(() => _activeProject = project);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"${template.name}" saved to My Apps — edit and customize anytime.')),
+        SnackBar(content: Text('"${project.name}" saved (${project.screens.length} screens).')),
       );
     }
+    await _reload();
   }
+
+  void _onProjectUpdatedFromStudio(NgmyAppProject project) {
+    setState(() => _activeProject = project);
+    unawaited(_reload());
+  }
+
+  /// Legacy tab UI still references this — dashboard uses inline AI panel instead.
+  Future<void> _openAiCopilot({NgmyAppProject? project}) async {
+    if (project != null && mounted) setState(() => _activeProject = project);
+  }
+
+  Future<void> _previewTemplate(NgmyAppTemplate template) async => _useTemplate(template);
 
   Future<void> _submitOrPublish(NgmyAppProject project) async {
     if (_isAdmin) {
@@ -277,7 +266,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
     await _reload();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"${imported.name}" restored from backup!')));
-    await _openEditor(imported);
+    if (mounted) setState(() => _activeProject = imported);
   }
 
   Future<void> _saveToCloud(NgmyAppProject project) async {
@@ -366,7 +355,75 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
       );
       return;
     }
-    await _openEditor(_activeProject!);
+    await _showIntegrationsDialog(_activeProject!);
+  }
+
+  Future<void> _showIntegrationsDialog(NgmyAppProject project) async {
+    var db = project.database;
+    final urlC = TextEditingController(text: db.projectUrl);
+    final keyC = TextEditingController(text: db.apiKey);
+    final pathC = TextEditingController(text: db.collectionPath);
+    final notesC = TextEditingController(text: db.notes);
+    var provider = db.provider;
+    var updated = project;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setST) => AlertDialog(
+          backgroundColor: const Color(0xFF1F2937),
+          title: const Text('Integrations', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<NgmyAppDatabaseProvider>(
+                  value: provider,
+                  dropdownColor: const Color(0xFF374151),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(labelText: 'Database', labelStyle: TextStyle(color: Colors.white70)),
+                  items: NgmyAppDatabaseProvider.values
+                      .map((p) => DropdownMenuItem(value: p, child: Text(p.label, style: const TextStyle(color: Colors.white))))
+                      .toList(),
+                  onChanged: (v) => setST(() => provider = v ?? NgmyAppDatabaseProvider.none),
+                ),
+                const SizedBox(height: 8),
+                TextField(controller: urlC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Project URL / API endpoint', labelStyle: TextStyle(color: Colors.white70))),
+                TextField(controller: keyC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'API key (optional)', labelStyle: TextStyle(color: Colors.white70))),
+                TextField(controller: pathC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Collection / table path', labelStyle: TextStyle(color: Colors.white70))),
+                TextField(controller: notesC, maxLines: 2, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Notes', labelStyle: TextStyle(color: Colors.white70))),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                updated = project.copyWith(
+                  database: NgmyAppDatabaseConfig(
+                    provider: provider,
+                    projectUrl: urlC.text.trim(),
+                    apiKey: keyC.text.trim(),
+                    collectionPath: pathC.text.trim(),
+                    notes: notesC.text.trim(),
+                  ),
+                );
+                Navigator.pop(ctx);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    urlC.dispose();
+    keyC.dispose();
+    pathC.dispose();
+    notesC.dispose();
+    await ngmySaveUserAppProject(_email, updated);
+    if (mounted) {
+      setState(() => _activeProject = updated);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Integrations saved.')));
+    }
   }
 
   @override
@@ -382,12 +439,16 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
       published: _published,
       activeProject: _activeProject,
       isAdmin: _isAdmin,
+      apiKey: _apiKey,
+      config: widget.config,
+      user: widget.user,
+      onChargeWallet: widget.onChargeWallet,
+      onDataChanged: widget.onDataChanged,
+      onPersistConfig: widget.onPersistConfig,
       onBack: () => NgmyNavigator.pop(context),
       onSelectProject: (p) => setState(() => _activeProject = p),
-      onOpenEditor: (p) => _openEditor(p),
       onCreateBlank: _createBlank,
-      onOpenAi: ({NgmyAppProject? project}) => _openAiCopilot(project: project ?? _activeProject),
-      onPreviewTemplate: _previewTemplate,
+      onUseTemplate: _useTemplate,
       onImport: _importApp,
       onPreviewRuntime: (p) => NgmyNavigator.push(
         context,
@@ -397,6 +458,9 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
       onPublish: (p) => _submitOrPublish(p),
       onIntegrations: () => unawaited(_openIntegrationsFromDashboard()),
       onOpenScreenEditor: (p, i) => unawaited(_openScreenFromDashboard(p, i)),
+      onProjectUpdated: _onProjectUpdatedFromStudio,
+      onSaveProject: _saveActiveProject,
+      onExportProject: _exportApp,
     );
   }
 
