@@ -317,6 +317,12 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
       if (idx >= 0) currentUser = users[idx];
     }
 
+    if (config != null) {
+      await ngmyHydrateCommunicateSettingsFromAllBackups(config);
+    } else {
+      await NgmyCommunicateAvatarCache.hydrateRamFromDisk();
+    }
+
     return NgmyLaunchBootstrap(
       themeMode: themeMode,
       currentUser: currentUser,
@@ -12434,16 +12440,42 @@ class _NgmyHomeHost extends StatefulWidget {
   State<_NgmyHomeHost> createState() => _NgmyHomeHostState();
 }
 
-class _NgmyHomeHostState extends State<_NgmyHomeHost> with AutomaticKeepAliveClientMixin {
+class _NgmyHomeHostState extends State<_NgmyHomeHost> with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
+  final GlobalKey _homeScreenKey = GlobalKey();
+
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() {});
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
     // Rebuild when app theme changes (Profile → Appearance).
     final _ = Theme.of(context).brightness;
-    return widget.main._buildHomeTab(widget.main._homeTransactionsForDisplay());
+    return RepaintBoundary(
+      child: widget.main._buildHomeTab(
+        widget.main._homeTransactionsForDisplay(),
+        homeKey: _homeScreenKey,
+      ),
+    );
   }
 }
 
@@ -12528,6 +12560,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _runScheduledPopups();
       _promptPushNotificationsIfNeeded();
+      if (_idx == 0 && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() {});
+        });
+      }
     }
   }
 
@@ -12836,9 +12873,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  Widget _buildHomeTab(List<AppTransaction> sorted) {
+  Widget _buildHomeTab(List<AppTransaction> sorted, {Key? homeKey}) {
     return HomeScreen(
-      key: ValueKey<String>('ngmy_home_${widget.user.email}'),
+      key: homeKey ?? ValueKey<String>('ngmy_home_${widget.user.email}'),
       user: widget.user,
       onClockIn: () async {
         final now = DateTime.now();
@@ -13126,7 +13163,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sorted = _idx == 0 ? const <AppTransaction>[] : _sortedTransactions();
-    final otherTabs = _buildOtherTabPages(sorted, activeIndex: _idx);
+    final pages = [_homeHost, ..._buildOtherTabPages(sorted, activeIndex: _idx)];
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
@@ -13159,23 +13196,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 child: ColoredBox(color: Theme.of(context).scaffoldBackgroundColor),
               ),
             Positioned.fill(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Offstage(
-                    offstage: _idx != 0,
-                    child: TickerMode(
-                      enabled: _idx == 0,
-                      child: _homeHost,
-                    ),
-                  ),
-                  if (_idx != 0)
-                    IndexedStack(
-                      index: _idx - 1,
-                      sizing: StackFit.expand,
-                      children: otherTabs,
-                    ),
-                ],
+              child: IndexedStack(
+                index: _idx,
+                sizing: StackFit.expand,
+                children: pages,
               ),
             ),
             if (_offline)
@@ -13358,8 +13382,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Timer? _liveTicker;
   int _liveStart = 0;
   int _unreadNewsCount = 0;
-  bool _heavySectionsReady = false;
-  bool _clockUiReady = false;
+  bool _heavySectionsReady = true;
+  bool _clockUiReady = true;
   DateTime? _homeMountedAt;
   int _liveCacheStart = -1;
   int _liveCacheTxnLen = -1;
@@ -13422,10 +13446,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      setState(() {
-        _clockUiReady = true;
-        _heavySectionsReady = true;
-      });
       if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
     });
   }

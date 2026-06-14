@@ -543,68 +543,93 @@ class NgmyCommunicateAvatar extends StatefulWidget {
 
 class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   Uint8List? _bytes;
-  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    final ram = NgmyCommunicateAvatarCache.bytesInRam(widget.profile.id);
-    if (ram != null && ram.isNotEmpty) {
-      _bytes = ram;
-      _loading = false;
+    unawaited(_bootstrapBytes());
+  }
+
+  Future<void> _bootstrapBytes() async {
+    final id = widget.profile.id.trim();
+    var bytes = NgmyCommunicateAvatarCache.bytesInRam(id);
+    bytes ??= await NgmyCommunicateAvatarCache.loadBytes(id);
+    if (bytes != null && bytes.isNotEmpty) {
+      if (mounted) {
+        setState(() => _bytes = bytes);
+      }
+      return;
     }
-    _resolve();
+    final url = widget.profile.avatarUrl.trim();
+    if (url.startsWith('data:image')) {
+      try {
+        bytes = base64Decode(url.split(',').last);
+        if (bytes.isNotEmpty) {
+          await NgmyCommunicateAvatarCache.saveBytes(id, bytes);
+          if (mounted) setState(() => _bytes = bytes);
+          return;
+        }
+      } catch (_) {}
+    }
+    await _resolveNetwork();
   }
 
   @override
   void didUpdateWidget(covariant NgmyCommunicateAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profile.id != widget.profile.id) {
-      final ram = NgmyCommunicateAvatarCache.bytesInRam(widget.profile.id);
-      _bytes = ram;
-      _loading = ram == null;
-      _resolve();
+      _bytes = NgmyCommunicateAvatarCache.bytesInRam(widget.profile.id);
+      unawaited(_bootstrapBytes());
       return;
     }
-    if (oldWidget.profile.avatarUrl != widget.profile.avatarUrl) {
-      final ram = NgmyCommunicateAvatarCache.bytesInRam(widget.profile.id);
-      if (ram != null && ram.isNotEmpty) {
-        _bytes = ram;
-        _loading = false;
-      } else if (_bytes == null || _bytes!.isEmpty) {
-        _loading = true;
-        _resolve();
-      }
+    if (oldWidget.profile.avatarUrl != widget.profile.avatarUrl &&
+        (_bytes == null || _bytes!.isEmpty)) {
+      unawaited(_bootstrapBytes());
     }
   }
 
-  Future<void> _resolve() async {
+  Future<void> _resolveNetwork() async {
     final id = widget.profile.id.trim();
     final url = widget.profile.avatarUrl.trim();
     final previous = _bytes;
-    Uint8List? bytes = NgmyCommunicateAvatarCache.bytesInRam(id) ?? await NgmyCommunicateAvatarCache.loadBytes(id);
-    if (bytes == null || bytes.isEmpty) {
-      if (url.startsWith('data:image')) {
-        try {
-          bytes = base64Decode(url.split(',').last);
-          if (bytes.isNotEmpty) await NgmyCommunicateAvatarCache.saveBytes(id, bytes);
-        } catch (_) {
-          bytes = null;
-        }
-      } else if (url.startsWith('http')) {
-        await NgmyCommunicateAvatarCache.ensureCached(id, url);
-        bytes = await NgmyCommunicateAvatarCache.loadBytes(id);
-      }
-    }
+    if (!url.startsWith('http')) return;
+    await NgmyCommunicateAvatarCache.ensureCached(id, url);
+    final bytes = await NgmyCommunicateAvatarCache.loadBytes(id);
     if (mounted) {
       setState(() {
         _bytes = (bytes != null && bytes.isNotEmpty) ? bytes : previous;
-        _loading = false;
       });
     }
   }
 
-  Widget _emojiFallback() => Center(child: Text(widget.profile.emoji, style: TextStyle(fontSize: widget.size * 0.5)));
+  Widget _initialsFallback() {
+    final name = widget.profile.name.trim();
+    final letter = name.isNotEmpty ? name[0].toUpperCase() : widget.profile.emoji;
+    return Center(
+      child: Text(
+        letter,
+        style: TextStyle(
+          fontSize: widget.size * 0.42,
+          fontWeight: FontWeight.w900,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder() => _bytes != null && _bytes!.isNotEmpty
+      ? ClipOval(
+          child: Image.memory(
+            _bytes!,
+            width: widget.size,
+            height: widget.size,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (_, __, ___) => _initialsFallback(),
+          ),
+        )
+      : _initialsFallback();
 
   @override
   Widget build(BuildContext context) {
@@ -618,13 +643,11 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
           fit: BoxFit.cover,
           gaplessPlayback: true,
           filterQuality: FilterQuality.medium,
-          errorBuilder: (_, __, ___) => _emojiFallback(),
+          errorBuilder: (_, __, ___) => _initialsFallback(),
         ),
       );
-    } else if (!_loading) {
-      inner = _emojiFallback();
     } else {
-      inner = _emojiFallback();
+      inner = _placeholder();
     }
     return Container(
       width: widget.size,
@@ -713,9 +736,14 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     super.initState();
     _bgCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 8))..repeat();
     _floatCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat(reverse: true);
-    unawaited(ngmyWarmCommunicateAvatarsFromConfig(widget.config));
+    unawaited(_prepAvatars());
     final email = ((widget.user as dynamic).email as String?) ?? '';
     if (email.isNotEmpty) unawaited(NgmyCommunicateTimeTracker.syncFromCloud(email));
+  }
+
+  Future<void> _prepAvatars() async {
+    await ngmyWarmCommunicateAvatarsFromConfig(widget.config);
+    if (mounted) setState(() {});
   }
 
   @override
@@ -1016,7 +1044,14 @@ class _Companion3DCard extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Center(child: NgmyCommunicateAvatar(profile: profile, size: 72, glow: true)),
+                          Center(
+                            child: NgmyCommunicateAvatar(
+                              key: ValueKey<String>('ngmy_avatar_${profile.id}'),
+                              profile: profile,
+                              size: 72,
+                              glow: true,
+                            ),
+                          ),
                           const SizedBox(height: 12),
                           Text(
                             profile.name,
