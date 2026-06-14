@@ -325,6 +325,60 @@ class NgmyCommunicateAvatarCache {
       await ensureCached(id, url);
     }
   }
+
+  /// Load every saved avatar into RAM so icons show instantly offline.
+  static Future<void> hydrateRamFromDisk() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final key in prefs.getKeys()) {
+        if (!key.startsWith('ngmy_comm_avatar_')) continue;
+        final id = key.substring('ngmy_comm_avatar_'.length).trim();
+        if (id.isEmpty || (_ram[id]?.isNotEmpty ?? false)) continue;
+        final raw = prefs.getString(key);
+        if (raw == null || raw.isEmpty) continue;
+        try {
+          final bytes = base64Decode(raw);
+          if (bytes.isNotEmpty) _ram[id] = bytes;
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  static Future<bool> hasOnDisk(String profileId) async {
+    if (profileId.trim().isEmpty) return false;
+    if (bytesInRam(profileId) != null) return true;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key(profileId.trim()));
+    return raw != null && raw.isNotEmpty;
+  }
+
+  /// Embed cached avatar bytes as data URLs so profiles survive offline reloads.
+  static Future<List<Map<String, dynamic>>> profilesWithEmbeddedAvatars(
+    Iterable<dynamic> rawProfiles,
+  ) async {
+    final out = <Map<String, dynamic>>[];
+    for (final e in rawProfiles) {
+      if (e is! Map) continue;
+      final m = Map<String, dynamic>.from(e);
+      final id = (m['id'] ?? '').toString().trim();
+      final url = (m['avatarUrl'] ?? m['avatar_url'] ?? '').toString().trim();
+      if (id.isEmpty) {
+        out.add(m);
+        continue;
+      }
+      if (url.startsWith('data:image')) {
+        await saveFromDataUrl(id, url);
+        out.add(m);
+        continue;
+      }
+      final bytes = bytesInRam(id) ?? await loadBytes(id);
+      if (bytes != null && bytes.isNotEmpty) {
+        m['avatarUrl'] = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      }
+      out.add(m);
+    }
+    return out;
+  }
 }
 
 /// One exclusive partner per companion profile (per device) — AI stays taken.

@@ -868,20 +868,32 @@ void _applyCommunicateSettingsPayload(AppConfig config, Map<String, dynamic> pay
   }
   final raw = payload['communicateProfiles'];
   if (raw is List) {
-    config.communicateProfiles = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final next = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    if (next.isNotEmpty || config.communicateProfiles.isEmpty) {
+      config.communicateProfiles = next;
+    }
   }
 }
 
 Future<void> _persistCommunicateSettingsLocal(AppConfig config) async {
   try {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kNgmyCommunicatePrefsKey, jsonEncode(_communicateSettingsPayload(config)));
+    final embedded = await NgmyCommunicateAvatarCache.profilesWithEmbeddedAvatars(config.communicateProfiles);
+    await prefs.setString(
+      _kNgmyCommunicatePrefsKey,
+      jsonEncode({
+        'communicateEnabled': config.communicateEnabled,
+        'communicateProfiles': embedded,
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+      }),
+    );
   } catch (e) {
     debugPrint('[admin communicate] local backup: $e');
   }
 }
 
 Future<void> ngmyHydrateCommunicateSettingsFromAllBackups(AppConfig config) async {
+  await NgmyCommunicateAvatarCache.hydrateRamFromDisk();
   try {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kNgmyCommunicatePrefsKey);
@@ -899,6 +911,7 @@ Future<void> ngmyHydrateCommunicateSettingsFromAllBackups(AppConfig config) asyn
     }
   }
   unawaited(ngmyWarmCommunicateAvatarsFromConfig(config));
+  unawaited(_persistCommunicateSettingsLocal(config));
 }
 
 Future<bool> ngmyPersistCommunicateSettings(AppConfig config) async {

@@ -2339,9 +2339,14 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     next.communicateMinutesPerPayment = keep.communicateMinutesPerPayment;
   }
   if (record.containsKey('communicateProfiles') && record['communicateProfiles'] is List) {
-    next.communicateProfiles = List<Map<String, dynamic>>.from(
+    final remote = List<Map<String, dynamic>>.from(
       (record['communicateProfiles'] as List).map((e) => Map<String, dynamic>.from(e as Map)),
     );
+    if (remote.isNotEmpty || keep.communicateProfiles.isEmpty) {
+      next.communicateProfiles = remote;
+    } else {
+      next.communicateProfiles = List<Map<String, dynamic>>.from(keep.communicateProfiles.map((e) => Map<String, dynamic>.from(e)));
+    }
   } else if (keep.communicateProfiles.isNotEmpty) {
     next.communicateProfiles = List<Map<String, dynamic>>.from(keep.communicateProfiles.map((e) => Map<String, dynamic>.from(e)));
   }

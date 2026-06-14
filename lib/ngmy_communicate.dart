@@ -86,6 +86,7 @@ String ngmyCommunicateRoleLabel(String role) => kNgmyCommunicateRoles[ngmyCommun
 
 /// Pre-cache companion avatars from config (call after settings hydrate).
 Future<void> ngmyWarmCommunicateAvatarsFromConfig(dynamic config) async {
+  await NgmyCommunicateAvatarCache.hydrateRamFromDisk();
   final raw = (config as dynamic).communicateProfiles;
   if (raw is List) await NgmyCommunicateAvatarCache.cacheAllProfiles(raw);
 }
@@ -131,7 +132,25 @@ bool ngmyUserWantsExplanation(String text) {
       RegExp(r'\bwalk\s+me\s+through\b').hasMatch(t) ||
       RegExp(r'\bhelp\s+me\s+understand\b').hasMatch(t) ||
       RegExp(r'\bsimpler\b').hasMatch(t) ||
-      RegExp(r'\bdifferent\s+way\b').hasMatch(t);
+      RegExp(r'\bdifferent\s+way\b').hasMatch(t) ||
+      RegExp(r"\bdon'?t\s+understand\b").hasMatch(t) ||
+      RegExp(r'\bconfus').hasMatch(t) ||
+      RegExp(r'\bwhat\s+does\s+(this|that|it)\s+mean\b').hasMatch(t) ||
+      RegExp(r'\bhard\s+to\s+understand\b').hasMatch(t);
+}
+
+/// Extra instruction when Bible Study Teacher should open the original Hebrew/Greek.
+String ngmyBibleStudyOriginalLanguageHint(String userText) {
+  final t = userText.toLowerCase();
+  final verseLike = RegExp(r'\b\d\s*:\s*\d').hasMatch(t) ||
+      RegExp(r'\b(genesis|exodus|leviticus|numbers|deuteronomy|matthew|mark|luke|john|romans|corinthians|revelation)\b')
+          .hasMatch(t);
+  final needsHelp = ngmyUserWantsExplanation(userText) ||
+      RegExp(r'\b(trinity|translation|original|hebrew|greek|mean|means|word)\b').hasMatch(t);
+  if (!verseLike && !needsHelp) {
+    return 'When any verse or doctrine is tricky in English, teach with the original Hebrew or Greek word (transliteration + plain meaning) before you apply it — like a real Bible study class.\n';
+  }
+  return 'They may be struggling with this passage or idea — lead with the original Hebrew or Greek (transliteration, literal meaning, why translations differ), then explain the verse in plain language so they truly understand.\n';
 }
 
 bool ngmyCommunicateRoleIsRomantic(String role) => ngmyCommunicateNormalizeRole(role) == 'romantic';
@@ -300,7 +319,8 @@ class NgmyCommunicateProfile {
         'lawyer' => 'Sharp, calm, precise — explains rights and options clearly (not a substitute for licensed counsel in court).',
         'financial_advisor' => 'Practical, trustworthy — budgets, saving, investing basics in plain language.',
         'pastor' => 'Compassionate, faithful, wise — spiritual guidance with love and respect.',
-        'bible_study_teacher' => 'Sharp, warm Bible teacher and apologist — varied answers, deep Scripture knowledge, never repetitive.',
+        'bible_study_teacher' =>
+          'Warm, sharp Bible Study Teacher — opens the text, uses Hebrew/Greek when it helps, never repetitive.',
         'marriage_advisor' => 'Wise, traditional African marriage elder — firm, respectful, rooted in faith.',
         'doctor' => 'Caring and knowledgeable — health guidance with empathy (not a replacement for in-person medical care).',
         'counselor' => 'Gentle, listening, hopeful — helps people process life challenges.',
@@ -329,12 +349,17 @@ class NgmyCommunicateProfile {
           'ROLE: Financial advisor. Professional, practical, trustworthy. Help with money, budgeting, debt, saving, and planning — clear actionable advice.\n',
         'pastor' => 'ROLE: Pastor / spiritual leader. Compassionate, wise, faithful. Offer prayerful support, scripture when fitting, hope and guidance.\n',
         'bible_study_teacher' =>
-          'ROLE: Bible Study Teacher — you teach, explain, and DEFEND what the Scriptures teach about God and Christ. You are a skilled apologist, not a parrot.\n'
+          'ROLE: Bible Study Teacher — you teach, explain, and DEFEND what the Scriptures teach about God and Christ. You are a skilled apologist and instructor, NOT a generic pastor bot.\n'
           'CORE BELIEF (what you teach and stand on):\n'
           '- There is only ONE God — God the Father is the only true God.\n'
           '- Jesus Christ is the Son of God — sent by the Father. Eternal life is knowing the only true God AND Jesus Christ whom He sent.\n'
           '- Jesus Christ is also God because He is the Son of God — the son shares the nature of the father (as the son of a human is human, the son of a goat is a goat, the Son of God is God). He is God\'s Son, not a rival second Almighty.\n'
           '- The Trinity doctrine (three co-equal persons in one God) is NOT biblical — you believe it is a lie. Teach: one God the Father, and Jesus Christ His Son.\n'
+          'ORIGINAL LANGUAGE TEACHING (do this often — your signature as a Bible Study Teacher):\n'
+          '- When a verse is hard in English, disputed, or easy to misunderstand, explain what the ORIGINAL Hebrew (OT) or Greek (NT) says — transliteration + literal meaning + why translations differ.\n'
+          '- Format example: "In Greek the word is ___ (sounds like ___), which literally means ___. That is why some Bibles say ___ and others say ___."\n'
+          '- Do this whenever the user seems confused, asks what something means, or the passage is doctrinally dense — do NOT wait for them to ask every time.\n'
+          '- Mention Aramaic when relevant. Keep it accessible: teach so they understand, never to show off.\n'
           'SCRIPTURE YOU CAN USE (rotate — do NOT repeat the same two verses every reply):\n'
           '- John 17:3; 1 Corinthians 8:6; Deuteronomy 6:4; Mark 12:29; John 20:17; John 14:28; 1 Timothy 2:5; Matthew 16:16; John 10:36; Psalm 2:7; Hebrews 1:5; Romans 1:3-4; Acts 2:22; Colossians 1:15; Revelation 3:14; Proverbs 30:4; Isaiah 9:6 (Mighty God = title of the Son); Micah 5:2; John 1:14 (Word became flesh — the Son came).\n'
           'HOW YOU DEFEND (critical — read carefully):\n'
@@ -343,8 +368,8 @@ class NgmyCommunicateProfile {
           '- When challenged on Trinity: explain what the Bible actually says vs what church tradition added; use multiple verses; show Father is supreme (John 14:28, 1 Cor 11:3); show Son is begotten/sent, not the same person as Father.\n'
           '- When challenged on "Is Jesus God?": explain Son-of-God logic — Son shares Father\'s nature; cite John 10:36, Matthew 16:16, Hebrews 1 — but always distinguish Father (the one true God) from the Son (God\'s Son).\n'
           '- Use plain language, stories, analogies, and step-by-step reasoning — like a real teacher in a study group, not a verse-dropping bot.\n'
-          '- In debates: stay calm, respectful, firm. Dismantle false ideas with Scripture + logic. Never concede Trinity as biblical.\n'
-          '- Tailor depth to the person — beginner gets simple; scholar gets Greek/Hebrew context when it helps.\n',
+          '- In debates: stay calm, respectful, firm. Dismantle false ideas with Scripture + logic + original-language clarity when needed. Never concede Trinity as biblical.\n'
+          '- Tailor depth to the person — beginner gets simple; scholar gets deeper Greek/Hebrew word studies.\n',
         'marriage_advisor' =>
           'ROLE: Traditional Marriage Advisor — like a wise African elder who counsels couples on marriage, family, and commitment.\n'
           'YOUR STYLE: Very traditional. Honor, respect, covenant, family, elders, patience, reconciliation, and doing things the right way — African traditional marriage wisdom blended with sacred text.\n'
@@ -534,17 +559,29 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   @override
   void didUpdateWidget(covariant NgmyCommunicateAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.profile.id != widget.profile.id || oldWidget.profile.avatarUrl != widget.profile.avatarUrl) {
+    if (oldWidget.profile.id != widget.profile.id) {
       final ram = NgmyCommunicateAvatarCache.bytesInRam(widget.profile.id);
       _bytes = ram;
       _loading = ram == null;
       _resolve();
+      return;
+    }
+    if (oldWidget.profile.avatarUrl != widget.profile.avatarUrl) {
+      final ram = NgmyCommunicateAvatarCache.bytesInRam(widget.profile.id);
+      if (ram != null && ram.isNotEmpty) {
+        _bytes = ram;
+        _loading = false;
+      } else if (_bytes == null || _bytes!.isEmpty) {
+        _loading = true;
+        _resolve();
+      }
     }
   }
 
   Future<void> _resolve() async {
     final id = widget.profile.id.trim();
     final url = widget.profile.avatarUrl.trim();
+    final previous = _bytes;
     Uint8List? bytes = NgmyCommunicateAvatarCache.bytesInRam(id) ?? await NgmyCommunicateAvatarCache.loadBytes(id);
     if (bytes == null || bytes.isEmpty) {
       if (url.startsWith('data:image')) {
@@ -561,7 +598,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     }
     if (mounted) {
       setState(() {
-        _bytes = bytes;
+        _bytes = (bytes != null && bytes.isNotEmpty) ? bytes : previous;
         _loading = false;
       });
     }
@@ -676,8 +713,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     super.initState();
     _bgCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 8))..repeat();
     _floatCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat(reverse: true);
-    final raw = (widget.config as dynamic).communicateProfiles;
-    if (raw is List) NgmyCommunicateAvatarCache.cacheAllProfiles(raw);
+    unawaited(ngmyWarmCommunicateAvatarsFromConfig(widget.config));
     final email = ((widget.user as dynamic).email as String?) ?? '';
     if (email.isNotEmpty) unawaited(NgmyCommunicateTimeTracker.syncFromCloud(email));
   }
@@ -1477,9 +1513,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 'Do NOT ask them to type questions that are visible on their homework image.\n'
             : '';
         final visionHint = recentPhotos.isNotEmpty ? _homeworkVisionInstruction(text, hasPhoto: true) : '';
+        final bibleHint = ngmyCommunicateNormalizeRole(widget.profile.role) == 'bible_study_teacher'
+            ? ngmyBibleStudyOriginalLanguageHint(text)
+            : '';
         final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
             '$homeworkCtx'
             '$visionHint'
+            '$bibleHint'
             '${transcript.isNotEmpty ? '$transcript\n' : ''}'
             'They just texted: $text\n'
             'Reply as ${widget.profile.name} only — natural human text, not overly eager:';
