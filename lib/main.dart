@@ -7418,11 +7418,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() => _themeMode = mode);
     _applySystemUiForMode(_effectiveThemeMode);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _applySystemUiForMode(_effectiveThemeMode);
-      setState(() {});
-    });
     final p = await SharedPreferences.getInstance();
     await p.setString('theme_mode', mode.name);
     _scheduleAutoThemeTick();
@@ -12283,28 +12278,7 @@ class _ClockInWindowClosedDialogState extends State<_ClockInWindowClosedDialog> 
   }
 }
 
-/// Stable home tab host — one widget in the tree, no duplicate GlobalKeys.
-class _NgmyHomeTabHost extends StatefulWidget {
-  const _NgmyHomeTabHost({required this.host});
-
-  final _MainScreenState host;
-
-  @override
-  State<_NgmyHomeTabHost> createState() => _NgmyHomeTabHostState();
-}
-
-class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    return widget.host._buildHomeTab(widget.host._homeDisplayTransactions);
-  }
-}
-
-/// Builds bottom-nav tab content lazily so the home screen paints on the first frame.
+/// Builds bottom-nav tab content lazily so unvisited tabs do not block the home screen.
 class _NgmyLazyTabSlot extends StatefulWidget {
   const _NgmyLazyTabSlot({
     super.key,
@@ -12324,12 +12298,10 @@ class _NgmyLazyTabSlot extends StatefulWidget {
 class _NgmyLazyTabSlotState extends State<_NgmyLazyTabSlot> {
   Widget? _content;
 
-  bool get _isHomeTab => widget.tabIndex == 0;
-
   @override
   void initState() {
     super.initState();
-    if (_isHomeTab || widget.tabIndex == widget.activeIndex) {
+    if (widget.tabIndex == widget.activeIndex) {
       _content = widget.buildContent();
       return;
     }
@@ -12348,7 +12320,7 @@ class _NgmyLazyTabSlotState extends State<_NgmyLazyTabSlot> {
   @override
   void didUpdateWidget(covariant _NgmyLazyTabSlot oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_content == null && (widget.tabIndex == widget.activeIndex || _isHomeTab)) {
+    if (_content == null && widget.tabIndex == widget.activeIndex) {
       _content = widget.buildContent();
     }
   }
@@ -12356,7 +12328,7 @@ class _NgmyLazyTabSlotState extends State<_NgmyLazyTabSlot> {
   @override
   Widget build(BuildContext context) {
     if (_content != null) return _content!;
-    if (_isHomeTab || widget.tabIndex == widget.activeIndex) {
+    if (widget.tabIndex == widget.activeIndex) {
       _content = widget.buildContent();
       return _content!;
     }
@@ -12441,44 +12413,35 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   DateTime? _mainShellMountedAt;
   Map<int, Widget Function()>? _tabContentBuilders;
   String? _tabPagesKey;
-  List<AppTransaction> _sortedTransactionsCache = const [];
-  List<AppTransaction> _homeDisplayTransactions = const [];
-  int _sortedTxSourceLen = -1;
-  Timer? _txnSortDebounce;
-  Widget? _homeTabHost;
-  bool _otherTabsReady = false;
-  List<Widget>? _cachedOtherTabWidgets;
-  String? _cachedOtherTabWidgetsKey;
+  List<AppTransaction>? _sortedTxCache;
+  int? _sortedTxCacheLen;
   final Set<int> _visitedTabs = {0};
 
-  static const int _kMaxTxnSortCount = 1500;
-
-  void _primeHomeTransactions() {
+  List<AppTransaction> _sortedTransactions() {
+    final len = widget.allTransactions.length;
+    if (_sortedTxCache != null && _sortedTxCacheLen == len) return _sortedTxCache!;
+    _sortedTxCacheLen = len;
+    if (len == 0) {
+      _sortedTxCache = const [];
+      return _sortedTxCache!;
+    }
     final raw = widget.allTransactions;
-    if (raw.isEmpty) return;
-    _homeDisplayTransactions = raw.length > 80 ? raw.take(80).toList() : List<AppTransaction>.from(raw);
-  }
-
-  /// Never sort or copy large transaction lists synchronously inside [build].
-  void _scheduleSortedTransactionRefresh() {
-    _txnSortDebounce?.cancel();
-    _txnSortDebounce = Timer(const Duration(milliseconds: 600), () {
-      if (!mounted) return;
-      final len = widget.allTransactions.length;
-      if (len == _sortedTxSourceLen && _sortedTransactionsCache.isNotEmpty) return;
-      final raw = widget.allTransactions;
-      if (_homeDisplayTransactions.isEmpty && raw.isNotEmpty) {
-        _homeDisplayTransactions = raw.length > 80 ? raw.take(80).toList() : List<AppTransaction>.from(raw);
+    if (len > 400) {
+      _sortedTxCache = List<AppTransaction>.from(raw);
+      final snapLen = len;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || widget.allTransactions.length != snapLen) return;
+        final sorted = List<AppTransaction>.from(widget.allTransactions)
+          ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        _sortedTxCache = sorted;
+        _sortedTxCacheLen = snapLen;
         setState(() {});
-      }
-      final toSort = raw.length > _kMaxTxnSortCount ? raw.take(_kMaxTxnSortCount).toList() : raw;
-      final sorted = List<AppTransaction>.from(toSort)
-        ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      _sortedTxSourceLen = len;
-      _sortedTransactionsCache = sorted;
-      _homeDisplayTransactions = sorted;
-      setState(() {});
-    });
+      });
+      return _sortedTxCache!;
+    }
+    _sortedTxCache = List<AppTransaction>.from(raw)
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return _sortedTxCache!;
   }
 
   void _runScheduledPopups() {
@@ -12639,33 +12602,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       NgmyIncomeSound.bindSession(widget.user.email);
       _tabPagesKey = null;
       _tabContentBuilders = null;
-      _cachedOtherTabWidgets = null;
-      _cachedOtherTabWidgetsKey = null;
-      _sortedTransactionsCache = const [];
-      _homeDisplayTransactions = const [];
-      _sortedTxSourceLen = -1;
-      _txnSortDebounce?.cancel();
-      _homeTabHost = _NgmyHomeTabHost(host: this);
-      _otherTabsReady = false;
+      _sortedTxCache = null;
+      _sortedTxCacheLen = null;
       _visitedTabs
         ..clear()
         ..add(0);
-      _primeHomeTransactions();
-      _scheduleSortedTransactionRefresh();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() => _otherTabsReady = true);
-      });
     } else if (oldWidget.allTransactions.length != widget.allTransactions.length) {
-      _scheduleSortedTransactionRefresh();
+      _sortedTxCacheLen = null;
     } else if (oldWidget.currentThemeMode != widget.currentThemeMode) {
-      _cachedOtherTabWidgets = null;
-      _cachedOtherTabWidgetsKey = null;
       _tabPagesKey = null;
       _tabContentBuilders = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() {});
-      });
     }
     final oldSig = jsonEncode({'p': oldWidget.config.ngmyPopups, 'v': oldWidget.config.ngmyVideoPopups});
     final newSig = jsonEncode({'p': widget.config.ngmyPopups, 'v': widget.config.ngmyVideoPopups});
@@ -12727,13 +12673,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override void initState() {
     super.initState();
     _mainShellMountedAt = DateTime.now();
-    _homeTabHost = _NgmyHomeTabHost(host: this);
-    _primeHomeTransactions();
-    _scheduleSortedTransactionRefresh();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() => _otherTabsReady = true);
-    });
     WidgetsBinding.instance.addObserver(this);
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
     _scheduleMainShellRepaint();
@@ -12826,7 +12765,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     NgmyAdminLiveRefresh.removeListener(_onAdminLiveRefresh);
     _adminTabRefreshDebounce?.cancel();
-    _txnSortDebounce?.cancel();
     _t?.cancel();
     _onlineCheck?.cancel();
     NgmyIncomeSound.bindSession(null);
@@ -12972,10 +12910,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     });
   }
 
-  List<Widget> _otherTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
-    if (!_otherTabsReady) {
-      return List.generate(6, (i) => SizedBox.shrink(key: ValueKey<String>('ngmy_tab_boot_$i')));
-    }
+  List<Widget> _buildTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
+    final home = _buildHomeTab(sorted);
     final inv = widget.user.activeInvestment;
     final invSig = inv == null
         ? 'none'
@@ -12985,16 +12921,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         '${widget.user.pendingInvestmentName}|${widget.allMedia.length}|'
         '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight|'
         '${_investmentPlansSig(widget.globalPlans)}|${_legalContentSig(widget.config)}';
-    if (_cachedOtherTabWidgets != null &&
-        _cachedOtherTabWidgetsKey == cacheKey &&
-        _tabContentBuilders != null &&
-        _tabPagesKey == cacheKey) {
-      return _cachedOtherTabWidgets!;
-    }
     if (_tabContentBuilders != null && _tabPagesKey == cacheKey) {
-      _cachedOtherTabWidgetsKey = cacheKey;
-      _cachedOtherTabWidgets = _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
-      return _cachedOtherTabWidgets!;
+      return [home, ..._buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey)];
     }
     _tabPagesKey = cacheKey;
     _tabContentBuilders = {
@@ -13121,19 +13049,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onRefreshLegalContent: widget.onRefreshLegalAndPlans,
       ),
     };
-    _cachedOtherTabWidgetsKey = cacheKey;
-    _cachedOtherTabWidgets = _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
-    return _cachedOtherTabWidgets!;
+    return [home, ..._buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey)];
   }
 
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sorted = _sortedTransactionsCache;
-    final otherTabs = _otherTabPages(sorted, activeIndex: _idx);
-    final pages = <Widget>[
-      _homeTabHost ?? _NgmyHomeTabHost(host: this),
-      ...otherTabs,
-    ];
+    final pages = _buildTabPages(_sortedTransactions(), activeIndex: _idx);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
@@ -13353,7 +13274,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int _liveStart = 0;
   int _unreadNewsCount = 0;
   bool _heavySectionsReady = true;
-  bool _fullClockReady = false;
   DateTime? _homeMountedAt;
   int _liveCacheStart = -1;
   int _liveCacheTxnLen = -1;
@@ -13416,7 +13336,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      setState(() => _fullClockReady = true);
       if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
     });
   }
@@ -13559,7 +13478,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ],
               ),
               const SizedBox(height: 30),
-              _fullClockReady ? _buildClockInFrame(isLight) : _buildClockShell(isLight),
+              _buildClockInFrame(isLight),
               const SizedBox(height: 40),
               if (_heavySectionsReady) ...[
                 _status(context),
@@ -13810,83 +13729,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         gamesPlayed: gamesPlayed,
         pointsEarned: pointsEarned,
         totalPoints: widget.user.points,
-      ),
-    );
-  }
-
-  Widget _buildClockShell(bool isLight) {
-    final active = widget.user.isClockedIn;
-    final alreadyDone = widget.user.alreadyClockedInToday && !active;
-    final onTrial = widget.user.isOnFreeTrial;
-    final now = DateTime.now();
-    final readyGold = !active && !alreadyDone && (onTrial || widget.user.activeInvestment != null);
-    final ringColor = active
-        ? const Color(0xFF00B25A)
-        : readyGold
-            ? const Color(0xFFFBBF24)
-            : Colors.grey;
-    final name = widget.user.username.trim().isEmpty ? 'MEMBER' : widget.user.username.toUpperCase();
-
-    return Container(
-      width: double.infinity,
-      height: 248,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(25),
-        border: isLight ? Border.all(color: const Color(0xFF00B25A).withOpacity(0.2), width: 1.5) : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Align(
-            alignment: Alignment.topLeft,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(9),
-                gradient: const LinearGradient(colors: [Color(0xFF6EE7B7), Color(0xFF059669)]),
-              ),
-              child: Text(
-                name,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.9),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Center(
-              child: Container(
-                width: 152,
-                height: 152,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: active
-                        ? [const Color(0xFF00B25A), const Color(0xFF00894B)]
-                        : readyGold
-                            ? [const Color(0xFFFDE68A), const Color(0xFFFBBF24), const Color(0xFFD97706)]
-                            : [Colors.grey.shade600, Colors.grey.shade800],
-                  ),
-                  border: Border.all(color: ringColor.withOpacity(0.35), width: 10),
-                ),
-                child: Center(
-                  child: Text(
-                    active
-                        ? 'EARNING'
-                        : alreadyDone
-                            ? 'DONE'
-                            : readyGold
-                                ? 'CLOCK IN'
-                                : 'CLOSED',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
