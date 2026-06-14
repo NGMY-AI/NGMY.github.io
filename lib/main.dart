@@ -7467,7 +7467,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _setThemeMode(ThemeMode mode) async {
     if (!mounted) return;
-    setState(() => _themeMode = mode);
+    setState(() {
+      _themeMode = mode;
+      _materialAppShellChild = null;
+    });
     _applySystemUiForMode(_effectiveThemeMode);
     final p = await SharedPreferences.getInstance();
     await p.setString('theme_mode', mode.name);
@@ -10747,9 +10750,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         themeMode: _effectiveThemeMode,
         themeAnimationDuration: Duration.zero,
         builder: (context, child) {
+          final shellBg = Theme.of(context).scaffoldBackgroundColor;
           if (child != null) _materialAppShellChild = child;
           final body = child ?? _materialAppShellChild;
-          if (body == null) return const SizedBox.shrink();
+          if (body == null) return ColoredBox(color: shellBg);
           if (!_appOffline) return body;
           return Stack(
             clipBehavior: Clip.none,
@@ -12470,7 +12474,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int? _sortedTxCacheLen;
   final Set<int> _visitedTabs = {0};
   final GlobalKey _ngmyHomeScreenKey = GlobalKey();
-  int _homeShellRepaintTick = 0;
   bool _warmingTxCache = false;
 
   List<AppTransaction> _sortedTransactions() {
@@ -12539,7 +12542,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _runScheduledPopups();
       _promptPushNotificationsIfNeeded();
-      _bumpHomeShellRepaint();
+      if (_idx == 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() {});
+        });
+      }
     }
   }
 
@@ -12690,7 +12697,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _sortedTxCacheLen = null;
       _warmTransactionCacheAfterFrame();
     } else if (oldWidget.currentThemeMode != widget.currentThemeMode) {
-      _bumpHomeShellRepaint();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
     }
     final oldSig = jsonEncode({'p': oldWidget.config.ngmyPopups, 'v': oldWidget.config.ngmyVideoPopups});
     final newSig = jsonEncode({'p': widget.config.ngmyPopups, 'v': widget.config.ngmyVideoPopups});
@@ -12749,20 +12758,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // No-op: an extra setState here kept the home tab blank during startup sync.
   }
 
-  void _bumpHomeShellRepaint() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() => _homeShellRepaintTick++);
-      WidgetsBinding.instance.scheduleFrame();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() {});
-      });
-    });
-  }
-
   void _onShellVisibleAgain() {
     if (!mounted) return;
-    _bumpHomeShellRepaint();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override void initState() {
@@ -13152,20 +13152,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
   }
 
-  List<Widget> _otherTabPagesForStack(List<AppTransaction> sorted) {
-    if (_idx == 0) {
-      return List.generate(
-        6,
-        (i) => SizedBox.shrink(key: ValueKey<String>('ngmy_tab_stack_empty_$i')),
-      );
-    }
-    return _buildOtherTabPages(sorted, activeIndex: _idx);
-  }
-
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final shellBg = Theme.of(context).scaffoldBackgroundColor;
     final sorted = _idx == 0 ? const <AppTransaction>[] : _sortedTransactions();
-    final otherTabs = _otherTabPagesForStack(sorted);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
@@ -13186,7 +13176,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onPointerDown: (_) => unawaited(NgmyIncomeSound.unlockForWebUserGesture()),
         child: Scaffold(
         extendBody: true,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: shellBg,
         body: Stack(
           children: [
             if (!isDark)
@@ -13195,34 +13185,21 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 left: 0,
                 right: 0,
                 height: MediaQuery.of(context).padding.top,
-                child: ColoredBox(color: Theme.of(context).scaffoldBackgroundColor),
+                child: ColoredBox(color: shellBg),
               ),
             Positioned.fill(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Home stays mounted at full opacity (never Opacity/Visibility 0) — iOS Safari loses hidden layers.
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      ignoring: _idx != 0,
-                      child: RepaintBoundary(
-                        key: ValueKey<int>(_homeShellRepaintTick),
-                        child: _buildHomeTab(
-                          _homeTransactionsForDisplay(),
-                          homeKey: _ngmyHomeScreenKey,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (_idx != 0)
-                    Positioned.fill(
-                      child: IndexedStack(
+              child: ColoredBox(
+                color: shellBg,
+                child: _idx == 0
+                    ? _buildHomeTab(
+                        _homeTransactionsForDisplay(),
+                        homeKey: _ngmyHomeScreenKey,
+                      )
+                    : IndexedStack(
                         index: _idx - 1,
                         sizing: StackFit.expand,
-                        children: otherTabs,
+                        children: _buildOtherTabPages(sorted, activeIndex: _idx),
                       ),
-                    ),
-                ],
               ),
             ),
             if (_offline)
@@ -13299,7 +13276,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 _idx = i;
                 _visitedTabs.add(i);
               });
-              if (i == 0) _bumpHomeShellRepaint();
+              if (i == 0) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() {});
+                });
+              }
               if (i == 1 || i == 6) unawaited(widget.onRefreshLegalAndPlans?.call());
             },
             customBorder: const CircleBorder(),
