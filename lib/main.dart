@@ -621,24 +621,27 @@ void ngmyPlayIncomeSoundForTransaction(AppTransaction t) {
   unawaited(NgmyIncomeSound.playForUser(
     beneficiaryEmail: t.userEmail,
     amount: t.amount,
+    dedupeKey: 'txn_${t.id}',
   ));
 }
 
 void ngmyPlayIncomeSoundForAmount({
   required String beneficiaryEmail,
   required double amount,
+  String? dedupeKey,
 }) {
   unawaited(NgmyIncomeSound.playForUser(
     beneficiaryEmail: beneficiaryEmail,
     amount: amount,
+    dedupeKey: dedupeKey,
   ));
 }
 
-void ngmyApplyApprovedTransactionToBalance(UserData user, AppTransaction t) {
+void ngmyApplyApprovedTransactionToBalance(UserData user, AppTransaction t, {bool playSound = false}) {
   if (t.status != TransactionStatus.approved) return;
   if (_ngmyTxnIncreasesBalance(t)) {
     user.accountBalance += t.amount;
-    ngmyPlayIncomeSoundForTransaction(t);
+    if (playSound) ngmyPlayIncomeSoundForTransaction(t);
   } else {
     user.accountBalance -= t.amount;
   }
@@ -704,6 +707,9 @@ void _ngmyApplyApprovedTransitionToBalance(
     return;
   }
   ngmyApplyApprovedTransactionToBalance(user, tx);
+  if (previousStatus == TransactionStatus.pending && ngmyTransactionCountsAsIncome(tx)) {
+    ngmyPlayIncomeSoundForTransaction(tx);
+  }
 }
 
 enum TransactionType { deposit, withdrawal, adminAdd, adminRemove, reimbursement, contribution, claim }
@@ -7076,6 +7082,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _notifiedTransactionKeys.add('txn_${t.id}_approved');
       }
     }
+    final incomeSoundKeys = <String>[
+      for (final t in _allTransactions)
+        if (ngmyTransactionCountsAsIncome(t)) 'txn_${t.id}',
+    ];
+    await NgmyIncomeSound.seedPlayedKeys(incomeSoundKeys);
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString('ngmy_notified_txn_keys');
@@ -9777,7 +9788,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               _currentUser = _allUsers[userIdx];
             }
           }
-          ngmyPlayIncomeSoundForTransaction(tx);
+          final isFreshApproval = previous != null && previous!.status != TransactionStatus.approved;
+          final isLiveInsert = previous == null &&
+              DateTime.now().difference(tx.timestamp) <= const Duration(minutes: 3);
+          if (isFreshApproval || isLiveInsert) {
+            ngmyPlayIncomeSoundForTransaction(tx);
+          }
         }
         if (userIdx >= 0 &&
             (_ngmyIsClockInSessionStartTransaction(tx) ||
@@ -12420,6 +12436,8 @@ class _NgmyHomeHostState extends State<_NgmyHomeHost> with AutomaticKeepAliveCli
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    // Rebuild when app theme changes (Profile → Appearance).
+    final _ = Theme.of(context).brightness;
     return widget.main._buildHomeTab(widget.main._homeTransactionsForDisplay());
   }
 }
@@ -12655,9 +12673,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     } else if (oldWidget.allTransactions.length != widget.allTransactions.length) {
       _sortedTxCacheLen = null;
       _warmTransactionCacheAfterFrame();
-    } else if (oldWidget.currentThemeMode != widget.currentThemeMode) {
-      _tabPagesKey = null;
-      _tabContentBuilders = null;
     }
     final oldSig = jsonEncode({'p': oldWidget.config.ngmyPopups, 'v': oldWidget.config.ngmyVideoPopups});
     final newSig = jsonEncode({'p': widget.config.ngmyPopups, 'v': widget.config.ngmyVideoPopups});
@@ -12774,24 +12789,21 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         }
 
         if (completed) {
-          if (earned > 0) {
+          final payoutId = _ngmyClockInTransactionId(widget.user.email, now);
+          final alreadyPaid = _ngmyHasClockInPayoutForDay(widget.user.email, widget.allTransactions, now);
+          if (earned > 0 && !alreadyPaid) {
             ngmyPlayIncomeSoundForAmount(
               beneficiaryEmail: widget.user.email,
               amount: earned,
+              dedupeKey: payoutId,
             );
-          }
-          if (earned > 0 &&
-              !_ngmyHasClockInPayoutForDay(widget.user.email, widget.allTransactions, now)) {
-            final penaltyNote = widget.user.clockInPenaltyPercent > 0
-                ? ' (${widget.user.clockInPenaltyPercent.toInt()}% late deduction — cap \$${formatCurrency(earned)} of \$${formatCurrency(widget.user.fullDailyEarningsBeforePenalty)})'
-                : '';
             widget.onAddTransaction(AppTransaction(
-              id: _ngmyClockInTransactionId(widget.user.email, now),
+              id: payoutId,
               userEmail: widget.user.email,
               amount: earned,
               type: TransactionType.reimbursement,
               method: PaymentMethod.system,
-              sourceDetails: 'Clock-in daily earnings$penaltyNote',
+              sourceDetails: 'Clock-in daily earnings${widget.user.clockInPenaltyPercent > 0 ? ' (${widget.user.clockInPenaltyPercent.toInt()}% late deduction — cap \$${formatCurrency(earned)} of \$${formatCurrency(widget.user.fullDailyEarningsBeforePenalty)})' : ''}',
               status: TransactionStatus.approved,
               timestamp: now,
             ));
@@ -13109,7 +13121,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sorted = _idx == 0 ? const <AppTransaction>[] : _sortedTransactions();
-    final pages = [_homeHost, ..._buildOtherTabPages(sorted, activeIndex: _idx)];
+    final otherTabs = _buildOtherTabPages(sorted, activeIndex: _idx);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
@@ -13142,10 +13154,23 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 child: ColoredBox(color: Theme.of(context).scaffoldBackgroundColor),
               ),
             Positioned.fill(
-              child: IndexedStack(
-                index: _idx,
-                sizing: StackFit.expand,
-                children: pages,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Offstage(
+                    offstage: _idx != 0,
+                    child: TickerMode(
+                      enabled: _idx == 0,
+                      child: _homeHost,
+                    ),
+                  ),
+                  if (_idx != 0)
+                    IndexedStack(
+                      index: _idx - 1,
+                      sizing: StackFit.expand,
+                      children: otherTabs,
+                    ),
+                ],
               ),
             ),
             if (_offline)

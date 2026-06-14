@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 
 
@@ -40,6 +41,10 @@ class NgmyIncomeSound {
 
   static const _debounce = Duration(milliseconds: 900);
 
+  static const _prefPlayedKeys = 'ngmy_income_sound_played_keys';
+
+  static final Set<String> _playedDedupeKeys = {};
+
 
 
   static const _candidateFiles = [
@@ -71,76 +76,83 @@ class NgmyIncomeSound {
 
 
   /// Web browsers block audio until a user gesture — call after login / first tap.
+  /// Does not play the income clip (that sounded like cash on every app open).
 
   static Future<void> unlockForWebUserGesture() async {
 
     if (!kIsWeb || _webAudioUnlocked) return;
 
-    await _resolveAssetOnce();
+    _webAudioUnlocked = true;
 
-    if (_resolvedAsset == null) return;
-
-    final url = _webAssetUrl(_resolvedAsset!);
-
-    if (url == null) return;
-
-    try {
-
-      await _player.setReleaseMode(ReleaseMode.stop);
-
-      await _player.setSource(UrlSource(url));
-
-      await _player.setVolume(0.001);
-
-      await _player.resume();
-
-      await Future<void>.delayed(const Duration(milliseconds: 40));
-
-      await _player.stop();
-
-      await _player.setVolume(1.0);
-
-      _webAudioUnlocked = true;
-
-      debugPrint('[income sound] web audio unlocked');
-
-    } catch (e) {
-
-      debugPrint('[income sound] web unlock: $e');
-
-    }
+    debugPrint('[income sound] web audio unlocked (silent)');
 
   }
 
 
 
+  /// Resolve asset path only — loading into the player on open caused audible glitches on web.
+
   static Future<void> preload() async {
 
     await _resolveAssetOnce();
 
-    if (_resolvedAsset == null) return;
+  }
+
+
+
+  static Future<void> seedPlayedKeys(Iterable<String> keys) async {
+
+    for (final raw in keys) {
+
+      final k = raw.trim();
+
+      if (k.isNotEmpty) _playedDedupeKeys.add(k);
+
+    }
 
     try {
 
-      await _player.setReleaseMode(ReleaseMode.stop);
+      final prefs = await SharedPreferences.getInstance();
 
-      if (kIsWeb) {
+      final raw = prefs.getString(_prefPlayedKeys);
 
-        final url = _webAssetUrl(_resolvedAsset!);
+      if (raw != null && raw.trim().isNotEmpty) {
 
-        if (url != null) await _player.setSource(UrlSource(url));
+        final list = jsonDecode(raw);
 
-      } else {
+        if (list is List) {
 
-        await _player.setSource(AssetSource(_resolvedAsset!));
+          for (final e in list) {
+
+            final s = e.toString().trim();
+
+            if (s.isNotEmpty) _playedDedupeKeys.add(s);
+
+          }
+
+        }
 
       }
 
-    } catch (e) {
+    } catch (_) {}
 
-      debugPrint('[income sound] preload: $e');
+  }
 
-    }
+
+
+  static Future<void> _persistPlayedKeys() async {
+
+    try {
+
+      final prefs = await SharedPreferences.getInstance();
+
+      final keys = _playedDedupeKeys.toList();
+
+      if (keys.length > 800) keys.removeRange(0, keys.length - 800);
+
+      await prefs.setString(_prefPlayedKeys, jsonEncode(keys));
+
+    } catch (_) {}
 
   }
 
@@ -228,6 +240,8 @@ class NgmyIncomeSound {
 
     required double amount,
 
+    String? dedupeKey,
+
   }) async {
 
     if (amount < 0.01) return;
@@ -239,6 +253,20 @@ class NgmyIncomeSound {
     if (me.isEmpty || ben != me) return;
 
     if (!(await isEnabled())) return;
+
+
+
+    final key = dedupeKey?.trim();
+
+    if (key != null && key.isNotEmpty) {
+
+      if (_playedDedupeKeys.contains(key)) return;
+
+      _playedDedupeKeys.add(key);
+
+      unawaited(_persistPlayedKeys());
+
+    }
 
 
 
