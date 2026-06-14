@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -22,6 +23,7 @@ import 'ngmy_app_builder_templates.dart';
 import 'ngmy_app_builder_urls.dart';
 import 'ngmy_app_builder_ai_usage.dart';
 import 'ngmy_app_studio_payments.dart';
+import 'ngmy_app_studio_dashboard.dart';
 import 'ngmy_app_studio_shell.dart';
 import 'ngmy_nav.dart';
 
@@ -130,6 +132,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
   List<NgmyAppProject> _published = [];
   bool _loading = true;
   Set<String> _cloudSavedProjectIds = {};
+  NgmyAppProject? _activeProject;
 
   bool get _isAdmin => widget.user.isAdmin == true;
   String get _email => widget.user.email.toString().toLowerCase().trim();
@@ -327,9 +330,78 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ngmy.org link copied')));
   }
 
+  Future<void> _openScreenFromDashboard(NgmyAppProject project, int screenIndex) async {
+    if (screenIndex < 0 || screenIndex >= project.screens.length) return;
+    final edited = await NgmyNavigator.push<NgmyAppScreen>(
+      context,
+      NgmyAppScreenEditorPage(
+        screen: project.screens[screenIndex],
+        allScreens: project.screens,
+        themeColor: project.theme,
+        screenIndex: screenIndex,
+        apiKey: _apiKey,
+        email: _email,
+        config: widget.config,
+        user: widget.user,
+        isAdmin: _isAdmin,
+        onChargeWallet: widget.onChargeWallet,
+        onDataChanged: widget.onDataChanged,
+        onPersistConfig: widget.onPersistConfig,
+      ),
+      routeName: 'NgmyAppScreenEditorPage',
+    );
+    if (edited == null || !mounted) return;
+    final list = [...project.screens];
+    list[screenIndex] = edited;
+    final updated = project.copyWith(screens: list);
+    await ngmySaveUserAppProject(_email, updated);
+    setState(() => _activeProject = updated);
+    await _reload();
+  }
+
+  Future<void> _openIntegrationsFromDashboard() async {
+    if (_activeProject == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Open a project first — then connect Supabase or other backends.')),
+      );
+      return;
+    }
+    await _openEditor(_activeProject!);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final userName = (widget.user.username ?? widget.user.email ?? '').toString().trim();
+    return NgmyAppStudioDashboard(
+      userName: userName.isEmpty ? 'User name' : userName,
+      userEmail: _email,
+      isDark: isDark,
+      loading: _loading,
+      projects: _mine,
+      published: _published,
+      activeProject: _activeProject,
+      isAdmin: _isAdmin,
+      onBack: () => NgmyNavigator.pop(context),
+      onSelectProject: (p) => setState(() => _activeProject = p),
+      onOpenEditor: (p) => _openEditor(p),
+      onCreateBlank: _createBlank,
+      onOpenAi: ({NgmyAppProject? project}) => _openAiCopilot(project: project ?? _activeProject),
+      onPreviewTemplate: _previewTemplate,
+      onImport: _importApp,
+      onPreviewRuntime: (p) => NgmyNavigator.push(
+        context,
+        NgmyAppRuntimeScreen(project: p, apiKey: _apiKey, email: _email),
+        routeName: 'NgmyAppRuntimeScreen',
+      ),
+      onPublish: (p) => _submitOrPublish(p),
+      onIntegrations: () => unawaited(_openIntegrationsFromDashboard()),
+      onOpenScreenEditor: (p, i) => unawaited(_openScreenFromDashboard(p, i)),
+    );
+  }
+
+  // Legacy tab UI kept for reference — dashboard replaces shell below.
+  Widget _legacyAppStudioShell(bool isDark) {
     final bg = isDark ? const Color(0xFF07080F) : const Color(0xFFE8EDF5);
     return Scaffold(
       backgroundColor: bg,
