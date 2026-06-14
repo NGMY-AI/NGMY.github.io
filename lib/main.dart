@@ -12277,6 +12277,66 @@ class _ClockInWindowClosedDialogState extends State<_ClockInWindowClosedDialog> 
   }
 }
 
+/// Builds bottom-nav tab content lazily so the home screen paints on the first frame.
+class _NgmyLazyTabSlot extends StatefulWidget {
+  const _NgmyLazyTabSlot({
+    super.key,
+    required this.tabIndex,
+    required this.activeIndex,
+    required this.buildContent,
+  });
+
+  final int tabIndex;
+  final int activeIndex;
+  final Widget Function() buildContent;
+
+  @override
+  State<_NgmyLazyTabSlot> createState() => _NgmyLazyTabSlotState();
+}
+
+class _NgmyLazyTabSlotState extends State<_NgmyLazyTabSlot> {
+  Widget? _content;
+
+  bool get _isHomeTab => widget.tabIndex == 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isHomeTab || widget.tabIndex == widget.activeIndex) {
+      _content = widget.buildContent();
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _schedulePrefetch());
+  }
+
+  void _schedulePrefetch() {
+    if (_content != null || !mounted) return;
+    final delayMs = 60 + widget.tabIndex * 100;
+    Future<void>.delayed(Duration(milliseconds: delayMs), () {
+      if (!mounted || _content != null) return;
+      setState(() => _content = widget.buildContent());
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _NgmyLazyTabSlot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_content == null && (widget.tabIndex == widget.activeIndex || _isHomeTab)) {
+      _content = widget.buildContent();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_content != null) return _content!;
+    if (_isHomeTab || widget.tabIndex == widget.activeIndex) {
+      _content = widget.buildContent();
+      return _content!;
+    }
+    return ColoredBox(color: Theme.of(context).scaffoldBackgroundColor);
+  }
+}
+
 class MainScreen extends StatefulWidget {
   final UserData user; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans;
   final List<MediaPost> allMedia; final List<Announcement> allAnnouncements; final AppConfig config;
@@ -12352,7 +12412,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   Timer? _onlineCheck;
   Timer? _adminTabRefreshDebounce;
   DateTime? _mainShellMountedAt;
-  List<Widget>? _tabPages;
+  Map<int, Widget Function()>? _tabContentBuilders;
   String? _tabPagesKey;
 
   void _runScheduledPopups() {
@@ -12511,16 +12571,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.user.email != widget.user.email) {
       NgmyIncomeSound.bindSession(widget.user.email);
-      _tabPages = null;
       _tabPagesKey = null;
-    }
-    if (oldWidget.config != widget.config ||
-        oldWidget.allMedia.length != widget.allMedia.length ||
-        oldWidget.allTransactions.length != widget.allTransactions.length ||
-        oldWidget.globalPlans.length != widget.globalPlans.length ||
-        oldWidget.allAnnouncements.length != widget.allAnnouncements.length) {
-      _tabPages = null;
-      _tabPagesKey = null;
+      _tabContentBuilders = null;
     }
     final oldSig = jsonEncode({'p': oldWidget.config.ngmyPopups, 'v': oldWidget.config.ngmyVideoPopups});
     final newSig = jsonEncode({'p': widget.config.ngmyPopups, 'v': widget.config.ngmyVideoPopups});
@@ -12563,14 +12615,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void _onAdminLiveRefresh() {
     if (!mounted) return;
     final mountedAt = _mainShellMountedAt;
-    if (mountedAt != null && DateTime.now().difference(mountedAt) < const Duration(seconds: 3)) {
+    if (mountedAt != null && DateTime.now().difference(mountedAt) < const Duration(seconds: 10)) {
       return;
     }
     _adminTabRefreshDebounce?.cancel();
     _adminTabRefreshDebounce = Timer(const Duration(milliseconds: 400), () {
       if (!mounted) return;
-      _tabPages = null;
       _tabPagesKey = null;
+      _tabContentBuilders = null;
       setState(() {});
     });
   }
@@ -12683,7 +12735,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  List<Widget> _buildTabPages(List<AppTransaction> sorted) {
+  List<Widget> _buildTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
     final inv = widget.user.activeInvestment;
     final invSig = inv == null
         ? 'none'
@@ -12693,12 +12745,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         '${widget.user.pendingInvestmentName}|${widget.allMedia.length}|'
         '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight|'
         '${_investmentPlansSig(widget.globalPlans)}|${_legalContentSig(widget.config)}';
-    if (_tabPages != null && _tabPagesKey == cacheKey) return _tabPages!;
+    if (_tabContentBuilders != null && _tabPagesKey == cacheKey) {
+      return List<Widget>.generate(7, (i) => _NgmyLazyTabSlot(
+        key: ValueKey<String>('ngmy_tab_${i}_$cacheKey'),
+        tabIndex: i,
+        activeIndex: activeIndex,
+        buildContent: _tabContentBuilders![i]!,
+      ));
+    }
     _tabPagesKey = cacheKey;
-    _tabPages = [
-      KeyedSubtree(
-        key: const ValueKey<String>('ngmy_tab_home'),
-        child: HomeScreen(user: widget.user, onClockIn: () async {
+    _tabContentBuilders = {
+      0: () => HomeScreen(user: widget.user, onClockIn: () async {
         final now = DateTime.now();
         _ngmyApplyMidnightClockReset(widget.user);
         final onTrial = widget.user.isOnFreeTrial;
@@ -12782,10 +12839,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           }
         }
       }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData, onDeleteMedia: widget.onDeleteMedia, onPushUserToCloud: widget.onPushUserToCloud, onSaveWalletPayments: widget.onSaveWalletPayments, onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan, onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan, onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans, onArchiveWalletTransaction: widget.onArchiveWalletTransaction, onPersistManagementConfig: widget.onPersistManagementConfig, onRefreshManagementData: widget.onRefreshManagementData, onRefreshAdminMedia: widget.onRefreshAdminMedia, onPurgeBrokenMedia: widget.onPurgeBrokenMedia, onOpenInvest: () => setState(() => _idx = 1)),
-      ),
-      KeyedSubtree(
-        key: const ValueKey<String>('ngmy_tab_invest'),
-        child: InvestScreen(
+      1: () => InvestScreen(
         user: widget.user,
         plans: widget.globalPlans,
         purchaseInFlight: _investPurchaseInFlight,
@@ -12832,7 +12886,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             widget.onDataChanged();
             if (mounted) {
               setState(() => _investPurchaseInFlight = false);
-              _tabPages = null;
+              _tabPagesKey = null;
+              _tabContentBuilders = null;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Plan purchased: $n')),
               );
@@ -12862,10 +12917,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           );
         },
       ),
-      ),
-      KeyedSubtree(
-        key: const ValueKey<String>('ngmy_tab_wallet'),
-        child: WalletScreen(
+      2: () => WalletScreen(
         user: widget.user,
         transactions: ngmyUserWalletHistoryTransactions(sorted, widget.user.email),
         allTransactions: sorted,
@@ -12874,10 +12926,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onDataChanged: widget.onDataChanged,
         onPersistUser: (u) => _pushUserToCloudFast(u),
       ),
-      ),
-      KeyedSubtree(
-        key: const ValueKey<String>('ngmy_tab_hub'),
-        child: NgmyHubScreen(
+      3: () => NgmyHubScreen(
         user: widget.user,
         allUsers: widget.allUsers,
         allTransactions: sorted,
@@ -12885,10 +12934,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onDataChanged: widget.onDataChanged,
         config: widget.config,
       ),
-      ),
-      KeyedSubtree(
-        key: const ValueKey<String>('ngmy_tab_media'),
-        child: MediaHubScreen(
+      4: () => MediaHubScreen(
         user: widget.user,
         allUsers: widget.allUsers,
         allMedia: widget.allMedia,
@@ -12903,14 +12949,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onSyncMediaPost: widget.onSyncAdminMediaPost,
         onSyncUserMedia: widget.onSyncAdminUserMedia,
       ),
-      ),
-      KeyedSubtree(
-        key: const ValueKey<String>('ngmy_tab_stats'),
-        child: StatsScreen(user: widget.user, transactions: sorted, allUsers: widget.allUsers),
-      ),
-      KeyedSubtree(
-        key: const ValueKey<String>('ngmy_tab_profile'),
-        child: ProfileScreen(
+      5: () => StatsScreen(user: widget.user, transactions: sorted, allUsers: widget.allUsers),
+      6: () => ProfileScreen(
         user: widget.user,
         allUsers: widget.allUsers,
         config: widget.config,
@@ -12921,15 +12961,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onAddTransaction: widget.onAddTransaction,
         onRefreshLegalContent: widget.onRefreshLegalAndPlans,
       ),
-      ),
-    ];
-    return _tabPages!;
+    };
+    return List<Widget>.generate(7, (i) => _NgmyLazyTabSlot(
+      key: ValueKey<String>('ngmy_tab_${i}_$cacheKey'),
+      tabIndex: i,
+      activeIndex: activeIndex,
+      buildContent: _tabContentBuilders![i]!,
+    ));
   }
 
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sorted = List<AppTransaction>.from(widget.allTransactions)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    final pages = _buildTabPages(sorted);
+    final pages = _buildTabPages(sorted, activeIndex: _idx);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
