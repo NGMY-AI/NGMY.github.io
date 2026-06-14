@@ -12393,6 +12393,50 @@ class _NgmyLazyTabSlotState extends State<_NgmyLazyTabSlot> {
   }
 }
 
+/// Keeps [HomeScreen] in the tab stack without remounting on every MainScreen rebuild.
+class _NgmyHomeTabHost extends StatefulWidget {
+  const _NgmyHomeTabHost({required this.main});
+
+  final _MainScreenState main;
+
+  @override
+  State<_NgmyHomeTabHost> createState() => _NgmyHomeTabHostState();
+}
+
+class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    ngmyRegisterPageVisibleHandler(_onPageVisible);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  void _onPageVisible() {
+    if (!mounted) return;
+    WidgetsBinding.instance.scheduleForcedFrame();
+    setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      WidgetsBinding.instance.scheduleForcedFrame();
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.main._buildHomeTab(widget.main._homeTransactionsForDisplay());
+  }
+}
+
 class MainScreen extends StatefulWidget {
   final UserData user; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans;
   final List<MediaPost> allMedia; final List<Announcement> allAnnouncements; final AppConfig config;
@@ -12473,7 +12517,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   List<AppTransaction>? _sortedTxCache;
   int? _sortedTxCacheLen;
   final Set<int> _visitedTabs = {0};
-  final GlobalKey _ngmyHomeScreenKey = GlobalKey();
+  late final _NgmyHomeTabHost _homeTabHost;
   bool _warmingTxCache = false;
 
   List<AppTransaction> _sortedTransactions() {
@@ -12760,6 +12804,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   void _onShellVisibleAgain() {
     if (!mounted) return;
+    WidgetsBinding.instance.scheduleForcedFrame();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() {});
     });
@@ -12767,6 +12812,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   @override void initState() {
     super.initState();
+    _homeTabHost = _NgmyHomeTabHost(main: this);
     _mainShellMountedAt = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
     ngmyRegisterPageVisibleHandler(_onShellVisibleAgain);
@@ -12865,9 +12911,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  Widget _buildHomeTab(List<AppTransaction> sorted, {Key? homeKey}) {
+  Widget _buildHomeTab(List<AppTransaction> sorted) {
     return HomeScreen(
-      key: homeKey ?? ValueKey<String>('ngmy_home_${widget.user.email}'),
+      key: ValueKey<String>('ngmy_home_${widget.user.email.toLowerCase().trim()}'),
       user: widget.user,
       onClockIn: () async {
         final now = DateTime.now();
@@ -13190,16 +13236,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             Positioned.fill(
               child: ColoredBox(
                 color: shellBg,
-                child: _idx == 0
-                    ? _buildHomeTab(
-                        _homeTransactionsForDisplay(),
-                        homeKey: _ngmyHomeScreenKey,
-                      )
-                    : IndexedStack(
-                        index: _idx - 1,
-                        sizing: StackFit.expand,
-                        children: _buildOtherTabPages(sorted, activeIndex: _idx),
-                      ),
+                child: IndexedStack(
+                  index: _idx,
+                  sizing: StackFit.expand,
+                  children: [
+                    _homeTabHost,
+                    ..._buildOtherTabPages(sorted, activeIndex: _idx),
+                  ],
+                ),
               ),
             ),
             if (_offline)
@@ -13277,6 +13321,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 _visitedTabs.add(i);
               });
               if (i == 0) {
+                WidgetsBinding.instance.scheduleForcedFrame();
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (mounted) setState(() {});
                 });
@@ -13381,7 +13426,7 @@ class HomeScreen extends StatefulWidget {
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _smokeCtrl;
   late Animation<double> _smokeRot;
   Timer? _liveTicker;
@@ -13393,9 +13438,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int _liveCacheStart = -1;
   int _liveCacheTxnLen = -1;
   List<AppTransaction> _liveCacheShown = const [];
-
-  @override
-  bool get wantKeepAlive => true;
 
   Future<void> _openNewsHub() async {
     await NgmyNavigator.push(
@@ -13459,6 +13501,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   void _onWebPageVisibleAgain() {
     if (!mounted) return;
+    WidgetsBinding.instance.scheduleForcedFrame();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() {});
     });
@@ -13491,21 +13534,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _liveTicker?.cancel();
+    if (_smokeCtrl.isAnimating) _smokeCtrl.stop();
     _smokeCtrl.dispose();
     super.dispose();
   }
 
   @override Widget build(BuildContext context) {
-    super.build(context);
     final bg = Theme.of(context).scaffoldBackgroundColor;
     final isLight = Theme.of(context).brightness == Brightness.light;
-    return Scaffold(
-      backgroundColor: bg,
-      body: ColoredBox(
-        color: bg,
-        child: SafeArea(
-          bottom: false,
-          child: SingleChildScrollView(
+    return ColoredBox(
+      color: bg,
+      child: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
           child: Column(
             children: [
@@ -13639,7 +13680,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ],
           ),
         ),
-      ),
       ),
     );
   }
