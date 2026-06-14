@@ -12278,21 +12278,6 @@ class _ClockInWindowClosedDialogState extends State<_ClockInWindowClosedDialog> 
 }
 
 /// Builds bottom-nav tab content lazily so the home screen paints on the first frame.
-/// Home tab shell — built outside [IndexedStack] so startup never blocks on other tabs.
-class _NgmyHomeTabShell extends StatefulWidget {
-  const _NgmyHomeTabShell({super.key, required this.state});
-
-  final _MainScreenState state;
-
-  @override
-  State<_NgmyHomeTabShell> createState() => _NgmyHomeTabShellState();
-}
-
-class _NgmyHomeTabShellState extends State<_NgmyHomeTabShell> {
-  @override
-  Widget build(BuildContext context) => widget.state._buildHomeTab(widget.state._homeDisplayTransactions);
-}
-
 class _NgmyLazyTabSlot extends StatefulWidget {
   const _NgmyLazyTabSlot({
     super.key,
@@ -12434,8 +12419,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _sortedTxSourceLen = -1;
   bool _sortInFlight = false;
   final Set<int> _visitedTabs = {0};
-  GlobalKey _homeScreenGlobalKey = GlobalKey(debugLabel: 'ngmy_home');
-  Widget? _homeTabShell;
 
   /// Never sort or copy large transaction lists synchronously inside [build].
   void _scheduleSortedTransactionRefresh() {
@@ -12627,8 +12610,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _homeDisplayTransactions = const [];
       _sortedTxSourceLen = -1;
       _sortInFlight = false;
-      _homeScreenGlobalKey = GlobalKey(debugLabel: 'ngmy_home');
-      _homeTabShell = _NgmyHomeTabShell(key: _homeScreenGlobalKey, state: this);
       _visitedTabs
         ..clear()
         ..add(0);
@@ -12696,7 +12677,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override void initState() {
     super.initState();
     _mainShellMountedAt = DateTime.now();
-    _homeTabShell = _NgmyHomeTabShell(key: _homeScreenGlobalKey, state: this);
     _scheduleSortedTransactionRefresh();
     WidgetsBinding.instance.addObserver(this);
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
@@ -12798,7 +12778,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Widget _buildHomeTab(List<AppTransaction> sorted) {
     return HomeScreen(
-      key: _homeScreenGlobalKey,
+      key: ValueKey<String>('ngmy_home_${widget.user.email}'),
       user: widget.user,
       onClockIn: () async {
         final now = DateTime.now();
@@ -12935,7 +12915,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     });
   }
 
-  List<Widget> _buildOtherTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
+  List<Widget> _buildTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
+    final home = RepaintBoundary(child: _buildHomeTab(_homeDisplayTransactions));
     final inv = widget.user.activeInvestment;
     final invSig = inv == null
         ? 'none'
@@ -12946,7 +12927,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight|'
         '${_investmentPlansSig(widget.globalPlans)}|${_legalContentSig(widget.config)}';
     if (_tabContentBuilders != null && _tabPagesKey == cacheKey) {
-      return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
+      return [home, ..._buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey)];
     }
     _tabPagesKey = cacheKey;
     _tabContentBuilders = {
@@ -13073,14 +13054,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onRefreshLegalContent: widget.onRefreshLegalAndPlans,
       ),
     };
-    return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
+    return [home, ..._buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey)];
   }
 
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sorted = _sortedTransactionsCache;
-    final otherTabs = _buildOtherTabPages(sorted, activeIndex: _idx);
-    final homeTab = _homeTabShell ?? _NgmyHomeTabShell(key: _homeScreenGlobalKey, state: this);
+    final pages = _buildTabPages(sorted, activeIndex: _idx);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
@@ -13113,20 +13093,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 child: const ColoredBox(color: Colors.white),
               ),
             Positioned.fill(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (_idx != 0)
-                    IndexedStack(
-                      index: _idx - 1,
-                      sizing: StackFit.expand,
-                      children: otherTabs,
-                    ),
-                  Offstage(
-                    offstage: _idx != 0,
-                    child: RepaintBoundary(child: homeTab),
-                  ),
-                ],
+              child: IndexedStack(
+                index: _idx,
+                sizing: StackFit.expand,
+                children: pages,
               ),
             ),
             if (_offline)
