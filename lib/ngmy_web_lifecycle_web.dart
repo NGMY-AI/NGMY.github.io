@@ -12,10 +12,12 @@ void ngmyRegisterPageHiddenHandler(void Function() onHidden) {
 
 /// Fires when the user returns to the NGMY tab (fixes blank home after backgrounding on web/PWA).
 void ngmyRegisterPageVisibleHandler(void Function() onVisible) {
+  void fire() => onVisible();
   html.document.onVisibilityChange.listen((_) {
     if (html.document.visibilityState == 'visible') {
-      onVisible();
+      fire();
     }
   });
-  html.window.onPageShow.listen((_) => onVisible());
+  html.window.onPageShow.listen((_) => fire());
+  html.window.onFocus.listen((_) => fire());
 }

@@ -10722,21 +10722,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         themeMode: _effectiveThemeMode,
         themeAnimationDuration: Duration.zero,
         builder: (context, child) {
-          // Theme/resume rebuilds can pass null briefly — never show an empty shell.
           if (child != null) _materialAppShellChild = child;
-          final body = _materialAppShellChild ?? child ?? const SizedBox.shrink();
-          final shell = _appOffline
-              ? Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    body,
-                    Positioned(top: 0, left: 0, right: 0, child: _offlineBanner()),
-                  ],
-                )
-              : body;
-          return ColoredBox(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            child: shell,
+          final body = child ?? _materialAppShellChild;
+          if (body == null) return const SizedBox.shrink();
+          if (!_appOffline) return body;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              body,
+              Positioned(top: 0, left: 0, right: 0, child: _offlineBanner()),
+            ],
           );
         },
         home: _currentUser == null
@@ -12437,54 +12432,6 @@ class NgmyAdminLiveRefresh {
   }
 }
 
-/// Keeps [HomeScreen] mounted once so startup sync storms do not recreate it every frame.
-class _NgmyHomeHost extends StatefulWidget {
-  const _NgmyHomeHost({required this.main});
-  final _MainScreenState main;
-
-  @override
-  State<_NgmyHomeHost> createState() => _NgmyHomeHostState();
-}
-
-class _NgmyHomeHostState extends State<_NgmyHomeHost> with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
-  final GlobalKey _homeScreenKey = GlobalKey();
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && mounted) {
-      setState(() {});
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    // Rebuild when app theme changes (Profile → Appearance).
-    final _ = Theme.of(context).brightness;
-    return RepaintBoundary(
-      child: widget.main._buildHomeTab(
-        widget.main._homeTransactionsForDisplay(),
-        homeKey: _homeScreenKey,
-      ),
-    );
-  }
-}
-
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
   bool _offline = false;
@@ -12497,7 +12444,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   List<AppTransaction>? _sortedTxCache;
   int? _sortedTxCacheLen;
   final Set<int> _visitedTabs = {0};
-  late Widget _homeHost;
+  final GlobalKey _ngmyHomeScreenKey = GlobalKey();
+  int _homeShellRepaintTick = 0;
   bool _warmingTxCache = false;
 
   List<AppTransaction> _sortedTransactions() {
@@ -12566,11 +12514,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _runScheduledPopups();
       _promptPushNotificationsIfNeeded();
-      if (_idx == 0 && mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() {});
-        });
-      }
+      _bumpHomeShellRepaint();
     }
   }
 
@@ -12710,7 +12654,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.user.email != widget.user.email) {
       NgmyIncomeSound.bindSession(widget.user.email);
-      _homeHost = _NgmyHomeHost(main: this);
       _tabPagesKey = null;
       _tabContentBuilders = null;
       _sortedTxCache = null;
@@ -12721,6 +12664,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     } else if (oldWidget.allTransactions.length != widget.allTransactions.length) {
       _sortedTxCacheLen = null;
       _warmTransactionCacheAfterFrame();
+    } else if (oldWidget.currentThemeMode != widget.currentThemeMode) {
+      _bumpHomeShellRepaint();
     }
     final oldSig = jsonEncode({'p': oldWidget.config.ngmyPopups, 'v': oldWidget.config.ngmyVideoPopups});
     final newSig = jsonEncode({'p': widget.config.ngmyPopups, 'v': widget.config.ngmyVideoPopups});
@@ -12779,16 +12724,24 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // No-op: an extra setState here kept the home tab blank during startup sync.
   }
 
-  void _onShellVisibleAgain() {
-    if (!mounted || _idx != 0) return;
+  void _bumpHomeShellRepaint() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      setState(() => _homeShellRepaintTick++);
+      WidgetsBinding.instance.scheduleFrame();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
     });
+  }
+
+  void _onShellVisibleAgain() {
+    if (!mounted) return;
+    _bumpHomeShellRepaint();
   }
 
   @override void initState() {
     super.initState();
-    _homeHost = _NgmyHomeHost(main: this);
     _mainShellMountedAt = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
     ngmyRegisterPageVisibleHandler(_onShellVisibleAgain);
@@ -13223,21 +13176,26 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  IgnorePointer(
-                    ignoring: _idx != 0,
-                    child: Visibility(
-                      visible: _idx == 0,
-                      maintainState: true,
-                      maintainAnimation: true,
-                      maintainSize: false,
-                      child: _homeHost,
+                  // Home stays mounted at full opacity (never Opacity/Visibility 0) — iOS Safari loses hidden layers.
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      ignoring: _idx != 0,
+                      child: RepaintBoundary(
+                        key: ValueKey<int>(_homeShellRepaintTick),
+                        child: _buildHomeTab(
+                          _homeTransactionsForDisplay(),
+                          homeKey: _ngmyHomeScreenKey,
+                        ),
+                      ),
                     ),
                   ),
                   if (_idx != 0)
-                    IndexedStack(
-                      index: _idx - 1,
-                      sizing: StackFit.expand,
-                      children: otherTabs,
+                    Positioned.fill(
+                      child: IndexedStack(
+                        index: _idx - 1,
+                        sizing: StackFit.expand,
+                        children: otherTabs,
+                      ),
                     ),
                 ],
               ),
@@ -13316,6 +13274,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 _idx = i;
                 _visitedTabs.add(i);
               });
+              if (i == 0) _bumpHomeShellRepaint();
               if (i == 1 || i == 6) unawaited(widget.onRefreshLegalAndPlans?.call());
             },
             customBorder: const CircleBorder(),
@@ -13478,6 +13437,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ngmyRegisterPageVisibleHandler(_onWebPageVisibleAgain);
     _homeMountedAt = DateTime.now();
     _smokeCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 10));
     _smokeRot = Tween<double>(begin: 0, end: 2 * math.pi).animate(_smokeCtrl);
@@ -13488,6 +13448,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
+    });
+  }
+
+  void _onWebPageVisibleAgain() {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
     });
   }
 
