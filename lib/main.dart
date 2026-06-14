@@ -12414,6 +12414,28 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   DateTime? _mainShellMountedAt;
   Map<int, Widget Function()>? _tabContentBuilders;
   String? _tabPagesKey;
+  List<AppTransaction>? _sortedTxCache;
+  String? _sortedTxCacheSig;
+  final Set<int> _visitedTabs = {0};
+
+  String _transactionListSig(List<AppTransaction> txns) {
+    if (txns.isEmpty) return '0';
+    var latestMs = txns.first.timestamp.millisecondsSinceEpoch;
+    for (final t in txns) {
+      final ms = t.timestamp.millisecondsSinceEpoch;
+      if (ms > latestMs) latestMs = ms;
+    }
+    return '${txns.length}|$latestMs';
+  }
+
+  List<AppTransaction> _sortedTransactions() {
+    final sig = _transactionListSig(widget.allTransactions);
+    if (_sortedTxCache != null && _sortedTxCacheSig == sig) return _sortedTxCache!;
+    _sortedTxCacheSig = sig;
+    _sortedTxCache = List<AppTransaction>.from(widget.allTransactions)
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return _sortedTxCache!;
+  }
 
   void _runScheduledPopups() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -12573,6 +12595,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       NgmyIncomeSound.bindSession(widget.user.email);
       _tabPagesKey = null;
       _tabContentBuilders = null;
+      _sortedTxCache = null;
+      _sortedTxCacheSig = null;
+      _visitedTabs
+        ..clear()
+        ..add(0);
     }
     final oldSig = jsonEncode({'p': oldWidget.config.ngmyPopups, 'v': oldWidget.config.ngmyVideoPopups});
     final newSig = jsonEncode({'p': widget.config.ngmyPopups, 'v': widget.config.ngmyVideoPopups});
@@ -12628,12 +12655,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   void _scheduleMainShellRepaint() {
+    // One repaint after the first frame — avoids startup setState storms that blank the home tab.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() {});
-      Future<void>.delayed(const Duration(milliseconds: 120), () {
-        if (mounted) setState(() {});
-      });
     });
   }
 
@@ -12646,7 +12671,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     NgmyIncomeSound.bindSession(widget.user.email);
     unawaited(NgmyIncomeSound.preload());
     NgmyPopupOrchestrator.resolveVideoUrl = _resolveSupabaseStorageUrlResilient;
-    _ngmyReconcileClockInSession(widget.user, widget.allTransactions);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _ngmyReconcileClockInSession(widget.user, widget.allTransactions);
+    });
     _refreshOnlineStatus();
     _runScheduledPopups();
     WidgetsBinding.instance.addPostFrameCallback((_) => _promptPushNotificationsIfNeeded());
@@ -12866,6 +12894,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   List<Widget> _buildOtherTabSlots(List<AppTransaction> sorted, {required int activeIndex, required String cacheKey}) {
     return List.generate(6, (i) {
       final tabIndex = i + 1;
+      if (!_visitedTabs.contains(tabIndex) && activeIndex != tabIndex) {
+        return SizedBox.shrink(key: ValueKey<String>('ngmy_tab_empty_$tabIndex'));
+      }
       return _NgmyLazyTabSlot(
         key: ValueKey<String>('ngmy_tab_${tabIndex}_$cacheKey'),
         tabIndex: tabIndex,
@@ -13019,7 +13050,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sorted = List<AppTransaction>.from(widget.allTransactions)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final sorted = _sortedTransactions();
     final pages = _buildTabPages(sorted, activeIndex: _idx);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
@@ -13129,7 +13160,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           color: Colors.transparent,
           child: InkWell(
             onTap: () {
-              setState(() => _idx = i);
+              setState(() {
+                _idx = i;
+                _visitedTabs.add(i);
+              });
               if (i == 1 || i == 6) unawaited(widget.onRefreshLegalAndPlans?.call());
             },
             customBorder: const CircleBorder(),
@@ -13151,7 +13185,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () => setState(() => _idx = i),
+            onTap: () => setState(() {
+              _idx = i;
+              _visitedTabs.add(i);
+            }),
             customBorder: const CircleBorder(),
             child: SizedBox(
               height: NgmyBottomNavMetrics.barHeight,
@@ -13233,6 +13270,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Timer? _liveTicker;
   int _liveStart = 0;
   int _unreadNewsCount = 0;
+  bool _heavySectionsReady = false;
+  int _liveCacheStart = -1;
+  int _liveCacheTxnLen = -1;
+  List<AppTransaction> _liveCacheShown = const [];
 
   @override
   bool get wantKeepAlive => true;
@@ -13289,7 +13330,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       setState(() => _liveStart++);
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !ngmyPreferLightGraphics) _smokeCtrl.repeat();
+      if (!mounted) return;
+      setState(() => _heavySectionsReady = true);
+      if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
     });
   }
 
@@ -13302,6 +13345,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         oldWidget.user.displayedTodayEarnings != widget.user.displayedTodayEarnings ||
         oldWidget.user.todayDailyGoal != widget.user.todayDailyGoal ||
         oldWidget.allTransactions.length != widget.allTransactions.length) {
+      _liveCacheStart = -1;
       setState(() {});
     }
   }
@@ -13432,17 +13476,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               const SizedBox(height: 30),
               _buildClockInFrame(isLight),
               const SizedBox(height: 40),
-              _status(context),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(child: _info(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit + widget.user.unpaidTodayEarnings)}')),
-                  const SizedBox(width: 15),
-                  Expanded(child: _info(context, 'Total Investment', '\$${formatCurrency(widget.user.totalInvestmentAmount)}')),
-                ],
-              ),
-              const SizedBox(height: 20),
-              _live(context),
+              if (_heavySectionsReady) ...[
+                _status(context),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(child: _info(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit + widget.user.unpaidTodayEarnings)}')),
+                    const SizedBox(width: 15),
+                    Expanded(child: _info(context, 'Total Investment', '\$${formatCurrency(widget.user.totalInvestmentAmount)}')),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _live(context),
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(child: _info(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit + widget.user.unpaidTodayEarnings)}')),
+                    const SizedBox(width: 15),
+                    Expanded(child: _info(context, 'Total Investment', '\$${formatCurrency(widget.user.totalInvestmentAmount)}')),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -14411,24 +14465,64 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return '$hour12:$minute $ampm';
   }
 
-  Widget _live(BuildContext ctx) {
-    final recent = widget.allTransactions
-        .where((t) =>
-            (t.type == TransactionType.deposit ||
-                t.type == TransactionType.withdrawal ||
-                t.type == TransactionType.adminRemove ||
-                t.type == TransactionType.reimbursement) &&
-            !_ngmyIsClockInSessionStartTransaction(t))
-        .toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    List<AppTransaction> shown = [];
+  bool _countsForLiveActivity(AppTransaction t) {
+    return (t.type == TransactionType.deposit ||
+            t.type == TransactionType.withdrawal ||
+            t.type == TransactionType.adminRemove ||
+            t.type == TransactionType.reimbursement) &&
+        !_ngmyIsClockInSessionStartTransaction(t);
+  }
+
+  List<AppTransaction> _liveShown() {
+    if (_liveCacheStart == _liveStart && _liveCacheTxnLen == widget.allTransactions.length) {
+      return _liveCacheShown;
+    }
+    AppTransaction? first;
+    AppTransaction? second;
+    AppTransaction? third;
+    void consider(AppTransaction t) {
+      if (!_countsForLiveActivity(t)) return;
+      if (first == null || t.timestamp.isAfter(first!.timestamp)) {
+        third = second;
+        second = first;
+        first = t;
+        return;
+      }
+      if (second == null || t.timestamp.isAfter(second!.timestamp)) {
+        third = second;
+        second = t;
+        return;
+      }
+      if (third == null || t.timestamp.isAfter(third!.timestamp)) {
+        third = t;
+      }
+    }
+
+    for (final t in widget.allTransactions) {
+      consider(t);
+    }
+
+    final recent = <AppTransaction>[
+      if (first != null) first!,
+      if (second != null) second!,
+      if (third != null) third!,
+    ];
+    final shown = <AppTransaction>[];
     if (recent.isNotEmpty) {
       final count = recent.length < 3 ? recent.length : 3;
       final start = _liveStart % recent.length;
-      for (int i = 0; i < count; i++) {
+      for (var i = 0; i < count; i++) {
         shown.add(recent[(start + i) % recent.length]);
       }
     }
+    _liveCacheStart = _liveStart;
+    _liveCacheTxnLen = widget.allTransactions.length;
+    _liveCacheShown = shown;
+    return shown;
+  }
+
+  Widget _live(BuildContext ctx) {
+    final shown = _liveShown();
     return Container(
       padding: const EdgeInsets.all(20),
       width: double.infinity,
