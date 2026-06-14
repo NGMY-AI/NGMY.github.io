@@ -6430,6 +6430,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   UserData? _currentUser;
   bool _launchCacheHydrated = false;
   bool _appOffline = false;
+  Widget? _materialAppShellChild;
   Timer? _startupRebuildDebounce;
   List<AppTransaction> _allTransactions = [];
   List<UserData> _allUsers = [];
@@ -7317,8 +7318,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (_currentUser != null) {
         _ngmyReconcileClockInSession(_currentUser!, _allTransactions);
       }
-      unawaited(_refreshGameCenterSettingsFromCloud());
-      unawaited(_refreshSessionFromCloudOnResume());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        unawaited(_refreshGameCenterSettingsFromCloud());
+        unawaited(_refreshSessionFromCloudOnResume());
+      });
       if (_ngmySessionIsAdmin(_currentUser)) {
         unawaited(_refreshPendingTransactionsFromCloud());
       }
@@ -10718,7 +10722,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         themeMode: _effectiveThemeMode,
         themeAnimationDuration: Duration.zero,
         builder: (context, child) {
-          final body = child ?? const SizedBox.shrink();
+          // Theme/resume rebuilds can pass null briefly — never show an empty shell.
+          if (child != null) _materialAppShellChild = child;
+          final body = _materialAppShellChild ?? child ?? const SizedBox.shrink();
           final shell = _appOffline
               ? Stack(
                   clipBehavior: Clip.none,
@@ -12773,11 +12779,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // No-op: an extra setState here kept the home tab blank during startup sync.
   }
 
+  void _onShellVisibleAgain() {
+    if (!mounted || _idx != 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
   @override void initState() {
     super.initState();
     _homeHost = _NgmyHomeHost(main: this);
     _mainShellMountedAt = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
+    ngmyRegisterPageVisibleHandler(_onShellVisibleAgain);
     _warmTransactionCacheAfterFrame();
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
     _scheduleMainShellRepaint();
@@ -13160,10 +13174,20 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
   }
 
+  List<Widget> _otherTabPagesForStack(List<AppTransaction> sorted) {
+    if (_idx == 0) {
+      return List.generate(
+        6,
+        (i) => SizedBox.shrink(key: ValueKey<String>('ngmy_tab_stack_empty_$i')),
+      );
+    }
+    return _buildOtherTabPages(sorted, activeIndex: _idx);
+  }
+
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sorted = _idx == 0 ? const <AppTransaction>[] : _sortedTransactions();
-    final pages = [_homeHost, ..._buildOtherTabPages(sorted, activeIndex: _idx)];
+    final otherTabs = _otherTabPagesForStack(sorted);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
@@ -13196,10 +13220,26 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 child: ColoredBox(color: Theme.of(context).scaffoldBackgroundColor),
               ),
             Positioned.fill(
-              child: IndexedStack(
-                index: _idx,
-                sizing: StackFit.expand,
-                children: pages,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  IgnorePointer(
+                    ignoring: _idx != 0,
+                    child: Visibility(
+                      visible: _idx == 0,
+                      maintainState: true,
+                      maintainAnimation: true,
+                      maintainSize: false,
+                      child: _homeHost,
+                    ),
+                  ),
+                  if (_idx != 0)
+                    IndexedStack(
+                      index: _idx - 1,
+                      sizing: StackFit.expand,
+                      children: otherTabs,
+                    ),
+                ],
               ),
             ),
             if (_offline)
@@ -13376,7 +13416,7 @@ class HomeScreen extends StatefulWidget {
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   late AnimationController _smokeCtrl;
   late Animation<double> _smokeRot;
   Timer? _liveTicker;
@@ -13437,6 +13477,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _homeMountedAt = DateTime.now();
     _smokeCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 10));
     _smokeRot = Tween<double>(begin: 0, end: 2 * math.pi).animate(_smokeCtrl);
@@ -13448,6 +13489,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       if (!mounted) return;
       if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      if (!ngmyPreferLightGraphics && !_smokeCtrl.isAnimating) {
+        _smokeCtrl.repeat();
+      }
+      setState(() {});
+    }
   }
 
   @override
@@ -13465,6 +13516,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   @override void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _liveTicker?.cancel();
     _smokeCtrl.dispose();
     super.dispose();

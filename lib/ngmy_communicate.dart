@@ -602,34 +602,8 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     }
   }
 
-  Widget _initialsFallback() {
-    final name = widget.profile.name.trim();
-    final letter = name.isNotEmpty ? name[0].toUpperCase() : widget.profile.emoji;
-    return Center(
-      child: Text(
-        letter,
-        style: TextStyle(
-          fontSize: widget.size * 0.42,
-          fontWeight: FontWeight.w900,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-
-  Widget _placeholder() => _bytes != null && _bytes!.isNotEmpty
-      ? ClipOval(
-          child: Image.memory(
-            _bytes!,
-            width: widget.size,
-            height: widget.size,
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
-            filterQuality: FilterQuality.medium,
-            errorBuilder: (_, __, ___) => _initialsFallback(),
-          ),
-        )
-      : _initialsFallback();
+  Widget _emojiFallback() =>
+      Center(child: Text(widget.profile.emoji, style: TextStyle(fontSize: widget.size * 0.5)));
 
   @override
   Widget build(BuildContext context) {
@@ -643,11 +617,11 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
           fit: BoxFit.cover,
           gaplessPlayback: true,
           filterQuality: FilterQuality.medium,
-          errorBuilder: (_, __, ___) => _initialsFallback(),
+          errorBuilder: (_, __, ___) => _emojiFallback(),
         ),
       );
     } else {
-      inner = _placeholder();
+      inner = _emojiFallback();
     }
     return Container(
       width: widget.size,
