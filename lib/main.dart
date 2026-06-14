@@ -12404,6 +12404,26 @@ class NgmyAdminLiveRefresh {
   }
 }
 
+/// Keeps [HomeScreen] mounted once so startup sync storms do not recreate it every frame.
+class _NgmyHomeHost extends StatefulWidget {
+  const _NgmyHomeHost({required this.main});
+  final _MainScreenState main;
+
+  @override
+  State<_NgmyHomeHost> createState() => _NgmyHomeHostState();
+}
+
+class _NgmyHomeHostState extends State<_NgmyHomeHost> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.main._buildHomeTab(widget.main._homeTransactionsForDisplay());
+  }
+}
+
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
   bool _offline = false;
@@ -12416,6 +12436,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   List<AppTransaction>? _sortedTxCache;
   int? _sortedTxCacheLen;
   final Set<int> _visitedTabs = {0};
+  late Widget _homeHost;
+  bool _warmingTxCache = false;
 
   List<AppTransaction> _sortedTransactions() {
     final len = widget.allTransactions.length;
@@ -12442,6 +12464,28 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _sortedTxCache = List<AppTransaction>.from(raw)
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return _sortedTxCache!;
+  }
+
+  List<AppTransaction> _homeTransactionsForDisplay() {
+    final len = widget.allTransactions.length;
+    if (_sortedTxCache != null && _sortedTxCacheLen == len) {
+      final cache = _sortedTxCache!;
+      return cache.length <= 120 ? cache : cache.sublist(0, 120);
+    }
+    return const [];
+  }
+
+  void _warmTransactionCacheAfterFrame() {
+    if (_warmingTxCache) return;
+    if (_sortedTxCache != null && _sortedTxCacheLen == widget.allTransactions.length) return;
+    _warmingTxCache = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _warmingTxCache = false;
+      if (!mounted) return;
+      if (_sortedTxCache != null && _sortedTxCacheLen == widget.allTransactions.length) return;
+      _sortedTransactions();
+      if (mounted) setState(() {});
+    });
   }
 
   void _runScheduledPopups() {
@@ -12600,6 +12644,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.user.email != widget.user.email) {
       NgmyIncomeSound.bindSession(widget.user.email);
+      _homeHost = _NgmyHomeHost(main: this);
       _tabPagesKey = null;
       _tabContentBuilders = null;
       _sortedTxCache = null;
@@ -12609,6 +12654,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         ..add(0);
     } else if (oldWidget.allTransactions.length != widget.allTransactions.length) {
       _sortedTxCacheLen = null;
+      _warmTransactionCacheAfterFrame();
     } else if (oldWidget.currentThemeMode != widget.currentThemeMode) {
       _tabPagesKey = null;
       _tabContentBuilders = null;
@@ -12672,8 +12718,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   @override void initState() {
     super.initState();
+    _homeHost = _NgmyHomeHost(main: this);
     _mainShellMountedAt = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
+    _warmTransactionCacheAfterFrame();
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
     _scheduleMainShellRepaint();
     NgmyIncomeSound.bindSession(widget.user.email);
@@ -12910,8 +12958,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     });
   }
 
-  List<Widget> _buildTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
-    final home = _buildHomeTab(sorted);
+  List<Widget> _buildOtherTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
+    final needsOtherTabs = activeIndex != 0 || _visitedTabs.length > 1;
+    if (!needsOtherTabs) {
+      return List.generate(
+        6,
+        (i) => SizedBox.shrink(key: ValueKey<String>('ngmy_tab_empty_${i + 1}')),
+      );
+    }
     final inv = widget.user.activeInvestment;
     final invSig = inv == null
         ? 'none'
@@ -12922,7 +12976,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight|'
         '${_investmentPlansSig(widget.globalPlans)}|${_legalContentSig(widget.config)}';
     if (_tabContentBuilders != null && _tabPagesKey == cacheKey) {
-      return [home, ..._buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey)];
+      return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
     }
     _tabPagesKey = cacheKey;
     _tabContentBuilders = {
@@ -13049,12 +13103,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onRefreshLegalContent: widget.onRefreshLegalAndPlans,
       ),
     };
-    return [home, ..._buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey)];
+    return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
   }
 
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pages = _buildTabPages(_sortedTransactions(), activeIndex: _idx);
+    final sorted = _idx == 0 ? const <AppTransaction>[] : _sortedTransactions();
+    final pages = [_homeHost, ..._buildOtherTabPages(sorted, activeIndex: _idx)];
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
@@ -13273,7 +13328,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Timer? _liveTicker;
   int _liveStart = 0;
   int _unreadNewsCount = 0;
-  bool _heavySectionsReady = true;
+  bool _heavySectionsReady = false;
+  bool _clockUiReady = false;
   DateTime? _homeMountedAt;
   int _liveCacheStart = -1;
   int _liveCacheTxnLen = -1;
@@ -13336,6 +13392,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      setState(() {
+        _clockUiReady = true;
+        _heavySectionsReady = true;
+      });
       if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
     });
   }
@@ -13478,7 +13538,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ],
               ),
               const SizedBox(height: 30),
-              _buildClockInFrame(isLight),
+              _clockUiReady ? _buildClockInFrame(isLight) : _buildClockShellQuick(isLight),
               const SizedBox(height: 40),
               if (_heavySectionsReady) ...[
                 _status(context),
@@ -13729,6 +13789,59 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         gamesPlayed: gamesPlayed,
         pointsEarned: pointsEarned,
         totalPoints: widget.user.points,
+      ),
+    );
+  }
+
+  Widget _buildClockShellQuick(bool isLight) {
+    return Container(
+      width: double.infinity,
+      height: 248,
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(25),
+        border: isLight ? Border.all(color: const Color(0xFF00B25A).withOpacity(0.2), width: 1.5) : null,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.topLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(9),
+                color: const Color(0xFF059669),
+              ),
+              child: Text(
+                widget.user.username.trim().isEmpty ? 'MEMBER' : widget.user.username.toUpperCase(),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.9),
+              ),
+            ),
+          ),
+          const Spacer(),
+          Container(
+            width: 132,
+            height: 132,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF22C55E), Color(0xFF059669)],
+              ),
+              boxShadow: [BoxShadow(color: const Color(0xFF22C55E).withOpacity(0.35), blurRadius: 16, offset: Offset(0, 6))],
+            ),
+            child: const Icon(Icons.access_time_filled_rounded, color: Colors.white, size: 52),
+          ),
+          const Spacer(),
+          Text(
+            widget.user.isClockedIn ? 'Session active' : 'Loading clock…',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isLight ? const Color(0xFF6B7280) : Colors.white70),
+          ),
+          const SizedBox(height: 4),
+        ],
       ),
     );
   }
