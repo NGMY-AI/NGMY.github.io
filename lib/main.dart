@@ -12350,6 +12350,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   bool _offline = false;
   bool _investPurchaseInFlight = false;
   Timer? _onlineCheck;
+  Timer? _adminTabRefreshDebounce;
+  DateTime? _mainShellMountedAt;
   List<Widget>? _tabPages;
   String? _tabPagesKey;
 
@@ -12509,6 +12511,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.user.email != widget.user.email) {
       NgmyIncomeSound.bindSession(widget.user.email);
+      _tabPages = null;
+      _tabPagesKey = null;
+    }
+    if (oldWidget.config != widget.config ||
+        oldWidget.allMedia.length != widget.allMedia.length ||
+        oldWidget.allTransactions.length != widget.allTransactions.length ||
+        oldWidget.globalPlans.length != widget.globalPlans.length ||
+        oldWidget.allAnnouncements.length != widget.allAnnouncements.length) {
+      _tabPages = null;
+      _tabPagesKey = null;
     }
     final oldSig = jsonEncode({'p': oldWidget.config.ngmyPopups, 'v': oldWidget.config.ngmyVideoPopups});
     final newSig = jsonEncode({'p': widget.config.ngmyPopups, 'v': widget.config.ngmyVideoPopups});
@@ -12550,15 +12562,35 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   void _onAdminLiveRefresh() {
     if (!mounted) return;
-    _tabPages = null;
-    _tabPagesKey = null;
-    setState(() {});
+    final mountedAt = _mainShellMountedAt;
+    if (mountedAt != null && DateTime.now().difference(mountedAt) < const Duration(seconds: 3)) {
+      return;
+    }
+    _adminTabRefreshDebounce?.cancel();
+    _adminTabRefreshDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      _tabPages = null;
+      _tabPagesKey = null;
+      setState(() {});
+    });
+  }
+
+  void _scheduleMainShellRepaint() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {});
+      Future<void>.delayed(const Duration(milliseconds: 120), () {
+        if (mounted) setState(() {});
+      });
+    });
   }
 
   @override void initState() {
     super.initState();
+    _mainShellMountedAt = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
+    _scheduleMainShellRepaint();
     NgmyIncomeSound.bindSession(widget.user.email);
     unawaited(NgmyIncomeSound.preload());
     NgmyPopupOrchestrator.resolveVideoUrl = _resolveSupabaseStorageUrlResilient;
@@ -12644,6 +12676,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     NgmyAdminLiveRefresh.removeListener(_onAdminLiveRefresh);
+    _adminTabRefreshDebounce?.cancel();
     _t?.cancel();
     _onlineCheck?.cancel();
     NgmyIncomeSound.bindSession(null);
@@ -12663,7 +12696,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (_tabPages != null && _tabPagesKey == cacheKey) return _tabPages!;
     _tabPagesKey = cacheKey;
     _tabPages = [
-      HomeScreen(user: widget.user, onClockIn: () async {
+      KeyedSubtree(
+        key: const ValueKey<String>('ngmy_tab_home'),
+        child: HomeScreen(user: widget.user, onClockIn: () async {
         final now = DateTime.now();
         _ngmyApplyMidnightClockReset(widget.user);
         final onTrial = widget.user.isOnFreeTrial;
@@ -12747,7 +12782,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           }
         }
       }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData, onDeleteMedia: widget.onDeleteMedia, onPushUserToCloud: widget.onPushUserToCloud, onSaveWalletPayments: widget.onSaveWalletPayments, onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan, onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan, onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans, onArchiveWalletTransaction: widget.onArchiveWalletTransaction, onPersistManagementConfig: widget.onPersistManagementConfig, onRefreshManagementData: widget.onRefreshManagementData, onRefreshAdminMedia: widget.onRefreshAdminMedia, onPurgeBrokenMedia: widget.onPurgeBrokenMedia, onOpenInvest: () => setState(() => _idx = 1)),
-      InvestScreen(
+      ),
+      KeyedSubtree(
+        key: const ValueKey<String>('ngmy_tab_invest'),
+        child: InvestScreen(
         user: widget.user,
         plans: widget.globalPlans,
         purchaseInFlight: _investPurchaseInFlight,
@@ -12824,7 +12862,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           );
         },
       ),
-      WalletScreen(
+      ),
+      KeyedSubtree(
+        key: const ValueKey<String>('ngmy_tab_wallet'),
+        child: WalletScreen(
         user: widget.user,
         transactions: ngmyUserWalletHistoryTransactions(sorted, widget.user.email),
         allTransactions: sorted,
@@ -12833,7 +12874,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onDataChanged: widget.onDataChanged,
         onPersistUser: (u) => _pushUserToCloudFast(u),
       ),
-      NgmyHubScreen(
+      ),
+      KeyedSubtree(
+        key: const ValueKey<String>('ngmy_tab_hub'),
+        child: NgmyHubScreen(
         user: widget.user,
         allUsers: widget.allUsers,
         allTransactions: sorted,
@@ -12841,7 +12885,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onDataChanged: widget.onDataChanged,
         config: widget.config,
       ),
-      MediaHubScreen(
+      ),
+      KeyedSubtree(
+        key: const ValueKey<String>('ngmy_tab_media'),
+        child: MediaHubScreen(
         user: widget.user,
         allUsers: widget.allUsers,
         allMedia: widget.allMedia,
@@ -12856,8 +12903,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onSyncMediaPost: widget.onSyncAdminMediaPost,
         onSyncUserMedia: widget.onSyncAdminUserMedia,
       ),
-      StatsScreen(user: widget.user, transactions: sorted, allUsers: widget.allUsers),
-      ProfileScreen(
+      ),
+      KeyedSubtree(
+        key: const ValueKey<String>('ngmy_tab_stats'),
+        child: StatsScreen(user: widget.user, transactions: sorted, allUsers: widget.allUsers),
+      ),
+      KeyedSubtree(
+        key: const ValueKey<String>('ngmy_tab_profile'),
+        child: ProfileScreen(
         user: widget.user,
         allUsers: widget.allUsers,
         config: widget.config,
@@ -12867,6 +12920,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onDataChanged: widget.onDataChanged,
         onAddTransaction: widget.onAddTransaction,
         onRefreshLegalContent: widget.onRefreshLegalAndPlans,
+      ),
       ),
     ];
     return _tabPages!;
@@ -12907,10 +12961,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 height: MediaQuery.of(context).padding.top,
                 child: const ColoredBox(color: Colors.white),
               ),
-            IndexedStack(
-              index: _idx,
-              sizing: StackFit.expand,
-              children: pages,
+            Positioned.fill(
+              child: IndexedStack(
+                index: _idx,
+                sizing: StackFit.expand,
+                children: pages,
+              ),
             ),
             if (_offline)
               Positioned(
@@ -13139,6 +13195,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       if (!mounted) return;
       setState(() => _liveStart++);
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -13153,11 +13212,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   @override Widget build(BuildContext context) {
-    bool isLight = Theme.of(context).brightness == Brightness.light;
+    final bg = Theme.of(context).scaffoldBackgroundColor;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Scaffold(
-      backgroundColor: isLight ? Colors.white : Colors.transparent,
+      backgroundColor: bg,
       body: ColoredBox(
-        color: isLight ? Colors.white : Colors.transparent,
+        color: bg,
         child: SafeArea(
           bottom: false,
           child: SingleChildScrollView(
