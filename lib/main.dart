@@ -12735,27 +12735,15 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  List<Widget> _buildTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
+  Widget _buildHomeTab(List<AppTransaction> sorted) {
     final inv = widget.user.activeInvestment;
     final invSig = inv == null
         ? 'none'
         : '${inv.name}|${inv.amount.toStringAsFixed(2)}|${inv.daysLeft}|${inv.purchaseDate.millisecondsSinceEpoch}';
-    final cacheKey =
-        '${widget.user.email}|$invSig|${widget.user.accountBalance.toStringAsFixed(2)}|'
-        '${widget.user.pendingInvestmentName}|${widget.allMedia.length}|'
-        '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight|'
-        '${_investmentPlansSig(widget.globalPlans)}|${_legalContentSig(widget.config)}';
-    if (_tabContentBuilders != null && _tabPagesKey == cacheKey) {
-      return List<Widget>.generate(7, (i) => _NgmyLazyTabSlot(
-        key: ValueKey<String>('ngmy_tab_${i}_$cacheKey'),
-        tabIndex: i,
-        activeIndex: activeIndex,
-        buildContent: _tabContentBuilders![i]!,
-      ));
-    }
-    _tabPagesKey = cacheKey;
-    _tabContentBuilders = {
-      0: () => HomeScreen(user: widget.user, onClockIn: () async {
+    return HomeScreen(
+      key: ValueKey<String>('ngmy_home_${widget.user.email}|$invSig'),
+      user: widget.user,
+      onClockIn: () async {
         final now = DateTime.now();
         _ngmyApplyMidnightClockReset(widget.user);
         final onTrial = widget.user.isOnFreeTrial;
@@ -12838,7 +12826,71 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             await _showClockInConfirmedDialog();
           }
         }
-      }, allTransactions: sorted, onProcess: widget.onProcessTransaction, allUsers: widget.allUsers, globalPlans: widget.globalPlans, onAddPlan: widget.onAddPlan, onAddTransaction: widget.onAddTransaction, onDataChanged: widget.onDataChanged, config: widget.config, allMedia: widget.allMedia, allAnnouncements: widget.allAnnouncements, onAddAnnouncement: widget.onAddAnnouncement, onDeleteAnnouncement: widget.onDeleteAnnouncement, onClearAllAnnouncements: widget.onClearAllAnnouncements, onSaveLegalContent: widget.onSaveLegalContent, onSavePopups: widget.onSavePopups, onUploadPopupVideo: widget.onUploadPopupVideo, onSyncAdminMediaPost: widget.onSyncAdminMediaPost, onSyncAdminUserMedia: widget.onSyncAdminUserMedia, onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery, onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead, onRefreshAdminData: widget.onRefreshAdminData, onDeleteMedia: widget.onDeleteMedia, onPushUserToCloud: widget.onPushUserToCloud, onSaveWalletPayments: widget.onSaveWalletPayments, onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan, onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan, onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans, onArchiveWalletTransaction: widget.onArchiveWalletTransaction, onPersistManagementConfig: widget.onPersistManagementConfig, onRefreshManagementData: widget.onRefreshManagementData, onRefreshAdminMedia: widget.onRefreshAdminMedia, onPurgeBrokenMedia: widget.onPurgeBrokenMedia, onOpenInvest: () => setState(() => _idx = 1)),
+      },
+      allTransactions: sorted,
+      onProcess: widget.onProcessTransaction,
+      allUsers: widget.allUsers,
+      globalPlans: widget.globalPlans,
+      onAddPlan: widget.onAddPlan,
+      onAddTransaction: widget.onAddTransaction,
+      onDataChanged: widget.onDataChanged,
+      config: widget.config,
+      allMedia: widget.allMedia,
+      allAnnouncements: widget.allAnnouncements,
+      onAddAnnouncement: widget.onAddAnnouncement,
+      onDeleteAnnouncement: widget.onDeleteAnnouncement,
+      onClearAllAnnouncements: widget.onClearAllAnnouncements,
+      onSaveLegalContent: widget.onSaveLegalContent,
+      onSavePopups: widget.onSavePopups,
+      onUploadPopupVideo: widget.onUploadPopupVideo,
+      onSyncAdminMediaPost: widget.onSyncAdminMediaPost,
+      onSyncAdminUserMedia: widget.onSyncAdminUserMedia,
+      onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery,
+      onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead,
+      onRefreshAdminData: widget.onRefreshAdminData,
+      onDeleteMedia: widget.onDeleteMedia,
+      onPushUserToCloud: widget.onPushUserToCloud,
+      onSaveWalletPayments: widget.onSaveWalletPayments,
+      onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan,
+      onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan,
+      onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans,
+      onArchiveWalletTransaction: widget.onArchiveWalletTransaction,
+      onPersistManagementConfig: widget.onPersistManagementConfig,
+      onRefreshManagementData: widget.onRefreshManagementData,
+      onRefreshAdminMedia: widget.onRefreshAdminMedia,
+      onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
+      onOpenInvest: () => setState(() => _idx = 1),
+    );
+  }
+
+  List<Widget> _buildOtherTabSlots(List<AppTransaction> sorted, {required int activeIndex, required String cacheKey}) {
+    return List.generate(6, (i) {
+      final tabIndex = i + 1;
+      return _NgmyLazyTabSlot(
+        key: ValueKey<String>('ngmy_tab_${tabIndex}_$cacheKey'),
+        tabIndex: tabIndex,
+        activeIndex: activeIndex,
+        buildContent: _tabContentBuilders![tabIndex]!,
+      );
+    });
+  }
+
+  List<Widget> _buildTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
+    final home = _buildHomeTab(sorted);
+    final inv = widget.user.activeInvestment;
+    final invSig = inv == null
+        ? 'none'
+        : '${inv.name}|${inv.amount.toStringAsFixed(2)}|${inv.daysLeft}|${inv.purchaseDate.millisecondsSinceEpoch}';
+    final cacheKey =
+        '${widget.user.email}|$invSig|'
+        '${widget.user.pendingInvestmentName}|${widget.allMedia.length}|'
+        '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight|'
+        '${_investmentPlansSig(widget.globalPlans)}|${_legalContentSig(widget.config)}';
+    if (_tabContentBuilders != null && _tabPagesKey == cacheKey) {
+      return [home, ..._buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey)];
+    }
+    _tabPagesKey = cacheKey;
+    _tabContentBuilders = {
       1: () => InvestScreen(
         user: widget.user,
         plans: widget.globalPlans,
@@ -12962,12 +13014,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onRefreshLegalContent: widget.onRefreshLegalAndPlans,
       ),
     };
-    return List<Widget>.generate(7, (i) => _NgmyLazyTabSlot(
-      key: ValueKey<String>('ngmy_tab_${i}_$cacheKey'),
-      tabIndex: i,
-      activeIndex: activeIndex,
-      buildContent: _tabContentBuilders![i]!,
-    ));
+    return [home, ..._buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey)];
   }
 
   @override Widget build(BuildContext context) {
@@ -13180,12 +13227,15 @@ class HomeScreen extends StatefulWidget {
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late AnimationController _smokeCtrl;
   late Animation<double> _smokeRot;
   Timer? _liveTicker;
   int _liveStart = 0;
   int _unreadNewsCount = 0;
+
+  @override
+  bool get wantKeepAlive => true;
 
   Future<void> _openNewsHub() async {
     await NgmyNavigator.push(
@@ -13233,20 +13283,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override void initState() {
     super.initState();
     _smokeCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 10));
-    if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
     _smokeRot = Tween<double>(begin: 0, end: 2 * math.pi).animate(_smokeCtrl);
     _liveTicker = Timer.periodic(const Duration(seconds: 6), (_) {
       if (!mounted) return;
       setState(() => _liveStart++);
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() {});
+      if (mounted && !ngmyPreferLightGraphics) _smokeCtrl.repeat();
     });
   }
 
   @override
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.user != widget.user ||
+        oldWidget.user.accountBalance != widget.user.accountBalance ||
+        oldWidget.user.isClockedIn != widget.user.isClockedIn ||
+        oldWidget.user.displayedTodayEarnings != widget.user.displayedTodayEarnings ||
+        oldWidget.user.todayDailyGoal != widget.user.todayDailyGoal ||
+        oldWidget.allTransactions.length != widget.allTransactions.length) {
+      setState(() {});
+    }
   }
 
   @override void dispose() {
@@ -13256,6 +13313,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   @override Widget build(BuildContext context) {
+    super.build(context);
     final bg = Theme.of(context).scaffoldBackgroundColor;
     final isLight = Theme.of(context).brightness == Brightness.light;
     return Scaffold(
