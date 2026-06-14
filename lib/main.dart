@@ -12277,6 +12277,27 @@ class _ClockInWindowClosedDialogState extends State<_ClockInWindowClosedDialog> 
   }
 }
 
+/// Stable home tab host — one widget in the tree, no duplicate GlobalKeys.
+class _NgmyHomeTabHost extends StatefulWidget {
+  const _NgmyHomeTabHost({required this.host});
+
+  final _MainScreenState host;
+
+  @override
+  State<_NgmyHomeTabHost> createState() => _NgmyHomeTabHostState();
+}
+
+class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.host._buildHomeTab(widget.host._homeDisplayTransactions);
+  }
+}
+
 /// Builds bottom-nav tab content lazily so the home screen paints on the first frame.
 class _NgmyLazyTabSlot extends StatefulWidget {
   const _NgmyLazyTabSlot({
@@ -12417,31 +12438,28 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   List<AppTransaction> _sortedTransactionsCache = const [];
   List<AppTransaction> _homeDisplayTransactions = const [];
   int _sortedTxSourceLen = -1;
-  bool _sortInFlight = false;
+  Timer? _txnSortDebounce;
+  Widget? _homeTabHost;
   final Set<int> _visitedTabs = {0};
+
+  static const int _kMaxTxnSortCount = 1500;
 
   /// Never sort or copy large transaction lists synchronously inside [build].
   void _scheduleSortedTransactionRefresh() {
-    final len = widget.allTransactions.length;
-    if (len == _sortedTxSourceLen && _sortedTransactionsCache.isNotEmpty) return;
-    if (_sortInFlight) return;
-    if (_homeDisplayTransactions.isEmpty && len > 0) {
-      _homeDisplayTransactions = len > 100
-          ? widget.allTransactions.take(50).toList()
-          : List<AppTransaction>.from(widget.allTransactions);
-    }
-    _sortInFlight = true;
-    final raw = widget.allTransactions;
-    final snapLen = len;
-    scheduleMicrotask(() {
-      if (!mounted) {
-        _sortInFlight = false;
-        return;
+    _txnSortDebounce?.cancel();
+    _txnSortDebounce = Timer(const Duration(milliseconds: 600), () {
+      if (!mounted) return;
+      final len = widget.allTransactions.length;
+      if (len == _sortedTxSourceLen && _sortedTransactionsCache.isNotEmpty) return;
+      final raw = widget.allTransactions;
+      if (_homeDisplayTransactions.isEmpty && raw.isNotEmpty) {
+        _homeDisplayTransactions = raw.length > 80 ? raw.take(80).toList() : List<AppTransaction>.from(raw);
+        setState(() {});
       }
-      final sorted = List<AppTransaction>.from(raw)
+      final toSort = raw.length > _kMaxTxnSortCount ? raw.take(_kMaxTxnSortCount).toList() : raw;
+      final sorted = List<AppTransaction>.from(toSort)
         ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      _sortInFlight = false;
-      _sortedTxSourceLen = snapLen;
+      _sortedTxSourceLen = len;
       _sortedTransactionsCache = sorted;
       _homeDisplayTransactions = sorted;
       setState(() {});
@@ -12609,7 +12627,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _sortedTransactionsCache = const [];
       _homeDisplayTransactions = const [];
       _sortedTxSourceLen = -1;
-      _sortInFlight = false;
+      _txnSortDebounce?.cancel();
+      _homeTabHost = _NgmyHomeTabHost(host: this);
       _visitedTabs
         ..clear()
         ..add(0);
@@ -12677,6 +12696,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override void initState() {
     super.initState();
     _mainShellMountedAt = DateTime.now();
+    _homeTabHost = _NgmyHomeTabHost(host: this);
     _scheduleSortedTransactionRefresh();
     WidgetsBinding.instance.addObserver(this);
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
@@ -12770,6 +12790,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     NgmyAdminLiveRefresh.removeListener(_onAdminLiveRefresh);
     _adminTabRefreshDebounce?.cancel();
+    _txnSortDebounce?.cancel();
     _t?.cancel();
     _onlineCheck?.cancel();
     NgmyIncomeSound.bindSession(null);
@@ -12915,8 +12936,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     });
   }
 
-  List<Widget> _buildTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
-    final home = RepaintBoundary(child: _buildHomeTab(_homeDisplayTransactions));
+  List<Widget> _buildOtherTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
     final inv = widget.user.activeInvestment;
     final invSig = inv == null
         ? 'none'
@@ -12927,7 +12947,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight|'
         '${_investmentPlansSig(widget.globalPlans)}|${_legalContentSig(widget.config)}';
     if (_tabContentBuilders != null && _tabPagesKey == cacheKey) {
-      return [home, ..._buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey)];
+      return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
     }
     _tabPagesKey = cacheKey;
     _tabContentBuilders = {
@@ -13054,13 +13074,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onRefreshLegalContent: widget.onRefreshLegalAndPlans,
       ),
     };
-    return [home, ..._buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey)];
+    return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
   }
 
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sorted = _sortedTransactionsCache;
-    final pages = _buildTabPages(sorted, activeIndex: _idx);
+    final otherTabs = _buildOtherTabPages(sorted, activeIndex: _idx);
+    final pages = <Widget>[
+      _homeTabHost ?? _NgmyHomeTabHost(host: this),
+      ...otherTabs,
+    ];
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
