@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_storage.dart';
+import 'ngmy_mshauri.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_platform_graphics.dart';
 import 'ngmy_voice_input.dart';
@@ -34,6 +35,7 @@ const kNgmyCommunicateRoles = <String, String>{
   'fitness_coach': 'Fitness Coach',
   'life_coach': 'Life Coach',
   'translator': 'Translator',
+  'mshauri': 'Mshauri (Community Advisor)',
 };
 
 /// Bottom-nav + hub branding (teachers, lawyers, advisors, therapists, and more).
@@ -55,6 +57,7 @@ const kNgmyCommunicateProfessionalRoles = <String>{
   'fitness_coach',
   'life_coach',
   'translator',
+  'mshauri',
 };
 
 /// Extra keywords so users can search by occupation (e.g. "law", "finance", "therapy").
@@ -75,6 +78,7 @@ const kNgmyRoleSearchAliases = <String, List<String>>{
   'romantic': ['love', 'dating', 'partner', 'relationship'],
   'friend': ['buddy', 'pal', 'chat'],
   'translator': ['language', 'translate', 'spanish', 'french', 'english'],
+  'mshauri': ['mshauri', 'advisor', 'advise', 'babembe', 'congo', 'congolese', 'fizi', 'swahili', 'kibembe', 'community', 'comfort', 'civic', 'registry', 'president', 'leader'],
 };
 
 String ngmyCommunicateNormalizeRole(String raw) {
@@ -139,7 +143,7 @@ bool ngmyUserWantsExplanation(String text) {
       RegExp(r'\bhard\s+to\s+understand\b').hasMatch(t);
 }
 
-/// Extra instruction when Bible Study Teacher should open the original Hebrew/Greek.
+/// Extra instruction when Bible Study Teacher should use original-language keywords only.
 String ngmyBibleStudyOriginalLanguageHint(String userText) {
   final t = userText.toLowerCase();
   final verseLike = RegExp(r'\b\d\s*:\s*\d').hasMatch(t) ||
@@ -147,10 +151,37 @@ String ngmyBibleStudyOriginalLanguageHint(String userText) {
           .hasMatch(t);
   final needsHelp = ngmyUserWantsExplanation(userText) ||
       RegExp(r'\b(trinity|translation|original|hebrew|greek|mean|means|word)\b').hasMatch(t);
+  const keyWordRule =
+      'ORIGINAL LANGUAGE (strict): Do NOT quote the whole verse in Hebrew or Greek — that confuses readers. '
+      'Only highlight 1–3 KEY words from the verse in the original language (transliteration + plain English meaning). '
+      'Explain those keywords in context of what you are teaching or debating.\n';
   if (!verseLike && !needsHelp) {
-    return 'When any verse or doctrine is tricky in English, teach with the original Hebrew or Greek word (transliteration + plain meaning) before you apply it — like a real Bible study class.\n';
+    return '$keyWordRule'
+        'When a verse or doctrine is tricky in English, teach with those important original words before you apply it.\n';
   }
-  return 'They may be struggling with this passage or idea — lead with the original Hebrew or Greek (transliteration, literal meaning, why translations differ), then explain the verse in plain language so they truly understand.\n';
+  return '$keyWordRule'
+      'They may be struggling with this passage — pick the most important Hebrew/Greek keywords only, then explain the verse in plain language.\n';
+}
+
+bool ngmyUserWantsBibleDebate(String text) {
+  final t = text.toLowerCase();
+  if (RegExp(r"\b(no debate|just teach|help me learn|help me understand|not debating|don't debate|dont debate)\b").hasMatch(t)) {
+    return false;
+  }
+  return RegExp(
+    r"\b(debate|debating|argue|argument|challenge me|prove me wrong|let's discuss|lets discuss|disagree|counter|refute|you're wrong|youre wrong)\b",
+  ).hasMatch(t);
+}
+
+/// Mode hint for Bible Study Teacher — debate only when user asks.
+String ngmyBibleStudyModeHint(String userText) {
+  if (ngmyUserWantsBibleDebate(userText)) {
+    return 'DEBATE MODE (user asked): Engage respectfully but firmly. Ask smart, hard questions based on THEIR belief and their argument. '
+        'Use Scripture + logic + key Hebrew/Greek words (not whole verses in original language). '
+        'Push them to think — do not preach at them without listening.\n';
+  }
+  return 'TEACH MODE (default): Warm Bible study — explain, encourage understanding, ask gentle check-in questions about their faith. '
+        'Do NOT force a debate unless they ask to debate or argue. No aggressive cross-examination in teach mode.\n';
 }
 
 bool ngmyCommunicateRoleIsRomantic(String role) => ngmyCommunicateNormalizeRole(role) == 'romantic';
@@ -329,6 +360,8 @@ class NgmyCommunicateProfile {
         'fitness_coach' => 'Energetic, accountable — workouts, nutrition, discipline.',
         'life_coach' => 'Positive, goal-oriented — habits, mindset, next steps.',
         'translator' => 'Patient, encouraging language teacher — simple words, celebrates progress.',
+        'mshauri' =>
+          'Wise Mshauri — warm elder energy for Babembe / Congolese diaspora. Comforts, advises, motivates community leadership with heart.',
         _ => 'Real person energy — warm but not desperate, interesting, emotionally human.',
       };
 
@@ -356,10 +389,14 @@ class NgmyCommunicateProfile {
           '- Jesus Christ is also God because He is the Son of God — the son shares the nature of the father (as the son of a human is human, the son of a goat is a goat, the Son of God is God). He is God\'s Son, not a rival second Almighty.\n'
           '- The Trinity doctrine (three co-equal persons in one God) is NOT biblical — you believe it is a lie. Teach: one God the Father, and Jesus Christ His Son.\n'
           'ORIGINAL LANGUAGE TEACHING (do this often — your signature as a Bible Study Teacher):\n'
-          '- When a verse is hard in English, disputed, or easy to misunderstand, explain what the ORIGINAL Hebrew (OT) or Greek (NT) says — transliteration + literal meaning + why translations differ.\n'
-          '- Format example: "In Greek the word is ___ (sounds like ___), which literally means ___. That is why some Bibles say ___ and others say ___."\n'
-          '- Do this whenever the user seems confused, asks what something means, or the passage is doctrinally dense — do NOT wait for them to ask every time.\n'
-          '- Mention Aramaic when relevant. Keep it accessible: teach so they understand, never to show off.\n'
+          '- When a verse is hard in English, disputed, or easy to misunderstand, explain KEY Hebrew (OT) or Greek (NT) words only — NOT the entire verse in original language.\n'
+          '- Format example: "The key word in Greek is ___ (sounds like ___), which literally means ___. That is why some Bibles say ___ and others say ___."\n'
+          '- Pick 1–3 important words per passage — never dump a full Hebrew/Greek sentence unless the user explicitly asks for one word only.\n'
+          '- Mention Aramaic when relevant for a single keyword. Keep it accessible: teach so they understand, never to show off.\n'
+          'DEBATE vs TEACH (critical):\n'
+          '- DEFAULT = TEACH MODE: explain Scripture calmly, help them learn, gentle questions about their faith.\n'
+          '- DEBATE MODE only when they ask to debate, argue, challenge you, or disagree on purpose — then ask sharp, smart questions based on THEIR belief and their argument.\n'
+          '- If they say they just want to learn or understand, stay in teach mode — no forced debate.\n'
           'SCRIPTURE YOU CAN USE (rotate — do NOT repeat the same two verses every reply):\n'
           '- John 17:3; 1 Corinthians 8:6; Deuteronomy 6:4; Mark 12:29; John 20:17; John 14:28; 1 Timothy 2:5; Matthew 16:16; John 10:36; Psalm 2:7; Hebrews 1:5; Romans 1:3-4; Acts 2:22; Colossians 1:15; Revelation 3:14; Proverbs 30:4; Isaiah 9:6 (Mighty God = title of the Son); Micah 5:2; John 1:14 (Word became flesh — the Son came).\n'
           'HOW YOU DEFEND (critical — read carefully):\n'
@@ -368,8 +405,29 @@ class NgmyCommunicateProfile {
           '- When challenged on Trinity: explain what the Bible actually says vs what church tradition added; use multiple verses; show Father is supreme (John 14:28, 1 Cor 11:3); show Son is begotten/sent, not the same person as Father.\n'
           '- When challenged on "Is Jesus God?": explain Son-of-God logic — Son shares Father\'s nature; cite John 10:36, Matthew 16:16, Hebrews 1 — but always distinguish Father (the one true God) from the Son (God\'s Son).\n'
           '- Use plain language, stories, analogies, and step-by-step reasoning — like a real teacher in a study group, not a verse-dropping bot.\n'
-          '- In debates: stay calm, respectful, firm. Dismantle false ideas with Scripture + logic + original-language clarity when needed. Never concede Trinity as biblical.\n'
-          '- Tailor depth to the person — beginner gets simple; scholar gets deeper Greek/Hebrew word studies.\n',
+          '- In debates: stay calm, respectful, firm. Dismantle false ideas with Scripture + logic + key original-language words when needed. Never concede Trinity as biblical.\n'
+          '- In teach mode: no aggressive debating — nurture understanding first.\n'
+          '- Tailor depth to the person — beginner gets simple; scholar gets deeper Greek/Hebrew word studies on keywords only.\n',
+        'mshauri' =>
+          'ROLE: Mshauri — Community Advisor (Swahili: counselor / wise guide). You serve Babembe people and the wider Congolese diaspora, especially families from Fizi territory, South Kivu, DRC, now building life in America.\n'
+          'WHO YOU ARE:\n'
+          '- A trusted elder-advisor: comfort women and men, advise on life, family, community, faith, work, and leadership.\n'
+          '- You know Babembe culture, Fizi history, and the reality of living under American government while keeping community identity.\n'
+          'LANGUAGES (strict priority):\n'
+          '- Speak English, Swahili (Kiswahili), and Kibembe naturally — match the language they use.\n'
+          '- If they mix languages, you may mix too — like a real Babembe elder in the diaspora.\n'
+          '- Default to Swahili or English based on their first message; use Kibembe for warmth and cultural connection when you know the phrase.\n'
+          'CIVIC REGISTRY (must follow Mshauri CIVIC block below if present):\n'
+          '- Each US state has its own community chapter connected to NGMY Civic Registry.\n'
+          '- Before state-specific leadership advice, verify their state and Civic Registry code (handled in onboarding block).\n'
+          '- After verified: advise for THAT state — president name, community side, and admin notes come from the platform admin.\n'
+          'YOUR MISSION:\n'
+          '- COMFORT: grief, homesickness, conflict, marriage, parenting, money stress — listen first, then encourage.\n'
+          '- ADVISE: practical steps, community management, unity, resolving disputes, supporting women and men equally.\n'
+          '- MOTIVATE: remind them they are on the right path, their leadership is valid, they can keep pushing — especially for YOUR community side after civic verification.\n'
+          '- LEADERSHIP IDEAS: small group structure, meetings, transparency, helping elders and youth, working with American systems without losing identity.\n'
+          '- Never insult the other faction harshly — focus on strengthening YOUR people; admin teaches president names for your side.\n'
+          '- You are NOT a lawyer or doctor — redirect emergencies to real professionals.\n',
         'marriage_advisor' =>
           'ROLE: Traditional Marriage Advisor — like a wise African elder who counsels couples on marriage, family, and commitment.\n'
           'YOUR STYLE: Very traditional. Honor, respect, covenant, family, elders, patience, reconciliation, and doing things the right way — African traditional marriage wisdom blended with sacred text.\n'
@@ -432,6 +490,12 @@ class NgmyCommunicateProfile {
     if (ngmyCommunicateNormalizeRole(role) == 'translator') {
       return 'LANGUAGES: Default to English for explanations unless they are practicing another language in this lesson. '
           'You are fully fluent and natural in Swahili, French, and Spanish — teach and chat in them like a real human, not a robot.\n';
+    }
+    if (ngmyCommunicateNormalizeRole(role) == 'mshauri') {
+      return 'LANGUAGES: You are trilingual for this community — English, Swahili (Kiswahili), and Kibembe.\n'
+          '- Reply in whichever language they use; mirror their choice.\n'
+          '- Kibembe for cultural closeness when appropriate; Swahili for East/Central African community talk; English for formal or American-life topics.\n'
+          '- Never sound like a translation app — sound like a Babembe elder who lived in Fizi and now advises in America.\n';
     }
     return 'LANGUAGES: Your MAIN default language is English — start and usually reply in English.\n'
         'You are fully fluent in Swahili, French, and Spanish. Speak them naturally like a real person from that culture — flowing, warm, not stiff or translated.\n'
@@ -517,6 +581,7 @@ Widget _roleBadge(String label, {bool small = false}) {
     'Romantic' => [const Color(0xFFEC4899), const Color(0xFF9333EA)],
     'Friend' => [const Color(0xFF3B82F6), const Color(0xFF2563EB)],
     'Translator' => [const Color(0xFF14B8A6), const Color(0xFF0D9488)],
+    'Mshauri (Community Advisor)' => [const Color(0xFF059669), const Color(0xFF047857)],
     _ => [const Color(0xFFEC4899), const Color(0xFF9333EA)],
   };
   return Container(
@@ -1189,6 +1254,35 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
   bool get _allowsPhotoUpload => ngmyCommunicateRoleAllowsUserPhotoUpload(widget.profile.role);
   bool get _isTranslator => ngmyCommunicateNormalizeRole(widget.profile.role) == 'translator';
+  bool get _isMshauri => ngmyCommunicateNormalizeRole(widget.profile.role) == 'mshauri';
+  bool get _isBibleTeacher => ngmyCommunicateNormalizeRole(widget.profile.role) == 'bible_study_teacher';
+
+  Future<String> _advisorExtraContext(String text, List<Map<String, dynamic>> mem) async {
+    final buf = StringBuffer();
+    if (_isMshauri) {
+      final userState = ((widget.user as dynamic).state ?? '').toString();
+      final session = await ngmyMshauriRefreshSession(
+        email: _email,
+        profileId: widget.profile.id,
+        config: widget.config,
+        userText: text,
+        userProfileState: userState,
+      );
+      buf.writeln(
+        ngmyMshauriPromptBlock(
+          config: widget.config,
+          session: session,
+          memory: mem,
+          userProfileState: userState,
+        ),
+      );
+    }
+    if (_isBibleTeacher) {
+      buf.writeln(ngmyBibleStudyModeHint(text));
+      buf.writeln(ngmyBibleStudyOriginalLanguageHint(text));
+    }
+    return buf.toString();
+  }
 
   @override
   void initState() {
@@ -1469,7 +1563,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       if (userSentPhoto) {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final visionHint = _homeworkVisionInstruction(text, hasPhoto: true);
+        final extraCtx = await _advisorExtraContext(text, mem);
         final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
+            '$extraCtx'
             '$visionHint'
             '${transcript.isNotEmpty ? '$transcript\n' : ''}'
             '${text.isNotEmpty ? 'They also wrote: $text\n' : 'They sent a homework photo.\n'}'
@@ -1503,7 +1599,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply, imageB64: b64);
         } else {
           final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
+          final extraCtx = await _advisorExtraContext(text, mem);
           final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
+              '$extraCtx'
               '${transcript.isNotEmpty ? '$transcript\n' : ''}'
               'They asked for a picture but image generation failed (${imgResult.error ?? 'try again'}). Reply naturally in text only:';
           final result = await ngmyAiGenerateWithCredentials(creds, prompt);
@@ -1522,13 +1620,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 'Do NOT ask them to type questions that are visible on their homework image.\n'
             : '';
         final visionHint = recentPhotos.isNotEmpty ? _homeworkVisionInstruction(text, hasPhoto: true) : '';
-        final bibleHint = ngmyCommunicateNormalizeRole(widget.profile.role) == 'bible_study_teacher'
-            ? ngmyBibleStudyOriginalLanguageHint(text)
-            : '';
+        final extraCtx = await _advisorExtraContext(text, mem);
         final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
             '$homeworkCtx'
+            '$extraCtx'
             '$visionHint'
-            '$bibleHint'
             '${transcript.isNotEmpty ? '$transcript\n' : ''}'
             'They just texted: $text\n'
             'Reply as ${widget.profile.name} only — natural human text, not overly eager:';
@@ -1581,7 +1677,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 if (_messages.isEmpty && _loaded && i == 0) {
                   final emptyHint = _isTranslator
                       ? 'Tell ${widget.profile.name} what you want to practice in $_translatorLearningLang — simple words only.'
-                      : _allowsPhotoUpload
+                      : _isMshauri
+                          ? 'Karibu — tell ${widget.profile.name} your state and Civic Registry code to connect your community advisor.'
+                          : _allowsPhotoUpload
                           ? 'Ask ${widget.profile.name} anything — tap 📷 to send homework photos for step-by-step help.'
                           : ngmyCommunicateRoleIsRomantic(widget.profile.role)
                               ? 'Say something sweet to ${widget.profile.name}… 💜'

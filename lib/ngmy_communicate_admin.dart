@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_communicate.dart';
 import 'ngmy_communicate_storage.dart';
+import 'ngmy_mshauri.dart';
 
 /// Admin → Management → Communicate — create AI companion profiles.
 Future<void> showNgmyCommunicateAdminSheet({
@@ -73,6 +74,23 @@ Future<void> showNgmyCommunicateAdminSheet({
                       icon: const Icon(Icons.person_add_rounded),
                       label: const Text('Add companion'),
                       style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEC4899)),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => showNgmyMshauriAdminSheet(
+                        context: ctx,
+                        config: config,
+                        isDark: isDark,
+                        onDataChanged: onDataChanged,
+                        onPersist: onPersist,
+                      ),
+                      icon: const Icon(Icons.public_rounded, color: Color(0xFF059669)),
+                      label: const Text('Mshauri — state & president settings'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF059669),
+                        side: const BorderSide(color: Color(0xFF059669)),
+                        minimumSize: const Size(double.infinity, 44),
+                      ),
                     ),
                     const SizedBox(height: 14),
                     ...profiles.map((p) {

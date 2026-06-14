@@ -1147,6 +1147,8 @@ class AppConfig {
   double communicateFeeAmount;
   int communicateMinutesPerPayment;
   List<Map<String, dynamic>> communicateProfiles;
+  /// Per US state: president / group names admin teaches Mshauri advisors.
+  Map<String, Map<String, dynamic>> mshauriSettingsByState;
   double invoicePremiumOneTimeFee;
   double invoicePremiumMonthlyFee;
   double invoiceLuxuryOneTimeFee;
@@ -1238,6 +1240,7 @@ class AppConfig {
     this.communicateFeeAmount = NgmyCommunicatePayments.defaultFeeAmount,
     this.communicateMinutesPerPayment = NgmyCommunicatePayments.defaultMinutesPerPayment,
     List<Map<String, dynamic>>? communicateProfiles,
+    Map<String, Map<String, dynamic>>? mshauriSettingsByState,
     Map<String, String>? familyTreePhotoAccessUntilByEmail,
     this.invoicePremiumOneTimeFee = NgmyInvoicePayments.defaultPremiumOneTime,
     this.invoicePremiumMonthlyFee = NgmyInvoicePayments.defaultPremiumMonthly,
@@ -1258,6 +1261,7 @@ class AppConfig {
         ),
         loanApplications = loanApplications ?? [],
         communicateProfiles = communicateProfiles ?? const [],
+        mshauriSettingsByState = mshauriSettingsByState ?? const {},
         familyTreePhotoAccessUntilByEmail = familyTreePhotoAccessUntilByEmail ?? const {},
         appStudioCloudAccessUntilByEmail = appStudioCloudAccessUntilByEmail ?? const {},
         appStudioAiAccessUntilByEmail = appStudioAiAccessUntilByEmail ?? const {},
@@ -1356,6 +1360,7 @@ class AppConfig {
     'communicateFeeAmount': communicateFeeAmount,
     'communicateMinutesPerPayment': communicateMinutesPerPayment,
     'communicateProfiles': communicateProfiles,
+    'mshauriSettingsByState': mshauriSettingsByState,
     'invoicePremiumOneTimeFee': invoicePremiumOneTimeFee,
     'invoicePremiumMonthlyFee': invoicePremiumMonthlyFee,
     'invoiceLuxuryOneTimeFee': invoiceLuxuryOneTimeFee,
@@ -1471,6 +1476,7 @@ class AppConfig {
     communicateProfiles: List<Map<String, dynamic>>.from(
       (json['communicateProfiles'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
     ),
+    mshauriSettingsByState: _mshauriSettingsFromJson(json['mshauriSettingsByState']),
     familyTreePhotoAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['familyTreePhotoAccessUntilByEmail']),
     invoicePremiumOneTimeFee: (json['invoicePremiumOneTimeFee'] as num?)?.toDouble() ?? NgmyInvoicePayments.defaultPremiumOneTime,
     invoicePremiumMonthlyFee: (json['invoicePremiumMonthlyFee'] as num?)?.toDouble() ?? NgmyInvoicePayments.defaultPremiumMonthly,
@@ -1540,6 +1546,17 @@ Map<String, String> _civicRegistryPinsFromJson(dynamic raw) {
     return raw.map((k, v) => MapEntry(k.toString().trim(), v.toString().trim()));
   }
   return {};
+}
+
+Map<String, Map<String, dynamic>> _mshauriSettingsFromJson(dynamic raw) {
+  if (raw is! Map) return {};
+  final out = <String, Map<String, dynamic>>{};
+  raw.forEach((k, v) {
+    final state = k.toString().trim();
+    if (state.isEmpty || v is! Map) return;
+    out[state] = Map<String, dynamic>.from(v);
+  });
+  return out;
 }
 
 /// Admin cloud timers always win so every player uses the same seconds.
@@ -2355,6 +2372,14 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     }
   } else if (keep.communicateProfiles.isNotEmpty) {
     next.communicateProfiles = List<Map<String, dynamic>>.from(keep.communicateProfiles.map((e) => Map<String, dynamic>.from(e)));
+  }
+  if (record.containsKey('mshauriSettingsByState') && record['mshauriSettingsByState'] is Map) {
+    final remote = _mshauriSettingsFromJson(record['mshauriSettingsByState']);
+    next.mshauriSettingsByState = {...keep.mshauriSettingsByState, ...remote};
+  } else if (keep.mshauriSettingsByState.isNotEmpty) {
+    next.mshauriSettingsByState = Map<String, Map<String, dynamic>>.from(
+      keep.mshauriSettingsByState.map((k, v) => MapEntry(k, Map<String, dynamic>.from(v))),
+    );
   }
   if (record.containsKey('familyTreePhotoAccessUntilByEmail') && record['familyTreePhotoAccessUntilByEmail'] is Map) {
     final remote = _familyTreePhotoAccessFromJson(record['familyTreePhotoAccessUntilByEmail']);
