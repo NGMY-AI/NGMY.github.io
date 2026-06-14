@@ -12416,7 +12416,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   String? _tabPagesKey;
   List<AppTransaction>? _sortedTxCache;
   String? _sortedTxCacheSig;
+  bool _deferredTxnSortScheduled = false;
   final Set<int> _visitedTabs = {0};
+  GlobalKey _homeScreenGlobalKey = GlobalKey(debugLabel: 'ngmy_home');
 
   String _transactionListSig(List<AppTransaction> txns) {
     if (txns.isEmpty) return '0';
@@ -12432,9 +12434,30 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     final sig = _transactionListSig(widget.allTransactions);
     if (_sortedTxCache != null && _sortedTxCacheSig == sig) return _sortedTxCache!;
     _sortedTxCacheSig = sig;
-    _sortedTxCache = List<AppTransaction>.from(widget.allTransactions)
+    _deferredTxnSortScheduled = false;
+    final raw = widget.allTransactions;
+    if (raw.length > 250) {
+      // Unsorted copy paints home immediately; full sort runs after first frame.
+      _sortedTxCache = List<AppTransaction>.from(raw);
+      _scheduleDeferredTransactionSort(sig);
+      return _sortedTxCache!;
+    }
+    _sortedTxCache = List<AppTransaction>.from(raw)
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return _sortedTxCache!;
+  }
+
+  void _scheduleDeferredTransactionSort(String sig) {
+    if (_deferredTxnSortScheduled) return;
+    _deferredTxnSortScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_sortedTxCacheSig != sig) return;
+      final sorted = List<AppTransaction>.from(widget.allTransactions)
+        ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      _sortedTxCache = sorted;
+      if (_idx == 0) setState(() {});
+    });
   }
 
   void _runScheduledPopups() {
@@ -12597,6 +12620,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _tabContentBuilders = null;
       _sortedTxCache = null;
       _sortedTxCacheSig = null;
+      _deferredTxnSortScheduled = false;
+      _homeScreenGlobalKey = GlobalKey(debugLabel: 'ngmy_home');
       _visitedTabs
         ..clear()
         ..add(0);
@@ -12655,11 +12680,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   void _scheduleMainShellRepaint() {
-    // One repaint after the first frame — avoids startup setState storms that blank the home tab.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {});
-    });
+    // No-op: an extra setState here kept the home tab blank during startup sync.
   }
 
   @override void initState() {
@@ -12764,12 +12785,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildHomeTab(List<AppTransaction> sorted) {
-    final inv = widget.user.activeInvestment;
-    final invSig = inv == null
-        ? 'none'
-        : '${inv.name}|${inv.amount.toStringAsFixed(2)}|${inv.daysLeft}|${inv.purchaseDate.millisecondsSinceEpoch}';
     return HomeScreen(
-      key: ValueKey<String>('ngmy_home_${widget.user.email}|$invSig'),
+      key: _homeScreenGlobalKey,
       user: widget.user,
       onClockIn: () async {
         final now = DateTime.now();
@@ -13271,6 +13288,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int _liveStart = 0;
   int _unreadNewsCount = 0;
   bool _heavySectionsReady = false;
+  bool _clockReady = false;
+  DateTime? _homeMountedAt;
   int _liveCacheStart = -1;
   int _liveCacheTxnLen = -1;
   List<AppTransaction> _liveCacheShown = const [];
@@ -13323,6 +13342,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override void initState() {
     super.initState();
+    _homeMountedAt = DateTime.now();
     _smokeCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 10));
     _smokeRot = Tween<double>(begin: 0, end: 2 * math.pi).animate(_smokeCtrl);
     _liveTicker = Timer.periodic(const Duration(seconds: 6), (_) {
@@ -13331,7 +13351,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      setState(() => _heavySectionsReady = true);
+      setState(() {
+        _clockReady = true;
+        _heavySectionsReady = true;
+      });
       if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
     });
   }
@@ -13339,6 +13362,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final inStartup = _homeMountedAt != null &&
+        DateTime.now().difference(_homeMountedAt!) < const Duration(seconds: 12);
+    if (inStartup) {
+      if (oldWidget.user.isClockedIn != widget.user.isClockedIn ||
+          oldWidget.user.email != widget.user.email) {
+        _liveCacheStart = -1;
+        if (mounted) setState(() {});
+      }
+      return;
+    }
     if (oldWidget.user != widget.user ||
         oldWidget.user.accountBalance != widget.user.accountBalance ||
         oldWidget.user.isClockedIn != widget.user.isClockedIn ||
@@ -13474,7 +13507,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ],
               ),
               const SizedBox(height: 30),
-              _buildClockInFrame(isLight),
+              _clockReady ? _buildClockInFrame(isLight) : _buildClockPlaceholder(isLight),
               const SizedBox(height: 40),
               if (_heavySectionsReady) ...[
                 _status(context),
@@ -13725,6 +13758,98 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         gamesPlayed: gamesPlayed,
         pointsEarned: pointsEarned,
         totalPoints: widget.user.points,
+      ),
+    );
+  }
+
+  Widget _buildClockPlaceholder(bool isLight) {
+    final active = widget.user.isClockedIn;
+    final alreadyDone = widget.user.alreadyClockedInToday && !active;
+    final now = DateTime.now();
+    final onTrial = widget.user.isOnFreeTrial;
+    final missedTodayBlocked = !onTrial && _ngmyIsPastNoon(now) && !_ngmyIsWeekend(now) && !active && !alreadyDone;
+    final weekend = !onTrial && _ngmyIsWeekend(now);
+    final missedWindow = !onTrial && _ngmyIsPastNoon(now);
+    final blocked = !active && !alreadyDone && (weekend || missedWindow);
+    final readyGoldClockIn = !active && !alreadyDone && !blocked;
+    final ringAccent = active
+        ? const Color(0xFF00B25A)
+        : readyGoldClockIn
+            ? const Color(0xFFFBBF24)
+            : Colors.grey;
+
+    return Container(
+      width: double.infinity,
+      height: 248,
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(25),
+        border: isLight ? Border.all(color: const Color(0xFF00B25A).withOpacity(0.2), width: 1.5) : null,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.topLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(9),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6EE7B7), Color(0xFF059669)],
+                ),
+              ),
+              child: Text(
+                widget.user.username.trim().isEmpty ? 'MEMBER' : widget.user.username.toUpperCase(),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.9),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Container(
+                width: 152,
+                height: 152,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: active
+                        ? [const Color(0xFF00B25A), const Color(0xFF00894B)]
+                        : readyGoldClockIn
+                            ? [const Color(0xFFFDE68A), const Color(0xFFFBBF24), const Color(0xFFD97706)]
+                            : [Colors.grey.shade600, Colors.grey.shade800],
+                  ),
+                  border: Border.all(color: ringAccent.withOpacity(0.35), width: 10),
+                ),
+                child: Center(
+                  child: Text(
+                    active
+                        ? 'EARNING'
+                        : alreadyDone
+                            ? 'DONE'
+                            : readyGoldClockIn
+                                ? 'CLOCK IN'
+                                : 'CLOSED',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (missedTodayBlocked)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 2),
+              child: Text(
+                'Clock-in window closed for today',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey),
+              ),
+            ),
+        ],
       ),
     );
   }
