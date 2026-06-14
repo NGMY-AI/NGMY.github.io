@@ -53,15 +53,9 @@ void _ngmySetWebChrome({required bool lightMode}) {
 
 /// Sync iOS PWA status bar + page chrome with app light/dark mode.
 void ngmyApplyWebStatusBarStyle({required bool lightMode}) {
-  if (lightMode) {
-    if (_ngmyWebStatusBarLightApplied) return;
-    _ngmyWebStatusBarLightApplied = true;
-    _ngmySetWebChrome(lightMode: true);
-    return;
-  }
-
-  _ngmyWebStatusBarLightApplied = false;
-  _ngmySetWebChrome(lightMode: false);
+  if (_ngmyWebStatusBarLightApplied == lightMode) return;
+  _ngmyWebStatusBarLightApplied = lightMode;
+  _ngmySetWebChrome(lightMode: lightMode);
 }
 
 /// Scroll to top once on cold start / bfcache restore — no resize storms.
