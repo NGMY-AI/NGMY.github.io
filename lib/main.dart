@@ -12278,6 +12278,21 @@ class _ClockInWindowClosedDialogState extends State<_ClockInWindowClosedDialog> 
 }
 
 /// Builds bottom-nav tab content lazily so the home screen paints on the first frame.
+/// Home tab shell — built outside [IndexedStack] so startup never blocks on other tabs.
+class _NgmyHomeTabShell extends StatefulWidget {
+  const _NgmyHomeTabShell({super.key, required this.state});
+
+  final _MainScreenState state;
+
+  @override
+  State<_NgmyHomeTabShell> createState() => _NgmyHomeTabShellState();
+}
+
+class _NgmyHomeTabShellState extends State<_NgmyHomeTabShell> {
+  @override
+  Widget build(BuildContext context) => widget.state._buildHomeTab(widget.state._homeDisplayTransactions);
+}
+
 class _NgmyLazyTabSlot extends StatefulWidget {
   const _NgmyLazyTabSlot({
     super.key,
@@ -12414,49 +12429,39 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   DateTime? _mainShellMountedAt;
   Map<int, Widget Function()>? _tabContentBuilders;
   String? _tabPagesKey;
-  List<AppTransaction>? _sortedTxCache;
-  String? _sortedTxCacheSig;
-  bool _deferredTxnSortScheduled = false;
+  List<AppTransaction> _sortedTransactionsCache = const [];
+  List<AppTransaction> _homeDisplayTransactions = const [];
+  int _sortedTxSourceLen = -1;
+  bool _sortInFlight = false;
   final Set<int> _visitedTabs = {0};
   GlobalKey _homeScreenGlobalKey = GlobalKey(debugLabel: 'ngmy_home');
+  Widget? _homeTabShell;
 
-  String _transactionListSig(List<AppTransaction> txns) {
-    if (txns.isEmpty) return '0';
-    var latestMs = txns.first.timestamp.millisecondsSinceEpoch;
-    for (final t in txns) {
-      final ms = t.timestamp.millisecondsSinceEpoch;
-      if (ms > latestMs) latestMs = ms;
+  /// Never sort or copy large transaction lists synchronously inside [build].
+  void _scheduleSortedTransactionRefresh() {
+    final len = widget.allTransactions.length;
+    if (len == _sortedTxSourceLen && _sortedTransactionsCache.isNotEmpty) return;
+    if (_sortInFlight) return;
+    if (_homeDisplayTransactions.isEmpty && len > 0) {
+      _homeDisplayTransactions = len > 100
+          ? widget.allTransactions.take(50).toList()
+          : List<AppTransaction>.from(widget.allTransactions);
     }
-    return '${txns.length}|$latestMs';
-  }
-
-  List<AppTransaction> _sortedTransactions() {
-    final sig = _transactionListSig(widget.allTransactions);
-    if (_sortedTxCache != null && _sortedTxCacheSig == sig) return _sortedTxCache!;
-    _sortedTxCacheSig = sig;
-    _deferredTxnSortScheduled = false;
+    _sortInFlight = true;
     final raw = widget.allTransactions;
-    if (raw.length > 250) {
-      // Unsorted copy paints home immediately; full sort runs after first frame.
-      _sortedTxCache = List<AppTransaction>.from(raw);
-      _scheduleDeferredTransactionSort(sig);
-      return _sortedTxCache!;
-    }
-    _sortedTxCache = List<AppTransaction>.from(raw)
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return _sortedTxCache!;
-  }
-
-  void _scheduleDeferredTransactionSort(String sig) {
-    if (_deferredTxnSortScheduled) return;
-    _deferredTxnSortScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (_sortedTxCacheSig != sig) return;
-      final sorted = List<AppTransaction>.from(widget.allTransactions)
+    final snapLen = len;
+    scheduleMicrotask(() {
+      if (!mounted) {
+        _sortInFlight = false;
+        return;
+      }
+      final sorted = List<AppTransaction>.from(raw)
         ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      _sortedTxCache = sorted;
-      if (_idx == 0) setState(() {});
+      _sortInFlight = false;
+      _sortedTxSourceLen = snapLen;
+      _sortedTransactionsCache = sorted;
+      _homeDisplayTransactions = sorted;
+      setState(() {});
     });
   }
 
@@ -12618,13 +12623,18 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       NgmyIncomeSound.bindSession(widget.user.email);
       _tabPagesKey = null;
       _tabContentBuilders = null;
-      _sortedTxCache = null;
-      _sortedTxCacheSig = null;
-      _deferredTxnSortScheduled = false;
+      _sortedTransactionsCache = const [];
+      _homeDisplayTransactions = const [];
+      _sortedTxSourceLen = -1;
+      _sortInFlight = false;
       _homeScreenGlobalKey = GlobalKey(debugLabel: 'ngmy_home');
+      _homeTabShell = _NgmyHomeTabShell(key: _homeScreenGlobalKey, state: this);
       _visitedTabs
         ..clear()
         ..add(0);
+      _scheduleSortedTransactionRefresh();
+    } else if (oldWidget.allTransactions.length != widget.allTransactions.length) {
+      _scheduleSortedTransactionRefresh();
     }
     final oldSig = jsonEncode({'p': oldWidget.config.ngmyPopups, 'v': oldWidget.config.ngmyVideoPopups});
     final newSig = jsonEncode({'p': widget.config.ngmyPopups, 'v': widget.config.ngmyVideoPopups});
@@ -12686,6 +12696,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override void initState() {
     super.initState();
     _mainShellMountedAt = DateTime.now();
+    _homeTabShell = _NgmyHomeTabShell(key: _homeScreenGlobalKey, state: this);
+    _scheduleSortedTransactionRefresh();
     WidgetsBinding.instance.addObserver(this);
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
     _scheduleMainShellRepaint();
@@ -12923,8 +12935,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     });
   }
 
-  List<Widget> _buildTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
-    final home = _buildHomeTab(sorted);
+  List<Widget> _buildOtherTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
     final inv = widget.user.activeInvestment;
     final invSig = inv == null
         ? 'none'
@@ -12935,7 +12946,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight|'
         '${_investmentPlansSig(widget.globalPlans)}|${_legalContentSig(widget.config)}';
     if (_tabContentBuilders != null && _tabPagesKey == cacheKey) {
-      return [home, ..._buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey)];
+      return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
     }
     _tabPagesKey = cacheKey;
     _tabContentBuilders = {
@@ -13062,13 +13073,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onRefreshLegalContent: widget.onRefreshLegalAndPlans,
       ),
     };
-    return [home, ..._buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey)];
+    return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
   }
 
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sorted = _sortedTransactions();
-    final pages = _buildTabPages(sorted, activeIndex: _idx);
+    final sorted = _sortedTransactionsCache;
+    final otherTabs = _buildOtherTabPages(sorted, activeIndex: _idx);
+    final homeTab = _homeTabShell ?? _NgmyHomeTabShell(key: _homeScreenGlobalKey, state: this);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
@@ -13101,10 +13113,20 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 child: const ColoredBox(color: Colors.white),
               ),
             Positioned.fill(
-              child: IndexedStack(
-                index: _idx,
-                sizing: StackFit.expand,
-                children: pages,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (_idx != 0)
+                    IndexedStack(
+                      index: _idx - 1,
+                      sizing: StackFit.expand,
+                      children: otherTabs,
+                    ),
+                  Offstage(
+                    offstage: _idx != 0,
+                    child: RepaintBoundary(child: homeTab),
+                  ),
+                ],
               ),
             ),
             if (_offline)
@@ -13288,7 +13310,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int _liveStart = 0;
   int _unreadNewsCount = 0;
   bool _heavySectionsReady = false;
-  bool _clockReady = false;
   DateTime? _homeMountedAt;
   int _liveCacheStart = -1;
   int _liveCacheTxnLen = -1;
@@ -13351,10 +13372,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      setState(() {
-        _clockReady = true;
-        _heavySectionsReady = true;
-      });
+      setState(() => _heavySectionsReady = true);
       if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
     });
   }
@@ -13362,24 +13380,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final inStartup = _homeMountedAt != null &&
-        DateTime.now().difference(_homeMountedAt!) < const Duration(seconds: 12);
-    if (inStartup) {
-      if (oldWidget.user.isClockedIn != widget.user.isClockedIn ||
-          oldWidget.user.email != widget.user.email) {
-        _liveCacheStart = -1;
-        if (mounted) setState(() {});
-      }
-      return;
-    }
-    if (oldWidget.user != widget.user ||
+    if (oldWidget.user.isClockedIn != widget.user.isClockedIn ||
         oldWidget.user.accountBalance != widget.user.accountBalance ||
-        oldWidget.user.isClockedIn != widget.user.isClockedIn ||
         oldWidget.user.displayedTodayEarnings != widget.user.displayedTodayEarnings ||
         oldWidget.user.todayDailyGoal != widget.user.todayDailyGoal ||
+        oldWidget.user.email != widget.user.email ||
         oldWidget.allTransactions.length != widget.allTransactions.length) {
       _liveCacheStart = -1;
-      setState(() {});
+      if (mounted) setState(() {});
     }
   }
 
@@ -13507,7 +13515,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ],
               ),
               const SizedBox(height: 30),
-              _clockReady ? _buildClockInFrame(isLight) : _buildClockPlaceholder(isLight),
+              _buildClockInFrame(isLight),
               const SizedBox(height: 40),
               if (_heavySectionsReady) ...[
                 _status(context),
@@ -13758,98 +13766,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         gamesPlayed: gamesPlayed,
         pointsEarned: pointsEarned,
         totalPoints: widget.user.points,
-      ),
-    );
-  }
-
-  Widget _buildClockPlaceholder(bool isLight) {
-    final active = widget.user.isClockedIn;
-    final alreadyDone = widget.user.alreadyClockedInToday && !active;
-    final now = DateTime.now();
-    final onTrial = widget.user.isOnFreeTrial;
-    final missedTodayBlocked = !onTrial && _ngmyIsPastNoon(now) && !_ngmyIsWeekend(now) && !active && !alreadyDone;
-    final weekend = !onTrial && _ngmyIsWeekend(now);
-    final missedWindow = !onTrial && _ngmyIsPastNoon(now);
-    final blocked = !active && !alreadyDone && (weekend || missedWindow);
-    final readyGoldClockIn = !active && !alreadyDone && !blocked;
-    final ringAccent = active
-        ? const Color(0xFF00B25A)
-        : readyGoldClockIn
-            ? const Color(0xFFFBBF24)
-            : Colors.grey;
-
-    return Container(
-      width: double.infinity,
-      height: 248,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(25),
-        border: isLight ? Border.all(color: const Color(0xFF00B25A).withOpacity(0.2), width: 1.5) : null,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Align(
-            alignment: Alignment.topLeft,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(9),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6EE7B7), Color(0xFF059669)],
-                ),
-              ),
-              child: Text(
-                widget.user.username.trim().isEmpty ? 'MEMBER' : widget.user.username.toUpperCase(),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.9),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Center(
-              child: Container(
-                width: 152,
-                height: 152,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: active
-                        ? [const Color(0xFF00B25A), const Color(0xFF00894B)]
-                        : readyGoldClockIn
-                            ? [const Color(0xFFFDE68A), const Color(0xFFFBBF24), const Color(0xFFD97706)]
-                            : [Colors.grey.shade600, Colors.grey.shade800],
-                  ),
-                  border: Border.all(color: ringAccent.withOpacity(0.35), width: 10),
-                ),
-                child: Center(
-                  child: Text(
-                    active
-                        ? 'EARNING'
-                        : alreadyDone
-                            ? 'DONE'
-                            : readyGoldClockIn
-                                ? 'CLOCK IN'
-                                : 'CLOSED',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          if (missedTodayBlocked)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 2),
-              child: Text(
-                'Clock-in window closed for today',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey),
-              ),
-            ),
-        ],
       ),
     );
   }
