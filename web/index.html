@@ -84,6 +84,7 @@
       function ngmyApplyLightChromeEarly() {
         var root = document.documentElement;
         root.classList.add('ngmy-app-light');
+        root.classList.remove('ngmy-app-dark');
         root.style.setProperty('background-color', '#ffffff', 'important');
         root.style.setProperty('color-scheme', 'light');
         if (document.body) {
@@ -98,11 +99,15 @@
       function ngmyApplyDarkChromeEarly() {
         var root = document.documentElement;
         root.classList.remove('ngmy-app-light');
+        root.classList.add('ngmy-app-dark');
         root.style.setProperty('background-color', '#121212', 'important');
         root.style.setProperty('color-scheme', 'dark');
         if (document.body) {
           document.body.style.setProperty('background-color', '#121212', 'important');
         }
+        document.querySelectorAll('flutter-view, flt-glass-pane').forEach(function (el) {
+          el.style.setProperty('background-color', '#121212', 'important');
+        });
         var statusMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
         if (statusMeta) statusMeta.setAttribute('content', 'black-translucent');
         document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
@@ -184,7 +189,18 @@
 
     @media (prefers-color-scheme: dark) {
 
-      html, body { background-color: #121212; }
+      html, body, flutter-view, flt-glass-pane { background-color: #121212; }
+
+    }
+
+    html.ngmy-app-dark,
+    html.ngmy-app-dark body,
+    html.ngmy-app-dark flutter-view,
+    html.ngmy-app-dark flt-glass-pane {
+
+      background-color: #121212 !important;
+
+      color-scheme: dark;
 
     }
 
@@ -219,6 +235,28 @@
       height: env(safe-area-inset-top, 0px);
 
       background: #ffffff;
+
+      z-index: 2147483646;
+
+      pointer-events: none;
+
+    }
+
+    html.ngmy-app-dark::before {
+
+      content: '';
+
+      position: fixed;
+
+      top: 0;
+
+      left: 0;
+
+      right: 0;
+
+      height: env(safe-area-inset-top, 0px);
+
+      background: #121212;
 
       z-index: 2147483646;
 
