@@ -62,7 +62,6 @@ class NgmyFamilyTreeSyncPage extends StatefulWidget {
 }
 
 class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
-  String? _activeCode;
   List<({String id, String name, int count})> _trees = [];
   bool _canExport = false;
   String? _statusMessage;
@@ -77,9 +76,6 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
   }
 
   Future<void> _refresh() async {
-    if (!widget.isAdmin) {
-      _activeCode = await NgmyFamilyTreeBackupCodes.codeForEmail(widget.email);
-    }
     final trees = await NgmyFamilyTreeSyncService.treesSummary(widget.email);
     final local = await loadFamilyTreesLocalOnly(widget.email);
     final canExport = !widget.importOnly &&
@@ -319,36 +315,6 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
                   ],
                 ),
               ),
-              if (!widget.importOnly && !widget.isAdmin && _activeCode != null) ...[
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: card, borderRadius: BorderRadius.circular(16), border: Border.all(color: border)),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.vpn_key_rounded, color: _accent, size: 22),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Backup code', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
-                            Text(_activeCode!, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: titleColor, letterSpacing: 0.6)),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Copy',
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: _activeCode!));
-                          _toast('Backup code copied.');
-                        },
-                        icon: const Icon(Icons.copy_rounded, color: _accent),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
               const SizedBox(height: 18),
               Text('Actions', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
               const SizedBox(height: 10),

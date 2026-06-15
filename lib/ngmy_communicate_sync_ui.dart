@@ -54,7 +54,6 @@ class NgmyCommunicateSyncPage extends StatefulWidget {
 }
 
 class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
-  String? _activeCode;
   List<({String id, String name, int count})> _threads = [];
   String? _statusMessage;
   bool _working = false;
@@ -69,9 +68,6 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
   }
 
   Future<void> _refresh() async {
-    if (!widget.isAdmin) {
-      _activeCode = await NgmyCommunicateBackupCodes.codeForEmail(widget.email);
-    }
     final threads = await NgmyCommunicateSyncService.threadsSummary(widget.email, widget.config);
     if (!mounted) return;
     setState(() {
@@ -300,36 +296,6 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
                   ],
                 ),
               ),
-              if (!widget.isAdmin && _activeCode != null) ...[
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: card, borderRadius: BorderRadius.circular(16), border: Border.all(color: border)),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.vpn_key_rounded, color: kNgmyAdvisorsHubAccent, size: 22),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Backup code', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
-                            Text(_activeCode!, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: titleColor, letterSpacing: 0.6)),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Copy',
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: _activeCode!));
-                          _toast('Backup code copied.');
-                        },
-                        icon: const Icon(Icons.copy_rounded, color: kNgmyAdvisorsHubAccent),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
               const SizedBox(height: 18),
               Text('Actions', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
               const SizedBox(height: 10),

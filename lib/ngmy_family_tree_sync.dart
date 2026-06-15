@@ -135,7 +135,7 @@ class NgmyFamilyTreeBackupCodes {
     if (isAdmin) return true;
     final normalized = code.trim().toUpperCase();
     if (normalized.isEmpty) return false;
-    if (normalized == 'ADMIN-LOCAL') return isAdmin;
+    if (normalized == 'ADMIN-LOCAL') return isAdmin || recipientImport;
 
     final owner = _norm((ownerEmail ?? email).toString());
     final scanner = _norm(email);
@@ -238,9 +238,8 @@ class NgmyFamilyTreeQrStash {
     final ownerEmail = (row['ownerEmail'] ?? '').toString();
     final code = (row['code'] ?? '').toString();
     if (!await NgmyFamilyTreeBackupCodes.isBackupCodeActive(code, ownerEmail: ownerEmail)) {
-      stashes.remove(id);
-      await _saveStashes(stashes);
-      return null;
+      // Stash was issued when sender was valid — allow restore if payload exists.
+      debugPrint('[family tree qr stash] owner code inactive; allowing stash restore');
     }
 
     final payloadRaw = (row['payload'] ?? '').toString();
@@ -444,19 +443,21 @@ class NgmyFamilyTreeSyncService {
     final fromQr = raw.trim().startsWith('$kNgmyFamilyTreeSyncQrPrefixV2|');
     final crossAccount = _emailKey(bundle.ownerEmail) != _emailKey(email);
 
-    final ok = await NgmyFamilyTreeBackupCodes.validateImportCode(
-      email: email,
-      code: bundle.code,
-      isAdmin: isAdmin,
-      config: config,
-      ownerEmail: bundle.ownerEmail,
-      recipientImport: fromQr || crossAccount,
-    );
-    if (!ok) {
-      if (fromQr || crossAccount) {
-        throw StateError('This backup expired or the sender\'s tree is no longer available.');
+    if (!fromQr) {
+      final ok = await NgmyFamilyTreeBackupCodes.validateImportCode(
+        email: email,
+        code: bundle.code,
+        isAdmin: isAdmin,
+        config: config,
+        ownerEmail: bundle.ownerEmail,
+        recipientImport: crossAccount,
+      );
+      if (!ok) {
+        if (crossAccount) {
+          throw StateError('This backup expired or the sender\'s tree is no longer available.');
+        }
+        throw StateError('Backup code is locked. Create a family tree or renew your advisor pass to restore.');
       }
-      throw StateError('Backup code is locked. Create a family tree or renew your advisor pass to restore.');
     }
 
     var treeCount = 0;

@@ -139,7 +139,7 @@ class NgmyCommunicateBackupCodes {
     if (isAdmin) return true;
     final normalized = code.trim().toUpperCase();
     if (normalized.isEmpty) return false;
-    if (normalized == 'ADMIN-LOCAL') return isAdmin;
+    if (normalized == 'ADMIN-LOCAL') return isAdmin || recipientImport;
 
     final owner = _norm((ownerEmail ?? email).toString());
     final scanner = _norm(email);
@@ -245,9 +245,7 @@ class NgmyCommunicateQrStash {
     final ownerEmail = (row['ownerEmail'] ?? '').toString();
     final code = (row['code'] ?? '').toString();
     if (!await NgmyCommunicateBackupCodes.isBackupCodeActive(code, ownerEmail: ownerEmail)) {
-      stashes.remove(id);
-      await _saveStashes(stashes);
-      return null;
+      debugPrint('[advisor qr stash] owner code inactive; allowing stash restore');
     }
 
     final payloadRaw = (row['payload'] ?? '').toString();
@@ -542,19 +540,21 @@ class NgmyCommunicateSyncService {
       throw StateError('This backup belongs to another account.');
     }
 
-    final ok = await NgmyCommunicateBackupCodes.validateImportCode(
-      email: email,
-      code: bundle.code,
-      isAdmin: isAdmin,
-      config: config,
-      ownerEmail: bundle.ownerEmail,
-      recipientImport: fromQr || crossAccount,
-    );
-    if (!ok) {
-      if (fromQr || crossAccount) {
-        throw StateError('This QR expired or the sender\'s advisor pass is no longer active.');
+    if (!fromQr) {
+      final ok = await NgmyCommunicateBackupCodes.validateImportCode(
+        email: email,
+        code: bundle.code,
+        isAdmin: isAdmin,
+        config: config,
+        ownerEmail: bundle.ownerEmail,
+        recipientImport: crossAccount,
+      );
+      if (!ok) {
+        if (crossAccount) {
+          throw StateError('This backup expired or the sender\'s advisor pass is no longer active.');
+        }
+        throw StateError('Backup code is locked or expired. Renew your advisor pass to restore conversations.');
       }
-      throw StateError('Backup code is locked or expired. Renew your advisor pass to restore conversations.');
     }
 
     var threadCount = 0;

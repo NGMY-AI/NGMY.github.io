@@ -189,7 +189,7 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
   Widget _emptyState(WorksheetPalette p) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+      padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
       decoration: BoxDecoration(
         color: p.cardBg,
         borderRadius: BorderRadius.circular(16),
@@ -204,48 +204,26 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
               onTap: _openImportSync,
               customBorder: const CircleBorder(),
               child: Container(
-                width: 56,
-                height: 56,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: WorksheetPalette.green.withValues(alpha: 0.12),
-                  border: Border.all(color: WorksheetPalette.green, width: 2.5),
-                  boxShadow: [
-                    BoxShadow(color: WorksheetPalette.green.withValues(alpha: 0.25), blurRadius: 8, offset: const Offset(0, 3)),
-                  ],
+                  border: Border.all(color: WorksheetPalette.green, width: 2),
                 ),
-                child: const Icon(Icons.park_outlined, color: WorksheetPalette.green, size: 30),
+                child: const Icon(Icons.park_outlined, color: WorksheetPalette.green, size: 32),
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            'Tap tree to upload or scan a shared backup',
-            style: TextStyle(fontSize: 12, color: p.secondaryText, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 20),
-          Icon(Icons.account_tree_outlined, size: 48, color: p.secondaryText.withValues(alpha: 0.45)),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Text('No Family Trees Yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.primaryText)),
           const SizedBox(height: 8),
           Text(
-            'Create your own tree, or restore one shared with you (view only until you pay to create).',
+            'Create a family tree with names, photos, notes, and generations.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.4),
           ),
           const SizedBox(height: 22),
-          OutlinedButton.icon(
-            onPressed: _openImportSync,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: WorksheetPalette.green,
-              side: const BorderSide(color: WorksheetPalette.green),
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            icon: const Icon(Icons.upload_file_rounded, size: 18),
-            label: const Text('Upload or scan backup', style: TextStyle(fontWeight: FontWeight.w700)),
-          ),
-          const SizedBox(height: 12),
           FilledButton(
             onPressed: _createTree,
             style: FilledButton.styleFrom(
