@@ -9,6 +9,8 @@ import 'ngmy_communicate_payments.dart';
 class NgmyDocumentScanPayments {
   static const int defaultFreeScanLimit = 5;
   static const double defaultUnlockFee = 2.99;
+  /// Every this many follow-up questions counts as one document scan.
+  static const int questionsPerScan = 2;
   static const _usagePrefsPrefix = 'ngmy_document_scan_usage_';
 
   static int freeScanLimitFromConfig(dynamic config) {

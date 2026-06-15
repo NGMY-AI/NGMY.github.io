@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_document_translate_chat.dart';
 import 'ngmy_document_scan_payments.dart';
@@ -85,9 +86,12 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
 
   static const double _emptyFrameHeight = 128;
   static const double _filledMaxHeight = 280;
+  static const _languagePrefsKey = 'ngmy_document_scan_response_lang_v1';
 
   final _picker = ImagePicker();
   final _questionC = TextEditingController();
+  final _scrollC = ScrollController();
+  final _latestAnswerKey = GlobalKey();
 
   late final AnimationController _ambient;
   late final AnimationController _framePulse;
@@ -102,6 +106,8 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   String? _documentContext;
   int _scannedPagesFingerprint = 0;
   final List<({String question, String answer})> _followUps = [];
+  /// Follow-up questions since the last scan charge (2 questions = 1 scan).
+  int _questionsSinceLastScanCharge = 0;
   /// `en` = English, `sw` = Swahili (Kiswahili).
   String _responseLanguage = 'en';
   int? _remainingFreeScans;
@@ -133,7 +139,25 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     _framePulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
     _inner3d = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
     _flagFx = AnimationController(vsync: this, duration: const Duration(milliseconds: 520));
+    unawaited(_loadSavedLanguage());
     unawaited(_refreshScanUsage());
+  }
+
+  Future<void> _loadSavedLanguage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_languagePrefsKey);
+      if (saved == 'en' || saved == 'sw') {
+        if (mounted) setState(() => _responseLanguage = saved!);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistLanguage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_languagePrefsKey, _responseLanguage);
+    } catch (_) {}
   }
 
   Future<void> _refreshScanUsage() async {
@@ -157,6 +181,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     _documentContext = null;
     _scannedPagesFingerprint = 0;
     _followUps.clear();
+    _questionsSinceLastScanCharge = 0;
   }
 
   @override
@@ -166,7 +191,46 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     _inner3d.dispose();
     _flagFx.dispose();
     _questionC.dispose();
+    _scrollC.dispose();
     super.dispose();
+  }
+
+  Future<bool> _ensureScanAccess() async {
+    final user = widget.user;
+    final config = widget.config;
+    if (user == null || config == null || widget.onCharge == null) return true;
+    final allowed = await NgmyDocumentScanPayments.ensureAccess(
+      context: context,
+      user: user,
+      config: config,
+      onCharge: widget.onCharge!,
+      onDataChanged: widget.onDataChanged ?? () {},
+      onPersistConfig: widget.onPersistConfig ?? () async => true,
+    );
+    if (allowed) await _refreshScanUsage();
+    return allowed;
+  }
+
+  Future<void> _recordScanUsage() async {
+    final email = widget.user != null ? (((widget.user as dynamic).email as String?) ?? '') : '';
+    if (email.isEmpty) return;
+    await NgmyDocumentScanPayments.recordScan(email);
+    await _refreshScanUsage();
+  }
+
+  void _scrollToLatestAnswer() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ctx = _latestAnswerKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+          alignment: 0.05,
+        );
+      }
+    });
   }
 
   int get _slotsLeft => 2 - _pages.length;
@@ -281,6 +345,8 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     final question = _questionC.text.trim();
     if (question.isEmpty || !_pagesMatchScan || _documentContext == null) return;
 
+    if (!await _ensureScanAccess()) return;
+
     setState(() {
       _analyzing = true;
       _error = null;
@@ -301,19 +367,30 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
         documentContext: _documentContext!,
         userQuestion: question,
         languageCode: _responseLanguage,
-        priorTurns: _followUps,
+        priorTurns: _followUps.reversed.toList(),
       );
 
       if (!mounted) return;
-      setState(() {
-        _analyzing = false;
-        if (reply.text != null && reply.text!.isNotEmpty) {
-          _followUps.add((question: question, answer: reply.text!));
+      if (reply.text != null && reply.text!.isNotEmpty) {
+        setState(() {
+          _analyzing = false;
+          _followUps.insert(0, (question: question, answer: reply.text!));
           _questionC.clear();
-        } else {
-          _error = _mapScanError(reply.error);
+        });
+        _questionsSinceLastScanCharge += 1;
+        if (_questionsSinceLastScanCharge >= NgmyDocumentScanPayments.questionsPerScan) {
+          _questionsSinceLastScanCharge = 0;
+          if (!_isAdminUser && !_hasPaidScanAccess) {
+            await _recordScanUsage();
+          }
         }
-      });
+        _scrollToLatestAnswer();
+      } else {
+        setState(() {
+          _analyzing = false;
+          _error = _mapScanError(reply.error);
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -334,16 +411,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     final user = widget.user;
     final config = widget.config;
     if (user != null && config != null && widget.onCharge != null) {
-      final allowed = await NgmyDocumentScanPayments.ensureAccess(
-        context: context,
-        user: user,
-        config: config,
-        onCharge: widget.onCharge!,
-        onDataChanged: widget.onDataChanged ?? () {},
-        onPersistConfig: widget.onPersistConfig ?? () async => true,
-      );
-      if (!allowed) return;
-      await _refreshScanUsage();
+      if (!await _ensureScanAccess()) return;
     }
 
     setState(() {
@@ -377,10 +445,10 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
           _result = scan.text;
           _documentContext = scan.text;
           _scannedPagesFingerprint = _pagesFingerprint;
+          _questionsSinceLastScanCharge = 0;
           _questionC.clear();
-          final email = widget.user != null ? (((widget.user as dynamic).email as String?) ?? '') : '';
-          if (email.isNotEmpty) {
-            unawaited(NgmyDocumentScanPayments.recordScan(email).then((_) => _refreshScanUsage()));
+          if (!_isAdminUser && !_hasPaidScanAccess) {
+            unawaited(_recordScanUsage());
           }
         } else {
           _error = _mapScanError(scan.error);
@@ -653,11 +721,14 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
 
   String get _flagEmoji => _responseLanguage == 'sw' ? '🇹🇿' : '🇺🇸';
 
+  String get _languageLabel => _responseLanguage == 'sw' ? 'Swahili' : 'English';
+
   Future<void> _toggleLanguageFlag() async {
     if (_analyzing) return;
     await _flagFx.forward(from: 0);
     if (!mounted) return;
     setState(() => _responseLanguage = _responseLanguage == 'en' ? 'sw' : 'en');
+    unawaited(_persistLanguage());
     _flagFx.reset();
   }
 
@@ -666,13 +737,13 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       color: Colors.transparent,
       child: InkWell(
         onTap: _toggleLanguageFlag,
-        customBorder: const CircleBorder(),
+        borderRadius: BorderRadius.circular(14),
         child: AnimatedBuilder(
           animation: _flagFx,
           builder: (context, child) {
             final t = Curves.easeInOutCubic.transform(_flagFx.value);
             final spin = t * math.pi;
-            final scale = 1.0 + math.sin(t * math.pi) * 0.22;
+            final scale = 1.0 + math.sin(t * math.pi) * 0.12;
             return Transform(
               alignment: Alignment.center,
               transform: Matrix4.identity()
@@ -680,15 +751,11 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                 ..rotateY(spin)
                 ..scale(scale, scale, 1.0),
               child: Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: _cyan.withValues(alpha: 0.35 * t), blurRadius: 16 + 8 * t),
-                    BoxShadow(color: _violet.withValues(alpha: 0.28 * t), blurRadius: 12),
-                  ],
+                  borderRadius: BorderRadius.circular(14),
+                  color: Colors.white.withValues(alpha: 0.08),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
                 ),
                 child: child,
               ),
@@ -697,7 +764,28 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 280),
             transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
-            child: Text(_flagEmoji, key: ValueKey<String>(_responseLanguage), style: const TextStyle(fontSize: 28)),
+            child: Row(
+              key: ValueKey<String>(_responseLanguage),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_flagEmoji, style: const TextStyle(fontSize: 22)),
+                const SizedBox(width: 5),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Language',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 8, fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      _languageLabel,
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -878,6 +966,122 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     );
   }
 
+  Widget _followUpCard(({String question, String answer}) turn, {Key? key}) {
+    return KeyedSubtree(
+      key: key,
+      child: _glassCard(
+        borderColors: const [_cyan],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _cyan.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _cyan.withValues(alpha: 0.45)),
+              ),
+              child: const Text(
+                'Latest answer',
+                style: TextStyle(color: _cyan, fontWeight: FontWeight.w800, fontSize: 11),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.person_outline_rounded, color: _cyan.withValues(alpha: 0.9), size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    turn.question,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.auto_awesome_rounded, color: _mint.withValues(alpha: 0.9), size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SelectableText(
+                    turn.answer,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryCard() {
+    return _glassCard(
+      borderColors: const [_mint],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: _mint.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _mint.withValues(alpha: 0.5)),
+            ),
+            child: Text(
+              _pages.length > 1 ? 'AI Summary · ${_pages.length} pages' : 'AI Summary',
+              style: const TextStyle(color: _mint, fontWeight: FontWeight.w800, fontSize: 11),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SelectableText(_result!, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5)),
+        ],
+      ),
+    );
+  }
+
+  Widget _olderFollowUpCard(({String question, String answer}) turn) {
+    return _glassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.person_outline_rounded, color: _cyan.withValues(alpha: 0.9), size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  turn.question,
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.auto_awesome_rounded, color: _mint.withValues(alpha: 0.9), size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SelectableText(
+                  turn.answer,
+                  style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _scanUsageBanner() {
     if (_isAdminUser) {
       return Container(
@@ -968,7 +1172,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
           Expanded(
             child: Text(
               remaining > 0
-                  ? '$remaining free scan${remaining == 1 ? '' : 's'} left'
+                  ? '$remaining free scan${remaining == 1 ? '' : 's'} left · 2 questions = 1 scan'
                   : 'No free scans left — pay to unlock 30 days',
               style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontWeight: FontWeight.w700, fontSize: 12),
             ),
@@ -1065,6 +1269,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                     ),
                     Expanded(
                       child: SingleChildScrollView(
+                        controller: _scrollC,
                         padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1239,69 +1444,17 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                 ),
                               ),
                             ],
+                            if (_followUps.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              _followUpCard(_followUps.first, key: _latestAnswerKey),
+                              for (var i = 1; i < _followUps.length; i++) ...[
+                                const SizedBox(height: 12),
+                                _olderFollowUpCard(_followUps[i]),
+                              ],
+                            ],
                             if (_result != null) ...[
                               const SizedBox(height: 16),
-                              _glassCard(
-                                borderColors: const [_mint],
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: _mint.withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(color: _mint.withValues(alpha: 0.5)),
-                                      ),
-                                      child: Text(
-                                        _pages.length > 1 ? 'AI Summary · ${_pages.length} pages' : 'AI Summary',
-                                        style: const TextStyle(color: _mint, fontWeight: FontWeight.w800, fontSize: 11),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    SelectableText(_result!, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            if (_followUps.isNotEmpty) ...[
-                              for (final turn in _followUps) ...[
-                                const SizedBox(height: 12),
-                                _glassCard(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Icon(Icons.person_outline_rounded, color: _cyan.withValues(alpha: 0.9), size: 18),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              turn.question,
-                                              style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 13, fontWeight: FontWeight.w700),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Icon(Icons.auto_awesome_rounded, color: _mint.withValues(alpha: 0.9), size: 18),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: SelectableText(
-                                              turn.answer,
-                                              style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                              _summaryCard(),
                             ],
                           ],
                         ),
