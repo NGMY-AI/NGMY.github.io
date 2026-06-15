@@ -13,8 +13,10 @@ import 'ngmy_network_resilience.dart';
 const String kNgmyAdvisorSyncMarker = 'ngmyAdvisorSync';
 const int kNgmyAdvisorSyncVersion = 1;
 const String kNgmyAdvisorSyncQrPrefix = 'NGMYASYNC1';
-const int kNgmyAdvisorSyncQrMaxChars = 2800;
+const String kNgmyAdvisorSyncQrPrefixV2 = 'NGMYASYNC2';
+const int kNgmyAdvisorSyncQrMaxUses = 2;
 const String _kCloudSettingsKey = 'ngmy_communicate_backup_codes_v1';
+const String _kQrStashSettingsKey = 'ngmy_communicate_qr_stashes_v1';
 
 /// Cloud activation codes — only codes live in Supabase; conversation data stays local.
 class NgmyCommunicateBackupCodes {
@@ -131,17 +133,140 @@ class NgmyCommunicateBackupCodes {
     required String code,
     required bool isAdmin,
     required dynamic config,
+    String? ownerEmail,
   }) async {
     if (isAdmin) return true;
     if (!NgmyCommunicatePayments.hasActivePass(config, email)) return false;
     final normalized = code.trim().toUpperCase();
     if (normalized.isEmpty) return false;
+    if (normalized == 'ADMIN-LOCAL') return isAdmin;
     if (!await ngmyCanReachCloud()) return false;
     final codes = await _loadCloudMap();
     final row = codes[normalized];
     if (row is! Map) return false;
     if (row['active'] != true) return false;
-    return _norm((row['email'] ?? '').toString()) == _norm(email);
+    final owner = _norm((ownerEmail ?? email).toString());
+    return _norm((row['email'] ?? '').toString()) == owner;
+  }
+
+  static Future<bool> isBackupCodeActive(String code, {required String ownerEmail}) async {
+    final normalized = code.trim().toUpperCase();
+    if (normalized.isEmpty || normalized == 'ADMIN-LOCAL') return true;
+    if (!await ngmyCanReachCloud()) return false;
+    final codes = await _loadCloudMap();
+    final row = codes[normalized];
+    if (row is! Map) return false;
+    if (row['active'] != true) return false;
+    return _norm((row['email'] ?? '').toString()) == _norm(ownerEmail);
+  }
+}
+
+/// Short-lived cloud stash so QR codes stay small (2 scans total).
+class NgmyCommunicateQrStash {
+  static String _generateToken() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final r = Random.secure();
+    return 'QR${List.generate(10, (_) => chars[r.nextInt(chars.length)]).join()}';
+  }
+
+  static Future<Map<String, dynamic>> _loadStashes() async {
+    if (!await ngmyCanReachCloud()) return {};
+    try {
+      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _kQrStashSettingsKey).maybeSingle();
+      if (row == null) return {};
+      final value = row['value'];
+      if (value is! Map) return {};
+      final stashes = value['stashes'];
+      if (stashes is Map) return Map<String, dynamic>.from(stashes);
+    } catch (e) {
+      debugPrint('[advisor qr stash] load: $e');
+    }
+    return {};
+  }
+
+  static Future<void> _saveStashes(Map<String, dynamic> stashes) async {
+    if (!await ngmyCanReachCloud()) return;
+    try {
+      await Supabase.instance.client.from('ngmy_settings').upsert([
+        {
+          'key': _kQrStashSettingsKey,
+          'value': {
+            'stashes': stashes,
+            'savedAt': DateTime.now().toUtc().toIso8601String(),
+          },
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        },
+      ], onConflict: 'key');
+    } catch (e) {
+      debugPrint('[advisor qr stash] save: $e');
+    }
+  }
+
+  /// Creates a cloud stash and returns a compact QR payload (always fits on screen).
+  static Future<({String qrPayload, String token, int usesRemaining})?> createFromBundle(
+    NgmyAdvisorSyncBundle bundle, {
+    required bool isAdmin,
+  }) async {
+    if (!await ngmyCanReachCloud()) return null;
+    final token = _generateToken();
+    final stashes = await _loadStashes();
+    stashes[token] = {
+      'ownerEmail': bundle.ownerEmail,
+      'code': bundle.code,
+      'payload': base64Encode(utf8.encode(jsonEncode(bundle.toMap()))),
+      'usesRemaining': isAdmin ? 999 : kNgmyAdvisorSyncQrMaxUses,
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+    };
+    await _saveStashes(stashes);
+    final uses = isAdmin ? 999 : kNgmyAdvisorSyncQrMaxUses;
+    return (
+      qrPayload: '$kNgmyAdvisorSyncQrPrefixV2|$token',
+      token: token,
+      usesRemaining: uses,
+    );
+  }
+
+  static Future<NgmyAdvisorSyncBundle?> consumeToken(String token) async {
+    final id = token.trim();
+    if (id.isEmpty) return null;
+    final stashes = await _loadStashes();
+    final row = stashes[id];
+    if (row is! Map) return null;
+    final uses = (row['usesRemaining'] as num?)?.toInt() ?? 0;
+    if (uses <= 0) return null;
+
+    final ownerEmail = (row['ownerEmail'] ?? '').toString();
+    final code = (row['code'] ?? '').toString();
+    if (!await NgmyCommunicateBackupCodes.isBackupCodeActive(code, ownerEmail: ownerEmail)) {
+      stashes.remove(id);
+      await _saveStashes(stashes);
+      return null;
+    }
+
+    final payloadRaw = (row['payload'] ?? '').toString();
+    if (payloadRaw.isEmpty) return null;
+    NgmyAdvisorSyncBundle? bundle;
+    try {
+      final jsonText = utf8.decode(base64Decode(payloadRaw));
+      bundle = NgmyAdvisorSyncBundle.parse(jsonText);
+    } catch (e) {
+      debugPrint('[advisor qr stash] decode: $e');
+      return null;
+    }
+    if (bundle == null) return null;
+
+    final nextUses = uses - 1;
+    if (nextUses <= 0) {
+      stashes.remove(id);
+    } else {
+      stashes[id] = {
+        ...Map<String, dynamic>.from(row),
+        'usesRemaining': nextUses,
+        'lastUsedAt': DateTime.now().toUtc().toIso8601String(),
+      };
+    }
+    await _saveStashes(stashes);
+    return bundle;
   }
 }
 
@@ -220,6 +345,7 @@ class NgmyAdvisorSyncBundle {
     try {
       var text = raw.trim();
       if (text.startsWith('\uFEFF')) text = text.substring(1);
+      if (text.startsWith(kNgmyAdvisorSyncQrPrefixV2)) return null;
       if (text.startsWith(kNgmyAdvisorSyncQrPrefix)) {
         final payload = text.substring(kNgmyAdvisorSyncQrPrefix.length);
         if (payload.startsWith('|')) {
@@ -235,6 +361,18 @@ class NgmyAdvisorSyncBundle {
     }
   }
 
+  static Future<NgmyAdvisorSyncBundle?> parseAsync(String raw) async {
+    final trimmed = raw.trim();
+    if (trimmed.startsWith('$kNgmyAdvisorSyncQrPrefixV2|')) {
+      final parts = trimmed.split('|');
+      if (parts.length >= 2) {
+        return NgmyCommunicateQrStash.consumeToken(parts[1]);
+      }
+      return null;
+    }
+    return parse(trimmed);
+  }
+
   static NgmyAdvisorSyncBundle? fromMap(Map<String, dynamic> map) {
     if (map[kNgmyAdvisorSyncMarker] != kNgmyAdvisorSyncVersion && map[kNgmyAdvisorSyncMarker] != 1) return null;
     final code = (map['code'] ?? '').toString().trim().toUpperCase();
@@ -246,13 +384,6 @@ class NgmyAdvisorSyncBundle {
         : <NgmyAdvisorSyncThread>[];
     final exportedAt = DateTime.tryParse((map['exportedAt'] ?? '').toString()) ?? DateTime.now();
     return NgmyAdvisorSyncBundle(code: code, ownerEmail: owner, threads: threads, exportedAt: exportedAt);
-  }
-
-  String? buildQrPayload() {
-    final compact = jsonEncode(toMap());
-    final payload = '$kNgmyAdvisorSyncQrPrefix|${base64Url.encode(utf8.encode(compact))}';
-    if (payload.length > kNgmyAdvisorSyncQrMaxChars) return null;
-    return payload;
   }
 }
 
@@ -371,16 +502,35 @@ class NgmyCommunicateSyncService {
     return downloadNgmyAdvisorSyncJson(const JsonEncoder.withIndent('  ').convert(bundle.toMap()), filename);
   }
 
+  static Future<({String qrPayload, String code, int usesRemaining})?> createQrRestorePayload({
+    required String email,
+    required dynamic config,
+    required bool isAdmin,
+    String? onlyProfileId,
+  }) async {
+    final bundle = await buildExportBundle(
+      email: email,
+      config: config,
+      isAdmin: isAdmin,
+      onlyProfileId: onlyProfileId,
+    );
+    if (bundle == null) return null;
+    final stash = await NgmyCommunicateQrStash.createFromBundle(bundle, isAdmin: isAdmin);
+    if (stash == null) return null;
+    return (qrPayload: stash.qrPayload, code: bundle.code, usesRemaining: stash.usesRemaining);
+  }
+
   static Future<({int threads, int messages})?> importBundle({
     required String email,
     required dynamic config,
     required bool isAdmin,
     required String raw,
   }) async {
-    final bundle = NgmyAdvisorSyncBundle.parse(raw);
+    final bundle = await NgmyAdvisorSyncBundle.parseAsync(raw);
     if (bundle == null) return null;
 
-    if (!isAdmin && _emailKey(bundle.ownerEmail) != _emailKey(email)) {
+    final fromQr = raw.trim().startsWith('$kNgmyAdvisorSyncQrPrefixV2|');
+    if (!fromQr && !isAdmin && _emailKey(bundle.ownerEmail) != _emailKey(email)) {
       throw StateError('This backup belongs to another account.');
     }
 
@@ -389,6 +539,7 @@ class NgmyCommunicateSyncService {
       code: bundle.code,
       isAdmin: isAdmin,
       config: config,
+      ownerEmail: bundle.ownerEmail,
     );
     if (!ok) {
       throw StateError('Backup code is locked or expired. Renew your advisor pass to restore conversations.');
