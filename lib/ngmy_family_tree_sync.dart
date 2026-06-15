@@ -375,6 +375,10 @@ class NgmyFamilyTreeSyncService {
     }
     if (trees.isEmpty) return null;
 
+    trees = trees
+        .map((t) => t.copyWith(ownerEmail: familyTreeOwnerEmail(t, email)))
+        .toList();
+
     return NgmyFamilyTreeSyncBundle(
       code: code,
       ownerEmail: _emailKey(email),
@@ -422,7 +426,7 @@ class NgmyFamilyTreeSyncService {
     return (qrPayload: stash.qrPayload, code: bundle.code, usesRemaining: stash.usesRemaining);
   }
 
-  static Future<({int trees, int members})?> importBundle({
+  static Future<({int trees, int members, bool viewOnly})?> importBundle({
     required String email,
     required dynamic config,
     required bool isAdmin,
@@ -430,11 +434,6 @@ class NgmyFamilyTreeSyncService {
   }) async {
     final bundle = await NgmyFamilyTreeSyncBundle.parseAsync(raw);
     if (bundle == null) return null;
-
-    final fromQr = raw.trim().startsWith('$kNgmyFamilyTreeSyncQrPrefixV2|');
-    if (!fromQr && !isAdmin && _emailKey(bundle.ownerEmail) != _emailKey(email)) {
-      throw StateError('This backup belongs to another account.');
-    }
 
     final ok = await NgmyFamilyTreeBackupCodes.validateImportCode(
       email: email,
@@ -451,11 +450,16 @@ class NgmyFamilyTreeSyncService {
     var memberCount = 0;
     for (final tree in bundle.trees) {
       if (tree.id.isEmpty) continue;
-      await restoreFamilyTreeMerged(email, tree);
+      await restoreFamilyTreeMerged(
+        email,
+        tree,
+        bundleOwnerEmail: bundle.ownerEmail,
+      );
       treeCount += 1;
       memberCount += tree.members.length;
     }
     if (treeCount == 0) return null;
-    return (trees: treeCount, members: memberCount);
+    final viewOnly = _emailKey(bundle.ownerEmail) != _emailKey(email);
+    return (trees: treeCount, members: memberCount, viewOnly: viewOnly);
   }
 }

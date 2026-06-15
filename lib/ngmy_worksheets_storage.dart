@@ -17,6 +17,8 @@ String _projectsKey(String userEmail) =>
 String _familyTreesKey(String userEmail) =>
     '$_familyTreesKeyPrefix${userEmail.toLowerCase().trim().hashCode.abs()}';
 
+String _normalizedEmail(String userEmail) => userEmail.toLowerCase().trim();
+
 class BudgetItem {
   final String id;
   final String name;
@@ -242,6 +244,55 @@ class FamilyMember {
   }
 }
 
+enum FamilyTreeAccessRole { owner, editor, viewer }
+
+FamilyTreeAccessRole familyTreeAccessRoleFromString(String? raw) {
+  switch ((raw ?? '').toLowerCase()) {
+    case 'editor':
+      return FamilyTreeAccessRole.editor;
+    case 'viewer':
+      return FamilyTreeAccessRole.viewer;
+    default:
+      return FamilyTreeAccessRole.owner;
+  }
+}
+
+String familyTreeAccessRoleToString(FamilyTreeAccessRole role) {
+  switch (role) {
+    case FamilyTreeAccessRole.editor:
+      return 'editor';
+    case FamilyTreeAccessRole.viewer:
+      return 'viewer';
+    case FamilyTreeAccessRole.owner:
+      return 'owner';
+  }
+}
+
+String familyTreeOwnerEmail(FamilyTree tree, String fallbackUserEmail) {
+  final owner = tree.ownerEmail.trim();
+  if (owner.isNotEmpty) return _normalizedEmail(owner);
+  return _normalizedEmail(fallbackUserEmail);
+}
+
+bool familyTreeIsOwner(FamilyTree tree, String userEmail) {
+  final me = _normalizedEmail(userEmail);
+  return me == familyTreeOwnerEmail(tree, userEmail) && tree.localRole != FamilyTreeAccessRole.viewer;
+}
+
+bool familyTreeCanEdit(FamilyTree tree, String userEmail) {
+  if (tree.localRole == FamilyTreeAccessRole.viewer) return false;
+  final me = _normalizedEmail(userEmail);
+  final owner = familyTreeOwnerEmail(tree, userEmail);
+  if (me == owner) return true;
+  if (tree.localRole == FamilyTreeAccessRole.editor) return true;
+  return tree.collaboratorEmails.map(_normalizedEmail).contains(me);
+}
+
+bool familyTreeCanManageCollaborators(FamilyTree tree, String userEmail) =>
+    familyTreeIsOwner(tree, userEmail);
+
+bool familyTreeCanWriteCloud(FamilyTree tree, String userEmail) => familyTreeCanEdit(tree, userEmail);
+
 class FamilyTree {
   final String id;
   final String name;
@@ -252,6 +303,10 @@ class FamilyTree {
   final DateTime createdAt;
   /// Default max children shown per parent in the tree (0 = show all).
   final int visibleChildrenPerParent;
+  /// Creator account email — cloud row lives under this user.
+  final String ownerEmail;
+  /// Local permission for this device (viewer = QR/file recipient, read-only).
+  final FamilyTreeAccessRole localRole;
 
   const FamilyTree({
     required this.id,
@@ -262,7 +317,11 @@ class FamilyTree {
     this.members = const [],
     required this.createdAt,
     this.visibleChildrenPerParent = 0,
+    this.ownerEmail = '',
+    this.localRole = FamilyTreeAccessRole.owner,
   });
+
+  bool get isViewOnly => localRole == FamilyTreeAccessRole.viewer;
 
   int get visibleMemberCount => members.where((m) => !m.hidden).length;
 
@@ -275,6 +334,8 @@ class FamilyTree {
         'members': members.map((e) => e.toJson()).toList(),
         'createdAt': createdAt.toIso8601String(),
         'visibleChildrenPerParent': visibleChildrenPerParent,
+        'ownerEmail': ownerEmail,
+        'localRole': familyTreeAccessRoleToString(localRole),
       };
 
   factory FamilyTree.fromJson(Map<String, dynamic> json) {
@@ -301,6 +362,8 @@ class FamilyTree {
       createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ??
           DateTime.now(),
       visibleChildrenPerParent: (json['visibleChildrenPerParent'] as num?)?.toInt() ?? 0,
+      ownerEmail: (json['ownerEmail'] ?? '').toString(),
+      localRole: familyTreeAccessRoleFromString(json['localRole']?.toString()),
     );
   }
 
@@ -311,6 +374,8 @@ class FamilyTree {
     List<String>? collaboratorEmails,
     List<FamilyMember>? members,
     int? visibleChildrenPerParent,
+    String? ownerEmail,
+    FamilyTreeAccessRole? localRole,
   }) {
     return FamilyTree(
       id: id,
@@ -321,6 +386,8 @@ class FamilyTree {
       members: members ?? this.members,
       createdAt: createdAt,
       visibleChildrenPerParent: visibleChildrenPerParent ?? this.visibleChildrenPerParent,
+      ownerEmail: ownerEmail ?? this.ownerEmail,
+      localRole: localRole ?? this.localRole,
     );
   }
 }
@@ -421,7 +488,10 @@ Future<List<FamilyTree>> loadFamilyTrees(String userEmail) async {
     await _persistFamilyTreesLocally(userEmail, merged);
   }
   if (local.isNotEmpty && remote.isEmpty) {
-    unawaited(_upsertFamilyTreesCloud(userEmail, merged));
+    final owned = merged.where((t) => familyTreeCanWriteCloud(t, userEmail)).toList();
+    if (owned.isNotEmpty) {
+      unawaited(_upsertFamilyTreesCloud(userEmail, owned));
+    }
   }
   return merged;
 }
@@ -431,7 +501,10 @@ Future<void> saveFamilyTrees(
   List<FamilyTree> trees,
 ) async {
   await _persistFamilyTreesLocally(userEmail, trees);
-  await _upsertFamilyTreesCloud(userEmail, trees);
+  final writable = trees.where((t) => familyTreeCanWriteCloud(t, userEmail)).toList();
+  if (writable.isNotEmpty) {
+    await _upsertFamilyTreesCloud(userEmail, writable);
+  }
 }
 
 Future<void> upsertFamilyTree(String userEmail, FamilyTree tree) async {
@@ -451,23 +524,36 @@ Future<void> upsertFamilyTree(String userEmail, FamilyTree tree) async {
     } catch (_) {}
   }
   final idx = list.indexWhere((t) => t.id == tree.id);
+  var normalized = tree;
+  if (tree.ownerEmail.trim().isEmpty && familyTreeCanEdit(tree, userEmail)) {
+    normalized = tree.copyWith(
+      ownerEmail: _normalizedEmail(userEmail),
+      localRole: tree.localRole == FamilyTreeAccessRole.viewer ? FamilyTreeAccessRole.viewer : FamilyTreeAccessRole.owner,
+    );
+  }
   if (idx == -1) {
-    list.insert(0, tree);
+    list.insert(0, normalized);
   } else {
-    list[idx] = tree;
+    list[idx] = normalized;
   }
   await _persistFamilyTreesLocally(userEmail, list);
-  final cloudOk = await _upsertFamilyTreeCloud(userEmail, tree);
-  if (!cloudOk) {
-    debugPrint('[family_trees] saved locally; cloud sync will retry on next load.');
+  if (familyTreeCanWriteCloud(normalized, userEmail)) {
+    final ownerEmail = familyTreeOwnerEmail(normalized, userEmail);
+    final cloudOk = await _upsertFamilyTreeCloud(ownerEmail, normalized);
+    if (!cloudOk) {
+      debugPrint('[family_trees] saved locally; cloud sync will retry on next load.');
+    }
   }
 }
 
 Future<void> deleteFamilyTree(String userEmail, String treeId) async {
   final list = await loadFamilyTrees(userEmail);
+  final tree = list.where((t) => t.id == treeId).firstOrNull;
   list.removeWhere((t) => t.id == treeId);
   await _persistFamilyTreesLocally(userEmail, list);
-  await _deleteFamilyTreeCloud(treeId);
+  if (tree != null && familyTreeIsOwner(tree, userEmail)) {
+    await _deleteFamilyTreeCloud(treeId);
+  }
 }
 
 List<FamilyMember> visibleMembers(FamilyTree tree) =>
@@ -519,8 +605,6 @@ int descendantCount(FamilyTree tree, String memberId) {
   return count;
 }
 
-String _normalizedEmail(String userEmail) => userEmail.toLowerCase().trim();
-
 /// Only name, birth, death fields go to Supabase — photos and notes stay local.
 Map<String, dynamic> familyMemberToCloudJson(FamilyMember member) => {
       'id': member.id,
@@ -528,6 +612,8 @@ Map<String, dynamic> familyMemberToCloudJson(FamilyMember member) => {
       'birthDate': member.birthDate,
       'birthPlace': member.birthPlace,
       'deathDate': member.deathDate,
+      'parentId': member.parentId,
+      'spouseId': member.spouseId,
     };
 
 FamilyMember familyMemberFromCloudJson(Map<String, dynamic> json) {
@@ -537,6 +623,8 @@ FamilyMember familyMemberFromCloudJson(Map<String, dynamic> json) {
     birthDate: (json['birthDate'] ?? '').toString(),
     birthPlace: (json['birthPlace'] ?? '').toString(),
     deathDate: (json['deathDate'] ?? '').toString(),
+    parentId: json['parentId']?.toString(),
+    spouseId: json['spouseId']?.toString(),
   );
 }
 
@@ -546,6 +634,8 @@ FamilyMember mergeFamilyMemberCloudIntoLocal(FamilyMember local, FamilyMember cl
     birthDate: cloud.birthDate.isNotEmpty ? cloud.birthDate : local.birthDate,
     birthPlace: cloud.birthPlace.isNotEmpty ? cloud.birthPlace : local.birthPlace,
     deathDate: cloud.deathDate.isNotEmpty ? cloud.deathDate : local.deathDate,
+    parentId: cloud.parentId ?? local.parentId,
+    spouseId: cloud.spouseId ?? local.spouseId,
   );
 }
 
@@ -564,7 +654,10 @@ FamilyTree mergeFamilyTreeCloudIntoLocal(FamilyTree local, FamilyTree remote) {
   return local.copyWith(
     name: remote.name.isNotEmpty ? remote.name : local.name,
     code: remote.code.isNotEmpty ? remote.code : local.code,
+    collaboratorEmails: remote.collaboratorEmails.isNotEmpty ? remote.collaboratorEmails : local.collaboratorEmails,
     members: merged,
+    ownerEmail: local.ownerEmail.isNotEmpty ? local.ownerEmail : remote.ownerEmail,
+    localRole: local.localRole,
   );
 }
 
@@ -586,11 +679,21 @@ Future<List<FamilyTree>> loadFamilyTreesLocalOnly(String userEmail) async {
   }
 }
 
-Future<void> restoreFamilyTreeMerged(String userEmail, FamilyTree imported) async {
+Future<void> restoreFamilyTreeMerged(
+  String userEmail,
+  FamilyTree imported, {
+  required String bundleOwnerEmail,
+}) async {
+  final isOwnerImport = _normalizedEmail(bundleOwnerEmail) == _normalizedEmail(userEmail);
+  final role = isOwnerImport ? FamilyTreeAccessRole.owner : FamilyTreeAccessRole.viewer;
+  final owner = familyTreeOwnerEmail(imported, bundleOwnerEmail);
+
   final list = await loadFamilyTreesLocalOnly(userEmail);
   final idx = list.indexWhere((t) => t.id == imported.id);
+  FamilyTree prepared;
   if (idx == -1) {
-    list.insert(0, imported);
+    prepared = imported.copyWith(ownerEmail: owner, localRole: role);
+    list.insert(0, prepared);
   } else {
     final existing = list[idx];
     final membersById = {for (final m in existing.members) m.id: m};
@@ -616,16 +719,24 @@ Future<void> restoreFamilyTreeMerged(String userEmail, FamilyTree imported) asyn
         );
       }
     }
-    list[idx] = existing.copyWith(
+    prepared = existing.copyWith(
       name: imported.name.isNotEmpty ? imported.name : existing.name,
       code: imported.code.isNotEmpty ? imported.code : existing.code,
       isPrivate: imported.isPrivate,
       collaboratorEmails: imported.collaboratorEmails.isNotEmpty ? imported.collaboratorEmails : existing.collaboratorEmails,
       members: membersById.values.toList(),
       visibleChildrenPerParent: imported.visibleChildrenPerParent,
+      ownerEmail: owner,
+      localRole: isOwnerImport ? FamilyTreeAccessRole.owner : FamilyTreeAccessRole.viewer,
     );
+    list[idx] = prepared;
   }
-  await saveFamilyTrees(userEmail, list);
+
+  // Shared backup / QR: full tree on this phone only — never duplicate Supabase rows.
+  await _persistFamilyTreesLocally(userEmail, list);
+  if (isOwnerImport) {
+    await _upsertFamilyTreeCloud(_normalizedEmail(bundleOwnerEmail), prepared);
+  }
 }
 
 Map<String, dynamic> _familyTreeRow(FamilyTree tree, String userEmail) {
@@ -643,7 +754,7 @@ Map<String, dynamic> _familyTreeRow(FamilyTree tree, String userEmail) {
   };
 }
 
-FamilyTree _familyTreeFromRow(Map<String, dynamic> row) {
+FamilyTree _familyTreeFromRow(Map<String, dynamic> row, String forUserEmail) {
   final payload = Map<String, dynamic>.from(row);
   if (payload['members'] is! List && row['data'] is Map) {
     return FamilyTree.fromJson(Map<String, dynamic>.from(row['data'] as Map));
@@ -656,17 +767,26 @@ FamilyTree _familyTreeFromRow(Map<String, dynamic> row) {
           .where((m) => m.id.isNotEmpty)
           .toList()
       : <FamilyMember>[];
+  final rawCollab = row['collaboratorEmails'];
+  final collabs = rawCollab is List
+      ? rawCollab.map((e) => _normalizedEmail(e.toString())).where((e) => e.isNotEmpty).toList()
+      : <String>[];
+  final rowOwner = _normalizedEmail((row['userEmail'] ?? '').toString());
+  final me = _normalizedEmail(forUserEmail);
+  final role = me == rowOwner
+      ? FamilyTreeAccessRole.owner
+      : (collabs.contains(me) ? FamilyTreeAccessRole.editor : FamilyTreeAccessRole.viewer);
   return FamilyTree(
     id: (row['id'] ?? '').toString(),
     name: (row['name'] ?? '').toString(),
     code: (row['code'] ?? '').toString(),
     isPrivate: row['isPrivate'] != false,
-    collaboratorEmails: row['collaboratorEmails'] is List
-        ? (row['collaboratorEmails'] as List).map((e) => e.toString()).toList()
-        : const <String>[],
+    collaboratorEmails: collabs,
     members: members,
     createdAt: DateTime.tryParse((row['createdAt'] ?? '').toString()) ?? DateTime.now(),
     visibleChildrenPerParent: (row['visibleChildrenPerParent'] as num?)?.toInt() ?? 0,
+    ownerEmail: rowOwner,
+    localRole: role,
   );
 }
 
@@ -679,14 +799,31 @@ Future<List<FamilyTree>?> _fetchFamilyTreesFromCloud(String userEmail) async {
   final email = _normalizedEmail(userEmail);
   if (email.isEmpty) return null;
   try {
-    final rows = await Supabase.instance.client
+    final ownedRows = await Supabase.instance.client
         .from('family_trees')
         .select()
         .eq('userEmail', email)
         .timeout(kNgmyCloudLoadTimeout);
-    if (rows == null) return null;
-    return (rows as List)
-        .map((e) => _familyTreeFromRow(Map<String, dynamic>.from(e as Map)))
+    List<dynamic> collabRows = const [];
+    try {
+      collabRows = await Supabase.instance.client
+          .from('family_trees')
+          .select()
+          .contains('collaboratorEmails', [email])
+          .timeout(kNgmyCloudLoadTimeout);
+    } catch (e) {
+      debugPrint('[family_trees] collaborator fetch: $e');
+    }
+    final byId = <String, Map<String, dynamic>>{};
+    for (final row in [...(ownedRows as List), ...(collabRows as List)]) {
+      if (row is Map) {
+        final map = Map<String, dynamic>.from(row);
+        final id = (map['id'] ?? '').toString();
+        if (id.isNotEmpty) byId[id] = map;
+      }
+    }
+    return byId.values
+        .map((e) => _familyTreeFromRow(e, email))
         .where((t) => t.id.isNotEmpty && t.name.isNotEmpty)
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -748,7 +885,9 @@ Future<bool> _upsertFamilyTreeCloud(String userEmail, FamilyTree tree) async {
 Future<bool> _upsertFamilyTreesCloud(String userEmail, List<FamilyTree> trees) async {
   if (trees.isEmpty || !await ngmyCanReachCloud()) return false;
   try {
-    final rows = trees.map((t) => _familyTreeRow(t, userEmail)).toList();
+    final rows = trees
+        .map((t) => _familyTreeRow(t, familyTreeOwnerEmail(t, userEmail)))
+        .toList();
     await Supabase.instance.client.from('family_trees').upsert(rows).timeout(kNgmyCloudWriteTimeout);
     return true;
   } catch (e) {

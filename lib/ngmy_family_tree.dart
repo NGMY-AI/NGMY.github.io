@@ -101,6 +101,8 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
       name: name.toUpperCase(),
       code: generateFamilyTreeCode(name),
       createdAt: DateTime.now(),
+      ownerEmail: widget.userEmail,
+      localRole: FamilyTreeAccessRole.owner,
     );
     await upsertFamilyTree(widget.userEmail, tree);
     await _reload();
@@ -239,7 +241,7 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
                       Text(tree.name, style: TextStyle(fontWeight: FontWeight.w800, color: p.primaryText)),
                       const SizedBox(height: 2),
                       Text(
-                        '${tree.visibleMemberCount} members · Code: ${tree.code}',
+                        '${tree.visibleMemberCount} members · Code: ${tree.code}${tree.isViewOnly ? ' · View only' : ''}',
                         style: TextStyle(color: p.secondaryText, fontSize: 12),
                       ),
                     ],
@@ -300,6 +302,13 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
 
   bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
 
+  bool get _canEdit => familyTreeCanEdit(_tree, widget.userEmail);
+
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> _openSync() async {
     await showNgmyFamilyTreeSyncPage(
       context,
@@ -333,6 +342,10 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   }
 
   Future<void> _renameTree() async {
+    if (!_canEdit) {
+      _toast('View only — you cannot rename this shared tree.');
+      return;
+    }
     final name = await showWorksheetTextDialog(
       context,
       title: 'Edit family tree name',
@@ -351,6 +364,10 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   }
 
   Future<void> _openTreeSettings() async {
+    if (!_canEdit) {
+      _toast('View only — display settings are locked.');
+      return;
+    }
     final p = WorksheetPalette.of(context);
     var limit = _tree.visibleChildrenPerParent;
     final ok = await showDialog<bool>(
@@ -410,6 +427,10 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   }
 
   Future<void> _addMember({String? parentId}) async {
+    if (!_canEdit) {
+      _toast('View only — you cannot add members to this shared tree.');
+      return;
+    }
     final result = await showDialog<FamilyMember>(
       context: context,
       builder: (ctx) => _MemberEditorDialog(
@@ -433,6 +454,10 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   }
 
   Future<void> _editMember(FamilyMember member) async {
+    if (!_canEdit) {
+      _toast('View only — open Family Book to browse members.');
+      return;
+    }
     final result = await showDialog<FamilyMember>(
       context: context,
       builder: (ctx) => _MemberEditorDialog(
@@ -458,10 +483,107 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   }
 
   void _undo() {
+    if (!_canEdit) return;
     if (_undoStack.isEmpty) return;
     setState(() => _tree = _undoStack.removeLast());
     _persist();
   }
+
+  Future<void> _manageCollaborators() async {
+    if (!familyTreeCanManageCollaborators(_tree, widget.userEmail)) {
+      _toast('Only the tree creator can invite collaborators.');
+      return;
+    }
+    final p = WorksheetPalette.of(context);
+    final emailCtrl = TextEditingController();
+    var collabs = List<String>.from(_tree.collaboratorEmails.map(_normalizeCollabEmail).where((e) => e.isNotEmpty));
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          backgroundColor: p.cardBg,
+          title: Text('Collaborators', style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w900)),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Invited users can edit this tree and add members. QR/file recipients stay view-only.',
+                  style: TextStyle(color: p.secondaryText, fontSize: 12, height: 1.35),
+                ),
+                const SizedBox(height: 12),
+                if (collabs.isEmpty)
+                  Text('No collaborators yet.', style: TextStyle(color: p.secondaryText, fontSize: 13))
+                else
+                  ...collabs.map(
+                    (e) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(e, style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w700)),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.remove_circle_outline, color: Colors.redAccent),
+                        onPressed: () => setLocal(() => collabs.remove(e)),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: emailCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Invite by email',
+                    hintText: 'friend@email.com',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                final email = _normalizeCollabEmail(emailCtrl.text);
+                if (email.isNotEmpty && !collabs.contains(email) && email != _normalizeCollabEmail(widget.userEmail)) {
+                  setLocal(() => collabs.add(email));
+                  emailCtrl.clear();
+                }
+              },
+              style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
+              child: const Text('Add'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final pending = _normalizeCollabEmail(emailCtrl.text);
+                if (pending.isNotEmpty && !collabs.contains(pending) && pending != _normalizeCollabEmail(widget.userEmail)) {
+                  collabs.add(pending);
+                }
+                Navigator.pop(ctx, true);
+              },
+              style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.green),
+              child: const Text('Save invites'),
+            ),
+          ],
+        ),
+      ),
+    );
+    emailCtrl.dispose();
+    if (saved != true || !mounted) return;
+    _pushUndo();
+    setState(() {
+      _tree = _tree.copyWith(
+        collaboratorEmails: collabs,
+        ownerEmail: familyTreeOwnerEmail(_tree, widget.userEmail),
+        localRole: FamilyTreeAccessRole.owner,
+      );
+    });
+    await _persist();
+    _toast('Collaborators updated.');
+  }
+
+  String _normalizeCollabEmail(String raw) => raw.toLowerCase().trim();
 
   void _openFamilyBook() {
     final p = WorksheetPalette.of(context);
@@ -571,6 +693,31 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: _headerBanner(p),
             ),
+            if (_tree.isViewOnly)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.withValues(alpha: 0.45)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.visibility_outlined, color: Colors.amber, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'View only — shared by ${familyTreeOwnerEmail(_tree, widget.userEmail)}. Saved on this phone only; cloud data stays with the creator.',
+                          style: TextStyle(color: p.primaryText, fontSize: 12, height: 1.35, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Column(
@@ -583,7 +730,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                     child: Row(
                       children: [
                         OutlinedButton.icon(
-                          onPressed: _undoStack.isEmpty ? null : _undo,
+                          onPressed: _canEdit && _undoStack.isNotEmpty ? _undo : null,
                           icon: const Icon(Icons.undo, size: 16),
                           label: const Text('Undo'),
                         ),
@@ -594,26 +741,30 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                           icon: const Icon(Icons.menu_book_outlined, size: 16),
                           label: const Text('Family Book'),
                         ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          onPressed: _openTreeSettings,
-                          style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.greenDark),
-                          icon: const Icon(Icons.tune, size: 16),
-                          label: const Text('Display'),
-                        ),
+                        if (_canEdit) ...[
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            onPressed: _openTreeSettings,
+                            style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.greenDark),
+                            icon: const Icon(Icons.tune, size: 16),
+                            label: const Text('Display'),
+                          ),
+                        ],
                         const SizedBox(width: 8),
                         OutlinedButton.icon(
                           onPressed: _openSync,
                           icon: const Icon(Icons.sync_rounded, size: 16),
                           label: const Text('Sync'),
                         ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          onPressed: () => _addMember(parentId: rootMember(_tree)?.id),
-                          style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
-                          icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Add Member'),
-                        ),
+                        if (_canEdit) ...[
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            onPressed: () => _addMember(parentId: rootMember(_tree)?.id),
+                            style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Add Member'),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -652,7 +803,9 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                                       }
                                     });
                                   },
-                                  onMemberTap: _editMember,
+                                  onMemberTap: _canEdit ? _editMember : (_) {
+                                    _toast('View only — tap Family Book to browse members.');
+                                  },
                                   isDark: p.isDark,
                                 ),
                               ),
@@ -722,7 +875,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                       ),
                     ),
                     IconButton(
-                      onPressed: _renameTree,
+                      onPressed: _canEdit ? _renameTree : null,
                       icon: const Icon(Icons.edit_outlined, color: Colors.white, size: 18),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -737,7 +890,15 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                     _metaChip(Icons.people_outline, '${_tree.visibleMemberCount} members'),
                     _metaChip(Icons.lock_outline, _tree.isPrivate ? 'Private' : 'Public'),
                     _metaChip(Icons.tag, 'Code: ${_tree.code}'),
-                    _metaChip(Icons.group_outlined, 'Collaborators (${_tree.collaboratorEmails.length})'),
+                    InkWell(
+                      onTap: _manageCollaborators,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                        child: _metaChip(Icons.group_outlined, 'Collaborators (${_tree.collaboratorEmails.length})'),
+                      ),
+                    ),
+                    if (_tree.isViewOnly) _metaChip(Icons.visibility_outlined, 'View only'),
                   ],
                 ),
               ],

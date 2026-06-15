@@ -172,7 +172,11 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
           return;
         }
         widget.onRestored?.call();
-        _toast('Restored ${result.members} members across ${result.trees} tree${result.trees == 1 ? '' : 's'}.');
+        if (result.viewOnly) {
+          _toast('Restored ${result.members} members on this phone (view only). Creator cloud data was not duplicated.');
+        } else {
+          _toast('Restored ${result.members} members across ${result.trees} tree${result.trees == 1 ? '' : 's'}.');
+        }
         await _refresh();
       } catch (e) {
         if (!mounted) return;
