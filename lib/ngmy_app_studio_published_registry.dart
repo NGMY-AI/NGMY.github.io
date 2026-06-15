@@ -91,11 +91,36 @@ class NgmyAppStudioPublishedRegistry {
   static Future<NgmyAppProject?> fetchBySlug(String slug) async {
     final target = _normSlug(slug);
     if (target.isEmpty) return null;
-    final value = await _fetchRegistryValue();
-    if (value == null) return null;
-    final entry = _appsFromValue(value)[target];
-    if (entry == null) return null;
-    return _projectFromEntry(entry);
+
+    // REST works for anonymous guests even when reachability probe fails on /app/{slug} URLs.
+    final viaRest = await _fetchRegistryValueViaRest();
+    if (viaRest != null) {
+      final entry = _appsFromValue(viaRest)[target];
+      if (entry != null) {
+        final project = await _projectFromEntry(entry);
+        if (project != null) return project;
+      }
+    }
+
+    if (!await ngmyCanReachCloud()) return null;
+    await ngmyWaitForSupabaseReady();
+    try {
+      final row = await Supabase.instance.client
+          .from('ngmy_settings')
+          .select()
+          .eq('key', settingsKey)
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      if (row == null) return null;
+      final value = row['value'];
+      if (value is! Map) return null;
+      final entry = _appsFromValue(Map<String, dynamic>.from(value))[target];
+      if (entry == null) return null;
+      return _projectFromEntry(entry);
+    } catch (e) {
+      debugPrint('[published registry] supabase fetchBySlug $target: $e');
+      return null;
+    }
   }
 
   /// Upserts project + runtime data so [https://ngmy.org/app/{slug}] works everywhere.

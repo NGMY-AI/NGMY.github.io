@@ -38,13 +38,24 @@ Future<bool> ngmyCanReachCloud() async {
 Future<bool> _probeReachability() async {
   try {
     if (kIsWeb) {
-      final uri = Uri.parse('${Uri.base.origin}${Uri.base.path}version.json?t=${DateTime.now().millisecondsSinceEpoch}');
+      final uri = Uri.parse('${_webVersionJsonUrl()}?t=${DateTime.now().millisecondsSinceEpoch}');
       return await ngmyWebFetchOk(uri.toString(), kNgmyReachabilityTimeout);
     }
     return await ngmyNativeReachabilityProbe(kNgmyReachabilityTimeout);
   } catch (_) {
     return false;
   }
+}
+
+/// version.json lives at site root — not under /app/{slug}.
+String _webVersionJsonUrl() {
+  final origin = Uri.base.origin.isNotEmpty ? Uri.base.origin : 'https://ngmy.org';
+  var path = Uri.base.path;
+  final appIdx = path.toLowerCase().indexOf('/app/');
+  if (appIdx >= 0) path = path.substring(0, appIdx);
+  if (path.isEmpty || path == '/') return '$origin/version.json';
+  if (!path.endsWith('/')) path = '$path/';
+  return '$origin${path}version.json';
 }
 
 /// Runs [action] with a timeout; returns [onTimeout] or rethrows on other errors.

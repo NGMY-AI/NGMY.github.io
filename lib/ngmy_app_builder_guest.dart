@@ -11,7 +11,6 @@ import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
 import 'ngmy_app_builder_urls.dart';
 import 'ngmy_app_studio_published_registry.dart';
-import 'ngmy_supabase_auth.dart';
 
 const _kGuestAppCachePrefix = 'ngmy_guest_app_cache_';
 
@@ -75,7 +74,14 @@ Future<NgmyAppProject?> ngmyFetchPublishedAppBySlug(String slug) async {
     }
   }
 
-  await ngmyWaitForSupabaseReady();
+  // Static JSON + cloud registry — do not block on Supabase init for first attempts.
+  final staticApp = await _fetchStaticGuestAppJson(target);
+  if (staticApp != null) {
+    await ngmyCachePublishedAppLocally(staticApp);
+    _guestAppMemoryCache[target] = staticApp;
+    return staticApp;
+  }
+
   try {
     final cloudApp = await NgmyAppStudioPublishedRegistry.fetchBySlug(target);
     if (cloudApp != null) {
@@ -85,13 +91,6 @@ Future<NgmyAppProject?> ngmyFetchPublishedAppBySlug(String slug) async {
     }
   } catch (e) {
     debugPrint('[app builder] cloud registry $target: $e');
-  }
-
-  final staticApp = await _fetchStaticGuestAppJson(target);
-  if (staticApp != null) {
-    await ngmyCachePublishedAppLocally(staticApp);
-    _guestAppMemoryCache[target] = staticApp;
-    return staticApp;
   }
 
   return null;
@@ -142,8 +141,7 @@ class _NgmyPublishedAppHostScreenState extends State<NgmyPublishedAppHostScreen>
       _loading = true;
       _error = null;
     });
-    await ngmyWaitForSupabaseReady();
-    for (var attempt = 0; attempt < 6; attempt++) {
+    for (var attempt = 0; attempt < 4; attempt++) {
       final app = await ngmyFetchPublishedAppBySlug(widget.slug);
       if (!mounted) return;
       if (app != null) {
@@ -153,7 +151,7 @@ class _NgmyPublishedAppHostScreenState extends State<NgmyPublishedAppHostScreen>
         });
         return;
       }
-      if (attempt < 5) await Future<void>.delayed(Duration(milliseconds: 600 * (attempt + 1)));
+      if (attempt < 3) await Future<void>.delayed(Duration(milliseconds: 500 * (attempt + 1)));
     }
     if (!mounted) return;
     setState(() {

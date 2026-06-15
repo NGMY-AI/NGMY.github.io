@@ -103,7 +103,7 @@ class NgmyAppStudioDashboard extends StatefulWidget {
     required this.apiKey,
     required this.config,
     required this.user,
-    required this.onBack,
+    required this.onExit,
     required this.onSelectProject,
     required this.onCreateBlank,
     required this.onUseTemplate,
@@ -133,7 +133,7 @@ class NgmyAppStudioDashboard extends StatefulWidget {
   final String apiKey;
   final dynamic config;
   final dynamic user;
-  final VoidCallback onBack;
+  final VoidCallback onExit;
   final ValueChanged<NgmyAppProject> onSelectProject;
   final Future<void> Function() onCreateBlank;
   final ValueChanged<NgmyAppTemplate> onUseTemplate;
@@ -167,6 +167,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
   String _treeQuery = '';
   bool _sidebarOpen = false;
   bool _inspectorOpen = false;
+  final List<NgmyStudioNav> _navStack = [NgmyStudioNav.buildDesign];
 
   @override
   void initState() {
@@ -185,6 +186,36 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
   }
 
   bool _isCompact(BuildContext context) => MediaQuery.sizeOf(context).width < 960;
+
+  void _pushNav(NgmyStudioNav item) {
+    if (_navStack.isEmpty || _navStack.last != item) {
+      _navStack.add(item);
+    }
+    _nav = item;
+  }
+
+  void _goBack() {
+    if (_navStack.length > 1) {
+      setState(() {
+        _navStack.removeLast();
+        _nav = _navStack.last;
+        _showBuildFlyout = _nav == NgmyStudioNav.buildDesign;
+        if (_nav == NgmyStudioNav.templates) _showTemplatesOverlay = true;
+      });
+      return;
+    }
+    if (_nav != NgmyStudioNav.myProjects) {
+      setState(() {
+        _pushNav(NgmyStudioNav.myProjects);
+        _showBuildFlyout = false;
+        _showTemplatesOverlay = false;
+      });
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Use Exit in the menu to leave App Builder.')),
+    );
+  }
 
   void _openDragDropEditor() {
     final p = widget.activeProject;
@@ -246,7 +277,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
   void _pickNav(NgmyStudioNav item) {
     if (compactSidebarClose(item)) return;
     setState(() {
-      _nav = item;
+      _pushNav(item);
       _showBuildFlyout = item == NgmyStudioNav.buildDesign;
       if (item == NgmyStudioNav.templates) _showTemplatesOverlay = true;
       if (item == NgmyStudioNav.previewTest && widget.activeProject != null) {
@@ -265,7 +296,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
     final compact = _isCompact(context);
     if (compact && _sidebarOpen) {
       setState(() {
-        _nav = item;
+        _pushNav(item);
         _sidebarOpen = false;
         _showBuildFlyout = item == NgmyStudioNav.buildDesign;
         if (item == NgmyStudioNav.templates) _showTemplatesOverlay = true;
@@ -427,7 +458,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
 
   void _resetCanvasHome() {
     setState(() {
-      _nav = NgmyStudioNav.buildDesign;
+      _pushNav(NgmyStudioNav.buildDesign);
       _canvasMode = NgmyStudioCanvasMode.design;
       _activeScreenIndex = 0;
       _selectedWidgetIndex = null;
@@ -501,8 +532,8 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
               onPressed: () => setState(() => _sidebarOpen = true),
             ),
           IconButton(
-            tooltip: 'Back to NGMY Hub',
-            onPressed: widget.onBack,
+            tooltip: 'Back',
+            onPressed: _goBack,
             icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 20),
           ),
           if (!compact) ...[
@@ -691,7 +722,32 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Material(
+                color: Colors.red.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: () {
+                    if (compact) setState(() => _sidebarOpen = false);
+                    widget.onExit();
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout_rounded, color: Colors.red.shade200, size: 22),
+                        const SizedBox(width: 12),
+                        Text('Exit App Builder', style: TextStyle(color: Colors.red.shade100, fontWeight: FontWeight.w800, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -776,7 +832,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
             onTap: () {
               setState(() {
                 _buildMode = NgmyStudioBuildMode.aiLayout;
-                _nav = NgmyStudioNav.aiAssistant;
+                _pushNav(NgmyStudioNav.aiAssistant);
                 _showBuildFlyout = false;
               });
             },
@@ -923,7 +979,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
         onProjectUpdated: (p) {
           widget.onProjectUpdated(p);
           setState(() {
-            _nav = NgmyStudioNav.buildDesign;
+            _pushNav(NgmyStudioNav.buildDesign);
             _activeScreenIndex = 0;
           });
         },
@@ -1106,7 +1162,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
             btn(Icons.auto_awesome_rounded, () {
               setState(() {
                 _buildMode = NgmyStudioBuildMode.aiLayout;
-                _nav = NgmyStudioNav.aiAssistant;
+                _pushNav(NgmyStudioNav.aiAssistant);
               });
             }, on: _nav == NgmyStudioNav.aiAssistant, tooltip: 'AI generator'),
           ],

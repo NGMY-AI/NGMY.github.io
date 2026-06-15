@@ -454,7 +454,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
       onChargeWallet: widget.onChargeWallet,
       onDataChanged: widget.onDataChanged,
       onPersistConfig: widget.onPersistConfig,
-      onBack: () => NgmyNavigator.pop(context),
+      onExit: () => NgmyNavigator.pop(context),
       onSelectProject: (p) => setState(() => _activeProject = p),
       onCreateBlank: _createBlank,
       onUseTemplate: _useTemplate,
