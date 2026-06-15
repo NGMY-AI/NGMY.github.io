@@ -657,6 +657,33 @@ FamilyMember mergeFamilyMemberCloudIntoLocal(FamilyMember local, FamilyMember cl
     deathDate: cloud.deathDate.isNotEmpty ? cloud.deathDate : local.deathDate,
     parentId: cloud.parentId ?? local.parentId,
     spouseId: cloud.spouseId ?? local.spouseId,
+    // Cloud stores names/dates/links only — never wipe photos, gender, notes, etc.
+    gender: local.gender,
+    photoPath: local.photoPath,
+    notes: local.notes,
+    occupation: local.occupation,
+    birthOrder: local.birthOrder,
+    hidden: local.hidden,
+    visibleChildrenCap: local.visibleChildrenCap,
+  );
+}
+
+FamilyMember mergeImportedMemberIntoLocal(FamilyMember local, FamilyMember imported) {
+  final importedPhoto = imported.photoPath?.trim();
+  return local.copyWith(
+    name: imported.name.isNotEmpty ? imported.name : local.name,
+    gender: imported.gender != FamilyGender.unknown ? imported.gender : local.gender,
+    parentId: imported.parentId ?? local.parentId,
+    spouseId: imported.spouseId ?? local.spouseId,
+    photoPath: (importedPhoto != null && importedPhoto.isNotEmpty) ? importedPhoto : local.photoPath,
+    notes: imported.notes.isNotEmpty ? imported.notes : local.notes,
+    birthDate: imported.birthDate.isNotEmpty ? imported.birthDate : local.birthDate,
+    birthPlace: imported.birthPlace.isNotEmpty ? imported.birthPlace : local.birthPlace,
+    deathDate: imported.deathDate.isNotEmpty ? imported.deathDate : local.deathDate,
+    occupation: imported.occupation.isNotEmpty ? imported.occupation : local.occupation,
+    birthOrder: imported.birthOrder > 0 ? imported.birthOrder : local.birthOrder,
+    hidden: imported.hidden,
+    visibleChildrenCap: imported.visibleChildrenCap > 0 ? imported.visibleChildrenCap : local.visibleChildrenCap,
   );
 }
 
@@ -726,21 +753,7 @@ Future<void> restoreFamilyTreeMerged(
       if (local == null) {
         membersById[im.id] = im;
       } else {
-        membersById[im.id] = local.copyWith(
-          name: im.name.isNotEmpty ? im.name : local.name,
-          gender: im.gender,
-          parentId: im.parentId ?? local.parentId,
-          spouseId: im.spouseId ?? local.spouseId,
-          photoPath: im.photoPath ?? local.photoPath,
-          notes: im.notes.isNotEmpty ? im.notes : local.notes,
-          birthDate: im.birthDate.isNotEmpty ? im.birthDate : local.birthDate,
-          birthPlace: im.birthPlace.isNotEmpty ? im.birthPlace : local.birthPlace,
-          deathDate: im.deathDate.isNotEmpty ? im.deathDate : local.deathDate,
-          occupation: im.occupation.isNotEmpty ? im.occupation : local.occupation,
-          birthOrder: im.birthOrder,
-          hidden: im.hidden,
-          visibleChildrenCap: im.visibleChildrenCap,
-        );
+        membersById[im.id] = mergeImportedMemberIntoLocal(local, im);
       }
     }
     prepared = existing.copyWith(

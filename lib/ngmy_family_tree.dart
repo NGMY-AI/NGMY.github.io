@@ -129,6 +129,8 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
   }
 
   Future<void> _openTree(FamilyTree tree) async {
+    final localTrees = await loadFamilyTreesLocalOnly(widget.userEmail);
+    final local = localTrees.where((t) => t.id == tree.id).firstOrNull;
     final updated = await NgmyNavigator.push<FamilyTree>(
       context,
       NgmyFamilyTreeDetailScreen(
@@ -137,7 +139,7 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
         config: widget.config,
         onChargeWallet: widget.onChargeWallet,
         onDataChanged: widget.onDataChanged,
-        tree: tree,
+        tree: local ?? tree,
       ),
       routeName: 'NgmyFamilyTreeDetailScreen',
     );
@@ -322,6 +324,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   void initState() {
     super.initState();
     _tree = widget.tree;
+    unawaited(_loadLocalTree());
     final email = widget.userEmail;
     if (email.isNotEmpty) {
       unawaited(NgmyFamilyTreeBackupCodes.syncForUser(
@@ -335,6 +338,14 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
 
   bool get _canEdit => familyTreeCanEdit(_tree, widget.userEmail);
+
+  Future<void> _loadLocalTree() async {
+    final trees = await loadFamilyTreesLocalOnly(widget.userEmail);
+    final fresh = trees.where((t) => t.id == widget.tree.id).firstOrNull;
+    if (fresh != null && mounted) {
+      setState(() => _tree = fresh);
+    }
+  }
 
   void _toast(String msg) {
     if (!mounted) return;
@@ -501,13 +512,58 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
     }
   }
 
+  Future<void> _showSharedRemoveBlockedDialog({required bool needsOwnTree, required bool needsPhoto}) async {
+    final p = WorksheetPalette.of(context);
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: p.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: Icon(Icons.info_outline_rounded, color: WorksheetPalette.green, size: 36),
+        title: Text(
+          'Almost there',
+          style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w900),
+          textAlign: TextAlign.center,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              needsOwnTree
+                  ? 'To remove a shared family tree from this phone, first create your own family tree in NGMY.'
+                  : 'To remove a shared family tree, you also need an active Family Tree photo pass.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: p.secondaryText, height: 1.45, fontSize: 14),
+            ),
+            if (needsPhoto && !needsOwnTree) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Photo access lets you upload member photos on trees you create. You can get it from any member profile when adding a photo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: p.secondaryText, height: 1.4, fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.green),
+            child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _deleteThisTree() async {
     if (_tree.isViewOnly) {
-      final canRemove = await NgmyFamilyTreePayments.canRemoveSharedFamilyTrees(widget.userEmail, widget.config);
-      if (!canRemove) {
-        _toast(
-          'Create your own family tree and pay for photo access before you can remove shared trees.',
-        );
+      final hasOwn = await userHasOwnedFamilyTree(widget.userEmail);
+      final hasPhoto = NgmyFamilyTreePayments.hasActivePhotoAccess(widget.config, widget.userEmail);
+      if (!hasOwn || !hasPhoto) {
+        await _showSharedRemoveBlockedDialog(needsOwnTree: !hasOwn, needsPhoto: !hasPhoto);
         return;
       }
     } else if (!familyTreeIsOwner(_tree, widget.userEmail)) {
@@ -848,12 +904,27 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                           icon: const Icon(Icons.sync_rounded, size: 16),
                           label: const Text('Sync'),
                         ),
-                        if (_tree.isViewOnly || familyTreeIsOwner(_tree, widget.userEmail)) ...[
+                        if (_tree.isViewOnly) ...[
                           const SizedBox(width: 8),
-                          OutlinedButton.icon(
+                          IconButton(
+                            tooltip: 'Remove shared tree from this device',
                             onPressed: _deleteThisTree,
-                            icon: const Icon(Icons.delete_outline, size: 16),
-                            label: Text(_tree.isViewOnly ? 'Remove' : 'Delete'),
+                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.redAccent.withValues(alpha: 0.08),
+                              padding: const EdgeInsets.all(10),
+                            ),
+                          ),
+                        ] else if (familyTreeIsOwner(_tree, widget.userEmail)) ...[
+                          const SizedBox(width: 8),
+                          IconButton(
+                            tooltip: 'Delete family tree',
+                            onPressed: _deleteThisTree,
+                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.redAccent.withValues(alpha: 0.08),
+                              padding: const EdgeInsets.all(10),
+                            ),
                           ),
                         ],
                         if (_canEdit) ...[
@@ -2245,6 +2316,17 @@ class _MemberViewDialog extends StatelessWidget {
   final FamilyTree tree;
   final WorksheetPalette palette;
 
+  Color _genderColor(FamilyGender gender) {
+    switch (gender) {
+      case FamilyGender.male:
+        return WorksheetPalette.teal;
+      case FamilyGender.female:
+        return const Color(0xFFEC4899);
+      case FamilyGender.unknown:
+        return Colors.grey;
+    }
+  }
+
   String _genderLabel(FamilyGender gender) {
     switch (gender) {
       case FamilyGender.male:
@@ -2264,67 +2346,178 @@ class _MemberViewDialog extends StatelessWidget {
     return '—';
   }
 
-  Widget _row(String label, String value) {
+  Widget _infoTile(String label, String value, {IconData? icon}) {
     final text = value.trim().isEmpty ? '—' : value.trim();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: palette.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.cardBorder.withValues(alpha: 0.85)),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 108,
-            child: Text(label, style: TextStyle(color: palette.secondaryText, fontSize: 12, fontWeight: FontWeight.w700)),
-          ),
+          if (icon != null) ...[
+            Icon(icon, size: 18, color: WorksheetPalette.teal),
+            const SizedBox(width: 10),
+          ],
           Expanded(
-            child: Text(text, style: TextStyle(color: palette.primaryText, fontSize: 13, height: 1.35)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label.toUpperCase(),
+                  style: TextStyle(
+                    color: palette.secondaryText,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  text,
+                  style: TextStyle(color: palette.primaryText, fontSize: 14, fontWeight: FontWeight.w700, height: 1.35),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
+  Widget _section(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.1,
+              color: palette.secondaryText,
+            ),
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: palette.mutedSurface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: palette.cardBorder),
+          ),
+          child: Column(children: children),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final order = siblingDisplayOrder(tree, member);
-    return AlertDialog(
+    final ring = _genderColor(member.gender);
+    final photo = ngmyImageFromRef(member.photoPath);
+
+    return Dialog(
       backgroundColor: palette.cardBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: Text('Member profile', style: TextStyle(color: palette.primaryText, fontWeight: FontWeight.w900)),
-      content: SizedBox(
-        width: 380,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
         child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              CircleAvatar(
-                radius: 44,
-                backgroundColor: palette.mutedSurface,
-                backgroundImage: ngmyImageFromRef(member.photoPath),
-                child: member.photoPath == null ? Icon(Icons.person, size: 40, color: palette.secondaryText) : null,
+              Text(
+                member.name,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.primaryText, fontWeight: FontWeight.w900, fontSize: 18),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                tree.isViewOnly ? 'Shared family tree · view only' : 'Member profile',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.secondaryText, fontSize: 12, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 16),
-              _row('Name', member.name),
-              _row('Gender', _genderLabel(member.gender)),
-              _row('Birth date', member.birthDate),
-              _row('Birth place', member.birthPlace),
-              _row('Date of death', member.deathDate),
-              _row('Occupation', member.occupation),
-              _row('Parent', _memberName(member.parentId)),
-              _row('Spouse', _memberName(member.spouseId)),
-              if (order > 0) _row('Child order', '#$order'),
-              _row('Notes', member.notes),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: ring, width: 3),
+                    boxShadow: [BoxShadow(color: ring.withValues(alpha: 0.25), blurRadius: 12)],
+                  ),
+                  child: CircleAvatar(
+                    radius: 52,
+                    backgroundColor: ring.withValues(alpha: 0.12),
+                    backgroundImage: photo,
+                    child: photo == null ? Icon(Icons.person, size: 48, color: ring) : null,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: ring.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: ring.withValues(alpha: 0.45)),
+                  ),
+                  child: Text(
+                    _genderLabel(member.gender),
+                    style: TextStyle(color: ring, fontWeight: FontWeight.w800, fontSize: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              _section('Identity', [
+                _infoTile('Full name', member.name, icon: Icons.badge_outlined),
+                if (order > 0) _infoTile('Child order', '#$order', icon: Icons.format_list_numbered_rounded),
+              ]),
+              const SizedBox(height: 12),
+              _section('Life details', [
+                _infoTile('Birth date', member.birthDate, icon: Icons.cake_outlined),
+                _infoTile('Birth place', member.birthPlace, icon: Icons.place_outlined),
+                _infoTile('Date of death', member.deathDate, icon: Icons.church_outlined),
+                _infoTile('Occupation', member.occupation, icon: Icons.work_outline_rounded),
+              ]),
+              const SizedBox(height: 12),
+              _section('Family links', [
+                _infoTile('Parent', _memberName(member.parentId), icon: Icons.account_tree_outlined),
+                _infoTile('Spouse', _memberName(member.spouseId), icon: Icons.favorite_border_rounded),
+              ]),
+              if (member.notes.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _section('Notes', [
+                  _infoTile('Notes', member.notes, icon: Icons.notes_rounded),
+                ]),
+              ],
+              const SizedBox(height: 18),
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                style: FilledButton.styleFrom(
+                  backgroundColor: WorksheetPalette.green,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
             ],
           ),
         ),
       ),
-      actions: [
-        FilledButton(
-          onPressed: () => Navigator.pop(context),
-          style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
-          child: const Text('Close'),
-        ),
-      ],
     );
   }
 }
