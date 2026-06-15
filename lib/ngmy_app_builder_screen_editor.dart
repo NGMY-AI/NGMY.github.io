@@ -5,6 +5,8 @@ import 'ngmy_app_builder_ai_usage.dart';
 import 'ngmy_app_builder_runtime.dart';
 import 'ngmy_app_builder_layout_utils.dart';
 import 'ngmy_app_builder_models.dart';
+import 'ngmy_app_builder_widget_ai_chat.dart';
+import 'ngmy_app_builder_invoice_templates.dart';
 import 'ngmy_app_studio_shell.dart';
 
 /// Full-screen studio for editing one app screen — widgets, wiring, drag reorder.
@@ -20,6 +22,7 @@ class NgmyAppScreenEditorPage extends StatefulWidget {
     this.config,
     this.user,
     this.isAdmin = false,
+    this.projectId,
     this.onChargeWallet,
     this.onDataChanged,
     this.onPersistConfig,
@@ -34,6 +37,7 @@ class NgmyAppScreenEditorPage extends StatefulWidget {
   final dynamic config;
   final dynamic user;
   final bool isAdmin;
+  final String? projectId;
   final Future<bool> Function(double amount, String description)? onChargeWallet;
   final VoidCallback? onDataChanged;
   final Future<bool> Function()? onPersistConfig;
@@ -235,119 +239,28 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
 
   Future<void> _askAiForWidgetAt(int index) async {
     if (index < 0 || index >= _widgets.length) return;
-    final w = _widgets[index];
-    final typeLabel = ngmyWidgetTypeLabel((w['type'] ?? '').toString());
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final ctrl = TextEditingController();
-    final request = await showModalBottomSheet<String>(
+    final updated = await showNgmyWidgetAiChat(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.auto_awesome_rounded, color: Color(0xFFF59E0B)),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text('Ask AI — $typeLabel', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87))),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Tell Bolt exactly what to change in this widget only — text, colors, links, buttons, fields, anything.',
-                style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : Colors.black54),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: ctrl,
-                autofocus: true,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: 'e.g. Change the button label to Buy Now and open the checkout screen',
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF111827) : Colors.grey.shade50,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 14),
-              FilledButton.icon(
-                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-                icon: const Icon(Icons.auto_awesome_rounded),
-                label: const Text('Update this widget'),
-                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), minimumSize: const Size(double.infinity, 48)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    ctrl.dispose();
-    if (request == null || request.isEmpty || !mounted) return;
-
-    if (!await NgmyAppBuilderAiUsage.ensureAccess(
-      context: context,
-      config: widget.config,
+      widgetJson: _widgets[index],
+      widgetIndex: index,
+      screen: _buildResult(),
+      allScreens: widget.allScreens,
+      themeColor: widget.themeColor,
+      isDark: Theme.of(context).brightness == Brightness.dark,
+      apiKey: widget.apiKey,
       email: widget.email,
-      isNewAppRequest: false,
-      isAdmin: widget.isAdmin,
+      projectId: widget.projectId,
+      config: widget.config,
       user: widget.user,
-      onCharge: widget.onChargeWallet,
+      isAdmin: widget.isAdmin,
+      onChargeWallet: widget.onChargeWallet,
       onDataChanged: widget.onDataChanged,
       onPersistConfig: widget.onPersistConfig,
-    )) {
-      return;
-    }
-
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        content: Row(
-          children: [
-            const CircularProgressIndicator(color: Color(0xFFF59E0B)),
-            const SizedBox(width: 16),
-            Expanded(child: Text('Bolt is updating this widget…', style: TextStyle(color: isDark ? Colors.white : Colors.black87))),
-          ],
-        ),
-      ),
+      getScreen: _buildResult,
     );
-
-    final result = await ngmyAppBuilderAiEditWidget(
-      apiKey: widget.apiKey,
-      screen: _buildResult(),
-      widgetIndex: index,
-      widgetJson: w,
-      allScreens: widget.allScreens,
-      userMessage: request,
-    );
-
-    if (!mounted) return;
-    Navigator.pop(context);
-
-    if (!widget.isAdmin && widget.email.isNotEmpty) {
-      await NgmyAppBuilderAiUsage.recordPrompt(widget.email);
+    if (updated != null && mounted) {
+      setState(() => _widgets[index] = updated);
     }
-
-    if (result.screen != null) {
-      final children = ngmyLayoutChildren(result.screen!);
-      if (index >= 0 && index < children.length) {
-        setState(() => _widgets[index] = Map<String, dynamic>.from(children[index]));
-      }
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result.message), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 4)),
-    );
   }
 
   @override
@@ -1455,6 +1368,7 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
           _tf('Places collection', (_w['collection'] ?? 'places').toString(), (v) => _set('collection', v)),
           _tf('Title field', (_w['titleField'] ?? 'name').toString(), (v) => _set('titleField', v)),
           _tf('Map height (px)', (_w['height'] ?? 240).toString(), (v) => _set('height', int.tryParse(v) ?? 240)),
+          SwitchListTile(title: const Text('Stay in app (recommended)'), subtitle: const Text('Pins open inside app, not Google Maps'), value: _w['inApp'] != false, onChanged: (v) => _set('inApp', v)),
         ];
       case 'reelFeed':
         return [
@@ -1494,6 +1408,25 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
         return [
           _tf('Invoices collection', (_w['collection'] ?? 'invoices').toString(), (v) => _set('collection', v)),
           _tf('Title', (_w['title'] ?? 'Create invoice').toString(), (v) => _set('title', v)),
+          _dropdown(
+            'Invoice template',
+            (_w['templateId'] ?? 'classic').toString(),
+            [for (final t in kNgmyAppBuilderInvoiceTemplates) t.id],
+            (v) => _set('templateId', v),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final t in kNgmyAppBuilderInvoiceTemplates)
+                ChoiceChip(
+                  label: Text(t.name, style: const TextStyle(fontSize: 11)),
+                  selected: (_w['templateId'] ?? 'classic').toString() == t.id,
+                  onSelected: (_) => _set('templateId', t.id),
+                ),
+            ],
+          ),
         ];
       case 'chip':
         return [_tf('Chip label', (_w['label'] ?? 'Tag').toString(), (v) => _set('label', v))];

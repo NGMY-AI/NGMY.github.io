@@ -13,6 +13,59 @@ class NgmyAppBuilderCopilotMemoryStore {
     return 'ngmy_bolt_chat_${e}_$pid';
   }
 
+  static String widgetScope(String projectId, String screenId, int widgetIndex) =>
+      '${projectId.trim().isEmpty ? 'draft' : projectId.trim()}_screen_${screenId}_w$widgetIndex';
+
+  static String screenScope(String projectId, String screenId) =>
+      '${projectId.trim().isEmpty ? 'draft' : projectId.trim()}_screen_$screenId';
+
+  static String _scopedKey(String email, String scope) => 'ngmy_bolt_chat_${email.toLowerCase().trim()}_$scope';
+
+  static Future<List<Map<String, String>>> loadScoped(String email, String scope) async {
+    if (email.trim().isEmpty || scope.trim().isEmpty) return [];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_scopedKey(email, scope));
+      if (raw == null || raw.isEmpty) return [];
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      final out = <Map<String, String>>[];
+      for (final item in decoded) {
+        if (item is! Map) continue;
+        final role = (item['role'] ?? '').toString();
+        final text = (item['text'] ?? '').toString().trim();
+        if (text.isEmpty || (role != 'user' && role != 'ai')) continue;
+        out.add({'role': role, 'text': text});
+      }
+      return out;
+    } catch (e) {
+      debugPrint('[bolt memory scoped] load: $e');
+      return [];
+    }
+  }
+
+  static Future<void> saveScoped(String email, String scope, List<Map<String, String>> messages) async {
+    if (email.trim().isEmpty || scope.trim().isEmpty) return;
+    try {
+      var slice = messages;
+      if (slice.length > maxMessages) {
+        slice = slice.sublist(slice.length - maxMessages);
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_scopedKey(email, scope), jsonEncode(slice));
+    } catch (e) {
+      debugPrint('[bolt memory scoped] save: $e');
+    }
+  }
+
+  static Future<void> clearScoped(String email, String scope) async {
+    if (email.trim().isEmpty || scope.trim().isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_scopedKey(email, scope));
+    } catch (_) {}
+  }
+
   static Future<List<Map<String, String>>> load(String email, {String? projectId}) async {
     if (email.trim().isEmpty) return [];
     try {

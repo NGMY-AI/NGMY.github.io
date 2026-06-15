@@ -3,6 +3,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_app_builder_data.dart';
+import 'ngmy_app_builder_invoice_templates.dart';
 
 /// Static QR display from layout JSON.
 class NgmyRuntimeQrDisplay extends StatelessWidget {
@@ -229,6 +230,13 @@ class _NgmyRuntimeInvoiceBuilderState extends State<NgmyRuntimeInvoiceBuilder> {
   final _dueC = TextEditingController();
   final _payUrlC = TextEditingController();
   Map<String, dynamic>? _preview;
+  late String _templateId;
+
+  @override
+  void initState() {
+    super.initState();
+    _templateId = (widget.node['templateId'] ?? 'classic').toString();
+  }
 
   @override
   void dispose() {
@@ -257,6 +265,7 @@ class _NgmyRuntimeInvoiceBuilderState extends State<NgmyRuntimeInvoiceBuilder> {
       'payUrl': _payUrlC.text.trim(),
       'invoiceNo': 'INV-${DateTime.now().millisecondsSinceEpoch % 100000}',
       'createdAt': DateTime.now().toUtc().toIso8601String(),
+      'templateId': _templateId,
     };
     await widget.store.ensureLoaded();
     await widget.store.addRecord(col, record);
@@ -274,6 +283,42 @@ class _NgmyRuntimeInvoiceBuilderState extends State<NgmyRuntimeInvoiceBuilder> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: textColor)),
+        const SizedBox(height: 10),
+        Text('Invoice template', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textColor.withValues(alpha: 0.7))),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 88,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: kNgmyAppBuilderInvoiceTemplates.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, i) {
+              final t = kNgmyAppBuilderInvoiceTemplates[i];
+              final selected = t.id == _templateId;
+              return InkWell(
+                onTap: () => setState(() => _templateId = t.id),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: 108,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: selected ? widget.theme.withValues(alpha: 0.15) : fieldFill,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: selected ? widget.theme : Colors.transparent, width: 2),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(t.icon, size: 20, color: selected ? widget.theme : textColor.withValues(alpha: 0.6)),
+                      const Spacer(),
+                      Text(t.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: textColor)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
         const SizedBox(height: 12),
         TextField(controller: _clientC, style: TextStyle(color: textColor), decoration: InputDecoration(labelText: 'Client / Company', filled: true, fillColor: fieldFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
         const SizedBox(height: 10),
@@ -293,56 +338,14 @@ class _NgmyRuntimeInvoiceBuilderState extends State<NgmyRuntimeInvoiceBuilder> {
         ),
         if (_preview != null) ...[
           const SizedBox(height: 20),
-          _InvoicePreviewCard(record: _preview!, theme: widget.theme, isDark: widget.isDark),
+          ngmyAppBuilderInvoicePreview(
+            templateId: (_preview!['templateId'] ?? _templateId).toString(),
+            record: _preview!,
+            theme: widget.theme,
+            isDark: widget.isDark,
+          ),
         ],
       ],
-    );
-  }
-}
-
-class _InvoicePreviewCard extends StatelessWidget {
-  const _InvoicePreviewCard({required this.record, required this.theme, required this.isDark});
-  final Map<String, dynamic> record;
-  final Color theme;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final payUrl = (record['payUrl'] ?? '').toString().trim();
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: theme.withValues(alpha: 0.35), width: 1.5),
-        boxShadow: [BoxShadow(color: theme.withValues(alpha: 0.12), blurRadius: 12, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.receipt_rounded, color: theme),
-              const SizedBox(width: 8),
-              Text('INVOICE', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2, color: theme)),
-              const Spacer(),
-              Text((record['invoiceNo'] ?? '').toString(), style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
-            ],
-          ),
-          const Divider(height: 24),
-          Text('Bill to: ${record['client']}', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
-          const SizedBox(height: 8),
-          Text((record['items'] ?? '').toString(), style: TextStyle(color: isDark ? Colors.white70 : Colors.black87)),
-          const SizedBox(height: 12),
-          Text('\$${record['amount']}', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: theme)),
-          if ((record['due'] ?? '').toString().isNotEmpty)
-            Padding(padding: const EdgeInsets.only(top: 4), child: Text('Due: ${record['due']}', style: TextStyle(color: isDark ? Colors.white60 : Colors.black54))),
-          if (payUrl.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Center(child: NgmyRuntimeQrDisplay(data: payUrl, theme: theme, isDark: isDark, label: 'Pay with QR', size: 140)),
-          ],
-        ],
-      ),
     );
   }
 }

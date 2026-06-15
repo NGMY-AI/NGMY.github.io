@@ -164,7 +164,7 @@ Map<String, dynamic> ngmyNewWidget(String type, {List<NgmyAppScreen> screens = c
     case 'qrGenerator':
       return {'type': 'qrGenerator', 'mode': 'url', 'placeholder': 'https://your-site.com', 'collection': 'qr_codes', 'allowSave': true};
     case 'invoiceBuilder':
-      return {'type': 'invoiceBuilder', 'collection': 'invoices', 'title': 'Create invoice'};
+      return {'type': 'invoiceBuilder', 'collection': 'invoices', 'title': 'Create invoice', 'templateId': 'classic'};
     case 'reelFeed':
       return {'type': 'reelFeed', 'collection': 'reels'};
     case 'socialFeed':
@@ -175,7 +175,7 @@ Map<String, dynamic> ngmyNewWidget(String type, {List<NgmyAppScreen> screens = c
       return {'type': 'searchHub', 'collection': 'bookmarks'};
     case 'mapView':
     case 'map':
-      return {'type': 'mapView', 'collection': 'places', 'titleField': 'name', 'subtitleField': 'address', 'height': 240};
+      return {'type': 'mapView', 'collection': 'places', 'titleField': 'name', 'subtitleField': 'address', 'height': 240, 'inApp': true};
     case 'profile':
       return {'type': 'profile', 'collection': 'reels', 'handle': '@you'};
     case 'tabs':

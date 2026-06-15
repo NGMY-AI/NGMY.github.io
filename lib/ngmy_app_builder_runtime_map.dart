@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_app_builder_data.dart';
@@ -31,6 +34,19 @@ class NgmyRuntimeMapView extends StatefulWidget {
 class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
   final _searchC = TextEditingController();
   String _query = '';
+  late double _centerLat;
+  late double _centerLng;
+  Map<String, dynamic>? _selectedPlace;
+  bool _geocoding = false;
+
+  bool get _inApp => widget.node['inApp'] != false;
+
+  @override
+  void initState() {
+    super.initState();
+    _centerLat = (widget.node['centerLat'] as num?)?.toDouble() ?? 40.7128;
+    _centerLng = (widget.node['centerLng'] as num?)?.toDouble() ?? -74.006;
+  }
 
   @override
   void dispose() {
@@ -38,7 +54,7 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
     super.dispose();
   }
 
-  Future<void> _openMaps({String? address, double? lat, double? lng}) async {
+  Future<void> _openExternalMaps({String? address, double? lat, double? lng}) async {
     Uri uri;
     if (lat != null && lng != null) {
       uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
@@ -55,6 +71,94 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
     } else {
       widget.onSnack('Could not open maps');
     }
+  }
+
+  Future<void> _geocodeInApp(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return;
+    setState(() => _geocoding = true);
+    try {
+      final uri = Uri.parse('https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(q)}&format=json&limit=1');
+      final res = await http.get(uri, headers: const {'User-Agent': 'NGMY-App-Builder/1.0'});
+      if (res.statusCode == 200) {
+        final list = jsonDecode(res.body);
+        if (list is List && list.isNotEmpty && list.first is Map) {
+          final m = Map<String, dynamic>.from(list.first as Map);
+          final lat = double.tryParse('${m['lat']}');
+          final lng = double.tryParse('${m['lon']}');
+          if (lat != null && lng != null) {
+            setState(() {
+              _centerLat = lat;
+              _centerLng = lng;
+              _selectedPlace = {'name': (m['display_name'] ?? q).toString(), 'lat': lat, 'lng': lng};
+            });
+            widget.onSnack('Showing on map');
+            return;
+          }
+        }
+      }
+      widget.onSnack('Place not found — try a different search');
+    } catch (_) {
+      widget.onSnack('Search failed — check connection');
+    } finally {
+      if (mounted) setState(() => _geocoding = false);
+    }
+  }
+
+  void _showPlaceSheet(Map<String, dynamic> place, {required String titleField, required String subtitleField, required String latField, required String lngField}) {
+    final title = (place[titleField] ?? place['name'] ?? 'Place').toString();
+    final subtitle = (place[subtitleField] ?? place['address'] ?? '').toString();
+    final lat = double.tryParse('${place[latField] ?? place['lat'] ?? ''}');
+    final lng = double.tryParse('${place[lngField] ?? place['lng'] ?? ''}');
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.place_rounded, color: widget.theme),
+                const SizedBox(width: 10),
+                Expanded(child: Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: widget.isDark ? Colors.white : Colors.black87))),
+              ],
+            ),
+            if (subtitle.isNotEmpty) ...[const SizedBox(height: 8), Text(subtitle, style: TextStyle(color: widget.isDark ? Colors.white70 : Colors.black54))],
+            if (lat != null && lng != null) ...[const SizedBox(height: 6), Text('${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}', style: TextStyle(fontSize: 12, color: widget.isDark ? Colors.white38 : Colors.black45))],
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                if (lat != null && lng != null) {
+                  setState(() {
+                    _centerLat = lat;
+                    _centerLng = lng;
+                    _selectedPlace = place;
+                  });
+                }
+                widget.onSnack('Centered on map');
+              },
+              icon: const Icon(Icons.map_rounded),
+              label: const Text('Show on map'),
+              style: FilledButton.styleFrom(backgroundColor: widget.theme),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _openExternalMaps(lat: lat, lng: lng, address: title);
+              },
+              icon: const Icon(Icons.open_in_new_rounded),
+              label: const Text('Open in Google Maps'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _staticMapUrl(double lat, double lng, int width, int height) {
@@ -83,9 +187,14 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
             return Stack(
               fit: StackFit.expand,
               children: [
-                Image.network(
-                  _staticMapUrl(centerLat, centerLng, w, h),
-                  fit: BoxFit.cover,
+                InteractiveViewer(
+                  minScale: 0.85,
+                  maxScale: 3.5,
+                  child: Image.network(
+                    _staticMapUrl(centerLat, centerLng, w, h),
+                    fit: BoxFit.cover,
+                    width: w.toDouble(),
+                    height: h.toDouble(),
                   loadingBuilder: (_, child, progress) {
                     if (progress == null) return child;
                     return Stack(
@@ -114,6 +223,7 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
                     ),
                   ),
                 ),
+                ),
                 Positioned(
                   top: 12,
                   right: 12,
@@ -122,7 +232,17 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
                     elevation: 4,
                     borderRadius: BorderRadius.circular(10),
                     child: InkWell(
-                      onTap: () => _openMaps(lat: centerLat, lng: centerLng),
+                      onTap: () {
+                        if (_inApp) {
+                          setState(() {
+                            _centerLat = centerLat;
+                            _centerLng = centerLng;
+                          });
+                          widget.onSnack('Map centered');
+                        } else {
+                          _openExternalMaps(lat: centerLat, lng: centerLng);
+                        }
+                      },
                       borderRadius: BorderRadius.circular(10),
                       child: const Padding(
                         padding: EdgeInsets.all(10),
@@ -142,10 +262,19 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
                         final r = filtered[i];
                         final lat = double.tryParse('${r[latField] ?? ''}');
                         final lng = double.tryParse('${r[lngField] ?? ''}');
-                        if (lat != null && lng != null) {
-                          _openMaps(lat: lat, lng: lng);
+                        if (_inApp) {
+                          if (lat != null && lng != null) {
+                            setState(() {
+                              _centerLat = lat;
+                              _centerLng = lng;
+                              _selectedPlace = r;
+                            });
+                          }
+                          _showPlaceSheet(r, titleField: titleField, subtitleField: subtitleField, latField: latField, lngField: lngField);
+                        } else if (lat != null && lng != null) {
+                          _openExternalMaps(lat: lat, lng: lng);
                         } else {
-                          _openMaps(address: '${r[titleField] ?? ''} ${r[subtitleField] ?? ''}'.trim());
+                          _openExternalMaps(address: '${r[titleField] ?? ''} ${r[subtitleField] ?? ''}'.trim());
                         }
                       },
                       child: Column(
@@ -200,8 +329,6 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
     final lngField = (widget.node['lngField'] ?? 'lng').toString();
     final configuredHeight = (widget.node['height'] as num?)?.toDouble() ?? 320;
     final placeholder = (widget.node['placeholder'] ?? 'Search places, addresses…').toString();
-    final centerLat = (widget.node['centerLat'] as num?)?.toDouble() ?? 40.7128;
-    final centerLng = (widget.node['centerLng'] as num?)?.toDouble() ?? -74.006;
 
     return AnimatedBuilder(
       animation: widget.store,
@@ -225,16 +352,18 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
             decoration: InputDecoration(
               hintText: placeholder,
               prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: IconButton(
-                icon: Icon(Icons.navigation_rounded, color: widget.theme),
-                tooltip: 'Search in Google Maps',
-                onPressed: () => _openMaps(),
-              ),
+              suffixIcon: _geocoding
+                  ? Padding(padding: const EdgeInsets.all(12), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: widget.theme)))
+                  : IconButton(
+                      icon: Icon(Icons.travel_explore_rounded, color: widget.theme),
+                      tooltip: 'Search on map',
+                      onPressed: () => _geocodeInApp(_searchC.text),
+                    ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             ),
             onChanged: (v) => setState(() => _query = v),
-            onSubmitted: (_) => _openMaps(),
+            onSubmitted: (v) => _inApp ? _geocodeInApp(v) : _openExternalMaps(address: v),
           ),
         );
 
@@ -250,14 +379,23 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
                       title: Text((r[titleField] ?? 'Place').toString(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                       subtitle: (r[subtitleField] ?? '').toString().isEmpty ? null : Text(r[subtitleField].toString(), maxLines: 1, overflow: TextOverflow.ellipsis),
                       trailing: IconButton(
-                        icon: const Icon(Icons.directions_rounded, color: Color(0xFF2563EB)),
+                        icon: const Icon(Icons.place_rounded, color: Color(0xFF2563EB)),
                         onPressed: () {
                           final lat = double.tryParse('${r[latField] ?? ''}');
                           final lng = double.tryParse('${r[lngField] ?? ''}');
-                          if (lat != null && lng != null) {
-                            _openMaps(lat: lat, lng: lng);
+                          if (_inApp) {
+                            if (lat != null && lng != null) {
+                              setState(() {
+                                _centerLat = lat;
+                                _centerLng = lng;
+                                _selectedPlace = r;
+                              });
+                            }
+                            _showPlaceSheet(r, titleField: titleField, subtitleField: subtitleField, latField: latField, lngField: lngField);
+                          } else if (lat != null && lng != null) {
+                            _openExternalMaps(lat: lat, lng: lng);
                           } else {
-                            _openMaps(address: '${r[titleField] ?? ''} ${r[subtitleField] ?? ''}'.trim());
+                            _openExternalMaps(address: '${r[titleField] ?? ''} ${r[subtitleField] ?? ''}'.trim());
                           }
                         },
                       ),
@@ -278,8 +416,8 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
                   const SizedBox(height: 10),
                   Expanded(
                     child: _buildMapCanvas(
-                      centerLat: centerLat,
-                      centerLng: centerLng,
+                      centerLat: _centerLat,
+                      centerLng: _centerLng,
                       height: null,
                       expand: true,
                       filtered: filtered,
@@ -306,8 +444,8 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
                 searchBar,
                 const SizedBox(height: 10),
                 _buildMapCanvas(
-                  centerLat: centerLat,
-                  centerLng: centerLng,
+                  centerLat: _centerLat,
+                  centerLng: _centerLng,
                   height: configuredHeight,
                   expand: false,
                   filtered: filtered,

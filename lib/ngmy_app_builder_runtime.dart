@@ -79,6 +79,17 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
     return _isImmersiveRoot(type) || type == 'profile';
   }
 
+  Color? _hexColor(dynamic raw) {
+    if (raw == null) return null;
+    var h = raw.toString().trim();
+    if (h.isEmpty) return null;
+    if (h.startsWith('#')) h = h.substring(1);
+    if (h.length == 6) h = 'FF$h';
+    if (h.length != 8) return null;
+    final v = int.tryParse(h, radix: 16);
+    return v != null ? Color(v) : null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final rootType = (widget.layout['type'] ?? 'column').toString().toLowerCase();
@@ -180,15 +191,18 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
           width: double.infinity,
           child: Text(
             (node['text'] ?? '').toString(),
-            style: ts ?? TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black87),
+            style: (ts ?? TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black87)).copyWith(color: _hexColor(node['textColor']) ?? ts?.color),
             textAlign: _textAlign(node['align']),
           ),
         );
       case 'button':
+        final btnBg = _hexColor(node['backgroundColor']) ?? _hexColor(node['accentColor']) ?? widget.theme;
+        final btnFg = _hexColor(node['textColor']);
         return FilledButton(
           onPressed: () => _handleButton(node),
           style: FilledButton.styleFrom(
-            backgroundColor: widget.theme,
+            backgroundColor: btnBg,
+            foregroundColor: btnFg,
             minimumSize: Size(double.infinity, (node['large'] == true) ? 52 : 46),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
@@ -196,13 +210,14 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
         );
       case 'outlinedbutton':
       case 'outlined_button':
+        final obFg = _hexColor(node['textColor']) ?? _hexColor(node['accentColor']) ?? widget.theme;
         return OutlinedButton(
           onPressed: () => _handleButton(node),
           style: OutlinedButton.styleFrom(
-            foregroundColor: widget.theme,
+            foregroundColor: obFg,
             minimumSize: Size(double.infinity, 46),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            side: BorderSide(color: widget.theme),
+            side: BorderSide(color: obFg),
           ),
           child: Text((node['label'] ?? 'Button').toString()),
         );

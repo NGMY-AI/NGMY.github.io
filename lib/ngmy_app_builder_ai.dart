@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_app_builder_models.dart';
+import 'ngmy_app_builder_invoice_templates.dart';
 import 'ngmy_app_builder_layout_utils.dart';
 import 'ngmy_app_builder_runtime.dart';
 
@@ -311,6 +312,7 @@ Future<NgmyAppScreenAiResult> ngmyAppBuilderAiEditScreen({
   required NgmyAppScreen screen,
   required List<NgmyAppScreen> allScreens,
   required String userMessage,
+  List<Map<String, String>> history = const [],
 }) async {
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
@@ -320,9 +322,27 @@ Future<NgmyAppScreenAiResult> ngmyAppBuilderAiEditScreen({
   }
 
   final screensList = [for (final s in allScreens) {'id': s.id, 'title': s.title}];
+  final transcript = StringBuffer();
+  for (final m in history.takeLast(12)) {
+    final role = m['role'] == 'ai' ? 'Bolt' : 'User';
+    transcript.writeln('$role: ${m['text']}');
+  }
   final prompt = '''
 You are Bolt editing ONE screen in NGMY App Studio.
-The user describes how buttons, text, or widgets should look or behave on this screen.
+The user describes how buttons, text, widgets, colors, or designs should look or behave on this screen.
+Remember prior conversation below — continue from context, do not forget earlier requests.
+
+PRIOR CHAT:
+${transcript.isEmpty ? '(none)' : transcript.toString()}
+
+DESIGN POWERS — you CAN change:
+- Any widget text, labels, URLs, collections, navigation
+- Colors on widgets: "backgroundColor", "textColor", "accentColor" as hex (#RRGGBB or #AARRGGBB)
+- Button look: large, outlined_button, custom colors
+- Images: image url, profile handle, hero emoji
+- Invoice templateId: ${ngmyAppBuilderInvoiceTemplateIdsForAi()}
+- Map: "inApp": true (stay in app), centerLat, centerLng, height
+- QR generator: mode, placeholder, colors, title
 
 RESPONSE FORMAT:
 1) Short friendly reply (1-3 sentences).
@@ -391,6 +411,7 @@ Future<NgmyAppScreenAiResult> ngmyAppBuilderAiEditWidget({
   required Map<String, dynamic> widgetJson,
   required List<NgmyAppScreen> allScreens,
   required String userMessage,
+  List<Map<String, String>> history = const [],
 }) async {
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
@@ -401,6 +422,12 @@ Future<NgmyAppScreenAiResult> ngmyAppBuilderAiEditWidget({
 
   final widgets = ngmyLayoutChildren(screen);
   final screensList = [for (final s in allScreens) {'id': s.id, 'title': s.title}];
+  final transcript = StringBuffer();
+  for (final m in history.takeLast(12)) {
+    if ((m['text'] ?? '').toString().trim().isEmpty) continue;
+    final role = m['role'] == 'ai' ? 'Bolt' : 'User';
+    transcript.writeln('$role: ${m['text']}');
+  }
   final prompt = '''
 You are Bolt editing ONE widget in NGMY App Studio.
 
@@ -408,8 +435,19 @@ CRITICAL — follow exactly:
 - Screen id MUST stay "${screen.id}".
 - layout.children MUST have EXACTLY ${widgets.length} widgets (same count, same order).
 - ONLY change the widget at index $widgetIndex (0-based). Every other child must be identical to the current screen JSON.
-- Apply whatever the user asks for that widget: text, labels, colors, URLs, fields, collections, navigation targets, etc.
-- You may change the widget "type" only if the user explicitly asks to convert it.
+- Apply whatever the user asks: text, labels, colors, design, templates, URLs, fields, collections, navigation.
+- Remember prior conversation — user expects you to recall earlier messages in this widget chat.
+
+PRIOR CHAT FOR THIS WIDGET:
+${transcript.isEmpty ? '(none)' : transcript.toString()}
+
+DESIGN — add any of these to the widget JSON when user asks:
+- backgroundColor, textColor, accentColor (hex #RRGGBB)
+- image url, profile handle, hero emoji/title/subtitle
+- invoiceBuilder: templateId one of ${ngmyAppBuilderInvoiceTemplateIdsForAi()}
+- mapView: inApp true (map stays in app), centerLat, centerLng, height, placeholder
+- qrGenerator: mode url|text, placeholder, title, defaultValue, accentColor
+- button: large true/false, action navigate|snack|openurl|clear
 
 Widget at index $widgetIndex (edit this):
 ${jsonEncode(widgetJson)}
@@ -428,6 +466,9 @@ Progress: {"type":"progress","label":"...","value":0.0-1.0}
 Rating: {"type":"rating","label":"...","value":1-5}
 Contact: {"type":"contact","name":"...","phone":"...","email":"..."}
 Video: {"type":"video","url":"https://...mp4","caption":"..."}
+Invoice: {"type":"invoiceBuilder","collection":"invoices","title":"Create invoice","templateId":"modern"}
+Map: {"type":"mapView","collection":"places","inApp":true,"centerLat":40.71,"centerLng":-74.0,"height":280}
+QR: {"type":"qrGenerator","mode":"url","placeholder":"https://...","title":"Scan me","accentColor":"#6366F1"}
 
 Screen ids for navigation: ${jsonEncode(screensList)}
 
