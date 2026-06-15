@@ -34159,14 +34159,32 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     }
   }
 
-  String _sellerPhoneFromListing(Map<String, dynamic> listing) {
-    final fromListing = (listing['sellerPhone'] ?? '').toString().trim();
-    if (fromListing.isNotEmpty) return fromListing;
+  Future<String> _sellerPhoneForListing(Map<String, dynamic> listing) async {
     final email = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
-    if (email.isEmpty) return '';
-    final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-    if (idx >= 0) return widget.allUsers[idx].phone.trim();
-    return '';
+    if (email.isNotEmpty) {
+      var idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+      if (idx < 0) {
+        await _resolveStoreUserIndex(email);
+        idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+      }
+      if (idx >= 0) {
+        final profilePhone = widget.allUsers[idx].phone.trim();
+        if (profilePhone.isNotEmpty) return profilePhone;
+      }
+    }
+    return (listing['sellerPhone'] ?? '').toString().trim();
+  }
+
+  String _sellerPhoneFromListing(Map<String, dynamic> listing) {
+    final email = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
+    if (email.isNotEmpty) {
+      final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+      if (idx >= 0) {
+        final profilePhone = widget.allUsers[idx].phone.trim();
+        if (profilePhone.isNotEmpty) return profilePhone;
+      }
+    }
+    return (listing['sellerPhone'] ?? '').toString().trim();
   }
 
   Future<void> _callSellerPhone(String phone) async {
@@ -34193,11 +34211,15 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     }
   }
 
-  void _showSellerProfileSheet(Map<String, dynamic> listing) {
+  Future<void> _showSellerProfileSheet(Map<String, dynamic> listing) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sellerEmail = (listing['sellerEmail'] ?? '').toString().trim();
     final sellerName = (listing['sellerName'] ?? 'Seller').toString();
-    final sellerPhone = _sellerPhoneFromListing(listing);
+    var sellerPhone = _sellerPhoneFromListing(listing);
+    if (sellerPhone.isEmpty) {
+      sellerPhone = await _sellerPhoneForListing(listing);
+    }
+    if (!mounted) return;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -34286,8 +34308,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final images = _listingImageRefs(listing);
     final videoRef = _listingVideoRef(listing);
     final id = (listing['id'] ?? '').toString();
-    final liked = _likedListingIds.contains(id) || ((listing['likedBy'] as List?)?.contains(widget.user.email) ?? false);
-    final likes = (listing['likedBy'] is List) ? (listing['likedBy'] as List).length : 0;
     final negotiable = listing['negotiable'] != false;
     final sellerEmail = (listing['sellerEmail'] ?? '').toString();
     final sellerName = (listing['sellerName'] ?? 'User').toString();
@@ -34334,18 +34354,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                     ),
                   if (videoRef.isNotEmpty)
                     const Center(child: Icon(Icons.play_circle_fill_rounded, color: Colors.white70, size: 36)),
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: GestureDetector(
-                      onTap: () => _toggleListingLike(listing),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                        child: Icon(liked ? Icons.favorite : Icons.favorite_border, size: 18, color: liked ? const Color(0xFFEF4444) : Colors.grey),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -34376,15 +34384,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                   const SizedBox(height: 4),
                   _storeListingCardPrice(price, delivery),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.favorite, size: 12, color: Colors.grey.shade500),
-                      const SizedBox(width: 3),
-                      Text('$likes', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
-                      const SizedBox(width: 8),
-                      Text((listing['condition'] ?? 'new').toString().toLowerCase(), style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
-                    ],
-                  ),
+                  Text((listing['condition'] ?? 'new').toString().toLowerCase(), style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
                   if (location.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Row(
