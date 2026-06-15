@@ -48,10 +48,10 @@ class _NgmyAppStudioAiPanelState extends State<NgmyAppStudioAiPanel> {
   int _promptsRemaining = -1;
 
   static const _hints = [
-    'Build a store with cart and checkout',
-    'Create an invoice app with payment QR',
-    'Make a fitness tracker with progress charts',
-    'Add a dark profile screen to my app',
+    'Build a map app like Google Maps with saved places',
+    'Create a store with product feed and cart',
+    'Make a social media feed with posts and profiles',
+    'Design a fitness dashboard with workouts and check-ins',
   ];
 
   @override
@@ -105,7 +105,7 @@ class _NgmyAppStudioAiPanelState extends State<NgmyAppStudioAiPanel> {
       if (_project == null) {
         _messages.add({
           'role': 'ai',
-          'text': 'Hi! I\'m NGMY AI — describe any app and I\'ll build working screens, forms, and menus for your canvas.',
+          'text': 'Hi! I\'m NGMY AI — describe ANY app (maps, stores, social feeds, booking, games) and I\'ll design unique layouts for your canvas.',
         });
       } else {
         _messages.add({

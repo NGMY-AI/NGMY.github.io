@@ -173,6 +173,9 @@ Map<String, dynamic> ngmyNewWidget(String type, {List<NgmyAppScreen> screens = c
       return {'type': 'postComposer', 'mode': 'reel', 'collection': 'reels', 'navigateAfter': 'feed'};
     case 'searchHub':
       return {'type': 'searchHub', 'collection': 'bookmarks'};
+    case 'mapView':
+    case 'map':
+      return {'type': 'mapView', 'collection': 'places', 'titleField': 'name', 'subtitleField': 'address', 'height': 360};
     case 'profile':
       return {'type': 'profile', 'collection': 'reels', 'handle': '@you'};
     default:
@@ -235,6 +238,10 @@ String ngmyWidgetTypeLabel(String type) {
     case 'searchhub':
     case 'search_hub':
       return 'Search hub';
+    case 'mapview':
+    case 'map_view':
+    case 'map':
+      return 'Map view';
     case 'profile':
       return 'Profile';
     case 'tabs':

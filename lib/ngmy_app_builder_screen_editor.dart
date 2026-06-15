@@ -647,6 +647,7 @@ class _AddWidgetSheet extends StatelessWidget {
       ('socialFeed', 'Social feed', Icons.dynamic_feed_rounded),
       ('postComposer', 'Post / reel', Icons.video_call_rounded),
       ('searchHub', 'Search hub', Icons.search_rounded),
+      ('mapView', 'Map view', Icons.map_rounded),
       ('profile', 'Profile', Icons.person_rounded),
     ],
     'Layout': [

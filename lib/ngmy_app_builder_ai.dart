@@ -61,6 +61,10 @@ FACEBOOK: socialFeed home + postComposer + bottomNav. NOT menu hub.
 
 GOOGLE: searchHub home (fullBleed) + bookmark form.
 
+MAPS / NAVIGATION / TRAVEL: mapView home (fullBleed+hideAppBar) + form saving places (name,address,lat,lng) + dataList + shell.bottomNav. NEVER hero+menuGrid for map apps.
+
+AI CUSTOM TEMPLATES: Design unique layouts per request — mapView, socialFeed, reelFeed, searchHub, tabs, product feeds, CRM dashboards. Do NOT default every app to hero+stat+menuGrid.
+
 MEDIA / SOCIAL: use socialFeed or reelFeed widgets — NOT plain dataList as home.
 
 You build WORKING apps — not text-only brochures. Every feature must FUNCTION:
@@ -170,6 +174,7 @@ NgmyAppBuilderCopilotResult _applySocialBlueprintIfNeeded(
     'facebook' => 'Facebook-style',
     'google' => 'Google-style',
     'instagram' => 'Instagram-style',
+    'maps' => 'Map & navigation',
     _ => kind,
   };
   return NgmyAppBuilderCopilotResult(

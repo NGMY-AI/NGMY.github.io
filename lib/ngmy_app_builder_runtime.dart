@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_app_builder_data.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_runtime_extras.dart';
+import 'ngmy_app_builder_runtime_map.dart';
 import 'ngmy_app_builder_runtime_social.dart';
 
 /// Renders interactive app screens from JSON — forms save, lists show data, settings work.
@@ -288,6 +289,16 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
       case 'searchhub':
       case 'search_hub':
         return NgmyRuntimeSearchHub(
+          node: node,
+          theme: widget.theme,
+          store: _store,
+          isDark: widget.isDarkMode,
+          onSnack: widget.onSnack,
+        );
+      case 'mapview':
+      case 'map_view':
+      case 'map':
+        return NgmyRuntimeMapView(
           node: node,
           theme: widget.theme,
           store: _store,
@@ -971,5 +982,13 @@ Home: {"type":"socialFeed","collection":"posts"} with fullBleed. Create screen: 
 GOOGLE / SEARCH:
 Home: {"type":"searchHub","collection":"bookmarks"} fullBleed hideAppBar. Form screen to save bookmarks.
 
-FORBIDDEN for TikTok/Facebook/Google requests: hero + menuGrid hub as the only home screen.
+MAPS / NAVIGATION / TRAVEL / UBER-LIKE (NEVER hero+menuGrid):
+Home MUST use mapView fullBleed hideAppBar:
+{"type":"mapView","collection":"places","titleField":"name","subtitleField":"address","latField":"lat","lngField":"lng","height":420,"placeholder":"Search destinations…"}
+Add form to save places (name, address, lat, lng). dataList of saved trips/places. shell.bottomNav: Map→home, Saved→list, Add→form, Profile→profile.
+Pins open Google Maps directions. User can ask for ANY map style app — delivery, travel, fleet, real estate.
+
+AI CUSTOM TEMPLATES: When user describes ANY app type, design unique layouts — do NOT default to hero+menuGrid. Use mapView, socialFeed, reelFeed, searchHub, tabs, dataList-first, stat dashboards, or mixed columns as appropriate.
+
+FORBIDDEN for TikTok/Facebook/Google/Map requests: hero + menuGrid hub as the only home screen.
 ''';

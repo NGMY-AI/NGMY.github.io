@@ -115,6 +115,7 @@ class NgmyAppStudioDashboard extends StatefulWidget {
     required this.onProjectUpdated,
     required this.onSaveProject,
     required this.onExportProject,
+    required this.onDeleteProject,
     this.onChargeWallet,
     this.onDataChanged,
     this.onPersistConfig,
@@ -144,6 +145,7 @@ class NgmyAppStudioDashboard extends StatefulWidget {
   final ValueChanged<NgmyAppProject> onProjectUpdated;
   final Future<void> Function(NgmyAppProject) onSaveProject;
   final Future<void> Function(NgmyAppProject) onExportProject;
+  final Future<void> Function(NgmyAppProject) onDeleteProject;
   final Future<bool> Function(double amount, String description)? onChargeWallet;
   final VoidCallback? onDataChanged;
   final Future<bool> Function()? onPersistConfig;
@@ -309,14 +311,127 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
   }
 
   void _showSettings() {
-    showDialog<void>(
+    showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('App Studio Settings'),
-        content: const Text('API keys and editor preferences are managed in NGMY Admin → System Hub.'),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+      backgroundColor: const Color(0xFF1F2937),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Canvas settings', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+              SwitchListTile(
+                value: _showGrid,
+                onChanged: (v) {
+                  setState(() => _showGrid = v);
+                  Navigator.pop(ctx);
+                },
+                title: const Text('Show alignment grid', style: TextStyle(color: Colors.white)),
+                activeThumbColor: const Color(0xFF2563EB),
+              ),
+              SwitchListTile(
+                value: _inspectorOpen,
+                onChanged: (v) {
+                  setState(() => _inspectorOpen = v);
+                  Navigator.pop(ctx);
+                },
+                title: const Text('Show components panel', style: TextStyle(color: Colors.white)),
+                activeThumbColor: const Color(0xFF2563EB),
+              ),
+              if (widget.activeProject != null)
+                ListTile(
+                  leading: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF60A5FA)),
+                  title: const Text('Open AI Assistant', style: TextStyle(color: Colors.white)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() => _nav = NgmyStudioNav.aiAssistant);
+                  },
+                ),
+              ListTile(
+                leading: const Icon(Icons.folder_open_rounded, color: Colors.white70),
+                title: const Text('My Projects', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickNav(NgmyStudioNav.myProjects);
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteProject(NgmyAppProject p) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1F2937),
+        title: const Text('Delete app?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        content: Text('Delete "${p.name}" from My Projects? This cannot be undone.', style: TextStyle(color: Colors.white.withValues(alpha: 0.85))),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) await widget.onDeleteProject(p);
+  }
+
+  void _showScreenPicker() {
+    final p = widget.activeProject;
+    if (p == null || p.screens.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Open a project with screens first.')));
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1F2937),
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Screens', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+            ),
+            for (var i = 0; i < p.screens.length; i++)
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: _activeScreenIndex == i ? const Color(0xFF2563EB) : const Color(0xFF374151),
+                  child: Text('${i + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                ),
+                title: Text(p.screens[i].title, style: const TextStyle(color: Colors.white)),
+                trailing: _activeScreenIndex == i ? const Icon(Icons.check_rounded, color: Color(0xFF60A5FA)) : null,
+                onTap: () {
+                  setState(() {
+                    _activeScreenIndex = i;
+                    _selectedWidgetIndex = null;
+                    _nav = NgmyStudioNav.buildDesign;
+                  });
+                  Navigator.pop(ctx);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _resetCanvasHome() {
+    setState(() {
+      _nav = NgmyStudioNav.buildDesign;
+      _canvasMode = NgmyStudioCanvasMode.design;
+      _activeScreenIndex = 0;
+      _selectedWidgetIndex = null;
+    });
   }
 
   List<Map<String, dynamic>> _activeWidgets() {
@@ -899,11 +1014,11 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          btn(Icons.home_outlined, () {}),
+          btn(Icons.home_outlined, _resetCanvasHome, on: _nav == NgmyStudioNav.buildDesign && _activeScreenIndex == 0),
           btn(Icons.grid_view_rounded, () => setState(() => _showGrid = !_showGrid), on: _showGrid),
           btn(Icons.layers_outlined, () => setState(() => _inspectorOpen = !_inspectorOpen), on: _inspectorOpen),
-          btn(Icons.history_rounded, () {}),
-          btn(Icons.settings_outlined, () => _pickNav(NgmyStudioNav.settings)),
+          btn(Icons.history_rounded, _showScreenPicker),
+          btn(Icons.settings_outlined, _showSettings),
         ],
       ),
     );
@@ -955,6 +1070,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                           onSelected: (v) {
                             if (v == 'view') widget.onPreviewRuntime(p);
                             if (v == 'edit') widget.onOpenScreenEditor(p, 0);
+                            if (v == 'delete') _confirmDeleteProject(p);
                             if (v == 'canvas') {
                               widget.onSelectProject(p);
                               setState(() => _nav = NgmyStudioNav.buildDesign);
@@ -964,6 +1080,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                             const PopupMenuItem(value: 'canvas', child: Text('Open in canvas')),
                             const PopupMenuItem(value: 'edit', child: Text('Edit screen')),
                             const PopupMenuItem(value: 'view', child: Text('View app')),
+                            const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Color(0xFFDC2626)))),
                           ],
                         ),
                         onTap: () {

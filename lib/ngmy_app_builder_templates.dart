@@ -20,7 +20,7 @@ class NgmyAppTemplate {
   });
 }
 
-NgmyAppProject _base(String owner, String name, String tagline, int color, List<NgmyAppScreen> screens, {String appIcon = ''}) {
+NgmyAppProject _base(String owner, String name, String tagline, int color, List<NgmyAppScreen> screens, {String appIcon = '', Map<String, dynamic> shell = const {}}) {
   final now = DateTime.now().toUtc().toIso8601String();
   return NgmyAppProject(
     id: 'app_${DateTime.now().millisecondsSinceEpoch}',
@@ -30,13 +30,23 @@ NgmyAppProject _base(String owner, String name, String tagline, int color, List<
     themeColor: color,
     screens: screens,
     appIcon: appIcon.isNotEmpty ? appIcon : '✨',
+    shell: shell,
     createdAt: now,
     updatedAt: now,
   );
 }
 
-NgmyAppScreen _custom(String id, String title, Map<String, dynamic> layout) {
-  return NgmyAppScreen(id: id, title: title, kind: NgmyAppScreenKind.custom, data: {'layout': layout});
+NgmyAppScreen _custom(String id, String title, Map<String, dynamic> layout, {bool fullBleed = false, bool hideAppBar = false}) {
+  return NgmyAppScreen(
+    id: id,
+    title: title,
+    kind: NgmyAppScreenKind.custom,
+    data: {
+      if (fullBleed) 'fullBleed': true,
+      if (hideAppBar) 'hideAppBar': true,
+      'layout': layout,
+    },
+  );
 }
 
 Map<String, dynamic> _settingsLayout(String homeId) {
@@ -50,197 +60,88 @@ Map<String, dynamic> _settingsLayout(String homeId) {
   };
 }
 
+const _storeNav = [
+  {'icon': 'shop', 'label': 'Shop', 'target': 'home'},
+  {'icon': 'cart', 'label': 'Cart', 'target': 'cart'},
+  {'icon': 'add', 'label': 'Sell', 'target': 'add_product'},
+  {'icon': 'profile', 'label': 'Profile', 'target': 'profile'},
+];
+
+const _socialNav = [
+  {'icon': 'feed', 'label': 'Feed', 'target': 'feed'},
+  {'icon': 'create', 'label': 'Post', 'target': 'create'},
+  {'icon': 'profile', 'label': 'Profile', 'target': 'profile'},
+];
+
+const _travelNav = [
+  {'icon': 'map', 'label': 'Map', 'target': 'home'},
+  {'icon': 'list', 'label': 'Trips', 'target': 'trips'},
+  {'icon': 'add', 'label': 'Add', 'target': 'add_place'},
+  {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
+];
+
 final List<NgmyAppTemplate> kNgmyAppTemplates = [
+  // Travel — map-first (showcase: Travel Booking)
   NgmyAppTemplate(
     id: 'qr_studio',
-    name: 'QR Code Studio',
-    description: 'Live QR for websites & text — scan, save, share.',
-    icon: '📱',
+    name: 'Travel Explorer',
+    description: 'Map, saved trips & destinations.',
+    icon: '✈️',
     badge: 'Featured',
-    themeColor: 0xFF06B6D4,
-    build: (o) => _base(o, 'QR Code Studio', 'Generate QR codes for links and text', 0xFF06B6D4, [
-      _custom('home', 'Home', {
+    themeColor: 0xFF0EA5E9,
+    build: (o) => _base(o, 'Travel Explorer', 'Maps, trips & reservations', 0xFF0EA5E9, [
+      _custom('home', 'Map', {'type': 'mapView', 'collection': 'places', 'titleField': 'name', 'subtitleField': 'address', 'latField': 'lat', 'lngField': 'lng', 'height': 440, 'placeholder': 'Search cities, hotels, airports…', 'centerLat': 48.8566, 'centerLng': 2.3522}, fullBleed: true, hideAppBar: true),
+      _custom('add_place', 'Add destination', {
         'type': 'column',
         'children': [
-          {'type': 'hero', 'emoji': '📱', 'title': 'QR Code Studio', 'subtitle': 'Website links · plain text · saved codes'},
-          {'type': 'menuGrid', 'columns': 2, 'style': 'classic', 'items': [
-            {'label': 'Website QR', 'icon': 'shop', 'target': 'url_qr'},
-            {'label': 'Text QR', 'icon': 'mail', 'target': 'text_qr'},
-            {'label': 'Saved QRs', 'icon': 'venue', 'target': 'saved'},
-            {'label': 'Settings', 'icon': 'settings', 'target': 'settings'},
-          ]},
-        ],
-      }),
-      _custom('url_qr', 'Website QR', {
-        'type': 'column',
-        'children': [
-          {'type': 'text', 'text': 'Website / link QR', 'style': 'title'},
-          {'type': 'text', 'text': 'Type a URL — your QR updates live. Anyone can scan it.', 'style': 'subtitle'},
-          {'type': 'qrGenerator', 'mode': 'url', 'placeholder': 'https://your-website.com', 'collection': 'qr_codes', 'allowSave': true, 'saveButtonLabel': 'Save this QR'},
-          {'type': 'button', 'label': 'Back home', 'target': 'home'},
-        ],
-      }),
-      _custom('text_qr', 'Text QR', {
-        'type': 'column',
-        'children': [
-          {'type': 'text', 'text': 'Text QR code', 'style': 'title'},
-          {'type': 'text', 'text': 'Encode any message — Wi‑Fi notes, contact info, or quotes.', 'style': 'subtitle'},
-          {'type': 'qrGenerator', 'mode': 'text', 'placeholder': 'Type your message here…', 'collection': 'qr_codes', 'allowSave': true},
-          {'type': 'button', 'label': 'Back home', 'target': 'home'},
-        ],
-      }),
-      _custom('saved', 'Saved QRs', {
-        'type': 'column',
-        'children': [
-          {'type': 'text', 'text': 'Saved QR codes', 'style': 'title'},
-          {'type': 'dataList', 'collection': 'qr_codes', 'titleField': 'label', 'subtitleField': 'payload',
-            'emptyText': 'No saved codes yet. Create one from Website or Text QR.', 'allowDelete': true},
-          {'type': 'button', 'label': 'Create website QR', 'target': 'url_qr', 'large': true},
-        ],
-      }),
-      _custom('settings', 'Settings', _settingsLayout('home')),
-    ], appIcon: '📱'),
-  ),
-  NgmyAppTemplate(
-    id: 'invoice_pro',
-    name: 'Invoice Pro',
-    description: 'Create invoices with totals & payment QR.',
-    icon: '🧾',
-    badge: 'Featured',
-    themeColor: 0xFF6366F1,
-    build: (o) => _base(o, 'Invoice Pro', 'Professional invoices in seconds', 0xFF6366F1, [
-      _custom('home', 'Home', {
-        'type': 'column',
-        'children': [
-          {'type': 'hero', 'emoji': '🧾', 'title': 'Invoice Pro', 'subtitle': 'Bill clients · track payments · QR checkout'},
-          {'type': 'stat', 'collection': 'invoices', 'label': 'Invoices created'},
-          {'type': 'menuGrid', 'columns': 2, 'items': [
-            {'label': 'New invoice', 'icon': 'add', 'target': 'create'},
-            {'label': 'All invoices', 'icon': 'mail', 'target': 'list'},
-            {'label': 'Sample QR', 'icon': 'shop', 'target': 'sample_qr'},
-            {'label': 'Settings', 'icon': 'settings', 'target': 'settings'},
-          ]},
-        ],
-      }),
-      _custom('create', 'New Invoice', {
-        'type': 'column',
-        'children': [
-          {'type': 'invoiceBuilder', 'collection': 'invoices', 'title': 'Create invoice'},
-          {'type': 'button', 'label': 'View all invoices', 'target': 'list'},
-        ],
-      }),
-      _custom('list', 'Invoices', {
-        'type': 'column',
-        'children': [
-          {'type': 'text', 'text': 'Your invoices', 'style': 'title'},
-          {'type': 'dataList', 'collection': 'invoices', 'titleField': 'client', 'subtitleField': 'amount',
-            'emptyText': 'No invoices yet.', 'addTarget': 'create', 'addLabel': 'New invoice', 'allowDelete': true},
-        ],
-      }),
-      _custom('sample_qr', 'Payment QR', {
-        'type': 'column',
-        'children': [
-          {'type': 'text', 'text': 'Payment link QR', 'style': 'title'},
-          {'type': 'text', 'text': 'Add a payment URL when creating an invoice, or preview below:', 'style': 'subtitle'},
-          {'type': 'qrGenerator', 'mode': 'url', 'placeholder': 'https://pay.example.com/invoice', 'collection': 'qr_codes', 'allowSave': false},
-        ],
-      }),
-      _custom('settings', 'Settings', _settingsLayout('home')),
-    ], appIcon: '🧾'),
-  ),
-  NgmyAppTemplate(
-    id: 'video_hub',
-    name: 'Video Link Hub',
-    description: 'Save video URLs & open them instantly.',
-    icon: '🎬',
-    badge: 'New',
-    themeColor: 0xFF8B5CF6,
-    build: (o) => _base(o, 'Video Link Hub', 'Your personal video library', 0xFF8B5CF6, [
-      _custom('home', 'Home', {
-        'type': 'column',
-        'children': [
-          {'type': 'hero', 'emoji': '🎬', 'title': 'Video Link Hub', 'subtitle': 'Save links · tap to open · organize favorites'},
-          {'type': 'stat', 'collection': 'videos', 'label': 'Videos saved'},
-          {'type': 'menuGrid', 'columns': 2, 'items': [
-            {'label': 'Add video', 'icon': 'add', 'target': 'add'},
-            {'label': 'My videos', 'icon': 'shop', 'target': 'library'},
-            {'label': 'How it works', 'icon': 'info', 'target': 'help'},
-            {'label': 'Settings', 'icon': 'settings', 'target': 'settings'},
-          ]},
-        ],
-      }),
-      _custom('add', 'Add Video', {
-        'type': 'column',
-        'children': [
-          {'type': 'text', 'text': 'Save a video link', 'style': 'title'},
-          {'type': 'form', 'collection': 'videos', 'submitLabel': 'Save video', 'successMessage': 'Video saved!', 'navigateAfter': 'library',
+          {'type': 'text', 'text': 'Save a place', 'style': 'title'},
+          {'type': 'form', 'collection': 'places', 'submitLabel': 'Save on map', 'successMessage': 'Place saved!', 'navigateAfter': 'home',
             'fields': [
-              {'id': 'title', 'label': 'Video title', 'type': 'text'},
-              {'id': 'url', 'label': 'Video URL (YouTube, etc.)', 'type': 'text'},
-              {'id': 'notes', 'label': 'Notes', 'type': 'text'},
+              {'id': 'name', 'label': 'Place name', 'type': 'text'},
+              {'id': 'address', 'label': 'Address', 'type': 'text'},
+              {'id': 'lat', 'label': 'Latitude', 'type': 'text'},
+              {'id': 'lng', 'label': 'Longitude', 'type': 'text'},
             ]},
         ],
       }),
-      _custom('library', 'My Videos', {
+      _custom('trips', 'My trips', {
         'type': 'column',
         'children': [
-          {'type': 'text', 'text': 'Tap any video to open', 'style': 'title'},
-          {'type': 'dataList', 'collection': 'videos', 'titleField': 'title', 'subtitleField': 'notes',
-            'urlField': 'url', 'emptyText': 'No videos yet — add your first link.', 'addTarget': 'add', 'addLabel': 'Add video', 'allowDelete': true},
-        ],
-      }),
-      _custom('help', 'How it works', {
-        'type': 'column',
-        'children': [
-          {'type': 'card', 'children': [
-            {'type': 'text', 'text': '1. Add a video', 'style': 'title'},
-            {'type': 'text', 'text': 'Paste any video URL from YouTube, TikTok, or the web.', 'style': 'subtitle'},
-          ]},
-          {'type': 'spacer', 'height': 10},
-          {'type': 'card', 'children': [
-            {'type': 'text', 'text': '2. Tap to open', 'style': 'title'},
-            {'type': 'text', 'text': 'Your saved list opens links in your browser.', 'style': 'subtitle'},
-          ]},
-          {'type': 'button', 'label': 'Add your first video', 'target': 'add', 'large': true},
+          {'type': 'text', 'text': 'Saved trips', 'style': 'title'},
+          {'type': 'dataList', 'collection': 'places', 'titleField': 'name', 'subtitleField': 'address', 'emptyText': 'No trips yet — add a destination on the map.', 'addTarget': 'add_place', 'addLabel': 'Add trip', 'allowDelete': true},
         ],
       }),
       _custom('settings', 'Settings', _settingsLayout('home')),
-    ], appIcon: '🎬'),
+    ], appIcon: '✈️', shell: {'bottomNav': _travelNav}),
   ),
+  // E-Commerce — product feed (showcase: E-Commerce)
   NgmyAppTemplate(
     id: 'luxe_store',
     name: 'Luxe Store',
-    description: 'Shop, cart, checkout — full e-commerce.',
+    description: 'Product feed, cart & checkout.',
     icon: '🛍️',
     themeColor: 0xFFEC4899,
-    build: (o) => _base(o, 'Luxe Store', 'Sell products with style', 0xFFEC4899, [
-      _custom('home', 'Home', {
+    build: (o) => _base(o, 'Luxe Store', 'Curated shop with cart & checkout', 0xFFEC4899, [
+      _custom('home', 'Shop', {
         'type': 'column',
         'children': [
-          {'type': 'hero', 'emoji': '🛍️', 'title': 'Luxe Store', 'subtitle': 'Curated products · secure checkout'},
-          {'type': 'stat', 'collection': 'products', 'label': 'Products'},
-          {'type': 'menuGrid', 'columns': 2, 'items': [
-            {'label': 'Shop', 'icon': 'shop', 'target': 'catalog'},
-            {'label': 'Sell', 'icon': 'add', 'target': 'add_product'},
-            {'label': 'Cart', 'icon': 'cart', 'target': 'cart'},
-            {'label': 'Settings', 'icon': 'settings', 'target': 'settings'},
+          {'type': 'text', 'text': 'Discover', 'style': 'title'},
+          {'type': 'wrap', 'children': [
+            {'type': 'chip', 'label': 'New arrivals'},
+            {'type': 'chip', 'label': 'Best sellers'},
+            {'type': 'chip', 'label': 'Sale'},
           ]},
-        ],
-      }),
-      _custom('catalog', 'Shop', {
-        'type': 'column',
-        'children': [
-          {'type': 'dataList', 'collection': 'products', 'titleField': 'name', 'subtitleField': 'price',
-            'emptyText': 'No products yet.', 'addTarget': 'add_product', 'addLabel': 'Add product', 'allowDelete': true},
+          {'type': 'stat', 'collection': 'products', 'label': 'Products live'},
+          {'type': 'dataList', 'collection': 'products', 'titleField': 'name', 'subtitleField': 'price', 'emptyText': 'Your catalog is empty.', 'addTarget': 'add_product', 'addLabel': 'Add product', 'allowDelete': true},
         ],
       }),
       _custom('add_product', 'Add Product', {
         'type': 'column',
         'children': [
-          {'type': 'form', 'collection': 'products', 'submitLabel': 'List product', 'successMessage': 'Listed!', 'navigateAfter': 'catalog',
+          {'type': 'form', 'collection': 'products', 'submitLabel': 'List product', 'successMessage': 'Listed!', 'navigateAfter': 'home',
             'fields': [
               {'id': 'name', 'label': 'Product name', 'type': 'text'},
-              {'id': 'price', 'label': 'Price', 'type': 'number'},
+              {'id': 'price', 'label': 'Price', 'type': 'text'},
               {'id': 'desc', 'label': 'Description', 'type': 'text'},
             ]},
         ],
@@ -248,7 +149,8 @@ final List<NgmyAppTemplate> kNgmyAppTemplates = [
       _custom('cart', 'Cart', {
         'type': 'column',
         'children': [
-          {'type': 'dataList', 'collection': 'cart', 'titleField': 'name', 'subtitleField': 'price', 'emptyText': 'Cart empty.'},
+          {'type': 'text', 'text': 'Your cart', 'style': 'title'},
+          {'type': 'dataList', 'collection': 'cart', 'titleField': 'name', 'subtitleField': 'price', 'emptyText': 'Cart is empty.'},
           {'type': 'button', 'label': 'Checkout', 'target': 'checkout', 'large': true},
         ],
       }),
@@ -258,72 +160,43 @@ final List<NgmyAppTemplate> kNgmyAppTemplates = [
           {'type': 'form', 'collection': 'orders', 'submitLabel': 'Place order', 'successMessage': 'Order placed!', 'navigateAfter': 'home',
             'fields': [
               {'id': 'name', 'label': 'Name', 'type': 'text'},
-              {'id': 'address', 'label': 'Address', 'type': 'text'},
+              {'id': 'address', 'label': 'Shipping address', 'type': 'text'},
             ]},
         ],
       }),
+      _custom('profile', 'Profile', {
+        'type': 'column',
+        'children': [
+          {'type': 'profile', 'collection': 'orders', 'handle': 'Shopper'},
+          {'type': 'button', 'label': 'Settings', 'target': 'settings'},
+        ],
+      }),
       _custom('settings', 'Settings', _settingsLayout('home')),
-    ], appIcon: '🛍️'),
+    ], appIcon: '🛍️', shell: {'bottomNav': _storeNav}),
   ),
+  // Social — live feed (showcase: Social Media)
   NgmyAppTemplate(
     id: 'creator_hub',
-    name: 'Creator Hub',
-    description: 'Portfolio, bookings & client intake.',
-    icon: '✨',
-    themeColor: 0xFFF59E0B,
-    build: (o) => _base(o, 'Creator Hub', 'Show your work · book clients', 0xFFF59E0B, [
-      _custom('home', 'Home', {
-        'type': 'column',
-        'children': [
-          {'type': 'hero', 'emoji': '✨', 'title': 'Creator Hub', 'subtitle': 'Portfolio · bookings · messages'},
-          {'type': 'menuGrid', 'columns': 2, 'items': [
-            {'label': 'Portfolio', 'icon': 'shop', 'target': 'portfolio'},
-            {'label': 'Book me', 'icon': 'calendar', 'target': 'book'},
-            {'label': 'Contact', 'icon': 'mail', 'target': 'contact'},
-            {'label': 'Settings', 'icon': 'settings', 'target': 'settings'},
-          ]},
-        ],
+    name: 'Social Pulse',
+    description: 'Posts, profiles & engagement.',
+    icon: '💬',
+    themeColor: 0xFF8B5CF6,
+    build: (o) => _base(o, 'Social Pulse', 'Share posts and connect', 0xFF8B5CF6, [
+      _custom('feed', 'Feed', {'type': 'socialFeed', 'collection': 'posts'}, fullBleed: true, hideAppBar: true),
+      _custom('create', 'Create', {
+        'type': 'postComposer',
+        'mode': 'post',
+        'collection': 'posts',
+        'captionField': 'body',
+        'videoField': 'imageUrl',
+        'navigateAfter': 'feed',
+        'submitLabel': 'Share post',
       }),
-      _custom('portfolio', 'Portfolio', {
-        'type': 'column',
-        'children': [
-          {'type': 'dataList', 'collection': 'works', 'titleField': 'title', 'subtitleField': 'category',
-            'emptyText': 'Add your first project.', 'addTarget': 'add_work', 'addLabel': 'Add project', 'allowDelete': true},
-        ],
-      }),
-      _custom('add_work', 'Add Project', {
-        'type': 'column',
-        'children': [
-          {'type': 'form', 'collection': 'works', 'submitLabel': 'Save', 'successMessage': 'Saved!', 'navigateAfter': 'portfolio',
-            'fields': [
-              {'id': 'title', 'label': 'Project title', 'type': 'text'},
-              {'id': 'category', 'label': 'Category', 'type': 'text'},
-            ]},
-        ],
-      }),
-      _custom('book', 'Book Session', {
-        'type': 'column',
-        'children': [
-          {'type': 'form', 'collection': 'bookings', 'submitLabel': 'Request booking', 'successMessage': 'Sent!', 'navigateAfter': 'home',
-            'fields': [
-              {'id': 'name', 'label': 'Your name', 'type': 'text'},
-              {'id': 'date', 'label': 'Preferred date', 'type': 'text'},
-            ]},
-        ],
-      }),
-      _custom('contact', 'Contact', {
-        'type': 'column',
-        'children': [
-          {'type': 'form', 'collection': 'messages', 'submitLabel': 'Send', 'successMessage': 'Message sent!',
-            'fields': [
-              {'id': 'name', 'label': 'Name', 'type': 'text'},
-              {'id': 'message', 'label': 'Message', 'type': 'text'},
-            ]},
-        ],
-      }),
-      _custom('settings', 'Settings', _settingsLayout('home')),
-    ], appIcon: '✨'),
+      _custom('profile', 'Profile', {'type': 'profile', 'collection': 'posts', 'handle': '@you'}),
+      _custom('settings', 'Settings', _settingsLayout('feed')),
+    ], appIcon: '💬', shell: {'bottomNav': _socialNav}),
   ),
+  // Fitness — workout dashboard (showcase: Health & Fitness)
   NgmyAppTemplate(
     id: 'pulse_fitness',
     name: 'Pulse Fitness',
@@ -331,27 +204,24 @@ final List<NgmyAppTemplate> kNgmyAppTemplates = [
     icon: '💪',
     themeColor: 0xFF10B981,
     build: (o) => _base(o, 'Pulse Fitness', 'Train smarter every day', 0xFF10B981, [
-      _custom('home', 'Home', {
+      _custom('home', 'Today', {
         'type': 'column',
         'children': [
-          {'type': 'hero', 'emoji': '💪', 'title': 'Pulse Fitness', 'subtitle': 'Plans · progress · daily wins'},
-          {'type': 'stat', 'collection': 'checkins', 'label': 'Check-ins'},
-          {'type': 'menuGrid', 'columns': 2, 'items': [
-            {'label': 'Workouts', 'icon': 'fitness', 'target': 'workouts'},
-            {'label': 'Check-in', 'icon': 'add', 'target': 'checkin'},
-            {'label': 'Nutrition', 'icon': 'food', 'target': 'nutrition'},
-            {'label': 'Settings', 'icon': 'settings', 'target': 'settings'},
+          {'type': 'text', 'text': 'Today\'s plan', 'style': 'title'},
+          {'type': 'row', 'children': [
+            {'type': 'stat', 'collection': 'checkins', 'label': 'Check-ins'},
+            {'type': 'stat', 'collection': 'workouts', 'label': 'Workouts'},
           ]},
-        ],
-      }),
-      _custom('workouts', 'Workouts', {
-        'type': 'column',
-        'children': [
-          {'type': 'workoutPlan', 'planId': 'main', 'title': 'Today\'s circuit', 'exercises': [
+          {'type': 'workoutPlan', 'planId': 'today', 'title': 'Strength circuit', 'exercises': [
             {'id': 'sq', 'name': 'Squats', 'sets': '4×12'},
             {'id': 'pu', 'name': 'Push-ups', 'sets': '3×15'},
-            {'id': 'pl', 'name': 'Plank', 'sets': '3×45s'},
+            {'id': 'run', 'name': 'Run', 'sets': '20 min'},
           ]},
+          {'type': 'checklist', 'id': 'nutrition', 'items': [
+            {'id': 'w', 'label': '8 glasses of water'},
+            {'id': 'p', 'label': 'Protein each meal'},
+          ]},
+          {'type': 'button', 'label': 'Log check-in', 'target': 'checkin'},
         ],
       }),
       _custom('checkin', 'Check-in', {
@@ -364,22 +234,136 @@ final List<NgmyAppTemplate> kNgmyAppTemplates = [
             ]},
         ],
       }),
-      _custom('nutrition', 'Nutrition', {
+      _custom('history', 'History', {
         'type': 'column',
         'children': [
-          {'type': 'checklist', 'id': 'nutrition', 'items': [
-            {'id': 'w', 'label': '8 glasses of water'},
-            {'id': 'p', 'label': 'Protein each meal'},
-          ]},
+          {'type': 'dataList', 'collection': 'checkins', 'titleField': 'weight', 'subtitleField': 'energy', 'emptyText': 'No check-ins yet.', 'allowDelete': true},
         ],
       }),
       _custom('settings', 'Settings', _settingsLayout('home')),
     ], appIcon: '💪'),
   ),
+  // CRM — tabbed dashboard (showcase: CRM)
+  NgmyAppTemplate(
+    id: 'invoice_pro',
+    name: 'CRM Dashboard',
+    description: 'Clients, invoices & pipeline.',
+    icon: '📊',
+    themeColor: 0xFF6366F1,
+    build: (o) => _base(o, 'CRM Dashboard', 'Clients, charts & pipeline', 0xFF6366F1, [
+      _custom('home', 'Dashboard', {
+        'type': 'tabs',
+        'tabs': [
+          {
+            'label': 'Overview',
+            'layout': {
+              'type': 'column',
+              'children': [
+                {'type': 'row', 'children': [
+                  {'type': 'stat', 'collection': 'clients', 'label': 'Clients'},
+                  {'type': 'stat', 'collection': 'invoices', 'label': 'Invoices'},
+                ]},
+                {'type': 'text', 'text': 'Recent invoices', 'style': 'subtitle'},
+                {'type': 'dataList', 'collection': 'invoices', 'titleField': 'client', 'subtitleField': 'amount', 'emptyText': 'No invoices yet.', 'addTarget': 'create', 'addLabel': 'New invoice'},
+              ],
+            },
+          },
+          {
+            'label': 'Clients',
+            'layout': {
+              'type': 'column',
+              'children': [
+                {'type': 'dataList', 'collection': 'clients', 'titleField': 'name', 'subtitleField': 'email', 'emptyText': 'Add your first client.', 'addTarget': 'add_client', 'addLabel': 'Add client', 'allowDelete': true},
+              ],
+            },
+          },
+        ],
+      }),
+      _custom('create', 'New Invoice', {
+        'type': 'column',
+        'children': [
+          {'type': 'invoiceBuilder', 'collection': 'invoices', 'title': 'Create invoice'},
+        ],
+      }),
+      _custom('add_client', 'Add Client', {
+        'type': 'column',
+        'children': [
+          {'type': 'form', 'collection': 'clients', 'submitLabel': 'Save client', 'successMessage': 'Client saved!', 'navigateAfter': 'home',
+            'fields': [
+              {'id': 'name', 'label': 'Client name', 'type': 'text'},
+              {'id': 'email', 'label': 'Email', 'type': 'text'},
+            ]},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '📊'),
+  ),
+  // Portfolio — search hub (showcase: Portfolio Web)
+  NgmyAppTemplate(
+    id: 'video_hub',
+    name: 'Portfolio Hub',
+    description: 'Showcase work & contact.',
+    icon: '🌐',
+    themeColor: 0xFF0EA5E9,
+    build: (o) => _base(o, 'Portfolio Hub', 'Showcase projects & contact', 0xFF0EA5E9, [
+      _custom('home', 'Portfolio', {'type': 'searchHub', 'collection': 'projects', 'placeholder': 'Search projects or add new work…'}, fullBleed: true, hideAppBar: true),
+      _custom('add', 'Add Project', {
+        'type': 'column',
+        'children': [
+          {'type': 'form', 'collection': 'projects', 'submitLabel': 'Publish project', 'successMessage': 'Added to portfolio!', 'navigateAfter': 'home',
+            'fields': [
+              {'id': 'title', 'label': 'Project title', 'type': 'text'},
+              {'id': 'url', 'label': 'Project URL', 'type': 'text'},
+              {'id': 'tags', 'label': 'Tags', 'type': 'text'},
+            ]},
+        ],
+      }),
+      _custom('contact', 'Contact', {
+        'type': 'column',
+        'children': [
+          {'type': 'card', 'children': [
+            {'type': 'text', 'text': 'Let\'s work together', 'style': 'title'},
+            {'type': 'text', 'text': 'Send a message — forms save to your app data.', 'style': 'subtitle'},
+          ]},
+          {'type': 'form', 'collection': 'messages', 'submitLabel': 'Send message', 'successMessage': 'Sent!',
+            'fields': [
+              {'id': 'name', 'label': 'Name', 'type': 'text'},
+              {'id': 'message', 'label': 'Message', 'type': 'text'},
+            ]},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '🌐'),
+  ),
+  // Keep QR studio as separate template id alias for older saves
+  NgmyAppTemplate(
+    id: 'qr_code_studio',
+    name: 'QR Code Studio',
+    description: 'Live QR for websites & text.',
+    icon: '📱',
+    themeColor: 0xFF06B6D4,
+    build: (o) => _base(o, 'QR Code Studio', 'Generate QR codes for links and text', 0xFF06B6D4, [
+      _custom('home', 'QR Tools', {
+        'type': 'tabs',
+        'tabs': [
+          {'label': 'Website', 'layout': {'type': 'column', 'children': [
+            {'type': 'qrGenerator', 'mode': 'url', 'placeholder': 'https://your-website.com', 'collection': 'qr_codes', 'allowSave': true},
+          ]}},
+          {'label': 'Text', 'layout': {'type': 'column', 'children': [
+            {'type': 'qrGenerator', 'mode': 'text', 'placeholder': 'Your message…', 'collection': 'qr_codes', 'allowSave': true},
+          ]}},
+          {'label': 'Saved', 'layout': {'type': 'column', 'children': [
+            {'type': 'dataList', 'collection': 'qr_codes', 'titleField': 'label', 'subtitleField': 'payload', 'emptyText': 'No saved codes yet.', 'allowDelete': true},
+          ]}},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '📱'),
+  ),
   NgmyAppTemplate(
     id: 'blank',
     name: 'Blank Canvas',
-    description: 'Start fresh — ask Bolt AI to build anything.',
+    description: 'Start fresh — describe any app to NGMY AI.',
     icon: '🚀',
     themeColor: 0xFF6366F1,
     build: (o) => NgmyAppProject.blank(ownerEmail: o).copyWith(appIcon: '🚀'),

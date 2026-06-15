@@ -14,6 +14,9 @@ class NgmyAppSocialBlueprints {
     if (q.contains('google') && (q.contains('search') || q.contains('like google') || q.contains('browser'))) {
       return 'google';
     }
+    if (q.contains('map') || q.contains('google map') || q.contains('navigation') || q.contains('gps') || q.contains('directions') || q.contains('uber') || q.contains('delivery route') || q.contains('realistic map')) {
+      return 'maps';
+    }
     if (q.contains('instagram') || q.contains('ig app')) {
       return 'instagram';
     }
@@ -26,7 +29,7 @@ class NgmyAppSocialBlueprints {
     final layout = home.data['layout'];
     if (layout is! Map) return home.kind != NgmyAppScreenKind.custom;
     final json = layout.toString().toLowerCase();
-    if (json.contains('reelfeed') || json.contains('socialfeed') || json.contains('searchhub')) return false;
+    if (json.contains('reelfeed') || json.contains('socialfeed') || json.contains('searchhub') || json.contains('mapview')) return false;
     return json.contains('menugrid') && (json.contains('hero') || json.contains('stat'));
   }
 
@@ -40,6 +43,8 @@ class NgmyAppSocialBlueprints {
         return _google(ownerEmail: ownerEmail, name: name);
       case 'instagram':
         return _instagram(ownerEmail: ownerEmail, name: name);
+      case 'maps':
+        return _maps(ownerEmail: ownerEmail, name: name);
       default:
         return null;
     }
@@ -244,6 +249,102 @@ class NgmyAppSocialBlueprints {
       themeColor: 0xFFE1306C,
       appIcon: '📸',
       tagline: 'Photos and reels',
+    );
+  }
+
+  static NgmyAppProject _maps({required String ownerEmail, String? name}) {
+    final now = DateTime.now().toUtc().toIso8601String();
+    return NgmyAppProject(
+      id: 'app_maps_${DateTime.now().millisecondsSinceEpoch}',
+      name: name ?? 'MapGo',
+      tagline: 'Search places, pins & directions',
+      ownerEmail: ownerEmail,
+      themeColor: 0xFF34A853,
+      appIcon: '🗺️',
+      createdAt: now,
+      updatedAt: now,
+      shell: {
+        'bottomNav': [
+          {'icon': 'map', 'label': 'Map', 'target': 'home'},
+          {'icon': 'list', 'label': 'Saved', 'target': 'places'},
+          {'icon': 'add', 'label': 'Add', 'target': 'add'},
+          {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
+        ],
+      },
+      screens: [
+        NgmyAppScreen(
+          id: 'home',
+          title: 'Map',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'fullBleed': true,
+            'hideAppBar': true,
+            'layout': {
+              'type': 'mapView',
+              'collection': 'places',
+              'titleField': 'name',
+              'subtitleField': 'address',
+              'latField': 'lat',
+              'lngField': 'lng',
+              'height': 460,
+              'placeholder': 'Search anywhere…',
+              'centerLat': 40.7128,
+              'centerLng': -74.006,
+            },
+          },
+        ),
+        NgmyAppScreen(
+          id: 'add',
+          title: 'Add place',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'form',
+              'collection': 'places',
+              'submitLabel': 'Save place',
+              'successMessage': 'Pinned on map!',
+              'navigateAfter': 'home',
+              'fields': [
+                {'id': 'name', 'label': 'Place name', 'type': 'text'},
+                {'id': 'address', 'label': 'Address', 'type': 'text'},
+                {'id': 'lat', 'label': 'Latitude', 'type': 'text'},
+                {'id': 'lng', 'label': 'Longitude', 'type': 'text'},
+              ],
+            },
+          },
+        ),
+        NgmyAppScreen(
+          id: 'places',
+          title: 'Saved places',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'dataList',
+              'collection': 'places',
+              'titleField': 'name',
+              'subtitleField': 'address',
+              'emptyText': 'No saved places — add one from the map.',
+              'addTarget': 'add',
+              'addLabel': 'Add place',
+              'allowDelete': true,
+            },
+          },
+        ),
+        NgmyAppScreen(
+          id: 'settings',
+          title: 'Settings',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'column',
+              'children': [
+                {'type': 'switch', 'setting': 'dark_mode', 'label': 'Dark mode', 'default': false},
+                {'type': 'button', 'label': 'Back to map', 'target': 'home'},
+              ],
+            },
+          },
+        ),
+      ],
     );
   }
 }

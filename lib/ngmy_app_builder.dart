@@ -209,6 +209,15 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
     await _reload();
   }
 
+  Future<void> _deleteProjectFromStudio(NgmyAppProject project) async {
+    await ngmyDeleteUserAppProject(_email, project.id);
+    if (mounted) {
+      if (_activeProject?.id == project.id) setState(() => _activeProject = null);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"${project.name}" deleted.')));
+    }
+    await _reload();
+  }
+
   void _onProjectUpdatedFromStudio(NgmyAppProject project) {
     setState(() => _activeProject = project);
     unawaited(_reload());
@@ -461,6 +470,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
       onProjectUpdated: _onProjectUpdatedFromStudio,
       onSaveProject: _saveActiveProject,
       onExportProject: _exportApp,
+      onDeleteProject: _deleteProjectFromStudio,
     );
   }
 
