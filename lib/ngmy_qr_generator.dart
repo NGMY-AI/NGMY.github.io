@@ -20,17 +20,19 @@ const List<String> _kQrTypeLabels = [
   'SMS',
 ];
 
-/// QR Code Generator — local device storage only (no cloud/database).
-void showNgmyQrGeneratorDialog(BuildContext context) {
+/// QR Code Generator — local codes plus cloud-saved Advisors / Family Tree sync QRs.
+void showNgmyQrGeneratorDialog(BuildContext context, {String? userEmail}) {
   showDialog<void>(
     context: context,
     barrierColor: Colors.black.withOpacity(0.82),
-    builder: (ctx) => const _NgmyQrGeneratorDialog(),
+    builder: (ctx) => _NgmyQrGeneratorDialog(userEmail: userEmail?.trim()),
   );
 }
 
 class _NgmyQrGeneratorDialog extends StatefulWidget {
-  const _NgmyQrGeneratorDialog();
+  const _NgmyQrGeneratorDialog({this.userEmail});
+
+  final String? userEmail;
 
   @override
   State<_NgmyQrGeneratorDialog> createState() => _NgmyQrGeneratorDialogState();
@@ -79,7 +81,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   }
 
   Future<void> _reloadSaved() async {
-    final list = await loadNgmySavedQrs();
+    final list = await loadNgmySavedQrs(userEmail: widget.userEmail);
     if (!mounted) return;
     setState(() => _saved = list);
   }
@@ -289,7 +291,11 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete saved QR?'),
-        content: Text('Remove “${record.label}” from this device?'),
+        content: Text(
+          record.isSyncQr
+              ? 'Remove “${record.label}” from your saved sync QRs? You can save a new ${record.label} QR after this.'
+              : 'Remove “${record.label}” from this device?',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
@@ -297,7 +303,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       ),
     );
     if (ok != true) return;
-    await deleteNgmySavedQr(record.id);
+    await deleteNgmySavedQr(record.id, userEmail: widget.userEmail);
     await _reloadSaved();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -424,12 +430,17 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
             child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 22),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('QR Code Generator', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                Text('Local device · Download · Save', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600)),
+                const Text('QR Code Generator', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                Text(
+                  widget.userEmail != null && widget.userEmail!.isNotEmpty
+                      ? 'Saved sync QRs · Local codes'
+                      : 'Local device · Download · Save',
+                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600),
+                ),
               ],
             ),
           ),
@@ -518,7 +529,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
           Flexible(
             child: Text(
               _type == _savedTabIndex
-                  ? '${_saved.length} QR code${_saved.length == 1 ? '' : 's'} on this device'
+                  ? '${_saved.length} saved QR code${_saved.length == 1 ? '' : 's'}'
                   : 'Generate ${_typeLabel()} QR instantly',
               textAlign: TextAlign.center,
               style: const TextStyle(color: _accent, fontWeight: FontWeight.w800, fontSize: 13),
@@ -541,7 +552,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
             const Text('No saved QR codes yet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
             const SizedBox(height: 6),
             Text(
-              'Create a QR, add a label, and tap Save.\nEverything stays on this phone only.',
+              'Create a QR and tap Save, or save a restore QR\nfrom NGMY Advisors or Family Tree sync.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12, height: 1.4),
             ),
@@ -587,6 +598,13 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                         children: [
                           Text(record.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18), maxLines: 1, overflow: TextOverflow.ellipsis),
                           Text(record.typeLabel, style: TextStyle(color: _accent.withOpacity(0.9), fontSize: 12, fontWeight: FontWeight.w700)),
+                          if (record.isSyncQr && record.usesRemaining != null)
+                            Text(
+                              record.usesRemaining! >= 999
+                                  ? 'Unlimited scans (admin)'
+                                  : '${record.usesRemaining} of 2 scans remaining',
+                              style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
                         ],
                       ),
                     ),
@@ -612,7 +630,9 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                         NgmyBrandedQrWidget(data: record.payload, large: true),
                         const SizedBox(height: 20),
                         Text(
-                          'Scan with any camera app',
+                          record.isSyncQr
+                              ? 'Restore QR — scan on another phone (${record.usesRemaining != null && record.usesRemaining! < 999 ? 'max 2 scans total' : 'admin'})'
+                              : 'Scan with any camera app',
                           style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -683,6 +703,20 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                 alignment: Alignment.centerLeft,
                 child: Text(record.typeLabel, style: TextStyle(color: _accent.withOpacity(0.85), fontSize: 9, fontWeight: FontWeight.w700)),
               ),
+              if (record.isSyncQr && record.usesRemaining != null) ...[
+                const SizedBox(height: 2),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    record.usesRemaining! >= 999 ? 'Unlimited' : '${record.usesRemaining} scans left',
+                    style: TextStyle(
+                      color: record.usesRemaining! > 0 ? const Color(0xFF34D399) : const Color(0xFFF59E0B),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
               const Spacer(),
               FittedBox(
                 child: NgmyBrandedQrWidget(data: record.payload, compact: true),

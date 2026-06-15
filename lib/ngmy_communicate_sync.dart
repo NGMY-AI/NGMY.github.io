@@ -233,6 +233,15 @@ class NgmyCommunicateQrStash {
     );
   }
 
+  static Future<int?> usesRemainingForToken(String token) async {
+    final id = token.trim();
+    if (id.isEmpty) return null;
+    final stashes = await _loadStashes();
+    final row = stashes[id];
+    if (row is! Map) return null;
+    return (row['usesRemaining'] as num?)?.toInt();
+  }
+
   static Future<NgmyAdvisorSyncBundle?> consumeToken(String token) async {
     final id = token.trim();
     if (id.isEmpty) return null;

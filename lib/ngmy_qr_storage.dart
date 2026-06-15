@@ -2,9 +2,13 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_sync_qr_saved.dart';
+
+export 'ngmy_sync_qr_saved.dart' show NgmySyncQrSource, NgmySavedSyncQrRecord, NgmySyncQrSavedStore;
+
 const String _kSavedQrsKey = 'ngmy_saved_qrs_v1';
 
-/// A QR code saved only on this device (never synced to Supabase).
+/// A QR code saved on this device, or a cloud-sync restore QR (Advisors / Family Tree).
 class NgmySavedQrRecord {
   final String id;
   final String label;
@@ -12,6 +16,9 @@ class NgmySavedQrRecord {
   final String typeLabel;
   final String payload;
   final String savedAt;
+  /// Non-null for restore QRs saved from Advisors or Family Tree sync.
+  final NgmySyncQrSourceKind? syncSource;
+  final int? usesRemaining;
 
   const NgmySavedQrRecord({
     required this.id,
@@ -20,7 +27,11 @@ class NgmySavedQrRecord {
     required this.typeLabel,
     required this.payload,
     required this.savedAt,
+    this.syncSource,
+    this.usesRemaining,
   });
+
+  bool get isSyncQr => syncSource != null;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -29,9 +40,18 @@ class NgmySavedQrRecord {
         'typeLabel': typeLabel,
         'payload': payload,
         'savedAt': savedAt,
+        if (syncSource != null) 'syncSource': syncSource!.name,
+        if (usesRemaining != null) 'usesRemaining': usesRemaining,
       };
 
   factory NgmySavedQrRecord.fromJson(Map<String, dynamic> json) {
+    NgmySyncQrSourceKind? sync;
+    final syncRaw = json['syncSource']?.toString();
+    if (syncRaw == NgmySyncQrSourceKind.advisor.name) {
+      sync = NgmySyncQrSourceKind.advisor;
+    } else if (syncRaw == NgmySyncQrSourceKind.familyTree.name) {
+      sync = NgmySyncQrSourceKind.familyTree;
+    }
     return NgmySavedQrRecord(
       id: (json['id'] ?? '').toString(),
       label: (json['label'] ?? 'Untitled').toString(),
@@ -39,11 +59,43 @@ class NgmySavedQrRecord {
       typeLabel: (json['typeLabel'] ?? 'QR').toString(),
       payload: (json['payload'] ?? '').toString(),
       savedAt: (json['savedAt'] ?? '').toString(),
+      syncSource: sync,
+      usesRemaining: (json['usesRemaining'] as num?)?.toInt(),
+    );
+  }
+
+  factory NgmySavedQrRecord.fromSyncRecord(NgmySavedSyncQrRecord sync) {
+    return NgmySavedQrRecord(
+      id: 'sync_${sync.source.storageKey}',
+      label: sync.label,
+      typeIndex: -1,
+      typeLabel: 'Saved from ${sync.source.displayLabel}',
+      payload: sync.qrPayload,
+      savedAt: sync.savedAt,
+      syncSource: sync.source == NgmySyncQrSource.advisor
+          ? NgmySyncQrSourceKind.advisor
+          : NgmySyncQrSourceKind.familyTree,
+      usesRemaining: sync.usesRemaining,
     );
   }
 }
 
-Future<List<NgmySavedQrRecord>> loadNgmySavedQrs() async {
+/// Matches cloud sync QR slots (not stored in SharedPreferences).
+enum NgmySyncQrSourceKind { advisor, familyTree }
+
+Future<List<NgmySavedQrRecord>> loadNgmySavedQrs({String? userEmail}) async {
+  final local = await _loadLocalSavedQrs();
+  if (userEmail == null || userEmail.trim().isEmpty) return local;
+  try {
+    final sync = await NgmySyncQrSavedStore.loadForUser(userEmail);
+    final syncRecords = sync.map(NgmySavedQrRecord.fromSyncRecord).toList();
+    return [...syncRecords, ...local];
+  } catch (_) {
+    return local;
+  }
+}
+
+Future<List<NgmySavedQrRecord>> _loadLocalSavedQrs() async {
   final prefs = await SharedPreferences.getInstance();
   final raw = prefs.getString(_kSavedQrsKey);
   if (raw == null || raw.isEmpty) return [];
@@ -69,14 +121,25 @@ Future<void> persistNgmySavedQrs(List<NgmySavedQrRecord> records) async {
 }
 
 Future<NgmySavedQrRecord> addNgmySavedQr(NgmySavedQrRecord record) async {
-  final list = await loadNgmySavedQrs();
+  final list = await _loadLocalSavedQrs();
   list.insert(0, record);
   await persistNgmySavedQrs(list);
   return record;
 }
 
-Future<void> deleteNgmySavedQr(String id) async {
-  final list = await loadNgmySavedQrs();
+Future<void> deleteNgmySavedQr(String id, {String? userEmail}) async {
+  if (id.startsWith('sync_')) {
+    if (userEmail == null || userEmail.trim().isEmpty) return;
+    if (id == 'sync_advisor') {
+      await NgmySyncQrSavedStore.delete(userEmail, NgmySyncQrSource.advisor);
+      return;
+    }
+    if (id == 'sync_family_tree') {
+      await NgmySyncQrSavedStore.delete(userEmail, NgmySyncQrSource.familyTree);
+      return;
+    }
+  }
+  final list = await _loadLocalSavedQrs();
   list.removeWhere((r) => r.id == id);
   await persistNgmySavedQrs(list);
 }

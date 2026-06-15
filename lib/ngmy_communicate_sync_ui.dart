@@ -12,6 +12,7 @@ import 'ngmy_communicate.dart' show kNgmyAdvisorsHubAccent;
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_sync.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_sync_qr_saved.dart';
 
 Future<void> showNgmyCommunicateSyncSheet(
   BuildContext context, {
@@ -196,6 +197,7 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
         MaterialPageRoute<void>(
           fullscreenDialog: true,
           builder: (_) => _NgmyAdvisorQrDisplayPage(
+            email: widget.email,
             qrPayload: qr.qrPayload,
             backupCode: qr.code,
             usesRemaining: qr.usesRemaining,
@@ -491,23 +493,73 @@ class _SyncActionTile extends StatelessWidget {
   }
 }
 
-class _NgmyAdvisorQrDisplayPage extends StatelessWidget {
+class _NgmyAdvisorQrDisplayPage extends StatefulWidget {
   const _NgmyAdvisorQrDisplayPage({
+    required this.email,
     required this.qrPayload,
     required this.backupCode,
     required this.usesRemaining,
   });
 
+  final String email;
   final String qrPayload;
   final String backupCode;
   final int usesRemaining;
+
+  @override
+  State<_NgmyAdvisorQrDisplayPage> createState() => _NgmyAdvisorQrDisplayPageState();
+}
+
+class _NgmyAdvisorQrDisplayPageState extends State<_NgmyAdvisorQrDisplayPage> {
+  bool _saving = false;
+  bool? _alreadySaved;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_checkSaved());
+  }
+
+  Future<void> _checkSaved() async {
+    final saved = await NgmySyncQrSavedStore.hasSaved(widget.email, NgmySyncQrSource.advisor);
+    if (mounted) setState(() => _alreadySaved = saved);
+  }
+
+  Future<void> _saveToHub() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final token = NgmySyncQrSavedStore.extractStashToken(widget.qrPayload, NgmySyncQrSource.advisor);
+      if (token == null) throw StateError('Could not read this QR code.');
+      await NgmySyncQrSavedStore.save(
+        email: widget.email,
+        source: NgmySyncQrSource.advisor,
+        qrPayload: widget.qrPayload,
+        stashToken: token,
+        backupCode: widget.backupCode,
+        usesRemaining: widget.usesRemaining,
+      );
+      if (!mounted) return;
+      setState(() => _alreadySaved = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saved to QR Code Generator → Saved (NGMY Advisors).')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('StateError: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
     final card = isDark ? const Color(0xFF151B28) : Colors.white;
-    final usesLabel = usesRemaining >= 999 ? 'Unlimited (admin)' : '$usesRemaining scans left';
+    final usesLabel = widget.usesRemaining >= 999 ? 'Unlimited (admin)' : '${widget.usesRemaining} scans left';
 
     return Scaffold(
       backgroundColor: bg,
@@ -543,14 +595,14 @@ class _NgmyAdvisorQrDisplayPage extends StatelessWidget {
                         ],
                       ),
                       child: QrImageView(
-                        data: qrPayload,
+                        data: widget.qrPayload,
                         size: 240,
                         backgroundColor: Colors.white,
                         errorCorrectionLevel: QrErrorCorrectLevel.M,
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Text('Code: $backupCode', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                    Text('Code: ${widget.backupCode}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -574,7 +626,37 @@ class _NgmyAdvisorQrDisplayPage extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, height: 1.45, color: isDark ? Colors.white60 : const Color(0xFF64748B)),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: (_saving || _alreadySaved == true) ? null : _saveToHub,
+                icon: _saving
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(_alreadySaved == true ? Icons.check_rounded : Icons.bookmark_add_outlined),
+                label: Text(
+                  _alreadySaved == true
+                      ? 'Saved in QR Generator'
+                      : 'Save to QR Generator',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kNgmyAdvisorsHubAccent,
+                  side: BorderSide(color: kNgmyAdvisorsHubAccent.withValues(alpha: 0.55)),
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+              ),
+            ),
+            if (_alreadySaved == true)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Labeled “NGMY Advisors” in Hub → QR Code Generator → Saved. Delete it there to save a new one.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, height: 1.35, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+                ),
+              ),
+            const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: FilledButton(

@@ -10,6 +10,7 @@ import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_f
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
 import 'ngmy_family_tree_sync.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_sync_qr_saved.dart';
 import 'ngmy_worksheet_helpers.dart';
 import 'ngmy_worksheets_storage.dart';
 
@@ -214,6 +215,7 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
         MaterialPageRoute<void>(
           fullscreenDialog: true,
           builder: (_) => _NgmyFamilyTreeQrDisplayPage(
+            email: widget.email,
             qrPayload: qr.qrPayload,
             backupCode: qr.code,
             usesRemaining: qr.usesRemaining,
@@ -512,23 +514,73 @@ class _SyncActionTile extends StatelessWidget {
   }
 }
 
-class _NgmyFamilyTreeQrDisplayPage extends StatelessWidget {
+class _NgmyFamilyTreeQrDisplayPage extends StatefulWidget {
   const _NgmyFamilyTreeQrDisplayPage({
+    required this.email,
     required this.qrPayload,
     required this.backupCode,
     required this.usesRemaining,
   });
 
+  final String email;
   final String qrPayload;
   final String backupCode;
   final int usesRemaining;
+
+  @override
+  State<_NgmyFamilyTreeQrDisplayPage> createState() => _NgmyFamilyTreeQrDisplayPageState();
+}
+
+class _NgmyFamilyTreeQrDisplayPageState extends State<_NgmyFamilyTreeQrDisplayPage> {
+  bool _saving = false;
+  bool? _alreadySaved;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_checkSaved());
+  }
+
+  Future<void> _checkSaved() async {
+    final saved = await NgmySyncQrSavedStore.hasSaved(widget.email, NgmySyncQrSource.familyTree);
+    if (mounted) setState(() => _alreadySaved = saved);
+  }
+
+  Future<void> _saveToHub() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final token = NgmySyncQrSavedStore.extractStashToken(widget.qrPayload, NgmySyncQrSource.familyTree);
+      if (token == null) throw StateError('Could not read this QR code.');
+      await NgmySyncQrSavedStore.save(
+        email: widget.email,
+        source: NgmySyncQrSource.familyTree,
+        qrPayload: widget.qrPayload,
+        stashToken: token,
+        backupCode: widget.backupCode,
+        usesRemaining: widget.usesRemaining,
+      );
+      if (!mounted) return;
+      setState(() => _alreadySaved = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saved to QR Code Generator → Saved (NGMY Family Tree).')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('StateError: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
     final card = isDark ? const Color(0xFF151B28) : Colors.white;
-    final usesLabel = usesRemaining >= 999 ? 'Unlimited (admin)' : '$usesRemaining scans left';
+    final usesLabel = widget.usesRemaining >= 999 ? 'Unlimited (admin)' : '${widget.usesRemaining} scans left';
 
     return Scaffold(
       backgroundColor: bg,
@@ -564,7 +616,7 @@ class _NgmyFamilyTreeQrDisplayPage extends StatelessWidget {
                         ],
                       ),
                       child: QrImageView(
-                        data: qrPayload,
+                        data: widget.qrPayload,
                         version: QrVersions.auto,
                         size: 220,
                         backgroundColor: Colors.white,
@@ -574,7 +626,8 @@ class _NgmyFamilyTreeQrDisplayPage extends StatelessWidget {
                     Text(usesLabel, style: TextStyle(fontWeight: FontWeight.w800, color: WorksheetPalette.green)),
                     const SizedBox(height: 8),
                     Text(
-                      'Scan on another phone to restore photos, family book, and all tree details.',
+                      'Scan on another phone to restore photos, family book, and all tree details. '
+                      'Works only $kNgmyFamilyTreeSyncQrMaxUses times total.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : const Color(0xFF64748B), height: 1.4),
                     ),
@@ -583,7 +636,47 @@ class _NgmyFamilyTreeQrDisplayPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Text('Code: $backupCode', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : const Color(0xFF475569))),
+            Text('Code: ${widget.backupCode}', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : const Color(0xFF475569))),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: (_saving || _alreadySaved == true) ? null : _saveToHub,
+                icon: _saving
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(_alreadySaved == true ? Icons.check_rounded : Icons.bookmark_add_outlined),
+                label: Text(
+                  _alreadySaved == true ? 'Saved in QR Generator' : 'Save to QR Generator',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: WorksheetPalette.green,
+                  side: BorderSide(color: WorksheetPalette.green.withValues(alpha: 0.55)),
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+              ),
+            ),
+            if (_alreadySaved == true)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Labeled “NGMY Family Tree” in Hub → QR Code Generator → Saved. Delete it there to save a new one.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, height: 1.35, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+                ),
+              ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(context),
+                style: FilledButton.styleFrom(
+                  backgroundColor: WorksheetPalette.green,
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+                child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ),
           ],
         ),
       ),
