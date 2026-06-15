@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import 'ngmy_family_tree_payments.dart';
+import 'ngmy_family_tree_sync.dart';
+import 'ngmy_family_tree_sync_ui.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_worksheet_dialogs.dart';
 import 'ngmy_worksheet_helpers.dart';
@@ -38,6 +41,31 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
   void initState() {
     super.initState();
     _reload();
+    final email = widget.userEmail;
+    if (email.isNotEmpty) {
+      unawaited(NgmyFamilyTreeBackupCodes.syncForUser(
+        email,
+        widget.config,
+        isAdmin: (widget.user as dynamic).isAdmin == true,
+      ));
+    }
+  }
+
+  bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
+
+  Future<void> _openSync() async {
+    await showNgmyFamilyTreeSyncPage(
+      context,
+      user: widget.user,
+      config: widget.config,
+      isAdmin: _isAdmin,
+      onRestored: () {
+        unawaited(_reload());
+        widget.onDataChanged();
+        widget.onChanged();
+      },
+    );
+    await _reload();
   }
 
   Future<void> _reload() async {
@@ -120,6 +148,12 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.primaryText),
             ),
             const Spacer(),
+            if (_trees.isNotEmpty)
+              IconButton(
+                tooltip: 'Sync family trees',
+                onPressed: _openSync,
+                icon: Icon(Icons.sync_rounded, color: WorksheetPalette.green),
+              ),
             FilledButton.icon(
               onPressed: _createTree,
               style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
@@ -254,6 +288,39 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   void initState() {
     super.initState();
     _tree = widget.tree;
+    final email = widget.userEmail;
+    if (email.isNotEmpty) {
+      unawaited(NgmyFamilyTreeBackupCodes.syncForUser(
+        email,
+        widget.config,
+        isAdmin: (widget.user as dynamic).isAdmin == true,
+      ));
+    }
+  }
+
+  bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
+
+  Future<void> _openSync() async {
+    await showNgmyFamilyTreeSyncPage(
+      context,
+      user: widget.user,
+      config: widget.config,
+      isAdmin: _isAdmin,
+      onlyTreeId: _tree.id,
+      onRestored: () async {
+        final trees = await loadFamilyTrees(widget.userEmail);
+        final updated = trees.where((t) => t.id == _tree.id).firstOrNull;
+        if (updated != null && mounted) {
+          setState(() => _tree = updated);
+        }
+        widget.onDataChanged();
+      },
+    );
+    final trees = await loadFamilyTrees(widget.userEmail);
+    final updated = trees.where((t) => t.id == _tree.id).firstOrNull;
+    if (updated != null && mounted) {
+      setState(() => _tree = updated);
+    }
   }
 
   void _pushUndo() {
@@ -441,6 +508,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                       [
                         if (siblingDisplayOrder(_tree, m) > 0) '#${siblingDisplayOrder(_tree, m)} child',
                         m.birthDate,
+                        if (m.deathDate.isNotEmpty) '† ${m.deathDate}',
                         m.occupation,
                         m.notes,
                       ].where((e) => e.toString().trim().isNotEmpty).join(' · '),
@@ -534,6 +602,12 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                           label: const Text('Display'),
                         ),
                         const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: _openSync,
+                          icon: const Icon(Icons.sync_rounded, size: 16),
+                          label: const Text('Sync'),
+                        ),
+                        const SizedBox(width: 8),
                         FilledButton.icon(
                           onPressed: () => _addMember(parentId: rootMember(_tree)?.id),
                           style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
@@ -614,14 +688,25 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _openSync,
+              customBorder: const CircleBorder(),
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.75), width: 2.5),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 6, offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: const Icon(Icons.park_outlined, color: Colors.white, size: 28),
+              ),
             ),
-            child: const Icon(Icons.park_outlined, color: Colors.white, size: 28),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1299,6 +1384,7 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
   late final TextEditingController _notesC;
   late final TextEditingController _birthC;
   late final TextEditingController _placeC;
+  late final TextEditingController _deathC;
   late final TextEditingController _jobC;
   late FamilyGender _gender;
   String? _parentId;
@@ -1316,6 +1402,7 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
     _notesC = TextEditingController(text: m?.notes ?? '');
     _birthC = TextEditingController(text: m?.birthDate ?? '');
     _placeC = TextEditingController(text: m?.birthPlace ?? '');
+    _deathC = TextEditingController(text: m?.deathDate ?? '');
     _jobC = TextEditingController(text: m?.occupation ?? '');
     _gender = m?.gender ?? FamilyGender.unknown;
     _parentId = m?.parentId ?? widget.initialParentId;
@@ -1332,6 +1419,7 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
     _notesC.dispose();
     _birthC.dispose();
     _placeC.dispose();
+    _deathC.dispose();
     _jobC.dispose();
     super.dispose();
   }
@@ -1371,6 +1459,7 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
         notes: _notesC.text.trim(),
         birthDate: _birthC.text.trim(),
         birthPlace: _placeC.text.trim(),
+        deathDate: _deathC.text.trim(),
         occupation: _jobC.text.trim(),
         birthOrder: _birthOrder,
         hidden: _hidden,
@@ -1500,6 +1589,13 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
                       controller: _placeC,
                       hint: 'Birth place',
                       icon: Icons.place_outlined,
+                    ),
+                    const SizedBox(height: 10),
+                    _MemberEditorTextField(
+                      palette: p,
+                      controller: _deathC,
+                      hint: 'Date of death (if deceased)',
+                      icon: Icons.church_outlined,
                     ),
                     const SizedBox(height: 10),
                     _MemberEditorTextField(

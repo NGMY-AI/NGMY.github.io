@@ -148,6 +148,7 @@ class FamilyMember {
   final String notes;
   final String birthDate;
   final String birthPlace;
+  final String deathDate;
   final String occupation;
   final int birthOrder;
   final bool hidden;
@@ -164,6 +165,7 @@ class FamilyMember {
     this.notes = '',
     this.birthDate = '',
     this.birthPlace = '',
+    this.deathDate = '',
     this.occupation = '',
     this.birthOrder = 1,
     this.hidden = false,
@@ -180,6 +182,7 @@ class FamilyMember {
         'notes': notes,
         'birthDate': birthDate,
         'birthPlace': birthPlace,
+        'deathDate': deathDate,
         'occupation': occupation,
         'birthOrder': birthOrder,
         'hidden': hidden,
@@ -197,6 +200,7 @@ class FamilyMember {
       notes: (json['notes'] ?? '').toString(),
       birthDate: (json['birthDate'] ?? '').toString(),
       birthPlace: (json['birthPlace'] ?? '').toString(),
+      deathDate: (json['deathDate'] ?? '').toString(),
       occupation: (json['occupation'] ?? '').toString(),
       birthOrder: (json['birthOrder'] as num?)?.toInt() ?? 1,
       hidden: json['hidden'] == true,
@@ -213,6 +217,7 @@ class FamilyMember {
     String? notes,
     String? birthDate,
     String? birthPlace,
+    String? deathDate,
     String? occupation,
     int? birthOrder,
     bool? hidden,
@@ -228,6 +233,7 @@ class FamilyMember {
       notes: notes ?? this.notes,
       birthDate: birthDate ?? this.birthDate,
       birthPlace: birthPlace ?? this.birthPlace,
+      deathDate: deathDate ?? this.deathDate,
       occupation: occupation ?? this.occupation,
       birthOrder: birthOrder ?? this.birthOrder,
       hidden: hidden ?? this.hidden,
@@ -515,6 +521,113 @@ int descendantCount(FamilyTree tree, String memberId) {
 
 String _normalizedEmail(String userEmail) => userEmail.toLowerCase().trim();
 
+/// Only name, birth, death fields go to Supabase — photos and notes stay local.
+Map<String, dynamic> familyMemberToCloudJson(FamilyMember member) => {
+      'id': member.id,
+      'name': member.name,
+      'birthDate': member.birthDate,
+      'birthPlace': member.birthPlace,
+      'deathDate': member.deathDate,
+    };
+
+FamilyMember familyMemberFromCloudJson(Map<String, dynamic> json) {
+  return FamilyMember(
+    id: (json['id'] ?? '').toString(),
+    name: (json['name'] ?? '').toString(),
+    birthDate: (json['birthDate'] ?? '').toString(),
+    birthPlace: (json['birthPlace'] ?? '').toString(),
+    deathDate: (json['deathDate'] ?? '').toString(),
+  );
+}
+
+FamilyMember mergeFamilyMemberCloudIntoLocal(FamilyMember local, FamilyMember cloud) {
+  return local.copyWith(
+    name: cloud.name.isNotEmpty ? cloud.name : local.name,
+    birthDate: cloud.birthDate.isNotEmpty ? cloud.birthDate : local.birthDate,
+    birthPlace: cloud.birthPlace.isNotEmpty ? cloud.birthPlace : local.birthPlace,
+    deathDate: cloud.deathDate.isNotEmpty ? cloud.deathDate : local.deathDate,
+  );
+}
+
+FamilyTree mergeFamilyTreeCloudIntoLocal(FamilyTree local, FamilyTree remote) {
+  final remoteById = {for (final m in remote.members) m.id: m};
+  final merged = <FamilyMember>[];
+  final seen = <String>{};
+  for (final lm in local.members) {
+    seen.add(lm.id);
+    final rm = remoteById[lm.id];
+    merged.add(rm == null ? lm : mergeFamilyMemberCloudIntoLocal(lm, rm));
+  }
+  for (final rm in remote.members) {
+    if (!seen.contains(rm.id)) merged.add(rm);
+  }
+  return local.copyWith(
+    name: remote.name.isNotEmpty ? remote.name : local.name,
+    code: remote.code.isNotEmpty ? remote.code : local.code,
+    members: merged,
+  );
+}
+
+Future<List<FamilyTree>> loadFamilyTreesLocalOnly(String userEmail) async {
+  final prefs = await SharedPreferences.getInstance();
+  final raw = prefs.getString(_familyTreesKey(userEmail));
+  if (raw == null || raw.isEmpty) return [];
+  try {
+    final list = jsonDecode(raw);
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => FamilyTree.fromJson(Map<String, dynamic>.from(e)))
+        .where((t) => t.id.isNotEmpty && t.name.isNotEmpty)
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  } catch (_) {
+    return [];
+  }
+}
+
+Future<void> restoreFamilyTreeMerged(String userEmail, FamilyTree imported) async {
+  final list = await loadFamilyTreesLocalOnly(userEmail);
+  final idx = list.indexWhere((t) => t.id == imported.id);
+  if (idx == -1) {
+    list.insert(0, imported);
+  } else {
+    final existing = list[idx];
+    final membersById = {for (final m in existing.members) m.id: m};
+    for (final im in imported.members) {
+      final local = membersById[im.id];
+      if (local == null) {
+        membersById[im.id] = im;
+      } else {
+        membersById[im.id] = local.copyWith(
+          name: im.name.isNotEmpty ? im.name : local.name,
+          gender: im.gender,
+          parentId: im.parentId ?? local.parentId,
+          spouseId: im.spouseId ?? local.spouseId,
+          photoPath: im.photoPath ?? local.photoPath,
+          notes: im.notes.isNotEmpty ? im.notes : local.notes,
+          birthDate: im.birthDate.isNotEmpty ? im.birthDate : local.birthDate,
+          birthPlace: im.birthPlace.isNotEmpty ? im.birthPlace : local.birthPlace,
+          deathDate: im.deathDate.isNotEmpty ? im.deathDate : local.deathDate,
+          occupation: im.occupation.isNotEmpty ? im.occupation : local.occupation,
+          birthOrder: im.birthOrder,
+          hidden: im.hidden,
+          visibleChildrenCap: im.visibleChildrenCap,
+        );
+      }
+    }
+    list[idx] = existing.copyWith(
+      name: imported.name.isNotEmpty ? imported.name : existing.name,
+      code: imported.code.isNotEmpty ? imported.code : existing.code,
+      isPrivate: imported.isPrivate,
+      collaboratorEmails: imported.collaboratorEmails.isNotEmpty ? imported.collaboratorEmails : existing.collaboratorEmails,
+      members: membersById.values.toList(),
+      visibleChildrenPerParent: imported.visibleChildrenPerParent,
+    );
+  }
+  await saveFamilyTrees(userEmail, list);
+}
+
 Map<String, dynamic> _familyTreeRow(FamilyTree tree, String userEmail) {
   final now = DateTime.now().toUtc().toIso8601String();
   return {
@@ -524,7 +637,7 @@ Map<String, dynamic> _familyTreeRow(FamilyTree tree, String userEmail) {
     'code': tree.code,
     'isPrivate': tree.isPrivate,
     'collaboratorEmails': tree.collaboratorEmails,
-    'members': tree.members.map((e) => e.toJson()).toList(),
+    'members': tree.members.map(familyMemberToCloudJson).toList(),
     'createdAt': tree.createdAt.toUtc().toIso8601String(),
     'updatedAt': now,
   };
@@ -535,15 +648,26 @@ FamilyTree _familyTreeFromRow(Map<String, dynamic> row) {
   if (payload['members'] is! List && row['data'] is Map) {
     return FamilyTree.fromJson(Map<String, dynamic>.from(row['data'] as Map));
   }
-  return FamilyTree.fromJson({
-    'id': row['id'],
-    'name': row['name'],
-    'code': row['code'],
-    'isPrivate': row['isPrivate'],
-    'collaboratorEmails': row['collaboratorEmails'],
-    'members': row['members'],
-    'createdAt': row['createdAt'],
-  });
+  final rawMembers = row['members'];
+  final members = rawMembers is List
+      ? rawMembers
+          .whereType<Map>()
+          .map((e) => familyMemberFromCloudJson(Map<String, dynamic>.from(e)))
+          .where((m) => m.id.isNotEmpty)
+          .toList()
+      : <FamilyMember>[];
+  return FamilyTree(
+    id: (row['id'] ?? '').toString(),
+    name: (row['name'] ?? '').toString(),
+    code: (row['code'] ?? '').toString(),
+    isPrivate: row['isPrivate'] != false,
+    collaboratorEmails: row['collaboratorEmails'] is List
+        ? (row['collaboratorEmails'] as List).map((e) => e.toString()).toList()
+        : const <String>[],
+    members: members,
+    createdAt: DateTime.tryParse((row['createdAt'] ?? '').toString()) ?? DateTime.now(),
+    visibleChildrenPerParent: (row['visibleChildrenPerParent'] as num?)?.toInt() ?? 0,
+  );
 }
 
 bool _familyTreesTableMissing(Object error) {
@@ -590,12 +714,7 @@ List<FamilyTree> _mergeFamilyTreeLists(List<FamilyTree> local, List<FamilyTree> 
       byId[r.id] = r;
       continue;
     }
-    if (r.members.length > existing.members.length) {
-      byId[r.id] = r;
-    } else if (existing.members.length > r.members.length) {
-      continue;
-    }
-    // Equal member count: keep local copy (user's device edits win).
+    byId[r.id] = mergeFamilyTreeCloudIntoLocal(existing, r);
   }
   return byId.values.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 }
