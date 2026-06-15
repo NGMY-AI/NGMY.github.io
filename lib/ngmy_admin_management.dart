@@ -23,6 +23,8 @@ const String _kNgmyRepairEstimatePaymentSettingsKey = 'repair_estimate_payment_s
 const String _kNgmyRepairEstimatePaymentPrefsKey = 'ngmy_repair_estimate_payment_settings_v1';
 const String _kNgmyTranslatePaymentSettingsKey = 'translate_message_payment_settings';
 const String _kNgmyTranslatePaymentPrefsKey = 'ngmy_translate_message_payment_settings_v1';
+const String _kNgmyDocumentScanPaymentSettingsKey = 'document_scan_payment_settings';
+const String _kNgmyDocumentScanPaymentPrefsKey = 'ngmy_document_scan_payment_settings_v1';
 const String _kNgmyCivicSelfEnrollmentSettingsKey = 'civic_self_enrollment_settings';
 const String _kNgmyCivicSelfEnrollmentPrefsKey = 'ngmy_civic_self_enrollment_settings_v1';
 const String _kNgmyHelperAiSettingsKey = 'ngmy_helper_ai_settings';
@@ -933,6 +935,12 @@ Future<bool> ngmyPersistCommunicateSettings(AppConfig config) async {
 Map<String, dynamic> _communicatePaymentPayload(AppConfig config) => {
       'communicateFeeAmount': config.communicateFeeAmount,
       'communicateMinutesPerPayment': config.communicateMinutesPerPayment,
+      'communicatePassTwoWeekFee': config.communicatePassTwoWeekFee,
+      'communicatePassTwoWeekEnabled': config.communicatePassTwoWeekEnabled,
+      'communicatePassMonthlyFee': config.communicatePassMonthlyFee,
+      'communicatePassMonthlyEnabled': config.communicatePassMonthlyEnabled,
+      'communicatePassYearlyFee': config.communicatePassYearlyFee,
+      'communicatePassYearlyEnabled': config.communicatePassYearlyEnabled,
       'savedAt': DateTime.now().toUtc().toIso8601String(),
     };
 
@@ -942,6 +950,21 @@ void _applyCommunicatePaymentPayload(AppConfig config, Map<String, dynamic> payl
   if (fee is num && fee >= 0) config.communicateFeeAmount = fee.toDouble();
   final mins = payload['communicateMinutesPerPayment'];
   if (mins is num && mins > 0) config.communicateMinutesPerPayment = mins.toInt();
+  final twoWeekFee = payload['communicatePassTwoWeekFee'];
+  if (twoWeekFee is num && twoWeekFee >= 0) config.communicatePassTwoWeekFee = twoWeekFee.toDouble();
+  if (payload.containsKey('communicatePassTwoWeekEnabled')) {
+    config.communicatePassTwoWeekEnabled = payload['communicatePassTwoWeekEnabled'] == true;
+  }
+  final monthlyFee = payload['communicatePassMonthlyFee'];
+  if (monthlyFee is num && monthlyFee >= 0) config.communicatePassMonthlyFee = monthlyFee.toDouble();
+  if (payload.containsKey('communicatePassMonthlyEnabled')) {
+    config.communicatePassMonthlyEnabled = payload['communicatePassMonthlyEnabled'] == true;
+  }
+  final yearlyFee = payload['communicatePassYearlyFee'];
+  if (yearlyFee is num && yearlyFee >= 0) config.communicatePassYearlyFee = yearlyFee.toDouble();
+  if (payload.containsKey('communicatePassYearlyEnabled')) {
+    config.communicatePassYearlyEnabled = payload['communicatePassYearlyEnabled'] == true;
+  }
 }
 
 Future<void> _persistCommunicatePaymentSettingsLocal(AppConfig config) async {
@@ -982,6 +1005,64 @@ Future<bool> ngmyPersistCommunicatePaymentSettings(AppConfig config) async {
   if (await ngmyCanReachCloud()) {
     final payload = _communicatePaymentPayload(config);
     cloudOk = await _upsertNgmySettingSafe(_kNgmyCommunicatePaymentSettingsKey, payload);
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
+Map<String, dynamic> _documentScanPaymentPayload(AppConfig config) => {
+      'documentScanFreeLimit': config.documentScanFreeLimit,
+      'documentScanUnlockFee': config.documentScanUnlockFee,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyDocumentScanPaymentPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+  final limit = payload['documentScanFreeLimit'];
+  if (limit is num && limit >= 0) config.documentScanFreeLimit = limit.toInt();
+  final fee = payload['documentScanUnlockFee'];
+  if (fee is num && fee >= 0) config.documentScanUnlockFee = fee.toDouble();
+}
+
+Future<void> _persistDocumentScanPaymentSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyDocumentScanPaymentPrefsKey, jsonEncode(_documentScanPaymentPayload(config)));
+  } catch (e) {
+    debugPrint('[admin document scan payments] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateDocumentScanPaymentsFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyDocumentScanPaymentPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyDocumentScanPaymentPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[admin document scan payments] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyDocumentScanPaymentSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      _applyDocumentScanPaymentPayload(config, row);
+    }
+  }
+}
+
+Future<bool> ngmyPersistDocumentScanPaymentSettings(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  await _persistDocumentScanPaymentSettingsLocal(config);
+
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _documentScanPaymentPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyDocumentScanPaymentSettingsKey, payload);
     await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
   }
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);

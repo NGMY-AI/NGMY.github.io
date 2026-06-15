@@ -78,6 +78,7 @@ import 'ngmy_store_gift_celebration.dart';
 import 'ngmy_store_listing_extras.dart';
 import 'ngmy_store_payment_notification.dart';
 import 'ngmy_document_scanner.dart';
+import 'ngmy_document_scan_payments.dart';
 import 'ngmy_oauth.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
@@ -1146,6 +1147,16 @@ class AppConfig {
   List<Map<String, dynamic>> appBuilderReviewQueue;
   double communicateFeeAmount;
   int communicateMinutesPerPayment;
+  Map<String, String> communicateAccessUntilByEmail;
+  double communicatePassTwoWeekFee;
+  bool communicatePassTwoWeekEnabled;
+  double communicatePassMonthlyFee;
+  bool communicatePassMonthlyEnabled;
+  double communicatePassYearlyFee;
+  bool communicatePassYearlyEnabled;
+  int documentScanFreeLimit;
+  double documentScanUnlockFee;
+  Map<String, String> documentScanAccessUntilByEmail;
   List<Map<String, dynamic>> communicateProfiles;
   /// Per US state: president / group names admin teaches Mshauri advisors.
   Map<String, Map<String, dynamic>> mshauriSettingsByState;
@@ -1239,6 +1250,16 @@ class AppConfig {
     List<Map<String, dynamic>>? appBuilderReviewQueue,
     this.communicateFeeAmount = NgmyCommunicatePayments.defaultFeeAmount,
     this.communicateMinutesPerPayment = NgmyCommunicatePayments.defaultMinutesPerPayment,
+    Map<String, String>? communicateAccessUntilByEmail,
+    this.communicatePassTwoWeekFee = NgmyCommunicatePayments.defaultFeeAmount,
+    this.communicatePassTwoWeekEnabled = true,
+    this.communicatePassMonthlyFee = 3.99,
+    this.communicatePassMonthlyEnabled = false,
+    this.communicatePassYearlyFee = 29.99,
+    this.communicatePassYearlyEnabled = false,
+    this.documentScanFreeLimit = NgmyDocumentScanPayments.defaultFreeScanLimit,
+    this.documentScanUnlockFee = NgmyDocumentScanPayments.defaultUnlockFee,
+    Map<String, String>? documentScanAccessUntilByEmail,
     List<Map<String, dynamic>>? communicateProfiles,
     Map<String, Map<String, dynamic>>? mshauriSettingsByState,
     Map<String, String>? familyTreePhotoAccessUntilByEmail,
@@ -1267,6 +1288,8 @@ class AppConfig {
         appStudioAiAccessUntilByEmail = appStudioAiAccessUntilByEmail ?? const {},
         repairEstimateAccessUntilByEmail = repairEstimateAccessUntilByEmail ?? const {},
         translateWeekPassByEmail = translateWeekPassByEmail ?? const {},
+        communicateAccessUntilByEmail = communicateAccessUntilByEmail ?? const {},
+        documentScanAccessUntilByEmail = documentScanAccessUntilByEmail ?? const {},
         invoicePremiumAccessUntilByEmail = invoicePremiumAccessUntilByEmail ?? const {},
         invoiceLuxuryAccessUntilByEmail = invoiceLuxuryAccessUntilByEmail ?? const {},
         invoicePremiumLifetimeEmails = invoicePremiumLifetimeEmails ?? const [],
@@ -1359,6 +1382,16 @@ class AppConfig {
     'appBuilderReviewQueue': appBuilderReviewQueue,
     'communicateFeeAmount': communicateFeeAmount,
     'communicateMinutesPerPayment': communicateMinutesPerPayment,
+    'communicateAccessUntilByEmail': communicateAccessUntilByEmail,
+    'communicatePassTwoWeekFee': communicatePassTwoWeekFee,
+    'communicatePassTwoWeekEnabled': communicatePassTwoWeekEnabled,
+    'communicatePassMonthlyFee': communicatePassMonthlyFee,
+    'communicatePassMonthlyEnabled': communicatePassMonthlyEnabled,
+    'communicatePassYearlyFee': communicatePassYearlyFee,
+    'communicatePassYearlyEnabled': communicatePassYearlyEnabled,
+    'documentScanFreeLimit': documentScanFreeLimit,
+    'documentScanUnlockFee': documentScanUnlockFee,
+    'documentScanAccessUntilByEmail': documentScanAccessUntilByEmail,
     'communicateProfiles': communicateProfiles,
     'mshauriSettingsByState': mshauriSettingsByState,
     'invoicePremiumOneTimeFee': invoicePremiumOneTimeFee,
@@ -1473,6 +1506,18 @@ class AppConfig {
     ),
     communicateFeeAmount: (json['communicateFeeAmount'] as num?)?.toDouble() ?? NgmyCommunicatePayments.defaultFeeAmount,
     communicateMinutesPerPayment: (json['communicateMinutesPerPayment'] as num?)?.toInt() ?? NgmyCommunicatePayments.defaultMinutesPerPayment,
+    communicateAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['communicateAccessUntilByEmail']),
+    communicatePassTwoWeekFee: (json['communicatePassTwoWeekFee'] as num?)?.toDouble() ??
+        (json['communicateFeeAmount'] as num?)?.toDouble() ??
+        NgmyCommunicatePayments.defaultFeeAmount,
+    communicatePassTwoWeekEnabled: json['communicatePassTwoWeekEnabled'] != false,
+    communicatePassMonthlyFee: (json['communicatePassMonthlyFee'] as num?)?.toDouble() ?? 3.99,
+    communicatePassMonthlyEnabled: json['communicatePassMonthlyEnabled'] == true,
+    communicatePassYearlyFee: (json['communicatePassYearlyFee'] as num?)?.toDouble() ?? 29.99,
+    communicatePassYearlyEnabled: json['communicatePassYearlyEnabled'] == true,
+    documentScanFreeLimit: (json['documentScanFreeLimit'] as num?)?.toInt() ?? NgmyDocumentScanPayments.defaultFreeScanLimit,
+    documentScanUnlockFee: (json['documentScanUnlockFee'] as num?)?.toDouble() ?? NgmyDocumentScanPayments.defaultUnlockFee,
+    documentScanAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['documentScanAccessUntilByEmail']),
     communicateProfiles: List<Map<String, dynamic>>.from(
       (json['communicateProfiles'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
     ),
@@ -2360,6 +2405,57 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     if (v is num && v > 0) next.communicateMinutesPerPayment = v.toInt();
   } else {
     next.communicateMinutesPerPayment = keep.communicateMinutesPerPayment;
+  }
+  if (!ngmyShouldDeferRemoteConfigOverwrite()) {
+    for (final field in [
+      'communicatePassTwoWeekFee',
+      'communicatePassMonthlyFee',
+      'communicatePassYearlyFee',
+      'documentScanUnlockFee',
+    ]) {
+      if (record.containsKey(field)) {
+        final v = record[field];
+        if (v is num && v >= 0) (next as dynamic)[field] = v.toDouble();
+      }
+    }
+    for (final field in [
+      'communicatePassTwoWeekEnabled',
+      'communicatePassMonthlyEnabled',
+      'communicatePassYearlyEnabled',
+    ]) {
+      if (record.containsKey(field)) {
+        (next as dynamic)[field] = record[field] == true;
+      }
+    }
+    if (record.containsKey('documentScanFreeLimit')) {
+      final v = record['documentScanFreeLimit'];
+      if (v is num && v >= 0) next.documentScanFreeLimit = v.toInt();
+    }
+  } else {
+    next.communicatePassTwoWeekFee = keep.communicatePassTwoWeekFee;
+    next.communicatePassTwoWeekEnabled = keep.communicatePassTwoWeekEnabled;
+    next.communicatePassMonthlyFee = keep.communicatePassMonthlyFee;
+    next.communicatePassMonthlyEnabled = keep.communicatePassMonthlyEnabled;
+    next.communicatePassYearlyFee = keep.communicatePassYearlyFee;
+    next.communicatePassYearlyEnabled = keep.communicatePassYearlyEnabled;
+    next.documentScanFreeLimit = keep.documentScanFreeLimit;
+    next.documentScanUnlockFee = keep.documentScanUnlockFee;
+  }
+  if (record.containsKey('communicateAccessUntilByEmail') && record['communicateAccessUntilByEmail'] is Map) {
+    next.communicateAccessUntilByEmail = {
+      ..._familyTreePhotoAccessFromJson(record['communicateAccessUntilByEmail']),
+      ...keep.communicateAccessUntilByEmail,
+    };
+  } else if (keep.communicateAccessUntilByEmail.isNotEmpty) {
+    next.communicateAccessUntilByEmail = Map<String, String>.from(keep.communicateAccessUntilByEmail);
+  }
+  if (record.containsKey('documentScanAccessUntilByEmail') && record['documentScanAccessUntilByEmail'] is Map) {
+    next.documentScanAccessUntilByEmail = {
+      ..._familyTreePhotoAccessFromJson(record['documentScanAccessUntilByEmail']),
+      ...keep.documentScanAccessUntilByEmail,
+    };
+  } else if (keep.documentScanAccessUntilByEmail.isNotEmpty) {
+    next.documentScanAccessUntilByEmail = Map<String, String>.from(keep.documentScanAccessUntilByEmail);
   }
   if (record.containsKey('communicateProfiles') && record['communicateProfiles'] is List) {
     final remote = List<Map<String, dynamic>>.from(
@@ -6842,6 +6938,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
+    await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
     await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
     await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
@@ -10052,6 +10149,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
+    await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
     await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
     await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
@@ -10296,6 +10394,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
+    await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
     await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
     await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
@@ -18492,8 +18591,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final repairEstimateFeeC = TextEditingController(text: widget.config.repairEstimateMonthlyFee.toStringAsFixed(2));
     final translateLimitC = TextEditingController(text: '${widget.config.translateWeeklyFreeLimit}');
     final translateFeeC = TextEditingController(text: widget.config.translateWeeklyUnlockFee.toStringAsFixed(2));
-    final commFeeC = TextEditingController(text: widget.config.communicateFeeAmount.toStringAsFixed(2));
     final commMinsC = TextEditingController(text: '${widget.config.communicateMinutesPerPayment}');
+    final commTwoWeekFeeC = TextEditingController(text: widget.config.communicatePassTwoWeekFee.toStringAsFixed(2));
+    final commMonthlyFeeC = TextEditingController(text: widget.config.communicatePassMonthlyFee.toStringAsFixed(2));
+    final commYearlyFeeC = TextEditingController(text: widget.config.communicatePassYearlyFee.toStringAsFixed(2));
+    final docScanLimitC = TextEditingController(text: '${widget.config.documentScanFreeLimit}');
+    final docScanFeeC = TextEditingController(text: widget.config.documentScanUnlockFee.toStringAsFixed(2));
+    var commTwoWeekOn = widget.config.communicatePassTwoWeekEnabled;
+    var commMonthlyOn = widget.config.communicatePassMonthlyEnabled;
+    var commYearlyOn = widget.config.communicatePassYearlyEnabled;
     var familyExpanded = true;
     var invoicesExpanded = false;
     var musicExpanded = false;
@@ -18501,6 +18607,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     var repairEstimateExpanded = false;
     var translateExpanded = false;
     var communicatePayExpanded = false;
+    var documentScanExpanded = false;
 
     Widget categoryShell({
       required String title,
@@ -18997,8 +19104,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ],
                       ),
                       categoryShell(
-                        title: 'Communicate',
-                        subtitle: 'Time-based fee for companion chat (double-tap Chat)',
+                        title: 'NGMY Advisors',
+                        subtitle: 'Free chat minutes, then 2-week / monthly / yearly passes',
                         icon: Icons.favorite_rounded,
                         accent: const Color(0xFFF472B6),
                         expanded: communicatePayExpanded,
@@ -19011,48 +19118,166 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             appStudioExpanded = false;
                             repairEstimateExpanded = false;
                             translateExpanded = false;
+                            documentScanExpanded = false;
                           }
                         }),
                         children: [
                           TextField(
-                            controller: commFeeC,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(
-                              labelText: 'Fee per time block (\$)',
-                              prefixIcon: Icon(Icons.timer_outlined),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          TextField(
                             controller: commMinsC,
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
-                              labelText: 'Minutes per payment block',
+                              labelText: 'Free chat minutes before payment',
                               prefixIcon: Icon(Icons.schedule_rounded),
-                              helperText: 'e.g. 10 min = \$1 — time stacks across sessions until paid',
+                              helperText: 'Default 20 — users chat free until this time is used, then pick a pass.',
                             ),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Pass options (enable any combination)',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                          ),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('2-week pass'),
+                            subtitle: TextField(
+                              controller: commTwoWeekFeeC,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                labelText: 'Fee (\$)',
+                                isDense: true,
+                              ),
+                            ),
+                            value: commTwoWeekOn,
+                            onChanged: (v) => setST(() => commTwoWeekOn = v),
+                          ),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('1-month pass'),
+                            subtitle: TextField(
+                              controller: commMonthlyFeeC,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                labelText: 'Fee (\$)',
+                                isDense: true,
+                              ),
+                            ),
+                            value: commMonthlyOn,
+                            onChanged: (v) => setST(() => commMonthlyOn = v),
+                          ),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('1-year pass'),
+                            subtitle: TextField(
+                              controller: commYearlyFeeC,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                labelText: 'Fee (\$)',
+                                isDense: true,
+                              ),
+                            ),
+                            value: commYearlyOn,
+                            onChanged: (v) => setST(() => commYearlyOn = v),
                           ),
                           const SizedBox(height: 12),
                           FilledButton(
                             onPressed: () async {
-                              final fee = double.tryParse(commFeeC.text.trim());
                               final mins = int.tryParse(commMinsC.text.trim());
-                              if (fee == null || mins == null || fee < 0 || mins <= 0) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid fee and minutes.')));
+                              final twoWeekFee = double.tryParse(commTwoWeekFeeC.text.trim());
+                              final monthlyFee = double.tryParse(commMonthlyFeeC.text.trim());
+                              final yearlyFee = double.tryParse(commYearlyFeeC.text.trim());
+                              if (mins == null || mins <= 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid free minutes.')));
+                                return;
+                              }
+                              if (twoWeekFee == null || monthlyFee == null || yearlyFee == null ||
+                                  twoWeekFee < 0 || monthlyFee < 0 || yearlyFee < 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid pass fees (0 or more).')));
+                                return;
+                              }
+                              if (!commTwoWeekOn && !commMonthlyOn && !commYearlyOn) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enable at least one pass option.')));
                                 return;
                               }
                               setST(() {
-                                widget.config.communicateFeeAmount = fee;
                                 widget.config.communicateMinutesPerPayment = mins;
+                                widget.config.communicatePassTwoWeekFee = twoWeekFee;
+                                widget.config.communicatePassTwoWeekEnabled = commTwoWeekOn;
+                                widget.config.communicatePassMonthlyFee = monthlyFee;
+                                widget.config.communicatePassMonthlyEnabled = commMonthlyOn;
+                                widget.config.communicatePassYearlyFee = yearlyFee;
+                                widget.config.communicatePassYearlyEnabled = commYearlyOn;
+                                widget.config.communicateFeeAmount = twoWeekFee;
                               });
                               widget.onDataChanged();
                               final ok = await ngmyPersistCommunicatePaymentSettings(widget.config);
                               if (!context.mounted) return;
                               setState(() {});
-                              ngmyAdminShowCloudSaveSnackBar(context, cloudOk: ok, success: 'Communicate payment settings saved.');
+                              ngmyAdminShowCloudSaveSnackBar(context, cloudOk: ok, success: 'Advisor payment settings saved.');
                             },
                             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFF472B6), minimumSize: const Size(double.infinity, 44)),
-                            child: const Text('Save Communicate', style: TextStyle(fontWeight: FontWeight.w800)),
+                            child: const Text('Save Advisors', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
+                      categoryShell(
+                        title: 'Document Scanner',
+                        subtitle: 'Free document scans, then wallet unlock for 30 days',
+                        icon: Icons.document_scanner_outlined,
+                        accent: const Color(0xFF34D399),
+                        expanded: documentScanExpanded,
+                        onToggle: () => setST(() {
+                          documentScanExpanded = !documentScanExpanded;
+                          if (documentScanExpanded) {
+                            familyExpanded = false;
+                            invoicesExpanded = false;
+                            musicExpanded = false;
+                            appStudioExpanded = false;
+                            repairEstimateExpanded = false;
+                            translateExpanded = false;
+                            communicatePayExpanded = false;
+                          }
+                        }),
+                        children: [
+                          TextField(
+                            controller: docScanLimitC,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Free document scans',
+                              prefixIcon: Icon(Icons.description_outlined),
+                              helperText: 'Default 5 — set 0 for unlimited free scans.',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: docScanFeeC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Unlock fee after free scans (\$)',
+                              prefixIcon: Icon(Icons.lock_open_rounded),
+                              helperText: 'Unlimited scans for 30 days after payment. Set 0 for free.',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: () async {
+                              final limit = int.tryParse(docScanLimitC.text.trim());
+                              final fee = double.tryParse(docScanFeeC.text.trim());
+                              if (limit == null || limit < 0 || fee == null || fee < 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid scan limit and fee.')));
+                                return;
+                              }
+                              setST(() {
+                                widget.config.documentScanFreeLimit = limit;
+                                widget.config.documentScanUnlockFee = fee;
+                              });
+                              widget.onDataChanged();
+                              final ok = await ngmyPersistDocumentScanPaymentSettings(widget.config);
+                              if (!context.mounted) return;
+                              setState(() {});
+                              ngmyAdminShowCloudSaveSnackBar(context, cloudOk: ok, success: 'Document Scanner payment settings saved.');
+                            },
+                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF34D399), minimumSize: const Size(double.infinity, 44)),
+                            child: const Text('Save Document Scanner', style: TextStyle(fontWeight: FontWeight.w800)),
                           ),
                         ],
                       ),
@@ -19072,8 +19297,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
       luxOneC.dispose();
       luxMoC.dispose();
       musicC.dispose();
-      commFeeC.dispose();
       commMinsC.dispose();
+      commTwoWeekFeeC.dispose();
+      commMonthlyFeeC.dispose();
+      commYearlyFeeC.dispose();
+      docScanLimitC.dispose();
+      docScanFeeC.dispose();
     });
   }
 
@@ -36398,6 +36627,8 @@ class MediaHubScreen extends StatelessWidget {
       user: user,
       config: config,
       apiKey: config.geminiApiKey,
+      onDataChanged: onDataChanged,
+      onPersistConfig: () => ngmyAdminPersistManagementConfig(config),
       onChargeWallet: user.isAdmin
           ? null
           : (amount, desc) async {

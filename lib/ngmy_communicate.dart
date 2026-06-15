@@ -737,6 +737,8 @@ Future<void> ngmyOpenCommunicateWorld(
   required dynamic config,
   required String apiKey,
   Future<bool> Function(double amount, String description)? onChargeWallet,
+  VoidCallback? onDataChanged,
+  Future<bool> Function()? onPersistConfig,
 }) {
   return NgmyNavigator.push<void>(
     context,
@@ -745,6 +747,8 @@ Future<void> ngmyOpenCommunicateWorld(
       config: config,
       apiKey: apiKey,
       onChargeWallet: onChargeWallet,
+      onDataChanged: onDataChanged,
+      onPersistConfig: onPersistConfig,
     ),
     routeName: 'communicate_world',
     fullscreenDialog: true,
@@ -758,6 +762,8 @@ class NgmyCommunicateWorldScreen extends StatefulWidget {
   final dynamic config;
   final String apiKey;
   final Future<bool> Function(double amount, String description)? onChargeWallet;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
 
   const NgmyCommunicateWorldScreen({
     super.key,
@@ -766,6 +772,8 @@ class NgmyCommunicateWorldScreen extends StatefulWidget {
     required this.config,
     required this.apiKey,
     this.onChargeWallet,
+    this.onDataChanged,
+    this.onPersistConfig,
   });
 
   @override
@@ -850,6 +858,8 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
         floatCtrl: _floatCtrl,
         onBack: () => setState(() => _selected = null),
         onChargeWallet: widget.onChargeWallet,
+        onDataChanged: widget.onDataChanged,
+        onPersistConfig: widget.onPersistConfig,
       );
     }
     final topPad = MediaQuery.paddingOf(context).top + (_searchOpen ? 210 : 178);
@@ -1242,6 +1252,8 @@ class _LoveWorldChat extends StatefulWidget {
   final AnimationController floatCtrl;
   final VoidCallback onBack;
   final Future<bool> Function(double amount, String description)? onChargeWallet;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
 
   const _LoveWorldChat({
     required this.user,
@@ -1252,6 +1264,8 @@ class _LoveWorldChat extends StatefulWidget {
     required this.floatCtrl,
     required this.onBack,
     this.onChargeWallet,
+    this.onDataChanged,
+    this.onPersistConfig,
   });
 
   @override
@@ -1472,15 +1486,18 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   Future<bool> _ensurePaid() async {
     if (_isAdmin) return true;
+    if (NgmyCommunicatePayments.hasActivePass(widget.config, _email)) return true;
     await _flushSessionTime();
     _usedSeconds = await NgmyCommunicateTimeTracker.getUsedSeconds(_email);
     if (!await NgmyCommunicatePayments.needsPayment(_email, widget.config)) return true;
     if (widget.onChargeWallet == null) return false;
-    return NgmyCommunicatePayments.confirmTimeBlockPayment(
+    return NgmyCommunicatePayments.confirmPassPayment(
       context: context,
       user: widget.user,
       config: widget.config,
       onCharge: widget.onChargeWallet!,
+      onDataChanged: widget.onDataChanged,
+      onPersistConfig: widget.onPersistConfig,
       productName: kNgmyAdvisorsHubTitle,
     );
   }
@@ -1682,6 +1699,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     }
   }
 
+  String _formatAdvisorPassDate(DateTime dt) {
+    final local = dt.toLocal();
+    return '${local.month}/${local.day}/${local.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1689,6 +1711,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     final totalSec = _usedSeconds + _sessionSeconds;
     final remaining = (NgmyCommunicatePayments.thresholdSeconds(widget.config) - totalSec).clamp(0, 999999);
     final remMin = (remaining / 60).ceil();
+    final passUntil = NgmyCommunicatePayments.passExpiresAt(widget.config, _email);
+    final passLabel = passUntil != null && passUntil.isAfter(DateTime.now())
+        ? 'Unlimited until ${_formatAdvisorPassDate(passUntil)}'
+        : '~$remMin min free · then choose a pass';
     final topPad = MediaQuery.paddingOf(context).top + 76;
     final bottomPad = MediaQuery.paddingOf(context).bottom + 88;
     final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF3F7FF);
@@ -1814,7 +1840,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                                 children: [
                                   Text(widget.profile.name, style: TextStyle(color: panelFg, fontWeight: FontWeight.w900, fontSize: 16)),
                                   Text(
-                                    _isAdmin ? 'Unlimited chat' : '~$remMin min left · $mins min block',
+                                    _isAdmin ? 'Unlimited chat' : passLabel,
                                     style: TextStyle(color: panelFgMuted, fontSize: 10),
                                   ),
                                 ],

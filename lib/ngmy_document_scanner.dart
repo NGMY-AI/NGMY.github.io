@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -7,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_document_translate_chat.dart';
+import 'ngmy_document_scan_payments.dart';
 import 'ngmy_gemini_vision.dart';
 import 'ngmy_modern_chat_prefix.dart';
 
@@ -195,6 +197,20 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       return;
     }
 
+    final user = widget.user;
+    final config = widget.config;
+    if (user != null && config != null && widget.onCharge != null) {
+      final allowed = await NgmyDocumentScanPayments.ensureAccess(
+        context: context,
+        user: user,
+        config: config,
+        onCharge: widget.onCharge!,
+        onDataChanged: widget.onDataChanged ?? () {},
+        onPersistConfig: widget.onPersistConfig ?? () async => true,
+      );
+      if (!allowed) return;
+    }
+
     setState(() {
       _analyzing = true;
       _error = null;
@@ -224,6 +240,10 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
         _analyzing = false;
         if (scan.text != null && scan.text!.isNotEmpty) {
           _result = scan.text;
+          final email = widget.user != null ? (((widget.user as dynamic).email as String?) ?? '') : '';
+          if (email.isNotEmpty) {
+            unawaited(NgmyDocumentScanPayments.recordScan(email));
+          }
         } else {
           final err = (scan.error ?? '').trim();
           if (err.contains('proxy not deployed') || err.contains('404')) {
