@@ -196,9 +196,27 @@ Map<String, dynamic> ngmyNewWidget(String type, {List<NgmyAppScreen> screens = c
           {'label': 'About', 'icon': 'info', 'target': homeTarget},
         ],
       };
+    case 'link':
+      return {'type': 'link', 'label': 'Visit website', 'url': 'https://example.com'};
+    case 'banner':
+      return {'type': 'banner', 'text': 'Important notice for your users', 'variant': 'info'};
+    case 'progress':
+      return {'type': 'progress', 'label': 'Progress', 'value': 0.65};
+    case 'rating':
+      return {'type': 'rating', 'label': 'Rating', 'value': 4.5};
+    case 'contact':
+      return {'type': 'contact', 'name': 'Support', 'phone': '+1 555 0100', 'email': 'help@example.com'};
+    case 'video':
+      return {'type': 'video', 'url': '', 'caption': 'Your video'};
     default:
       return {'type': 'text', 'text': 'Widget', 'style': 'subtitle'};
   }
+}
+
+/// Pad grid item count so the last row always has [crossAxisCount] cells.
+int ngmyWidgetGridPaddedCount(int itemCount, {int crossAxisCount = 5}) {
+  if (itemCount <= 0) return 0;
+  return ((itemCount + crossAxisCount - 1) ~/ crossAxisCount) * crossAxisCount;
 }
 
 String ngmyWidgetTypeLabel(String type) {
@@ -268,6 +286,18 @@ String ngmyWidgetTypeLabel(String type) {
       return 'Chip tag';
     case 'list':
       return 'Link list';
+    case 'link':
+      return 'Link button';
+    case 'banner':
+      return 'Banner alert';
+    case 'progress':
+      return 'Progress bar';
+    case 'rating':
+      return 'Star rating';
+    case 'contact':
+      return 'Contact card';
+    case 'video':
+      return 'Video';
     case 'dark_mode':
       return 'Dark mode toggle';
     default:

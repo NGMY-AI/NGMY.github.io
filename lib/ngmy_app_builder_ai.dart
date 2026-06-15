@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_app_builder_models.dart';
+import 'ngmy_app_builder_layout_utils.dart';
 import 'ngmy_app_builder_runtime.dart';
 
 class NgmyAppBuilderCopilotResult {
@@ -378,6 +379,112 @@ User request: $userMessage
     );
   } catch (e) {
     debugPrint('[app builder screen ai] $e');
+    return NgmyAppScreenAiResult(message: 'AI error: $e');
+  }
+}
+
+/// AI edit for ONE widget at a specific index — keeps all other widgets unchanged.
+Future<NgmyAppScreenAiResult> ngmyAppBuilderAiEditWidget({
+  required String apiKey,
+  required NgmyAppScreen screen,
+  required int widgetIndex,
+  required Map<String, dynamic> widgetJson,
+  required List<NgmyAppScreen> allScreens,
+  required String userMessage,
+}) async {
+  final creds = ngmyParseAiCredentials(apiKey);
+  if (creds.apiKey.isEmpty) {
+    return const NgmyAppScreenAiResult(
+      message: 'Add an AI API key in Admin → Management Menus → NGMY AI, then try again.',
+    );
+  }
+
+  final widgets = ngmyLayoutChildren(screen);
+  final screensList = [for (final s in allScreens) {'id': s.id, 'title': s.title}];
+  final prompt = '''
+You are Bolt editing ONE widget in NGMY App Studio.
+
+CRITICAL — follow exactly:
+- Screen id MUST stay "${screen.id}".
+- layout.children MUST have EXACTLY ${widgets.length} widgets (same count, same order).
+- ONLY change the widget at index $widgetIndex (0-based). Every other child must be identical to the current screen JSON.
+- Apply whatever the user asks for that widget: text, labels, colors, URLs, fields, collections, navigation targets, etc.
+- You may change the widget "type" only if the user explicitly asks to convert it.
+
+Widget at index $widgetIndex (edit this):
+${jsonEncode(widgetJson)}
+
+RESPONSE FORMAT:
+1) Short friendly reply (1-2 sentences).
+2) Append exactly ---SCREEN_JSON---
+3) Full screen JSON:
+   {"id":"${screen.id}","title":"...","kind":"custom","data":{"layout":{"type":"column","children":[...]}}}
+
+Buttons: {"type":"button","label":"...","target":"<screenId>","action":"navigate|snack|clear|openurl","url":"..."}
+Text: {"type":"text","text":"...","style":"title|subtitle|body"}
+Link: {"type":"link","label":"...","url":"https://..."}
+Banner: {"type":"banner","text":"...","variant":"info|warning|success"}
+Progress: {"type":"progress","label":"...","value":0.0-1.0}
+Rating: {"type":"rating","label":"...","value":1-5}
+Contact: {"type":"contact","name":"...","phone":"...","email":"..."}
+Video: {"type":"video","url":"https://...mp4","caption":"..."}
+
+Screen ids for navigation: ${jsonEncode(screensList)}
+
+Current full screen JSON:
+${jsonEncode(screen.toMap())}
+
+$kNgmyAppBuilderCodeSchemaHelp
+
+User request for widget at index $widgetIndex: $userMessage
+''';
+
+  try {
+    final reply = await ngmyAiGenerateForAppBuilder(creds, prompt);
+    final text = reply.text?.trim();
+    if (text == null || text.isEmpty) {
+      return NgmyAppScreenAiResult(message: reply.error ?? 'AI returned an empty reply. Try again.');
+    }
+    const marker = '---SCREEN_JSON---';
+    if (!text.contains(marker)) {
+      return NgmyAppScreenAiResult(message: text);
+    }
+    final parts = text.split(marker);
+    final message = parts.first.trim();
+    final jsonPart = parts.length > 1 ? parts.sublist(1).join(marker).trim() : '';
+    final jsonText = _extractJson(jsonPart);
+    if (jsonText == null) {
+      return NgmyAppScreenAiResult(
+        message: message.isEmpty ? 'Could not apply that change — try being more specific.' : message,
+      );
+    }
+    final map = jsonDecode(jsonText);
+    if (map is! Map) {
+      return NgmyAppScreenAiResult(message: message.isEmpty ? 'Invalid screen JSON from AI.' : message);
+    }
+    final screenMap = Map<String, dynamic>.from(map);
+    screenMap['id'] = screen.id;
+    var updated = NgmyAppScreen.fromMap(screenMap);
+    final newChildren = ngmyLayoutChildren(updated);
+    if (newChildren.length != widgets.length) {
+      if (widgetIndex >= 0 && widgetIndex < newChildren.length) {
+        final merged = List<Map<String, dynamic>>.from(widgets);
+        merged[widgetIndex] = newChildren[widgetIndex];
+        updated = ngmyScreenWithLayoutChildren(screen, merged);
+      } else {
+        return NgmyAppScreenAiResult(
+          message: message.isEmpty
+              ? 'AI changed the widget list — try a simpler request for this widget only.'
+              : message,
+        );
+      }
+    }
+    return NgmyAppScreenAiResult(
+      message: message.isEmpty ? 'Widget updated!' : message,
+      screen: updated,
+    );
+  } catch (e) {
+    debugPrint('[app builder widget ai] $e');
     return NgmyAppScreenAiResult(message: 'AI error: $e');
   }
 }

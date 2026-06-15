@@ -336,6 +336,130 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
           isDark: widget.isDarkMode,
           compact: _compactFor('profile', isRoot: isRoot),
         );
+      case 'link':
+      case 'text_link':
+        return TextButton.icon(
+          onPressed: () => ngmyRuntimeOpenUrl((node['url'] ?? node['link'] ?? '').toString(), widget.onSnack),
+          icon: Icon(Icons.open_in_new_rounded, color: widget.theme, size: 18),
+          label: Text(
+            (node['label'] ?? 'Open link').toString(),
+            style: TextStyle(color: widget.theme, fontWeight: FontWeight.w700),
+          ),
+        );
+      case 'banner':
+      case 'alert':
+        final variant = (node['variant'] ?? 'info').toString().toLowerCase();
+        final (bg, fg, icon) = switch (variant) {
+          'warning' => (const Color(0xFFFEF3C7), const Color(0xFF92400E), Icons.warning_amber_rounded),
+          'success' => (const Color(0xFFD1FAE5), const Color(0xFF065F46), Icons.check_circle_outline_rounded),
+          _ => (widget.theme.withValues(alpha: 0.12), widget.theme, Icons.info_outline_rounded),
+        };
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14), border: Border.all(color: fg.withValues(alpha: 0.25))),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: fg, size: 22),
+              const SizedBox(width: 10),
+              Expanded(child: Text((node['text'] ?? node['message'] ?? '').toString(), style: TextStyle(color: fg, fontWeight: FontWeight.w600))),
+            ],
+          ),
+        );
+      case 'progress':
+        final value = ((node['value'] as num?)?.toDouble() ?? 0.65).clamp(0.0, 1.0);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if ((node['label'] ?? '').toString().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text((node['label'] ?? '').toString(), style: TextStyle(fontWeight: FontWeight.w700, color: widget.isDarkMode ? Colors.white : Colors.black87)),
+              ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(value: value, minHeight: 10, backgroundColor: widget.isDarkMode ? Colors.white12 : Colors.grey.shade200, color: widget.theme),
+            ),
+          ],
+        );
+      case 'rating':
+        final value = ((node['value'] as num?)?.toDouble() ?? 4.0).clamp(0.0, 5.0);
+        return Row(
+          children: [
+            for (var i = 1; i <= 5; i++)
+              Icon(
+                i <= value.round() ? Icons.star_rounded : (i - 0.5 <= value ? Icons.star_half_rounded : Icons.star_outline_rounded),
+                color: const Color(0xFFF59E0B),
+                size: 22,
+              ),
+            if ((node['label'] ?? '').toString().isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text((node['label'] ?? '').toString(), style: TextStyle(fontWeight: FontWeight.w700, color: widget.isDarkMode ? Colors.white70 : Colors.grey.shade700)),
+            ],
+          ],
+        );
+      case 'contact':
+        final phone = (node['phone'] ?? '').toString();
+        final email = (node['email'] ?? '').toString();
+        return Card(
+          child: ListTile(
+            leading: CircleAvatar(backgroundColor: widget.theme.withValues(alpha: 0.15), child: Icon(Icons.contact_phone_rounded, color: widget.theme)),
+            title: Text((node['name'] ?? 'Contact').toString(), style: const TextStyle(fontWeight: FontWeight.w800)),
+            subtitle: Text([if (phone.isNotEmpty) phone, if (email.isNotEmpty) email].join(' · ')),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () {
+              if (phone.isNotEmpty) {
+                ngmyRuntimeOpenUrl('tel:$phone', widget.onSnack);
+              } else if (email.isNotEmpty) {
+                ngmyRuntimeOpenUrl('mailto:$email', widget.onSnack);
+              } else {
+                widget.onSnack('Add a phone or email');
+              }
+            },
+          ),
+        );
+      case 'video':
+        final url = (node['url'] ?? '').toString();
+        final caption = (node['caption'] ?? '').toString();
+        if (url.isEmpty) {
+          return Container(
+            height: 180,
+            width: double.infinity,
+            decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
+            child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.videocam_outlined, size: 48), SizedBox(height: 8), Text('Add video URL in widget settings')]),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                height: 180,
+                color: Colors.black,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const Icon(Icons.play_circle_fill_rounded, color: Colors.white70, size: 64),
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 10,
+                      child: Text(caption.isEmpty ? url : caption, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => ngmyRuntimeOpenUrl(url, widget.onSnack),
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('Play video'),
+            ),
+          ],
+        );
       default:
         if (children.isNotEmpty) {
           return Column(
@@ -931,7 +1055,7 @@ SCREEN kind: use "custom" with data.layout for interactive apps.
 
 WIDGET TYPES (all functional):
   column, row, wrap, card, hero, text, button, spacer, divider, image,
-  list, menuGrid, tabs, chip,
+  list, menuGrid, tabs, chip, link, banner, progress, rating, contact, video,
   form — MUST include "collection" to save data,
   dataList — shows saved records from "collection",
   switch — toggles a setting (persists),

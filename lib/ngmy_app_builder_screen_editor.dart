@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import 'ngmy_app_builder_ai.dart';
@@ -235,6 +233,123 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
     );
   }
 
+  Future<void> _askAiForWidgetAt(int index) async {
+    if (index < 0 || index >= _widgets.length) return;
+    final w = _widgets[index];
+    final typeLabel = ngmyWidgetTypeLabel((w['type'] ?? '').toString());
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ctrl = TextEditingController();
+    final request = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.auto_awesome_rounded, color: Color(0xFFF59E0B)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('Ask AI — $typeLabel', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87))),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Tell Bolt exactly what to change in this widget only — text, colors, links, buttons, fields, anything.',
+                style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : Colors.black54),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'e.g. Change the button label to Buy Now and open the checkout screen',
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF111827) : Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: const Text('Update this widget'),
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), minimumSize: const Size(double.infinity, 48)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    ctrl.dispose();
+    if (request == null || request.isEmpty || !mounted) return;
+
+    if (!await NgmyAppBuilderAiUsage.ensureAccess(
+      context: context,
+      config: widget.config,
+      email: widget.email,
+      isNewAppRequest: false,
+      isAdmin: widget.isAdmin,
+      user: widget.user,
+      onCharge: widget.onChargeWallet,
+      onDataChanged: widget.onDataChanged,
+      onPersistConfig: widget.onPersistConfig,
+    )) {
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(color: Color(0xFFF59E0B)),
+            const SizedBox(width: 16),
+            Expanded(child: Text('Bolt is updating this widget…', style: TextStyle(color: isDark ? Colors.white : Colors.black87))),
+          ],
+        ),
+      ),
+    );
+
+    final result = await ngmyAppBuilderAiEditWidget(
+      apiKey: widget.apiKey,
+      screen: _buildResult(),
+      widgetIndex: index,
+      widgetJson: w,
+      allScreens: widget.allScreens,
+      userMessage: request,
+    );
+
+    if (!mounted) return;
+    Navigator.pop(context);
+
+    if (!widget.isAdmin && widget.email.isNotEmpty) {
+      await NgmyAppBuilderAiUsage.recordPrompt(widget.email);
+    }
+
+    if (result.screen != null) {
+      final children = ngmyLayoutChildren(result.screen!);
+      if (index >= 0 && index < children.length) {
+        setState(() => _widgets[index] = Map<String, dynamic>.from(children[index]));
+      }
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.message), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 4)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = widget.themeColor;
@@ -457,6 +572,7 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
                                     theme: theme,
                                     isDark: isDark,
                                     onEdit: () => _editWidget(i),
+                                    onAskAi: () => _askAiForWidgetAt(i),
                                     onDelete: () => setState(() => _widgets.removeAt(i)),
                                     onDropWidget: (dropType) => setState(() {
                                       _widgets.insert(i + 1, ngmyNewWidget(dropType, screens: widget.allScreens));
@@ -630,6 +746,7 @@ class _WidgetTile extends StatelessWidget {
     required this.theme,
     required this.isDark,
     required this.onEdit,
+    required this.onAskAi,
     required this.onDelete,
     this.onDropWidget,
   });
@@ -640,6 +757,7 @@ class _WidgetTile extends StatelessWidget {
   final Color theme;
   final bool isDark;
   final VoidCallback onEdit;
+  final VoidCallback onAskAi;
   final VoidCallback onDelete;
   final void Function(String type)? onDropWidget;
 
@@ -717,6 +835,12 @@ class _WidgetTile extends StatelessWidget {
                       Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.grey.shade800)),
                     ],
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.auto_awesome_rounded, size: 20),
+                  color: const Color(0xFFF59E0B),
+                  tooltip: 'Ask AI to update this widget',
+                  onPressed: onAskAi,
                 ),
                 IconButton(icon: Icon(Icons.delete_outline, size: 20, color: Colors.red.shade300), onPressed: onDelete),
               ],
@@ -823,6 +947,12 @@ class _WidgetToolStrip extends StatelessWidget {
     ('chip', Icons.label_outline, 'Chip'),
     ('list', Icons.format_list_bulleted, 'Links'),
     ('dark_mode', Icons.dark_mode_outlined, 'Dark'),
+    ('link', Icons.link, 'Link'),
+    ('banner', Icons.campaign_outlined, 'Banner'),
+    ('progress', Icons.linear_scale, 'Progress'),
+    ('rating', Icons.star_outline, 'Rating'),
+    ('contact', Icons.contact_phone_outlined, 'Contact'),
+    ('video', Icons.videocam_outlined, 'Video'),
   ];
 
   @override
@@ -846,8 +976,11 @@ class _WidgetToolStrip extends StatelessWidget {
               crossAxisSpacing: 8,
               childAspectRatio: 0.82,
             ),
-            itemCount: _tools.length,
+            itemCount: ngmyWidgetGridPaddedCount(_tools.length),
             itemBuilder: (_, i) {
+              if (i >= _tools.length) {
+                return const SizedBox.shrink();
+              }
               final (type, icon, label) = _tools[i];
               return LongPressDraggable<String>(
                 data: type,
@@ -958,6 +1091,14 @@ class _AddWidgetSheet extends StatelessWidget {
       ('spacer', 'Spacer', Icons.space_bar),
       ('divider', 'Divider', Icons.horizontal_rule),
     ],
+    'More widgets': [
+      ('link', 'Link button', Icons.link),
+      ('banner', 'Banner alert', Icons.campaign),
+      ('progress', 'Progress bar', Icons.linear_scale),
+      ('rating', 'Star rating', Icons.star),
+      ('contact', 'Contact card', Icons.contact_phone),
+      ('video', 'Video', Icons.videocam),
+    ],
   };
 
   @override
@@ -999,8 +1140,11 @@ class _AddWidgetSheet extends StatelessWidget {
                       crossAxisSpacing: 8,
                       childAspectRatio: 0.85,
                     ),
-                    itemCount: entry.value.length,
+                    itemCount: ngmyWidgetGridPaddedCount(entry.value.length),
                     itemBuilder: (_, i) {
+                      if (i >= entry.value.length) {
+                        return const SizedBox.shrink();
+                      }
                       final (type, label, icon) = entry.value[i];
                       return _PaletteTile(type: type, label: label, icon: icon, color: themeColor, onTap: () => onAdd(type));
                     },
@@ -1102,12 +1246,21 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
-        title: Text('Ask AI', style: TextStyle(color: widget.isDark ? Colors.white : Colors.black87)),
+        title: Row(
+          children: [
+            const Icon(Icons.auto_awesome_rounded, color: Color(0xFFF59E0B)),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Ask AI', style: TextStyle(color: widget.isDark ? Colors.white : Colors.black87))),
+          ],
+        ),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          maxLines: 3,
-          decoration: const InputDecoration(hintText: 'e.g. Make this button say Buy Now and open checkout'),
+          maxLines: 4,
+          decoration: InputDecoration(
+            hintText: 'Tell Bolt anything to change in this widget — text, links, colors, actions…',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -1132,14 +1285,13 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
       return;
     }
 
-    final prompt = 'Only change the widget at index ${widget.widgetIndex} (${ngmyWidgetTypeLabel((_w['type'] ?? '').toString())}). '
-        'Do not remove or reorder other widgets. '
-        'Current widget JSON: ${jsonEncode(_w)}. User request: $request';
-    final result = await ngmyAppBuilderAiEditScreen(
+    final result = await ngmyAppBuilderAiEditWidget(
       apiKey: widget.apiKey,
       screen: widget.screen!,
+      widgetIndex: widget.widgetIndex,
+      widgetJson: _w,
       allScreens: widget.screens,
-      userMessage: prompt,
+      userMessage: request,
     );
     if (!mounted) return;
     if (!widget.isAdmin && widget.email.isNotEmpty) {
@@ -1348,6 +1500,37 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
       case 'card':
         return [
           Text('Edit card contents by adding nested widgets via AI or rebuild the card.', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        ];
+      case 'link':
+        return [
+          _tf('Link label', (_w['label'] ?? 'Open link').toString(), (v) => _set('label', v)),
+          _tf('URL', (_w['url'] ?? '').toString(), (v) => _set('url', v)),
+        ];
+      case 'banner':
+        return [
+          _tf('Banner text', (_w['text'] ?? '').toString(), (v) => _set('text', v), maxLines: 3),
+          _dropdown('Style', (_w['variant'] ?? 'info').toString(), const ['info', 'warning', 'success'], (v) => _set('variant', v)),
+        ];
+      case 'progress':
+        return [
+          _tf('Label', (_w['label'] ?? 'Progress').toString(), (v) => _set('label', v)),
+          _tf('Value 0–1', (_w['value'] ?? 0.65).toString(), (v) => _set('value', double.tryParse(v) ?? 0.65)),
+        ];
+      case 'rating':
+        return [
+          _tf('Label', (_w['label'] ?? 'Rating').toString(), (v) => _set('label', v)),
+          _tf('Stars 0–5', (_w['value'] ?? 4.5).toString(), (v) => _set('value', double.tryParse(v) ?? 4.5)),
+        ];
+      case 'contact':
+        return [
+          _tf('Name', (_w['name'] ?? 'Contact').toString(), (v) => _set('name', v)),
+          _tf('Phone', (_w['phone'] ?? '').toString(), (v) => _set('phone', v)),
+          _tf('Email', (_w['email'] ?? '').toString(), (v) => _set('email', v)),
+        ];
+      case 'video':
+        return [
+          _tf('Video URL (MP4)', (_w['url'] ?? '').toString(), (v) => _set('url', v)),
+          _tf('Caption', (_w['caption'] ?? '').toString(), (v) => _set('caption', v)),
         ];
       default:
         return [Text('No extra settings for this widget. Use Ask AI to change it.', style: TextStyle(color: Colors.grey.shade600))];
