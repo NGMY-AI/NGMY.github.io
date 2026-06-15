@@ -175,9 +175,27 @@ Map<String, dynamic> ngmyNewWidget(String type, {List<NgmyAppScreen> screens = c
       return {'type': 'searchHub', 'collection': 'bookmarks'};
     case 'mapView':
     case 'map':
-      return {'type': 'mapView', 'collection': 'places', 'titleField': 'name', 'subtitleField': 'address', 'height': 360};
+      return {'type': 'mapView', 'collection': 'places', 'titleField': 'name', 'subtitleField': 'address', 'height': 240};
     case 'profile':
       return {'type': 'profile', 'collection': 'reels', 'handle': '@you'};
+    case 'tabs':
+      return {
+        'type': 'tabs',
+        'tabs': [
+          {'label': 'Tab 1', 'layout': {'type': 'text', 'text': 'Tab 1 content', 'style': 'subtitle'}},
+          {'label': 'Tab 2', 'layout': {'type': 'text', 'text': 'Tab 2 content', 'style': 'subtitle'}},
+        ],
+      };
+    case 'chip':
+      return {'type': 'chip', 'label': 'Featured'};
+    case 'list':
+      return {
+        'type': 'list',
+        'items': [
+          {'label': 'Home', 'icon': 'home', 'target': homeTarget},
+          {'label': 'About', 'icon': 'info', 'target': homeTarget},
+        ],
+      };
     default:
       return {'type': 'text', 'text': 'Widget', 'style': 'subtitle'};
   }
@@ -246,6 +264,12 @@ String ngmyWidgetTypeLabel(String type) {
       return 'Profile';
     case 'tabs':
       return 'Tabs';
+    case 'chip':
+      return 'Chip tag';
+    case 'list':
+      return 'Link list';
+    case 'dark_mode':
+      return 'Dark mode toggle';
     default:
       return type.isEmpty ? 'Text' : type[0].toUpperCase() + type.substring(1);
   }

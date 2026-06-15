@@ -107,6 +107,7 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => _WidgetEditorSheet(
         widget: _widgets[index],
+        widgetIndex: index,
         screens: widget.allScreens,
         themeColor: widget.themeColor,
         isDark: isDark,
@@ -264,7 +265,7 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
               child: NgmyAppStudioContentFrame(
                 isDark: isDark,
                 child: ListView(
-                  padding: EdgeInsets.fromLTRB(12, 12, 12, narrow ? 120 : 100),
+                  padding: EdgeInsets.fromLTRB(12, 12, 12, narrow ? 180 : 140),
                   children: [
                     _SectionCard(
                       isDark: isDark,
@@ -280,7 +281,10 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
                           ),
                           const SizedBox(height: 8),
                           Container(
-                            constraints: const BoxConstraints(maxHeight: 280),
+                            constraints: BoxConstraints(
+                              minHeight: 220,
+                              maxHeight: MediaQuery.sizeOf(context).height * 0.42,
+                            ),
                             decoration: BoxDecoration(
                               color: isDark ? const Color(0xFF111827) : Colors.white,
                               borderRadius: BorderRadius.circular(14),
@@ -302,6 +306,7 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
                                         theme: theme,
                                         appId: 'editor_preview_${widget.screen.id}',
                                         isDarkMode: isDark,
+                                        embedded: true,
                                         onNavigate: (_) {},
                                         onSnack: (m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m))),
                                       ),
@@ -790,25 +795,34 @@ class _WidgetToolStrip extends StatelessWidget {
 
   static const _tools = <(String, IconData, String)>[
     ('button', Icons.smart_button_outlined, 'Button'),
+    ('outlined_button', Icons.crop_square_outlined, 'Outline'),
+    ('title', Icons.title, 'Title'),
+    ('text', Icons.text_fields, 'Text'),
+    ('hero', Icons.view_carousel_outlined, 'Hero'),
     ('form', Icons.edit_note_outlined, 'Form'),
     ('dataList', Icons.list_alt, 'List'),
-    ('mapView', Icons.map_outlined, 'Map'),
     ('menuGrid', Icons.grid_view_rounded, 'Menu'),
-    ('hero', Icons.view_carousel_outlined, 'Hero'),
-    ('reelFeed', Icons.smart_display_outlined, 'Reels'),
-    ('socialFeed', Icons.dynamic_feed_outlined, 'Feed'),
+    ('stat', Icons.analytics_outlined, 'Stat'),
+    ('checklist', Icons.checklist, 'Tasks'),
+    ('switch', Icons.toggle_on_outlined, 'Toggle'),
+    ('card', Icons.credit_card, 'Card'),
+    ('image', Icons.image_outlined, 'Image'),
+    ('divider', Icons.horizontal_rule, 'Divider'),
+    ('spacer', Icons.space_bar, 'Spacer'),
+    ('mapView', Icons.map_outlined, 'Map'),
     ('searchHub', Icons.search, 'Search'),
+    ('socialFeed', Icons.dynamic_feed_outlined, 'Feed'),
+    ('reelFeed', Icons.smart_display_outlined, 'Reels'),
     ('postComposer', Icons.video_call_outlined, 'Post'),
+    ('profile', Icons.person_outline, 'Profile'),
+    ('qrCode', Icons.qr_code, 'QR'),
     ('qrGenerator', Icons.qr_code_2, 'QR gen'),
     ('invoiceBuilder', Icons.receipt_long, 'Invoice'),
-    ('switch', Icons.toggle_on_outlined, 'Toggle'),
-    ('stat', Icons.analytics_outlined, 'Stat'),
-    ('checklist', Icons.checklist, 'Checklist'),
     ('workout', Icons.fitness_center, 'Workout'),
-    ('image', Icons.image_outlined, 'Image'),
-    ('text', Icons.text_fields, 'Text'),
-    ('card', Icons.credit_card, 'Card'),
-    ('spacer', Icons.space_bar, 'Spacer'),
+    ('tabs', Icons.tab_outlined, 'Tabs'),
+    ('chip', Icons.label_outline, 'Chip'),
+    ('list', Icons.format_list_bulleted, 'Links'),
+    ('dark_mode', Icons.dark_mode_outlined, 'Dark'),
   ];
 
   @override
@@ -917,11 +931,15 @@ class _AddWidgetSheet extends StatelessWidget {
     ],
     'Navigation': [
       ('menuGrid', 'Menu grid', Icons.grid_view),
+      ('list', 'Link list', Icons.format_list_bulleted),
+      ('tabs', 'Tabs', Icons.tab),
     ],
     'Interactive': [
       ('switch', 'Toggle', Icons.toggle_on),
+      ('dark_mode', 'Dark mode', Icons.dark_mode),
       ('checklist', 'Checklist', Icons.checklist),
       ('workout', 'Workout plan', Icons.fitness_center),
+      ('chip', 'Chip tag', Icons.label),
     ],
     'QR & Invoices': [
       ('qrGenerator', 'QR generator', Icons.qr_code_2),
@@ -1033,6 +1051,7 @@ class _PaletteTile extends StatelessWidget {
 class _WidgetEditorSheet extends StatefulWidget {
   const _WidgetEditorSheet({
     required this.widget,
+    required this.widgetIndex,
     required this.screens,
     required this.themeColor,
     required this.isDark,
@@ -1047,6 +1066,7 @@ class _WidgetEditorSheet extends StatefulWidget {
     this.onPersistConfig,
   });
   final Map<String, dynamic> widget;
+  final int widgetIndex;
   final List<NgmyAppScreen> screens;
   final Color themeColor;
   final bool isDark;
@@ -1112,7 +1132,8 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
       return;
     }
 
-    final prompt = 'Only change the ${ngmyWidgetTypeLabel((_w['type'] ?? '').toString())} widget. '
+    final prompt = 'Only change the widget at index ${widget.widgetIndex} (${ngmyWidgetTypeLabel((_w['type'] ?? '').toString())}). '
+        'Do not remove or reorder other widgets. '
         'Current widget JSON: ${jsonEncode(_w)}. User request: $request';
     final result = await ngmyAppBuilderAiEditScreen(
       apiKey: widget.apiKey,
@@ -1126,12 +1147,10 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
     }
     final layout = ngmyScreenLayout(result.screen ?? widget.screen!);
     final children = layout?['children'];
-    if (children is List && children.isNotEmpty) {
-      for (final c in children) {
-        if (c is Map && (c['type'] ?? '').toString() == (_w['type'] ?? '').toString()) {
-          setState(() => _w = Map<String, dynamic>.from(c));
-          break;
-        }
+    if (children is List && widget.widgetIndex >= 0 && widget.widgetIndex < children.length) {
+      final c = children[widget.widgetIndex];
+      if (c is Map) {
+        setState(() => _w = Map<String, dynamic>.from(c));
       }
     }
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.message), behavior: SnackBarBehavior.floating));
@@ -1259,9 +1278,86 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
         ];
       case 'image':
         return [_tf('Image URL', (_w['url'] ?? '').toString(), (v) => _set('url', v))];
+      case 'spacer':
+        return [_tf('Height (px)', (_w['height'] ?? 16).toString(), (v) => _set('height', int.tryParse(v) ?? 16))];
+      case 'divider':
+        return [Text('Divider — no extra settings.', style: TextStyle(color: Colors.grey.shade600))];
+      case 'checklist':
+        return [
+          _tf('Checklist ID', (_w['id'] ?? 'tasks').toString(), (v) => _set('id', v)),
+          const SizedBox(height: 8),
+          Text('Items (one per line)', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          _tf('Tasks', _checklistLines(), (v) {
+            _set('items', v.split('\n').where((l) => l.trim().isNotEmpty).map((l) => {'id': l.hashCode.toString(), 'label': l.trim()}).toList());
+          }, maxLines: 5),
+        ];
+      case 'workout':
+      case 'workoutPlan':
+        return [
+          _tf('Plan title', (_w['title'] ?? 'Workout').toString(), (v) => _set('title', v)),
+          _tf('Plan ID', (_w['planId'] ?? 'plan1').toString(), (v) => _set('planId', v)),
+        ];
+      case 'mapView':
+      case 'map':
+        return [
+          _tf('Places collection', (_w['collection'] ?? 'places').toString(), (v) => _set('collection', v)),
+          _tf('Title field', (_w['titleField'] ?? 'name').toString(), (v) => _set('titleField', v)),
+          _tf('Map height (px)', (_w['height'] ?? 240).toString(), (v) => _set('height', int.tryParse(v) ?? 240)),
+        ];
+      case 'reelFeed':
+        return [
+          _tf('Reels collection', (_w['collection'] ?? 'reels').toString(), (v) => _set('collection', v)),
+          _tf('Preview height (px)', (_w['height'] ?? 220).toString(), (v) => _set('height', int.tryParse(v) ?? 220)),
+        ];
+      case 'socialFeed':
+        return [_tf('Posts collection', (_w['collection'] ?? 'posts').toString(), (v) => _set('collection', v))];
+      case 'searchHub':
+        return [
+          _tf('Bookmarks collection', (_w['collection'] ?? 'bookmarks').toString(), (v) => _set('collection', v)),
+          _tf('Search placeholder', (_w['placeholder'] ?? 'Search the web').toString(), (v) => _set('placeholder', v)),
+        ];
+      case 'postComposer':
+        return [
+          _tf('Save to collection', (_w['collection'] ?? 'reels').toString(), (v) => _set('collection', v)),
+          _dropdown('Mode', (_w['mode'] ?? 'reel').toString(), const ['reel', 'post'], (v) => _set('mode', v)),
+          _tf('After post go to screen ID', (_w['navigateAfter'] ?? '').toString(), (v) => _set('navigateAfter', v)),
+        ];
+      case 'profile':
+        return [
+          _tf('Username / handle', (_w['handle'] ?? '@you').toString(), (v) => _set('handle', v)),
+          _tf('Posts collection', (_w['collection'] ?? 'reels').toString(), (v) => _set('collection', v)),
+        ];
+      case 'qrCode':
+      case 'qr':
+        return [
+          _tf('QR data / URL', (_w['data'] ?? '').toString(), (v) => _set('data', v)),
+          _tf('Label', (_w['label'] ?? '').toString(), (v) => _set('label', v)),
+        ];
+      case 'qrGenerator':
+        return [
+          _tf('Save collection', (_w['collection'] ?? 'qr_codes').toString(), (v) => _set('collection', v)),
+          _tf('Placeholder', (_w['placeholder'] ?? '').toString(), (v) => _set('placeholder', v)),
+        ];
+      case 'invoiceBuilder':
+        return [
+          _tf('Invoices collection', (_w['collection'] ?? 'invoices').toString(), (v) => _set('collection', v)),
+          _tf('Title', (_w['title'] ?? 'Create invoice').toString(), (v) => _set('title', v)),
+        ];
+      case 'chip':
+        return [_tf('Chip label', (_w['label'] ?? 'Tag').toString(), (v) => _set('label', v))];
+      case 'card':
+        return [
+          Text('Edit card contents by adding nested widgets via AI or rebuild the card.', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        ];
       default:
-        return [Text('No extra settings for this widget.', style: TextStyle(color: Colors.grey.shade600))];
+        return [Text('No extra settings for this widget. Use Ask AI to change it.', style: TextStyle(color: Colors.grey.shade600))];
     }
+  }
+
+  String _checklistLines() {
+    final items = _w['items'];
+    if (items is! List) return '';
+    return items.map((e) => (e is Map ? (e['label'] ?? '').toString() : e.toString())).join('\n');
   }
 
   Widget _tf(String label, String value, void Function(String) onChanged, {int maxLines = 1}) {

@@ -13,6 +13,7 @@ class NgmyRuntimeReelFeed extends StatefulWidget {
     required this.store,
     required this.isDark,
     required this.onSnack,
+    this.compact = false,
   });
 
   final Map<String, dynamic> node;
@@ -20,6 +21,7 @@ class NgmyRuntimeReelFeed extends StatefulWidget {
   final NgmyAppDataStore store;
   final bool isDark;
   final void Function(String message) onSnack;
+  final bool compact;
 
   @override
   State<NgmyRuntimeReelFeed> createState() => _NgmyRuntimeReelFeedState();
@@ -110,12 +112,27 @@ class _NgmyRuntimeReelFeedState extends State<NgmyRuntimeReelFeed> {
   Widget build(BuildContext context) {
     final items = _items;
     if (items.isEmpty) {
-      return const Center(child: Text('No reels yet — tap + to post', style: TextStyle(color: Colors.white70)));
+      final empty = Center(child: Text('No reels yet — tap + to post', style: TextStyle(color: widget.isDark ? Colors.white70 : Colors.black54)));
+      if (!widget.compact) return empty;
+      return SizedBox(height: 120, child: empty);
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_video == null) _playAt(_index);
     });
 
+    final feed = _reelBody(items);
+    if (!widget.compact) return feed;
+    final h = (widget.node['height'] as num?)?.toDouble() ?? 220;
+    return SizedBox(
+      height: h,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: feed,
+      ),
+    );
+  }
+
+  Widget _reelBody(List<Map<String, dynamic>> items) {
     return ColoredBox(
       color: Colors.black,
       child: PageView.builder(
@@ -225,6 +242,7 @@ class NgmyRuntimeSocialFeed extends StatelessWidget {
     required this.store,
     required this.isDark,
     required this.onSnack,
+    this.compact = false,
   });
 
   final Map<String, dynamic> node;
@@ -232,6 +250,7 @@ class NgmyRuntimeSocialFeed extends StatelessWidget {
   final NgmyAppDataStore store;
   final bool isDark;
   final void Function(String message) onSnack;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -248,6 +267,8 @@ class NgmyRuntimeSocialFeed extends StatelessWidget {
     }
 
     return ListView.separated(
+      shrinkWrap: compact,
+      physics: compact ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: posts.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
@@ -406,6 +427,7 @@ class NgmyRuntimeSearchHub extends StatefulWidget {
     required this.store,
     required this.isDark,
     required this.onSnack,
+    this.compact = false,
   });
 
   final Map<String, dynamic> node;
@@ -413,6 +435,7 @@ class NgmyRuntimeSearchHub extends StatefulWidget {
   final NgmyAppDataStore store;
   final bool isDark;
   final void Function(String message) onSnack;
+  final bool compact;
 
   @override
   State<NgmyRuntimeSearchHub> createState() => _NgmyRuntimeSearchHubState();
@@ -439,22 +462,57 @@ class _NgmyRuntimeSearchHubState extends State<NgmyRuntimeSearchHub> {
       return hay.contains(_q.toLowerCase());
     }).toList();
 
+    final searchField = Padding(
+      padding: const EdgeInsets.all(16),
+      child: TextField(
+        controller: _queryC,
+        onChanged: (v) => setState(() => _q = v.trim()),
+        decoration: InputDecoration(
+          hintText: (widget.node['placeholder'] ?? 'Search the web').toString(),
+          prefixIcon: const Icon(Icons.search_rounded),
+          filled: true,
+          fillColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
+        ),
+      ),
+    );
+
+    if (widget.compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          searchField,
+          if (_q.isNotEmpty)
+            ListTile(
+              leading: Icon(Icons.language_rounded, color: widget.theme),
+              title: Text('Search "$_q" on Google', style: const TextStyle(fontWeight: FontWeight.w700)),
+              onTap: () => ngmyRuntimeOpenUrl('https://www.google.com/search?q=${Uri.encodeComponent(_q)}', widget.onSnack),
+            ),
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(_q.isEmpty ? 'Search or save bookmarks below' : 'No saved results', style: TextStyle(color: widget.isDark ? Colors.white54 : Colors.black54)),
+            )
+          else
+            ...items.take(4).map((r) {
+              final title = (r[titleField] ?? 'Link').toString();
+              final url = (r[urlField] ?? '').toString();
+              return ListTile(
+                dense: true,
+                leading: Icon(Icons.bookmark_rounded, color: widget.theme),
+                title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: url.isNotEmpty ? Text(url, maxLines: 1, overflow: TextOverflow.ellipsis) : null,
+                onTap: () => ngmyRuntimeOpenUrl(url, widget.onSnack),
+              );
+            }),
+        ],
+      );
+    }
+
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            controller: _queryC,
-            onChanged: (v) => setState(() => _q = v.trim()),
-            decoration: InputDecoration(
-              hintText: (widget.node['placeholder'] ?? 'Search the web').toString(),
-              prefixIcon: const Icon(Icons.search_rounded),
-              filled: true,
-              fillColor: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
-            ),
-          ),
-        ),
+        searchField,
         if (_q.isNotEmpty)
           ListTile(
             leading: Icon(Icons.language_rounded, color: widget.theme),
@@ -492,12 +550,14 @@ class NgmyRuntimeProfile extends StatelessWidget {
     required this.theme,
     required this.store,
     required this.isDark,
+    this.compact = false,
   });
 
   final Map<String, dynamic> node;
   final Color theme;
   final NgmyAppDataStore store;
   final bool isDark;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -507,6 +567,8 @@ class NgmyRuntimeProfile extends StatelessWidget {
     final items = store.records(collection);
 
     return ListView(
+      shrinkWrap: compact,
+      physics: compact ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.all(16),
       children: [
         Row(

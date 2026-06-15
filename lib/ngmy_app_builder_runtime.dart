@@ -17,6 +17,8 @@ class NgmyAppLayoutRenderer extends StatefulWidget {
   final void Function(String? targetScreenId) onNavigate;
   final void Function(String message) onSnack;
   final bool fullBleed;
+  /// Editor preview — parent scrolls; tall widgets use compact heights.
+  final bool embedded;
 
   const NgmyAppLayoutRenderer({
     super.key,
@@ -25,6 +27,7 @@ class NgmyAppLayoutRenderer extends StatefulWidget {
     required this.appId,
     this.isDarkMode = false,
     this.fullBleed = false,
+    this.embedded = false,
     required this.onNavigate,
     required this.onSnack,
   });
@@ -70,16 +73,25 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
     }
   }
 
+  bool _compactFor(String type, {required bool isRoot}) {
+    if (widget.embedded) return true;
+    if (isRoot && widget.fullBleed && _isImmersiveRoot(type)) return false;
+    return _isImmersiveRoot(type) || type == 'profile';
+  }
+
   @override
   Widget build(BuildContext context) {
     final rootType = (widget.layout['type'] ?? 'column').toString().toLowerCase();
-    final immersive = widget.fullBleed || _isImmersiveRoot(rootType);
+    final immersive = !widget.embedded && (widget.fullBleed || _isImmersiveRoot(rootType));
     return ListenableBuilder(
       listenable: _store,
       builder: (context, _) {
-        final node = _buildNode(context, widget.layout);
+        final node = _buildNode(context, widget.layout, isRoot: true);
         if (immersive) {
           return SizedBox.expand(child: node);
+        }
+        if (widget.embedded) {
+          return node;
         }
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -89,7 +101,7 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
     );
   }
 
-  Widget _buildNode(BuildContext context, Map<String, dynamic> node) {
+  Widget _buildNode(BuildContext context, Map<String, dynamic> node, {bool isRoot = false}) {
     final type = (node['type'] ?? 'text').toString().toLowerCase();
     final childrenRaw = node['children'];
     final children = <Map<String, dynamic>>[];
@@ -102,15 +114,15 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
     switch (type) {
       case 'column':
         return Column(
-          crossAxisAlignment: _crossAlign(node['align']),
-          children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 10), child: _buildNode(context, c))).toList(),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 10), child: _buildNode(context, c, isRoot: false))).toList(),
         );
       case 'row':
         return Row(
-          children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 6), child: _buildNode(context, c)))).toList(),
+          children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 6), child: _buildNode(context, c, isRoot: false)))).toList(),
         );
       case 'wrap':
-        return Wrap(spacing: 8, runSpacing: 8, children: children.map((c) => _buildNode(context, c)).toList());
+        return Wrap(spacing: 8, runSpacing: 8, children: children.map((c) => _buildNode(context, c, isRoot: false)).toList());
       case 'card':
         return Card(
           elevation: 2,
@@ -121,7 +133,7 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
                 ? const SizedBox.shrink()
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 8), child: _buildNode(context, c))).toList(),
+                    children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 8), child: _buildNode(context, c, isRoot: false))).toList(),
                   ),
           ),
         );
@@ -164,10 +176,13 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
         if (style == 'caption') {
           ts = TextStyle(fontSize: 11, color: widget.isDarkMode ? Colors.white54 : Colors.grey);
         }
-        return Text(
-          (node['text'] ?? '').toString(),
-          style: ts ?? TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black87),
-          textAlign: _textAlign(node['align']),
+        return SizedBox(
+          width: double.infinity,
+          child: Text(
+            (node['text'] ?? '').toString(),
+            style: ts ?? TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black87),
+            textAlign: _textAlign(node['align']),
+          ),
         );
       case 'button':
         return FilledButton(
@@ -270,6 +285,7 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
           store: _store,
           isDark: widget.isDarkMode,
           onSnack: widget.onSnack,
+          compact: _compactFor(type, isRoot: isRoot),
         );
       case 'socialfeed':
       case 'social_feed':
@@ -279,6 +295,7 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
           store: _store,
           isDark: widget.isDarkMode,
           onSnack: widget.onSnack,
+          compact: _compactFor(type, isRoot: isRoot),
         );
       case 'postcomposer':
       case 'post_composer':
@@ -298,6 +315,7 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
           store: _store,
           isDark: widget.isDarkMode,
           onSnack: widget.onSnack,
+          compact: _compactFor(type, isRoot: isRoot),
         );
       case 'mapview':
       case 'map_view':
@@ -308,7 +326,7 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
           store: _store,
           isDark: widget.isDarkMode,
           onSnack: widget.onSnack,
-          fillHeight: widget.fullBleed,
+          fillHeight: widget.fullBleed && isRoot && !widget.embedded,
         );
       case 'profile':
         return NgmyRuntimeProfile(
@@ -316,10 +334,14 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
           theme: widget.theme,
           store: _store,
           isDark: widget.isDarkMode,
+          compact: _compactFor('profile', isRoot: isRoot),
         );
       default:
         if (children.isNotEmpty) {
-          return Column(children: children.map((c) => _buildNode(context, c)).toList());
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children.map((c) => _buildNode(context, c, isRoot: false)).toList(),
+          );
         }
         return Text((node['text'] ?? '').toString());
     }
