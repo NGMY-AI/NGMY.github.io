@@ -35326,7 +35326,31 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     bonusGiftC.dispose();
   }
 
-  void _completeStorePurchase({
+  Future<int> _resolveStoreUserIndex(String email) async {
+    final key = ngmyNormalizeEmail(email);
+    if (key.isEmpty) return -1;
+    var idx = widget.allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == key);
+    if (idx >= 0) return idx;
+    try {
+      if (!await ngmyCanReachCloud()) return -1;
+      final row = await Supabase.instance.client
+          .from('users')
+          .select()
+          .eq('email', key)
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      if (row == null) return -1;
+      final remote = UserData.fromJson(Map<String, dynamic>.from(row));
+      widget.allUsers.add(remote);
+      widget.onDataChanged();
+      return widget.allUsers.length - 1;
+    } catch (e) {
+      debugPrint('[store] resolve user $key: $e');
+      return -1;
+    }
+  }
+
+  Future<void> _completeStorePurchase({
     required Map<String, dynamic> listing,
     required String selectedPay,
     required String address,
@@ -35334,17 +35358,20 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     required String buyerName,
     required int quantity,
     String? paymentScreenshot,
-  }) {
+  }) async {
     final price = (listing['price'] as num?)?.toDouble() ?? 0;
     final delivery = (listing['deliveryFee'] as num?)?.toDouble() ?? 0;
     final unitTotal = price + delivery;
     final total = unitTotal * quantity;
     final sellerEmail = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
     final title = (listing['title'] ?? 'Item').toString();
-    final sellerIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sellerEmail);
-    if (sellerIdx < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Seller account not found.')));
+    if (sellerEmail.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This listing has no seller on file.')));
       return;
+    }
+    var sellerIdx = widget.allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == sellerEmail);
+    if (sellerIdx < 0) {
+      sellerIdx = await _resolveStoreUserIndex(sellerEmail);
     }
     final listingId = (listing['id'] ?? '').toString();
     final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == listingId);
@@ -35427,7 +35454,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       ));
       widget.onAddTransaction(AppTransaction(
         id: 'store_sale_$ts',
-        userEmail: widget.allUsers[sellerIdx].email,
+        userEmail: sellerEmail,
         amount: total,
         type: TransactionType.adminAdd,
         method: PaymentMethod.system,
@@ -35775,9 +35802,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         child: ElevatedButton(
                           onPressed: !canConfirm
                               ? null
-                              : () {
+                              : () async {
                                   Navigator.pop(ctx);
-                                  _completeStorePurchase(
+                                  await _completeStorePurchase(
                                     listing: listing,
                                     selectedPay: selectedPay,
                                     address: addressC.text.trim(),
