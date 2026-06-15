@@ -248,6 +248,58 @@ Future<({String? text, String? error})> geminiAnalyzeImages({
   return (text: null, error: direct.error ?? 'Could not reach Gemini.');
 }
 
+String ngmyDocumentFollowUpPrompt({
+  required String documentContext,
+  required String userQuestion,
+  String languageCode = 'en',
+  List<({String question, String answer})> priorTurns = const [],
+}) {
+  final q = userQuestion.trim();
+  final langLine = languageCode == 'sw'
+      ? 'Write your entire response in Swahili (Kiswahili). Use simple, clear language.'
+      : 'Write your entire response in English.';
+  final history = StringBuffer();
+  for (final turn in priorTurns) {
+    history.writeln('User: ${turn.question.trim()}');
+    history.writeln('Assistant: ${turn.answer.trim()}');
+    history.writeln();
+  }
+  return 'You are a document analysis assistant. The user already scanned their document(s). '
+      'Use ONLY the document analysis below — do not ask them to upload again.\n'
+      '$langLine\n'
+      'Answer directly about their specific document. Do not introduce yourself as "NGMY AI".\n\n'
+      '--- Document analysis (from scan) ---\n'
+      '${documentContext.trim()}\n'
+      '--- End document analysis ---\n\n'
+      '${history.isNotEmpty ? '--- Prior Q&A ---\n${history}--- End prior Q&A ---\n\n' : ''}'
+      'User question: $q';
+}
+
+/// Text-only follow-up about a document already scanned (no images re-sent).
+Future<({String? text, String? error})> geminiDocumentFollowUp({
+  required String apiKey,
+  required String documentContext,
+  required String userQuestion,
+  String languageCode = 'en',
+  List<({String question, String answer})> priorTurns = const [],
+}) async {
+  final creds = ngmyParseAiCredentials(apiKey);
+  if (creds.apiKey.isEmpty) return (text: null, error: 'No API key configured.');
+  if (creds.provider != NgmyAiProviderKind.gemini) {
+    return (
+      text: null,
+      error: 'Document Scanner needs a Google Gemini API key (AIza… or gemini: prefix in Management Menus → NGMY AI).',
+    );
+  }
+  final prompt = ngmyDocumentFollowUpPrompt(
+    documentContext: documentContext,
+    userQuestion: userQuestion,
+    languageCode: languageCode,
+    priorTurns: priorTurns,
+  );
+  return ngmyAiGenerateWithCredentials(creds, prompt);
+}
+
 String ngmyDocumentScanPrompt({String userQuestion = '', int pageCount = 1, String languageCode = 'en'}) {
   final q = userQuestion.trim();
   final ask = q.isEmpty

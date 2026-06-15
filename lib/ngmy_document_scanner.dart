@@ -98,12 +98,33 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   bool _analyzing = false;
   String? _result;
   String? _error;
+  /// Cached AI analysis of current pages — used for follow-up Q&A without re-scanning.
+  String? _documentContext;
+  int _scannedPagesFingerprint = 0;
+  final List<({String question, String answer})> _followUps = [];
   /// `en` = English, `sw` = Swahili (Kiswahili).
   String _responseLanguage = 'en';
   int? _remainingFreeScans;
   bool _hasPaidScanAccess = false;
+  bool _isAdminUser = false;
 
   bool get _hasPages => _pages.isNotEmpty;
+
+  bool get _hasDocumentContext => _documentContext != null && _documentContext!.trim().isNotEmpty;
+
+  bool get _pagesMatchScan =>
+      _hasDocumentContext && _scannedPagesFingerprint == _pagesFingerprint;
+
+  bool get _canAskFollowUp =>
+      _pagesMatchScan && _questionC.text.trim().isNotEmpty;
+
+  int get _pagesFingerprint {
+    var fp = _pages.length;
+    for (final p in _pages) {
+      fp = fp * 31 + p.bytes.length;
+    }
+    return fp;
+  }
 
   @override
   void initState() {
@@ -128,7 +149,14 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     setState(() {
       _remainingFreeScans = remaining;
       _hasPaidScanAccess = paid;
+      _isAdminUser = isAdmin;
     });
+  }
+
+  void _clearDocumentContext() {
+    _documentContext = null;
+    _scannedPagesFingerprint = 0;
+    _followUps.clear();
   }
 
   @override
@@ -155,6 +183,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       setState(() {
         _result = null;
         _error = null;
+        _clearDocumentContext();
       });
       if (files.length > _slotsLeft && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -205,10 +234,96 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     setState(() {
       _pages.removeAt(index);
       _result = null;
+      _error = null;
+      _clearDocumentContext();
     });
   }
 
-  Future<void> _analyze() async {
+  Future<String?> _resolveApiKey() async {
+    var apiKey = widget.geminiApiKey.trim();
+    if (apiKey.isEmpty) apiKey = (await widget.refreshApiKey()).trim();
+    return apiKey.isEmpty ? null : apiKey;
+  }
+
+  String? _mapScanError(String? errRaw) {
+    final err = (errRaw ?? '').trim();
+    if (err.contains('proxy not deployed') || err.contains('404')) {
+      return 'Document Scanner needs the ngmy-ai-chat Supabase function (same as NGMY Helper). Ask admin to deploy it, then reload.';
+    }
+    if (err.contains('Network') || err.contains('Failed to fetch') || err.contains('CORS')) {
+      return 'Network blocked the scan. Reload the page or try again on the NGMY app.';
+    }
+    if (err.isNotEmpty) return err.length > 220 ? '${err.substring(0, 220)}…' : err;
+    return 'Could not read this document. Try again or use a closer, flatter photo.';
+  }
+
+  Future<void> _submitAction() async {
+    if (_pages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add one or two document photos first.')),
+      );
+      return;
+    }
+    if (_canAskFollowUp) {
+      await _askFollowUp();
+      return;
+    }
+    if (_hasDocumentContext && _pagesMatchScan && _questionC.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Type a question about your document, or remove pages to scan again.')),
+      );
+      return;
+    }
+    await _scanDocuments();
+  }
+
+  Future<void> _askFollowUp() async {
+    final question = _questionC.text.trim();
+    if (question.isEmpty || !_pagesMatchScan || _documentContext == null) return;
+
+    setState(() {
+      _analyzing = true;
+      _error = null;
+    });
+
+    try {
+      final apiKey = await _resolveApiKey();
+      if (apiKey == null) {
+        setState(() {
+          _error = 'AI is not connected. Ask an admin to save an AI API key in Admin → Management Menus → NGMY AI.';
+          _analyzing = false;
+        });
+        return;
+      }
+
+      final reply = await geminiDocumentFollowUp(
+        apiKey: apiKey,
+        documentContext: _documentContext!,
+        userQuestion: question,
+        languageCode: _responseLanguage,
+        priorTurns: _followUps,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _analyzing = false;
+        if (reply.text != null && reply.text!.isNotEmpty) {
+          _followUps.add((question: question, answer: reply.text!));
+          _questionC.clear();
+        } else {
+          _error = _mapScanError(reply.error);
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _analyzing = false;
+        _error = 'Something went wrong: $e';
+      });
+    }
+  }
+
+  Future<void> _scanDocuments() async {
     if (_pages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Add one or two document photos first.')),
@@ -235,12 +350,12 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       _analyzing = true;
       _error = null;
       _result = null;
+      _clearDocumentContext();
     });
 
     try {
-      var apiKey = widget.geminiApiKey.trim();
-      if (apiKey.isEmpty) apiKey = (await widget.refreshApiKey()).trim();
-      if (apiKey.isEmpty) {
+      final apiKey = await _resolveApiKey();
+      if (apiKey == null) {
         setState(() {
           _error = 'AI is not connected. Ask an admin to save an AI API key in Admin → Management Menus → NGMY AI.';
           _analyzing = false;
@@ -260,21 +375,15 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
         _analyzing = false;
         if (scan.text != null && scan.text!.isNotEmpty) {
           _result = scan.text;
+          _documentContext = scan.text;
+          _scannedPagesFingerprint = _pagesFingerprint;
+          _questionC.clear();
           final email = widget.user != null ? (((widget.user as dynamic).email as String?) ?? '') : '';
           if (email.isNotEmpty) {
             unawaited(NgmyDocumentScanPayments.recordScan(email).then((_) => _refreshScanUsage()));
           }
         } else {
-          final err = (scan.error ?? '').trim();
-          if (err.contains('proxy not deployed') || err.contains('404')) {
-            _error = 'Document Scanner needs the ngmy-ai-chat Supabase function (same as NGMY Helper). Ask admin to deploy it, then reload.';
-          } else if (err.contains('Network') || err.contains('Failed to fetch') || err.contains('CORS')) {
-            _error = 'Network blocked the scan. Reload the page or try again on the NGMY app.';
-          } else if (err.isNotEmpty) {
-            _error = err.length > 220 ? '${err.substring(0, 220)}…' : err;
-          } else {
-            _error = 'Could not read this document. Try again or use a closer, flatter photo.';
-          }
+          _error = _mapScanError(scan.error);
         }
       });
     } catch (e) {
@@ -770,6 +879,28 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   }
 
   Widget _scanUsageBanner() {
+    if (_isAdminUser) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: _violet.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _violet.withValues(alpha: 0.45)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.admin_panel_settings_outlined, color: _violet.withValues(alpha: 0.95), size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Unlimited scans (admin)',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontWeight: FontWeight.w700, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     if (_hasPaidScanAccess) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -794,8 +925,31 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     }
     final limit = NgmyDocumentScanPayments.freeScanLimitFromConfig(widget.config);
     final remaining = _remainingFreeScans;
-    if (limit <= 0 || remaining == null) return const SizedBox.shrink();
-    final used = (limit - remaining).clamp(0, limit);
+    if (limit <= 0) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: _mint.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _mint.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.all_inclusive_rounded, color: _mint.withValues(alpha: 0.9), size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Unlimited free scans',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontWeight: FontWeight.w700, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (remaining == null || NgmyDocumentScanPayments.isUnlimitedRemaining(remaining)) {
+      return const SizedBox.shrink();
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -814,8 +968,8 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
           Expanded(
             child: Text(
               remaining > 0
-                  ? '$remaining of $limit free scans left ($used used)'
-                  : 'All $limit free scans used — pay to unlock 30 days',
+                  ? '$remaining free scan${remaining == 1 ? '' : 's'} left'
+                  : 'No free scans left — pay to unlock 30 days',
               style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontWeight: FontWeight.w700, fontSize: 12),
             ),
           ),
@@ -823,6 +977,19 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       ),
     );
   }
+
+  String get _primaryActionLabel {
+    if (_analyzing) {
+      return _canAskFollowUp || (_hasDocumentContext && _pagesMatchScan && _questionC.text.trim().isNotEmpty)
+          ? 'Answering your question…'
+          : 'Reading your document${_pages.length > 1 ? 's' : ''}…';
+    }
+    if (_canAskFollowUp) return 'Ask about document';
+    return 'Scan & summarize';
+  }
+
+  IconData get _primaryActionIcon =>
+      _canAskFollowUp ? Icons.chat_bubble_outline_rounded : Icons.auto_awesome_rounded;
 
   @override
   Widget build(BuildContext context) {
@@ -985,15 +1152,30 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                   TextField(
                                     controller: _questionC,
                                     maxLines: 2,
+                                    onChanged: (_) {
+                                      if (mounted) setState(() {});
+                                    },
+                                    onSubmitted: (_) {
+                                      if (!_analyzing) unawaited(_submitAction());
+                                    },
                                     style: const TextStyle(color: Colors.white, fontSize: 14),
                                     decoration: InputDecoration(
-                                      hintText: 'Ask anything about your document(s)…',
+                                      hintText: _pagesMatchScan
+                                          ? 'Ask a follow-up question about your document(s)…'
+                                          : 'Optional: ask something specific when you scan…',
                                       hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.38)),
                                       border: InputBorder.none,
                                       isDense: true,
                                       contentPadding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
                                     ),
                                   ),
+                                  if (_pagesMatchScan) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Documents are loaded — ask questions without scanning again.',
+                                      style: TextStyle(color: _mint.withValues(alpha: 0.85), fontSize: 10, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -1005,7 +1187,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                             Material(
                               color: Colors.transparent,
                               child: InkWell(
-                                onTap: _analyzing ? null : _analyze,
+                                onTap: _analyzing ? null : _submitAction,
                                 borderRadius: BorderRadius.circular(18),
                                 child: Ink(
                                   decoration: BoxDecoration(
@@ -1013,7 +1195,9 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                     gradient: LinearGradient(
                                       colors: _analyzing
                                           ? [Colors.grey.shade700, Colors.grey.shade800]
-                                          : const [Color(0xFFF59E0B), Color(0xFFEC4899), Color(0xFF8B5CF6)],
+                                          : _canAskFollowUp
+                                              ? const [Color(0xFF059669), Color(0xFF10B981), Color(0xFF22D3EE)]
+                                              : const [Color(0xFFF59E0B), Color(0xFFEC4899), Color(0xFF8B5CF6)],
                                     ),
                                     boxShadow: [
                                       BoxShadow(color: _pink.withValues(alpha: 0.45), blurRadius: 20, offset: const Offset(0, 8)),
@@ -1030,12 +1214,10 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                           child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
                                         )
                                       else
-                                        const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 24),
+                                        Icon(_primaryActionIcon, color: Colors.white, size: 24),
                                       const SizedBox(width: 10),
                                       Text(
-                                        _analyzing
-                                            ? 'Reading your document${_pages.length > 1 ? 's' : ''}…'
-                                            : 'Scan & summarize',
+                                        _primaryActionLabel,
                                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
                                       ),
                                     ],
@@ -1081,6 +1263,45 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                   ],
                                 ),
                               ),
+                            ],
+                            if (_followUps.isNotEmpty) ...[
+                              for (final turn in _followUps) ...[
+                                const SizedBox(height: 12),
+                                _glassCard(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(Icons.person_outline_rounded, color: _cyan.withValues(alpha: 0.9), size: 18),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              turn.question,
+                                              style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 13, fontWeight: FontWeight.w700),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(Icons.auto_awesome_rounded, color: _mint.withValues(alpha: 0.9), size: 18),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: SelectableText(
+                                              turn.answer,
+                                              style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
                           ],
                         ),

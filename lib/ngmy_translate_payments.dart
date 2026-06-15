@@ -86,11 +86,16 @@ class NgmyTranslatePayments {
     );
   }
 
+  static const int unlimitedRemaining = -1;
+
+  static bool isUnlimitedRemaining(int remaining) =>
+      remaining == unlimitedRemaining || remaining >= 999999;
+
   static Future<int> remainingFree(dynamic config, String email, {bool isAdmin = false}) async {
-    if (isAdmin) return 999999;
+    if (isAdmin) return unlimitedRemaining;
     final limit = weeklyFreeLimitFromConfig(config);
-    if (limit <= 0) return 999999;
-    if (hasWeekPass(config, email)) return 999999;
+    if (limit <= 0) return unlimitedRemaining;
+    if (hasWeekPass(config, email)) return unlimitedRemaining;
     final used = await weeklyUsageCount(email);
     return (limit - used).clamp(0, limit);
   }

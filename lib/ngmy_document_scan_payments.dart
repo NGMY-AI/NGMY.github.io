@@ -75,11 +75,17 @@ class NgmyDocumentScanPayments {
     await prefs.setInt('$_usagePrefsPrefix$key', count + 1);
   }
 
+  /// `-1` means unlimited (admin, paid pass, or admin set limit to 0).
+  static const int unlimitedRemaining = -1;
+
+  static bool isUnlimitedRemaining(int remaining) =>
+      remaining == unlimitedRemaining || remaining >= 999999;
+
   static Future<int> remainingFree(dynamic config, String email, {bool isAdmin = false}) async {
-    if (isAdmin) return 999999;
+    if (isAdmin) return unlimitedRemaining;
     final limit = freeScanLimitFromConfig(config);
-    if (limit <= 0) return 999999;
-    if (hasActiveAccess(config, email)) return 999999;
+    if (limit <= 0) return unlimitedRemaining;
+    if (hasActiveAccess(config, email)) return unlimitedRemaining;
     final used = await lifetimeScanCount(email);
     return (limit - used).clamp(0, limit);
   }

@@ -515,7 +515,7 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
                         ],
                       ),
                     ),
-                    if (_remainingFree != null && _remainingFree! < 999999)
+                    if (_remainingFree != null && !NgmyTranslatePayments.isUnlimitedRemaining(_remainingFree!))
                       Container(
                         margin: const EdgeInsets.only(right: 4),
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
