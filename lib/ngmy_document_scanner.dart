@@ -100,6 +100,8 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   String? _error;
   /// `en` = English, `sw` = Swahili (Kiswahili).
   String _responseLanguage = 'en';
+  int? _remainingFreeScans;
+  bool _hasPaidScanAccess = false;
 
   bool get _hasPages => _pages.isNotEmpty;
 
@@ -110,6 +112,23 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     _framePulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
     _inner3d = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
     _flagFx = AnimationController(vsync: this, duration: const Duration(milliseconds: 520));
+    unawaited(_refreshScanUsage());
+  }
+
+  Future<void> _refreshScanUsage() async {
+    final user = widget.user;
+    final config = widget.config;
+    if (user == null || config == null) return;
+    final email = ((user as dynamic).email as String?) ?? '';
+    if (email.isEmpty) return;
+    final isAdmin = (user as dynamic).isAdmin == true;
+    final remaining = await NgmyDocumentScanPayments.remainingFree(config, email, isAdmin: isAdmin);
+    final paid = NgmyDocumentScanPayments.hasActiveAccess(config, email);
+    if (!mounted) return;
+    setState(() {
+      _remainingFreeScans = remaining;
+      _hasPaidScanAccess = paid;
+    });
   }
 
   @override
@@ -209,6 +228,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
         onPersistConfig: widget.onPersistConfig ?? () async => true,
       );
       if (!allowed) return;
+      await _refreshScanUsage();
     }
 
     setState(() {
@@ -242,7 +262,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
           _result = scan.text;
           final email = widget.user != null ? (((widget.user as dynamic).email as String?) ?? '') : '';
           if (email.isNotEmpty) {
-            unawaited(NgmyDocumentScanPayments.recordScan(email));
+            unawaited(NgmyDocumentScanPayments.recordScan(email).then((_) => _refreshScanUsage()));
           }
         } else {
           final err = (scan.error ?? '').trim();
@@ -749,6 +769,61 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     );
   }
 
+  Widget _scanUsageBanner() {
+    if (_hasPaidScanAccess) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: _mint.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _mint.withValues(alpha: 0.45)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.all_inclusive_rounded, color: _mint.withValues(alpha: 0.95), size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Unlimited scans active (30-day pass)',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontWeight: FontWeight.w700, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final limit = NgmyDocumentScanPayments.freeScanLimitFromConfig(widget.config);
+    final remaining = _remainingFreeScans;
+    if (limit <= 0 || remaining == null) return const SizedBox.shrink();
+    final used = (limit - remaining).clamp(0, limit);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            remaining > 0 ? Icons.document_scanner_outlined : Icons.lock_outline_rounded,
+            color: remaining > 0 ? _cyan : const Color(0xFFF59E0B),
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              remaining > 0
+                  ? '$remaining of $limit free scans left ($used used)'
+                  : 'All $limit free scans used — pay to unlock 30 days',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -922,6 +997,10 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
                                 ],
                               ),
                             ),
+                            if (widget.user != null && widget.config != null) ...[
+                              const SizedBox(height: 10),
+                              _scanUsageBanner(),
+                            ],
                             const SizedBox(height: 14),
                             Material(
                               color: Colors.transparent,

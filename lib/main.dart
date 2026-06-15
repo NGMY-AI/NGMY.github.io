@@ -2406,41 +2406,15 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
   } else {
     next.communicateMinutesPerPayment = keep.communicateMinutesPerPayment;
   }
-  if (!ngmyShouldDeferRemoteConfigOverwrite()) {
-    for (final field in [
-      'communicatePassTwoWeekFee',
-      'communicatePassMonthlyFee',
-      'communicatePassYearlyFee',
-      'documentScanUnlockFee',
-    ]) {
-      if (record.containsKey(field)) {
-        final v = record[field];
-        if (v is num && v >= 0) (next as dynamic)[field] = v.toDouble();
-      }
-    }
-    for (final field in [
-      'communicatePassTwoWeekEnabled',
-      'communicatePassMonthlyEnabled',
-      'communicatePassYearlyEnabled',
-    ]) {
-      if (record.containsKey(field)) {
-        (next as dynamic)[field] = record[field] == true;
-      }
-    }
-    if (record.containsKey('documentScanFreeLimit')) {
-      final v = record['documentScanFreeLimit'];
-      if (v is num && v >= 0) next.documentScanFreeLimit = v.toInt();
-    }
-  } else {
-    next.communicatePassTwoWeekFee = keep.communicatePassTwoWeekFee;
-    next.communicatePassTwoWeekEnabled = keep.communicatePassTwoWeekEnabled;
-    next.communicatePassMonthlyFee = keep.communicatePassMonthlyFee;
-    next.communicatePassMonthlyEnabled = keep.communicatePassMonthlyEnabled;
-    next.communicatePassYearlyFee = keep.communicatePassYearlyFee;
-    next.communicatePassYearlyEnabled = keep.communicatePassYearlyEnabled;
-    next.documentScanFreeLimit = keep.documentScanFreeLimit;
-    next.documentScanUnlockFee = keep.documentScanUnlockFee;
-  }
+  // Authoritative source is ngmy_settings (communicate_payment_settings / document_scan_payment_settings).
+  next.communicatePassTwoWeekFee = keep.communicatePassTwoWeekFee;
+  next.communicatePassTwoWeekEnabled = keep.communicatePassTwoWeekEnabled;
+  next.communicatePassMonthlyFee = keep.communicatePassMonthlyFee;
+  next.communicatePassMonthlyEnabled = keep.communicatePassMonthlyEnabled;
+  next.communicatePassYearlyFee = keep.communicatePassYearlyFee;
+  next.communicatePassYearlyEnabled = keep.communicatePassYearlyEnabled;
+  next.documentScanFreeLimit = keep.documentScanFreeLimit;
+  next.documentScanUnlockFee = keep.documentScanUnlockFee;
   if (record.containsKey('communicateAccessUntilByEmail') && record['communicateAccessUntilByEmail'] is Map) {
     next.communicateAccessUntilByEmail = {
       ..._familyTreePhotoAccessFromJson(record['communicateAccessUntilByEmail']),
@@ -8216,6 +8190,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await ngmyHydrateCivicSelfEnrollmentFromAllBackups(next);
         await ngmyHydrateCivicRegistryMembersFromAllBackups(next, _allUsers);
         await ngmyHydrateCivicHelpModeFromAllBackups(next);
+        await ngmyHydrateCommunicatePaymentsFromAllBackups(next);
+        await ngmyHydrateDocumentScanPaymentsFromAllBackups(next);
         if (_appConfigSig(_config) == _appConfigSig(next)) return;
         setState(() {
           _config = next;
@@ -8283,6 +8259,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return removedListingIds;
   }
 
+  List<String> _purgeExpiredStorePaymentReceipts() {
+    final removedIds = ngmyPurgeExpiredStorePaymentReceipts(_config.storeInquiries);
+    if (removedIds.isEmpty) return removedIds;
+    unawaited(_deleteStoreInquiryRowsFromSupabase(removedIds));
+    unawaited(_persistOperationalConfigToCloud(_config));
+    return removedIds;
+  }
+
   Future<void> _reloadStoreFromSupabase() async {
     final listingsSigBefore = _storeListingsSignature(_config.storeListings);
     final inquiriesBefore = _config.storeInquiries.length;
@@ -8296,6 +8280,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _mergeStoreInquiriesIntoConfig(configInquiries);
     }
     _purgeExpiredSoldStoreListings();
+    _purgeExpiredStorePaymentReceipts();
     if (!mounted) return;
     final listingsSigAfter = _storeListingsSignature(_config.storeListings);
     final inquiriesAfter = _config.storeInquiries.length;
@@ -8772,6 +8757,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _syncStoreToSupabase() async {
     _purgeExpiredSoldStoreListings();
+    _purgeExpiredStorePaymentReceipts();
     for (final listing in _config.storeListings) {
       final copy = Map<String, dynamic>.from(listing);
       copy['updatedAt'] = DateTime.now().toUtc().toIso8601String();
@@ -10603,6 +10589,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
 
       _purgeExpiredSoldStoreListings();
+      _purgeExpiredStorePaymentReceipts();
       await _pruneExpiredAnnouncements(updateUi: false);
       for (final o in _config.storeOrders) {
         final id = (o['id'] ?? '').toString();
@@ -18578,7 +18565,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _showPaymentsAdmin(isDark);
   }
 
-  void _showPaymentsAdmin(bool isDark) {
+  Future<void> _showPaymentsAdmin(bool isDark) async {
+    await ngmyHydrateCommunicatePaymentsFromAllBackups(widget.config);
+    await ngmyHydrateDocumentScanPaymentsFromAllBackups(widget.config);
+    if (!mounted) return;
     final createC = TextEditingController(text: widget.config.familyTreeCreateFee.toStringAsFixed(2));
     final photoC = TextEditingController(text: widget.config.familyTreePhotoMonthlyFee.toStringAsFixed(2));
     final premOneC = TextEditingController(text: widget.config.invoicePremiumOneTimeFee.toStringAsFixed(2));
@@ -24889,7 +24879,9 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
   void _openYQrGenerator() => showNgmyQrGeneratorDialog(context);
 
-  void _openDocumentScanner() {
+  void _openDocumentScanner() async {
+    await ngmyHydrateDocumentScanPaymentsFromAllBackups(widget.config);
+    if (!mounted) return;
     showNgmyDocumentScanner(
       context,
       geminiApiKey: widget.config.geminiApiKey,
@@ -31153,6 +31145,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         merged = _mergeStoreInquiriesLists(merged, fromConfig);
       }
       widget.config.storeInquiries = merged;
+      final removedReceiptIds = ngmyPurgeExpiredStorePaymentReceipts(widget.config.storeInquiries);
+      if (removedReceiptIds.isNotEmpty) {
+        unawaited(_deleteStoreInquiryRowsFromSupabase(removedReceiptIds));
+        widget.onDataChanged();
+      }
       _ensurePaymentReviewInquiriesFromOrders();
       _ensureStoreThreadsFromOrders();
       await ngmyFlushCriticalConfigLocalAndCloud(widget.config, cloud: false);
@@ -31278,6 +31275,11 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       return true;
     });
     widget.config.storeInquiries.removeWhere((m) => removedListingIds.contains((m['listingId'] ?? '').toString()));
+    final removedReceiptIds = ngmyPurgeExpiredStorePaymentReceipts(widget.config.storeInquiries);
+    if (removedReceiptIds.isNotEmpty) {
+      unawaited(_deleteStoreInquiryRowsFromSupabase(removedReceiptIds));
+      widget.onDataChanged();
+    }
   }
 
   @override

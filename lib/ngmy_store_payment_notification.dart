@@ -17,10 +17,53 @@ class NgmyStorePaymentReply {
   static bool isPurchaseStatus(Map<String, dynamic> r) =>
       (r['type'] ?? '').toString() == purchaseStatus;
 
+  static bool isPaymentReply(Map<String, dynamic> r) =>
+      isPurchaseNotification(r) || isPurchaseStatus(r);
+
   static String paymentStatusOf(Map<String, dynamic> r) =>
       (r['paymentStatus'] ?? 'pending').toString();
 
   static bool isPending(Map<String, dynamic> r) => paymentStatusOf(r) == 'pending';
+}
+
+/// Store payment confirmation threads auto-delete after this many days.
+const kNgmyStorePaymentReceiptRetentionDays = 14;
+
+List<Map<String, dynamic>> _storeInquiryRepliesFrom(Map<String, dynamic> m) {
+  final raw = m['replies'];
+  if (raw is List) {
+    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+  return const [];
+}
+
+bool ngmyStoreInquiryHasPaymentContent(Map<String, dynamic> m) =>
+    _storeInquiryRepliesFrom(m).any(NgmyStorePaymentReply.isPaymentReply);
+
+DateTime? ngmyStoreInquiryLastActivityAt(Map<String, dynamic> m) {
+  final replies = _storeInquiryRepliesFrom(m);
+  if (replies.isNotEmpty) {
+    return DateTime.tryParse((replies.last['createdAt'] ?? m['createdAt'] ?? '').toString());
+  }
+  return DateTime.tryParse((m['createdAt'] ?? '').toString());
+}
+
+/// Removes payment-confirmation inquiries older than [retentionDays]. Returns deleted inquiry ids.
+List<String> ngmyPurgeExpiredStorePaymentReceipts(
+  List<Map<String, dynamic>> inquiries, {
+  int retentionDays = kNgmyStorePaymentReceiptRetentionDays,
+}) {
+  final cutoff = DateTime.now().toUtc().subtract(Duration(days: retentionDays));
+  final removedIds = <String>[];
+  inquiries.removeWhere((m) {
+    if (!ngmyStoreInquiryHasPaymentContent(m)) return false;
+    final lastAt = ngmyStoreInquiryLastActivityAt(m);
+    if (lastAt == null || !lastAt.isBefore(cutoff)) return false;
+    final id = (m['id'] ?? '').toString();
+    if (id.isNotEmpty) removedIds.add(id);
+    return true;
+  });
+  return removedIds;
 }
 
 String ngmyGenerateStorePaymentCode() {

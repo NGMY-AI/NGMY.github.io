@@ -944,8 +944,21 @@ Map<String, dynamic> _communicatePaymentPayload(AppConfig config) => {
       'savedAt': DateTime.now().toUtc().toIso8601String(),
     };
 
-void _applyCommunicatePaymentPayload(AppConfig config, Map<String, dynamic> payload) {
-  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+DateTime? _ngmySettingsPayloadSavedAt(Map<String, dynamic> payload) =>
+    DateTime.tryParse((payload['savedAt'] ?? '').toString());
+
+bool _shouldApplyRemoteNgmySettingsPayload(Map<String, dynamic>? localPayload, Map<String, dynamic> remotePayload) {
+  if (ngmyShouldDeferRemoteConfigOverwrite()) return false;
+  final remoteAt = _ngmySettingsPayloadSavedAt(remotePayload);
+  if (remoteAt == null) return true;
+  if (localPayload == null || localPayload.isEmpty) return true;
+  final localAt = _ngmySettingsPayloadSavedAt(localPayload);
+  if (localAt == null) return true;
+  return !remoteAt.isBefore(localAt);
+}
+
+void _applyCommunicatePaymentPayload(AppConfig config, Map<String, dynamic> payload, {bool fromRemote = false}) {
+  if (fromRemote && ngmyShouldDeferRemoteConfigOverwrite()) return;
   final fee = payload['communicateFeeAmount'];
   if (fee is num && fee >= 0) config.communicateFeeAmount = fee.toDouble();
   final mins = payload['communicateMinutesPerPayment'];
@@ -977,20 +990,25 @@ Future<void> _persistCommunicatePaymentSettingsLocal(AppConfig config) async {
 }
 
 Future<void> ngmyHydrateCommunicatePaymentsFromAllBackups(AppConfig config) async {
+  Map<String, dynamic>? localPayload;
   try {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kNgmyCommunicatePaymentPrefsKey);
     if (raw != null && raw.trim().isNotEmpty) {
       final decoded = jsonDecode(raw);
-      if (decoded is Map) _applyCommunicatePaymentPayload(config, Map<String, dynamic>.from(decoded));
+      if (decoded is Map) {
+        localPayload = Map<String, dynamic>.from(decoded);
+        _applyCommunicatePaymentPayload(config, localPayload!, fromRemote: false);
+      }
     }
   } catch (e) {
     debugPrint('[admin communicate payments] local hydrate: $e');
   }
   if (await ngmyCanReachCloud()) {
     final row = await _fetchNgmySettingSafe(_kNgmyCommunicatePaymentSettingsKey);
-    if (row != null && row.isNotEmpty) {
-      _applyCommunicatePaymentPayload(config, row);
+    if (row != null && row.isNotEmpty && _shouldApplyRemoteNgmySettingsPayload(localPayload, row)) {
+      _applyCommunicatePaymentPayload(config, row, fromRemote: true);
+      await _persistCommunicatePaymentSettingsLocal(config);
     }
   }
 }
@@ -1017,8 +1035,8 @@ Map<String, dynamic> _documentScanPaymentPayload(AppConfig config) => {
       'savedAt': DateTime.now().toUtc().toIso8601String(),
     };
 
-void _applyDocumentScanPaymentPayload(AppConfig config, Map<String, dynamic> payload) {
-  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+void _applyDocumentScanPaymentPayload(AppConfig config, Map<String, dynamic> payload, {bool fromRemote = false}) {
+  if (fromRemote && ngmyShouldDeferRemoteConfigOverwrite()) return;
   final limit = payload['documentScanFreeLimit'];
   if (limit is num && limit >= 0) config.documentScanFreeLimit = limit.toInt();
   final fee = payload['documentScanUnlockFee'];
@@ -1035,20 +1053,25 @@ Future<void> _persistDocumentScanPaymentSettingsLocal(AppConfig config) async {
 }
 
 Future<void> ngmyHydrateDocumentScanPaymentsFromAllBackups(AppConfig config) async {
+  Map<String, dynamic>? localPayload;
   try {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kNgmyDocumentScanPaymentPrefsKey);
     if (raw != null && raw.trim().isNotEmpty) {
       final decoded = jsonDecode(raw);
-      if (decoded is Map) _applyDocumentScanPaymentPayload(config, Map<String, dynamic>.from(decoded));
+      if (decoded is Map) {
+        localPayload = Map<String, dynamic>.from(decoded);
+        _applyDocumentScanPaymentPayload(config, localPayload!, fromRemote: false);
+      }
     }
   } catch (e) {
     debugPrint('[admin document scan payments] local hydrate: $e');
   }
   if (await ngmyCanReachCloud()) {
     final row = await _fetchNgmySettingSafe(_kNgmyDocumentScanPaymentSettingsKey);
-    if (row != null && row.isNotEmpty) {
-      _applyDocumentScanPaymentPayload(config, row);
+    if (row != null && row.isNotEmpty && _shouldApplyRemoteNgmySettingsPayload(localPayload, row)) {
+      _applyDocumentScanPaymentPayload(config, row, fromRemote: true);
+      await _persistDocumentScanPaymentSettingsLocal(config);
     }
   }
 }
