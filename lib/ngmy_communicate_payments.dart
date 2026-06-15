@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_communicate_storage.dart';
+import 'ngmy_communicate_sync.dart';
 import 'ngmy_wallet_payment_ui.dart';
 
 enum NgmyCommunicatePassTier { twoWeek, monthly, yearly }
@@ -174,6 +175,12 @@ class NgmyCommunicatePayments {
 
     grantPass(config, email, days: picked.days);
     await NgmyCommunicateTimeTracker.resetAfterPayment(email);
+    if (!((user as dynamic).isAdmin == true)) {
+      await NgmyCommunicateBackupCodes.ensureActiveCode(
+        email,
+        passUntil: passExpiresAt(config, email),
+      );
+    }
     onDataChanged?.call();
     if (onPersistConfig != null) await onPersistConfig();
     return true;

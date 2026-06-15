@@ -90,6 +90,65 @@ class NgmyCommunicateMemoryStore {
     if (email.trim().isEmpty || profileId.trim().isEmpty) return;
     final now = DateTime.now();
     final cutoff = now.subtract(const Duration(days: retentionDays));
+    final cleaned = _cleanMessageRows(messages, cutoff: cutoff);
+    while (cleaned.length > maxStoredMessages) {
+      cleaned.removeAt(0);
+    }
+    await _persist(email, profileId, cleaned);
+  }
+
+  /// Full history for backup export (no message cap).
+  static Future<List<Map<String, dynamic>>> loadAllForExport(String email, String profileId) async {
+    if (email.trim().isEmpty || profileId.trim().isEmpty) return [];
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_chatKey(email, profileId));
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      final kept = <Map<String, dynamic>>[];
+      for (final item in decoded) {
+        if (item is! Map) continue;
+        final map = Map<String, dynamic>.from(item);
+        final role = (map['role'] ?? '').toString();
+        final text = (map['text'] ?? '').toString().trim();
+        final imageB64 = (map['imageB64'] ?? '').toString().trim();
+        if (text.isEmpty && imageB64.isEmpty) continue;
+        if (role != 'user' && role != 'ai') continue;
+        kept.add(map);
+      }
+      kept.sort((a, b) => (a['at'] ?? '').toString().compareTo((b['at'] ?? '').toString()));
+      return kept;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Merge imported messages into local chat (keeps all history).
+  static Future<void> restoreMerged(String email, String profileId, List<Map<String, dynamic>> imported) async {
+    if (email.trim().isEmpty || profileId.trim().isEmpty || imported.isEmpty) return;
+    final existing = await loadAllForExport(email, profileId);
+    final byKey = <String, Map<String, dynamic>>{};
+    for (final m in existing) {
+      byKey[_messageMergeKey(m)] = m;
+    }
+    for (final m in imported) {
+      byKey[_messageMergeKey(m)] = m;
+    }
+    final merged = byKey.values.toList()
+      ..sort((a, b) => (a['at'] ?? '').toString().compareTo((b['at'] ?? '').toString()));
+    await _persist(email, profileId, merged);
+  }
+
+  static String _messageMergeKey(Map<String, dynamic> m) {
+    final at = (m['at'] ?? '').toString();
+    final role = (m['role'] ?? '').toString();
+    final text = (m['text'] ?? '').toString();
+    return '$at|$role|$text';
+  }
+
+  static List<Map<String, dynamic>> _cleanMessageRows(List<Map<String, dynamic>> messages, {required DateTime cutoff}) {
+    final now = DateTime.now();
     final cleaned = <Map<String, dynamic>>[];
     for (final m in messages) {
       final role = (m['role'] ?? '').toString();
@@ -106,10 +165,7 @@ class NgmyCommunicateMemoryStore {
       }
       cleaned.add(row);
     }
-    while (cleaned.length > maxStoredMessages) {
-      cleaned.removeAt(0);
-    }
-    await _persist(email, profileId, cleaned);
+    return cleaned;
   }
 
   static Future<void> _persist(String email, String profileId, List<Map<String, dynamic>> list) async {

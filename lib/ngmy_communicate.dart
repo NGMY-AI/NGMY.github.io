@@ -11,6 +11,8 @@ import 'package:image_picker/image_picker.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_storage.dart';
+import 'ngmy_communicate_sync.dart';
+import 'ngmy_communicate_sync_ui.dart';
 import 'ngmy_mshauri.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_platform_graphics.dart';
@@ -797,7 +799,26 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     unawaited(_prepAvatars());
     unawaited(_warmAiKey());
     final email = ((widget.user as dynamic).email as String?) ?? '';
-    if (email.isNotEmpty) unawaited(NgmyCommunicateTimeTracker.syncFromCloud(email));
+    if (email.isNotEmpty) {
+      unawaited(NgmyCommunicateTimeTracker.syncFromCloud(email));
+      unawaited(NgmyCommunicateBackupCodes.syncForUser(email, widget.config, isAdmin: _isAdmin));
+    }
+  }
+
+  bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
+
+  bool get _canSync => NgmyCommunicateSyncService.userCanSync(widget.user, widget.config);
+
+  Future<void> _openSyncSheet() async {
+    await showNgmyCommunicateSyncSheet(
+      context,
+      user: widget.user,
+      config: widget.config,
+      isAdmin: _isAdmin,
+      onRestored: () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   Future<void> _warmAiKey() async {
@@ -901,7 +922,21 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
               height: 64,
               child: Row(
                 children: [
-                  const SizedBox(width: 44),
+                  if (_canSync)
+                    Material(
+                      color: Colors.transparent,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: _openSyncSheet,
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Icon(Icons.sync_rounded, size: 22, color: mutedIcon),
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 44),
                   Expanded(
                     child: Center(
                       child: Text(
