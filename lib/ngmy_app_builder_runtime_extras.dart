@@ -239,6 +239,13 @@ class _NgmyRuntimeInvoiceBuilderState extends State<NgmyRuntimeInvoiceBuilder> {
   }
 
   @override
+  void didUpdateWidget(covariant NgmyRuntimeInvoiceBuilder oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = (widget.node['templateId'] ?? 'classic').toString();
+    if (next != _templateId) _templateId = next;
+  }
+
+  @override
   void dispose() {
     _clientC.dispose();
     _itemsC.dispose();

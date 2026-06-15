@@ -1,14 +1,14 @@
 import 'dart:convert';
 
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_app_builder_data.dart';
 
-/// Interactive map UI — real OpenStreetMap tiles, search, pins, Google Maps directions.
+/// Real OpenStreetMap tiles — search geocodes and moves the map in-app.
 class NgmyRuntimeMapView extends StatefulWidget {
   const NgmyRuntimeMapView({
     super.key,
@@ -33,10 +33,12 @@ class NgmyRuntimeMapView extends StatefulWidget {
 
 class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
   final _searchC = TextEditingController();
+  final _mapController = MapController();
   String _query = '';
   late double _centerLat;
   late double _centerLng;
-  Map<String, dynamic>? _selectedPlace;
+  double _zoom = 14;
+  String _searchResultLabel = '';
   bool _geocoding = false;
 
   bool get _inApp => widget.node['inApp'] != false;
@@ -46,12 +48,24 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
     super.initState();
     _centerLat = (widget.node['centerLat'] as num?)?.toDouble() ?? 40.7128;
     _centerLng = (widget.node['centerLng'] as num?)?.toDouble() ?? -74.006;
+    _zoom = (widget.node['zoom'] as num?)?.toDouble() ?? 14;
   }
 
   @override
   void dispose() {
     _searchC.dispose();
+    _mapController.dispose();
     super.dispose();
+  }
+
+  void _moveMap(double lat, double lng, {double? zoom, String? label}) {
+    setState(() {
+      _centerLat = lat;
+      _centerLng = lng;
+      if (zoom != null) _zoom = zoom;
+      if (label != null) _searchResultLabel = label;
+    });
+    _mapController.move(LatLng(lat, lng), _zoom);
   }
 
   Future<void> _openExternalMaps({String? address, double? lat, double? lng}) async {
@@ -78,8 +92,10 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
     if (q.isEmpty) return;
     setState(() => _geocoding = true);
     try {
-      final uri = Uri.parse('https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(q)}&format=json&limit=1');
-      final res = await http.get(uri, headers: const {'User-Agent': 'NGMY-App-Builder/1.0'});
+      final uri = Uri.parse(
+        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(q)}&format=json&limit=1',
+      );
+      final res = await http.get(uri, headers: const {'User-Agent': 'NGMY-App-Builder/1.0 (contact@ngmy.org)'});
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body);
         if (list is List && list.isNotEmpty && list.first is Map) {
@@ -87,19 +103,16 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
           final lat = double.tryParse('${m['lat']}');
           final lng = double.tryParse('${m['lon']}');
           if (lat != null && lng != null) {
-            setState(() {
-              _centerLat = lat;
-              _centerLng = lng;
-              _selectedPlace = {'name': (m['display_name'] ?? q).toString(), 'lat': lat, 'lng': lng};
-            });
-            widget.onSnack('Showing on map');
+            final name = (m['display_name'] ?? q).toString();
+            _moveMap(lat, lng, zoom: 15, label: name);
+            widget.onSnack('Found: ${name.split(',').first}');
             return;
           }
         }
       }
-      widget.onSnack('Place not found — try a different search');
+      widget.onSnack('Place not found — try a different address');
     } catch (_) {
-      widget.onSnack('Search failed — check connection');
+      widget.onSnack('Search failed — check your connection');
     } finally {
       if (mounted) setState(() => _geocoding = false);
     }
@@ -128,19 +141,17 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
               ],
             ),
             if (subtitle.isNotEmpty) ...[const SizedBox(height: 8), Text(subtitle, style: TextStyle(color: widget.isDark ? Colors.white70 : Colors.black54))],
-            if (lat != null && lng != null) ...[const SizedBox(height: 6), Text('${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}', style: TextStyle(fontSize: 12, color: widget.isDark ? Colors.white38 : Colors.black45))],
+            if (lat != null && lng != null) ...[
+              const SizedBox(height: 6),
+              Text('${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}', style: TextStyle(fontSize: 12, color: widget.isDark ? Colors.white38 : Colors.black45)),
+            ],
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () {
                 Navigator.pop(ctx);
                 if (lat != null && lng != null) {
-                  setState(() {
-                    _centerLat = lat;
-                    _centerLng = lng;
-                    _selectedPlace = place;
-                  });
+                  _moveMap(lat, lng, zoom: 16, label: title);
                 }
-                widget.onSnack('Centered on map');
               },
               icon: const Icon(Icons.map_rounded),
               label: const Text('Show on map'),
@@ -161,162 +172,162 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
     );
   }
 
-  String _staticMapUrl(double lat, double lng, int width, int height) {
-    final w = width.clamp(200, 1280);
-    final h = height.clamp(200, 1280);
-    return 'https://staticmap.openstreetmap.de/staticmap.php'
-        '?center=$lat,$lng&zoom=13&size=${w}x$h&maptype=mapnik'
-        '&markers=$lat,$lng,red-pushpin';
-  }
-
-  Widget _buildMapCanvas({
-    required double centerLat,
-    required double centerLng,
-    required double? height,
-    required bool expand,
-    required List<Map<String, dynamic>> filtered,
+  List<Marker> _markersForPlaces(
+    List<Map<String, dynamic>> places, {
     required String titleField,
-    required String subtitleField,
     required String latField,
     required String lngField,
   }) {
-    final mapStack = LayoutBuilder(
-          builder: (context, constraints) {
-            final w = constraints.maxWidth.isFinite ? constraints.maxWidth.round() : 600;
-            final h = constraints.maxHeight.isFinite ? constraints.maxHeight.round() : (height?.round() ?? 320);
-            return Stack(
-              fit: StackFit.expand,
+    final markers = <Marker>[
+      Marker(
+        point: LatLng(_centerLat, _centerLng),
+        width: 44,
+        height: 44,
+        child: Icon(Icons.my_location_rounded, color: widget.theme, size: 40, shadows: const [Shadow(color: Colors.black26, blurRadius: 6)]),
+      ),
+    ];
+    for (final r in places) {
+      final lat = double.tryParse('${r[latField] ?? r['lat'] ?? ''}');
+      final lng = double.tryParse('${r[lngField] ?? r['lng'] ?? ''}');
+      if (lat == null || lng == null) continue;
+      final title = (r[titleField] ?? 'Place').toString();
+      markers.add(
+        Marker(
+          point: LatLng(lat, lng),
+          width: 40,
+          height: 48,
+          child: GestureDetector(
+            onTap: () {
+              _moveMap(lat, lng, zoom: 16, label: title);
+              if (_inApp) {
+                _showPlaceSheet(r, titleField: titleField, subtitleField: 'address', latField: latField, lngField: lngField);
+              }
+            },
+            child: Column(
               children: [
-                InteractiveViewer(
-                  minScale: 0.85,
-                  maxScale: 3.5,
-                  child: Image.network(
-                    _staticMapUrl(centerLat, centerLng, w, h),
-                    fit: BoxFit.cover,
-                    width: w.toDouble(),
-                    height: h.toDouble(),
-                  loadingBuilder: (_, child, progress) {
-                    if (progress == null) return child;
-                    return Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CustomPaint(
-                          painter: _MapCanvasPainter(
-                            centerLat: centerLat,
-                            centerLng: centerLng,
-                            pins: filtered.length,
-                            theme: widget.theme,
-                          ),
-                        ),
-                        Center(
-                          child: CircularProgressIndicator(color: widget.theme, strokeWidth: 2),
-                        ),
-                      ],
-                    );
-                  },
-                  errorBuilder: (_, __, ___) => CustomPaint(
-                    painter: _MapCanvasPainter(
-                      centerLat: centerLat,
-                      centerLng: centerLng,
-                      pins: filtered.length,
-                      theme: widget.theme,
-                    ),
-                  ),
-                ),
-                ),
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Material(
-                    color: Colors.white,
-                    elevation: 4,
-                    borderRadius: BorderRadius.circular(10),
-                    child: InkWell(
-                      onTap: () {
-                        if (_inApp) {
-                          setState(() {
-                            _centerLat = centerLat;
-                            _centerLng = centerLng;
-                          });
-                          widget.onSnack('Map centered');
-                        } else {
-                          _openExternalMaps(lat: centerLat, lng: centerLng);
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(10),
-                      child: const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: Icon(Icons.my_location_rounded, color: Color(0xFF2563EB), size: 22),
-                      ),
-                    ),
-                  ),
-                ),
-                ...List.generate(math.min(filtered.length, 6), (i) {
-                  final angle = (i / math.max(filtered.length, 1)) * 2 * math.pi;
-                  final dx = 0.5 + math.cos(angle) * 0.28;
-                  final dy = 0.45 + math.sin(angle) * 0.22;
-                  return Align(
-                    alignment: Alignment(dx * 2 - 1, dy * 2 - 1),
-                    child: GestureDetector(
-                      onTap: () {
-                        final r = filtered[i];
-                        final lat = double.tryParse('${r[latField] ?? ''}');
-                        final lng = double.tryParse('${r[lngField] ?? ''}');
-                        if (_inApp) {
-                          if (lat != null && lng != null) {
-                            setState(() {
-                              _centerLat = lat;
-                              _centerLng = lng;
-                              _selectedPlace = r;
-                            });
-                          }
-                          _showPlaceSheet(r, titleField: titleField, subtitleField: subtitleField, latField: latField, lngField: lngField);
-                        } else if (lat != null && lng != null) {
-                          _openExternalMaps(lat: lat, lng: lng);
-                        } else {
-                          _openExternalMaps(address: '${r[titleField] ?? ''} ${r[subtitleField] ?? ''}'.trim());
-                        }
-                      },
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.location_on_rounded, color: widget.theme, size: 32, shadows: const [Shadow(color: Colors.black26, blurRadius: 4)]),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-                            child: Text(
-                              (filtered[i][titleField] ?? 'Place').toString(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-                Positioned(
-                  left: 8,
-                  bottom: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.92), borderRadius: BorderRadius.circular(8)),
-                    child: Text(
-                      '© OpenStreetMap · ${centerLat.toStringAsFixed(2)}, ${centerLng.toStringAsFixed(2)}',
-                      style: const TextStyle(fontSize: 9, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-                    ),
-                  ),
+                Icon(Icons.location_on_rounded, color: widget.theme, size: 34),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
+                  child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800)),
                 ),
               ],
-            );
-          },
-        );
+            ),
+          ),
+        ),
+      );
+    }
+    return markers;
+  }
+
+  Widget _buildLiveMap({
+    required double height,
+    required List<Map<String, dynamic>> filtered,
+    required String titleField,
+    required String latField,
+    required String lngField,
+  }) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: expand
-          ? SizedBox(width: double.infinity, child: mapStack)
-          : SizedBox(height: height ?? 320, width: double.infinity, child: mapStack),
+      child: SizedBox(
+        height: height,
+        width: double.infinity,
+        child: Stack(
+          children: [
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: LatLng(_centerLat, _centerLng),
+                initialZoom: _zoom,
+                minZoom: 3,
+                maxZoom: 18,
+                interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+                onMapEvent: (e) {
+                  if (e is MapEventMoveEnd) {
+                    final c = _mapController.camera.center;
+                    setState(() {
+                      _centerLat = c.latitude;
+                      _centerLng = c.longitude;
+                      _zoom = _mapController.camera.zoom;
+                    });
+                  }
+                },
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'org.ngmy.app',
+                  maxZoom: 19,
+                ),
+                MarkerLayer(markers: _markersForPlaces(filtered, titleField: titleField, latField: latField, lngField: lngField)),
+              ],
+            ),
+            if (_searchResultLabel.isNotEmpty)
+              Positioned(
+                top: 10,
+                left: 10,
+                right: 10,
+                child: Material(
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Row(
+                      children: [
+                        Icon(Icons.place_rounded, color: widget.theme, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _searchResultLabel,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF1E293B)),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () => setState(() => _searchResultLabel = ''),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              left: 8,
+              bottom: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.92), borderRadius: BorderRadius.circular(8)),
+                child: const Text('© OpenStreetMap contributors', style: TextStyle(fontSize: 9, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+              ),
+            ),
+            Positioned(
+              right: 8,
+              bottom: 8,
+              child: Material(
+                color: Colors.white,
+                elevation: 3,
+                borderRadius: BorderRadius.circular(10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.add, size: 20),
+                      onPressed: () => _mapController.move(LatLng(_centerLat, _centerLng), (_zoom + 1).clamp(3, 18)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.remove, size: 20),
+                      onPressed: () => _mapController.move(LatLng(_centerLat, _centerLng), (_zoom - 1).clamp(3, 18)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -328,7 +339,7 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
     final latField = (widget.node['latField'] ?? 'lat').toString();
     final lngField = (widget.node['lngField'] ?? 'lng').toString();
     final configuredHeight = (widget.node['height'] as num?)?.toDouble() ?? 320;
-    final placeholder = (widget.node['placeholder'] ?? 'Search places, addresses…').toString();
+    final placeholder = (widget.node['placeholder'] ?? 'Search address or place…').toString();
 
     return AnimatedBuilder(
       animation: widget.store,
@@ -353,11 +364,14 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
               hintText: placeholder,
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: _geocoding
-                  ? Padding(padding: const EdgeInsets.all(12), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: widget.theme)))
-                  : IconButton(
-                      icon: Icon(Icons.travel_explore_rounded, color: widget.theme),
-                      tooltip: 'Search on map',
+                  ? Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: widget.theme)),
+                    )
+                  : FilledButton.tonal(
                       onPressed: () => _geocodeInApp(_searchC.text),
+                      style: FilledButton.styleFrom(backgroundColor: widget.theme.withValues(alpha: 0.15), foregroundColor: widget.theme, padding: const EdgeInsets.symmetric(horizontal: 12)),
+                      child: const Text('Search', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
                     ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -379,23 +393,19 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
                       title: Text((r[titleField] ?? 'Place').toString(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                       subtitle: (r[subtitleField] ?? '').toString().isEmpty ? null : Text(r[subtitleField].toString(), maxLines: 1, overflow: TextOverflow.ellipsis),
                       trailing: IconButton(
-                        icon: const Icon(Icons.place_rounded, color: Color(0xFF2563EB)),
+                        icon: Icon(Icons.map_rounded, color: widget.theme),
                         onPressed: () {
                           final lat = double.tryParse('${r[latField] ?? ''}');
                           final lng = double.tryParse('${r[lngField] ?? ''}');
                           if (_inApp) {
                             if (lat != null && lng != null) {
-                              setState(() {
-                                _centerLat = lat;
-                                _centerLng = lng;
-                                _selectedPlace = r;
-                              });
+                              _moveMap(lat, lng, zoom: 16, label: (r[titleField] ?? 'Place').toString());
+                            } else {
+                              _geocodeInApp('${r[titleField] ?? ''} ${r[subtitleField] ?? ''}');
                             }
                             _showPlaceSheet(r, titleField: titleField, subtitleField: subtitleField, latField: latField, lngField: lngField);
                           } else if (lat != null && lng != null) {
                             _openExternalMaps(lat: lat, lng: lng);
-                          } else {
-                            _openExternalMaps(address: '${r[titleField] ?? ''} ${r[subtitleField] ?? ''}'.trim());
                           }
                         },
                       ),
@@ -407,56 +417,23 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
         return LayoutBuilder(
           builder: (context, constraints) {
             final canExpand = widget.fillHeight && constraints.maxHeight.isFinite && constraints.maxHeight > 280;
-
-            if (canExpand) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  searchBar,
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: _buildMapCanvas(
-                      centerLat: _centerLat,
-                      centerLng: _centerLng,
-                      height: null,
-                      expand: true,
-                      filtered: filtered,
-                      titleField: titleField,
-                      subtitleField: subtitleField,
-                      latField: latField,
-                      lngField: lngField,
-                    ),
-                  ),
-                  if (filtered.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(maxHeight: math.min(220, constraints.maxHeight * 0.35)),
-                      child: SingleChildScrollView(child: placeList),
-                    ),
-                  ],
-                ],
-              );
-            }
+            final mapHeight = canExpand ? constraints.maxHeight - 120 : configuredHeight;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 searchBar,
                 const SizedBox(height: 10),
-                _buildMapCanvas(
-                  centerLat: _centerLat,
-                  centerLng: _centerLng,
-                  height: configuredHeight,
-                  expand: false,
-                  filtered: filtered,
-                  titleField: titleField,
-                  subtitleField: subtitleField,
-                  latField: latField,
-                  lngField: lngField,
-                ),
+                if (canExpand)
+                  Expanded(child: _buildLiveMap(height: mapHeight.clamp(200, 2000), filtered: filtered, titleField: titleField, latField: latField, lngField: lngField))
+                else
+                  _buildLiveMap(height: configuredHeight, filtered: filtered, titleField: titleField, latField: latField, lngField: lngField),
                 if (filtered.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  placeList,
+                  if (canExpand)
+                    ConstrainedBox(constraints: BoxConstraints(maxHeight: 180), child: SingleChildScrollView(child: placeList))
+                  else
+                    placeList,
                 ],
               ],
             );
@@ -465,53 +442,4 @@ class _NgmyRuntimeMapViewState extends State<NgmyRuntimeMapView> {
       },
     );
   }
-}
-
-class _MapCanvasPainter extends CustomPainter {
-  _MapCanvasPainter({required this.centerLat, required this.centerLng, required this.pins, required this.theme});
-
-  final double centerLat;
-  final double centerLng;
-  final int pins;
-  final Color theme;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bg = Paint()..color = const Color(0xFFE8F4EA);
-    canvas.drawRect(Offset.zero & size, bg);
-
-    final park = Paint()..color = const Color(0xFFB8E0B4);
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(size.width * 0.05, size.height * 0.55, size.width * 0.35, size.height * 0.35), const Radius.circular(12)), park);
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(size.width * 0.55, size.height * 0.08, size.width * 0.38, size.height * 0.28), const Radius.circular(10)), park);
-
-    final water = Paint()..color = const Color(0xFF93C5FD);
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(size.width * 0.62, size.height * 0.62, size.width * 0.32, size.height * 0.3), const Radius.circular(8)), water);
-
-    final road = Paint()
-      ..color = const Color(0xFFCBD5E1)
-      ..strokeWidth = 10
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset(0, size.height * 0.42), Offset(size.width, size.height * 0.38), road);
-    canvas.drawLine(Offset(size.width * 0.35, 0), Offset(size.width * 0.42, size.height), road);
-    canvas.drawLine(Offset(size.width * 0.72, 0), Offset(size.width * 0.68, size.height), road);
-
-    final minor = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 4;
-    for (var i = 0.15; i < 0.9; i += 0.18) {
-      canvas.drawLine(Offset(size.width * i, 0), Offset(size.width * (i + 0.02), size.height), minor);
-    }
-
-    final label = TextPainter(
-      text: TextSpan(
-        text: 'Map · ${centerLat.toStringAsFixed(2)}, ${centerLng.toStringAsFixed(2)}',
-        style: const TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w600),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: size.width - 16);
-    label.paint(canvas, Offset(8, size.height - 18));
-  }
-
-  @override
-  bool shouldRepaint(covariant _MapCanvasPainter oldDelegate) => oldDelegate.pins != pins;
 }
