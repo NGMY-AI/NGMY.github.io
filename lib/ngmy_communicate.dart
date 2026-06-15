@@ -807,7 +807,12 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
 
   bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
 
-  bool get _canSync => NgmyCommunicateSyncService.userCanSync(widget.user, widget.config);
+  bool get _canSync {
+    final email = ((widget.user as dynamic).email as String?) ?? '';
+    return email.isNotEmpty;
+  }
+
+  bool get _canExportSync => NgmyCommunicateSyncService.userCanSync(widget.user, widget.config);
 
   Future<void> _openSyncSheet() async {
     await showNgmyCommunicateSyncSheet(

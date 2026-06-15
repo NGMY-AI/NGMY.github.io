@@ -134,18 +134,25 @@ class NgmyCommunicateBackupCodes {
     required bool isAdmin,
     required dynamic config,
     String? ownerEmail,
+    bool recipientImport = false,
   }) async {
     if (isAdmin) return true;
-    if (!NgmyCommunicatePayments.hasActivePass(config, email)) return false;
     final normalized = code.trim().toUpperCase();
     if (normalized.isEmpty) return false;
     if (normalized == 'ADMIN-LOCAL') return isAdmin;
+
+    final owner = _norm((ownerEmail ?? email).toString());
+    final scanner = _norm(email);
+    final isRecipient = recipientImport || owner != scanner;
+
+    // Scanner restoring someone else's QR/file does not need their own advisor pass.
+    if (!isRecipient && !NgmyCommunicatePayments.hasActivePass(config, email)) return false;
+
     if (!await ngmyCanReachCloud()) return false;
     final codes = await _loadCloudMap();
     final row = codes[normalized];
     if (row is! Map) return false;
     if (row['active'] != true) return false;
-    final owner = _norm((ownerEmail ?? email).toString());
     return _norm((row['email'] ?? '').toString()) == owner;
   }
 
@@ -530,7 +537,8 @@ class NgmyCommunicateSyncService {
     if (bundle == null) return null;
 
     final fromQr = raw.trim().startsWith('$kNgmyAdvisorSyncQrPrefixV2|');
-    if (!fromQr && !isAdmin && _emailKey(bundle.ownerEmail) != _emailKey(email)) {
+    final crossAccount = !isAdmin && _emailKey(bundle.ownerEmail) != _emailKey(email);
+    if (!fromQr && crossAccount) {
       throw StateError('This backup belongs to another account.');
     }
 
@@ -540,8 +548,12 @@ class NgmyCommunicateSyncService {
       isAdmin: isAdmin,
       config: config,
       ownerEmail: bundle.ownerEmail,
+      recipientImport: fromQr || crossAccount,
     );
     if (!ok) {
+      if (fromQr || crossAccount) {
+        throw StateError('This QR expired or the sender\'s advisor pass is no longer active.');
+      }
       throw StateError('Backup code is locked or expired. Renew your advisor pass to restore conversations.');
     }
 

@@ -11,6 +11,7 @@ import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platfor
 import 'ngmy_family_tree_sync.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_worksheet_helpers.dart';
+import 'ngmy_worksheets_storage.dart';
 
 Future<void> showNgmyFamilyTreeSyncPage(
   BuildContext context, {
@@ -18,6 +19,7 @@ Future<void> showNgmyFamilyTreeSyncPage(
   required dynamic config,
   required bool isAdmin,
   String? onlyTreeId,
+  bool importOnly = false,
   VoidCallback? onRestored,
 }) {
   final email = ((user as dynamic).email as String?) ?? '';
@@ -30,6 +32,7 @@ Future<void> showNgmyFamilyTreeSyncPage(
       config: config,
       isAdmin: isAdmin,
       onlyTreeId: onlyTreeId,
+      importOnly: importOnly,
       onRestored: onRestored,
     ),
     fullscreenDialog: true,
@@ -43,6 +46,7 @@ class NgmyFamilyTreeSyncPage extends StatefulWidget {
     required this.config,
     required this.isAdmin,
     this.onlyTreeId,
+    this.importOnly = false,
     this.onRestored,
   });
 
@@ -50,6 +54,7 @@ class NgmyFamilyTreeSyncPage extends StatefulWidget {
   final dynamic config;
   final bool isAdmin;
   final String? onlyTreeId;
+  final bool importOnly;
   final VoidCallback? onRestored;
 
   @override
@@ -59,6 +64,7 @@ class NgmyFamilyTreeSyncPage extends StatefulWidget {
 class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
   String? _activeCode;
   List<({String id, String name, int count})> _trees = [];
+  bool _canExport = false;
   String? _statusMessage;
   bool _working = false;
 
@@ -75,9 +81,13 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
       _activeCode = await NgmyFamilyTreeBackupCodes.codeForEmail(widget.email);
     }
     final trees = await NgmyFamilyTreeSyncService.treesSummary(widget.email);
+    final local = await loadFamilyTreesLocalOnly(widget.email);
+    final canExport = !widget.importOnly &&
+        (widget.isAdmin || local.any((t) => familyTreeCanEdit(t, widget.email)));
     if (!mounted) return;
     setState(() {
       _trees = trees;
+      _canExport = canExport;
     });
   }
 
@@ -253,7 +263,7 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Family tree sync',
+          widget.importOnly ? 'Restore family tree' : 'Family tree sync',
           style: TextStyle(color: titleColor, fontWeight: FontWeight.w900, fontSize: 17),
         ),
         centerTitle: true,
@@ -296,9 +306,11 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            widget.isAdmin
-                                ? 'Photos and family books stay on this device. Admin skips cloud codes.'
-                                : 'Full trees stay local. QR works 2 times — names & dates sync to cloud only.',
+                            widget.importOnly
+                                ? 'Upload a file or scan a QR from someone who shared their tree. View only until you create your own tree.'
+                                : widget.isAdmin
+                                    ? 'Photos and family books stay on this device. Admin skips cloud codes.'
+                                    : 'Full trees stay local. QR works 2 times — names & dates sync to cloud only.',
                             style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 12, height: 1.35),
                           ),
                         ],
@@ -307,7 +319,7 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
                   ],
                 ),
               ),
-              if (!widget.isAdmin && _activeCode != null) ...[
+              if (!widget.importOnly && !widget.isAdmin && _activeCode != null) ...[
                 const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.all(14),
@@ -340,43 +352,48 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
               const SizedBox(height: 18),
               Text('Actions', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
               const SizedBox(height: 10),
-              _SyncActionTile(
-                icon: Icons.download_rounded,
-                label: 'Download all family trees',
-                subtitle: 'Photos, books & notes included in file',
-                card: card,
-                border: border,
-                onTap: _working ? null : _exportAll,
-              ),
-              const SizedBox(height: 8),
+              if (_canExport) ...[
+                _SyncActionTile(
+                  icon: Icons.download_rounded,
+                  label: 'Download all family trees',
+                  subtitle: 'Photos, books & notes included in file',
+                  card: card,
+                  border: border,
+                  onTap: _working ? null : _exportAll,
+                ),
+                const SizedBox(height: 8),
+              ],
               _SyncActionTile(
                 icon: Icons.upload_file_rounded,
                 label: 'Upload backup file',
-                subtitle: 'Restore trees from a saved file',
+                subtitle: widget.importOnly ? 'Restore a shared family tree file' : 'Restore trees from a saved file',
                 card: card,
                 border: border,
                 onTap: _working ? null : _importFile,
               ),
-              const SizedBox(height: 8),
-              _SyncActionTile(
-                icon: Icons.qr_code_2_rounded,
-                label: 'Show restore QR',
-                subtitle: widget.isAdmin ? 'Share a scannable backup' : 'Works 2 times — any phone can scan',
-                card: card,
-                border: border,
-                accent: true,
-                onTap: _working ? null : _showQr,
-              ),
+              if (_canExport) ...[
+                const SizedBox(height: 8),
+                _SyncActionTile(
+                  icon: Icons.qr_code_2_rounded,
+                  label: 'Show restore QR',
+                  subtitle: widget.isAdmin ? 'Share a scannable backup' : 'Works 2 times — any phone can scan',
+                  card: card,
+                  border: border,
+                  accent: true,
+                  onTap: _working ? null : _showQr,
+                ),
+              ],
               const SizedBox(height: 8),
               _SyncActionTile(
                 icon: Icons.qr_code_scanner_rounded,
                 label: 'Scan QR to restore',
-                subtitle: 'Import from another device',
+                subtitle: 'Import from another device — no tree purchase required',
                 card: card,
                 border: border,
+                accent: widget.importOnly || !_canExport,
                 onTap: _working ? null : _scanQr,
               ),
-              if (_trees.length > 1 && widget.onlyTreeId == null) ...[
+              if (_canExport && _trees.length > 1 && widget.onlyTreeId == null) ...[
                 const SizedBox(height: 22),
                 Text('One tree', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
                 const SizedBox(height: 8),

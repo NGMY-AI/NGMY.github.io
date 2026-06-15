@@ -8,7 +8,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
-import 'ngmy_communicate.dart';
+import 'ngmy_communicate.dart' show kNgmyAdvisorsHubAccent;
+import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_sync.dart';
 import 'ngmy_nav.dart';
 
@@ -57,6 +58,9 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
   List<({String id, String name, int count})> _threads = [];
   String? _statusMessage;
   bool _working = false;
+
+  bool get _canExport =>
+      widget.isAdmin || NgmyCommunicatePayments.hasActivePass(widget.config, widget.email);
 
   @override
   void initState() {
@@ -285,7 +289,9 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
                           Text(
                             widget.isAdmin
                                 ? 'Backups stay on this device. Admin skips cloud codes.'
-                                : 'Messages stay local. QR works 2 times while your pass is active.',
+                                : _canExport
+                                    ? 'Messages stay local. QR works 2 times while your pass is active.'
+                                    : 'Scan a QR or upload a file to receive conversations — no pass needed to import.',
                             style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 12, height: 1.35),
                           ),
                         ],
@@ -327,15 +333,17 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
               const SizedBox(height: 18),
               Text('Actions', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
               const SizedBox(height: 10),
-              _SyncActionTile(
-                icon: Icons.download_rounded,
-                label: 'Download all conversations',
-                subtitle: 'Save every advisor chat as a file',
-                card: card,
-                border: border,
-                onTap: _working ? null : _exportAll,
-              ),
-              const SizedBox(height: 8),
+              if (_canExport) ...[
+                _SyncActionTile(
+                  icon: Icons.download_rounded,
+                  label: 'Download all conversations',
+                  subtitle: 'Save every advisor chat as a file',
+                  card: card,
+                  border: border,
+                  onTap: _working ? null : _exportAll,
+                ),
+                const SizedBox(height: 8),
+              ],
               _SyncActionTile(
                 icon: Icons.upload_file_rounded,
                 label: 'Upload backup file',
@@ -344,26 +352,29 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
                 border: border,
                 onTap: _working ? null : _importFile,
               ),
-              const SizedBox(height: 8),
-              _SyncActionTile(
-                icon: Icons.qr_code_2_rounded,
-                label: 'Show restore QR',
-                subtitle: widget.isAdmin ? 'Share a scannable backup' : 'Works 2 times — any phone can scan',
-                card: card,
-                border: border,
-                accent: true,
-                onTap: _working ? null : _showQr,
-              ),
+              if (_canExport) ...[
+                const SizedBox(height: 8),
+                _SyncActionTile(
+                  icon: Icons.qr_code_2_rounded,
+                  label: 'Show restore QR',
+                  subtitle: widget.isAdmin ? 'Share a scannable backup' : 'Works 2 times — any phone can scan',
+                  card: card,
+                  border: border,
+                  accent: true,
+                  onTap: _working ? null : _showQr,
+                ),
+              ],
               const SizedBox(height: 8),
               _SyncActionTile(
                 icon: Icons.qr_code_scanner_rounded,
                 label: 'Scan QR to restore',
-                subtitle: 'Import from another device',
+                subtitle: 'Import from another device — no advisor pass required',
                 card: card,
                 border: border,
+                accent: !_canExport,
                 onTap: _working ? null : _scanQr,
               ),
-              if (_threads.isNotEmpty) ...[
+              if (_canExport && _threads.isNotEmpty) ...[
                 const SizedBox(height: 22),
                 Text('One advisor', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
                 const SizedBox(height: 8),

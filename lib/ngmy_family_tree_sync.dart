@@ -130,18 +130,24 @@ class NgmyFamilyTreeBackupCodes {
     required bool isAdmin,
     required dynamic config,
     String? ownerEmail,
+    bool recipientImport = false,
   }) async {
     if (isAdmin) return true;
-    if (!await NgmyFamilyTreeSyncService.userCanSyncEmail(email, config)) return false;
     final normalized = code.trim().toUpperCase();
     if (normalized.isEmpty) return false;
     if (normalized == 'ADMIN-LOCAL') return isAdmin;
+
+    final owner = _norm((ownerEmail ?? email).toString());
+    final scanner = _norm(email);
+    final isRecipient = recipientImport || owner != scanner;
+
+    if (!isRecipient && !await NgmyFamilyTreeSyncService.userCanSyncEmail(email, config)) return false;
+
     if (!await ngmyCanReachCloud()) return false;
     final codes = await _loadCloudMap();
     final row = codes[normalized];
     if (row is! Map) return false;
     if (row['active'] != true) return false;
-    final owner = _norm((ownerEmail ?? email).toString());
     return _norm((row['email'] ?? '').toString()) == owner;
   }
 
@@ -435,14 +441,21 @@ class NgmyFamilyTreeSyncService {
     final bundle = await NgmyFamilyTreeSyncBundle.parseAsync(raw);
     if (bundle == null) return null;
 
+    final fromQr = raw.trim().startsWith('$kNgmyFamilyTreeSyncQrPrefixV2|');
+    final crossAccount = _emailKey(bundle.ownerEmail) != _emailKey(email);
+
     final ok = await NgmyFamilyTreeBackupCodes.validateImportCode(
       email: email,
       code: bundle.code,
       isAdmin: isAdmin,
       config: config,
       ownerEmail: bundle.ownerEmail,
+      recipientImport: fromQr || crossAccount,
     );
     if (!ok) {
+      if (fromQr || crossAccount) {
+        throw StateError('This backup expired or the sender\'s tree is no longer available.');
+      }
       throw StateError('Backup code is locked. Create a family tree or renew your advisor pass to restore.');
     }
 
