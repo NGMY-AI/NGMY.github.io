@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_ai_memory.dart';
+import 'ngmy_supabase_columns.dart';
 
 /// Supported AI backends for NGMY Helper (auto-detected from key shape or prefix).
 enum NgmyAiProviderKind {
@@ -464,6 +465,113 @@ String ngmyAiHelperFailureMessage({
     return 'NGMY Helper could not reach $provider: $err';
   }
   return 'NGMY Helper could not reach $provider. Check the key in Management Menus → NGMY AI and reload the app.';
+}
+
+const _kNgmyConfigRowId = '1';
+
+/// Reads AI key from any Supabase config row shape.
+String ngmyGeminiKeyFromMap(Map<String, dynamic>? json) {
+  if (json == null) return '';
+  for (final field in ['aiApiKey', 'ai_api_key', 'geminiApiKey', 'gemini_api_key', 'geminiapikey']) {
+    final v = json[field]?.toString().trim();
+    if (v != null && v.isNotEmpty) return v;
+  }
+  return '';
+}
+
+Future<Map<String, dynamic>?> _ngmyFetchConfigRowForGemini() async {
+  final client = Supabase.instance.client;
+  for (final id in [_kNgmyConfigRowId, 1]) {
+    try {
+      final row = await client
+          .from('config')
+          .select(NgmySupabaseColumns.geminiOnly)
+          .eq('id', id)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 15));
+      if (row != null) return Map<String, dynamic>.from(row);
+    } catch (e) {
+      debugPrint('[ngmy-ai] config fetch id=$id: $e');
+    }
+  }
+  try {
+    final row = await client.from('config').select(NgmySupabaseColumns.geminiOnly).limit(1).maybeSingle().timeout(const Duration(seconds: 15));
+    if (row != null) return Map<String, dynamic>.from(row);
+  } catch (e) {
+    debugPrint('[ngmy-ai] config fetch fallback: $e');
+  }
+  return null;
+}
+
+/// Pull the shared NGMY AI key from Supabase (all users).
+Future<String> ngmyFetchRemoteGeminiApiKey() async {
+  try {
+    return ngmyGeminiKeyFromMap(await _ngmyFetchConfigRowForGemini());
+  } catch (e) {
+    debugPrint('[ngmy-ai] fetch gemini key: $e');
+    return '';
+  }
+}
+
+/// Local config first, then cloud — with retries for slow mobile networks.
+Future<String> ngmyResolveGeminiApiKey({
+  String localKey = '',
+  dynamic config,
+  int retries = 3,
+}) async {
+  var key = localKey.trim();
+  if (key.isEmpty && config != null) {
+    try {
+      key = (config as dynamic).geminiApiKey?.toString().trim() ?? '';
+    } catch (_) {}
+  }
+  for (var attempt = 0; attempt < retries && key.isEmpty; attempt++) {
+    if (attempt > 0) await Future<void>.delayed(Duration(milliseconds: 350 * attempt));
+    key = await ngmyFetchRemoteGeminiApiKey();
+  }
+  if (key.isNotEmpty && config != null) {
+    try {
+      (config as dynamic).geminiApiKey = key;
+    } catch (_) {}
+  }
+  return key;
+}
+
+/// Advisor chat errors — never blame the user for having internet.
+String ngmyCommunicateAiFailureMessage({required String apiKey, String? lastError}) {
+  final err = (lastError ?? '').trim();
+  if (apiKey.trim().isEmpty) {
+    return 'NGMY AI is still loading — wait a few seconds and send again. If this keeps happening, ask an admin to verify AI settings.';
+  }
+  if (err.toLowerCase().contains('timeout') || err.toLowerCase().contains('socket') || err.toLowerCase().contains('network')) {
+    return 'Network hiccup — your message did not reach NGMY AI. Tap send again.';
+  }
+  final base = ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: lastError);
+  return base.replaceAll('NGMY Helper', 'Your advisor');
+}
+
+Future<({String? text, String? error})> ngmyAiGenerateWithRetry(
+  NgmyAiCredentials creds,
+  String prompt, {
+  List<NgmyAiImagePart> images = const [],
+  int attempts = 2,
+}) async {
+  ({String? text, String? error}) result = (text: null, error: null);
+  for (var i = 0; i < attempts; i++) {
+    if (i > 0) await Future<void>.delayed(Duration(milliseconds: 500 * i));
+    result = await ngmyAiGenerateWithCredentials(creds, prompt, images: images);
+    if (result.text != null && result.text!.trim().isNotEmpty) return result;
+    final err = (result.error ?? '').toLowerCase();
+    final retryable = err.contains('timeout') ||
+        err.contains('socket') ||
+        err.contains('network') ||
+        err.contains('connection') ||
+        err.contains('503') ||
+        err.contains('502') ||
+        err.contains('429');
+    if (!retryable) break;
+  }
+  return result;
 }
 
 /// Free image fallback — works without an API key (romantic chat selfies, etc.).

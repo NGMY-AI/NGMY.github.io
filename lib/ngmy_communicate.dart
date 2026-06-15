@@ -787,8 +787,20 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     _bgCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 8))..repeat();
     _floatCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat(reverse: true);
     unawaited(_prepAvatars());
+    unawaited(_warmAiKey());
     final email = ((widget.user as dynamic).email as String?) ?? '';
     if (email.isNotEmpty) unawaited(NgmyCommunicateTimeTracker.syncFromCloud(email));
+  }
+
+  Future<void> _warmAiKey() async {
+    await ngmyResolveGeminiApiKey(localKey: widget.apiKey, config: widget.config);
+    if (mounted) setState(() {});
+  }
+
+  String get _liveApiKey {
+    final fromConfig = ((widget.config as dynamic).geminiApiKey ?? '').toString().trim();
+    if (fromConfig.isNotEmpty) return fromConfig;
+    return widget.apiKey.trim();
   }
 
   Future<void> _prepAvatars() async {
@@ -832,7 +844,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
       return _LoveWorldChat(
         user: widget.user,
         config: widget.config,
-        apiKey: widget.apiKey,
+        apiKey: _liveApiKey,
         profile: _selected!,
         bgCtrl: _bgCtrl,
         floatCtrl: _floatCtrl,
@@ -1323,6 +1335,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   Future<void> _load() async {
     await NgmyCommunicateTimeTracker.syncFromCloud(_email);
+    unawaited(ngmyResolveGeminiApiKey(localKey: widget.apiKey, config: widget.config));
     final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
     final used = await NgmyCommunicateTimeTracker.getUsedSeconds(_email);
     if (_isTranslator) {
@@ -1520,6 +1533,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         'If something is blurry or cut off, say what you can see and ask only about the missing part.\n';
   }
 
+  Future<String> _resolveApiKey() => ngmyResolveGeminiApiKey(localKey: widget.apiKey, config: widget.config);
+
   Future<void> _send() async {
     final text = _controller.text.trim();
     final imageB64 = _pendingImageB64;
@@ -1552,20 +1567,23 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     }
     _scrollBottom();
 
-    final apiKey = widget.apiKey.trim();
+    final apiKey = await _resolveApiKey();
     if (apiKey.isEmpty) {
+      if (!mounted) return;
       setState(() {
-        _messages.add({'role': 'ai', 'text': 'Connection warming up — try again soon.'});
+        _messages.add({'role': 'ai', 'text': ngmyCommunicateAiFailureMessage(apiKey: '')});
         _busy = false;
       });
+      await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: _messages.last['text'] ?? '');
+      _scrollBottom();
       return;
     }
 
     try {
+      final creds = ngmyParseAiCredentials(apiKey);
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
       await NgmyCommunicateRelationshipStore.syncFromMemory(widget.profile.id, _email, mem);
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
-      final creds = ngmyParseAiCredentials(apiKey);
       final wantsImage = text.isNotEmpty &&
           !_allowsPhotoUpload &&
           ngmyUserRequestedChatImage(text) &&
@@ -1585,10 +1603,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final images = <NgmyAiImagePart>[
           (mimeType: imageMime, data: imageB64),
         ];
-        final result = await ngmyAiGenerateWithCredentials(creds, prompt, images: images);
+        final result = await ngmyAiGenerateWithRetry(creds, prompt, images: images);
         final reply = (result.text != null && result.text!.trim().isNotEmpty)
             ? result.text!.trim()
-            : ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: result.error);
+            : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
         if (!mounted) return;
         setState(() => _messages.add({'role': 'ai', 'text': reply}));
         await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
@@ -1616,7 +1634,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               '$extraCtx'
               '${transcript.isNotEmpty ? '$transcript\n' : ''}'
               'They asked for a picture but image generation failed (${imgResult.error ?? 'try again'}). Reply naturally in text only:';
-          final result = await ngmyAiGenerateWithCredentials(creds, prompt);
+          final result = await ngmyAiGenerateWithRetry(creds, prompt);
           final reply = (result.text != null && result.text!.trim().isNotEmpty)
               ? result.text!.trim()
               : 'I tried to send a pic but it glitched — ask me again in a sec.';
@@ -1641,17 +1659,23 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             'They just texted: $text\n'
             'Reply as ${widget.profile.name} only — natural human text, not overly eager:';
         final result = recentPhotos.isNotEmpty
-            ? await ngmyAiGenerateWithCredentials(creds, prompt, images: recentPhotos)
-            : await ngmyAiGenerateWithCredentials(creds, prompt);
+            ? await ngmyAiGenerateWithRetry(creds, prompt, images: recentPhotos)
+            : await ngmyAiGenerateWithRetry(creds, prompt);
         final reply = (result.text != null && result.text!.trim().isNotEmpty)
             ? result.text!.trim()
-            : ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: result.error);
+            : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
         if (!mounted) return;
         setState(() => _messages.add({'role': 'ai', 'text': reply}));
         await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
       }
-    } catch (_) {
-      if (mounted) setState(() => _messages.add({'role': 'ai', 'text': 'Glitch — check internet and try again.'}));
+    } catch (e) {
+      debugPrint('[communicate] send error: $e');
+      if (mounted) {
+        setState(() => _messages.add({
+          'role': 'ai',
+          'text': ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: e.toString()),
+        }));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
       _scrollBottom();
