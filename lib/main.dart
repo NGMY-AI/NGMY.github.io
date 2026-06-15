@@ -4340,6 +4340,8 @@ Map<String, dynamic> _normalizeStoreListing(Map<String, dynamic> listing) {
   final copy = Map<String, dynamic>.from(listing);
   final email = (copy['sellerEmail'] ?? '').toString().toLowerCase().trim();
   if (email.isNotEmpty) copy['sellerEmail'] = email;
+  final phone = (copy['sellerPhone'] ?? '').toString().trim();
+  if (phone.isNotEmpty) copy['sellerPhone'] = phone;
   if ((copy['status'] ?? '').toString().isEmpty) copy['status'] = 'active';
   if (copy['negotiable'] == null) copy['negotiable'] = true;
   if (copy['deliveryFee'] == null) copy['deliveryFee'] = 0;
@@ -7265,6 +7267,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return false;
   }
 
+  /// Claims a one-time notification slot for this transaction (prevents duplicate alerts).
+  bool _tryClaimTransactionNotification(AppTransaction t, {bool statusChanged = false}) {
+    if (_shouldSkipTransactionNotification(t, statusChanged: statusChanged)) return false;
+    _notifiedTransactionKeys.add('txn_${t.id}');
+    if (statusChanged && t.status == TransactionStatus.approved) {
+      _notifiedTransactionKeys.add('txn_${t.id}_approved');
+    }
+    unawaited(_persistNotifiedTransactionKeys());
+    return true;
+  }
+
   DateTime? _adminMediaProtectUntil;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   OverlayEntry? _inAppNoticeEntry;
@@ -7319,12 +7332,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     unawaited(_refreshWalletDecisionLedger());
     WidgetsBinding.instance.addObserver(this);
     ngmyOnGameWinNotify = (gameTitle, body) async {
-      await _pushInAppNotification(
-        title: 'You won — $gameTitle',
-        body: body,
-        tag: 'game_win_${gameTitle.hashCode}',
-        cooldown: const Duration(seconds: 8),
-      );
+      // Game wins also create AppTransaction rows — _notifyTransactionEvent sends one alert per txn.
     };
     ngmyInAppNotify = ({required String title, required String body, String? tag, Duration cooldown = const Duration(seconds: 50)}) =>
         _pushInAppNotification(title: title, body: body, tag: tag, cooldown: cooldown);
@@ -9067,12 +9075,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final sd = (t.sourceDetails ?? '').toLowerCase();
       if (sd.contains('clock-in')) return;
     }
-    if (ngmyIsGameRelatedTransaction(sourceDetails: t.sourceDetails)) return;
-    if (_shouldSkipTransactionNotification(t, statusChanged: statusChanged)) return;
     final currentEmail = _currentUser?.email.toLowerCase().trim();
     if (currentEmail == null || currentEmail.isEmpty) return;
     if (t.userEmail.toLowerCase().trim() != currentEmail) return;
-    _markTransactionNotified(t, statusChanged: statusChanged);
+    if (!_tryClaimTransactionNotification(t, statusChanged: statusChanged)) return;
     await _pushInAppNotification(
       title: _notificationTitleForTransaction(t, statusChanged: statusChanged),
       body: _notificationBodyForTransaction(t, statusChanged: statusChanged),
@@ -31626,6 +31632,15 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     }
   }
 
+  bool _inquiryHasPaymentContent(Map<String, dynamic> m) {
+    return _inquiryReplies(m).any(
+      (r) => NgmyStorePaymentReply.isPurchaseNotification(r) || NgmyStorePaymentReply.isPurchaseStatus(r),
+    );
+  }
+
+  bool _threadHasPaymentContent(List<Map<String, dynamic>> inquiries) =>
+      inquiries.any(_inquiryHasPaymentContent);
+
   String _inquiryLastPreview(Map<String, dynamic> m) {
     final replies = _inquiryReplies(m);
     if (replies.isNotEmpty) {
@@ -31636,9 +31651,14 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         if (st == 'approved') return 'Payment confirmed';
         return 'Payment rejected';
       }
-      return (last['message'] ?? '').toString();
+      if (NgmyStorePaymentReply.isPurchaseStatus(last)) {
+        final st = NgmyStorePaymentReply.paymentStatusOf(last);
+        if (st == 'approved') return 'Payment confirmed';
+        return 'Payment rejected';
+      }
+      return 'Payment update';
     }
-    return (m['message'] ?? '').toString();
+    return 'Payment update';
   }
 
   String _inquiryLastAt(Map<String, dynamic> m) {
@@ -31650,16 +31670,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   bool _threadUnreadForUser(String me, List<Map<String, dynamic>> threadInquiries) {
     final isSeller = threadInquiries.any((m) => (m['sellerEmail'] ?? '').toString().toLowerCase().trim() == me);
     for (final m in threadInquiries) {
-      if (isSeller) {
-        if (m['read'] != true) return true;
-        final replies = _inquiryReplies(m);
-        for (final r in replies) {
-          if (NgmyStorePaymentReply.isPurchaseNotification(r) && NgmyStorePaymentReply.isPending(r)) return true;
+      final replies = _inquiryReplies(m);
+      for (final r in replies) {
+        if (NgmyStorePaymentReply.isPurchaseNotification(r) && NgmyStorePaymentReply.isPending(r) && isSeller) {
+          return true;
         }
-        if (replies.isNotEmpty && (replies.last['role'] ?? '').toString() == 'buyer') return true;
-      } else {
-        final replies = _inquiryReplies(m);
-        if (replies.isNotEmpty && (replies.last['role'] ?? '').toString() == 'seller' && m['buyerRead'] != true) {
+        if (NgmyStorePaymentReply.isPurchaseStatus(r) && !isSeller && m['buyerRead'] != true) {
           return true;
         }
       }
@@ -31680,6 +31696,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     for (final entry in buckets.entries) {
       final list = entry.value
         ..sort((a, b) => _inquiryLastAt(b).compareTo(_inquiryLastAt(a)));
+      if (!_threadHasPaymentContent(list)) continue;
       var preview = '';
       var lastAt = '';
       for (final inq in list) {
@@ -31718,14 +31735,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     for (final inq in inquiries) {
       final title = (inq['listingTitle'] ?? 'Item').toString();
       final created = DateTime.tryParse((inq['createdAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
-      items.add((
-        at: created,
-        who: (inq['buyerName'] ?? 'Buyer').toString(),
-        text: (inq['message'] ?? '').toString(),
-        mine: !isSeller,
-        itemHint: title,
-        reply: null,
-      ));
       for (final r in _inquiryReplies(inq)) {
         final at = DateTime.tryParse((r['createdAt'] ?? '').toString()) ?? created;
         final role = (r['role'] ?? '').toString();
@@ -31753,14 +31762,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           ));
           continue;
         }
-        items.add((
-          at: at,
-          who: (r['name'] ?? (role == 'seller' ? 'Seller' : 'Buyer')).toString(),
-          text: (r['message'] ?? '').toString(),
-          mine: mine,
-          itemHint: (r['listingTitle'] ?? '').toString().isEmpty ? null : (r['listingTitle'] ?? '').toString(),
-          reply: null,
-        ));
       }
     }
     items.sort((a, b) => a.at.compareTo(b.at));
@@ -32152,26 +32153,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     required String text,
     required bool isSeller,
   }) {
-    final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
-    if (idx == null || text.trim().isEmpty) return;
-    final list = _inquiryReplies(_inquiries[idx]);
-    list.add({
-      'role': isSeller ? 'seller' : 'buyer',
-      'name': widget.user.username,
-      'email': widget.user.email,
-      'message': text.trim(),
-      'createdAt': DateTime.now().toUtc().toIso8601String(),
-    });
-    _inquiries[idx]['replies'] = list;
-    if (isSeller) {
-      _inquiries[idx]['read'] = true;
-      _inquiries[idx]['buyerRead'] = false;
-    } else {
-      _inquiries[idx]['buyerRead'] = true;
-      _inquiries[idx]['read'] = false;
-    }
-    unawaited(_upsertStoreInquiryRowSafe(_inquiries[idx]));
-    _save();
+    return;
   }
 
   List<Map<String, dynamic>> _inquiryReplies(Map<String, dynamic> m) {
@@ -32245,7 +32227,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'Messages',
+                                'Payment updates',
                                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: _storeSheetTextPrimary(ctx)),
                               ),
                             ),
@@ -32257,13 +32239,13 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'One chat per buyer — tap to open the full conversation',
+                          'Payment confirmations only — tap to review or see status',
                           style: TextStyle(fontSize: 12, color: _storeSheetTextMuted(ctx)),
                         ),
                         const SizedBox(height: 12),
                         Expanded(
                           child: sheetMessages.isEmpty
-                              ? const Center(child: Text('No messages yet.', style: TextStyle(color: Colors.grey)))
+                              ? const Center(child: Text('No payment updates yet.', style: TextStyle(color: Colors.grey)))
                               : ListView.builder(
                                   itemCount: sheetMessages.length,
                                   itemBuilder: (_, i) {
@@ -32307,7 +32289,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                                         child: Text(
                                                           isSellerView
                                                               ? (row['buyerName'] ?? 'Buyer').toString()
-                                                              : 'Seller chat',
+                                                              : 'Payment update',
                                                           style: TextStyle(
                                                             fontWeight: FontWeight.w800,
                                                             fontSize: 14,
@@ -32405,7 +32387,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             ),
             Expanded(
               child: Text(
-                isSeller ? buyerName : 'Chat with seller',
+                isSeller ? buyerName : 'Payment confirmation',
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: _storeSheetTextPrimary(ctx)),
               ),
             ),
@@ -32416,7 +32398,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           ],
         ),
         Text(
-          'All messages with this ${isSeller ? 'buyer' : 'seller'} stay in one thread',
+          'Payment confirmations for this order — free-text chat is disabled',
           style: TextStyle(fontSize: 11, color: _storeSheetTextMuted(ctx)),
         ),
         const SizedBox(height: 8),
@@ -32508,38 +32490,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             },
           ),
         ),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: replyC,
-                minLines: 1,
-                maxLines: 3,
-                style: TextStyle(color: _storeSheetTextPrimary(ctx)),
-                decoration: _storeSheetInputDecoration(
-                  ctx,
-                  hintText: isSeller ? 'Reply to buyer…' : 'Reply to seller…',
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              onPressed: () {
-                final text = replyC.text.trim();
-                if (text.isEmpty) return;
-                _sendThreadReply(
-                  sellerEmail: sellerEmail,
-                  buyerEmail: buyerEmail,
-                  text: text,
-                  isSeller: isSeller,
-                );
-                replyC.clear();
-                onSent();
-              },
-              icon: const Icon(Icons.send_rounded),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -32577,78 +32527,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   void _askAvailability(Map<String, dynamic> listing) {
-    final msgC = TextEditingController(text: 'Is this item still available?');
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _storeSheetBackground(ctx),
-        title: Text('Ask Seller', style: TextStyle(color: _storeSheetTextPrimary(ctx))),
-        content: TextField(
-          controller: msgC,
-          maxLines: 3,
-          style: TextStyle(color: _storeSheetTextPrimary(ctx)),
-          decoration: _storeSheetInputDecoration(
-            ctx,
-            labelText: 'Your message',
-            hintText: 'Is this item still available?',
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              final message = msgC.text.trim();
-              if (message.isEmpty) return;
-              final sellerEmail = (listing['sellerEmail'] ?? '').toString();
-              final buyerEmail = widget.user.email;
-              final listingTitle = (listing['title'] ?? 'Item').toString();
-              final listingId = (listing['id'] ?? '').toString();
-              final existingIdx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
-              if (existingIdx != null) {
-                final list = _inquiryReplies(_inquiries[existingIdx]);
-                list.add({
-                  'role': 'buyer',
-                  'name': widget.user.username,
-                  'email': buyerEmail,
-                  'message': message,
-                  'listingTitle': listingTitle,
-                  'listingId': listingId,
-                  'createdAt': DateTime.now().toUtc().toIso8601String(),
-                });
-                _inquiries[existingIdx]['replies'] = list;
-                _inquiries[existingIdx]['read'] = false;
-                _inquiries[existingIdx]['buyerRead'] = true;
-                _inquiries[existingIdx]['listingTitle'] = listingTitle;
-                _inquiries[existingIdx]['listingId'] = listingId;
-                unawaited(_upsertStoreInquiryRowSafe(_inquiries[existingIdx]));
-              } else {
-                final inquiry = {
-                  'id': DateTime.now().microsecondsSinceEpoch.toString(),
-                  'listingId': listingId,
-                  'listingTitle': listingTitle,
-                  'sellerEmail': sellerEmail,
-                  'buyerEmail': buyerEmail,
-                  'buyerName': widget.user.username,
-                  'message': message,
-                  'createdAt': DateTime.now().toUtc().toIso8601String(),
-                  'read': false,
-                  'buyerRead': true,
-                  'replies': <Map<String, dynamic>>[],
-                };
-                _inquiries.add(inquiry);
-                unawaited(_upsertStoreInquiryRowSafe(inquiry));
-              }
-              _save();
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(existingIdx != null ? 'Message added to your chat with the seller.' : 'Message sent to seller.')),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white),
-            child: const Text('Send'),
-          ),
-        ],
-      ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Store chat is disabled. Use Buy and payment confirmation only.')),
     );
   }
 
@@ -34277,6 +34157,109 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     }
   }
 
+  String _sellerPhoneFromListing(Map<String, dynamic> listing) {
+    final fromListing = (listing['sellerPhone'] ?? '').toString().trim();
+    if (fromListing.isNotEmpty) return fromListing;
+    final email = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
+    if (email.isEmpty) return '';
+    final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+    if (idx >= 0) return widget.allUsers[idx].phone.trim();
+    return '';
+  }
+
+  Future<void> _callSellerPhone(String phone) async {
+    final digits = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    if (digits.isEmpty) return;
+    final uri = Uri.parse('tel:$digits');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open the phone dialer.')));
+    }
+  }
+
+  Future<void> _emailSeller(String email) async {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty) return;
+    final uri = Uri.parse('mailto:$trimmed');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      await Clipboard.setData(ClipboardData(text: trimmed));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Seller email copied.')));
+    }
+  }
+
+  void _showSellerProfileSheet(Map<String, dynamic> listing) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sellerEmail = (listing['sellerEmail'] ?? '').toString().trim();
+    final sellerName = (listing['sellerName'] ?? 'Seller').toString();
+    final sellerPhone = _sellerPhoneFromListing(listing);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF121726) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                _sellerAvatar(sellerEmail, radius: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    sellerName,
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : Colors.black87),
+                  ),
+                ),
+                IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close_rounded, color: isDark ? Colors.white70 : Colors.black54)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.email_outlined, color: _storePurple),
+              title: Text('Email', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54)),
+              subtitle: Text(
+                sellerEmail.isNotEmpty ? sellerEmail : 'Not provided',
+                style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87),
+              ),
+              onTap: sellerEmail.isEmpty ? null : () => _emailSeller(sellerEmail),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.phone_rounded, color: _storeAccent),
+              title: Text('Cell phone', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54)),
+              subtitle: Text(
+                sellerPhone.isNotEmpty ? sellerPhone : 'Not provided',
+                style: TextStyle(fontWeight: FontWeight.w800, color: sellerPhone.isNotEmpty ? _storeAccent : Colors.orange),
+              ),
+              onTap: sellerPhone.isEmpty ? null : () => _callSellerPhone(sellerPhone),
+            ),
+            if (sellerPhone.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: () => _callSellerPhone(sellerPhone),
+                icon: const Icon(Icons.call_rounded),
+                label: const Text('Call seller'),
+                style: FilledButton.styleFrom(backgroundColor: _storeAccent, minimumSize: const Size(double.infinity, 46)),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _sellerAvatar(String sellerEmail, {double radius = 12}) {
     final provider = _avatarForEmail(sellerEmail);
     if (provider != null) {
@@ -34374,7 +34357,15 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                       _sellerAvatar(sellerEmail, radius: 10),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(sellerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                        child: GestureDetector(
+                          onTap: () => _showSellerProfileSheet(listing),
+                          child: Text(
+                            sellerName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 10, color: _storePurple, fontWeight: FontWeight.w700),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -34795,12 +34786,31 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                     _storeDetailFrame(
                       isDark: isDark,
                       label: 'Seller',
-                      child: Row(
-                        children: [
-                          _sellerAvatar((listing['sellerEmail'] ?? '').toString(), radius: 14),
-                          const SizedBox(width: 8),
-                          Expanded(child: _storeDetailValue(sellerName, isDark)),
-                        ],
+                      child: InkWell(
+                        onTap: () => _showSellerProfileSheet(listing),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              _sellerAvatar((listing['sellerEmail'] ?? '').toString(), radius: 14),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _storeDetailValue(sellerName, isDark, weight: FontWeight.w800),
+                                    Text(
+                                      'Tap for phone & email',
+                                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black45),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.chevron_right_rounded, color: isDark ? Colors.white38 : Colors.black38),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -34954,32 +34964,17 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                           label: const Text('Delete listing'),
                         ),
                       ),
-                    if (!isOwner || status == 'active')
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                NgmyNavigator.pop(ctx);
-                                _askAvailability(listing);
-                              },
-                              icon: const Icon(Icons.chat_bubble_outline),
-                              label: const Text('Message'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (status == 'active' && !isOwner && buyerCanBuyToday)
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  NgmyNavigator.pop(ctx);
-                                  _buyListing(listing);
-                                },
-                                style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white),
-                                child: Text(giftTitle.isNotEmpty ? 'Buy + Win Gift' : 'Buy'),
-                              ),
-                            ),
-                        ],
+                    if (!isOwner && status == 'active' && buyerCanBuyToday)
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            NgmyNavigator.pop(ctx);
+                            _buyListing(listing);
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                          child: Text(giftTitle.isNotEmpty ? 'Buy + Win Gift' : 'Buy'),
+                        ),
                       ),
                             ],
                           ),
@@ -35424,6 +35419,13 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Title, description, and valid price are required.')));
                                 return;
                               }
+                              final sellerPhone = widget.user.phone.trim();
+                              if (sellerPhone.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Add your cell phone number in your profile before listing items.')),
+                                );
+                                return;
+                              }
                               final payments = <String>[];
                               if (payNgmy) payments.add('ngmy');
                               if (payCashApp) payments.add('cashapp');
@@ -35467,6 +35469,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                 'id': DateTime.now().microsecondsSinceEpoch.toString(),
                                 'sellerEmail': widget.user.email.toLowerCase().trim(),
                                 'sellerName': widget.user.username,
+                                'sellerPhone': sellerPhone,
                                 'title': title,
                                 'description': desc,
                                 'price': price,
@@ -36197,21 +36200,17 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Seller: ${(listing['sellerName'] ?? 'User').toString()}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
+                GestureDetector(
+                  onTap: () => _showSellerProfileSheet(listing),
+                  child: Text(
+                    'Seller: ${(listing['sellerName'] ?? 'User').toString()} · tap for contact',
+                    style: TextStyle(fontSize: 11, color: _storePurple, fontWeight: FontWeight.w700),
+                  ),
+                ),
                 if (status == 'sold' && (listing['buyerName'] ?? '').toString().isNotEmpty)
                   Text('Buyer: ${listing['buyerName']}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
                 const SizedBox(height: 10),
                 if (showBuy && status == 'active' && NgmyStoreListingExtras.isVisibleToBuyersToday(listing)) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => _askAvailability(listing),
-                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-                      label: const Text('Ask if Available'),
-                      style: OutlinedButton.styleFrom(foregroundColor: _storeAccent, side: const BorderSide(color: _storeAccent)),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
