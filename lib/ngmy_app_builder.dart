@@ -2404,7 +2404,12 @@ class _NgmyAppRuntimeScreenState extends State<NgmyAppRuntimeScreen> {
         final dark = _dataStore.darkModeEnabled;
         final hideBar = screen.data['hideAppBar'] == true;
         final fullBleed = screen.data['fullBleed'] == true;
-        final bg = fullBleed ? Colors.black : (dark ? const Color(0xFF0F172A) : theme.withValues(alpha: 0.08));
+        final layout = ngmyScreenLayout(screen);
+        final rootType = (layout?['type'] ?? '').toString().toLowerCase();
+        final isMapScreen = rootType == 'mapview' || rootType == 'map' || rootType == 'map_view';
+        final bg = fullBleed
+            ? (isMapScreen ? const Color(0xFFF1F5F9) : Colors.black)
+            : (dark ? const Color(0xFF0F172A) : theme.withValues(alpha: 0.08));
         final barBg = dark ? const Color(0xFF1E293B) : theme;
         final navItems = ngmyParseBottomNavItems(widget.project.shell['bottomNav']);
         return Scaffold(
@@ -2423,7 +2428,9 @@ class _NgmyAppRuntimeScreenState extends State<NgmyAppRuntimeScreen> {
                     ),
                   ],
                 ),
-          body: fullBleed ? _buildScreen(screen, theme, dark) : SafeArea(child: _buildScreen(screen, theme, dark)),
+          body: fullBleed
+              ? SafeArea(bottom: navItems != null, child: _buildScreen(screen, theme, dark))
+              : SafeArea(child: _buildScreen(screen, theme, dark)),
           bottomNavigationBar: navItems == null
               ? null
               : NavigationBar(

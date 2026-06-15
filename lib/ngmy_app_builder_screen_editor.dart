@@ -823,37 +823,40 @@ class _WidgetToolStrip extends StatelessWidget {
           const SizedBox(height: 4),
           Text('Tap to add · long-press and drag onto the list', style: TextStyle(fontSize: 11, color: sub)),
           const SizedBox(height: 10),
-          SizedBox(
-            height: 72,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _tools.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final (type, icon, label) = _tools[i];
-                return LongPressDraggable<String>(
-                  data: type,
-                  feedback: Material(
-                    elevation: 8,
-                    borderRadius: BorderRadius.circular(14),
-                    color: theme,
-                    child: SizedBox(width: 56, height: 56, child: Icon(icon, color: Colors.white, size: 28)),
-                  ),
-                  childWhenDragging: Opacity(
-                    opacity: 0.35,
-                    child: _toolChip(type, icon, label),
-                  ),
-                  child: _toolChip(type, icon, label),
-                );
-              },
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 5,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 0.82,
             ),
+            itemCount: _tools.length,
+            itemBuilder: (_, i) {
+              final (type, icon, label) = _tools[i];
+              return LongPressDraggable<String>(
+                data: type,
+                feedback: Material(
+                  elevation: 8,
+                  borderRadius: BorderRadius.circular(14),
+                  color: theme,
+                  child: SizedBox(width: 56, height: 56, child: Icon(icon, color: Colors.white, size: 28)),
+                ),
+                childWhenDragging: Opacity(
+                  opacity: 0.35,
+                  child: _toolChip(type, icon, label, compact: true),
+                ),
+                child: _toolChip(type, icon, label, compact: true),
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _toolChip(String type, IconData icon, String label) {
+  Widget _toolChip(String type, IconData icon, String label, {bool compact = false}) {
     return Tooltip(
       message: label,
       child: Material(
@@ -863,8 +866,8 @@ class _WidgetToolStrip extends StatelessWidget {
           onTap: () => onAdd(type),
           borderRadius: BorderRadius.circular(14),
           child: Container(
-            width: 64,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            width: compact ? double.infinity : 64,
+            padding: EdgeInsets.symmetric(vertical: compact ? 6 : 8, horizontal: 4),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: isDark ? Colors.white12 : Colors.grey.shade300),
@@ -872,13 +875,14 @@ class _WidgetToolStrip extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 22, color: theme),
+                Icon(icon, size: compact ? 20 : 22, color: theme),
                 const SizedBox(height: 4),
                 Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : Colors.grey.shade700),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: compact ? 8 : 9, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : Colors.grey.shade700),
                 ),
               ],
             ),
@@ -968,13 +972,20 @@ class _AddWidgetSheet extends StatelessWidget {
                 for (final entry in _groups.entries) ...[
                   Text(entry.key, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: themeColor)),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final (type, label, icon) in entry.value)
-                        _PaletteTile(type: type, label: label, icon: icon, color: themeColor, onTap: () => onAdd(type)),
-                    ],
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 5,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                      childAspectRatio: 0.85,
+                    ),
+                    itemCount: entry.value.length,
+                    itemBuilder: (_, i) {
+                      final (type, label, icon) = entry.value[i];
+                      return _PaletteTile(type: type, label: label, icon: icon, color: themeColor, onTap: () => onAdd(type));
+                    },
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -1003,17 +1014,15 @@ class _PaletteTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          width: 100,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-            child: Column(
-              children: [
-                Icon(icon, color: color),
-                const SizedBox(height: 6),
-                Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade800)),
-              ],
-            ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(height: 6),
+              Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade800)),
+            ],
           ),
         ),
       ),

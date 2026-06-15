@@ -239,11 +239,18 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Open a project to publish.')));
       return;
     }
+    await _confirmPublishProject(p);
+  }
+
+  Future<void> _confirmPublishProject(NgmyAppProject p) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1F2937),
-        title: const Text('Publish app', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        title: Text(
+          widget.isAdmin ? 'Publish app' : 'Submit for review',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+        ),
         content: Text(
           widget.isAdmin
               ? 'Publish "${p.name}" to ngmy.org? A backup file will download and your public link will be ready.'
@@ -256,7 +263,10 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
         ],
       ),
     );
-    if (ok == true && mounted) widget.onPublish(p);
+    if (ok == true && mounted) {
+      widget.onSelectProject(p);
+      widget.onPublish(p);
+    }
   }
 
   @override
@@ -1221,6 +1231,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                           onSelected: (v) {
                             if (v == 'view') widget.onPreviewRuntime(p);
                             if (v == 'edit') widget.onOpenScreenEditor(p, 0);
+                            if (v == 'publish') _confirmPublishProject(p);
                             if (v == 'delete') _confirmDeleteProject(p);
                             if (v == 'canvas') {
                               widget.onSelectProject(p);
@@ -1231,6 +1242,10 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                             const PopupMenuItem(value: 'canvas', child: Text('Open in canvas')),
                             const PopupMenuItem(value: 'edit', child: Text('Edit screen')),
                             const PopupMenuItem(value: 'view', child: Text('View app')),
+                            PopupMenuItem(
+                              value: 'publish',
+                              child: Text(widget.isAdmin ? 'Publish app' : 'Submit for review'),
+                            ),
                             const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Color(0xFFDC2626)))),
                           ],
                         ),

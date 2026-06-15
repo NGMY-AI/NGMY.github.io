@@ -61,6 +61,10 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
       case 'searchhub':
       case 'search_hub':
         return true;
+      case 'mapview':
+      case 'map_view':
+      case 'map':
+        return true;
       default:
         return false;
     }
@@ -304,6 +308,7 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
           store: _store,
           isDark: widget.isDarkMode,
           onSnack: widget.onSnack,
+          fillHeight: widget.fullBleed,
         );
       case 'profile':
         return NgmyRuntimeProfile(
