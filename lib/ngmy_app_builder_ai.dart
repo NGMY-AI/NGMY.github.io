@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_runtime.dart';
-import 'ngmy_app_builder_social_blueprints.dart';
 
 class NgmyAppBuilderCopilotResult {
   final String message;
@@ -61,9 +60,21 @@ FACEBOOK: socialFeed home + postComposer + bottomNav. NOT menu hub.
 
 GOOGLE: searchHub home (fullBleed) + bookmark form.
 
-MAPS / NAVIGATION / TRAVEL: mapView home (fullBleed+hideAppBar) + form saving places (name,address,lat,lng) + dataList + shell.bottomNav. NEVER hero+menuGrid for map apps.
+MAPS / NAVIGATION / TRAVEL / UBER / DELIVERY / REAL ESTATE:
+YOU must build these from scratch in JSON — never tell the user to use a template.
+Home screen MUST be mapView (fullBleed+hideAppBar):
+{"type":"mapView","collection":"places","titleField":"name","subtitleField":"address","latField":"lat","lngField":"lng","centerLat":40.7128,"centerLng":-74.006,"height":420,"placeholder":"Search places…"}
+Add screens: save-place form (name, address, lat, lng), saved places dataList, profile, settings.
+shell.bottomNav: Map→home, Saved→list, Add→form, Profile→profile.
+Pins open Google Maps. Works for fleet tracking, travel, food delivery, store locator — build ALL screens the user needs.
 
-AI CUSTOM TEMPLATES: Design unique layouts per request — mapView, socialFeed, reelFeed, searchHub, tabs, product feeds, CRM dashboards. Do NOT default every app to hero+stat+menuGrid.
+GAMES / ENGINES / CALCULATORS / CUSTOM TOOLS:
+Use forms + dataList + stat + buttons + checklist + customCode notes. Multi-screen flows with real navigation. Never say "I can't build games" — build score trackers, quiz apps, timers, engines with state via collections.
+
+BOOKING / CRM / SCHOOL / CHURCH / PORTFOLIO / DASHBOARDS:
+Infer 5-8 screens minimum. Every data type gets form + list pair. Home shows stats and navigation.
+
+AI CUSTOM BUILDS ONLY: Design unique layouts per request — mapView, socialFeed, reelFeed, searchHub, tabs, product feeds, CRM dashboards. Do NOT default every app to hero+stat+menuGrid. Do NOT tell users to pick templates — YOU build it in ---APP_JSON---.
 
 MEDIA / SOCIAL: use socialFeed or reelFeed widgets — NOT plain dataList as home.
 
@@ -130,59 +141,17 @@ User: $userMessage
 ''';
 
   try {
-    final reply = await ngmyAiGenerateWithCredentials(creds, prompt);
+    final reply = await ngmyAiGenerateForAppBuilder(creds, prompt);
     final text = reply.text?.trim();
     if (text == null || text.isEmpty) {
       return NgmyAppBuilderCopilotResult(message: reply.error ?? 'AI returned an empty reply. Try again.');
     }
     final email = ownerEmail.isNotEmpty ? ownerEmail : (project?.ownerEmail ?? '');
-    final parsed = _parseCopilotReply(text, project, email);
-    return _applySocialBlueprintIfNeeded(parsed, userMessage, parsed.updatedProject ?? project, email);
+    return _parseCopilotReply(text, project, email);
   } catch (e) {
     debugPrint('[app builder copilot] $e');
     return NgmyAppBuilderCopilotResult(message: 'AI error: $e');
   }
-}
-
-NgmyAppBuilderCopilotResult _applySocialBlueprintIfNeeded(
-  NgmyAppBuilderCopilotResult result,
-  String userMessage,
-  NgmyAppProject? base,
-  String ownerEmail,
-) {
-  final kind = NgmyAppSocialBlueprints.detectKind(userMessage);
-  if (kind == null) return result;
-  final email = ownerEmail.isNotEmpty ? ownerEmail : (base?.ownerEmail ?? '');
-  if (result.updatedProject != null && !NgmyAppSocialBlueprints.looksLikeGenericDemo(result.updatedProject)) {
-    return result;
-  }
-  final blueprint = NgmyAppSocialBlueprints.build(
-    kind,
-    ownerEmail: email,
-    name: result.updatedProject?.name,
-  );
-  if (blueprint == null) return result;
-  final merged = blueprint.copyWith(
-    id: result.updatedProject?.id ?? base?.id ?? blueprint.id,
-    ownerEmail: email.isNotEmpty ? email : blueprint.ownerEmail,
-    status: base?.status ?? result.updatedProject?.status ?? NgmyAppBuilderStatus.draft,
-    slug: base?.slug ?? result.updatedProject?.slug ?? '',
-    publicUrl: base?.publicUrl ?? result.updatedProject?.publicUrl ?? '',
-  );
-  final label = switch (kind) {
-    'tiktok' => 'TikTok-style',
-    'facebook' => 'Facebook-style',
-    'google' => 'Google-style',
-    'instagram' => 'Instagram-style',
-    'maps' => 'Map & navigation',
-    _ => kind,
-  };
-  return NgmyAppBuilderCopilotResult(
-    message: result.updatedProject == null
-        ? 'Built a full $label app — vertical video feed, post screen, profile, and bottom navigation. Preview it now!'
-        : '${result.message}\n\n(Replaced generic menu with a real $label app — swipe videos, post reels, use bottom tabs.)',
-    updatedProject: merged,
-  );
 }
 
 NgmyAppBuilderCopilotResult _parseCopilotReply(String raw, NgmyAppProject? base, [String ownerEmail = '']) {
@@ -378,7 +347,7 @@ User request: $userMessage
 ''';
 
   try {
-    final reply = await ngmyAiGenerateWithCredentials(creds, prompt);
+    final reply = await ngmyAiGenerateForAppBuilder(creds, prompt);
     final text = reply.text?.trim();
     if (text == null || text.isEmpty) {
       return NgmyAppScreenAiResult(message: reply.error ?? 'AI returned an empty reply. Try again.');

@@ -459,6 +459,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                 child: Column(
                   children: [
                     _topBar(compact: compact),
+                    if (compact && _nav == NgmyStudioNav.buildDesign) _mobileBuildModeBar(),
                     Expanded(
                       child: Row(
                         children: [
@@ -477,7 +478,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
             GestureDetector(onTap: () => setState(() => _sidebarOpen = false), child: Container(color: Colors.black54)),
             SizedBox(width: 280, child: _leftSidebar(compact: true)),
           ],
-          if (_showBuildFlyout && _nav == NgmyStudioNav.buildDesign) _buildFlyout(compact),
+          if (_showBuildFlyout && _nav == NgmyStudioNav.buildDesign && !compact) _buildFlyout(compact),
           if (_showTemplatesOverlay) _templatesOverlay(),
         ],
       ),
@@ -748,6 +749,71 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
     );
   }
 
+  Widget _mobileBuildModeBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111827),
+        border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildModeIconButton(
+            icon: Icons.open_with_rounded,
+            tooltip: 'Drag-and-drop editor',
+            selected: _buildMode == NgmyStudioBuildMode.dragDrop,
+            onTap: () {
+              setState(() => _buildMode = NgmyStudioBuildMode.dragDrop);
+              _openDragDropEditor();
+            },
+          ),
+          const SizedBox(width: 16),
+          _buildModeIconButton(
+            icon: Icons.auto_awesome_rounded,
+            tooltip: 'AI layout generator',
+            selected: _buildMode == NgmyStudioBuildMode.aiLayout || _nav == NgmyStudioNav.aiAssistant,
+            onTap: () {
+              setState(() {
+                _buildMode = NgmyStudioBuildMode.aiLayout;
+                _nav = NgmyStudioNav.aiAssistant;
+                _showBuildFlyout = false;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeIconButton({
+    required IconData icon,
+    required String tooltip,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: selected ? const Color(0xFF2563EB).withValues(alpha: 0.25) : const Color(0xFF1F2937),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: selected ? const Color(0xFF60A5FA) : Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Icon(icon, color: selected ? const Color(0xFF60A5FA) : Colors.white70, size: 26),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFlyout(bool compact) {
     final left = compact ? 288.0 : 280.0;
     final top = compact ? 56.0 : 72.0;
@@ -777,6 +843,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                   setState(() => _buildMode = NgmyStudioBuildMode.dragDrop);
                   _openDragDropEditor();
                 },
+                compact: compact,
               ),
               const SizedBox(height: 6),
               _flyoutOption(
@@ -790,6 +857,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                     _showBuildFlyout = false;
                   });
                 },
+                compact: compact,
               ),
             ],
           ),
@@ -798,7 +866,24 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
     );
   }
 
-  Widget _flyoutOption(String label, IconData icon, bool on, VoidCallback tap) {
+  Widget _flyoutOption(String label, IconData icon, bool on, VoidCallback tap, {bool compact = false}) {
+    if (compact) {
+      return Tooltip(
+        message: label,
+        child: Material(
+          color: on ? const Color(0xFF374151) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: tap,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Icon(icon, color: on ? const Color(0xFF60A5FA) : Colors.white60, size: 26),
+            ),
+          ),
+        ),
+      );
+    }
     return Material(
       color: on ? const Color(0xFF374151) : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
@@ -997,8 +1082,9 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
   }
 
   Widget _canvasBottomBar(bool compact) {
-    Widget btn(IconData icon, VoidCallback? onTap, {bool on = false}) {
+    Widget btn(IconData icon, VoidCallback? onTap, {bool on = false, String? tooltip}) {
       return IconButton(
+        tooltip: tooltip,
         onPressed: onTap,
         icon: Icon(icon, size: 20, color: on ? const Color(0xFF2563EB) : const Color(0xFF374151)),
       );
@@ -1014,11 +1100,20 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          btn(Icons.home_outlined, _resetCanvasHome, on: _nav == NgmyStudioNav.buildDesign && _activeScreenIndex == 0),
-          btn(Icons.grid_view_rounded, () => setState(() => _showGrid = !_showGrid), on: _showGrid),
-          btn(Icons.layers_outlined, () => setState(() => _inspectorOpen = !_inspectorOpen), on: _inspectorOpen),
-          btn(Icons.history_rounded, _showScreenPicker),
-          btn(Icons.settings_outlined, _showSettings),
+          btn(Icons.home_outlined, _resetCanvasHome, on: _nav == NgmyStudioNav.buildDesign && _activeScreenIndex == 0, tooltip: 'Home screen'),
+          if (compact && _nav == NgmyStudioNav.buildDesign) ...[
+            btn(Icons.open_with_rounded, _openDragDropEditor, tooltip: 'Drag editor'),
+            btn(Icons.auto_awesome_rounded, () {
+              setState(() {
+                _buildMode = NgmyStudioBuildMode.aiLayout;
+                _nav = NgmyStudioNav.aiAssistant;
+              });
+            }, on: _nav == NgmyStudioNav.aiAssistant, tooltip: 'AI generator'),
+          ],
+          btn(Icons.grid_view_rounded, () => setState(() => _showGrid = !_showGrid), on: _showGrid, tooltip: 'Grid'),
+          btn(Icons.layers_outlined, () => setState(() => _inspectorOpen = !_inspectorOpen), on: _inspectorOpen, tooltip: 'Components'),
+          btn(Icons.history_rounded, _showScreenPicker, tooltip: 'Screens'),
+          btn(Icons.settings_outlined, _showSettings, tooltip: 'Settings'),
         ],
       ),
     );

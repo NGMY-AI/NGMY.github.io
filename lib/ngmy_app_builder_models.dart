@@ -100,7 +100,10 @@ const List<NgmyAppBuilderActor> kNgmyAppBuilderActors = [
         '"QR code app" means qrGenerator (url+text screens) + saved list. "Invoice app" means invoiceBuilder + invoice list. '
         '"Video/download app" means form saving URLs + dataList with urlField. '
         '"TikTok/reels" means reelFeed home + postComposer + shell.bottomNav — NEVER hero+menuGrid. '
-        '"Facebook" means socialFeed + postComposer. "Google search" means searchHub. ALWAYS output ---APP_JSON---.',
+        '"Facebook" means socialFeed + postComposer. "Google search" means searchHub. '
+        '"Maps/navigation/travel" means mapView home + place form + saved list + bottomNav — build it yourself in JSON, never tell user to use templates. '
+        '"Games/engines/calculators" — build multi-screen apps with forms, stats, lists, buttons. Never refuse. '
+        'ALWAYS output ---APP_JSON--- with complete working apps.',
   ),
   NgmyAppBuilderActor(
     id: 'reviewer',

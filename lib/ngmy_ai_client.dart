@@ -178,6 +178,104 @@ Future<({String? text, String? error})> _callGeminiDirect(
   return (text: null, error: _extractApiErrorMessage(lastError, body: lastBody));
 }
 
+/// Stronger Gemini call for App Builder — larger JSON apps, longer timeout.
+Future<({String? text, String? error})> _callGeminiDirectAppBuilder(String apiKey, String prompt) async {
+  const models = [
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-pro-latest',
+    'gemini-1.5-flash-latest',
+  ];
+  Object? lastError;
+  String? lastBody;
+  for (final model in models) {
+    try {
+      final url = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${Uri.encodeQueryComponent(apiKey)}',
+      );
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'contents': [
+                {'parts': [{'text': prompt}]},
+              ],
+              'generationConfig': {
+                'maxOutputTokens': 16384,
+                'temperature': 0.35,
+              },
+            }),
+          )
+          .timeout(const Duration(seconds: 180));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final candidates = data['candidates'];
+        if (candidates is List && candidates.isNotEmpty) {
+          final parts = candidates[0]['content']?['parts'];
+          if (parts is List && parts.isNotEmpty) {
+            final text = parts[0]['text']?.toString();
+            if (text != null && text.trim().isNotEmpty) {
+              return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
+            }
+          }
+        }
+      } else {
+        lastBody = response.body;
+        lastError = 'HTTP ${response.statusCode}';
+      }
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  return (text: null, error: _extractApiErrorMessage(lastError, body: lastBody));
+}
+
+/// App Builder AI — uses stronger models and longer output for full app JSON.
+Future<({String? text, String? error})> ngmyAiGenerateForAppBuilder(
+  NgmyAiCredentials creds,
+  String prompt,
+) async {
+  if (creds.apiKey.isEmpty) {
+    return (text: null, error: 'No API key configured.');
+  }
+
+  Future<({String? text, String? error})> runDirect() async {
+    switch (creds.provider) {
+      case NgmyAiProviderKind.gemini:
+        final strong = await _callGeminiDirectAppBuilder(creds.apiKey, prompt);
+        if (strong.text != null) return strong;
+        return _callGeminiDirect(creds.apiKey, prompt);
+      case NgmyAiProviderKind.openai:
+        return _callOpenAiDirect(creds.apiKey, prompt, model: 'gpt-4o');
+      case NgmyAiProviderKind.anthropic:
+        return _callAnthropicDirect(creds.apiKey, prompt);
+      case NgmyAiProviderKind.openaiCompatible:
+        return _callOpenAiDirect(
+          creds.apiKey,
+          prompt,
+          baseUrl: creds.openAiBaseUrl ?? 'https://api.openai.com/v1',
+          model: 'gpt-4o',
+        );
+    }
+  }
+
+  if (kIsWeb) {
+    final proxied = await _callAiViaSupabaseProxy(
+      apiKey: creds.apiKey,
+      prompt: prompt,
+      provider: creds.provider,
+      openAiBaseUrl: creds.openAiBaseUrl,
+    );
+    if (proxied.text != null) return proxied;
+    final direct = await runDirect();
+    if (direct.text != null) return direct;
+    return (text: null, error: proxied.error ?? direct.error ?? 'AI request failed on web.');
+  }
+  return runDirect();
+}
+
 Future<({String? text, String? error})> _callOpenAiDirect(
   String apiKey,
   String prompt, {

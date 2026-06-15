@@ -48,10 +48,12 @@ class _NgmyAppStudioAiPanelState extends State<NgmyAppStudioAiPanel> {
   int _promptsRemaining = -1;
 
   static const _hints = [
-    'Build a map app like Google Maps with saved places',
+    'Build a map app with saved places and directions',
     'Create a store with product feed and cart',
-    'Make a social media feed with posts and profiles',
-    'Design a fitness dashboard with workouts and check-ins',
+    'Make a TikTok-style video feed with posting',
+    'Design a fitness app with workouts and check-ins',
+    'Build a booking app with calendar and payments',
+    'Create a game score tracker with leaderboards',
   ];
 
   @override
