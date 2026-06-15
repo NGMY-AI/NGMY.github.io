@@ -293,6 +293,27 @@ bool familyTreeCanManageCollaborators(FamilyTree tree, String userEmail) =>
 
 bool familyTreeCanWriteCloud(FamilyTree tree, String userEmail) => familyTreeCanEdit(tree, userEmail);
 
+/// Max shared (view-only) family trees a user can import via QR/file.
+const int kNgmyFamilyTreeMaxSharedTrees = 2;
+
+int countViewOnlyFamilyTrees(Iterable<FamilyTree> trees) =>
+    trees.where((t) => t.isViewOnly).length;
+
+Future<bool> userHasOwnedFamilyTree(String userEmail) async {
+  final list = await loadFamilyTreesLocalOnly(userEmail);
+  return list.any((t) => familyTreeIsOwner(t, userEmail));
+}
+
+Future<void> assertCanImportSharedFamilyTree(String userEmail, FamilyTree imported) async {
+  final list = await loadFamilyTreesLocalOnly(userEmail);
+  if (list.any((t) => t.id == imported.id)) return;
+  if (countViewOnlyFamilyTrees(list) >= kNgmyFamilyTreeMaxSharedTrees) {
+    throw StateError(
+      'You can only keep $kNgmyFamilyTreeMaxSharedTrees shared family trees. Remove one before importing another.',
+    );
+  }
+}
+
 class FamilyTree {
   final String id;
   final String name;
@@ -690,6 +711,9 @@ Future<void> restoreFamilyTreeMerged(
 
   final list = await loadFamilyTreesLocalOnly(userEmail);
   final idx = list.indexWhere((t) => t.id == imported.id);
+  if (!isOwnerImport && idx == -1) {
+    await assertCanImportSharedFamilyTree(userEmail, imported);
+  }
   FamilyTree prepared;
   if (idx == -1) {
     prepared = imported.copyWith(ownerEmail: owner, localRole: role);

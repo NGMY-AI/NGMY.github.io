@@ -485,9 +485,69 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
     await _persist();
   }
 
+  Future<void> _viewMember(FamilyMember member) async {
+    final p = WorksheetPalette.of(context);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => _MemberViewDialog(member: member, tree: _tree, palette: p),
+    );
+  }
+
+  void _onMemberTap(FamilyMember member) {
+    if (_canEdit) {
+      _editMember(member);
+    } else {
+      _viewMember(member);
+    }
+  }
+
+  Future<void> _deleteThisTree() async {
+    if (_tree.isViewOnly) {
+      final canRemove = await NgmyFamilyTreePayments.canRemoveSharedFamilyTrees(widget.userEmail, widget.config);
+      if (!canRemove) {
+        _toast(
+          'Create your own family tree and pay for photo access before you can remove shared trees.',
+        );
+        return;
+      }
+    } else if (!familyTreeIsOwner(_tree, widget.userEmail)) {
+      _toast('Only the tree creator can delete this family tree.');
+      return;
+    }
+
+    if (!mounted) return;
+    final p = WorksheetPalette.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: p.cardBg,
+        title: Text('Remove family tree?', style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w900)),
+        content: Text(
+          _tree.isViewOnly
+              ? 'This removes "${_tree.name}" from this phone only. The creator\'s copy is not affected.'
+              : 'Delete "${_tree.name}" permanently? This cannot be undone.',
+          style: TextStyle(color: p.secondaryText, height: 1.35),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await deleteFamilyTree(widget.userEmail, _tree.id);
+    widget.onDataChanged();
+    if (!mounted) return;
+    NgmyNavigator.pop(context);
+  }
+
   Future<void> _editMember(FamilyMember member) async {
     if (!_canEdit) {
-      _toast('View only — open Family Book to browse members.');
+      await _viewMember(member);
       return;
     }
     final result = await showDialog<FamilyMember>(
@@ -671,7 +731,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                     ),
                     onTap: () {
                       Navigator.pop(ctx);
-                      _editMember(m);
+                      _onMemberTap(m);
                     },
                   );
                 },
@@ -742,7 +802,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'View only — shared by ${familyTreeOwnerEmail(_tree, widget.userEmail)}. Saved on this phone only; cloud data stays with the creator.',
+                          'View only — shared by ${familyTreeOwnerEmail(_tree, widget.userEmail)}. You can keep up to $kNgmyFamilyTreeMaxSharedTrees shared trees. Tap a member to view details.',
                           style: TextStyle(color: p.primaryText, fontSize: 12, height: 1.35, fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -788,6 +848,14 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                           icon: const Icon(Icons.sync_rounded, size: 16),
                           label: const Text('Sync'),
                         ),
+                        if (_tree.isViewOnly || familyTreeIsOwner(_tree, widget.userEmail)) ...[
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: _deleteThisTree,
+                            icon: const Icon(Icons.delete_outline, size: 16),
+                            label: Text(_tree.isViewOnly ? 'Remove' : 'Delete'),
+                          ),
+                        ],
                         if (_canEdit) ...[
                           const SizedBox(width: 8),
                           FilledButton.icon(
@@ -835,9 +903,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                                       }
                                     });
                                   },
-                                  onMemberTap: _canEdit ? _editMember : (_) {
-                                    _toast('View only — tap Family Book to browse members.');
-                                  },
+                                  onMemberTap: _onMemberTap,
                                   isDark: p.isDark,
                                 ),
                               ),
@@ -2164,6 +2230,101 @@ class _StepperIconButton extends StatelessWidget {
           child: Icon(icon, size: 20, color: enabled ? WorksheetPalette.teal : palette.secondaryText.withValues(alpha: 0.4)),
         ),
       ),
+    );
+  }
+}
+
+class _MemberViewDialog extends StatelessWidget {
+  const _MemberViewDialog({
+    required this.member,
+    required this.tree,
+    required this.palette,
+  });
+
+  final FamilyMember member;
+  final FamilyTree tree;
+  final WorksheetPalette palette;
+
+  String _genderLabel(FamilyGender gender) {
+    switch (gender) {
+      case FamilyGender.male:
+        return 'Male';
+      case FamilyGender.female:
+        return 'Female';
+      case FamilyGender.unknown:
+        return 'Not specified';
+    }
+  }
+
+  String _memberName(String? id) {
+    if (id == null || id.isEmpty) return '—';
+    for (final m in tree.members) {
+      if (m.id == id) return m.name;
+    }
+    return '—';
+  }
+
+  Widget _row(String label, String value) {
+    final text = value.trim().isEmpty ? '—' : value.trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 108,
+            child: Text(label, style: TextStyle(color: palette.secondaryText, fontSize: 12, fontWeight: FontWeight.w700)),
+          ),
+          Expanded(
+            child: Text(text, style: TextStyle(color: palette.primaryText, fontSize: 13, height: 1.35)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final order = siblingDisplayOrder(tree, member);
+    return AlertDialog(
+      backgroundColor: palette.cardBg,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text('Member profile', style: TextStyle(color: palette.primaryText, fontWeight: FontWeight.w900)),
+      content: SizedBox(
+        width: 380,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 44,
+                backgroundColor: palette.mutedSurface,
+                backgroundImage: ngmyImageFromRef(member.photoPath),
+                child: member.photoPath == null ? Icon(Icons.person, size: 40, color: palette.secondaryText) : null,
+              ),
+              const SizedBox(height: 16),
+              _row('Name', member.name),
+              _row('Gender', _genderLabel(member.gender)),
+              _row('Birth date', member.birthDate),
+              _row('Birth place', member.birthPlace),
+              _row('Date of death', member.deathDate),
+              _row('Occupation', member.occupation),
+              _row('Parent', _memberName(member.parentId)),
+              _row('Spouse', _memberName(member.spouseId)),
+              if (order > 0) _row('Child order', '#$order'),
+              _row('Notes', member.notes),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
+          child: const Text('Close'),
+        ),
+      ],
     );
   }
 }

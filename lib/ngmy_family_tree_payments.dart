@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_wallet_payment_ui.dart';
+import 'ngmy_worksheets_storage.dart';
 
 /// Family tree wallet pricing and photo subscription (stored on [AppConfig] in main.dart).
 class NgmyFamilyTreePayments {
@@ -47,6 +48,11 @@ class NgmyFamilyTreePayments {
     final base = (existing != null && existing.isAfter(DateTime.now())) ? existing : DateTime.now();
     map[key] = base.add(Duration(days: days)).toUtc().toIso8601String();
     (config as dynamic).familyTreePhotoAccessUntilByEmail = map;
+  }
+
+  static Future<bool> canRemoveSharedFamilyTrees(String userEmail, dynamic config) async {
+    if (!await userHasOwnedFamilyTree(userEmail)) return false;
+    return hasActivePhotoAccess(config, userEmail);
   }
 
   static Future<bool> confirmAndCharge({

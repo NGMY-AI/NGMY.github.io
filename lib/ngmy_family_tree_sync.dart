@@ -462,8 +462,12 @@ class NgmyFamilyTreeSyncService {
 
     var treeCount = 0;
     var memberCount = 0;
+    final viewOnly = _emailKey(bundle.ownerEmail) != _emailKey(email);
     for (final tree in bundle.trees) {
       if (tree.id.isEmpty) continue;
+      if (viewOnly) {
+        await assertCanImportSharedFamilyTree(email, tree);
+      }
       await restoreFamilyTreeMerged(
         email,
         tree,
@@ -473,7 +477,6 @@ class NgmyFamilyTreeSyncService {
       memberCount += tree.members.length;
     }
     if (treeCount == 0) return null;
-    final viewOnly = _emailKey(bundle.ownerEmail) != _emailKey(email);
     return (trees: treeCount, members: memberCount, viewOnly: viewOnly);
   }
 }
