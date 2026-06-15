@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_family_book_ui.dart';
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_family_tree_sync.dart';
 import 'ngmy_family_tree_sync_ui.dart';
@@ -734,80 +735,12 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   String _normalizeCollabEmail(String raw) => raw.toLowerCase().trim();
 
   void _openFamilyBook() {
-    final p = WorksheetPalette.of(context);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: p.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.75,
-        minChildSize: 0.45,
-        maxChildSize: 0.95,
-        builder: (_, controller) => Column(
-          children: [
-            const SizedBox(height: 10),
-            Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(8))),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(Icons.menu_book_outlined, color: Colors.orange),
-                  const SizedBox(width: 8),
-                  Text('Family Book', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: p.primaryText)),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                controller: controller,
-                itemCount: visibleMembers(_tree).length,
-                itemBuilder: (_, i) {
-                  final m = visibleMembers(_tree)[i];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: _genderColor(m.gender).withValues(alpha: 0.2),
-                      backgroundImage: ngmyImageFromRef(m.photoPath),
-                      child: m.photoPath == null ? Icon(Icons.person, color: _genderColor(m.gender)) : null,
-                    ),
-                    title: Text(m.name, style: TextStyle(fontWeight: FontWeight.w700, color: p.primaryText)),
-                    subtitle: Text(
-                      [
-                        if (siblingDisplayOrder(_tree, m) > 0) '#${siblingDisplayOrder(_tree, m)} child',
-                        m.birthDate,
-                        if (m.deathDate.isNotEmpty) '† ${m.deathDate}',
-                        m.occupation,
-                        m.notes,
-                      ].where((e) => e.toString().trim().isNotEmpty).join(' · '),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _onMemberTap(m);
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _genderColor(FamilyGender gender) {
-    switch (gender) {
-      case FamilyGender.male:
-        return WorksheetPalette.teal;
-      case FamilyGender.female:
-        return const Color(0xFFEC4899);
-      case FamilyGender.unknown:
-        return Colors.grey;
-    }
+    unawaited(showFamilyBookSheet(
+      context,
+      userEmail: widget.userEmail,
+      treeId: _tree.id,
+      canEdit: _canEdit,
+    ));
   }
 
   @override

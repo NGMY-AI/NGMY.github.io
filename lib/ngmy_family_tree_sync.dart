@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
+import 'ngmy_family_book_storage.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_worksheets_storage.dart';
 
@@ -284,12 +285,14 @@ class NgmyFamilyTreeSyncBundle {
     required this.ownerEmail,
     required this.trees,
     required this.exportedAt,
+    this.familyBooksByTreeId = const {},
   });
 
   final String code;
   final String ownerEmail;
   final List<FamilyTree> trees;
   final DateTime exportedAt;
+  final Map<String, List<FamilyBookEntry>> familyBooksByTreeId;
 
   Map<String, dynamic> toMap() => {
         'marker': kNgmyFamilyTreeSyncMarker,
@@ -298,6 +301,10 @@ class NgmyFamilyTreeSyncBundle {
         'ownerEmail': ownerEmail,
         'exportedAt': exportedAt.toUtc().toIso8601String(),
         'trees': trees.map((t) => t.toJson()).toList(),
+        if (familyBooksByTreeId.isNotEmpty)
+          'familyBooks': familyBooksByTreeId.map(
+            (treeId, entries) => MapEntry(treeId, entries.map((e) => e.toJson()).toList()),
+          ),
       };
 
   static NgmyFamilyTreeSyncBundle? parse(String raw) {
@@ -337,7 +344,28 @@ class NgmyFamilyTreeSyncBundle {
             .toList()
         : <FamilyTree>[];
     final exportedAt = DateTime.tryParse((map['exportedAt'] ?? '').toString()) ?? DateTime.now();
-    return NgmyFamilyTreeSyncBundle(code: code, ownerEmail: owner, trees: trees, exportedAt: exportedAt);
+    final familyBooks = <String, List<FamilyBookEntry>>{};
+    final rawBooks = map['familyBooks'];
+    if (rawBooks is Map) {
+      for (final entry in rawBooks.entries) {
+        final treeId = entry.key.toString();
+        final rawList = entry.value;
+        if (rawList is! List) continue;
+        final entries = rawList
+            .whereType<Map>()
+            .map((e) => FamilyBookEntry.fromJson(Map<String, dynamic>.from(e)))
+            .where((e) => e.id.isNotEmpty)
+            .toList();
+        if (entries.isNotEmpty) familyBooks[treeId] = entries;
+      }
+    }
+    return NgmyFamilyTreeSyncBundle(
+      code: code,
+      ownerEmail: owner,
+      trees: trees,
+      exportedAt: exportedAt,
+      familyBooksByTreeId: familyBooks,
+    );
   }
 }
 
@@ -393,11 +421,18 @@ class NgmyFamilyTreeSyncService {
         .map((t) => t.copyWith(ownerEmail: familyTreeOwnerEmail(t, email)))
         .toList();
 
+    final familyBooks = <String, List<FamilyBookEntry>>{};
+    for (final tree in trees) {
+      final entries = await loadFamilyBookEntries(email, tree.id);
+      if (entries.isNotEmpty) familyBooks[tree.id] = entries;
+    }
+
     return NgmyFamilyTreeSyncBundle(
       code: code,
       ownerEmail: _emailKey(email),
       trees: trees,
       exportedAt: DateTime.now(),
+      familyBooksByTreeId: familyBooks,
     );
   }
 
@@ -482,6 +517,10 @@ class NgmyFamilyTreeSyncService {
         tree,
         bundleOwnerEmail: bundle.ownerEmail,
       );
+      final bookEntries = bundle.familyBooksByTreeId[tree.id];
+      if (bookEntries != null && bookEntries.isNotEmpty) {
+        await saveFamilyBookEntries(email, tree.id, bookEntries);
+      }
       treeCount += 1;
       memberCount += tree.members.length;
     }

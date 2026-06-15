@@ -508,11 +508,9 @@ Future<List<FamilyTree>> loadFamilyTrees(String userEmail) async {
   if (mergedJson != (raw ?? '')) {
     await _persistFamilyTreesLocally(userEmail, merged);
   }
-  if (local.isNotEmpty && remote.isEmpty) {
-    final owned = merged.where((t) => familyTreeCanWriteCloud(t, userEmail)).toList();
-    if (owned.isNotEmpty) {
-      unawaited(_upsertFamilyTreesCloud(userEmail, owned));
-    }
+  final ownedWritable = merged.where((t) => familyTreeCanWriteCloud(t, userEmail)).toList();
+  if (ownedWritable.isNotEmpty && local.isNotEmpty && remote.isEmpty) {
+    unawaited(_upsertFamilyTreesCloud(userEmail, ownedWritable));
   }
   return merged;
 }
@@ -626,45 +624,42 @@ int descendantCount(FamilyTree tree, String memberId) {
   return count;
 }
 
-/// Only name, birth, death fields go to Supabase — photos and notes stay local.
+/// Full member profile for Supabase — photos and Family Book stay on device only.
 Map<String, dynamic> familyMemberToCloudJson(FamilyMember member) => {
       'id': member.id,
       'name': member.name,
+      'gender': familyGenderToString(member.gender),
       'birthDate': member.birthDate,
       'birthPlace': member.birthPlace,
       'deathDate': member.deathDate,
+      'occupation': member.occupation,
+      'notes': member.notes,
       'parentId': member.parentId,
       'spouseId': member.spouseId,
+      'birthOrder': member.birthOrder,
+      'hidden': member.hidden,
+      'visibleChildrenCap': member.visibleChildrenCap,
     };
 
 FamilyMember familyMemberFromCloudJson(Map<String, dynamic> json) {
-  return FamilyMember(
-    id: (json['id'] ?? '').toString(),
-    name: (json['name'] ?? '').toString(),
-    birthDate: (json['birthDate'] ?? '').toString(),
-    birthPlace: (json['birthPlace'] ?? '').toString(),
-    deathDate: (json['deathDate'] ?? '').toString(),
-    parentId: json['parentId']?.toString(),
-    spouseId: json['spouseId']?.toString(),
-  );
+  return FamilyMember.fromJson(json);
 }
 
 FamilyMember mergeFamilyMemberCloudIntoLocal(FamilyMember local, FamilyMember cloud) {
   return local.copyWith(
     name: cloud.name.isNotEmpty ? cloud.name : local.name,
+    gender: cloud.gender != FamilyGender.unknown ? cloud.gender : local.gender,
     birthDate: cloud.birthDate.isNotEmpty ? cloud.birthDate : local.birthDate,
     birthPlace: cloud.birthPlace.isNotEmpty ? cloud.birthPlace : local.birthPlace,
     deathDate: cloud.deathDate.isNotEmpty ? cloud.deathDate : local.deathDate,
+    occupation: cloud.occupation.isNotEmpty ? cloud.occupation : local.occupation,
+    notes: cloud.notes.isNotEmpty ? cloud.notes : local.notes,
     parentId: cloud.parentId ?? local.parentId,
     spouseId: cloud.spouseId ?? local.spouseId,
-    // Cloud stores names/dates/links only — never wipe photos, gender, notes, etc.
-    gender: local.gender,
+    birthOrder: cloud.birthOrder > 0 ? cloud.birthOrder : local.birthOrder,
+    hidden: cloud.hidden,
+    visibleChildrenCap: cloud.visibleChildrenCap > 0 ? cloud.visibleChildrenCap : local.visibleChildrenCap,
     photoPath: local.photoPath,
-    notes: local.notes,
-    occupation: local.occupation,
-    birthOrder: local.birthOrder,
-    hidden: local.hidden,
-    visibleChildrenCap: local.visibleChildrenCap,
   );
 }
 
@@ -786,6 +781,7 @@ Map<String, dynamic> _familyTreeRow(FamilyTree tree, String userEmail) {
     'isPrivate': tree.isPrivate,
     'collaboratorEmails': tree.collaboratorEmails,
     'members': tree.members.map(familyMemberToCloudJson).toList(),
+    'visibleChildrenPerParent': tree.visibleChildrenPerParent,
     'createdAt': tree.createdAt.toUtc().toIso8601String(),
     'updatedAt': now,
   };
