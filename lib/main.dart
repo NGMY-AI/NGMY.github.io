@@ -8179,9 +8179,24 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _reloadStoreFromSupabase() async {
-    _config.storeListings = const [];
-    _config.storeInquiries = const [];
-    _config.storeOrders = const [];
+    final listingsSigBefore = _storeListingsSignature(_config.storeListings);
+    final inquiriesBefore = _config.storeInquiries.length;
+    final remoteListings = await _fetchStoreListingsFromSupabase();
+    final remoteInquiries = await _fetchStoreInquiriesFromSupabase();
+    final cfg = await _fetchNgmyConfigRow(columns: 'storeInquiries');
+    final configInquiries = _storeInquiriesFromConfigMap(cfg);
+    _mergeStoreListingsIntoConfig(remoteListings);
+    _mergeStoreInquiriesIntoConfig(remoteInquiries);
+    if (configInquiries.isNotEmpty) {
+      _mergeStoreInquiriesIntoConfig(configInquiries);
+    }
+    _purgeExpiredSoldStoreListings();
+    if (!mounted) return;
+    final listingsSigAfter = _storeListingsSignature(_config.storeListings);
+    final inquiriesAfter = _config.storeInquiries.length;
+    if (listingsSigBefore != listingsSigAfter || inquiriesBefore != inquiriesAfter) {
+      setState(() {});
+    }
   }
 
   void _mergeHelpListIntoConfig(String key, List<Map<String, dynamic>> remote, void Function(List<Map<String, dynamic>>) setter, List<Map<String, dynamic>> local) {
@@ -9122,9 +9137,34 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               table: 'ngmy_settings',
               callback: (payload) => _onNgmySettingsChange(payload),
             )
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'store_listings',
+              callback: (payload) => _onStoreListingChange(payload),
+            )
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'store_inquiries',
+              callback: (payload) => _onStoreInquiryChange(payload),
+            )
             .subscribe();
       } else if (sessionEmail.isNotEmpty) {
-        _appSyncChannel = channel.subscribe();
+        _appSyncChannel = channel
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'store_listings',
+              callback: (payload) => _onStoreListingChange(payload),
+            )
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'store_inquiries',
+              callback: (payload) => _onStoreInquiryChange(payload),
+            )
+            .subscribe();
       } else {
         _appSyncChannel = null;
       }
@@ -10231,8 +10271,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _allMedia = const [];
         _allAnnouncements = const [];
 
-        final localStoreListings = const <Map<String, dynamic>>[];
-        final localStoreInquiries = const <Map<String, dynamic>>[];
+        final localStoreListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
+        final localStoreInquiries = List<Map<String, dynamic>>.from(_config.storeInquiries.map((e) => Map<String, dynamic>.from(e)));
         final localRegistrarApps = List<Map<String, dynamic>>.from(
           _config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)),
         );
@@ -10273,9 +10313,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await _applyRemoteLegalToConfig(_config, cfgMap, keep: localConfigSnapshot);
           _mergeStoreListingsIntoConfig(localStoreListings);
           _mergeStoreInquiriesIntoConfig(localStoreInquiries);
-          _config.storeListings = const [];
-          _config.storeInquiries = const [];
-          _config.storeOrders = const [];
           _config.civicRegistrarApplications = _mergeCivicRegistrarApplications(
             localRegistrarApps,
             _config.civicRegistrarApplications,
@@ -17990,11 +18027,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _adminInvest(isDark),
       _adminLegal(isDark),
       _adminWallet(isDark),
+      _adminStore(isDark),
       NgmyAdminDomainCalendarPanel(isDark: isDark),
     ];
     return NgmyTabBackScope(
       activeTab: _idx,
-      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 5)),
+      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 6)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
       appBar: AppBar(
@@ -18040,7 +18078,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
               frameBorder,
               badgeCount: _adminWalletPendingCount(),
             ),
-            _navItem(5, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
+            _navItem(5, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
+            _navItem(6, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
           ],
         ),
       ),
@@ -18155,7 +18194,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "CALENDAR"][_idx];
+  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "STORE", "CALENDAR"][_idx];
 
   Widget _adminRetiredPanel({
     required bool isDark,
@@ -18173,14 +18212,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _adminStore(bool isDark) {
-    return _adminRetiredPanel(
-      isDark: isDark,
-      title: 'NGMY Store',
-      icon: Icons.storefront_rounded,
-      message: 'Store admin is retired while we rebuild the marketplace.',
-    );
-  }
+  Widget _adminStore(bool isDark) => _adminStoreLegacy(isDark);
 
   Widget _adminStoreLegacy(bool isDark) {
     final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
@@ -30670,33 +30702,5543 @@ class NgmyStoreScreen extends StatefulWidget {
   State<NgmyStoreScreen> createState() => _NgmyStoreScreenState();
 }
 
-class _NgmyStoreScreenState extends State<NgmyStoreScreen> {
+class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  static const Color _storeAccent = Color(0xFF00B25A);
+  static const Color _storePurple = Color(0xFF7C3AED);
+
+  late TabController _tabCtrl;
+  final ImagePicker _picker = ImagePicker();
+  final TextEditingController _searchC = TextEditingController();
+  String _searchQuery = '';
+  String _listingsSig = '';
+  bool _storeLoading = false;
+  DateTime? _lastCloudRefresh;
+  final Set<String> _likedListingIds = {};
+  final Map<String, String> _listingMediaUrlCache = {};
+  Timer? _liveOrderPollTimer;
+  Timer? _storeMessagesPollTimer;
+  Timer? _autoGpsTimer;
+  final Set<String> _autoGpsOrderIds = {};
+  int _trackingReplayToken = 0;
+  final Set<String> _storePaymentDecisionLocks = {};
+
+  bool get _canSell => ngmyUserCanSellOnStore(widget.user, widget.config);
+
   @override
   void initState() {
     super.initState();
-    widget.config.storeListings = const [];
-    widget.config.storeInquiries = const [];
-    widget.config.storeOrders = const [];
+    WidgetsBinding.instance.addObserver(this);
+    _tabCtrl = TabController(length: _canSell ? 3 : 2, vsync: this)..addListener(() {
+      if (!mounted) return;
+      final ordersTab = _canSell ? 2 : 1;
+      if (_tabCtrl.index == ordersTab) {
+        _trackingReplayToken++;
+        unawaited(_syncLiveOrders());
+      }
+      setState(() {});
+    });
+    widget.config.storeListings = List<Map<String, dynamic>>.from(
+      widget.config.storeListings.map((e) => Map<String, dynamic>.from(e)),
+    );
+    widget.config.storeInquiries = List<Map<String, dynamic>>.from(
+      widget.config.storeInquiries.map((e) => Map<String, dynamic>.from(e)),
+    );
+    widget.config.storeOrders = List<Map<String, dynamic>>.from(
+      widget.config.storeOrders.map((e) => Map<String, dynamic>.from(e)),
+    );
+    _migrateLegacySoldListingsToOrders(widget.config);
+    for (final l in widget.config.storeListings) {
+      final liked = l['likedBy'];
+      if (liked is List && liked.contains(widget.user.email)) {
+        _likedListingIds.add((l['id'] ?? '').toString());
+      }
+    }
+    _purgeExpiredSoldListingsLocal();
+    _listingsSig = _storeListingsSignature(_listings);
+    _applyStoreSellAccessEmailsToUsers(widget.config, widget.allUsers, currentUser: widget.user);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStoreSellAccessFromCloud());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStoreListingsFromCloud(silent: true));
+    _searchC.addListener(() => setState(() => _searchQuery = _searchC.text.trim().toLowerCase()));
+    _liveOrderPollTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+      if (!mounted) return;
+      unawaited(_syncLiveOrders());
+    });
+    _storeMessagesPollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      unawaited(_refreshStoreMessagesFromCloud(silent: true));
+    });
+    unawaited(_syncLiveOrders());
+    unawaited(_refreshStoreMessagesFromCloud(silent: true));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _ensurePaymentReviewInquiriesFromOrders();
+      _ensureStoreThreadsFromOrders();
+    });
+    for (final o in _orders) {
+      if (o['autoLocationEnabled'] == true && _isMySaleOrder(o)) {
+        final id = (o['id'] ?? '').toString();
+        if (id.isNotEmpty) _autoGpsOrderIds.add(id);
+      }
+    }
+    _startAutoGpsTimerIfNeeded();
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF080B16) : const Color(0xFFF3F7FF),
-      body: SafeArea(
-        child: Center(
-          child: ngmyComingSoonFrame(
-            context: context,
-            title: 'NGMY Store',
-            icon: Icons.storefront_rounded,
-            message: 'We are rebuilding the marketplace. Check back later.',
+  void didUpdateWidget(NgmyStoreScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldCanSell = ngmyUserCanSellOnStore(oldWidget.user, oldWidget.config);
+    final newCanSell = ngmyUserCanSellOnStore(widget.user, widget.config);
+    if (oldCanSell != newCanSell) {
+      final idx = _tabCtrl.index;
+      _tabCtrl.dispose();
+      _tabCtrl = TabController(length: newCanSell ? 3 : 2, vsync: this)
+        ..addListener(() {
+          if (!mounted) return;
+          final ordersTab = newCanSell ? 2 : 1;
+          if (_tabCtrl.index == ordersTab) {
+            _trackingReplayToken++;
+            unawaited(_syncLiveOrders());
+          }
+          setState(() {});
+        });
+      if (idx < _tabCtrl.length) {
+        _tabCtrl.index = idx.clamp(0, _tabCtrl.length - 1);
+      }
+    }
+  }
+
+  bool _isMySaleOrder(Map<String, dynamic> order) {
+    final me = widget.user.email.toLowerCase().trim();
+    return (order['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
+  }
+
+  void _startAutoGpsTimerIfNeeded() {
+    _autoGpsTimer?.cancel();
+    if (_autoGpsOrderIds.isEmpty) return;
+    _autoGpsTimer = Timer.periodic(const Duration(minutes: 5), (_) => unawaited(_runAutoGpsUpdates()));
+  }
+
+  Future<void> _runAutoGpsUpdates() async {
+    for (final id in _autoGpsOrderIds.toList()) {
+      await _applyGpsToOrder(id, fromAuto: true);
+    }
+  }
+
+  Future<void> _applyGpsToOrder(String orderId, {bool fromAuto = false}) async {
+    final result = await ngmyFetchCurrentGpsDetailed();
+    if (!mounted) return;
+    final reading = result.reading;
+    if (reading == null) {
+      if (!fromAuto) {
+        final msg = result.failure != null
+            ? ngmyGpsFailureMessage(result.failure!)
+            : 'Could not get GPS. Allow location when your phone/browser asks.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+      return;
+    }
+    await _patchOrder(orderId, (o) {
+      o['currentLocation'] = reading.label;
+      o['currentLat'] = reading.lat;
+      o['currentLng'] = reading.lng;
+      o['lastGpsAt'] = DateTime.now().toUtc().toIso8601String();
+      if (fromAuto) o['autoLocationEnabled'] = true;
+      _appendLocationHistory(
+        o,
+        reading.label,
+        fromAuto ? 'Auto GPS update' : 'Live GPS shared',
+        lat: reading.lat,
+        lng: reading.lng,
+      );
+    }, successMessage: fromAuto ? null : 'Live location shared with buyer.');
+  }
+
+  void _appendLocationHistory(
+    Map<String, dynamic> o,
+    String location,
+    String note, {
+    double? lat,
+    double? lng,
+  }) {
+    final hist = List<Map<String, dynamic>>.from((o['locationHistory'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? []);
+    hist.insert(0, {
+      'location': location,
+      'note': note,
+      'at': DateTime.now().toLocal().toString(),
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
+    });
+    o['locationHistory'] = hist;
+    final s = (o['fulfillmentStatus'] ?? '').toString();
+    if (s == 'shipped') o['fulfillmentStatus'] = 'in_transit';
+    final eta = DateTime.tryParse((o['estimatedArrival'] ?? '').toString());
+    if (eta != null && DateTime.now().isAfter(eta.subtract(const Duration(hours: 6)))) {
+      o['fulfillmentStatus'] = 'arriving';
+    }
+  }
+
+  String _storeOrdersDigest() {
+    return _orders
+        .map((o) => '${o['id']}|${o['fulfillmentStatus']}|${o['refunded']}|${o['updatedAt']}')
+        .join(';');
+  }
+
+  Future<void> _syncLiveOrders() async {
+    if (!mounted) return;
+    final before = _storeOrdersDigest();
+    await _refreshStoreOrdersFromConfig();
+    final advanced = _advanceOrderStatuses();
+    if (advanced) await _pushStoreOrdersToSupabase(_orders);
+    final refunded = _processUnshippedRefunds();
+    if (refunded && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A late order was auto-refunded to the buyer (not shipped within 3 days).')),
+      );
+    }
+    final after = _storeOrdersDigest();
+    if (!mounted) return;
+    if (after != before || refunded) {
+      setState(() {});
+    }
+    _ensurePaymentReviewInquiriesFromOrders();
+    _ensureStoreThreadsFromOrders();
+  }
+
+  /// Pulls store message threads from Supabase table + config json (never wipes local until merged).
+  Future<void> _refreshStoreMessagesFromCloud({bool silent = false}) async {
+    try {
+      final local = widget.config.storeInquiries
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      final fromTable = await _fetchStoreInquiriesFromSupabase();
+      var merged = _mergeStoreInquiriesLists(local, fromTable);
+      final cfg = await _fetchNgmyConfigRow(columns: 'storeInquiries');
+      final fromConfig = _storeInquiriesFromConfigMap(cfg);
+      if (fromConfig.isNotEmpty) {
+        merged = _mergeStoreInquiriesLists(merged, fromConfig);
+      }
+      widget.config.storeInquiries = merged;
+      _ensurePaymentReviewInquiriesFromOrders();
+      _ensureStoreThreadsFromOrders();
+      await ngmyFlushCriticalConfigLocalAndCloud(widget.config, cloud: false);
+      if (!mounted) return;
+      if (!silent) {
+        setState(() {});
+      } else {
+        final sig = '${widget.config.storeInquiries.length}|${_groupedStoreMessageThreads(widget.user.email.toLowerCase().trim()).length}';
+        if (sig != _lastMessagesSig) {
+          _lastMessagesSig = sig;
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      debugPrint('[store] messages refresh error: $e');
+    }
+  }
+
+  String _lastMessagesSig = '';
+
+  Future<void> _refreshStoreOrdersFromConfig() async {
+    try {
+      final prevOrders = widget.config.storeOrders
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      final cfg = await _fetchNgmyConfigRow(columns: 'storeOrders');
+      if (cfg == null || cfg['storeOrders'] is! List) return;
+      final remote = (cfg['storeOrders'] as List).map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
+      widget.config.storeOrders = _mergeStoreOrdersLists(widget.config.storeOrders, remote);
+      widget.config.storeOrders = _mutableStoreOrdersCopy(widget.config.storeOrders);
+      ngmyOnStoreOrdersChanged?.call(prevOrders, widget.config.storeOrders);
+      if (_maintainStoreOrders(widget.config.storeOrders)) {
+        unawaited(_pushStoreOrdersToSupabase(widget.config.storeOrders));
+      }
+    } catch (e) {
+      debugPrint('[storeOrders] refresh error: $e');
+    }
+  }
+
+  bool _advanceOrderStatuses() {
+    var changed = false;
+    final now = DateTime.now();
+    for (final o in _orders) {
+      final s = (o['fulfillmentStatus'] ?? '').toString();
+      if (s == 'delivered' || s == 'pending') continue;
+      final eta = DateTime.tryParse((o['estimatedArrival'] ?? '').toString());
+      if (eta == null) continue;
+      if (s == 'shipped' && now.isAfter(eta.subtract(const Duration(hours: 12)))) {
+        o['fulfillmentStatus'] = 'in_transit';
+        o['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+        changed = true;
+      }
+      if ((s == 'shipped' || s == 'in_transit') && now.isAfter(eta.subtract(const Duration(hours: 2)))) {
+        o['fulfillmentStatus'] = 'arriving';
+        o['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+        changed = true;
+      }
+    }
+    if (_maintainStoreOrders(_orders)) changed = true;
+    return changed;
+  }
+
+  void _mergeRemoteStoreListings(List<Map<String, dynamic>> remote) {
+    final byId = <String, Map<String, dynamic>>{};
+    for (final l in remote) {
+      final id = (l['id'] ?? '').toString();
+      if (id.isEmpty) continue;
+      byId[id] = _normalizeStoreListing(Map<String, dynamic>.from(l));
+    }
+    for (final l in widget.config.storeListings) {
+      final id = (l['id'] ?? '').toString();
+      if (id.isEmpty) continue;
+      final existing = byId[id];
+      final local = _normalizeStoreListing(Map<String, dynamic>.from(l));
+      byId[id] = existing == null ? local : _pickNewerListing(existing, local);
+    }
+    widget.config.storeListings = byId.values.toList();
+  }
+
+  Future<void> _refreshStoreSellAccessFromCloud() async {
+    try {
+      await ngmyApplyStoreSellAccessFromSettings(widget.config);
+      _applyStoreSellAccessEmailsToUsers(widget.config, widget.allUsers, currentUser: widget.user);
+      if (!mounted) return;
+      setState(() {});
+    } catch (e) {
+      debugPrint('[store] sell access refresh: $e');
+    }
+  }
+
+  Future<void> _refreshStoreListingsFromCloud({bool silent = false, bool force = false}) async {
+    if (_storeLoading) return;
+    if (!force && _lastCloudRefresh != null && DateTime.now().difference(_lastCloudRefresh!) < const Duration(seconds: 8)) {
+      return;
+    }
+    _storeLoading = true;
+    if (!silent && mounted) setState(() {});
+    final remote = await _fetchStoreListingsFromSupabase();
+    _mergeRemoteStoreListings(remote);
+    await _refreshStoreOrdersFromConfig();
+    _advanceOrderStatuses();
+    _lastCloudRefresh = DateTime.now();
+    _storeLoading = false;
+    if (!mounted) return;
+    final sig = _storeListingsSignature(_listings);
+    if (sig != _listingsSig) {
+      _listingsSig = sig;
+      setState(() {});
+    } else if (!silent) {
+      setState(() {});
+    }
+  }
+
+  void _purgeExpiredSoldListingsLocal() {
+    final now = DateTime.now();
+    final removedListingIds = <String>[];
+    widget.config.storeListings.removeWhere((l) {
+      if ((l['status'] ?? '').toString() != 'sold') return false;
+      final soldAt = DateTime.tryParse((l['soldAt'] ?? '').toString());
+      if (soldAt == null || now.difference(soldAt).inDays < 7) return false;
+      final id = (l['id'] ?? '').toString();
+      if (id.isNotEmpty) removedListingIds.add(id);
+      return true;
+    });
+    widget.config.storeInquiries.removeWhere((m) => removedListingIds.contains((m['listingId'] ?? '').toString()));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() => _trackingReplayToken++);
+      unawaited(_syncLiveOrders());
+      unawaited(_refreshStoreMessagesFromCloud(silent: true));
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _liveOrderPollTimer?.cancel();
+    _storeMessagesPollTimer?.cancel();
+    _autoGpsTimer?.cancel();
+    _tabCtrl.dispose();
+    _searchC.dispose();
+    super.dispose();
+  }
+
+  bool _processUnshippedRefunds() {
+    final now = DateTime.now();
+    var any = false;
+    for (final o in _orders) {
+      if (o['refunded'] == true) continue;
+      final status = (o['fulfillmentStatus'] ?? 'pending').toString();
+      if (status != 'pending') continue;
+      final deadline = _storeShipByDeadline(o);
+      if (deadline == null || now.isBefore(deadline)) continue;
+      final total = (o['total'] as num?)?.toDouble() ?? 0;
+      if (total <= 0) continue;
+      final paidVia = (o['paidVia'] ?? 'ngmy').toString();
+      final sellerEmail = (o['sellerEmail'] ?? '').toString().toLowerCase().trim();
+      final buyerEmail = (o['buyerEmail'] ?? '').toString().toLowerCase().trim();
+      final sellerIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sellerEmail);
+      final buyerIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == buyerEmail);
+      if (paidVia == 'ngmy' && sellerIdx >= 0 && buyerIdx >= 0) {
+        final seller = widget.allUsers[sellerIdx];
+        final buyer = widget.allUsers[buyerIdx];
+        final refund = math.min(total, seller.accountBalance);
+        seller.accountBalance -= refund;
+        buyer.accountBalance += refund;
+        final ts = DateTime.now().microsecondsSinceEpoch.toString();
+        widget.onAddTransaction(AppTransaction(
+          id: 'store_refund_buy_$ts',
+          userEmail: buyer.email,
+          amount: refund,
+          type: TransactionType.adminAdd,
+          method: PaymentMethod.system,
+          status: TransactionStatus.approved,
+          timestamp: DateTime.now(),
+          sourceDetails: 'NGMY Store refund (seller did not ship in 3 days): ${o['title']}',
+        ));
+        if (refund > 0) {
+          widget.onAddTransaction(AppTransaction(
+            id: 'store_refund_sell_$ts',
+            userEmail: seller.email,
+            amount: refund,
+            type: TransactionType.adminRemove,
+            method: PaymentMethod.system,
+            status: TransactionStatus.approved,
+            timestamp: DateTime.now(),
+            sourceDetails: 'NGMY Store refund charge (late shipment): ${o['title']}',
+          ));
+        }
+      }
+      o['fulfillmentStatus'] = 'refunded';
+      o['refunded'] = true;
+      o['refundedAt'] = DateTime.now().toUtc().toIso8601String();
+      o['updatedAt'] = o['refundedAt'];
+      any = true;
+    }
+    if (any) {
+      _save(refreshCloud: true);
+      widget.onDataChanged();
+    }
+    return any;
+  }
+
+  bool _matchesSearch(Map<String, dynamic> listing) {
+    if (_searchQuery.isEmpty) return true;
+    final hay = '${listing['title']} ${listing['description']} ${listing['category']} ${listing['location']} ${listing['sellerName']}'.toLowerCase();
+    return hay.contains(_searchQuery);
+  }
+
+  List<String> _listingImageRefs(Map<String, dynamic> listing) {
+    final raw = listing['imageRefs'];
+    if (raw is List) {
+      return raw.map((e) => e.toString()).where((s) => s.trim().isNotEmpty).take(3).toList();
+    }
+    final legacy = (listing['imageRef'] ?? '').toString().trim();
+    return legacy.isEmpty ? <String>[] : [legacy];
+  }
+
+  String _listingVideoRef(Map<String, dynamic> listing) => (listing['videoRef'] ?? '').toString().trim();
+
+  List<Map<String, dynamic>> get _listings => widget.config.storeListings;
+  List<Map<String, dynamic>> get _inquiries => widget.config.storeInquiries;
+  List<Map<String, dynamic>> get _orders => widget.config.storeOrders;
+
+  void _upsertOrderLocal(Map<String, dynamic> order) {
+    final normalized = _normalizeStoreOrder(order);
+    final id = (normalized['id'] ?? '').toString();
+    final idx = _orders.indexWhere((o) => (o['id'] ?? '').toString() == id);
+    if (idx >= 0) {
+      _orders[idx] = normalized;
+    } else {
+      _orders.add(normalized);
+    }
+  }
+
+  int _unreadMessageCount() {
+    final me = widget.user.email.toLowerCase().trim();
+    return _groupedStoreMessageThreads(me).where((t) => t['unread'] == true).length;
+  }
+
+  void _markInquiryRead(String id) {
+    final idx = _inquiries.indexWhere((m) => (m['id'] ?? '').toString() == id);
+    if (idx >= 0) {
+      _inquiries[idx]['read'] = true;
+      _save();
+    }
+  }
+
+  void _markInquiryBuyerRead(String id) {
+    final idx = _inquiries.indexWhere((m) => (m['id'] ?? '').toString() == id);
+    if (idx >= 0) {
+      _inquiries[idx]['buyerRead'] = true;
+      _save();
+    }
+  }
+
+  bool _storeSheetIsDark(BuildContext ctx) => Theme.of(ctx).brightness == Brightness.dark;
+
+  Color _storeSheetBackground(BuildContext ctx) =>
+      _storeSheetIsDark(ctx) ? const Color(0xFF121726) : Colors.white;
+
+  Color _storeSheetTextPrimary(BuildContext ctx) =>
+      _storeSheetIsDark(ctx) ? Colors.white : const Color(0xFF0F172A);
+
+  Color _storeSheetTextMuted(BuildContext ctx) =>
+      _storeSheetIsDark(ctx) ? Colors.white54 : Colors.black54;
+
+  InputDecoration _storeSheetInputDecoration(
+    BuildContext ctx, {
+    String? labelText,
+    String? hintText,
+    IconData? prefixIcon,
+  }) {
+    final dark = _storeSheetIsDark(ctx);
+    return InputDecoration(
+      labelText: labelText,
+      hintText: hintText,
+      prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: dark ? Colors.white54 : null) : null,
+      labelStyle: TextStyle(color: dark ? Colors.white70 : null),
+      hintStyle: TextStyle(color: dark ? Colors.white38 : null),
+      filled: true,
+      fillColor: dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: dark ? Colors.white24 : const Color(0xFFE2E8F0)),
+      ),
+    );
+  }
+
+  String _storeMsgThreadKey(String sellerEmail, String buyerEmail) =>
+      '${sellerEmail.toLowerCase().trim()}|${buyerEmail.toLowerCase().trim()}';
+
+  int? _findInquiryThreadIndex(String sellerEmail, String buyerEmail) {
+    final indices = _findAllInquiryThreadIndices(sellerEmail, buyerEmail);
+    return indices.isEmpty ? null : indices.first;
+  }
+
+  List<int> _findAllInquiryThreadIndices(String sellerEmail, String buyerEmail) {
+    final sk = sellerEmail.toLowerCase().trim();
+    final bk = buyerEmail.toLowerCase().trim();
+    final out = <int>[];
+    for (var i = 0; i < _inquiries.length; i++) {
+      final m = _inquiries[i];
+      if ((m['sellerEmail'] ?? '').toString().toLowerCase().trim() == sk &&
+          (m['buyerEmail'] ?? '').toString().toLowerCase().trim() == bk) {
+        out.add(i);
+      }
+    }
+    return out;
+  }
+
+  int? _newestInquiryThreadIndex(String sellerEmail, String buyerEmail) {
+    final indices = _findAllInquiryThreadIndices(sellerEmail, buyerEmail);
+    if (indices.isEmpty) return null;
+    var best = indices.first;
+    var bestAt = _inquiryLastAt(_inquiries[best]);
+    for (final i in indices.skip(1)) {
+      final at = _inquiryLastAt(_inquiries[i]);
+      if (at.compareTo(bestAt) > 0) {
+        best = i;
+        bestAt = at;
+      }
+    }
+    return best;
+  }
+
+  bool _orderHasPendingPaymentNotification(String orderId, String sellerEmail, String buyerEmail) {
+    for (final idx in _findAllInquiryThreadIndices(sellerEmail, buyerEmail)) {
+      for (final r in _inquiryReplies(_inquiries[idx])) {
+        if (NgmyStorePaymentReply.isPurchaseNotification(r) &&
+            (r['orderId'] ?? '').toString() == orderId &&
+            NgmyStorePaymentReply.isPending(r)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  bool _threadHasPaymentDecisionForOrder(String orderId, String sellerEmail, String buyerEmail) {
+    for (final idx in _findAllInquiryThreadIndices(sellerEmail, buyerEmail)) {
+      for (final r in _inquiryReplies(_inquiries[idx])) {
+        if (!NgmyStorePaymentReply.isPurchaseStatus(r)) continue;
+        if ((r['orderId'] ?? '').toString() != orderId) continue;
+        final st = NgmyStorePaymentReply.paymentStatusOf(r);
+        if (st == 'approved' || st == 'rejected') return true;
+      }
+    }
+    return false;
+  }
+
+  /// Ensures every store order for the current user has a message thread (so Sales always show in Messages).
+  void _ensureStoreThreadsFromOrders() {
+    var changed = false;
+    final me = widget.user.email.toLowerCase().trim();
+    for (final order in _orders) {
+      final sellerEmail = (order['sellerEmail'] ?? '').toString().toLowerCase().trim();
+      final buyerEmail = (order['buyerEmail'] ?? '').toString().toLowerCase().trim();
+      if (sellerEmail.isEmpty || buyerEmail.isEmpty) continue;
+      if (sellerEmail != me && buyerEmail != me) continue;
+      if (_findAllInquiryThreadIndices(sellerEmail, buyerEmail).isNotEmpty) continue;
+
+      final listingTitle = (order['title'] ?? 'Item').toString();
+      final buyerName = (order['buyerName'] ?? 'Buyer').toString();
+      final orderId = (order['id'] ?? '').toString();
+      final pay = (order['paymentStatus'] ?? '').toString();
+      final msg = pay == 'awaiting_proof'
+          ? 'Order placed — payment proof to review'
+          : pay == 'approved'
+              ? 'Order confirmed — ready to fulfill'
+              : pay == 'rejected'
+                  ? 'Order payment was not approved'
+                  : 'Store order update';
+
+      _inquiries.add({
+        'id': orderId.isNotEmpty ? 'inq_order_$orderId' : 'inq_order_${DateTime.now().microsecondsSinceEpoch}',
+        'listingId': (order['listingId'] ?? '').toString(),
+        'listingTitle': listingTitle,
+        'sellerEmail': sellerEmail,
+        'buyerEmail': buyerEmail,
+        'buyerName': buyerName,
+        'message': msg,
+        'createdAt': (order['createdAt'] ?? DateTime.now().toUtc().toIso8601String()).toString(),
+        'read': sellerEmail != me,
+        'buyerRead': buyerEmail != me,
+        'replies': <Map<String, dynamic>>[],
+      });
+      changed = true;
+    }
+    if (changed) {
+      widget.onDataChanged();
+      if (mounted) setState(() {});
+    }
+  }
+
+  /// Rebuilds purchase-notification cards in Messages from orders (fixes empty inbox when inquiry sync failed).
+  void _ensurePaymentReviewInquiriesFromOrders() {
+    var changed = false;
+    for (final order in _orders) {
+      if (!_storeOrderAwaitingPaymentProof(order)) continue;
+      final orderId = (order['id'] ?? '').toString();
+      final sellerEmail = (order['sellerEmail'] ?? '').toString();
+      final buyerEmail = (order['buyerEmail'] ?? '').toString();
+      if (orderId.isEmpty || sellerEmail.isEmpty || buyerEmail.isEmpty) continue;
+      if (_orderHasPendingPaymentNotification(orderId, sellerEmail, buyerEmail)) continue;
+      if (_threadHasPaymentDecisionForOrder(orderId, sellerEmail, buyerEmail)) continue;
+
+      final listingId = (order['listingId'] ?? '').toString();
+      Map<String, dynamic>? listing;
+      for (final l in _listings) {
+        if ((l['id'] ?? '').toString() == listingId) {
+          listing = l;
+          break;
+        }
+      }
+      final listingTitle = (order['title'] ?? listing?['title'] ?? 'Item').toString();
+      final method = (order['paidVia'] ?? 'cashapp').toString();
+      var proof = (order['paymentProofPath'] ?? '').toString();
+      if (proof.isEmpty) proof = _paymentProofFromInquiries(orderId, sellerEmail, buyerEmail);
+      final code = (order['paymentVerificationCode'] ?? '').toString();
+      final product = (listing?['category'] ?? listingTitle).toString();
+      final buyerName = (order['buyerName'] ?? 'Buyer').toString();
+
+      final reply = <String, dynamic>{
+        'type': NgmyStorePaymentReply.purchaseNotification,
+        'role': 'buyer',
+        'name': buyerName,
+        'email': buyerEmail,
+        'message': 'Purchase notification',
+        'listingTitle': listingTitle,
+        'listingId': listingId,
+        'orderId': orderId,
+        'product': product,
+        'paymentMethod': ngmyStorePaymentMethodLabel(method),
+        'deliveryAddress': (order['buyerAddress'] ?? '').toString(),
+        'transactionCode': code,
+        'screenshotPath': proof,
+        'amount': (order['total'] as num?)?.toDouble() ?? 0.0,
+        'paymentStatus': 'pending',
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+      };
+
+      final existingIdx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+      if (existingIdx != null) {
+        final list = _inquiryReplies(_inquiries[existingIdx]);
+        list.add(reply);
+        _inquiries[existingIdx]['replies'] = list;
+        _inquiries[existingIdx]['read'] = false;
+        _inquiries[existingIdx]['listingTitle'] = listingTitle;
+        _inquiries[existingIdx]['listingId'] = listingId;
+        unawaited(_upsertStoreInquiryRowSafe(_inquiries[existingIdx]));
+      } else {
+        _inquiries.add({
+          'id': 'inq_pay_${orderId}_${DateTime.now().microsecondsSinceEpoch}',
+          'listingId': listingId,
+          'listingTitle': listingTitle,
+          'sellerEmail': sellerEmail,
+          'buyerEmail': buyerEmail,
+          'buyerName': buyerName,
+          'message': 'Order placed — payment proof submitted',
+          'createdAt': DateTime.now().toUtc().toIso8601String(),
+          'read': false,
+          'buyerRead': true,
+          'replies': <Map<String, dynamic>>[reply],
+        });
+        unawaited(_upsertStoreInquiryRowSafe(_inquiries.last));
+      }
+      changed = true;
+    }
+    if (changed) {
+      widget.onDataChanged();
+      if (mounted) setState(() {});
+    }
+  }
+
+  String _inquiryLastPreview(Map<String, dynamic> m) {
+    final replies = _inquiryReplies(m);
+    if (replies.isNotEmpty) {
+      final last = replies.last;
+      if (NgmyStorePaymentReply.isPurchaseNotification(last)) {
+        final st = NgmyStorePaymentReply.paymentStatusOf(last);
+        if (st == 'pending') return 'Purchase notification — payment proof to review';
+        if (st == 'approved') return 'Payment confirmed';
+        return 'Payment rejected';
+      }
+      return (last['message'] ?? '').toString();
+    }
+    return (m['message'] ?? '').toString();
+  }
+
+  String _inquiryLastAt(Map<String, dynamic> m) {
+    final replies = _inquiryReplies(m);
+    if (replies.isNotEmpty) return (replies.last['createdAt'] ?? m['createdAt'] ?? '').toString();
+    return (m['createdAt'] ?? '').toString();
+  }
+
+  bool _threadUnreadForUser(String me, List<Map<String, dynamic>> threadInquiries) {
+    final isSeller = threadInquiries.any((m) => (m['sellerEmail'] ?? '').toString().toLowerCase().trim() == me);
+    for (final m in threadInquiries) {
+      if (isSeller) {
+        if (m['read'] != true) return true;
+        final replies = _inquiryReplies(m);
+        for (final r in replies) {
+          if (NgmyStorePaymentReply.isPurchaseNotification(r) && NgmyStorePaymentReply.isPending(r)) return true;
+        }
+        if (replies.isNotEmpty && (replies.last['role'] ?? '').toString() == 'buyer') return true;
+      } else {
+        final replies = _inquiryReplies(m);
+        if (replies.isNotEmpty && (replies.last['role'] ?? '').toString() == 'seller' && m['buyerRead'] != true) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  List<Map<String, dynamic>> _groupedStoreMessageThreads(String me) {
+    final buckets = <String, List<Map<String, dynamic>>>{};
+    for (final m in _inquiries) {
+      final seller = (m['sellerEmail'] ?? '').toString().toLowerCase().trim();
+      final buyer = (m['buyerEmail'] ?? '').toString().toLowerCase().trim();
+      if (seller != me && buyer != me) continue;
+      final key = _storeMsgThreadKey(seller, buyer);
+      buckets.putIfAbsent(key, () => []).add(Map<String, dynamic>.from(m));
+    }
+    final rows = <Map<String, dynamic>>[];
+    for (final entry in buckets.entries) {
+      final list = entry.value
+        ..sort((a, b) => _inquiryLastAt(b).compareTo(_inquiryLastAt(a)));
+      var preview = '';
+      var lastAt = '';
+      for (final inq in list) {
+        final p = _inquiryLastPreview(inq);
+        final at = _inquiryLastAt(inq);
+        if (lastAt.isEmpty || at.compareTo(lastAt) > 0) {
+          preview = p;
+          lastAt = at;
+        }
+      }
+      final latest = list.first;
+      final seller = (latest['sellerEmail'] ?? '').toString();
+      final buyer = (latest['buyerEmail'] ?? '').toString();
+      rows.add({
+        'threadKey': entry.key,
+        'sellerEmail': seller,
+        'buyerEmail': buyer,
+        'buyerName': latest['buyerName'] ?? 'Buyer',
+        'listingTitle': latest['listingTitle'] ?? 'Item',
+        'preview': preview,
+        'lastAt': lastAt,
+        'unread': _threadUnreadForUser(me, list),
+        'inquiries': list,
+      });
+    }
+    rows.sort((a, b) => (b['lastAt'] ?? '').toString().compareTo((a['lastAt'] ?? '').toString()));
+    return rows;
+  }
+
+  List<({DateTime at, String who, String text, bool mine, String? itemHint, Map<String, dynamic>? reply})> _allMessagesInThread(
+    List<Map<String, dynamic>> inquiries,
+    String me,
+  ) {
+    final isSeller = inquiries.any((m) => (m['sellerEmail'] ?? '').toString().toLowerCase().trim() == me);
+    final items = <({DateTime at, String who, String text, bool mine, String? itemHint, Map<String, dynamic>? reply})>[];
+    for (final inq in inquiries) {
+      final title = (inq['listingTitle'] ?? 'Item').toString();
+      final created = DateTime.tryParse((inq['createdAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      items.add((
+        at: created,
+        who: (inq['buyerName'] ?? 'Buyer').toString(),
+        text: (inq['message'] ?? '').toString(),
+        mine: !isSeller,
+        itemHint: title,
+        reply: null,
+      ));
+      for (final r in _inquiryReplies(inq)) {
+        final at = DateTime.tryParse((r['createdAt'] ?? '').toString()) ?? created;
+        final role = (r['role'] ?? '').toString();
+        final mine = role == 'seller' ? isSeller : !isSeller;
+        if (NgmyStorePaymentReply.isPurchaseNotification(r)) {
+          if (!isSeller) continue;
+          items.add((
+            at: at,
+            who: (r['name'] ?? (role == 'seller' ? 'Seller' : 'Buyer')).toString(),
+            text: '',
+            mine: mine,
+            itemHint: (r['listingTitle'] ?? '').toString().isEmpty ? title : (r['listingTitle'] ?? '').toString(),
+            reply: r,
+          ));
+          continue;
+        }
+        if (NgmyStorePaymentReply.isPurchaseStatus(r)) {
+          items.add((
+            at: at,
+            who: (r['name'] ?? (role == 'seller' ? 'Seller' : 'Buyer')).toString(),
+            text: '',
+            mine: mine,
+            itemHint: (r['listingTitle'] ?? '').toString().isEmpty ? title : (r['listingTitle'] ?? '').toString(),
+            reply: r,
+          ));
+          continue;
+        }
+        items.add((
+          at: at,
+          who: (r['name'] ?? (role == 'seller' ? 'Seller' : 'Buyer')).toString(),
+          text: (r['message'] ?? '').toString(),
+          mine: mine,
+          itemHint: (r['listingTitle'] ?? '').toString().isEmpty ? null : (r['listingTitle'] ?? '').toString(),
+          reply: null,
+        ));
+      }
+    }
+    items.sort((a, b) => a.at.compareTo(b.at));
+    return items;
+  }
+
+  Map<String, dynamic>? _orderById(String orderId) {
+    if (orderId.isEmpty) return null;
+    for (final o in _orders) {
+      if ((o['id'] ?? '').toString() == orderId) return o;
+    }
+    return null;
+  }
+
+  String _paymentProofPathForReply(Map<String, dynamic> reply, Map<String, dynamic>? order) {
+    final fromReply = (reply['screenshotPath'] ?? '').toString().trim();
+    if (fromReply.isNotEmpty) return fromReply;
+    if (order != null) return (order['paymentProofPath'] ?? '').toString().trim();
+    return '';
+  }
+
+  String _paymentProofFromInquiries(String orderId, String sellerEmail, String buyerEmail) {
+    for (final idx in _findAllInquiryThreadIndices(sellerEmail, buyerEmail)) {
+      for (final r in _inquiryReplies(_inquiries[idx])) {
+        if (NgmyStorePaymentReply.isPurchaseNotification(r) && (r['orderId'] ?? '').toString() == orderId) {
+          final path = (r['screenshotPath'] ?? '').toString().trim();
+          if (path.isNotEmpty) return path;
+        }
+      }
+    }
+    return '';
+  }
+
+  void _updateOrderFields(String orderId, Map<String, dynamic> patch) {
+    final idx = _orders.indexWhere((o) => (o['id'] ?? '').toString() == orderId);
+    if (idx < 0) return;
+    _orders[idx].addAll(patch);
+    _orders[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+  }
+
+  bool _threadHasPaymentStatusForOrder(String orderId, String sellerEmail, String buyerEmail) {
+    return _threadHasPaymentDecisionForOrder(orderId, sellerEmail, buyerEmail);
+  }
+
+  void _removePurchaseNotificationFromThread(String orderId) {
+    if (orderId.isEmpty) return;
+    for (final inq in _inquiries) {
+      final replies = _inquiryReplies(inq);
+      final before = replies.length;
+      replies.removeWhere((r) =>
+          NgmyStorePaymentReply.isPurchaseNotification(r) && (r['orderId'] ?? '').toString() == orderId);
+      if (replies.length != before) {
+        inq['replies'] = replies;
+        unawaited(_upsertStoreInquiryRowSafe(inq));
+      }
+    }
+  }
+
+  void _dedupePaymentStatusRepliesForOrder(String orderId, String sellerEmail, String buyerEmail) {
+    final indices = _findAllInquiryThreadIndices(sellerEmail, buyerEmail);
+    if (indices.isEmpty) return;
+    Map<String, dynamic>? keepStatus;
+    for (final idx in indices) {
+      for (final r in _inquiryReplies(_inquiries[idx])) {
+        if (NgmyStorePaymentReply.isPurchaseStatus(r) && (r['orderId'] ?? '').toString() == orderId) {
+          keepStatus = r;
+        }
+      }
+    }
+    final hostIdx = _newestInquiryThreadIndex(sellerEmail, buyerEmail) ?? indices.first;
+    for (final idx in indices) {
+      final replies = _inquiryReplies(_inquiries[idx]);
+      final before = replies.length;
+      replies.removeWhere((r) =>
+          NgmyStorePaymentReply.isPurchaseStatus(r) && (r['orderId'] ?? '').toString() == orderId);
+      if (idx == hostIdx && keepStatus != null) replies.add(keepStatus);
+      if (replies.length != before || (idx == hostIdx && keepStatus != null)) {
+        _inquiries[idx]['replies'] = replies;
+        unawaited(_upsertStoreInquiryRowSafe(_inquiries[idx]));
+      }
+    }
+  }
+
+  void _removeStoreOrderLocal(String orderId) {
+    if (orderId.isEmpty) return;
+    _orders.removeWhere((o) => (o['id'] ?? '').toString() == orderId);
+  }
+
+  Future<void> _persistInquiriesTouchingOrder(String orderId) async {
+    if (orderId.isEmpty) return;
+    for (final inq in _inquiries) {
+      final hasOrder = _inquiryReplies(inq).any((r) => (r['orderId'] ?? '').toString() == orderId);
+      if (hasOrder) await _upsertStoreInquiryRowSafe(inq);
+    }
+  }
+
+  void _appendStorePaymentDecisionToThread({
+    required String orderId,
+    required String sellerEmail,
+    required String buyerEmail,
+    required bool approved,
+  }) {
+    final idx = _newestInquiryThreadIndex(sellerEmail, buyerEmail);
+    if (idx == null) return;
+    _removePurchaseNotificationFromThread(orderId);
+    final list = _inquiryReplies(_inquiries[idx]);
+    list.removeWhere((r) =>
+        NgmyStorePaymentReply.isPurchaseStatus(r) && (r['orderId'] ?? '').toString() == orderId);
+    final order = _orderById(orderId);
+    list.add({
+      'type': NgmyStorePaymentReply.purchaseStatus,
+      'role': 'seller',
+      'name': widget.user.username,
+      'email': widget.user.email,
+      'orderId': orderId,
+      'paymentStatus': approved ? 'approved' : 'rejected',
+      'listingTitle': _inquiries[idx]['listingTitle'] ?? order?['title'] ?? '',
+      'product': order?['title'] ?? _inquiries[idx]['listingTitle'] ?? 'Item',
+      'paymentMethod': ngmyStorePaymentMethodLabel((order?['paidVia'] ?? '').toString()),
+      'amount': (order?['total'] as num?)?.toDouble(),
+      'transactionCode': (order?['paymentVerificationCode'] ?? '').toString(),
+      'message': approved
+          ? 'Payment confirmed! Your order has been approved and will be processed.'
+          : 'Payment rejected. The seller could not verify your payment proof.',
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+    });
+    _inquiries[idx]['replies'] = list;
+    _inquiries[idx]['read'] = true;
+    _inquiries[idx]['buyerRead'] = false;
+    unawaited(_upsertStoreInquiryRowSafe(_inquiries[idx]));
+  }
+
+  void _restoreListingUnitsForRejectedOrder(Map<String, dynamic> order) {
+    final listingId = (order['listingId'] ?? '').toString();
+    if (listingId.isEmpty) return;
+    final qty = (order['quantity'] as num?)?.toInt() ?? 1;
+    final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == listingId);
+    if (idx < 0) return;
+    final remaining = ((_listings[idx]['unitsRemaining'] as num?)?.toInt() ?? 0) + qty;
+    _listings[idx]['unitsRemaining'] = remaining;
+    if ((_listings[idx]['status'] ?? '') == 'sold') {
+      _listings[idx]['status'] = 'active';
+      _listings[idx].remove('buyerEmail');
+      _listings[idx].remove('buyerName');
+      _listings[idx].remove('soldAt');
+    }
+    _listings[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+    unawaited(_upsertStoreListingRowSafe(_listings[idx]));
+    _listingsSig = _storeListingsSignature(_listings);
+  }
+
+  Future<void> _confirmStorePaymentNotification(Map<String, dynamic> reply) async {
+    final orderId = (reply['orderId'] ?? '').toString();
+    if (orderId.isEmpty || _storePaymentDecisionLocks.contains(orderId)) return;
+    if (!NgmyStorePaymentReply.isPending(reply)) return;
+    final order = _orderById(orderId);
+    final pay = (order?['paymentStatus'] ?? '').toString();
+    if (pay == 'approved' || pay == 'rejected') return;
+
+    _storePaymentDecisionLocks.add(orderId);
+    try {
+      _updateOrderFields(orderId, {'paymentStatus': 'approved'});
+      _removePurchaseNotificationFromThread(orderId);
+      if (order != null) {
+        final sellerEmail = (order['sellerEmail'] ?? widget.user.email).toString();
+        final buyerEmail = (order['buyerEmail'] ?? '').toString();
+        _dedupePaymentStatusRepliesForOrder(orderId, sellerEmail, buyerEmail);
+        _appendStorePaymentDecisionToThread(
+          orderId: orderId,
+          sellerEmail: sellerEmail,
+          buyerEmail: buyerEmail,
+          approved: true,
+        );
+        _dedupePaymentStatusRepliesForOrder(orderId, sellerEmail, buyerEmail);
+        await _persistInquiriesTouchingOrder(orderId);
+      } else {
+        await _persistInquiriesTouchingOrder(orderId);
+      }
+      await _persistOrdersAndRefresh(orderId: orderId);
+      widget.onDataChanged();
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment confirmed. Order is now in Sales — you can ship it.')),
+        );
+      }
+    } finally {
+      _storePaymentDecisionLocks.remove(orderId);
+    }
+  }
+
+  Future<void> _rejectStorePaymentNotification(Map<String, dynamic> reply) async {
+    final orderId = (reply['orderId'] ?? '').toString();
+    if (orderId.isEmpty || _storePaymentDecisionLocks.contains(orderId)) return;
+    if (!NgmyStorePaymentReply.isPending(reply)) return;
+    final order = _orderById(orderId);
+    final pay = (order?['paymentStatus'] ?? '').toString();
+    if (pay == 'approved' || pay == 'rejected') return;
+
+    _storePaymentDecisionLocks.add(orderId);
+    try {
+      if (order != null) {
+        _restoreListingUnitsForRejectedOrder(order);
+        final sellerEmail = (order['sellerEmail'] ?? widget.user.email).toString();
+        final buyerEmail = (order['buyerEmail'] ?? '').toString();
+        _removePurchaseNotificationFromThread(orderId);
+        _dedupePaymentStatusRepliesForOrder(orderId, sellerEmail, buyerEmail);
+        _appendStorePaymentDecisionToThread(
+          orderId: orderId,
+          sellerEmail: sellerEmail,
+          buyerEmail: buyerEmail,
+          approved: false,
+        );
+        _dedupePaymentStatusRepliesForOrder(orderId, sellerEmail, buyerEmail);
+        await _persistInquiriesTouchingOrder(orderId);
+      } else {
+        _removePurchaseNotificationFromThread(orderId);
+        await _persistInquiriesTouchingOrder(orderId);
+      }
+      _updateOrderFields(orderId, {'paymentStatus': 'rejected'});
+      _removeStoreOrderLocal(orderId);
+      await _persistOrdersAndRefresh();
+      widget.onDataChanged();
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment rejected. Buyer was notified in Messages.')),
+        );
+      }
+    } finally {
+      _storePaymentDecisionLocks.remove(orderId);
+    }
+  }
+
+  void _openPaymentScreenshotViewer(String? path) {
+    if (path == null || path.trim().isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Payment Proof', style: TextStyle(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.6),
+                child: NgmyPaymentProofImage(path: path),
+              ),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+            ],
           ),
         ),
       ),
     );
   }
+
+  List<Widget> _paymentStatusBubblesForOrder(Map<String, dynamic>? order) {
+    if (order == null) return const [];
+    final out = <Widget>[];
+    final pay = (order['paymentStatus'] ?? '').toString();
+    if (pay == 'awaiting_proof') {
+      out.add(NgmyPurchaseStatusCard.fromStoreReply({
+        'paymentStatus': 'awaiting_proof',
+        'message': 'Payment proof sent. Waiting for the seller to confirm in Messages.',
+        'listingTitle': order['title'],
+        'product': order['title'],
+        'paymentMethod': ngmyStorePaymentMethodLabel((order['paidVia'] ?? '').toString()),
+        'amount': order['total'],
+        'transactionCode': order['paymentVerificationCode'],
+      }, order: order));
+    } else if (pay == 'approved') {
+      out.add(NgmyPurchaseStatusCard.fromStoreReply({
+        'paymentStatus': 'approved',
+        'message': 'Payment confirmed! Your order has been approved and will be processed.',
+        'listingTitle': order['title'],
+        'product': order['title'],
+        'paymentMethod': ngmyStorePaymentMethodLabel((order['paidVia'] ?? '').toString()),
+        'amount': order['total'],
+        'transactionCode': order['paymentVerificationCode'],
+      }, order: order));
+    } else if (pay == 'rejected') {
+      out.add(NgmyPurchaseStatusCard.fromStoreReply({
+        'paymentStatus': 'rejected',
+        'message': 'Payment rejected. The seller could not verify your payment proof.',
+        'listingTitle': order['title'],
+        'product': order['title'],
+        'paymentMethod': ngmyStorePaymentMethodLabel((order['paidVia'] ?? '').toString()),
+        'amount': order['total'],
+        'transactionCode': order['paymentVerificationCode'],
+      }, order: order));
+    }
+    final fulfillment = (order['fulfillmentStatus'] ?? '').toString();
+    if (fulfillment == 'shipped' || fulfillment == 'in_transit' || fulfillment == 'arriving') {
+      final eta = DateTime.tryParse((order['estimatedArrival'] ?? '').toString());
+      final etaLabel = eta != null ? '${eta.month}/${eta.day}/${eta.year}' : 'soon';
+      out.add(NgmyPurchaseStatusCard.shipping(
+        headline: 'Order shipped',
+        productName: (order['title'] ?? '').toString(),
+        subtitle: 'Expected arrival: $etaLabel. Track in Purchases.',
+      ));
+    }
+    if (fulfillment == 'delivered') {
+      out.add(NgmyPurchaseStatusCard.delivered(productName: (order['title'] ?? '').toString()));
+    }
+    return out;
+  }
+
+  Future<void> _postStorePaymentNotificationToSeller({
+    required Map<String, dynamic> listing,
+    required Map<String, dynamic> order,
+    required String method,
+    required String screenshotPath,
+  }) async {
+    final sellerEmail = (listing['sellerEmail'] ?? '').toString();
+    final buyerEmail = widget.user.email;
+    final listingTitle = (listing['title'] ?? 'Item').toString();
+    final listingId = (listing['id'] ?? '').toString();
+    final orderId = (order['id'] ?? '').toString();
+    final code = (order['paymentVerificationCode'] ?? '').toString();
+    final product = (listing['category'] ?? listingTitle).toString();
+    final reply = <String, dynamic>{
+      'type': NgmyStorePaymentReply.purchaseNotification,
+      'role': 'buyer',
+      'name': widget.user.username,
+      'email': buyerEmail,
+      'message': 'Purchase notification',
+      'listingTitle': listingTitle,
+      'listingId': listingId,
+      'orderId': orderId,
+      'product': product,
+      'paymentMethod': ngmyStorePaymentMethodLabel(method),
+      'deliveryAddress': (order['buyerAddress'] ?? '').toString(),
+      'transactionCode': code,
+      'screenshotPath': screenshotPath,
+      'amount': (order['total'] as num?)?.toDouble() ?? 0.0,
+      'paymentStatus': 'pending',
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+    final existingIdx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+    if (existingIdx != null) {
+      final list = _inquiryReplies(_inquiries[existingIdx]);
+      list.add(reply);
+      _inquiries[existingIdx]['replies'] = list;
+      _inquiries[existingIdx]['read'] = false;
+      _inquiries[existingIdx]['buyerRead'] = true;
+      _inquiries[existingIdx]['listingTitle'] = listingTitle;
+      _inquiries[existingIdx]['listingId'] = listingId;
+      unawaited(_upsertStoreInquiryRowSafe(_inquiries[existingIdx]));
+    } else {
+      final inquiry = {
+        'id': DateTime.now().microsecondsSinceEpoch.toString(),
+        'listingId': listingId,
+        'listingTitle': listingTitle,
+        'sellerEmail': sellerEmail,
+        'buyerEmail': buyerEmail,
+        'buyerName': widget.user.username,
+        'message': 'Order placed — payment proof submitted',
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'read': false,
+        'buyerRead': true,
+        'replies': <Map<String, dynamic>>[reply],
+      };
+      _inquiries.add(inquiry);
+      unawaited(_upsertStoreInquiryRowSafe(inquiry));
+    }
+    widget.onDataChanged();
+    if (mounted) setState(() {});
+  }
+
+  void _markThreadRead(String me, List<Map<String, dynamic>> inquiries) {
+    final isSeller = inquiries.any((m) => (m['sellerEmail'] ?? '').toString().toLowerCase().trim() == me);
+    for (final inq in inquiries) {
+      final id = (inq['id'] ?? '').toString();
+      if (isSeller) {
+        _markInquiryRead(id);
+      } else {
+        _markInquiryBuyerRead(id);
+      }
+    }
+    widget.onDataChanged();
+  }
+
+  void _sendThreadReply({
+    required String sellerEmail,
+    required String buyerEmail,
+    required String text,
+    required bool isSeller,
+  }) {
+    final idx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+    if (idx == null || text.trim().isEmpty) return;
+    final list = _inquiryReplies(_inquiries[idx]);
+    list.add({
+      'role': isSeller ? 'seller' : 'buyer',
+      'name': widget.user.username,
+      'email': widget.user.email,
+      'message': text.trim(),
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+    });
+    _inquiries[idx]['replies'] = list;
+    if (isSeller) {
+      _inquiries[idx]['read'] = true;
+      _inquiries[idx]['buyerRead'] = false;
+    } else {
+      _inquiries[idx]['buyerRead'] = true;
+      _inquiries[idx]['read'] = false;
+    }
+    unawaited(_upsertStoreInquiryRowSafe(_inquiries[idx]));
+    _save();
+  }
+
+  List<Map<String, dynamic>> _inquiryReplies(Map<String, dynamic> m) {
+    final raw = m['replies'];
+    if (raw is! List) return [];
+    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  void _showSellerInbox() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final me = widget.user.email.toLowerCase().trim();
+    final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
+    final replyC = TextEditingController();
+    final sheetNav = <String, dynamic>{'threadKey': null};
+    Timer? inboxPoll;
+
+    Future<void> refreshInbox(StateSetter setSheet) async {
+      await _refreshStoreMessagesFromCloud(silent: true);
+      if (context.mounted) setSheet(() {});
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          if (inboxPoll == null) {
+            unawaited(refreshInbox(setSheet));
+            inboxPoll = Timer.periodic(const Duration(seconds: 20), (_) => refreshInbox(setSheet));
+          }
+          final sheetMessages = _groupedStoreMessageThreads(me);
+          final openKey = sheetNav['threadKey'] as String?;
+          Map<String, dynamic>? openRow;
+          if (openKey != null) {
+            for (final row in sheetMessages) {
+              if ((row['threadKey'] ?? '').toString() == openKey) {
+                openRow = row;
+                break;
+              }
+            }
+            if (openRow == null) sheetNav['threadKey'] = null;
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              height: MediaQuery.of(ctx).size.height * 0.72,
+              margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF121726) : Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: border, width: 1.4),
+              ),
+              child: openRow == null
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: _storePurple.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: _storePurple.withOpacity(0.35)),
+                              ),
+                              child: const Icon(Icons.chat_bubble_rounded, color: _storePurple),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Messages',
+                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: _storeSheetTextPrimary(ctx)),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              icon: Icon(Icons.close_rounded, color: _storeSheetTextPrimary(ctx)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'One chat per buyer — tap to open the full conversation',
+                          style: TextStyle(fontSize: 12, color: _storeSheetTextMuted(ctx)),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: sheetMessages.isEmpty
+                              ? const Center(child: Text('No messages yet.', style: TextStyle(color: Colors.grey)))
+                              : ListView.builder(
+                                  itemCount: sheetMessages.length,
+                                  itemBuilder: (_, i) {
+                                    final row = sheetMessages[i];
+                                    final inquiries = List<Map<String, dynamic>>.from((row['inquiries'] as List).map((e) => Map<String, dynamic>.from(e as Map)));
+                                    final unread = row['unread'] == true;
+                                    final isSellerView = (row['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
+                                    return GestureDetector(
+                                      onTap: () {
+                                        _markThreadRead(me, inquiries);
+                                        sheetNav['threadKey'] = (row['threadKey'] ?? '').toString();
+                                        setSheet(() {});
+                                      },
+                                      child: Container(
+                                        margin: const EdgeInsets.only(bottom: 10),
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(14),
+                                          border: Border.all(color: unread ? _storePurple : border, width: unread ? 1.6 : 1.1),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 22,
+                                              backgroundColor: _storePurple.withOpacity(0.2),
+                                              child: Icon(
+                                                isSellerView ? Icons.person_rounded : Icons.storefront_rounded,
+                                                color: _storePurple,
+                                                size: 22,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          isSellerView
+                                                              ? (row['buyerName'] ?? 'Buyer').toString()
+                                                              : 'Seller chat',
+                                                          style: TextStyle(
+                                                            fontWeight: FontWeight.w800,
+                                                            fontSize: 14,
+                                                            color: _storeSheetTextPrimary(ctx),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (unread)
+                                                        Container(
+                                                          width: 8,
+                                                          height: 8,
+                                                          decoration: const BoxDecoration(color: _storePurple, shape: BoxShape.circle),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                  Text(
+                                                    isSellerView
+                                                        ? 'About: ${(row['listingTitle'] ?? 'Item').toString()}'
+                                                        : 'Item: ${(row['listingTitle'] ?? 'Item').toString()}',
+                                                    style: TextStyle(fontSize: 11, color: _storeSheetTextMuted(ctx)),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    (row['preview'] ?? '').toString(),
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(fontSize: 13, color: _storeSheetTextPrimary(ctx)),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    _safeStoreDate((row['lastAt'] ?? '').toString()),
+                                                    style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black45),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    )
+                  : _storeInboxThreadPane(
+                      ctx: ctx,
+                      isDark: isDark,
+                      me: me,
+                      row: openRow,
+                      replyC: replyC,
+                      onBack: () {
+                        sheetNav['threadKey'] = null;
+                        setSheet(() {});
+                      },
+                      onClose: () => Navigator.pop(ctx),
+                      onSent: () => setSheet(() {}),
+                    ),
+            ),
+          );
+        },
+      ),
+    ).whenComplete(() {
+      inboxPoll?.cancel();
+      replyC.dispose();
+    });
+  }
+
+  Widget _storeInboxThreadPane({
+    required BuildContext ctx,
+    required bool isDark,
+    required String me,
+    required Map<String, dynamic> row,
+    required TextEditingController replyC,
+    required VoidCallback onBack,
+    required VoidCallback onClose,
+    required VoidCallback onSent,
+  }) {
+    final inquiries = List<Map<String, dynamic>>.from((row['inquiries'] as List).map((e) => Map<String, dynamic>.from(e as Map)));
+    final sellerEmail = (row['sellerEmail'] ?? '').toString();
+    final buyerEmail = (row['buyerEmail'] ?? '').toString();
+    final buyerName = (row['buyerName'] ?? 'Buyer').toString();
+    final isSeller = sellerEmail.toLowerCase().trim() == me;
+    final messages = _allMessagesInThread(inquiries, me);
+    var paymentActionBusy = false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            IconButton(
+              onPressed: onBack,
+              icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: _storeSheetTextPrimary(ctx)),
+            ),
+            Expanded(
+              child: Text(
+                isSeller ? buyerName : 'Chat with seller',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: _storeSheetTextPrimary(ctx)),
+              ),
+            ),
+            IconButton(
+              onPressed: onClose,
+              icon: Icon(Icons.close_rounded, color: _storeSheetTextPrimary(ctx)),
+            ),
+          ],
+        ),
+        Text(
+          'All messages with this ${isSeller ? 'buyer' : 'seller'} stay in one thread',
+          style: TextStyle(fontSize: 11, color: _storeSheetTextMuted(ctx)),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: StatefulBuilder(
+            builder: (ctx2, setThread) {
+              return ListView(
+                children: messages.expand((msg) {
+                  final reply = msg.reply;
+                  if (reply != null && NgmyStorePaymentReply.isPurchaseStatus(reply)) {
+                    final orderId = (reply['orderId'] ?? '').toString();
+                    return [
+                      NgmyPurchaseStatusCard.fromStoreReply(
+                        reply,
+                        order: orderId.isEmpty ? null : _orderById(orderId),
+                      ),
+                    ];
+                  }
+                  if (reply != null && NgmyStorePaymentReply.isPurchaseNotification(reply)) {
+                    if (!isSeller || !NgmyStorePaymentReply.isPending(reply)) return <Widget>[];
+                    final order = _orderById((reply['orderId'] ?? '').toString());
+                    final orderId = (reply['orderId'] ?? '').toString();
+                    final locked = paymentActionBusy || _storePaymentDecisionLocks.contains(orderId);
+                    return [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (msg.itemHint != null && msg.itemHint!.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                'Re: ${msg.itemHint}',
+                                style: TextStyle(fontSize: 10, color: _storeSheetTextMuted(ctx), fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          NgmyPurchaseNotificationCard(
+                            product: (reply['product'] ?? msg.itemHint ?? 'Item').toString(),
+                            paymentMethod: (reply['paymentMethod'] ?? 'CASHAPP').toString(),
+                            deliveryAddress: (reply['deliveryAddress'] ?? '').toString(),
+                            transactionCode: (reply['transactionCode'] ?? '').toString(),
+                            screenshotPath: _paymentProofPathForReply(reply, order),
+                            paymentStatus: NgmyStorePaymentReply.paymentStatusOf(reply),
+                            showActions: true,
+                            busy: locked,
+                            onScreenshotTap: () => _openPaymentScreenshotViewer(_paymentProofPathForReply(reply, order)),
+                            onConfirm: locked
+                                ? null
+                                : () async {
+                                    setThread(() => paymentActionBusy = true);
+                                    await _confirmStorePaymentNotification(reply);
+                                    if (ctx2.mounted) {
+                                      setThread(() => paymentActionBusy = false);
+                                      onSent();
+                                    }
+                                  },
+                            onReject: locked
+                                ? null
+                                : () async {
+                                    setThread(() => paymentActionBusy = true);
+                                    await _rejectStorePaymentNotification(reply);
+                                    if (ctx2.mounted) {
+                                      setThread(() => paymentActionBusy = false);
+                                      onSent();
+                                    }
+                                  },
+                          ),
+                        ],
+                      ),
+                    ];
+                  }
+                  return [
+                    Column(
+                      crossAxisAlignment: msg.mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      children: [
+                        if (msg.itemHint != null && msg.itemHint!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              'Re: ${msg.itemHint}',
+                              style: TextStyle(fontSize: 10, color: _storeSheetTextMuted(ctx), fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        _inquiryBubble(isDark: isDark, who: msg.who, text: msg.text, mine: msg.mine),
+                      ],
+                    ),
+                  ];
+                }).toList(),
+              );
+            },
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: replyC,
+                minLines: 1,
+                maxLines: 3,
+                style: TextStyle(color: _storeSheetTextPrimary(ctx)),
+                decoration: _storeSheetInputDecoration(
+                  ctx,
+                  hintText: isSeller ? 'Reply to buyer…' : 'Reply to seller…',
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              onPressed: () {
+                final text = replyC.text.trim();
+                if (text.isEmpty) return;
+                _sendThreadReply(
+                  sellerEmail: sellerEmail,
+                  buyerEmail: buyerEmail,
+                  text: text,
+                  isSeller: isSeller,
+                );
+                replyC.clear();
+                onSent();
+              },
+              icon: const Icon(Icons.send_rounded),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _inquiryBubble({required bool isDark, required String who, required String text, required bool mine}) {
+    return Align(
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+        decoration: BoxDecoration(
+          color: mine ? _storePurple.withOpacity(0.15) : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(who, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: mine ? _storePurple : Colors.grey)),
+            const SizedBox(height: 2),
+            Text(text, style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _safeStoreDate(String raw) {
+    try {
+      final d = DateTime.parse(raw).toLocal();
+      return '${d.month}/${d.day}/${d.year} ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  void _askAvailability(Map<String, dynamic> listing) {
+    final msgC = TextEditingController(text: 'Is this item still available?');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _storeSheetBackground(ctx),
+        title: Text('Ask Seller', style: TextStyle(color: _storeSheetTextPrimary(ctx))),
+        content: TextField(
+          controller: msgC,
+          maxLines: 3,
+          style: TextStyle(color: _storeSheetTextPrimary(ctx)),
+          decoration: _storeSheetInputDecoration(
+            ctx,
+            labelText: 'Your message',
+            hintText: 'Is this item still available?',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final message = msgC.text.trim();
+              if (message.isEmpty) return;
+              final sellerEmail = (listing['sellerEmail'] ?? '').toString();
+              final buyerEmail = widget.user.email;
+              final listingTitle = (listing['title'] ?? 'Item').toString();
+              final listingId = (listing['id'] ?? '').toString();
+              final existingIdx = _findInquiryThreadIndex(sellerEmail, buyerEmail);
+              if (existingIdx != null) {
+                final list = _inquiryReplies(_inquiries[existingIdx]);
+                list.add({
+                  'role': 'buyer',
+                  'name': widget.user.username,
+                  'email': buyerEmail,
+                  'message': message,
+                  'listingTitle': listingTitle,
+                  'listingId': listingId,
+                  'createdAt': DateTime.now().toUtc().toIso8601String(),
+                });
+                _inquiries[existingIdx]['replies'] = list;
+                _inquiries[existingIdx]['read'] = false;
+                _inquiries[existingIdx]['buyerRead'] = true;
+                _inquiries[existingIdx]['listingTitle'] = listingTitle;
+                _inquiries[existingIdx]['listingId'] = listingId;
+                unawaited(_upsertStoreInquiryRowSafe(_inquiries[existingIdx]));
+              } else {
+                final inquiry = {
+                  'id': DateTime.now().microsecondsSinceEpoch.toString(),
+                  'listingId': listingId,
+                  'listingTitle': listingTitle,
+                  'sellerEmail': sellerEmail,
+                  'buyerEmail': buyerEmail,
+                  'buyerName': widget.user.username,
+                  'message': message,
+                  'createdAt': DateTime.now().toUtc().toIso8601String(),
+                  'read': false,
+                  'buyerRead': true,
+                  'replies': <Map<String, dynamic>>[],
+                };
+                _inquiries.add(inquiry);
+                unawaited(_upsertStoreInquiryRowSafe(inquiry));
+              }
+              _save();
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(existingIdx != null ? 'Message added to your chat with the seller.' : 'Message sent to seller.')),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white),
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _storeGlassFrame({required bool isDark, required Widget child}) {
+    final border = isDark ? Colors.white.withOpacity(0.22) : Colors.black.withOpacity(0.1);
+    return ngmyClipBackdrop(
+      borderRadius: BorderRadius.circular(28),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF121726) : Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: border, width: 1.2),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.25 : 0.08), blurRadius: 12, offset: const Offset(0, 4))],
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  void _save({bool refreshCloud = false}) {
+    _listingsSig = _storeListingsSignature(_listings);
+    widget.onDataChanged();
+    if (refreshCloud) {
+      unawaited(_persistOrdersAndRefresh());
+    } else if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _persistOrdersAndRefresh({String? orderId, bool pullRemote = false}) async {
+    _advanceOrderStatuses();
+    final ok = await _pushStoreOrdersToSupabase(_orders, forceLocalOrderId: orderId);
+    if (pullRemote) await _refreshStoreOrdersFromConfig();
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save order to cloud. Check connection and try again.'), backgroundColor: Color(0xFFEF4444)),
+      );
+    }
+    if (mounted) setState(() {});
+    return;
+  }
+
+  void _upsertListingLocal(Map<String, dynamic> listing) {
+    final normalized = _normalizeStoreListing(listing);
+    final id = (normalized['id'] ?? '').toString();
+    final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == id);
+    if (idx >= 0) {
+      _listings[idx] = normalized;
+    } else {
+      _listings.add(normalized);
+    }
+    unawaited(_upsertStoreListingRowSafe(normalized));
+  }
+
+  ImageProvider? _listingImage(String? imageRef) {
+    if (imageRef == null || imageRef.trim().isEmpty) return null;
+    final src = imageRef.trim();
+    if (src.startsWith('supabase://')) return null;
+    if (src.startsWith('data:image')) {
+      try {
+        return MemoryImage(base64Decode(src.split(',').last));
+      } catch (_) {
+        return null;
+      }
+    }
+    if (src.startsWith('http://') || src.startsWith('https://')) return NetworkImage(src);
+    if (!kIsWeb) return FileImage(File(src));
+    return null;
+  }
+
+  Widget _listingPhoto(String? imageRef, {double? height, double? width, BoxFit fit = BoxFit.cover}) {
+    if (imageRef == null || imageRef.trim().isEmpty) return const SizedBox.shrink();
+    return _NgmyListingPhoto(
+      key: ValueKey(imageRef.trim()),
+      imageRef: imageRef.trim(),
+      urlCache: _listingMediaUrlCache,
+      height: height,
+      width: width,
+      fit: fit,
+    );
+  }
+
+  Future<String> _persistStoreMediaRef(String ref, {bool isVideo = false}) async {
+    final src = ref.trim();
+    if (src.isEmpty || src.startsWith('supabase://') || src.startsWith('http://') || src.startsWith('https://')) return src;
+    try {
+      late List<int> bytes;
+      var ext = isVideo ? 'mp4' : 'jpg';
+      if (src.startsWith('data:')) {
+        bytes = base64Decode(src.split(',').last);
+        if (src.contains('video')) ext = 'mp4';
+      } else if (!kIsWeb) {
+        bytes = await File(src).readAsBytes();
+        if (src.contains('.')) ext = src.split('.').last.toLowerCase();
+      } else {
+        return src;
+      }
+      final fileName = '${DateTime.now().microsecondsSinceEpoch}_${widget.user.email.hashCode.abs()}.$ext';
+      final storagePath = 'store/$fileName';
+      final upload = await _uploadNgmyMediaBytes(
+        bytes: Uint8List.fromList(bytes),
+        storagePath: storagePath,
+        contentType: isVideo ? 'video/mp4' : _mimeForImageExt(ext),
+      );
+      if (upload.ref != null) return upload.ref!;
+      return src;
+    } catch (e) {
+      debugPrint('[store] media upload error: $e');
+      return src;
+    }
+  }
+
+  List<Map<String, dynamic>> _activeShopListings() {
+    final me = widget.user.email.toLowerCase().trim();
+    return _listings
+        .where((l) =>
+            (l['status'] ?? 'active').toString() == 'active' &&
+            (l['sellerEmail'] ?? '').toString().toLowerCase().trim() != me &&
+            _matchesSearch(l) &&
+            NgmyStoreListingExtras.isVisibleToBuyersToday(l))
+        .toList()
+      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+  }
+
+  List<Map<String, dynamic>> _myListings() {
+    final me = widget.user.email.toLowerCase().trim();
+    return _listings
+        .where((l) => (l['sellerEmail'] ?? '').toString().toLowerCase().trim() == me && _matchesSearch(l))
+        .toList()
+      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+  }
+
+  List<Map<String, dynamic>> _myPurchases() {
+    final me = widget.user.email.toLowerCase().trim();
+    final list = _orders
+        .where((o) {
+          if ((o['buyerEmail'] ?? '').toString().toLowerCase().trim() != me) return false;
+          final pay = (o['paymentStatus'] ?? 'approved').toString();
+          return pay != 'rejected';
+        })
+        .toList();
+    _sortStoreOrdersForDisplay(list);
+    return list;
+  }
+
+  List<Map<String, dynamic>> _mySalesOrders() {
+    final me = widget.user.email.toLowerCase().trim();
+    final list = _orders
+        .where((o) =>
+            (o['sellerEmail'] ?? '').toString().toLowerCase().trim() == me &&
+            _storeOrderPaymentApproved(o))
+        .toList();
+    _sortStoreOrdersForDisplay(list);
+    return list;
+  }
+
+  List<Map<String, dynamic>> _myPendingPaymentReviewOrders() {
+    final me = widget.user.email.toLowerCase().trim();
+    return _orders
+        .where((o) =>
+            (o['sellerEmail'] ?? '').toString().toLowerCase().trim() == me &&
+            _storeOrderAwaitingPaymentProof(o))
+        .toList();
+  }
+
+  String _formatReceiptWhen(String iso) {
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return iso;
+    final local = dt.toLocal();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final h = local.hour > 12 ? local.hour - 12 : (local.hour == 0 ? 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    return '${months[local.month - 1]} ${local.day}, ${local.year} at $h:${local.minute.toString().padLeft(2, '0')} $ampm';
+  }
+
+  Future<void> _patchOrder(String orderId, void Function(Map<String, dynamic>) edit, {String? successMessage}) async {
+    final idx = _orders.indexWhere((o) => (o['id'] ?? '').toString() == orderId);
+    if (idx < 0) return;
+    edit(_orders[idx]);
+    _orders[idx]['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+    _orders[idx] = _normalizeStoreOrder(_orders[idx]);
+    await _persistOrdersAndRefresh(orderId: orderId, pullRemote: false);
+    widget.onDataChanged();
+    if (mounted) {
+      setState(() {});
+      if (successMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(successMessage)));
+      }
+    }
+  }
+
+  Widget _shipByDeadlineBanner(Map<String, dynamic> order, {required bool isDark, required bool forSeller}) {
+    final deadline = _storeShipByDeadline(order);
+    if (deadline == null) return const SizedBox.shrink();
+    final left = deadline.difference(DateTime.now());
+    final late = left.isNegative;
+    final text = late
+        ? (forSeller
+            ? 'Not shipped in 3 days — buyer is refunded only because the order was never marked shipped.'
+            : 'Seller did not ship within 3 days. Your refund is processing…')
+        : 'Mark shipped within ${left.inDays}d ${left.inHours % 24}h ${left.inMinutes % 60}m (refund only if you never ship)';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: late ? Colors.red.withOpacity(0.12) : Colors.orange.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: late ? Colors.red : Colors.orange),
+      ),
+      child: Row(
+        children: [
+          Icon(late ? Icons.warning_amber_rounded : Icons.timer_outlined, size: 18, color: late ? Colors.red : Colors.orange),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87))),
+        ],
+      ),
+    );
+  }
+
+  void _showStoreReceipts() {
+    NgmyNavigator.pushRoute(
+      context,
+      NgmyNavigator.route(
+        (ctx) => _StoreReceiptsPage(
+          onPoll: _syncLiveOrders,
+          bodyBuilder: (ctx) {
+              final purchases = _myPurchases();
+              final sales = _mySalesOrders();
+              final receiptsDark = Theme.of(ctx).brightness == Brightness.dark;
+              return DefaultTabController(
+                length: 2,
+                child: Scaffold(
+                  appBar: AppBar(
+                    title: const Text('Receipts', style: TextStyle(fontWeight: FontWeight.w900)),
+                    bottom: TabBar(
+                      labelColor: _storePurple,
+                      tabs: [
+                        Tab(text: 'My Purchases (${purchases.length})'),
+                        Tab(text: 'My Sales (${sales.length})'),
+                      ],
+                    ),
+                  ),
+                  body: TabBarView(
+                    children: [
+                      _buyerPurchasesTab(purchases, receiptsDark),
+                      _receiptsScroll(sales, isBuyer: false),
+                    ],
+                  ),
+                ),
+              );
+          },
+        ),
+        settings: const RouteSettings(name: 'StoreReceiptsPage'),
+      ),
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  Widget _receiptsScroll(List<Map<String, dynamic>> orders, {required bool isBuyer}) {
+    if (orders.isEmpty) {
+      return Center(child: Text(isBuyer ? 'No purchases yet.' : 'No sales yet.', style: const TextStyle(color: Colors.grey)));
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 120),
+      itemCount: orders.length,
+      itemBuilder: (_, i) => _orderReceiptCard(orders[i], isBuyer: isBuyer),
+    );
+  }
+
+  Widget _buyerPurchasesTab(List<Map<String, dynamic>> bought, bool isDark) {
+    return RefreshIndicator(
+      color: _storePurple,
+      onRefresh: () async {
+        await _syncLiveOrders();
+        if (mounted) setState(() {});
+      },
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          if (bought.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Text('No purchases yet.', style: TextStyle(color: Colors.grey))),
+            )
+          else
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (_, i) => Padding(
+                  padding: EdgeInsets.fromLTRB(14, i == 0 ? 4 : 0, 14, 0),
+                  child: _orderReceiptCard(bought[i], isBuyer: true),
+                ),
+                childCount: bought.length,
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
+        ],
+      ),
+    );
+  }
+
+  Widget _sellerSalesTab(List<Map<String, dynamic>> sales) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final awaitingReview = _myPendingPaymentReviewOrders().length;
+    final pending = sales.where((o) => (o['fulfillmentStatus'] ?? 'pending').toString() == 'pending').length;
+    return RefreshIndicator(
+      color: _storePurple,
+      onRefresh: () async {
+        await _refreshStoreOrdersFromConfig();
+        if (mounted) setState(() {});
+      },
+      child: CustomScrollView(
+        slivers: [
+          if (awaitingReview > 0)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF2A2210) : const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.mark_email_unread_outlined, color: Color(0xFFD97706), size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '$awaitingReview Cash App/Zelle payment(s) waiting in Messages — confirm or reject before they appear here.',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.orange.shade200 : const Color(0xFF9A3412)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _storePurple.withOpacity(0.35)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.local_shipping_outlined, color: _storePurple, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        pending > 0
+                            ? '$pending order(s) need shipping — confirm address and mark shipped below.'
+                            : 'Confirmed payments appear here. Use Mark as Shipped, then update location and ETA.',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF334155)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (sales.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    awaitingReview > 0
+                        ? 'No confirmed sales yet. Open Messages to review payment proof.'
+                        : 'No sales yet. Cash App/Zelle orders appear here after you confirm payment in Messages.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+            )
+          else
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (_, i) => Padding(
+                  padding: EdgeInsets.fromLTRB(14, i == 0 ? 4 : 0, 14, 0),
+                  child: _orderReceiptCard(sales[i], isBuyer: false),
+                ),
+                childCount: sales.length,
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
+        ],
+      ),
+    );
+  }
+
+  Widget _orderReceiptCard(Map<String, dynamic> order, {required bool isBuyer}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final total = (order['total'] as num?)?.toDouble() ?? (((order['price'] as num?) ?? 0).toDouble() + ((order['deliveryFee'] as num?) ?? 0).toDouble());
+    final status = _orderStatusLabel(order);
+    final fulfillment = (order['fulfillmentStatus'] ?? 'pending').toString();
+    final orderId = (order['id'] ?? '').toString();
+    final isSeller = !isBuyer;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE5E7EB)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.shopping_bag_outlined, color: _storePurple, size: 22),
+              const SizedBox(width: 8),
+              Expanded(child: Text((order['title'] ?? 'Item').toString(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87))),
+              Text('\$${formatCurrency(total)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(child: Text(_formatReceiptWhen((order['createdAt'] ?? '').toString()), style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54))),
+              Row(
+                children: [
+                  Icon(
+                    fulfillment == 'delivered' ? Icons.check_circle : Icons.schedule,
+                    size: 14,
+                    color: fulfillment == 'delivered' ? Colors.green : (fulfillment == 'pending' ? Colors.orange : Colors.blue),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(status, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fulfillment == 'delivered' ? Colors.green : Colors.blue)),
+                ],
+              ),
+            ],
+          ),
+          if (fulfillment == 'pending' && _storeShipByDeadline(order) != null) ...[
+            const SizedBox(height: 10),
+            _shipByDeadlineBanner(order, isDark: isDark, forSeller: isSeller),
+          ],
+          if (isSeller && fulfillment == 'pending') ...[
+            const SizedBox(height: 12),
+            _sellerShipToBlock(order, isDark: isDark),
+          ],
+          if (fulfillment != 'pending' && fulfillment != 'refunded') ...[
+            const SizedBox(height: 12),
+            _LiveTrackingPanel(
+              key: ValueKey('track_${orderId}_${order['updatedAt']}_$_trackingReplayToken'),
+              order: order,
+              isDark: isDark,
+              replayTrigger: _trackingReplayToken,
+            ),
+          ],
+          if (fulfillment == 'refunded')
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                'Refunded — seller did not ship within 3 days.',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.orange.shade800),
+              ),
+            ),
+          const SizedBox(height: 10),
+          if (!isSeller || fulfillment != 'pending') ...[
+            _receiptInfoRow(Icons.person_outline, 'Buyer Name', (order['buyerName'] ?? '').toString(), isDark),
+            _receiptInfoRow(Icons.inventory_2_outlined, 'Payment Method', _paymentDisplayLabel((order['paidVia'] ?? 'ngmy').toString()), isDark),
+            _receiptInfoRow(Icons.location_on_outlined, 'Delivery Address', (order['buyerAddress'] ?? '').toString(), isDark),
+            if ((order['buyerPhone'] ?? '').toString().isNotEmpty)
+              _receiptInfoRow(Icons.phone_outlined, 'Phone', (order['buyerPhone'] ?? '').toString(), isDark),
+          ] else ...[
+            _receiptInfoRow(Icons.inventory_2_outlined, 'Payment Method', _paymentDisplayLabel((order['paidVia'] ?? 'ngmy').toString()), isDark),
+          ],
+          if (isSeller && fulfillment == 'pending') ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _showShipOrderSheet(order),
+                icon: const Icon(Icons.local_shipping_outlined),
+                label: const Text('Mark as Shipped'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E3A5F), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              ),
+            ),
+          ],
+          if (isSeller && fulfillment != 'pending' && fulfillment != 'delivered') ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _sellerActionChip('Location', Icons.place, const Color(0xFF7C3AED), () => _showUpdateLocationSheet(order))),
+                const SizedBox(width: 8),
+                Expanded(child: _sellerActionChip('ETA', Icons.schedule, const Color(0xFFF97316), () => _showUpdateEtaSheet(order))),
+                const SizedBox(width: 8),
+                Expanded(child: _sellerActionChip('Delivered', Icons.check_circle, const Color(0xFF00B25A), () => _markOrderDelivered(orderId))),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Waiting for buyer to confirm delivery…',
+              style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ],
+          if (fulfillment == 'delivered')
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Center(child: Text('✓ Transaction Complete', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w800))),
+            ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () {
+              final lid = (order['listingId'] ?? '').toString();
+              Map<String, dynamic>? listing;
+              for (final l in _listings) {
+                if ((l['id'] ?? '').toString() == lid) {
+                  listing = l;
+                  break;
+                }
+              }
+              if (listing != null) _openListingDetail(listing);
+            },
+            icon: const Icon(Icons.storefront_outlined, size: 18),
+            label: const Text('View Seller Store'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 42)),
+          ),
+          if (isSeller && fulfillment == 'delivered')
+            TextButton.icon(
+              onPressed: () => _resellFromOrder(order),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Resell this item'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _receiptInfoRow(IconData icon, String label, String value, bool isDark) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: isDark ? Colors.white38 : Colors.black45),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black45)),
+                Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sellerShipToBlock(Map<String, dynamic> order, {required bool isDark}) {
+    final name = (order['buyerName'] ?? 'Buyer').toString().trim();
+    final phone = (order['buyerPhone'] ?? '').toString().trim();
+    final address = (order['buyerAddress'] ?? '').toString().trim();
+    final email = (order['buyerEmail'] ?? '').toString().trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? const Color(0xFF3B82F6) : const Color(0xFF2563EB), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.local_shipping_outlined, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8), size: 20),
+              const SizedBox(width: 8),
+              Text('SHIP TO — Buyer Details', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8))),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _shipToLine(Icons.person, 'Name', name.isEmpty ? 'Not provided' : name, isDark, missing: name.isEmpty),
+          _shipToLine(Icons.phone, 'Phone', phone.isEmpty ? 'Not provided' : phone, isDark, missing: phone.isEmpty),
+          _shipToLine(Icons.location_on, 'Address', address.isEmpty ? 'Not provided — ask buyer in Messages' : address, isDark, missing: address.isEmpty),
+          if (email.isNotEmpty) _shipToLine(Icons.email_outlined, 'Email', email, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _shipToLine(IconData icon, String label, String value, bool isDark, {bool missing = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: missing ? Colors.orange : (isDark ? Colors.white54 : const Color(0xFF64748B))),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : Colors.black54)),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: missing ? Colors.orange : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _sellerActionChip(String label, IconData icon, Color color, VoidCallback onTap) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(height: 4),
+              Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showShipOrderSheet(Map<String, dynamic> order) {
+    String method = 'car';
+    DateTime? eta = DateTime.now().add(const Duration(days: 3));
+    final locationC = TextEditingController();
+    final orderId = (order['id'] ?? '').toString();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) {
+          final dark = _storeSheetIsDark(ctx);
+          final noteBg = dark ? const Color(0xFF422006) : const Color(0xFFFFF7ED);
+          final noteBorder = dark ? const Color(0xFFF97316) : Colors.orange;
+          final noteText = dark ? const Color(0xFFFED7AA) : const Color(0xFF9A3412);
+          return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            margin: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: _storeSheetBackground(ctx),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: dark ? Colors.white12 : const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('Ship Order', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: _storeSheetTextPrimary(ctx))),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: Icon(Icons.close, color: _storeSheetTextPrimary(ctx)),
+                    ),
+                  ],
+                ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: noteBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: noteBorder),
+                  ),
+                  child: Text(
+                    'Ship within 3 days of purchase. The buyer is refunded from your NGMY balance only if you never mark the order as shipped.',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: noteText),
+                  ),
+                ),
+                Text('Shipping Method', style: TextStyle(fontWeight: FontWeight.w700, color: _storeSheetTextPrimary(ctx))),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _shipMethodBtn(ctx, 'car', Icons.directions_car, method, setDlg, (m) => method = m),
+                    _shipMethodBtn(ctx, 'truck', Icons.local_shipping, method, setDlg, (m) => method = m),
+                    _shipMethodBtn(ctx, 'plane', Icons.flight, method, setDlg, (m) => method = m),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text('Estimated Arrival (Date & Time)', style: TextStyle(fontWeight: FontWeight.w700, color: _storeSheetTextPrimary(ctx))),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.calendar_today, color: _storeSheetTextMuted(ctx)),
+                  title: Text(
+                    eta == null ? 'Pick date & time' : _formatReceiptWhen(eta!.toUtc().toIso8601String()),
+                    style: TextStyle(color: _storeSheetTextPrimary(ctx)),
+                  ),
+                  onTap: () async {
+                    final d = await showDatePicker(context: ctx, initialDate: eta ?? DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+                    if (d == null) return;
+                    final t = await showTimePicker(context: ctx, initialTime: TimeOfDay.fromDateTime(eta ?? DateTime.now()));
+                    if (t == null) return;
+                    setDlg(() => eta = DateTime(d.year, d.month, d.day, t.hour, t.minute));
+                  },
+                ),
+                TextField(
+                  controller: locationC,
+                  style: TextStyle(color: _storeSheetTextPrimary(ctx)),
+                  decoration: _storeSheetInputDecoration(
+                    ctx,
+                    labelText: 'Current Location (optional)',
+                    hintText: 'e.g. Warehouse in Nairobi',
+                    prefixIcon: Icons.place,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: eta == null
+                        ? null
+                        : () {
+                            Navigator.pop(ctx);
+                            _patchOrder(orderId, (o) {
+                              o['fulfillmentStatus'] = 'shipped';
+                              o['shippingMethod'] = method;
+                              o['estimatedArrival'] = eta!.toUtc().toIso8601String();
+                              o['shippedAt'] = DateTime.now().toUtc().toIso8601String();
+                              final loc = locationC.text.trim().isEmpty ? 'Shipped — ${_storeVehicleLabel(method)}' : locationC.text.trim();
+                              o['currentLocation'] = loc;
+                              final hist = List<Map<String, dynamic>>.from((o['locationHistory'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? []);
+                              hist.insert(0, {
+                                'location': loc,
+                                'note': 'Order shipped via ${_storeVehicleLabel(method)}',
+                                'at': DateTime.now().toLocal().toString(),
+                              });
+                              o['locationHistory'] = hist;
+                              if (DateTime.now().isAfter(eta!.subtract(const Duration(hours: 2)))) {
+                                o['fulfillmentStatus'] = 'in_transit';
+                              }
+                            });
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Shipped! Buyer sees live tracking now.')),
+                              );
+                            }
+                          },
+                    icon: const Icon(Icons.send_rounded),
+                    label: const Text('Ship Order'),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        },
+      ),
+    );
+  }
+
+  Widget _shipMethodBtn(
+    BuildContext ctx,
+    String key,
+    IconData icon,
+    String selected,
+    void Function(void Function()) setDlg,
+    void Function(String) onPick,
+  ) {
+    final sel = selected == key;
+    final dark = _storeSheetIsDark(ctx);
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: InkWell(
+          onTap: () => setDlg(() => onPick(key)),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: sel ? const Color(0xFF2563EB) : (dark ? Colors.white24 : Colors.grey.shade300),
+                width: sel ? 2 : 1,
+              ),
+              color: sel
+                  ? (dark ? const Color(0xFF1E3A5F) : const Color(0xFFEFF6FF))
+                  : (dark ? const Color(0xFF0F172A) : Colors.white),
+            ),
+            child: Icon(icon, color: sel ? const Color(0xFF2563EB) : (dark ? Colors.white54 : Colors.grey)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showUpdateLocationSheet(Map<String, dynamic> order) {
+    final c = TextEditingController(text: (order['currentLocation'] ?? '').toString());
+    final orderId = (order['id'] ?? '').toString();
+    var autoEnabled = order['autoLocationEnabled'] == true;
+    var gpsLoading = false;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _storeSheetBackground(context),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => Padding(
+          padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(ctx).viewInsets.bottom + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: Text('Update Package Location', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: _storeSheetTextPrimary(ctx)))),
+                  IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close, color: _storeSheetTextMuted(ctx))),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: c,
+                      style: TextStyle(color: _storeSheetTextPrimary(ctx)),
+                      decoration: _storeSheetInputDecoration(ctx, hintText: 'Address from GPS or type manually', prefixIcon: Icons.place_outlined),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    tooltip: 'Share live GPS now',
+                    onPressed: gpsLoading
+                        ? null
+                        : () async {
+                            setDlg(() => gpsLoading = true);
+                            final result = await ngmyFetchCurrentGpsDetailed();
+                            if (!ctx.mounted) return;
+                            setDlg(() => gpsLoading = false);
+                            final reading = result.reading;
+                            if (reading == null) {
+                              final msg = result.failure != null
+                                  ? ngmyGpsFailureMessage(result.failure!)
+                                  : 'Could not get GPS. Allow location when prompted.';
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                              return;
+                            }
+                            c.text = reading.label;
+                            setDlg(() {});
+                            await _patchOrder(orderId, (o) {
+                              o['currentLocation'] = reading.label;
+                              o['currentLat'] = reading.lat;
+                              o['currentLng'] = reading.lng;
+                              o['lastGpsAt'] = DateTime.now().toUtc().toIso8601String();
+                              _appendLocationHistory(o, reading.label, 'Live GPS shared', lat: reading.lat, lng: reading.lng);
+                            }, successMessage: 'Live GPS shared with buyer.');
+                          },
+                    icon: gpsLoading
+                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.my_location_rounded),
+                    style: IconButton.styleFrom(backgroundColor: const Color(0xFF7C3AED), foregroundColor: Colors.white, minimumSize: const Size(52, 52)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: autoEnabled,
+                onChanged: (v) => setDlg(() => autoEnabled = v),
+                title: Text('Automatic GPS every 5 min', style: TextStyle(fontWeight: FontWeight.w700, color: _storeSheetTextPrimary(ctx))),
+                subtitle: Text('Shares your live location while delivering', style: TextStyle(fontSize: 11, color: _storeSheetTextMuted(ctx))),
+                secondary: const Icon(Icons.gps_fixed_rounded, color: Color(0xFF10B981)),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await _patchOrder(orderId, (o) {
+                    final loc = c.text.trim();
+                    if (loc.isNotEmpty) {
+                      o['currentLocation'] = loc;
+                      _appendLocationHistory(o, loc, 'Location updated by seller');
+                    }
+                    o['autoLocationEnabled'] = autoEnabled;
+                    if (autoEnabled) {
+                      _autoGpsOrderIds.add(orderId);
+                      _startAutoGpsTimerIfNeeded();
+                    } else {
+                      _autoGpsOrderIds.remove(orderId);
+                      _startAutoGpsTimerIfNeeded();
+                    }
+                  }, successMessage: 'Location saved — buyer sees it live.');
+                  if (autoEnabled) unawaited(_applyGpsToOrder(orderId, fromAuto: true));
+                },
+                icon: const Icon(Icons.save_rounded),
+                label: const Text('Save Location'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showUpdateEtaSheet(Map<String, dynamic> order) {
+    DateTime? eta = DateTime.tryParse((order['estimatedArrival'] ?? '').toString()) ?? DateTime.now().add(const Duration(days: 2));
+    final orderId = (order['id'] ?? '').toString();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _storeSheetBackground(context),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => Padding(
+          padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(ctx).viewInsets.bottom + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Update Delivery ETA', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: _storeSheetTextPrimary(ctx))),
+              const SizedBox(height: 6),
+              Text('Buyer sees this instantly on live tracking.', style: TextStyle(fontSize: 11, color: _storeSheetTextMuted(ctx))),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.schedule, color: _storeSheetTextMuted(ctx)),
+                title: Text(
+                  eta == null ? 'Pick date & time' : _formatReceiptWhen(eta!.toUtc().toIso8601String()),
+                  style: TextStyle(fontWeight: FontWeight.w800, color: _storeSheetTextPrimary(ctx)),
+                ),
+                trailing: const Icon(Icons.edit_calendar),
+                onTap: () async {
+                  final d = await showDatePicker(context: ctx, initialDate: eta ?? DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+                  if (d == null) return;
+                  if (!ctx.mounted) return;
+                  final t = await showTimePicker(context: ctx, initialTime: TimeOfDay.fromDateTime(eta ?? DateTime.now()));
+                  if (t == null) return;
+                  setDlg(() => eta = DateTime(d.year, d.month, d.day, t.hour, t.minute));
+                },
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ActionChip(
+                    label: const Text('+1 hour'),
+                    onPressed: () => setDlg(() => eta = DateTime.now().add(const Duration(hours: 1))),
+                  ),
+                  ActionChip(
+                    label: const Text('+1 day'),
+                    onPressed: () => setDlg(() => eta = DateTime.now().add(const Duration(days: 1))),
+                  ),
+                  ActionChip(
+                    label: const Text('In 10 min'),
+                    onPressed: () => setDlg(() => eta = DateTime.now().add(const Duration(minutes: 10))),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                onPressed: eta == null
+                    ? null
+                    : () async {
+                        Navigator.pop(ctx);
+                        final picked = eta!;
+                        await _patchOrder(orderId, (o) {
+                          o['estimatedArrival'] = picked.toUtc().toIso8601String();
+                          final now = DateTime.now();
+                          if (picked.difference(now).inMinutes <= 30) {
+                            o['fulfillmentStatus'] = 'arriving';
+                          } else if ((o['fulfillmentStatus'] ?? '') == 'shipped') {
+                            o['fulfillmentStatus'] = 'in_transit';
+                          }
+                        }, successMessage: 'ETA updated — buyer tracking refreshed.');
+                      },
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('Save ETA'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF97316), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _markOrderDelivered(String orderId) {
+    unawaited(_patchOrder(orderId, (o) {
+      o['fulfillmentStatus'] = 'delivered';
+      final hist = List<Map<String, dynamic>>.from((o['locationHistory'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? []);
+      hist.insert(0, {'location': (o['buyerAddress'] ?? '').toString(), 'note': 'Delivered', 'at': DateTime.now().toLocal().toString()});
+      o['locationHistory'] = hist;
+    }, successMessage: 'Order marked delivered.'));
+  }
+
+  Future<void> _resellListing(Map<String, dynamic> src, {int? units}) async {
+    final me = widget.user.email.toLowerCase().trim();
+    if ((src['sellerEmail'] ?? '').toString().toLowerCase().trim() != me) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You can only resell your own items.')));
+      return;
+    }
+    final listingId = (src['id'] ?? '').toString();
+    final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == listingId);
+    if (idx < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Listing not found.')));
+      return;
+    }
+    final unitCount = units ?? (src['units'] as num?)?.toInt() ?? 1;
+    if (unitCount < 1) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter at least 1 unit.')));
+      return;
+    }
+    final now = DateTime.now().toUtc().toIso8601String();
+    setState(() {
+      _listings[idx]['status'] = 'active';
+      _listings[idx]['units'] = unitCount;
+      _listings[idx]['unitsRemaining'] = unitCount;
+      _listings[idx]['buyerEmail'] = '';
+      _listings[idx]['buyerName'] = '';
+      _listings[idx]['soldAt'] = '';
+      _listings[idx]['paidVia'] = '';
+      _listings[idx]['updatedAt'] = now;
+    });
+    final relisted = _normalizeStoreListing(_listings[idx]);
+    _listings[idx] = relisted;
+    final cloudOk = await _upsertStoreListingRowSafe(relisted);
+    _listingsSig = _storeListingsSignature(_listings);
+    _save(refreshCloud: true);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          cloudOk
+              ? '“${src['title'] ?? 'Item'}” moved back to Shop ($unitCount unit${unitCount == 1 ? '' : 's'}). No duplicate listing.'
+              : 'Moved to Shop on this device. Push website update so all users see it.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _promptResellListing(Map<String, dynamic> listing) async {
+    final unitsC = TextEditingController(text: '${(listing['units'] as num?)?.toInt() ?? 1}');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          title: const Text('Resell item'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Move “${listing['title'] ?? 'Item'}” back to the Shop. The same listing is reactivated (no duplicate copy).',
+                style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: unitsC,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Units in stock',
+                  prefixIcon: Icon(Icons.inventory_2_outlined),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white),
+              child: const Text('Resell'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    final units = int.tryParse(unitsC.text.trim()) ?? 1;
+    await _resellListing(listing, units: units);
+  }
+
+  void _resellFromOrder(Map<String, dynamic> order) {
+    final listingId = (order['listingId'] ?? '').toString();
+    Map<String, dynamic>? src;
+    for (final l in _listings) {
+      if ((l['id'] ?? '').toString() == listingId) {
+        src = l;
+        break;
+      }
+    }
+    if (src == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Original listing not found.')));
+      return;
+    }
+    unawaited(_promptResellListing(src));
+  }
+
+  Widget _storeTabChip(int index, String label, int count, bool isDark) {
+    final selected = _tabCtrl.index == index;
+    final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
+    return GestureDetector(
+      onTap: () => _tabCtrl.animateTo(index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        margin: const EdgeInsets.only(left: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? (isDark ? const Color(0xFF1F2937) : Colors.white) : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: selected ? _storeAccent : border, width: selected ? 1.6 : 1),
+        ),
+        child: Text(
+          '$label $count',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 9,
+            color: selected ? _storeAccent : (isDark ? Colors.white60 : Colors.black54),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static const List<(String, IconData)> _storeCategories = [
+    ('Electronics', Icons.devices_rounded),
+    ('Fashion', Icons.checkroom_rounded),
+    ('Home & Garden', Icons.home_rounded),
+    ('Vehicles', Icons.directions_car_rounded),
+    ('Sports', Icons.sports_soccer_rounded),
+    ('Other', Icons.category_rounded),
+  ];
+
+  static const List<(String, IconData)> _storeConditions = [
+    ('New', Icons.new_releases_rounded),
+    ('Used - Like New', Icons.star_rounded),
+    ('Used - Good', Icons.thumb_up_alt_rounded),
+    ('Used - Fair', Icons.info_outline_rounded),
+  ];
+
+  InputDecoration _storeFieldDec(String label, IconData icon, bool isDark) {
+    final border = isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB);
+    final fill = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, size: 20, color: _storeAccent),
+      filled: true,
+      fillColor: fill,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _storeAccent, width: 1.4)),
+    );
+  }
+
+  Widget _storeSectionTitle(String title, IconData icon, bool isDark) => Row(
+    children: [
+      Icon(icon, size: 18, color: _storeAccent),
+      const SizedBox(width: 8),
+      Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF111827))),
+    ],
+  );
+
+  Widget _storeFramedChip({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFD1D5DB);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? _storeAccent.withOpacity(isDark ? 0.22 : 0.10)
+                : (isDark ? const Color(0xFF0F172A) : Colors.white),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? _storeAccent : border, width: selected ? 1.8 : 1.2),
+            boxShadow: selected
+                ? [BoxShadow(color: _storeAccent.withOpacity(0.18), blurRadius: 8, offset: const Offset(0, 3))]
+                : [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.12 : 0.04), blurRadius: 4, offset: const Offset(0, 2))],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: selected ? _storeAccent : (isDark ? Colors.white60 : Colors.grey)),
+              const SizedBox(width: 6),
+              Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sellItemButton({bool compact = false}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final unread = _unreadMessageCount();
+    Widget? sellBtn;
+    if (_canSell) {
+    sellBtn = Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [isDark ? const Color(0xFF1E293B) : _storeAccent, const Color(0xFF00894B)]),
+        borderRadius: BorderRadius.circular(compact ? 12 : 999),
+        boxShadow: [
+          BoxShadow(color: _storeAccent.withOpacity(0.35), blurRadius: compact ? 8 : 14, offset: Offset(0, compact ? 3 : 6)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _showPostListingDialog,
+          borderRadius: BorderRadius.circular(compact ? 12 : 999),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 18, vertical: compact ? 8 : 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(compact ? Icons.add_rounded : Icons.sell_rounded, color: Colors.white, size: compact ? 18 : 20),
+                const SizedBox(width: 6),
+                Text(compact ? 'Sell' : 'Sell Item', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: compact ? 12 : 14)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    }
+    if (compact) return sellBtn ?? const SizedBox.shrink();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        GestureDetector(
+          onTap: _showSellerInbox,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6, offset: const Offset(0, 2))],
+                ),
+                child: const Icon(Icons.chat_bubble_rounded, color: _storeAccent, size: 21),
+              ),
+              if (unread > 0)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                    decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
+                    child: Text(
+                      unread > 9 ? '9+' : '$unread',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (sellBtn != null) ...[const SizedBox(height: 8), sellBtn],
+      ],
+    );
+  }
+
+  List<String> _listingAcceptedPayments(Map<String, dynamic> listing) {
+    final raw = listing['acceptedPayments'];
+    if (raw is! List || raw.isEmpty) return ['ngmy'];
+    final list = raw.map((e) => e.toString()).where((p) {
+      if (p == 'cashapp' && _listingSellerCashTag(listing).isEmpty) return false;
+      if (p == 'zelle' && _listingSellerZelle(listing).isEmpty) return false;
+      return true;
+    }).toList();
+    return list.isEmpty ? ['ngmy'] : list;
+  }
+
+  UserData? _sellerUserForListing(Map<String, dynamic> listing) {
+    final email = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
+    if (email.isEmpty) return null;
+    for (final u in widget.allUsers) {
+      if (u.email.toLowerCase().trim() == email) return u;
+    }
+    return null;
+  }
+
+  String _listingSellerCashTag(Map<String, dynamic> listing) {
+    final onListing = (listing['sellerCashAppTag'] ?? '').toString().trim();
+    if (onListing.isNotEmpty) return _normalizeCashAppDisplayTag(onListing);
+    return _normalizeCashAppDisplayTag(_sellerUserForListing(listing)?.savedCashAppTag ?? '');
+  }
+
+  String _listingSellerZelle(Map<String, dynamic> listing) {
+    final onListing = (listing['sellerZelleInfo'] ?? '').toString().trim();
+    if (onListing.isNotEmpty) return onListing;
+    return (_sellerUserForListing(listing)?.savedZelleInfo ?? '').trim();
+  }
+
+  String _normalizeCashAppDisplayTag(String raw) {
+    var t = raw.trim().replaceAll(RegExp(r'^\$+'), '');
+    if (t.isEmpty) return '';
+    return '\$$t';
+  }
+
+  String _cashAppBareHandle(String tag) {
+    return tag.replaceFirst(RegExp(r'^\$'), '').trim();
+  }
+
+  Future<void> _openSellerCashApp(String tag) async {
+    final handle = _cashAppBareHandle(tag);
+    if (handle.isEmpty) return;
+    final uri = Uri.parse('https://cash.app/\$$handle');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Cash App.')));
+    }
+  }
+
+  Future<void> _openSellerZelle(String info) async {
+    final t = info.trim();
+    if (t.isEmpty) return;
+    Uri? uri;
+    if (t.contains('@')) {
+      uri = Uri.parse('mailto:$t');
+    } else {
+      final digits = t.replaceAll(RegExp(r'[^\d+]'), '');
+      if (digits.isNotEmpty) uri = Uri.parse('tel:$digits');
+    }
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      await Clipboard.setData(ClipboardData(text: t));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Zelle info copied.')));
+    }
+  }
+
+  void _persistSellerPaymentPrefs({required bool saveCashApp, required String cashTag, required bool saveZelle, required String zelleInfo}) {
+    if (saveCashApp && cashTag.isNotEmpty) widget.user.savedCashAppTag = cashTag;
+    if (saveZelle && zelleInfo.isNotEmpty) widget.user.savedZelleInfo = zelleInfo;
+    widget.onDataChanged();
+  }
+
+  Widget _storePaymentInfoTile({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+    required IconData icon,
+    required Color color,
+    bool isDark = false,
+    bool copyOnly = false,
+  }) {
+    final bg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
+    final sub = isDark ? Colors.white54 : Colors.grey;
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: sub)),
+                    const SizedBox(height: 2),
+                    copyOnly
+                        ? CopyOnHoldText(
+                            value,
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : color),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        : Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: color)),
+                  ],
+                ),
+              ),
+              Icon(copyOnly ? Icons.content_copy_rounded : Icons.open_in_new_rounded, size: 18, color: color),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showExternalPaymentSheet(String method, Map<String, dynamic> listing, Map<String, dynamic> order, double total) {
+    final cashTag = _listingSellerCashTag(listing);
+    final zelle = _listingSellerZelle(listing);
+    final code = (order['paymentVerificationCode'] ?? ngmyGenerateStorePaymentCode()).toString();
+    String? screenshotRef;
+    var submitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          Future<void> pickShot() async {
+            final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1600);
+            if (file == null) return;
+            final bytes = await file.readAsBytes();
+            final mime = file.mimeType ?? 'image/jpeg';
+            setSheet(() => screenshotRef = 'data:$mime;base64,${base64Encode(bytes)}');
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF121726) : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.payments_rounded, color: isDark ? Colors.white : const Color(0xFF0F172A), size: 28),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Pay via ${_paymentLabel(method)}',
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          ),
+                        ),
+                        IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                      ],
+                    ),
+                    Text(
+                      'Send \$${formatCurrency(total)} to the seller, then upload your payment screenshot. The seller will confirm in Messages.',
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54, height: 1.35),
+                    ),
+                    const SizedBox(height: 14),
+                    if (method == 'cashapp' && cashTag.isNotEmpty)
+                      _storePaymentInfoTile(
+                        label: 'Cash App — tap to open',
+                        value: cashTag,
+                        icon: Icons.payments_rounded,
+                        color: const Color(0xFF00D632),
+                        isDark: isDark,
+                        onTap: () => _openSellerCashApp(cashTag),
+                      ),
+                    if (method == 'zelle' && zelle.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _storePaymentInfoTile(
+                        label: 'Zelle — tap or hold to copy',
+                        value: zelle,
+                        icon: Icons.account_balance_rounded,
+                        color: const Color(0xFF6D1ED4),
+                        isDark: isDark,
+                        copyOnly: true,
+                        onTap: () => _copyStorePaymentInfo(zelle, label: 'Zelle info'),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF93C5FD)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Transaction Code (put in payment note):', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFF1D4ED8))),
+                          const SizedBox(height: 6),
+                          Text(code, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Color(0xFF1D4ED8), letterSpacing: 1.2)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    GestureDetector(
+                      onTap: submitting ? null : pickShot,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFF2563EB), width: 1.5),
+                          borderRadius: BorderRadius.circular(12),
+                          color: const Color(0xFFF8FAFC),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(Icons.add_a_photo_outlined, size: 32, color: screenshotRef == null ? Colors.grey : const Color(0xFF16A34A)),
+                            const SizedBox(height: 8),
+                            Text(
+                              screenshotRef == null ? 'Tap to upload payment screenshot' : 'Screenshot attached — tap to change',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
+                            if (screenshotRef != null) ...[
+                              const SizedBox(height: 10),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 140),
+                                child: NgmyPaymentProofImage(path: screenshotRef),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: submitting || screenshotRef == null
+                            ? null
+                            : () async {
+                                setSheet(() => submitting = true);
+                                order['paymentVerificationCode'] = code;
+                                order['paymentStatus'] = 'awaiting_proof';
+                                order['paymentProofPath'] = screenshotRef!;
+                                _updateOrderFields((order['id'] ?? '').toString(), {
+                                  'paymentVerificationCode': code,
+                                  'paymentStatus': 'awaiting_proof',
+                                  'paymentProofPath': screenshotRef!,
+                                });
+                                await _postStorePaymentNotificationToSeller(
+                                  listing: listing,
+                                  order: order,
+                                  method: method,
+                                  screenshotPath: screenshotRef!,
+                                );
+                                _ensurePaymentReviewInquiriesFromOrders();
+                                await _persistOrdersAndRefresh(orderId: (order['id'] ?? '').toString());
+                                if (!ctx.mounted) return;
+                                Navigator.pop(ctx);
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Payment proof sent to seller in Messages.')),
+                                );
+                                _showSellerInbox();
+                              },
+                        icon: submitting
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.send_rounded),
+                        label: Text(submitting ? 'Sending…' : 'Send payment receipt to seller'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _toggleListingLike(Map<String, dynamic> listing) {
+    final id = (listing['id'] ?? '').toString();
+    if (id.isEmpty) return;
+    final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == id);
+    if (idx < 0) return;
+    final liked = List<String>.from((_listings[idx]['likedBy'] as List?)?.map((e) => e.toString()) ?? []);
+    final me = widget.user.email.toLowerCase().trim();
+    if (liked.contains(me)) {
+      liked.remove(me);
+      _likedListingIds.remove(id);
+    } else {
+      liked.add(me);
+      _likedListingIds.add(id);
+    }
+    _listings[idx]['likedBy'] = liked;
+    unawaited(_upsertStoreListingRowSafe(_listings[idx]));
+    final sig = _storeListingsSignature(_listings);
+    if (sig != _listingsSig) {
+      _listingsSig = sig;
+      setState(() {});
+    }
+  }
+
+  Widget _sellerAvatar(String sellerEmail, {double radius = 12}) {
+    final provider = _avatarForEmail(sellerEmail);
+    if (provider != null) {
+      return CircleAvatar(radius: radius, backgroundImage: provider);
+    }
+    return CircleAvatar(radius: radius, backgroundColor: _storePurple.withOpacity(0.2), child: Icon(Icons.person, size: radius, color: _storePurple));
+  }
+
+  ImageProvider? _avatarForEmail(String email) {
+    final key = email.toLowerCase().trim();
+    for (final u in widget.allUsers) {
+      if (u.email.toLowerCase().trim() != key) continue;
+      return ngmyCachedProfileImage(u.profilePicturePath);
+    }
+    return null;
+  }
+
+  Widget _storeGridCard(Map<String, dynamic> listing) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final price = (listing['price'] as num?)?.toDouble() ?? 0;
+    final delivery = (listing['deliveryFee'] as num?)?.toDouble() ?? 0;
+    final images = _listingImageRefs(listing);
+    final videoRef = _listingVideoRef(listing);
+    final id = (listing['id'] ?? '').toString();
+    final liked = _likedListingIds.contains(id) || ((listing['likedBy'] as List?)?.contains(widget.user.email) ?? false);
+    final likes = (listing['likedBy'] is List) ? (listing['likedBy'] as List).length : 0;
+    final negotiable = listing['negotiable'] != false;
+    final sellerEmail = (listing['sellerEmail'] ?? '').toString();
+    final sellerName = (listing['sellerName'] ?? 'User').toString();
+    final location = (listing['location'] ?? '').toString();
+
+    return GestureDetector(
+      onTap: () => _openListingDetail(listing),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 1,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: images.isNotEmpty
+                        ? _listingPhoto(images.first, fit: BoxFit.cover)
+                        : Container(color: Colors.grey.shade300, child: const Icon(Icons.image_outlined, size: 40, color: Colors.white54)),
+                  ),
+                  if (negotiable)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(color: const Color(0xFF22C55E), borderRadius: BorderRadius.circular(20)),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.chat_bubble_outline, size: 12, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text('Negotiable', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (videoRef.isNotEmpty)
+                    const Center(child: Icon(Icons.play_circle_fill_rounded, color: Colors.white70, size: 36)),
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: GestureDetector(
+                      onTap: () => _toggleListingLike(listing),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                        child: Icon(liked ? Icons.favorite : Icons.favorite_border, size: 18, color: liked ? const Color(0xFFEF4444) : Colors.grey),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _sellerAvatar(sellerEmail, radius: 10),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(sellerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text((listing['title'] ?? '').toString().toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  _storeListingCardPrice(price, delivery),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.favorite, size: 12, color: Colors.grey.shade500),
+                      const SizedBox(width: 3),
+                      Text('$likes', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                      const SizedBox(width: 8),
+                      Text((listing['condition'] ?? 'new').toString().toLowerCase(), style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                  if (location.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, size: 12, color: Colors.red.shade400),
+                        const SizedBox(width: 2),
+                        Expanded(child: Text(location, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: Colors.grey.shade600))),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _storeDetailLabel(String label, bool isDark) {
+    return Text(
+      label.toUpperCase(),
+      style: TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.6,
+        color: isDark ? Colors.white54 : Colors.black45,
+      ),
+    );
+  }
+
+  Widget _storeDetailValue(String value, bool isDark, {double fontSize = 14, FontWeight weight = FontWeight.w600, Color? color}) {
+    return Text(
+      value,
+      style: TextStyle(fontSize: fontSize, fontWeight: weight, height: 1.35, color: color ?? (isDark ? Colors.white : Colors.black87)),
+    );
+  }
+
+  BoxDecoration _storeDetailFrameDecoration(bool isDark) {
+    return BoxDecoration(
+      color: isDark ? const Color(0xFF1A2035) : const Color(0xFFF8FAFC),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0)),
+    );
+  }
+
+  Widget _storeDetailFrame({
+    required bool isDark,
+    required String label,
+    required Widget child,
+    EdgeInsets padding = const EdgeInsets.all(12),
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: padding,
+      decoration: _storeDetailFrameDecoration(isDark),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _storeDetailLabel(label, isDark),
+          const SizedBox(height: 6),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _storeDetailFrameTile({
+    required bool isDark,
+    required String label,
+    required String value,
+    Color? valueColor,
+    int maxLines = 2,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: _storeDetailFrameDecoration(isDark),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _storeDetailLabel(label, isDark),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+              color: valueColor ?? (isDark ? Colors.white : Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Fixed-height price row on shop cards — price large, shipping smaller.
+  Widget _storeListingCardPrice(double price, double delivery) {
+    final shipLabel = delivery > 0 ? '+\$${formatCurrency(delivery)} shipping' : 'Free shipping';
+    return SizedBox(
+      height: 38,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '\$${formatCurrency(price)}',
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+              color: Color(0xFF2563EB),
+              height: 1.05,
+              decoration: TextDecoration.none,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            shipLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: delivery > 0 ? _storePurple.withValues(alpha: 0.92) : Colors.grey.shade600,
+              height: 1.1,
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _storeDetailPricePanel({required bool isDark, required double price, required double delivery}) {
+    final shipColor = isDark ? Colors.white60 : const Color(0xFF64748B);
+    return Container(
+      height: 78,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: _storeDetailFrameDecoration(isDark),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _storeDetailLabel('Price', isDark),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '\$${formatCurrency(price)}',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF2563EB),
+                  height: 1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  delivery > 0 ? '+\$${formatCurrency(delivery)} shipping' : 'Free shipping',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: shipColor, height: 1.2),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _storeCheckoutPricePanel({
+    required bool isDark,
+    required double price,
+    required double delivery,
+    required int buyQty,
+    required String title,
+  }) {
+    final sub = isDark ? Colors.white70 : const Color(0xFF475569);
+    final lineTotal = (price + delivery) * buyQty;
+    return Container(
+      height: 88,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '\$${formatCurrency(price)}',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                  height: 1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  delivery > 0 ? '+\$${formatCurrency(delivery)} shipping' : 'Free shipping',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: sub),
+                ),
+              ),
+              if (buyQty > 1) Text(' × $buyQty', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: sub)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+          ),
+          if (buyQty > 1)
+            Text(
+              'Total \$${formatCurrency(lineTotal)}',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: sub),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _copyStorePaymentInfo(String value, {String label = 'Payment info'}) async {
+    final t = value.trim();
+    if (t.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: t));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label copied.')));
+  }
+
+  void _openListingMediaFullscreen(
+    BuildContext context, {
+    required List<String> images,
+    required String videoRef,
+    required int initialPage,
+    required Widget Function(String imageRef, {BoxFit fit}) photoBuilder,
+    required Widget Function(String videoRef) videoBuilder,
+  }) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => _StoreListingFullscreenGallery(
+          imageRefs: images,
+          videoRef: videoRef,
+          initialPage: initialPage,
+          photoBuilder: photoBuilder,
+          videoBuilder: videoBuilder,
+        ),
+      ),
+    );
+  }
+
+  void _openListingDetail(Map<String, dynamic> listing) {
+    final images = _listingImageRefs(listing);
+    final videoRef = _listingVideoRef(listing);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final me = widget.user.email.toLowerCase().trim();
+    final isOwner = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
+    final status = (listing['status'] ?? 'active').toString();
+    final price = (listing['price'] as num?)?.toDouble() ?? 0;
+    final delivery = (listing['deliveryFee'] as num?)?.toDouble() ?? 0;
+    final description = (listing['description'] ?? '').toString().trim();
+    final condition = (listing['condition'] ?? '').toString().trim();
+    final category = (listing['category'] ?? '').toString().trim();
+    final location = (listing['location'] ?? '').toString().trim();
+    final units = (listing['units'] as num?)?.toInt() ?? 1;
+    final negotiable = listing['negotiable'] != false;
+    final sellerName = (listing['sellerName'] ?? 'User').toString();
+    final title = (listing['title'] ?? 'Item').toString();
+    final marketSchedule = NgmyStoreListingExtras.scheduleLabel(listing);
+    final giftTitle = NgmyStoreListingExtras.bonusGiftTitle(listing);
+    final buyerCanBuyToday = isOwner || NgmyStoreListingExtras.isVisibleToBuyersToday(listing);
+
+    Widget photo(String ref, {BoxFit fit = BoxFit.cover}) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return _listingPhoto(
+            ref,
+            fit: fit,
+            width: constraints.maxWidth,
+            height: constraints.maxHeight,
+          );
+        },
+      );
+    }
+
+    NgmyNavigator.pushRoute(
+      context,
+      NgmyNavigator.route(
+        (ctx) {
+          var mediaPage = 0;
+          return StatefulBuilder(
+            builder: (ctx, setDetail) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+              onPressed: () => NgmyNavigator.pop(ctx),
+            ),
+            title: Text(title, style: const TextStyle(fontSize: 16)),
+          ),
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: _StoreListingMediaGallery(
+                  imageRefs: images,
+                  videoRef: videoRef,
+                  photoBuilder: photo,
+                  videoBuilder: (ref) => _StoreListingVideoPlayer(videoRef: ref),
+                  onPageChanged: (p) => mediaPage = p,
+                  onTapExpand: () => _openListingMediaFullscreen(
+                    ctx,
+                    images: images,
+                    videoRef: videoRef,
+                    initialPage: mediaPage,
+                    photoBuilder: photo,
+                    videoBuilder: (ref) => _StoreListingVideoPlayer(videoRef: ref),
+                  ),
+                ),
+              ),
+              DraggableScrollableSheet(
+                initialChildSize: 0.36,
+                minChildSize: 0.22,
+                maxChildSize: 0.93,
+                snap: true,
+                snapSizes: const [0.36, 0.58, 0.93],
+                builder: (sheetCtx, scrollController) {
+                  final bottomInset = MediaQuery.of(sheetCtx).padding.bottom;
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF121726) : Colors.white,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.14),
+                          blurRadius: 24,
+                          offset: const Offset(0, -8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 10),
+                        Center(
+                          child: Container(
+                            width: 48,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white.withValues(alpha: 0.28) : Colors.black.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: ListView(
+                            controller: scrollController,
+                            padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottomInset),
+                            children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: _storeDetailPricePanel(isDark: isDark, price: price, delivery: delivery),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 3,
+                          child: _storeDetailFrame(
+                            isDark: isDark,
+                            label: 'Title',
+                            child: _storeDetailValue(title, isDark, fontSize: 16, weight: FontWeight.w900),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    _storeDetailFrame(
+                      isDark: isDark,
+                      label: 'Seller',
+                      child: Row(
+                        children: [
+                          _sellerAvatar((listing['sellerEmail'] ?? '').toString(), radius: 14),
+                          const SizedBox(width: 8),
+                          Expanded(child: _storeDetailValue(sellerName, isDark)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _storeDetailFrame(
+                      isDark: isDark,
+                      label: 'Description',
+                      child: _storeDetailValue(
+                        description.isNotEmpty ? description : 'No description provided.',
+                        isDark,
+                        weight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (category.isNotEmpty)
+                            Expanded(
+                              child: _storeDetailFrameTile(isDark: isDark, label: 'Category', value: category),
+                            ),
+                          if (category.isNotEmpty) const SizedBox(width: 8),
+                          if (condition.isNotEmpty)
+                            Expanded(
+                              child: _storeDetailFrameTile(isDark: isDark, label: 'Condition', value: condition),
+                            ),
+                          if (condition.isNotEmpty) const SizedBox(width: 8),
+                          Expanded(
+                            child: _storeDetailFrameTile(
+                              isDark: isDark,
+                              label: 'Stock',
+                              value: '${units > 1 ? '$units items' : '1 item'}${negotiable ? '\nNegotiable' : ''}',
+                              maxLines: 3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _storeDetailFrame(
+                      isDark: isDark,
+                      label: 'Market days',
+                      child: _storeDetailValue(marketSchedule, isDark, weight: FontWeight.w700),
+                    ),
+                    if (giftTitle.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _storeDetailFrame(
+                        isDark: isDark,
+                        label: 'Bonus gift',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.card_giftcard_rounded, color: Color(0xFFF59E0B), size: 22),
+                            const SizedBox(width: 8),
+                            Expanded(child: _storeDetailValue('Buy today and win: $giftTitle', isDark, weight: FontWeight.w800)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (!isOwner && !buyerCanBuyToday) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.orange.withValues(alpha: 0.45)),
+                        ),
+                        child: Text(
+                          NgmyStoreListingExtras.nextAvailableMessage(listing) ?? 'Not on the market today.',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFEA580C)),
+                        ),
+                      ),
+                    ],
+                    if (location.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _storeDetailFrame(
+                        isDark: isDark,
+                        label: 'Location',
+                        child: _storeDetailValue(location, isDark),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    _storeDetailFrame(
+                      isDark: isDark,
+                      label: 'Payment methods',
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _listingAcceptedPayments(listing).map((p) {
+                      if (p == 'cashapp') {
+                        final tag = _listingSellerCashTag(listing);
+                        if (tag.isEmpty) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _storePaymentInfoTile(
+                            label: 'Cash App — tap to open',
+                            value: tag,
+                            icon: Icons.payments_rounded,
+                            color: const Color(0xFF00D632),
+                            isDark: isDark,
+                            onTap: () => _openSellerCashApp(tag),
+                          ),
+                        );
+                      }
+                      if (p == 'zelle') {
+                        final z = _listingSellerZelle(listing);
+                        if (z.isEmpty) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _storePaymentInfoTile(
+                            label: 'Zelle — tap or hold to copy',
+                            value: z,
+                            icon: Icons.account_balance_rounded,
+                            color: const Color(0xFF6D1ED4),
+                            isDark: isDark,
+                            copyOnly: true,
+                            onTap: () => _copyStorePaymentInfo(z, label: 'Zelle info'),
+                          ),
+                        );
+                      }
+                      return Chip(label: Text(_paymentLabel(p), style: const TextStyle(fontSize: 10)));
+                    }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (isOwner && status == 'sold') ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            NgmyNavigator.pop(ctx);
+                            _promptResellListing(listing);
+                          },
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Resell this item'),
+                          style: ElevatedButton.styleFrom(backgroundColor: _storePurple, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (isOwner)
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            NgmyNavigator.pop(ctx);
+                            _confirmDeleteListing(listing);
+                          },
+                          icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                          label: const Text('Delete listing'),
+                        ),
+                      ),
+                    if (!isOwner || status == 'active')
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                NgmyNavigator.pop(ctx);
+                                _askAvailability(listing);
+                              },
+                              icon: const Icon(Icons.chat_bubble_outline),
+                              label: const Text('Message'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (status == 'active' && !isOwner && buyerCanBuyToday)
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  NgmyNavigator.pop(ctx);
+                                  _buyListing(listing);
+                                },
+                                style: ElevatedButton.styleFrom(backgroundColor: _storeAccent, foregroundColor: Colors.white),
+                                child: Text(giftTitle.isNotEmpty ? 'Buy + Win Gift' : 'Buy'),
+                              ),
+                            ),
+                        ],
+                      ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+          );
+        },
+        settings: const RouteSettings(name: 'StoreListingDetailPage'),
+      ),
+    );
+  }
+
+  String _paymentLabel(String key) {
+    switch (key) {
+      case 'cashapp':
+        return 'Cash App';
+      case 'zelle':
+        return 'Zelle';
+      default:
+        return 'NGMY Balance';
+    }
+  }
+
+  Future<void> _showPostListingDialog() async {
+    if (!_canSell) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are not authorized to sell on NGMY Store. Ask admin to enable Store Sell.')));
+      return;
+    }
+    final titleC = TextEditingController();
+    final descC = TextEditingController();
+    final priceC = TextEditingController();
+    final deliveryC = TextEditingController(text: '0');
+    final unitsC = TextEditingController(text: '1');
+    final locationC = TextEditingController(text: widget.user.city ?? '');
+    String category = 'Electronics';
+    String condition = 'Used - Good';
+    bool negotiable = true;
+    bool payNgmy = true;
+    bool payCashApp = false;
+    bool payZelle = false;
+    final List<String> imageRefs = [];
+    String videoRef = '';
+    final cashAppTagC = TextEditingController(text: widget.user.savedCashAppTag);
+    final zelleInfoC = TextEditingController(text: widget.user.savedZelleInfo);
+    final bonusGiftC = TextEditingController();
+    final Set<int> marketDays = {};
+    bool restrictMarketDays = false;
+    bool bonusGiftEnabled = false;
+
+    await showDialog(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final panelBg = isDark ? const Color(0xFF121726) : Colors.white;
+          final panelBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFE5E7EB);
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 520, maxHeight: 640),
+              decoration: BoxDecoration(
+                color: panelBg,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: panelBorder, width: 1.4),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.35), blurRadius: 24, offset: const Offset(0, 12))],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: isDark ? [const Color(0xFF1E293B), const Color(0xFF0F172A)] : [_storeAccent, const Color(0xFF00894B)]),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white30),
+                          ),
+                          child: const Icon(Icons.sell_rounded, color: Colors.white, size: 26),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Sell an Item', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                              Text('List on NGMY Store like eBay', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                        IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded, color: Colors.white)),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _storeSectionTitle('Item Details', Icons.inventory_2_outlined, isDark),
+                          const SizedBox(height: 10),
+                          TextField(controller: titleC, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Item title *', Icons.title_rounded, isDark)),
+                          const SizedBox(height: 10),
+                          TextField(controller: descC, maxLines: 3, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Description *', Icons.notes_rounded, isDark)),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(child: TextField(controller: priceC, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Price (\$) *', Icons.attach_money_rounded, isDark))),
+                              const SizedBox(width: 10),
+                              Expanded(child: TextField(controller: deliveryC, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Delivery (\$)', Icons.local_shipping_outlined, isDark))),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(controller: unitsC, keyboardType: TextInputType.number, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Units in stock *', Icons.inventory_2_outlined, isDark)),
+                          const SizedBox(height: 8),
+                          TextField(controller: locationC, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _storeFieldDec('Location', Icons.location_on_outlined, isDark)),
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Negotiable', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                            value: negotiable,
+                            activeColor: _storeAccent,
+                            onChanged: (v) => setDlg(() => negotiable = v),
+                          ),
+                          const SizedBox(height: 8),
+                          _storeSectionTitle('Accepted payments', Icons.payments_outlined, isDark),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              FilterChip(
+                                label: const Text('NGMY account'),
+                                selected: payNgmy,
+                                onSelected: (v) => setDlg(() => payNgmy = v),
+                              ),
+                              FilterChip(
+                                label: const Text('Cash App'),
+                                selected: payCashApp,
+                                onSelected: (v) => setDlg(() => payCashApp = v),
+                              ),
+                              FilterChip(
+                                label: const Text('Zelle'),
+                                selected: payZelle,
+                                onSelected: (v) => setDlg(() => payZelle = v),
+                              ),
+                            ],
+                          ),
+                          if (payCashApp) ...[
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: cashAppTagC,
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                              decoration: _storeFieldDec('Cash App \$tag (saved for next time)', Icons.payments_rounded, isDark),
+                            ),
+                          ],
+                          if (payZelle) ...[
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: zelleInfoC,
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                              decoration: _storeFieldDec('Zelle phone or email (saved)', Icons.account_balance_rounded, isDark),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          _storeSectionTitle('Category', Icons.grid_view_rounded, isDark),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _storeCategories.map((c) {
+                              return _storeFramedChip(
+                                label: c.$1,
+                                icon: c.$2,
+                                selected: category == c.$1,
+                                isDark: isDark,
+                                onTap: () => setDlg(() => category = c.$1),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 16),
+                          _storeSectionTitle('Condition', Icons.verified_outlined, isDark),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _storeConditions.map((c) {
+                              return _storeFramedChip(
+                                label: c.$1,
+                                icon: c.$2,
+                                selected: condition == c.$1,
+                                isDark: isDark,
+                                onTap: () => setDlg(() => condition = c.$1),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 16),
+                          _storeSectionTitle('Market days', Icons.calendar_month_rounded, isDark),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Choose which days buyers can see and buy this item. Turn on to pick days; leave off to show every day.',
+                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
+                          ),
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Only on selected days', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                            value: restrictMarketDays,
+                            activeColor: _storeAccent,
+                            onChanged: (v) => setDlg(() {
+                              restrictMarketDays = v;
+                              if (!v) marketDays.clear();
+                            }),
+                          ),
+                          if (restrictMarketDays) ...[
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: NgmyStoreListingExtras.weekdays.map((w) {
+                                final selected = marketDays.contains(w.$1);
+                                return _storeFramedChip(
+                                  label: w.$2,
+                                  icon: Icons.event_rounded,
+                                  selected: selected,
+                                  isDark: isDark,
+                                  onTap: () => setDlg(() {
+                                    if (selected) {
+                                      marketDays.remove(w.$1);
+                                    } else {
+                                      marketDays.add(w.$1);
+                                    }
+                                  }),
+                                );
+                              }).toList(),
+                            ),
+                            if (marketDays.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text('Pick at least one day.', style: TextStyle(fontSize: 11, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
+                              ),
+                          ],
+                          const SizedBox(height: 12),
+                          _storeSectionTitle('Bonus gift (optional)', Icons.card_giftcard_rounded, isDark),
+                          const SizedBox(height: 6),
+                          Text(
+                            'If someone buys on a market day, they can win an extra gift you name (phone, charger, etc.).',
+                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
+                          ),
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Include bonus gift', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                            value: bonusGiftEnabled,
+                            activeColor: _storePurple,
+                            onChanged: (v) => setDlg(() => bonusGiftEnabled = v),
+                          ),
+                          if (bonusGiftEnabled) ...[
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: bonusGiftC,
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                              decoration: _storeFieldDec('What the buyer wins (e.g. iPhone, Samsung, charger)', Icons.emoji_events_rounded, isDark),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          _storeSectionTitle('Media (3 photos + 1 video)', Icons.perm_media_outlined, isDark),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () async {
+                                      if (imageRefs.length >= 3) {
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maximum 3 photos per listing.')));
+                                        return;
+                                      }
+                                      final img = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 78, maxWidth: 1200);
+                                      if (img == null) return;
+                                      if (kIsWeb) {
+                                        final bytes = await img.readAsBytes();
+                                        imageRefs.add('data:image/jpeg;base64,${base64Encode(bytes)}');
+                                      } else {
+                                        imageRefs.add(img.path);
+                                      }
+                                      setDlg(() {});
+                                    },
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: panelBorder, width: 1.2),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Icon(Icons.add_a_photo_rounded, color: _storeAccent, size: 22),
+                                          const SizedBox(height: 4),
+                                          Text('Add Photo (${imageRefs.length}/3)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: isDark ? Colors.white70 : const Color(0xFF334155))),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () async {
+                                      if (videoRef.isNotEmpty) {
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Only 1 video allowed per listing.')));
+                                        return;
+                                      }
+                                      final vid = await _picker.pickVideo(source: ImageSource.gallery);
+                                      if (vid == null) return;
+                                      if (kIsWeb) {
+                                        final bytes = await vid.readAsBytes();
+                                        videoRef = 'data:video/mp4;base64,${base64Encode(bytes)}';
+                                      } else {
+                                        videoRef = vid.path;
+                                      }
+                                      setDlg(() {});
+                                    },
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: panelBorder, width: 1.2),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Icon(Icons.videocam_rounded, color: _storeAccent, size: 22),
+                                          const SizedBox(height: 4),
+                                          Text(videoRef.isEmpty ? 'Add Video (0/1)' : 'Video Added (1/1)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: isDark ? Colors.white70 : const Color(0xFF334155))),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (imageRefs.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              height: 72,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: imageRefs.length,
+                                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                                itemBuilder: (_, i) => Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image(image: _listingImage(imageRefs[i])!, width: 72, height: 72, fit: BoxFit.cover),
+                                    ),
+                                    Positioned(
+                                      top: 2,
+                                      right: 2,
+                                      child: GestureDetector(
+                                        onTap: () => setDlg(() => imageRefs.removeAt(i)),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                          child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (videoRef.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: panelBorder),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.movie_rounded, color: _storeAccent),
+                                  const SizedBox(width: 8),
+                                  const Expanded(child: Text('Video attached', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
+                                  IconButton(onPressed: () => setDlg(() => videoRef = ''), icon: const Icon(Icons.close_rounded, size: 18)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              final title = titleC.text.trim();
+                              final desc = descC.text.trim();
+                              final price = double.tryParse(priceC.text.trim()) ?? 0;
+                              final deliveryFee = double.tryParse(deliveryC.text.trim()) ?? 0;
+                              if (title.isEmpty || desc.isEmpty || price <= 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Title, description, and valid price are required.')));
+                                return;
+                              }
+                              final payments = <String>[];
+                              if (payNgmy) payments.add('ngmy');
+                              if (payCashApp) payments.add('cashapp');
+                              if (payZelle) payments.add('zelle');
+                              if (payments.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select at least one payment method.')));
+                                return;
+                              }
+                              final cashTag = _normalizeCashAppDisplayTag(cashAppTagC.text);
+                              final zelleInfo = zelleInfoC.text.trim();
+                              if (payCashApp && cashTag.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter your Cash App \$tag for Cash App payments.')));
+                                return;
+                              }
+                              if (payZelle && zelleInfo.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter your Zelle phone number or email.')));
+                                return;
+                              }
+                              if (restrictMarketDays && marketDays.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select at least one market day, or turn off “Only on selected days”.')));
+                                return;
+                              }
+                              if (bonusGiftEnabled && bonusGiftC.text.trim().isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Describe the bonus gift, or turn off bonus gift.')));
+                                return;
+                              }
+                              _persistSellerPaymentPrefs(
+                                saveCashApp: payCashApp,
+                                cashTag: cashTag,
+                                saveZelle: payZelle,
+                                zelleInfo: zelleInfo,
+                              );
+                              final now = DateTime.now().toUtc().toIso8601String();
+                              final uploadedImages = <String>[];
+                              for (final ref in imageRefs) {
+                                uploadedImages.add(await _persistStoreMediaRef(ref));
+                              }
+                              final uploadedVideo = videoRef.isEmpty ? '' : await _persistStoreMediaRef(videoRef, isVideo: true);
+                              if (!ctx.mounted) return;
+                              final listing = <String, dynamic>{
+                                'id': DateTime.now().microsecondsSinceEpoch.toString(),
+                                'sellerEmail': widget.user.email.toLowerCase().trim(),
+                                'sellerName': widget.user.username,
+                                'title': title,
+                                'description': desc,
+                                'price': price,
+                                'deliveryFee': deliveryFee,
+                                'negotiable': negotiable,
+                                'acceptedPayments': payments,
+                                'sellerCashAppTag': payCashApp ? cashTag : '',
+                                'sellerZelleInfo': payZelle ? zelleInfo : '',
+                                'likedBy': <String>[],
+                                'category': category,
+                                'condition': condition,
+                                'location': locationC.text.trim(),
+                                'imageRefs': uploadedImages,
+                                'videoRef': uploadedVideo,
+                                'imageRef': uploadedImages.isNotEmpty ? uploadedImages.first : '',
+                                'status': 'active',
+                                'units': int.tryParse(unitsC.text.trim()) ?? 1,
+                                'unitsRemaining': int.tryParse(unitsC.text.trim()) ?? 1,
+                                'buyerEmail': '',
+                                'buyerName': '',
+                                'createdAt': now,
+                                'updatedAt': now,
+                                'soldAt': '',
+                              };
+                              final marketDayList = marketDays.toList()..sort();
+                              NgmyStoreListingExtras.applyToListing(
+                                listing,
+                                days: restrictMarketDays ? marketDayList : const [],
+                                giftTitle: bonusGiftEnabled ? bonusGiftC.text.trim() : '',
+                              );
+                              final normalized = _normalizeStoreListing(listing);
+                              final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == normalized['id']);
+                              if (idx >= 0) {
+                                _listings[idx] = normalized;
+                              } else {
+                                _listings.add(normalized);
+                              }
+                              final cloudOk = await _upsertStoreListingRowSafe(normalized);
+                              if (!cloudOk) {
+                                if (!ctx.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Listed on this device only. Run supabase/store_tables.sql in Supabase so others can see it.'),
+                                    backgroundColor: Color(0xFFEF4444),
+                                  ),
+                                );
+                              }
+                              _listingsSig = _storeListingsSignature(_listings);
+                              _save();
+                              Navigator.pop(ctx);
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    cloudOk
+                                        ? 'Item is live in the shop for all NGMY users.'
+                                        : 'Item saved locally. Fix Supabase store tables to sync worldwide.',
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.rocket_launch_rounded, color: Colors.white),
+                            label: const Text('Publish Listing', style: TextStyle(fontWeight: FontWeight.w900)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _storeAccent,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 4,
+                              shadowColor: _storeAccent.withOpacity(0.4),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    cashAppTagC.dispose();
+    zelleInfoC.dispose();
+    bonusGiftC.dispose();
+  }
+
+  void _completeStorePurchase({
+    required Map<String, dynamic> listing,
+    required String selectedPay,
+    required String address,
+    required String phone,
+    required String buyerName,
+    required int quantity,
+    String? paymentScreenshot,
+  }) {
+    final price = (listing['price'] as num?)?.toDouble() ?? 0;
+    final delivery = (listing['deliveryFee'] as num?)?.toDouble() ?? 0;
+    final unitTotal = price + delivery;
+    final total = unitTotal * quantity;
+    final sellerEmail = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
+    final title = (listing['title'] ?? 'Item').toString();
+    final sellerIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sellerEmail);
+    if (sellerIdx < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Seller account not found.')));
+      return;
+    }
+    final listingId = (listing['id'] ?? '').toString();
+    final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == listingId);
+    if (idx < 0 || (_listings[idx]['status'] ?? '') != 'active') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This item is no longer available.')));
+      return;
+    }
+    if (!NgmyStoreListingExtras.isVisibleToBuyersToday(_listings[idx])) {
+      final msg = NgmyStoreListingExtras.nextAvailableMessage(_listings[idx]);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg ?? 'This item is not on the market today.')));
+      return;
+    }
+    final remaining = ((_listings[idx]['unitsRemaining'] as num?)?.toInt() ?? 1);
+    if (quantity > remaining) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Only $remaining unit(s) left.')));
+      return;
+    }
+    if (selectedPay == 'ngmy' && widget.user.accountBalance < total) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Not enough NGMY balance. Need \$${formatCurrency(total)}.')));
+      return;
+    }
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    final externalPay = selectedPay == 'cashapp' || selectedPay == 'zelle';
+    final payCode = externalPay ? ngmyGenerateStorePaymentCode() : '';
+    final order = _normalizeStoreOrder({
+      'id': 'order_${DateTime.now().microsecondsSinceEpoch}',
+      'listingId': listingId,
+      'title': title,
+      'price': price,
+      'deliveryFee': delivery,
+      'total': total,
+      'quantity': quantity,
+      'sellerEmail': sellerEmail,
+      'sellerName': listing['sellerName'] ?? 'Seller',
+      'buyerEmail': widget.user.email,
+      'buyerName': buyerName.isNotEmpty ? buyerName : widget.user.username,
+      'buyerPhone': phone,
+      'buyerAddress': address,
+      'paidVia': selectedPay,
+      'paymentVerificationCode': payCode,
+      'paymentStatus': externalPay ? 'awaiting_proof' : 'approved',
+      'createdAt': now,
+      'updatedAt': now,
+      'fulfillmentStatus': 'pending',
+      'shipByDeadline': DateTime.now().toUtc().add(kStoreShipByWindow).toIso8601String(),
+      'locationHistory': <Map<String, dynamic>>[],
+      'bonusGiftTitle': NgmyStoreListingExtras.bonusGiftTitle(listing),
+    });
+
+    setState(() {
+      if (selectedPay == 'ngmy') {
+        widget.user.accountBalance -= total;
+        widget.allUsers[sellerIdx].accountBalance += total;
+      }
+      final newRemaining = remaining - quantity;
+      _listings[idx]['unitsRemaining'] = newRemaining;
+      _listings[idx]['updatedAt'] = now;
+      if (newRemaining <= 0) {
+        _listings[idx]['status'] = 'sold';
+        _listings[idx]['buyerEmail'] = widget.user.email;
+        _listings[idx]['buyerName'] = widget.user.username;
+        _listings[idx]['soldAt'] = now;
+        _listings[idx]['paidVia'] = selectedPay;
+      }
+      _upsertOrderLocal(order);
+    });
+
+    final ts = DateTime.now().microsecondsSinceEpoch.toString();
+    if (selectedPay == 'ngmy') {
+      widget.onAddTransaction(AppTransaction(
+        id: 'store_buy_$ts',
+        userEmail: widget.user.email,
+        amount: total,
+        type: TransactionType.adminRemove,
+        method: PaymentMethod.system,
+        status: TransactionStatus.approved,
+        timestamp: DateTime.now(),
+        sourceDetails: 'NGMY Store purchase: $title x$quantity',
+      ));
+      widget.onAddTransaction(AppTransaction(
+        id: 'store_sale_$ts',
+        userEmail: widget.allUsers[sellerIdx].email,
+        amount: total,
+        type: TransactionType.adminAdd,
+        method: PaymentMethod.system,
+        status: TransactionStatus.approved,
+        timestamp: DateTime.now(),
+        sourceDetails: 'NGMY Store sale: $title x$quantity',
+      ));
+    }
+    unawaited(_upsertStoreListingRowSafe(_listings[idx]));
+    _listingsSig = _storeListingsSignature(_listings);
+    _save(refreshCloud: true);
+    if (mounted) {
+      setState(() {});
+      if (!_canSell) {
+        _tabCtrl.animateTo(1);
+      }
+    }
+    final giftTitle = NgmyStoreListingExtras.bonusGiftTitle(listing);
+    if (giftTitle.isNotEmpty) {
+      unawaited(showNgmyStoreGiftCelebration(context, productTitle: title, giftTitle: giftTitle));
+    }
+    if (selectedPay == 'ngmy') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            giftTitle.isNotEmpty
+                ? 'Purchase complete! You won: $giftTitle. Track in Purchases.'
+                : (_canSell ? 'Purchase complete! Track in Receipts → My Purchases.' : 'Purchase complete! Track shipment in Purchases.'),
+          ),
+        ),
+      );
+    } else {
+      final hasProof = paymentScreenshot != null && paymentScreenshot.trim().isNotEmpty;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            hasProof
+                ? (giftTitle.isNotEmpty
+                    ? 'Order placed — payment proof sent to seller. Bonus gift: $giftTitle.'
+                    : 'Order placed — payment proof sent to seller. Track in Purchases.')
+                : (giftTitle.isNotEmpty
+                    ? 'Order placed — bonus gift: $giftTitle. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}.'
+                    : 'Order placed. Pay \$${formatCurrency(total)} via ${_paymentLabel(selectedPay)}. Track in Purchases.'),
+          ),
+        ),
+      );
+      if (hasProof) {
+        final proof = paymentScreenshot!.trim();
+        _updateOrderFields((order['id'] ?? '').toString(), {
+          'paymentProofPath': proof,
+          'paymentStatus': 'awaiting_proof',
+        });
+        order['paymentProofPath'] = proof;
+        unawaited(_postStorePaymentNotificationToSeller(
+          listing: listing,
+          order: order,
+          method: selectedPay,
+          screenshotPath: proof,
+        ));
+        _ensurePaymentReviewInquiriesFromOrders();
+        unawaited(_persistOrdersAndRefresh(orderId: (order['id'] ?? '').toString()));
+      } else {
+        _showExternalPaymentSheet(selectedPay, listing, order, total);
+      }
+    }
+  }
+
+  void _buyListing(Map<String, dynamic> listing) {
+    final price = (listing['price'] as num?)?.toDouble() ?? 0;
+    final delivery = (listing['deliveryFee'] as num?)?.toDouble() ?? 0;
+    final unitTotal = price + delivery;
+    if (unitTotal <= 0) return;
+    final sellerEmail = (listing['sellerEmail'] ?? '').toString().toLowerCase().trim();
+    if (sellerEmail == widget.user.email.toLowerCase().trim()) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You cannot buy your own listing.')));
+      return;
+    }
+    if (!NgmyStoreListingExtras.isVisibleToBuyersToday(listing)) {
+      final msg = NgmyStoreListingExtras.nextAvailableMessage(listing);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg ?? 'This item is not on the market today.')));
+      return;
+    }
+    final payments = _listingAcceptedPayments(listing);
+    String selectedPay = payments.contains('ngmy') ? 'ngmy' : payments.first;
+    final title = (listing['title'] ?? 'Item').toString();
+    final unitsRemaining = (listing['unitsRemaining'] as num?)?.toInt() ?? (listing['units'] as num?)?.toInt() ?? 1;
+    final addressC = TextEditingController(text: widget.user.homeAddress ?? '');
+    final phoneC = TextEditingController(text: widget.user.phone);
+    final nameC = TextEditingController(text: widget.user.fullName ?? widget.user.username);
+    int buyQty = 1;
+    String? paymentScreenshotRef;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      useSafeArea: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final total = unitTotal * buyQty;
+          final balanceOk = widget.user.accountBalance >= total;
+          final needsPaymentProof = selectedPay == 'cashapp' || selectedPay == 'zelle';
+          final hasPaymentProof = paymentScreenshotRef != null && paymentScreenshotRef!.isNotEmpty;
+          final canConfirm = addressC.text.trim().isNotEmpty &&
+              phoneC.text.trim().isNotEmpty &&
+              (selectedPay != 'ngmy' || balanceOk) &&
+              (selectedPay != 'cashapp' || _listingSellerCashTag(listing).isNotEmpty) &&
+              (selectedPay != 'zelle' || _listingSellerZelle(listing).isNotEmpty) &&
+              (!needsPaymentProof || hasPaymentProof);
+
+          Future<void> pickPaymentScreenshot() async {
+            final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1600);
+            if (file == null) return;
+            final bytes = await file.readAsBytes();
+            final mime = file.mimeType ?? 'image/jpeg';
+            setDlg(() => paymentScreenshotRef = 'data:$mime;base64,${base64Encode(bytes)}');
+          }
+
+          Widget payTile(String key, String emoji, String label, String? sub) {
+            final sel = selectedPay == key;
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => setDlg(() => selectedPay = key),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: sel ? _storePurple : (isDark ? Colors.white24 : const Color(0xFFE5E7EB)), width: sel ? 2 : 1),
+                    color: sel ? _storePurple.withOpacity(0.08) : (isDark ? const Color(0xFF0F172A) : Colors.white),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(sel ? Icons.radio_button_checked : Icons.radio_button_off, color: sel ? _storePurple : Colors.grey, size: 20),
+                      const SizedBox(width: 10),
+                      Text(emoji, style: const TextStyle(fontSize: 20)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                            if (sub != null && sub.isNotEmpty)
+                              Text(sub, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
+          final sheetBottom = MediaQuery.of(ctx).padding.bottom;
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              margin: EdgeInsets.fromLTRB(12, 0, 12, 12 + sheetBottom),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF121726) : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        ShaderMask(
+                          shaderCallback: (b) => const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFF2563EB)]).createShader(b),
+                          child: const Text('Buy Item', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: Icon(Icons.close_rounded, color: isDark ? Colors.white70 : Colors.black54),
+                        ),
+                      ],
+                    ),
+                    _storeCheckoutPricePanel(
+                      isDark: isDark,
+                      price: price,
+                      delivery: delivery,
+                      buyQty: buyQty,
+                      title: title,
+                    ),
+                    if (unitsRemaining > 1) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Text('Quantity', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                          IconButton(
+                            onPressed: buyQty > 1 ? () => setDlg(() => buyQty--) : null,
+                            icon: const Icon(Icons.remove_circle_outline),
+                          ),
+                          Text('$buyQty', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
+                          IconButton(
+                            onPressed: buyQty < unitsRemaining ? () => setDlg(() => buyQty++) : null,
+                            icon: const Icon(Icons.add_circle_outline),
+                          ),
+                          Text('($unitsRemaining available)', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey)),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                    const SizedBox(height: 8),
+                    if (payments.contains('ngmy')) payTile('ngmy', '💰', 'Account Balance', 'Balance: \$${formatCurrency(widget.user.accountBalance)}'),
+                    if (payments.contains('cashapp'))
+                      payTile('cashapp', '💵', 'Cash App', _listingSellerCashTag(listing).isEmpty ? null : _normalizeCashAppDisplayTag(_listingSellerCashTag(listing))),
+                    if (payments.contains('zelle'))
+                      payTile('zelle', '🏦', 'Zelle', _listingSellerZelle(listing).isEmpty ? null : 'Send to: ${_listingSellerZelle(listing)}'),
+                    if (selectedPay == 'ngmy' && !balanceOk)
+                      Text('Not enough balance for \$${formatCurrency(total)}.', style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+                    if (needsPaymentProof) ...[
+                      const SizedBox(height: 12),
+                      if (selectedPay == 'cashapp' && _listingSellerCashTag(listing).isNotEmpty)
+                        _storePaymentInfoTile(
+                          label: 'Pay seller on Cash App',
+                          value: _listingSellerCashTag(listing),
+                          icon: Icons.payments_rounded,
+                          color: const Color(0xFF00D632),
+                          isDark: isDark,
+                          onTap: () => _openSellerCashApp(_listingSellerCashTag(listing)),
+                        ),
+                      if (selectedPay == 'zelle' && _listingSellerZelle(listing).isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        _storePaymentInfoTile(
+                          label: 'Zelle — tap or hold to copy',
+                          value: _listingSellerZelle(listing),
+                          icon: Icons.account_balance_rounded,
+                          color: const Color(0xFF6D1ED4),
+                          isDark: isDark,
+                          copyOnly: true,
+                          onTap: () => _copyStorePaymentInfo(_listingSellerZelle(listing), label: 'Zelle info'),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Text(
+                        'Payment screenshot (required)',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87),
+                      ),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: pickPaymentScreenshot,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: hasPaymentProof ? const Color(0xFF16A34A) : (isDark ? const Color(0xFF475569) : const Color(0xFF2563EB)),
+                              width: 1.5,
+                            ),
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.add_a_photo_outlined,
+                                size: 32,
+                                color: hasPaymentProof ? const Color(0xFF16A34A) : (isDark ? Colors.white54 : Colors.grey),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                hasPaymentProof ? 'Screenshot attached — tap to change' : 'Tap to upload Cash App or Zelle payment screenshot',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: isDark ? Colors.white70 : Colors.black87,
+                                ),
+                              ),
+                              if (hasPaymentProof) ...[
+                                const SizedBox(height: 10),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(maxHeight: 120),
+                                  child: NgmyPaymentProofImage(path: paymentScreenshotRef),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    Text('Full name', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: nameC,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                      decoration: _storeFieldDec('Your name', Icons.person_outline, isDark),
+                    ),
+                    const SizedBox(height: 10),
+                    Text('Phone number', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: phoneC,
+                      keyboardType: TextInputType.phone,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                      decoration: _storeFieldDec('Phone for delivery updates', Icons.phone_outlined, isDark),
+                    ),
+                    const SizedBox(height: 10),
+                    Text('Delivery Address', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: addressC,
+                      maxLines: 3,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                      onChanged: (_) => setDlg(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Street, city, state, zip — everything needed to ship',
+                        hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: _storeAccent, width: 1.4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFFDB2777)]),
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: !canConfirm
+                              ? null
+                              : () {
+                                  Navigator.pop(ctx);
+                                  _completeStorePurchase(
+                                    listing: listing,
+                                    selectedPay: selectedPay,
+                                    address: addressC.text.trim(),
+                                    phone: phoneC.text.trim(),
+                                    buyerName: nameC.text.trim(),
+                                    quantity: buyQty,
+                                    paymentScreenshot: paymentScreenshotRef,
+                                  );
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                          ),
+                          child: const Text('Confirm Purchase 🎉', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteListing(Map<String, dynamic> listing) async {
+    final title = (listing['title'] ?? 'Item').toString();
+    final status = (listing['status'] ?? '').toString();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete listing?'),
+        content: Text(
+          status == 'sold'
+              ? 'Remove "$title" from your Listings history? This cannot be undone.'
+              : 'Remove "$title" from the Shop and your Listings?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await _removeListing(listing);
+  }
+
+  Future<void> _removeListing(Map<String, dynamic> listing) async {
+    final id = (listing['id'] ?? '').toString();
+    final idx = _listings.indexWhere((l) => (l['id'] ?? '').toString() == id);
+    if (idx < 0) return;
+    setState(() => _listings.removeAt(idx));
+    unawaited(_deleteStoreListingRowsFromSupabase([id]));
+    _listingsSig = _storeListingsSignature(_listings);
+    _save(refreshCloud: true);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Listing deleted.')));
+    }
+  }
+
+  Widget _listingCard(Map<String, dynamic> listing, {required bool showBuy, required bool showManage}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final status = (listing['status'] ?? 'active').toString();
+    final price = (listing['price'] as num?)?.toDouble() ?? 0;
+    final images = _listingImageRefs(listing);
+    final videoRef = _listingVideoRef(listing);
+    final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
+    Color statusColor = Colors.green;
+    if (status == 'sold') statusColor = Colors.blue;
+    if (status == 'removed') statusColor = Colors.grey;
+
+    final me = widget.user.email.toLowerCase().trim();
+    final isMyListing = showManage && (listing['sellerEmail'] ?? '').toString().toLowerCase().trim() == me;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: (images.isNotEmpty || videoRef.isNotEmpty) ? () => _openListingDetail(listing) : null,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border, width: 1.2),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.06), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (images.isNotEmpty)
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: Stack(
+                children: [
+                  _listingPhoto(images.first, height: 160, width: double.infinity),
+                  if (images.length > 1)
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
+                        child: Text('+${images.length - 1} photos', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  if (videoRef.isNotEmpty)
+                    const Positioned(left: 8, bottom: 8, child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 28)),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: Text((listing['title'] ?? '').toString(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+                    if (showManage)
+                      IconButton(
+                        onPressed: () => _confirmDeleteListing(listing),
+                        icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                        tooltip: 'Delete listing',
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: statusColor.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                      child: Text(
+                        status == 'active' ? 'IN SHOP' : status.toUpperCase(),
+                        style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '\$${formatCurrency(price)}',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A), decoration: TextDecoration.none, height: 1.1),
+                ),
+                const SizedBox(height: 6),
+                Text((listing['description'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _storeChip((listing['category'] ?? 'Other').toString()),
+                    _storeChip((listing['condition'] ?? '').toString()),
+                    if ((listing['location'] ?? '').toString().isNotEmpty) _storeChip((listing['location'] ?? '').toString()),
+                    if (NgmyStoreListingExtras.hasRestrictedDays(listing)) _storeChip(NgmyStoreListingExtras.scheduleLabel(listing)),
+                    if (NgmyStoreListingExtras.hasBonusGift(listing)) _storeChip('Gift: ${NgmyStoreListingExtras.bonusGiftTitle(listing)}'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text('Seller: ${(listing['sellerName'] ?? 'User').toString()}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
+                if (status == 'sold' && (listing['buyerName'] ?? '').toString().isNotEmpty)
+                  Text('Buyer: ${listing['buyerName']}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
+                const SizedBox(height: 10),
+                if (showBuy && status == 'active' && NgmyStoreListingExtras.isVisibleToBuyersToday(listing)) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _askAvailability(listing),
+                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                      label: const Text('Ask if Available'),
+                      style: OutlinedButton.styleFrom(foregroundColor: _storeAccent, side: const BorderSide(color: _storeAccent)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _buyListing(listing),
+                      icon: Icon(NgmyStoreListingExtras.hasBonusGift(listing) ? Icons.card_giftcard_rounded : Icons.shopping_cart_checkout_rounded),
+                      label: Text(NgmyStoreListingExtras.hasBonusGift(listing) ? 'Buy Now + Win Gift' : 'Buy Now'),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
+                    ),
+                  ),
+                ],
+                if (showBuy && status == 'active' && !NgmyStoreListingExtras.isVisibleToBuyersToday(listing))
+                  Text(
+                    NgmyStoreListingExtras.nextAvailableMessage(listing) ?? 'Not on the market today.',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.orange.shade800),
+                  ),
+                if (showManage && status == 'sold')
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _promptResellListing(listing),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Resell Item'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _storePurple,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                if (showManage && status == 'active')
+                  Text(
+                    NgmyStoreListingExtras.isVisibleToBuyersToday(listing)
+                        ? 'Live in Shop today · ${NgmyStoreListingExtras.scheduleLabel(listing)}'
+                        : 'Hidden from Shop today · ${NgmyStoreListingExtras.scheduleLabel(listing)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: NgmyStoreListingExtras.isVisibleToBuyersToday(listing)
+                          ? (isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A))
+                          : Colors.orange.shade800,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+        ),
+      ),
+    );
+  }
+
+  Widget _storeChip(String text) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
+      ),
+      child: Text(text, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF334155))),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final shop = _activeShopListings();
+    final mine = _myListings();
+    final bought = _myPurchases();
+    final sales = _mySalesOrders();
+    final ordersTabCount = _canSell
+        ? sales.where((o) => (o['fulfillmentStatus'] ?? 'pending').toString() == 'pending').length
+        : bought.length;
+    final ordersTabLabel = _canSell ? 'Sales' : 'Purchases';
+    final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
+
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0B0F1A) : const Color(0xFFF1F5F9),
+      floatingActionButton: Padding(padding: const EdgeInsets.only(bottom: 8), child: _sellItemButton()),
+      body: Column(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: _storeGlassFrame(
+                isDark: isDark,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(2, 4, 8, 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: isDark ? Colors.white : Colors.black87),
+                            onPressed: () => NgmyNavigator.pop(context),
+                          ),
+                          const Icon(Icons.storefront_rounded, color: _storePurple, size: 18),
+                          const SizedBox(width: 6),
+                          const Text('NGMY Store', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: _storePurple)),
+                          const Spacer(),
+                          _storeTabChip(0, 'Shop', shop.length, isDark),
+                          if (_canSell) _storeTabChip(1, 'Listings', mine.length, isDark),
+                          _storeTabChip(_canSell ? 2 : 1, ordersTabLabel, ordersTabCount, isDark),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                      child: _storeTopActionBar(isDark, frameBorder),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabCtrl,
+              physics: const NeverScrollableScrollPhysics(),
+              children: _canSell
+                  ? [
+                      _shopGrid(shop),
+                      _listingList(mine, empty: 'You have no listings. Tap Sell Item to post.', showBuy: false, showManage: true),
+                      _sellerSalesTab(sales),
+                    ]
+                  : [
+                      _shopGrid(shop),
+                      _buyerPurchasesTab(bought, isDark),
+                    ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _storeTopActionBar(bool isDark, Color frameBorder) {
+    final barFill = isDark ? const Color(0xFF0F172A) : Colors.white;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: barFill,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: frameBorder, width: 1.4),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.06), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Scan barcode',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
+            icon: const Icon(Icons.qr_code_scanner_rounded, color: _storePurple, size: 22),
+            onPressed: () => openNgmyBarcodeScanner(context),
+          ),
+          Container(
+            height: 36,
+            width: 1,
+            margin: const EdgeInsets.only(right: 6),
+            color: frameBorder,
+          ),
+          const Icon(Icons.search_rounded, color: _storePurple, size: 20),
+          const SizedBox(width: 6),
+          Expanded(
+            child: TextField(
+              controller: _searchC,
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(
+                hintText: 'Search products...',
+                hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade500, fontSize: 14),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          Container(
+            height: 36,
+            width: 1,
+            margin: const EdgeInsets.symmetric(horizontal: 6),
+            color: frameBorder,
+          ),
+          IconButton(
+            tooltip: 'Receipts',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
+            icon: const Icon(Icons.receipt_long_rounded, color: _storeAccent, size: 22),
+            onPressed: _showStoreReceipts,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _shopGrid(List<Map<String, dynamic>> items) {
+    if (_storeLoading && items.isEmpty && _listings.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: _storePurple));
+    }
+    return RefreshIndicator(
+      color: _storePurple,
+      onRefresh: () => _refreshStoreListingsFromCloud(force: true),
+      child: CustomScrollView(
+        slivers: [
+          if (items.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    _canSell ? 'No items for sale yet. Tap Sell Item to post!' : 'No items for sale yet.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 100),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.58,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => _storeGridCard(items[i]),
+                  childCount: items.length,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _listingList(List<Map<String, dynamic>> items, {required String empty, required bool showBuy, required bool showManage}) {
+    if (items.isEmpty) {
+      return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(empty, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey))));
+    }
+    if (showManage) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final sold = items.where((l) => (l['status'] ?? '').toString() == 'sold').toList();
+      final active = items.where((l) => (l['status'] ?? '').toString() == 'active').toList();
+      final other = items.where((l) {
+        final s = (l['status'] ?? '').toString();
+        return s != 'sold' && s != 'active';
+      }).toList();
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        children: [
+          if (sold.isNotEmpty) ...[
+            Text('Sold (Resell moves item back to Shop)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+            const SizedBox(height: 8),
+            ...sold.map((l) => _listingCard(l, showBuy: false, showManage: true)),
+            const SizedBox(height: 16),
+          ],
+          if (active.isNotEmpty) ...[
+            Text('Live in Shop', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+            const SizedBox(height: 8),
+            ...active.map((l) => _listingCard(l, showBuy: false, showManage: true)),
+          ],
+          ...other.map((l) => _listingCard(l, showBuy: false, showManage: true)),
+        ],
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      itemCount: items.length,
+      itemBuilder: (_, i) => _listingCard(items[i], showBuy: showBuy, showManage: showManage),
+    );
+  }
 }
+
 class NgmyHelpCenterScreen extends StatelessWidget {
   final UserData user;
   final List<UserData> allUsers;
