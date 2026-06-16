@@ -585,6 +585,23 @@ bool ngmyIsGameLedgerTransaction(AppTransaction t) {
   return false;
 }
 
+bool ngmyIsStoreLedgerTransaction(AppTransaction t) {
+  final d = (t.sourceDetails ?? '').toLowerCase();
+  return d.contains('ngmy store sale') || d.contains('ngmy store purchase');
+}
+
+void ngmyDeliverTransactionAlerts(AppTransaction t, {bool forceIncomeSound = false}) {
+  if (t.status != TransactionStatus.approved) return;
+  if (ngmyTransactionCountsAsIncome(t)) {
+    ngmyPlayIncomeSoundForTransaction(
+      t,
+      force: forceIncomeSound ||
+          ngmyIsGameLedgerTransaction(t) ||
+          ngmyIsStoreLedgerTransaction(t),
+    );
+  }
+}
+
 void ngmyApplyPendingWithdrawalHold(UserData user, AppTransaction t, Set<String> appliedHoldIds) {
   if (t.type != TransactionType.withdrawal || t.status != TransactionStatus.pending) return;
   if (t.id.isEmpty || appliedHoldIds.contains(t.id)) return;
@@ -4454,7 +4471,7 @@ const bool kNgmySuppressClockInPopups = true;
 const bool kNgmyShowClockInConfirmDialog = true;
 
 /// No deposit/withdrawal banner popups (requests still save; check Wallet / History).
-const bool kNgmySuppressWalletTransactionPopups = true;
+const bool kNgmySuppressWalletTransactionPopups = false;
 
 /// No top overlay banners (New sale, New announcement, store orders, jobs, etc.).
 /// Realtime sync still runs — users see updates in the relevant screens only.
@@ -8807,21 +8824,35 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   String _notificationTitleForTransaction(AppTransaction t, {bool statusChanged = false}) {
+    final sd = (t.sourceDetails ?? '').toLowerCase();
     if (statusChanged) {
-      if (t.status == TransactionStatus.approved) return 'Transaction approved';
+      if (t.status == TransactionStatus.approved) {
+        if (t.type == TransactionType.deposit) return 'Deposit approved';
+        if (t.type == TransactionType.withdrawal) return 'Withdrawal approved';
+        return 'Transaction approved';
+      }
       if (t.status == TransactionStatus.rejected) return 'Transaction rejected';
       return 'Transaction update';
     }
+    if (ngmyIsGameLedgerTransaction(t)) {
+      if (t.type == TransactionType.adminRemove) return 'Game bet placed';
+      if (sd.contains('partial')) return 'Partial game win';
+      if (sd.contains('multiplayer')) return 'Multiplayer payout';
+      return 'You won!';
+    }
+    if (ngmyIsStoreLedgerTransaction(t)) {
+      if (sd.contains('sale')) return 'Store sale — payment received';
+      return 'Store purchase';
+    }
     if (t.type == TransactionType.reimbursement) {
-      final sd = (t.sourceDetails ?? '').toLowerCase();
       if (sd.contains('clock-in session started')) return 'Clock-in started';
       if (sd.contains('clock-in')) return 'Clock-in income received';
     }
     switch (t.type) {
       case TransactionType.deposit:
-        return 'Deposit request submitted';
+        return t.status == TransactionStatus.pending ? 'Deposit submitted' : 'Deposit received';
       case TransactionType.withdrawal:
-        return 'Withdrawal request submitted';
+        return t.status == TransactionStatus.pending ? 'Withdrawal submitted' : 'Withdrawal processed';
       case TransactionType.adminAdd:
         return 'Account credited';
       case TransactionType.adminRemove:
@@ -8845,6 +8876,53 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (details.isNotEmpty) return '$amount - $details';
     return amount;
+  }
+
+  Future<void> _pushUserPushAlert({
+    required String title,
+    required String body,
+    String? tag,
+    Duration cooldown = const Duration(seconds: 8),
+  }) async {
+    if (_currentUser == null) return;
+    final dedupeKey = tag ?? '${title.trim()}|${body.trim()}';
+    final last = _notificationCooldown[dedupeKey];
+    if (last != null && DateTime.now().difference(last) < cooldown) return;
+    _notificationCooldown[dedupeKey] = DateTime.now();
+
+    if (kIsWeb) {
+      await ngmyPushShow(title: title, body: body, tag: tag ?? title);
+    } else if (_notificationsReady) {
+      try {
+        const androidDetails = AndroidNotificationDetails(
+          'ngmy_transactions',
+          'NGMY Transactions',
+          channelDescription: 'Transaction, earnings, and store sale alerts',
+          importance: Importance.max,
+          priority: Priority.high,
+        );
+        const darwinDetails = DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        );
+        const linuxDetails = LinuxNotificationDetails();
+        const details = NotificationDetails(
+          android: androidDetails,
+          iOS: darwinDetails,
+          macOS: darwinDetails,
+          linux: linuxDetails,
+        );
+        await _localNotifications.show(
+          id: _nextNotificationId++,
+          title: title,
+          body: body,
+          notificationDetails: details,
+        );
+      } catch (e) {
+        debugPrint('Push alert failed: $e');
+      }
+    }
   }
 
   Future<void> _pushInAppNotification({
@@ -9062,12 +9140,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _notifyTransactionEvent(AppTransaction t, {bool statusChanged = false}) async {
-    if (NgmyGameSession.suppressExternalNotifications) return;
     if (_ngmyIsClockInSessionStartTransaction(t)) return;
-    if (kNgmySuppressWalletTransactionPopups &&
-        (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal)) {
-      return;
-    }
     if (kNgmySuppressClockInPopups) {
       final sd = (t.sourceDetails ?? '').toLowerCase();
       if (sd.contains('clock-in')) return;
@@ -9076,11 +9149,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (currentEmail == null || currentEmail.isEmpty) return;
     if (t.userEmail.toLowerCase().trim() != currentEmail) return;
     if (!_tryClaimTransactionNotification(t, statusChanged: statusChanged)) return;
-    await _pushInAppNotification(
+    await _pushUserPushAlert(
       title: _notificationTitleForTransaction(t, statusChanged: statusChanged),
       body: _notificationBodyForTransaction(t, statusChanged: statusChanged),
-      tag: 'txn_${t.id}',
-      showInAppBanner: false,
+      tag: statusChanged ? 'txn_${t.id}_${t.status.name}' : 'txn_${t.id}',
     );
   }
 
@@ -9348,13 +9420,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final title = (o['title'] ?? 'Item').toString();
       final pay = (o['paymentStatus'] ?? '').toString();
       if (pay == 'awaiting_proof') {
-        unawaited(_pushInAppNotification(
+        unawaited(_pushUserPushAlert(
           title: 'Payment proof to review',
           body: 'A buyer paid for $title with Cash App or Zelle. Open Messages to confirm or reject.',
           tag: 'store_pay_review_$id',
         ));
       } else if (pay == 'approved') {
-        unawaited(_pushInAppNotification(
+        unawaited(_pushUserPushAlert(
           title: 'New sale',
           body: 'Payment confirmed for $title. Open Store → Sales to ship.',
           tag: 'store_sale_$id',
@@ -9362,7 +9434,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       } else {
         final via = (o['paidVia'] ?? '').toString();
         final viaLabel = via.isEmpty ? '' : ' (${ngmyStorePaymentMethodLabel(via)})';
-        unawaited(_pushInAppNotification(
+        unawaited(_pushUserPushAlert(
           title: 'New store order',
           body: 'Someone ordered $title$viaLabel. Open Store → Messages or Sales.',
           tag: 'store_order_$id',
@@ -9981,7 +10053,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final isLiveInsert = previous == null &&
               DateTime.now().difference(tx.timestamp) <= const Duration(minutes: 3);
           if (isFreshApproval || isLiveInsert) {
-            ngmyPlayIncomeSoundForTransaction(tx, force: ngmyIsGameLedgerTransaction(tx));
+            ngmyDeliverTransactionAlerts(tx);
           }
         }
         if (userIdx >= 0 &&
@@ -11031,16 +11103,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     ngmyNotifyBalanceChanged();
                   }
                   unawaited(_persistLocalOnly());
-                  if (t.status == TransactionStatus.approved && ngmyTransactionCountsAsIncome(t)) {
-                    ngmyPlayIncomeSoundForTransaction(t, force: ngmyIsGameLedgerTransaction(t));
-                  }
+                  ngmyDeliverTransactionAlerts(t);
                   if (t.status == TransactionStatus.pending &&
                       (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal)) {
                     unawaited(_notifyAdminAboutPendingTransaction(t));
                   }
-                  if (!_ngmyIsClockInSessionStartTransaction(t) &&
-                      (!kNgmySuppressWalletTransactionPopups ||
-                          (t.type != TransactionType.deposit && t.type != TransactionType.withdrawal))) {
+                  if (!_ngmyIsClockInSessionStartTransaction(t)) {
                     unawaited(_notifyTransactionEvent(t));
                   }
                 },
@@ -11161,9 +11229,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     );
                   }
                   if (approve) {
-                    ngmyPlayIncomeSoundForTransaction(t);
+                    ngmyDeliverTransactionAlerts(t, forceIncomeSound: true);
                   }
-                  _notifyTransactionEvent(t, statusChanged: true);
+                  unawaited(_notifyTransactionEvent(t, statusChanged: true));
                 },
                 onAddPlan: (p) {
                   setState(() {
