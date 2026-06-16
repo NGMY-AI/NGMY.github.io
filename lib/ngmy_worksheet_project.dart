@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'ngmy_nav.dart';
@@ -29,6 +31,20 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
   void initState() {
     super.initState();
     _project = widget.project;
+    _reloadFromStorage();
+  }
+
+  @override
+  void dispose() {
+    unawaited(upsertWorksheetProject(widget.userEmail, _project));
+    super.dispose();
+  }
+
+  Future<void> _reloadFromStorage() async {
+    final saved = await loadWorksheetProjectById(widget.userEmail, widget.project.id);
+    if (saved != null && mounted) {
+      setState(() => _project = saved);
+    }
   }
 
   Future<void> _persist() async {
@@ -162,10 +178,12 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
                             ),
                           ),
                           Material(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white,
+                            elevation: 2,
+                            shadowColor: Colors.black26,
+                            borderRadius: BorderRadius.circular(24),
                             child: InkWell(
-                            onTap: () => showNgmyWorksheetProjectShareSheet(
+                              onTap: () => showNgmyWorksheetProjectShareSheet(
                                 context,
                                 ownerEmail: widget.userEmail,
                                 project: _project,
@@ -175,10 +193,24 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
                                   NgmyNavigator.pop(context, imported);
                                 },
                               ),
-                              borderRadius: BorderRadius.circular(12),
-                              child: const Padding(
-                                padding: EdgeInsets.all(10),
-                                child: Icon(Icons.ios_share_rounded, color: Colors.white, size: 22),
+                              borderRadius: BorderRadius.circular(24),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.share_rounded, color: WorksheetPalette.greenDark, size: 18),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Share',
+                                      style: TextStyle(
+                                        color: WorksheetPalette.greenDark,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),

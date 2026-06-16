@@ -9,10 +9,24 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'ngmy_network_resilience.dart';
 
 const String _projectsKeyPrefix = 'ngmy_worksheets_projects_v2_';
+const String _projectsIndexV3Prefix = 'ngmy_worksheets_index_v3_';
+const String _projectItemV3Prefix = 'ngmy_worksheet_item_v3_';
 const String _familyTreesKeyPrefix = 'ngmy_worksheets_family_trees_v1_';
+
+String _emailSlug(String userEmail) {
+  final email = userEmail.toLowerCase().trim();
+  if (email.isEmpty) return '';
+  return email.replaceAll(RegExp(r'[^a-z0-9@._+-]'), '_');
+}
 
 String _projectsKey(String userEmail) =>
     '$_projectsKeyPrefix${userEmail.toLowerCase().trim().hashCode.abs()}';
+
+String _projectsIndexV3Key(String userEmail) =>
+    '$_projectsIndexV3Prefix${_emailSlug(userEmail)}';
+
+String _projectItemV3Key(String userEmail, String projectId) =>
+    '$_projectItemV3Prefix${_emailSlug(userEmail)}_$projectId';
 
 String _familyTreesKey(String userEmail) =>
     '$_familyTreesKeyPrefix${userEmail.toLowerCase().trim().hashCode.abs()}';
@@ -420,20 +434,82 @@ String generateFamilyTreeCode(String name) {
 }
 
 Future<List<WorksheetProject>> loadWorksheetProjects(String userEmail) async {
+  final email = _normalizedEmail(userEmail);
+  if (email.isEmpty) return [];
+
   final prefs = await SharedPreferences.getInstance();
-  final v2 = prefs.getString(_projectsKey(userEmail));
+  await prefs.reload();
+
+  final v3 = await _loadWorksheetProjectsV3(prefs, email);
+  if (v3.isNotEmpty) return v3;
+
+  final v2 = prefs.getString(_projectsKey(email));
   if (v2 != null && v2.isNotEmpty) {
-    return _decodeProjects(v2);
+    final migrated = _decodeProjects(v2);
+    if (migrated.isNotEmpty) {
+      await saveWorksheetProjects(email, migrated);
+      return migrated;
+    }
   }
+
   final legacyKey =
-      'ngmy_worksheets_projects_v1_${userEmail.toLowerCase().trim().hashCode.abs()}';
+      'ngmy_worksheets_projects_v1_${email.hashCode.abs()}';
   final legacy = prefs.getString(legacyKey);
   if (legacy != null && legacy.isNotEmpty) {
     final migrated = _decodeProjects(legacy);
-    await saveWorksheetProjects(userEmail, migrated);
-    return migrated;
+    if (migrated.isNotEmpty) {
+      await saveWorksheetProjects(email, migrated);
+      return migrated;
+    }
   }
   return [];
+}
+
+Future<List<WorksheetProject>> _loadWorksheetProjectsV3(
+  SharedPreferences prefs,
+  String email,
+) async {
+  final indexKey = _projectsIndexV3Key(email);
+  final rawIndex = prefs.getString(indexKey);
+  if (rawIndex == null || rawIndex.trim().isEmpty) return [];
+
+  try {
+    final decoded = jsonDecode(rawIndex);
+    if (decoded is! List) return [];
+    final projects = <WorksheetProject>[];
+    for (final rawId in decoded) {
+      final id = rawId.toString().trim();
+      if (id.isEmpty) continue;
+      final rawProject = prefs.getString(_projectItemV3Key(email, id));
+      if (rawProject == null || rawProject.isEmpty) continue;
+      try {
+        final map = jsonDecode(rawProject);
+        if (map is! Map) continue;
+        final project = WorksheetProject.fromJson(Map<String, dynamic>.from(map));
+        if (project.id.isNotEmpty && project.name.isNotEmpty) {
+          projects.add(project);
+        }
+      } catch (_) {}
+    }
+    projects.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return projects;
+  } catch (_) {
+    return [];
+  }
+}
+
+Future<WorksheetProject?> loadWorksheetProjectById(
+  String userEmail,
+  String projectId,
+) async {
+  final email = _normalizedEmail(userEmail);
+  final id = projectId.trim();
+  if (email.isEmpty || id.isEmpty) return null;
+  final list = await loadWorksheetProjects(email);
+  for (final p in list) {
+    if (p.id == id) return p;
+  }
+  return null;
 }
 
 List<WorksheetProject> _decodeProjects(String raw) {
@@ -451,18 +527,61 @@ List<WorksheetProject> _decodeProjects(String raw) {
   }
 }
 
-Future<void> saveWorksheetProjects(
+Future<bool> saveWorksheetProjects(
   String userEmail,
   List<WorksheetProject> projects,
 ) async {
+  final email = _normalizedEmail(userEmail);
+  if (email.isEmpty) return false;
+
   final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(
-    _projectsKey(userEmail),
-    jsonEncode(projects.map((p) => p.toJson()).toList()),
-  );
+  final ids = <String>[];
+
+  try {
+    final previousIndex = prefs.getString(_projectsIndexV3Key(email));
+    if (previousIndex != null && previousIndex.isNotEmpty) {
+      try {
+        final oldIds = (jsonDecode(previousIndex) as List).map((e) => e.toString()).toSet();
+        final keep = projects.map((p) => p.id).where((id) => id.isNotEmpty).toSet();
+        for (final oldId in oldIds) {
+          if (!keep.contains(oldId)) {
+            await prefs.remove(_projectItemV3Key(email, oldId));
+          }
+        }
+      } catch (_) {}
+    }
+
+    for (final project in projects) {
+      if (project.id.isEmpty || project.name.trim().isEmpty) continue;
+      ids.add(project.id);
+      final payload = jsonEncode(project.toJson());
+      var saved = await prefs.setString(_projectItemV3Key(email, project.id), payload);
+      if (!saved && project.thumbnailPath != null && project.thumbnailPath!.isNotEmpty) {
+        final lite = project.copyWith(thumbnailPath: null);
+        saved = await prefs.setString(
+          _projectItemV3Key(email, project.id),
+          jsonEncode(lite.toJson()),
+        );
+      }
+      if (!saved) {
+        debugPrint('[worksheets] failed to save project ${project.id} for $email');
+      }
+    }
+
+    await prefs.setString(_projectsIndexV3Key(email), jsonEncode(ids));
+    await prefs.setString(
+      _projectsKey(email),
+      jsonEncode(projects.map((p) => p.toJson()).toList()),
+    );
+    await prefs.reload();
+    return true;
+  } catch (e) {
+    debugPrint('[worksheets] saveWorksheetProjects error: $e');
+    return false;
+  }
 }
 
-Future<void> upsertWorksheetProject(
+Future<bool> upsertWorksheetProject(
   String userEmail,
   WorksheetProject project,
 ) async {
@@ -473,7 +592,7 @@ Future<void> upsertWorksheetProject(
   } else {
     list[idx] = project;
   }
-  await saveWorksheetProjects(userEmail, list);
+  return saveWorksheetProjects(userEmail, list);
 }
 
 Future<void> deleteWorksheetProject(String userEmail, String projectId) async {

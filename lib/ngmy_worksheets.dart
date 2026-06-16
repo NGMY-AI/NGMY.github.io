@@ -30,7 +30,7 @@ class NgmyWorksheetsScreen extends StatefulWidget {
   State<NgmyWorksheetsScreen> createState() => _NgmyWorksheetsScreenState();
 }
 
-class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> {
+class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with WidgetsBindingObserver {
   _WorksheetTab _tab = _WorksheetTab.projects;
   List<WorksheetProject> _projects = [];
   bool _loading = true;
@@ -42,7 +42,21 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _reload();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reload();
+    }
   }
 
   Future<void> _reload() async {
@@ -64,9 +78,17 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> {
       thumbnailPath: result.thumbnailPath,
       createdAt: DateTime.now(),
     );
-    await upsertWorksheetProject(widget.userEmail, project);
+    final saved = await upsertWorksheetProject(widget.userEmail, project);
     await _reload();
     if (!mounted) return;
+    if (!saved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save project to this device. Try again or use a smaller thumbnail.'),
+        ),
+      );
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Project "${result.name}" created.')),
     );
