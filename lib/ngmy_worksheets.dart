@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 
-import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_family_tree.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_worksheet_dialogs.dart';
@@ -106,21 +104,17 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> {
     );
     if (choice == null || !mounted) return;
 
-    String? raw;
+    WorksheetProject? imported;
     if (choice == 'file') {
-      raw = await ngmyPickBackupJsonViaBrowser();
+      imported = await ngmyPickAndParseWorksheetProjectBackup();
     } else if (choice == 'scan') {
-      raw = await NgmyNavigator.push<String>(
-        context,
-        const _NgmyWorksheetProjectScanPage(),
-        routeName: 'NgmyWorksheetProjectScan',
-        fullscreenDialog: true,
-      );
+      final raw = await ngmyScanWorksheetProjectQrPayload(context);
+      if (raw != null && raw.trim().isNotEmpty) {
+        imported = ngmyWorksheetProjectFromShareRaw(raw);
+      }
     }
-    if (raw == null || raw.trim().isEmpty) return;
-
-    final imported = ngmyWorksheetProjectFromShareRaw(raw);
     if (imported == null) {
+      if (choice != 'file' && choice != 'scan') return;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not read that project backup.')),
@@ -128,13 +122,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> {
       return;
     }
 
-    final project = WorksheetProject(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      name: imported.name.trim().isEmpty ? 'Shared project' : imported.name,
-      thumbnailPath: imported.thumbnailPath,
-      items: imported.items,
-      createdAt: DateTime.now(),
-    );
+    final project = ngmyWorksheetProjectCopyForImport(imported);
     await upsertWorksheetProject(widget.userEmail, project);
     await _reload();
     if (!mounted) return;
@@ -631,39 +619,6 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> {
           Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.4)),
         ],
       ),
-    );
-  }
-}
-
-class _NgmyWorksheetProjectScanPage extends StatefulWidget {
-  const _NgmyWorksheetProjectScanPage();
-
-  @override
-  State<_NgmyWorksheetProjectScanPage> createState() => _NgmyWorksheetProjectScanPageState();
-}
-
-class _NgmyWorksheetProjectScanPageState extends State<_NgmyWorksheetProjectScanPage> {
-  bool _handled = false;
-
-  void _onDetect(BarcodeCapture capture) {
-    if (_handled) return;
-    final raw = capture.barcodes.firstOrNull?.rawValue?.trim();
-    if (raw == null || raw.isEmpty) return;
-    if (!raw.startsWith('NGMY_WS:') && !raw.contains('"ngmy_worksheet_project_v1"')) return;
-    _handled = true;
-    NgmyNavigator.pop(context, raw);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Scan project QR'),
-        backgroundColor: const Color(0xFF0B1018),
-        foregroundColor: Colors.white,
-      ),
-      backgroundColor: Colors.black,
-      body: MobileScanner(onDetect: _onDetect),
     );
   }
 }

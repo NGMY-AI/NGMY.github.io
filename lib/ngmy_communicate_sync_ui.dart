@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
@@ -12,6 +12,7 @@ import 'ngmy_communicate.dart' show kNgmyAdvisorsHubAccent;
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_sync.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_qr_generator.dart';
 import 'ngmy_sync_qr_saved.dart';
 
 Future<void> showNgmyCommunicateSyncSheet(
@@ -95,6 +96,7 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
           _working = false;
           _statusMessage = null;
         });
+        SchedulerBinding.instance.scheduleFrame();
       }
     }
   }
@@ -585,22 +587,8 @@ class _NgmyAdvisorQrDisplayPageState extends State<_NgmyAdvisorQrDisplayPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4)),
-                        ],
-                      ),
-                      child: QrImageView(
-                        data: widget.qrPayload,
-                        size: 240,
-                        backgroundColor: Colors.white,
-                        errorCorrectionLevel: QrErrorCorrectLevel.M,
-                      ),
-                    ),
+                    const SizedBox(height: 8),
+                    NgmyBrandedQrWidget(data: widget.qrPayload, large: true),
                     const SizedBox(height: 18),
                     Text('Code: ${widget.backupCode}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
                     const SizedBox(height: 8),

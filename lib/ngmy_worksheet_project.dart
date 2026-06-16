@@ -165,10 +165,15 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
                             color: Colors.white.withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(12),
                             child: InkWell(
-                              onTap: () => showNgmyWorksheetProjectShareSheet(
+                            onTap: () => showNgmyWorksheetProjectShareSheet(
                                 context,
                                 ownerEmail: widget.userEmail,
                                 project: _project,
+                                onImported: (imported) async {
+                                  await upsertWorksheetProject(widget.userEmail, imported);
+                                  if (!context.mounted) return;
+                                  NgmyNavigator.pop(context, imported);
+                                },
                               ),
                               borderRadius: BorderRadius.circular(12),
                               child: const Padding(

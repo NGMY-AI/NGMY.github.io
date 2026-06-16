@@ -1,12 +1,13 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
+import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_communicate_sync_download_io.dart'
     if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_qr_generator.dart';
 import 'ngmy_worksheet_helpers.dart';
 import 'ngmy_worksheets_storage.dart';
 
@@ -75,10 +76,36 @@ WorksheetProject? ngmyWorksheetProjectFromShareRaw(String raw) {
   }
 }
 
+WorksheetProject ngmyWorksheetProjectCopyForImport(WorksheetProject imported) {
+  return WorksheetProject(
+    id: DateTime.now().microsecondsSinceEpoch.toString(),
+    name: imported.name.trim().isEmpty ? 'Shared project' : imported.name,
+    thumbnailPath: imported.thumbnailPath,
+    items: imported.items,
+    createdAt: DateTime.now(),
+  );
+}
+
+Future<WorksheetProject?> ngmyPickAndParseWorksheetProjectBackup() async {
+  final raw = await ngmyPickBackupJsonViaBrowser();
+  if (raw == null || raw.trim().isEmpty) return null;
+  return ngmyWorksheetProjectFromShareRaw(raw);
+}
+
+Future<String?> ngmyScanWorksheetProjectQrPayload(BuildContext context) {
+  return NgmyNavigator.push<String>(
+    context,
+    const NgmyWorksheetProjectScanPage(),
+    routeName: 'NgmyWorksheetProjectScan',
+    fullscreenDialog: true,
+  );
+}
+
 Future<void> showNgmyWorksheetProjectShareSheet(
   BuildContext context, {
   required String ownerEmail,
   required WorksheetProject project,
+  Future<void> Function(WorksheetProject imported)? onImported,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -87,6 +114,7 @@ Future<void> showNgmyWorksheetProjectShareSheet(
     builder: (ctx) => _NgmyWorksheetProjectShareSheet(
       ownerEmail: ownerEmail,
       project: project,
+      onImported: onImported,
     ),
   );
 }
@@ -95,25 +123,16 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
   const _NgmyWorksheetProjectShareSheet({
     required this.ownerEmail,
     required this.project,
+    this.onImported,
   });
 
   final String ownerEmail;
   final WorksheetProject project;
-
-  Future<void> _copyJson(BuildContext context) async {
-    final json = ngmyWorksheetProjectShareJson(
-      ownerEmail: ownerEmail,
-      project: project,
-      includeThumbnail: true,
-    );
-    await Clipboard.setData(ClipboardData(text: json));
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Project backup copied — paste in Import shared project')),
-    );
-  }
+  final Future<void> Function(WorksheetProject imported)? onImported;
 
   Future<void> _download(BuildContext context) async {
+    Navigator.pop(context);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
     final json = ngmyWorksheetProjectShareJson(
       ownerEmail: ownerEmail,
       project: project,
@@ -126,11 +145,44 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
   }
 
   void _showQr(BuildContext context) {
+    Navigator.pop(context);
     final payload = ngmyWorksheetProjectQrPayload(ownerEmail: ownerEmail, project: project);
     NgmyNavigator.push<void>(
       context,
-      _NgmyWorksheetProjectQrPage(projectName: project.name, payload: payload),
+      NgmyWorksheetProjectQrPage(projectName: project.name, payload: payload),
       routeName: 'NgmyWorksheetProjectQr',
+    );
+  }
+
+  Future<void> _scan(BuildContext context) async {
+    Navigator.pop(context);
+    final raw = await ngmyScanWorksheetProjectQrPayload(context);
+    if (raw == null || raw.trim().isEmpty) return;
+    final imported = ngmyWorksheetProjectFromShareRaw(raw);
+    if (imported == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not read that project QR.')),
+      );
+      return;
+    }
+    final copy = ngmyWorksheetProjectCopyForImport(imported);
+    await onImported?.call(copy);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Imported "${copy.name}" from QR')),
+    );
+  }
+
+  Future<void> _upload(BuildContext context) async {
+    Navigator.pop(context);
+    final imported = await ngmyPickAndParseWorksheetProjectBackup();
+    if (imported == null) return;
+    final copy = ngmyWorksheetProjectCopyForImport(imported);
+    await onImported?.call(copy);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Imported "${copy.name}" from file')),
     );
   }
 
@@ -177,7 +229,7 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
                 p,
                 icon: Icons.qr_code_2_rounded,
                 label: 'Show QR code',
-                subtitle: 'Budget items sync — thumbnail not in QR',
+                subtitle: 'NGMY logo · circle corners · scan to import',
                 onTap: () => _showQr(context),
                 accent: true,
               ),
@@ -187,17 +239,26 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
                 p,
                 icon: Icons.download_rounded,
                 label: 'Download backup file',
-                subtitle: 'Includes thumbnail when available',
+                subtitle: 'Save file, then upload on another phone',
                 onTap: () => _download(context),
               ),
               const SizedBox(height: 8),
               _shareTile(
                 context,
                 p,
-                icon: Icons.copy_rounded,
-                label: 'Copy backup text',
-                subtitle: 'Send via text or email',
-                onTap: () => _copyJson(context),
+                icon: Icons.qr_code_scanner_rounded,
+                label: 'Scan QR',
+                subtitle: 'Import a project someone shared',
+                onTap: () => _scan(context),
+              ),
+              const SizedBox(height: 8),
+              _shareTile(
+                context,
+                p,
+                icon: Icons.upload_file_rounded,
+                label: 'Upload backup file',
+                subtitle: 'Import a downloaded .json project file',
+                onTap: () => _upload(context),
               ),
             ],
           ),
@@ -251,8 +312,9 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
   }
 }
 
-class _NgmyWorksheetProjectQrPage extends StatelessWidget {
-  const _NgmyWorksheetProjectQrPage({
+class NgmyWorksheetProjectQrPage extends StatelessWidget {
+  const NgmyWorksheetProjectQrPage({
+    super.key,
     required this.projectName,
     required this.payload,
   });
@@ -300,23 +362,10 @@ class _NgmyWorksheetProjectQrPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    QrImageView(
-                      data: payload,
-                      version: QrVersions.auto,
-                      size: 240,
-                      backgroundColor: Colors.white,
-                      eyeStyle: const QrEyeStyle(
-                        eyeShape: QrEyeShape.square,
-                        color: WorksheetPalette.greenDark,
-                      ),
-                      dataModuleStyle: const QrDataModuleStyle(
-                        dataModuleShape: QrDataModuleShape.square,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
+                    NgmyBrandedQrWidget(data: payload, large: true),
                     const SizedBox(height: 14),
                     Text(
-                      'Scan in Worksheets → Import shared project',
+                      'Scan with Worksheets → Share → Scan QR',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF64748B)),
                     ),
@@ -324,25 +373,44 @@ class _NgmyWorksheetProjectQrPage extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: payload));
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('QR payload copied')),
-                  );
-                },
-                style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.green),
-                icon: const Icon(Icons.copy_rounded),
-                label: const Text('Copy QR payload'),
-              ),
-            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class NgmyWorksheetProjectScanPage extends StatefulWidget {
+  const NgmyWorksheetProjectScanPage({super.key});
+
+  @override
+  State<NgmyWorksheetProjectScanPage> createState() => _NgmyWorksheetProjectScanPageState();
+}
+
+class _NgmyWorksheetProjectScanPageState extends State<NgmyWorksheetProjectScanPage> {
+  bool _handled = false;
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_handled) return;
+    final barcodes = capture.barcodes;
+    if (barcodes.isEmpty) return;
+    final raw = barcodes.first.rawValue?.trim();
+    if (raw == null || raw.isEmpty) return;
+    if (!raw.startsWith('NGMY_WS:') && !raw.contains('"ngmy_worksheet_project_v1"')) return;
+    _handled = true;
+    NgmyNavigator.pop(context, raw);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Scan project QR'),
+        backgroundColor: const Color(0xFF0B1018),
+        foregroundColor: Colors.white,
+      ),
+      backgroundColor: Colors.black,
+      body: MobileScanner(onDetect: _onDetect),
     );
   }
 }

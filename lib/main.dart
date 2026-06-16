@@ -6499,7 +6499,7 @@ String? ngmyApplyReferralCodeToUser({
   final normalized = ngmyNormalizeReferralCode(code);
   if (normalized.isEmpty) return null;
   if (user.referredByCode.trim().isNotEmpty) return null;
-  if (normalized == ngmyReferralCodeForEmail(user.email).toUpperCase()) return null;
+  if (ngmyReferralCodeBelongsToEmail(user.email, normalized)) return null;
 
   UserData? referrer;
   if (referrerRow != null) {
@@ -23500,7 +23500,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     final normalized = ngmyNormalizeReferralCode(raw);
-    if (normalized == _referralCode.toUpperCase()) {
+    if (ngmyReferralCodeBelongsToEmail(widget.user.email, raw)) {
       if (!mounted) return;
       setState(() {
         _referralPreviewName = null;
@@ -23653,7 +23653,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral code already linked on this account.')));
       return;
     }
-    if (ngmyNormalizeReferralCode(code) == _referralCode.toUpperCase()) {
+    if (ngmyReferralCodeBelongsToEmail(widget.user.email, code)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You cannot use your own referral code.')));
       return;
     }

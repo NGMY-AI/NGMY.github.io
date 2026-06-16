@@ -4,12 +4,14 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+
+import 'package:flutter/scheduler.dart';
 
 import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
 import 'ngmy_family_tree_sync.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_qr_generator.dart';
 import 'ngmy_sync_qr_saved.dart';
 import 'ngmy_worksheet_helpers.dart';
 import 'ngmy_worksheets_storage.dart';
@@ -107,6 +109,7 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
           _working = false;
           _statusMessage = null;
         });
+        SchedulerBinding.instance.scheduleFrame();
       }
     }
   }
@@ -606,22 +609,8 @@ class _NgmyFamilyTreeQrDisplayPageState extends State<_NgmyFamilyTreeQrDisplayPa
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4)),
-                        ],
-                      ),
-                      child: QrImageView(
-                        data: widget.qrPayload,
-                        version: QrVersions.auto,
-                        size: 220,
-                        backgroundColor: Colors.white,
-                      ),
-                    ),
+                    const SizedBox(height: 8),
+                    NgmyBrandedQrWidget(data: widget.qrPayload, large: true),
                     const SizedBox(height: 18),
                     Text(usesLabel, style: TextStyle(fontWeight: FontWeight.w800, color: WorksheetPalette.green)),
                     const SizedBox(height: 8),
