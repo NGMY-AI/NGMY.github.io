@@ -84,7 +84,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     if (!saved) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not save project to this device. Try again or use a smaller thumbnail.'),
+          content: Text('Could not save project to this device. Please try again.'),
         ),
       );
       return;

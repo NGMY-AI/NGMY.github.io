@@ -11,6 +11,7 @@ import 'ngmy_network_resilience.dart';
 const String _projectsKeyPrefix = 'ngmy_worksheets_projects_v2_';
 const String _projectsIndexV3Prefix = 'ngmy_worksheets_index_v3_';
 const String _projectItemV3Prefix = 'ngmy_worksheet_item_v3_';
+const String _projectThumbV3Prefix = 'ngmy_worksheet_thumb_v3_';
 const String _familyTreesKeyPrefix = 'ngmy_worksheets_family_trees_v1_';
 
 String _emailSlug(String userEmail) {
@@ -27,6 +28,40 @@ String _projectsIndexV3Key(String userEmail) =>
 
 String _projectItemV3Key(String userEmail, String projectId) =>
     '$_projectItemV3Prefix${_emailSlug(userEmail)}_$projectId';
+
+String _projectThumbV3Key(String userEmail, String projectId) =>
+    '$_projectThumbV3Prefix${_emailSlug(userEmail)}_$projectId';
+
+Future<bool> _safePrefsSetString(
+  SharedPreferences prefs,
+  String key,
+  String value,
+) async {
+  try {
+    return await prefs.setString(key, value);
+  } catch (e) {
+    debugPrint('[worksheets] setString failed for $key: $e');
+    return false;
+  }
+}
+
+Future<void> _safePrefsRemove(SharedPreferences prefs, String key) async {
+  try {
+    await prefs.remove(key);
+  } catch (e) {
+    debugPrint('[worksheets] remove failed for $key: $e');
+  }
+}
+
+WorksheetProject _projectWithStoredThumbnail(
+  WorksheetProject project,
+  String? storedThumb,
+) {
+  if (storedThumb != null && storedThumb.isNotEmpty) {
+    return project.copyWith(thumbnailPath: storedThumb);
+  }
+  return project;
+}
 
 String _familyTreesKey(String userEmail) =>
     '$_familyTreesKeyPrefix${userEmail.toLowerCase().trim().hashCode.abs()}';
@@ -487,7 +522,8 @@ Future<List<WorksheetProject>> _loadWorksheetProjectsV3(
         if (map is! Map) continue;
         final project = WorksheetProject.fromJson(Map<String, dynamic>.from(map));
         if (project.id.isNotEmpty && project.name.isNotEmpty) {
-          projects.add(project);
+          final storedThumb = prefs.getString(_projectThumbV3Key(email, id));
+          projects.add(_projectWithStoredThumbnail(project, storedThumb));
         }
       } catch (_) {}
     }
@@ -545,7 +581,8 @@ Future<bool> saveWorksheetProjects(
         final keep = projects.map((p) => p.id).where((id) => id.isNotEmpty).toSet();
         for (final oldId in oldIds) {
           if (!keep.contains(oldId)) {
-            await prefs.remove(_projectItemV3Key(email, oldId));
+            await _safePrefsRemove(prefs, _projectItemV3Key(email, oldId));
+            await _safePrefsRemove(prefs, _projectThumbV3Key(email, oldId));
           }
         }
       } catch (_) {}
@@ -553,27 +590,56 @@ Future<bool> saveWorksheetProjects(
 
     for (final project in projects) {
       if (project.id.isEmpty || project.name.trim().isEmpty) continue;
-      ids.add(project.id);
-      final payload = jsonEncode(project.toJson());
-      var saved = await prefs.setString(_projectItemV3Key(email, project.id), payload);
-      if (!saved && project.thumbnailPath != null && project.thumbnailPath!.isNotEmpty) {
-        final lite = project.copyWith(thumbnailPath: null);
-        saved = await prefs.setString(
-          _projectItemV3Key(email, project.id),
-          jsonEncode(lite.toJson()),
+
+      final thumbnail = project.thumbnailPath?.trim();
+      if (thumbnail != null && thumbnail.isNotEmpty) {
+        await _safePrefsSetString(
+          prefs,
+          _projectThumbV3Key(email, project.id),
+          thumbnail,
         );
+      } else {
+        await _safePrefsRemove(prefs, _projectThumbV3Key(email, project.id));
       }
-      if (!saved) {
+
+      final coreProject = (thumbnail != null && thumbnail.isNotEmpty)
+          ? project.copyWith(thumbnailPath: null)
+          : project;
+      final coreSaved = await _safePrefsSetString(
+        prefs,
+        _projectItemV3Key(email, project.id),
+        jsonEncode(coreProject.toJson()),
+      );
+      if (!coreSaved) {
         debugPrint('[worksheets] failed to save project ${project.id} for $email');
+        continue;
       }
+      ids.add(project.id);
     }
 
-    await prefs.setString(_projectsIndexV3Key(email), jsonEncode(ids));
-    await prefs.setString(
-      _projectsKey(email),
-      jsonEncode(projects.map((p) => p.toJson()).toList()),
+    final indexSaved = await _safePrefsSetString(
+      prefs,
+      _projectsIndexV3Key(email),
+      jsonEncode(ids),
     );
+    if (!indexSaved) {
+      debugPrint('[worksheets] failed to save project index for $email');
+      return false;
+    }
+
+    // Lite v2 mirror for migration only — never embed thumbnails (quota overflow on web).
+    final liteMirror = projects
+        .where((p) => ids.contains(p.id))
+        .map((p) => p.copyWith(thumbnailPath: null).toJson())
+        .toList();
+    await _safePrefsSetString(
+      prefs,
+      _projectsKey(email),
+      jsonEncode(liteMirror),
+    );
+
     await prefs.reload();
+    if (projects.isNotEmpty && ids.isEmpty) return false;
     return true;
   } catch (e) {
     debugPrint('[worksheets] saveWorksheetProjects error: $e');
