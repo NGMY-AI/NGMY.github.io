@@ -27,6 +27,70 @@ void showNgmyVideoStudio(BuildContext context) {
   );
 }
 
+const Color kNgmyStudioNavAccent = Color(0xFF7C3AED);
+const Color kNgmyStudioNavAccent2 = Color(0xFF00B25A);
+
+/// Bottom-nav studio launcher icon (gradient clapper + play).
+class NgmyStudioNavIcon extends StatelessWidget {
+  const NgmyStudioNavIcon({super.key, this.dimmed = false, this.size = 30});
+
+  final bool dimmed;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = dimmed ? Colors.grey : Colors.white;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        gradient: dimmed
+            ? null
+            : const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [kNgmyStudioNavAccent, kNgmyStudioNavAccent2],
+              ),
+        color: dimmed ? Colors.transparent : null,
+        border: dimmed ? Border.all(color: Colors.grey.shade400, width: 1.4) : null,
+        boxShadow: dimmed
+            ? null
+            : [
+                BoxShadow(
+                  color: kNgmyStudioNavAccent.withValues(alpha: 0.38),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Icon(Icons.videocam_rounded, size: size * 0.52, color: fg),
+          Positioned(
+            right: size * 0.14,
+            bottom: size * 0.12,
+            child: Container(
+              width: size * 0.34,
+              height: size * 0.34,
+              decoration: BoxDecoration(
+                color: dimmed ? Colors.grey.shade500 : Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.play_arrow_rounded,
+                size: size * 0.28,
+                color: dimmed ? Colors.white : kNgmyStudioNavAccent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SlotMedia {
   VideoPlayerController? controller;
   String? source;

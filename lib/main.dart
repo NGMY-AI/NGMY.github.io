@@ -6499,7 +6499,19 @@ String? ngmyApplyReferralCodeToUser({
 }) {
   final normalized = ngmyNormalizeReferralCode(code);
   if (normalized.isEmpty) return null;
-  if (user.referredByCode.trim().isNotEmpty) return null;
+  final existing = ngmyNormalizeReferralCode(user.referredByCode);
+  if (existing.isNotEmpty) {
+    if (existing == normalized) {
+      final fromRow = ngmyReferrerEmailFromRow(referrerRow);
+      if (fromRow != null && fromRow.trim().isNotEmpty) return fromRow.trim();
+      for (final u in allUsers) {
+        for (final c in ngmyReferralCodesForEmail(u.email)) {
+          if (c.toUpperCase() == normalized) return u.email;
+        }
+      }
+    }
+    return null;
+  }
   if (ngmyReferralCodeBelongsToEmail(user.email, normalized)) return null;
 
   UserData? referrer;
@@ -13522,7 +13534,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
         onSyncMediaPost: widget.onSyncAdminMediaPost,
         onSyncUserMedia: widget.onSyncAdminUserMedia,
       ),
-      5: () => NgmyStudioTabScreen(user: widget.user),
+      5: () => const SizedBox.shrink(),
       6: () => ProfileScreen(
         user: widget.user,
         allUsers: widget.allUsers,
@@ -13643,7 +13655,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
               _nav(2, Icons.account_balance_wallet_rounded),
               _navC(3),
               _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
-              _nav(5, Icons.movie_creation_rounded, selectedColor: const Color(0xFF7C3AED)),
+              _navStudio(),
               _nav(6, Icons.person_rounded),
             ],
           ),
@@ -13651,6 +13663,20 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
       ),
     );
   }
+
+  Widget _navStudio() => Expanded(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => showNgmyVideoStudio(context),
+            customBorder: const CircleBorder(),
+            child: SizedBox(
+              height: NgmyBottomNavMetrics.barHeight,
+              child: Center(child: NgmyStudioNavIcon(dimmed: false, size: 30)),
+            ),
+          ),
+        ),
+      );
 
   Widget _nav(int i, IconData icon, {Color? selectedColor}) => Expanded(
         child: Material(
@@ -22493,185 +22519,6 @@ class _InvestScreenState extends State<InvestScreen> {
     );
   }
 }
-class NgmyStudioTabScreen extends StatelessWidget {
-  final UserData user;
-  const NgmyStudioTabScreen({super.key, required this.user});
-
-  static const _accent = Color(0xFF00B25A);
-  static const _studioPurple = Color(0xFF7C3AED);
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final subColor = isDark ? Colors.white70 : const Color(0xFF64748B);
-    final cardBg = isDark ? const Color(0xFF111731) : Colors.white;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
-          child: Column(
-            children: [
-              Container(
-                height: 60,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 15, offset: const Offset(0, 5))],
-                ),
-                child: const Row(
-                  children: [
-                    SizedBox(width: 40),
-                    Expanded(
-                      child: Center(
-                        child: Text('NGMY STUDIO', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 1)),
-                      ),
-                    ),
-                    SizedBox(width: 40),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  gradient: const LinearGradient(
-                    colors: [_accent, _studioPurple, Color(0xFF22D3EE), _accent],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(color: _studioPurple.withOpacity(isDark ? 0.28 : 0.16), blurRadius: 24, offset: const Offset(0, 12)),
-                  ],
-                ),
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(25),
-                    color: cardBg,
-                    border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 92,
-                        height: 92,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [
-                              _studioPurple.withOpacity(isDark ? 0.45 : 0.18),
-                              _accent.withOpacity(isDark ? 0.35 : 0.14),
-                            ],
-                          ),
-                          border: Border.all(color: _studioPurple.withOpacity(0.5), width: 2),
-                          boxShadow: [BoxShadow(color: _studioPurple.withOpacity(0.25), blurRadius: 16, offset: const Offset(0, 6))],
-                        ),
-                        child: Icon(Icons.movie_creation_rounded, size: 44, color: NgmyStudioTabScreen._studioPurple),
-                      ),
-                      const SizedBox(height: 18),
-                      Text('NGMY Studio', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: titleColor)),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Edit videos, thumbnails, banners & logos — then export for TikTok, YouTube, and more.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13.5, height: 1.45, color: subColor, fontWeight: FontWeight.w500),
-                      ),
-                      const SizedBox(height: 18),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
-                        children: const [
-                          _NgmyStudioFeatureChip(icon: Icons.videocam_rounded, label: 'Videos'),
-                          _NgmyStudioFeatureChip(icon: Icons.image_rounded, label: 'Thumbnails'),
-                          _NgmyStudioFeatureChip(icon: Icons.dashboard_customize_rounded, label: 'Templates'),
-                          _NgmyStudioFeatureChip(icon: Icons.download_rounded, label: 'Export'),
-                        ],
-                      ),
-                      const SizedBox(height: 22),
-                      SizedBox(
-                        width: double.infinity,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            gradient: const LinearGradient(colors: [_accent, Color(0xFF059669)]),
-                            boxShadow: [BoxShadow(color: _accent.withOpacity(0.35), blurRadius: 14, offset: const Offset(0, 6))],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(14),
-                              onTap: () => showNgmyVideoStudio(context),
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 15),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.play_circle_filled_rounded, color: Colors.white, size: 22),
-                                    SizedBox(width: 10),
-                                    Text('Open Studio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NgmyStudioFeatureChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _NgmyStudioFeatureChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: NgmyStudioTabScreen._studioPurple),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isDark ? Colors.white70 : const Color(0xFF334155))),
-        ],
-      ),
-    );
-  }
-}
-
-class StatsScreen extends StatelessWidget {
-  final UserData user;
-  final List<AppTransaction> transactions;
-  final List<UserData> allUsers;
-  const StatsScreen({super.key, required this.user, required this.transactions, required this.allUsers});
-
-  @override
-  Widget build(BuildContext context) => NgmyStudioTabScreen(user: user);
-}
 
 class _NgmyAiAdminSheet extends StatefulWidget {
   final bool isDark;
@@ -23733,6 +23580,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return referrerEmail;
   }
 
+  String? _applyReferralLink(String code, Map<String, dynamic> referrerRow) {
+    final normalized = ngmyNormalizeReferralCode(code);
+    if (normalized.isEmpty) return null;
+
+    var referrerEmail = ngmyApplyReferralCodeToUser(
+      code: code,
+      user: widget.user,
+      allUsers: widget.allUsers,
+      referrerRow: referrerRow,
+    );
+    if (referrerEmail != null && referrerEmail.trim().isNotEmpty) {
+      return referrerEmail.trim();
+    }
+
+    final refEmail = (ngmyReferrerEmailFromRow(referrerRow) ?? '').trim();
+    if (refEmail.isEmpty) return null;
+    final currentEmail = widget.user.email.toLowerCase().trim();
+    if (refEmail.toLowerCase().trim() == currentEmail) return null;
+
+    final already = ngmyNormalizeReferralCode(widget.user.referredByCode);
+    if (already.isNotEmpty && already != normalized) return null;
+
+    widget.user.referredByCode = normalized;
+    final currentIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == currentEmail);
+    if (currentIdx >= 0) {
+      widget.allUsers[currentIdx].referredByCode = normalized;
+    } else {
+      widget.allUsers.add(widget.user);
+    }
+
+    final refKey = refEmail.toLowerCase().trim();
+    var refIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == refKey);
+    if (refIdx == -1) {
+      final referrer = UserData.fromJson(referrerRow);
+      if (referrer.email.trim().isEmpty) referrer.email = refEmail;
+      widget.allUsers.add(referrer);
+      refIdx = widget.allUsers.length - 1;
+    }
+    if (already.isEmpty) {
+      widget.allUsers[refIdx].referralCount += 1;
+      widget.allUsers[refIdx].points += 100;
+    }
+    return widget.allUsers[refIdx].email;
+  }
+
   void _scheduleReferralPreview() {
     _referralPreviewDebounce?.cancel();
     _referralPreviewDebounce = Timer(const Duration(milliseconds: 350), () {
@@ -23921,7 +23813,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _submitReferralCode() async {
     if (_referralSubmitting) return;
     final code = _referralInputC.text.trim();
-    if (code.isEmpty) return;
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a referral code first.')));
+      return;
+    }
     if (_isReferralLinked) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral code already linked on this account.')));
       return;
@@ -23934,7 +23829,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final normalized = ngmyNormalizeReferralCode(code);
       Map<String, dynamic>? referrerRow;
-      if (_referralPreviewReferrerRow != null && _referralPreviewCode == normalized) {
+      if (_referralPreviewReferrerRow != null &&
+          _referralPreviewCode == normalized &&
+          (_referralPreviewName?.trim().isNotEmpty ?? false)) {
         referrerRow = _referralPreviewReferrerRow;
       }
       referrerRow ??= ngmyLookupReferrerUserRowLocal(code, localUsers: widget.allUsers);
@@ -23946,26 +23843,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
         return;
       }
-      final referrerEmail = ngmyApplyReferralCodeToUser(
-        code: code,
-        user: widget.user,
-        allUsers: widget.allUsers,
-        referrerRow: referrerRow,
-      );
+      final referrerEmail = _applyReferralLink(code, referrerRow);
       if (!mounted) return;
-      if (referrerEmail == null) {
+      if (referrerEmail == null || referrerEmail.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not link that referral code. Try again.')),
         );
         return;
       }
       final referrerName = _referrerDisplayName(referrerRow, referrerEmail);
+      _savedReferredByCode = normalized;
+      widget.user.referredByCode = normalized;
       if (referrerName.isNotEmpty) {
         await ngmyCacheReferrerNameForUser(widget.user.email, referrerName);
-      }
-      _savedReferredByCode = normalized;
-      if (widget.onReferralLinked != null) {
-        await widget.onReferralLinked!(normalized);
       }
       setState(() {
         _linkedReferrerName = referrerName.isNotEmpty ? referrerName : null;
@@ -23975,6 +23865,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _referralPreviewReferrerRow = null;
       });
       _referralInputC.clear();
+      if (widget.onReferralLinked != null) {
+        await widget.onReferralLinked!(normalized);
+      }
       try {
         final currentEmail = widget.user.email.toLowerCase().trim();
         final refKey = referrerEmail.toLowerCase().trim();
@@ -24316,16 +24209,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 8),
                       SizedBox(
                         width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _referralSubmitting ? null : _submitReferralCode,
-                          style: ElevatedButton.styleFrom(backgroundColor: neutralAction, foregroundColor: neutralActionText),
+                        child: FilledButton(
+                          onPressed: _referralSubmitting
+                              ? null
+                              : () {
+                                  unawaited(_submitReferralCode());
+                                },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF059669),
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: neutralAction,
+                          ),
                           child: _referralSubmitting
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                 )
-                              : const Text('Submit'),
+                              : const Text('Submit', style: TextStyle(fontWeight: FontWeight.w800)),
                         ),
                       ),
                     ],
