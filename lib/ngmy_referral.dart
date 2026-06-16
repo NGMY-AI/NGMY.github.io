@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_network_resilience.dart';
@@ -60,8 +61,10 @@ bool _rowMatchesReferralCode(Map<String, dynamic> row, String normalized) {
 }
 
 String? ngmyDisplayNameFromReferrerRow(Map<String, dynamic> row) {
-  final username = (row['username'] ?? row['fullName'] ?? '').toString().trim();
-  if (username.isNotEmpty) return username;
+  final fullName = (row['fullName'] ?? '').toString().trim();
+  if (fullName.isNotEmpty) return fullName;
+  final username = (row['username'] ?? '').toString().trim();
+  if (username.isNotEmpty && username.toLowerCase() != 'user') return username;
   final email = (row['email'] ?? '').toString().trim();
   if (email.contains('@')) return email.split('@').first;
   return email.isEmpty ? null : email;
@@ -71,6 +74,45 @@ String? ngmyReferrerEmailFromRow(Map<String, dynamic>? row) {
   if (row == null) return null;
   final email = (row['email'] ?? '').toString().trim();
   return email.isEmpty ? null : email;
+}
+
+String _referrerNameCacheKey(String userEmail) =>
+    'ngmy_referred_by_name_${userEmail.toLowerCase().trim()}';
+
+Future<void> ngmyCacheReferrerNameForUser(String userEmail, String referrerName) async {
+  final email = userEmail.trim();
+  final name = referrerName.trim();
+  if (email.isEmpty || name.isEmpty) return;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_referrerNameCacheKey(email), name);
+  } catch (e) {
+    debugPrint('[referral] cache name: $e');
+  }
+}
+
+Future<String?> ngmyCachedReferrerNameForUser(String userEmail) async {
+  final email = userEmail.trim();
+  if (email.isEmpty) return null;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final name = prefs.getString(_referrerNameCacheKey(email));
+    if (name == null || name.trim().isEmpty) return null;
+    return name.trim();
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<String?> ngmyResolveReferrerNameForCode(
+  String rawCode, {
+  List<dynamic> localUsers = const [],
+}) async {
+  final local = ngmyLookupReferrerUserRowLocal(rawCode, localUsers: localUsers);
+  if (local != null) return ngmyDisplayNameFromReferrerRow(local);
+  final row = await ngmyLookupReferrerUserRow(rawCode, localUsers: localUsers);
+  if (row == null) return null;
+  return ngmyDisplayNameFromReferrerRow(row);
 }
 
 /// Instant lookup against users already on this device (no network).
@@ -128,14 +170,19 @@ Future<Map<String, dynamic>?> _ngmyLookupReferrerUserRowImpl(
       debugPrint('[referral] referralCode column lookup skipped: $e');
     }
 
-    final rows = await client
-        .from('users')
-        .select('email, username, fullName, referralCount, points, referredByCode, referralCode')
-        .limit(1500)
-        .timeout(kNgmyCloudLoadTimeout);
-    for (final raw in rows) {
-      final row = Map<String, dynamic>.from(raw);
-      if (_rowMatchesReferralCode(row, normalized)) return row;
+    const pageSize = 500;
+    for (var from = 0; from < 10000; from += pageSize) {
+      final rows = await client
+          .from('users')
+          .select('email, username, fullName, referralCount, points, referredByCode, referralCode')
+          .range(from, from + pageSize - 1)
+          .timeout(kNgmyCloudLoadTimeout);
+      if (rows.isEmpty) break;
+      for (final raw in rows) {
+        final row = Map<String, dynamic>.from(raw);
+        if (_rowMatchesReferralCode(row, normalized)) return row;
+      }
+      if (rows.length < pageSize) break;
     }
   } catch (e) {
     debugPrint('[referral] cloud lookup: $e');

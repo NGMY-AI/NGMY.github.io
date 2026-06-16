@@ -6502,11 +6502,12 @@ String? ngmyApplyReferralCodeToUser({
   if (ngmyReferralCodeBelongsToEmail(user.email, normalized)) return null;
 
   UserData? referrer;
+  String? refEmail = ngmyReferrerEmailFromRow(referrerRow);
   if (referrerRow != null) {
     referrer = UserData.fromJson(referrerRow);
-    final directEmail = ngmyReferrerEmailFromRow(referrerRow);
-    if (referrer.email.trim().isEmpty && directEmail != null) {
-      referrer.email = directEmail;
+    refEmail ??= referrer.email.trim().isNotEmpty ? referrer.email : null;
+    if (referrer.email.trim().isEmpty && refEmail != null) {
+      referrer.email = refEmail;
     }
   }
   if (referrer == null || referrer.email.trim().isEmpty) {
@@ -6514,6 +6515,7 @@ String? ngmyApplyReferralCodeToUser({
       for (final c in ngmyReferralCodesForEmail(u.email)) {
         if (c.toUpperCase() == normalized) {
           referrer = u;
+          refEmail = u.email;
           break;
         }
       }
@@ -6523,9 +6525,10 @@ String? ngmyApplyReferralCodeToUser({
   if (referrer == null || referrer.email.trim().isEmpty) return null;
 
   final currentEmail = user.email.toLowerCase().trim();
+  final referrerEmail = referrer.email.toLowerCase().trim();
+  if (referrerEmail == currentEmail) return null;
   final currentIdx = allUsers.indexWhere((u) => u.email.toLowerCase().trim() == currentEmail);
-  final refEmail = referrer.email.toLowerCase().trim();
-  var refIdx = allUsers.indexWhere((u) => u.email.toLowerCase().trim() == refEmail);
+  var refIdx = allUsers.indexWhere((u) => u.email.toLowerCase().trim() == referrerEmail);
   if (refIdx == -1) {
     allUsers.add(referrer);
     refIdx = allUsers.length - 1;
@@ -23465,6 +23468,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Timer? _referralPreviewDebounce;
   String _referralPreviewCode = '';
   Map<String, dynamic>? _referralPreviewReferrerRow;
+  String? _linkedReferrerName;
 
   String get _accountId => 'NGMY/USR/${widget.user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
   String get _referralCode => ngmyReferralCodeForEmail(widget.user.email);
@@ -23481,6 +23485,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     _syncProfileAvatarCache();
     _referralInputC.addListener(_scheduleReferralPreview);
+    unawaited(_loadLinkedReferrerDisplay());
+  }
+
+  Future<void> _loadLinkedReferrerDisplay() async {
+    if (widget.user.referredByCode.trim().isEmpty) return;
+    final cached = await ngmyCachedReferrerNameForUser(widget.user.email);
+    if (cached != null && cached.isNotEmpty) {
+      if (mounted) setState(() => _linkedReferrerName = cached);
+      return;
+    }
+    final localRow = ngmyLookupReferrerUserRowLocal(
+      widget.user.referredByCode,
+      localUsers: widget.allUsers,
+    );
+    if (localRow != null) {
+      final localName = ngmyDisplayNameFromReferrerRow(localRow);
+      if (localName != null && localName.isNotEmpty) {
+        await ngmyCacheReferrerNameForUser(widget.user.email, localName);
+        if (mounted) setState(() => _linkedReferrerName = localName);
+        return;
+      }
+    }
+    final name = await ngmyResolveReferrerNameForCode(
+      widget.user.referredByCode,
+      localUsers: widget.allUsers,
+    );
+    if (name != null && name.isNotEmpty) {
+      await ngmyCacheReferrerNameForUser(widget.user.email, name);
+    }
+    if (mounted) setState(() => _linkedReferrerName = name);
+  }
+
+  String _referrerDisplayName(Map<String, dynamic> referrerRow, String referrerEmail) {
+    final fromRow = ngmyDisplayNameFromReferrerRow(referrerRow);
+    if (fromRow != null && fromRow.isNotEmpty) return fromRow;
+    final refKey = referrerEmail.toLowerCase().trim();
+    for (final u in widget.allUsers) {
+      if (u.email.toLowerCase().trim() != refKey) continue;
+      final name = u.fullName?.trim();
+      if (name != null && name.isNotEmpty) return name;
+      final username = u.username.trim();
+      if (username.isNotEmpty && username.toLowerCase() != 'user') return username;
+      if (u.email.contains('@')) return u.email.split('@').first;
+      break;
+    }
+    if (referrerEmail.contains('@')) return referrerEmail.split('@').first;
+    return referrerEmail;
   }
 
   void _scheduleReferralPreview() {
@@ -23538,6 +23589,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.user.profilePicturePath != widget.user.profilePicturePath) {
       _syncProfileAvatarCache();
+    }
+    if (oldWidget.user.referredByCode != widget.user.referredByCode) {
+      unawaited(_loadLinkedReferrerDisplay());
     }
   }
 
@@ -23674,24 +23728,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You cannot use your own referral code.')));
       return;
     }
-    if (_referralPreviewInvalid && _referralInputC.text.trim().isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid referral code.')));
-      return;
-    }
     setState(() => _referralSubmitting = true);
     try {
       final normalized = ngmyNormalizeReferralCode(code);
       Map<String, dynamic>? referrerRow;
-      if (_referralPreviewReferrerRow != null &&
-          _referralPreviewCode == normalized &&
-          _referralPreviewName != null) {
+      if (_referralPreviewReferrerRow != null && _referralPreviewCode == normalized) {
         referrerRow = _referralPreviewReferrerRow;
       }
       referrerRow ??= ngmyLookupReferrerUserRowLocal(code, localUsers: widget.allUsers);
       referrerRow ??= await ngmyLookupReferrerUserRow(code, localUsers: widget.allUsers);
       if (!mounted) return;
       if (referrerRow == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid referral code.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid referral code. Check the code and try again.')),
+        );
         return;
       }
       final referrerEmail = ngmyApplyReferralCodeToUser(
@@ -23702,11 +23752,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       if (!mounted) return;
       if (referrerEmail == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid referral code.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not link that referral code. Try again.')),
+        );
         return;
       }
-      final referrerName = ngmyDisplayNameFromReferrerRow(referrerRow) ?? '';
+      final referrerName = _referrerDisplayName(referrerRow, referrerEmail);
+      if (referrerName.isNotEmpty) {
+        await ngmyCacheReferrerNameForUser(widget.user.email, referrerName);
+      }
       setState(() {
+        _linkedReferrerName = referrerName.isNotEmpty ? referrerName : null;
         _referralPreviewName = null;
         _referralPreviewInvalid = false;
         _referralPreviewCode = '';
@@ -23743,13 +23799,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       } catch (_) {}
       widget.onDataChanged();
       if (!mounted) return;
+      setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             referrerName.isNotEmpty
-                ? 'Referral linked — referred by $referrerName'
+                ? 'You were referred by $referrerName'
                 : 'Referral linked successfully.',
           ),
+          backgroundColor: const Color(0xFF059669),
         ),
       );
     } finally {
@@ -23997,50 +24055,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 2),
                     Text('Enter a referral code to credit your referrer', style: TextStyle(fontSize: 11, color: softText)),
                     if (widget.user.referredByCode.trim().isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.35)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _linkedReferrerName != null && _linkedReferrerName!.isNotEmpty
+                                  ? 'You were referred by $_linkedReferrerName'
+                                  : 'Referral linked',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF059669),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Code: ${widget.user.referredByCode}',
+                              style: TextStyle(fontSize: 11, color: softText),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (widget.user.referredByCode.trim().isEmpty) ...[
                       const SizedBox(height: 8),
-                      Text(
-                        'Referred by code: ${widget.user.referredByCode}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF10B981)),
+                      TextField(
+                        controller: _referralInputC,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: InputDecoration(
+                          hintText: 'ENTER CODE',
+                          errorText: _referralPreviewInvalid &&
+                                  (_referralPreviewName == null || _referralPreviewName!.isEmpty) &&
+                                  _referralInputC.text.trim().isNotEmpty
+                              ? 'Invalid referral code'
+                              : null,
+                        ),
+                      ),
+                      if (_referralPreviewName != null && _referralPreviewName!.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'You will be referred by: $_referralPreviewName',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _referralSubmitting ? null : _submitReferralCode,
+                          style: ElevatedButton.styleFrom(backgroundColor: neutralAction, foregroundColor: neutralActionText),
+                          child: _referralSubmitting
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Text('Submit'),
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _referralInputC,
-                      enabled: widget.user.referredByCode.trim().isEmpty,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: InputDecoration(
-                        hintText: 'ENTER CODE',
-                        errorText: _referralPreviewInvalid &&
-                                (_referralPreviewName == null || _referralPreviewName!.isEmpty) &&
-                                _referralInputC.text.trim().isNotEmpty
-                            ? 'Invalid referral code'
-                            : null,
-                      ),
-                    ),
-                    if (_referralPreviewName != null && _referralPreviewName!.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'Referred by: $_referralPreviewName',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _referralSubmitting || widget.user.referredByCode.trim().isNotEmpty
-                            ? null
-                            : _submitReferralCode,
-                        style: ElevatedButton.styleFrom(backgroundColor: neutralAction, foregroundColor: neutralActionText),
-                        child: _referralSubmitting
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Submit'),
-                      ),
-                    ),
                   ],
                 ),
               ),
