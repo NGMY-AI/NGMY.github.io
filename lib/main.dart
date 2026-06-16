@@ -6507,10 +6507,13 @@ String? ngmyApplyReferralCodeToUser({
   }
   if (referrer == null || referrer.email.trim().isEmpty) {
     for (final u in allUsers) {
-      if (ngmyReferralCodeForEmail(u.email).toUpperCase() == normalized) {
-        referrer = u;
-        break;
+      for (final c in ngmyReferralCodesForEmail(u.email)) {
+        if (c.toUpperCase() == normalized) {
+          referrer = u;
+          break;
+        }
       }
+      if (referrer != null) break;
     }
   }
   if (referrer == null || referrer.email.trim().isEmpty) return null;
@@ -23456,6 +23459,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _referralPreviewInvalid = false;
   bool _referralSubmitting = false;
   Timer? _referralPreviewDebounce;
+  String _referralPreviewCode = '';
+  Map<String, dynamic>? _referralPreviewReferrerRow;
 
   String get _accountId => 'NGMY/USR/${widget.user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
   String get _referralCode => ngmyReferralCodeForEmail(widget.user.email);
@@ -23487,6 +23492,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _referralPreviewName = null;
         _referralPreviewInvalid = false;
+        _referralPreviewCode = '';
+        _referralPreviewReferrerRow = null;
       });
       return;
     }
@@ -23496,6 +23503,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _referralPreviewName = null;
         _referralPreviewInvalid = false;
+        _referralPreviewCode = '';
+        _referralPreviewReferrerRow = null;
       });
       return;
     }
@@ -23505,14 +23514,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _referralPreviewName = null;
         _referralPreviewInvalid = true;
+        _referralPreviewCode = normalized;
+        _referralPreviewReferrerRow = null;
       });
       return;
     }
-    final name = await ngmyReferrerDisplayNameForCode(raw, localUsers: widget.allUsers);
+    final row = await ngmyLookupReferrerUserRow(raw, localUsers: widget.allUsers);
+    final name = row == null
+        ? null
+        : await ngmyReferrerDisplayNameForCode(raw, localUsers: widget.allUsers);
     if (!mounted) return;
     setState(() {
+      _referralPreviewCode = normalized;
+      _referralPreviewReferrerRow = row;
       _referralPreviewName = name;
-      _referralPreviewInvalid = name == null;
+      _referralPreviewInvalid = row == null;
     });
   }
 
@@ -23658,63 +23674,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     setState(() => _referralSubmitting = true);
-    final referrerRow = await ngmyLookupReferrerUserRow(code, localUsers: widget.allUsers);
-    if (!mounted) return;
-    if (referrerRow == null) {
-      setState(() => _referralSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid referral code.')));
-      return;
-    }
-    final referrerEmail = ngmyApplyReferralCodeToUser(
-      code: code,
-      user: widget.user,
-      allUsers: widget.allUsers,
-      referrerRow: referrerRow,
-    );
-    if (!mounted) return;
-    setState(() => _referralSubmitting = false);
-    if (referrerEmail == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid referral code.')));
-      return;
-    }
-    final referrerName = await ngmyReferrerDisplayNameForCode(code, localUsers: widget.allUsers);
-    setState(() {
-      _referralPreviewName = null;
-      _referralPreviewInvalid = false;
-    });
-    _referralInputC.clear();
     try {
-      final currentEmail = widget.user.email.toLowerCase().trim();
-      final refKey = referrerEmail.toLowerCase().trim();
-      final currentIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == currentEmail);
-      final refIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == refKey);
-      final rows = <Map<String, dynamic>>[];
-      if (currentIdx != -1) {
-        rows.add(Map<String, dynamic>.from(widget.allUsers[currentIdx].toJson()));
+      final normalized = ngmyNormalizeReferralCode(code);
+      Map<String, dynamic>? referrerRow;
+      if (_referralPreviewReferrerRow != null && _referralPreviewCode == normalized) {
+        referrerRow = _referralPreviewReferrerRow;
       } else {
-        rows.add(Map<String, dynamic>.from(widget.user.toJson()));
+        referrerRow = await ngmyLookupReferrerUserRow(code, localUsers: widget.allUsers);
       }
-      if (refIdx != -1) {
-        rows.add(Map<String, dynamic>.from(widget.allUsers[refIdx].toJson()));
+      if (!mounted) return;
+      if (referrerRow == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid referral code.')));
+        return;
       }
-      if (rows.isNotEmpty) {
-        final canWriteTrial = widget.user.isAdmin;
-        Supabase.instance.client.from('users').upsert(rows.map((r) {
-          final u = UserData.fromJson(r);
-          return _userRowForBulkSync(u, includeFreeTrial: canWriteTrial);
-        }).toList()).then((_) {}).catchError((_) {});
+      final referrerEmail = ngmyApplyReferralCodeToUser(
+        code: code,
+        user: widget.user,
+        allUsers: widget.allUsers,
+        referrerRow: referrerRow,
+      );
+      if (!mounted) return;
+      if (referrerEmail == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid referral code.')));
+        return;
       }
-    } catch (_) {}
-    widget.onDataChanged();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          referrerName != null && referrerName.isNotEmpty
-              ? 'Referral linked — referred by $referrerName'
-              : 'Referral linked successfully.',
+      final referrerName = (referrerRow['username'] ?? referrerRow['fullName'] ?? '').toString().trim();
+      setState(() {
+        _referralPreviewName = null;
+        _referralPreviewInvalid = false;
+        _referralPreviewCode = '';
+        _referralPreviewReferrerRow = null;
+      });
+      _referralInputC.clear();
+      try {
+        final currentEmail = widget.user.email.toLowerCase().trim();
+        final refKey = referrerEmail.toLowerCase().trim();
+        final currentIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == currentEmail);
+        final refIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == refKey);
+        final rows = <Map<String, dynamic>>[];
+        if (currentIdx != -1) {
+          rows.add(Map<String, dynamic>.from(widget.allUsers[currentIdx].toJson()));
+        } else {
+          rows.add(Map<String, dynamic>.from(widget.user.toJson()));
+        }
+        if (refIdx != -1) {
+          rows.add(Map<String, dynamic>.from(widget.allUsers[refIdx].toJson()));
+        }
+        if (rows.isNotEmpty) {
+          final canWriteTrial = widget.user.isAdmin;
+          unawaited(
+            Supabase.instance.client
+                .from('users')
+                .upsert(rows.map((r) {
+                  final u = UserData.fromJson(r);
+                  return _userRowForBulkSync(u, includeFreeTrial: canWriteTrial);
+                }).toList())
+                .timeout(kNgmyCloudWriteTimeout)
+                .catchError((_) {}),
+          );
+        }
+      } catch (_) {}
+      widget.onDataChanged();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            referrerName.isNotEmpty
+                ? 'Referral linked — referred by $referrerName'
+                : 'Referral linked successfully.',
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) setState(() => _referralSubmitting = false);
+    }
   }
 
   @override Widget build(BuildContext context) {

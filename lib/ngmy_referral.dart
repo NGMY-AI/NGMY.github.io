@@ -63,6 +63,19 @@ bool _rowMatchesReferralCode(Map<String, dynamic> row, String normalized) {
 Future<Map<String, dynamic>?> ngmyLookupReferrerUserRow(
   String rawCode, {
   List<dynamic> localUsers = const [],
+}) {
+  return ngmyWithTimeout(
+    () => _ngmyLookupReferrerUserRowImpl(rawCode, localUsers: localUsers),
+    onTimeout: () {
+      debugPrint('[referral] lookup timed out for $rawCode');
+      return null;
+    },
+  );
+}
+
+Future<Map<String, dynamic>?> _ngmyLookupReferrerUserRowImpl(
+  String rawCode, {
+  List<dynamic> localUsers = const [],
 }) async {
   final normalized = ngmyNormalizeReferralCode(rawCode);
   if (normalized.isEmpty) return null;
@@ -91,8 +104,8 @@ Future<Map<String, dynamic>?> ngmyLookupReferrerUserRow(
 
     final rows = await client
         .from('users')
-        .select('email, username, fullName, referralCount, points, referredByCode')
-        .limit(5000)
+        .select('email, username, fullName, referralCount, points, referredByCode, referralCode')
+        .limit(1500)
         .timeout(kNgmyCloudLoadTimeout);
     for (final raw in rows) {
       final row = Map<String, dynamic>.from(raw);

@@ -16,10 +16,12 @@ const _kWorksheetProjectBundleType = 'ngmy_worksheet_project_v1';
 Map<String, dynamic> ngmyWorksheetProjectShareBundle({
   required String ownerEmail,
   required WorksheetProject project,
-  bool includeThumbnail = true,
+  String? thumbnailOverride,
 }) {
   final projectJson = project.toJson();
-  if (!includeThumbnail) {
+  if (thumbnailOverride != null && thumbnailOverride.isNotEmpty) {
+    projectJson['thumbnailPath'] = thumbnailOverride;
+  } else {
     projectJson.remove('thumbnailPath');
   }
   return {
@@ -30,28 +32,51 @@ Map<String, dynamic> ngmyWorksheetProjectShareBundle({
   };
 }
 
-String ngmyWorksheetProjectShareJson({
+Future<Map<String, dynamic>> ngmyWorksheetProjectShareBundleAsync({
   required String ownerEmail,
   required WorksheetProject project,
   bool includeThumbnail = true,
-}) {
+  bool compressForQr = false,
+}) async {
+  String? thumb;
+  if (includeThumbnail) {
+    thumb = await ngmyWorksheetShareThumbnail(
+      project.thumbnailPath,
+      forQr: compressForQr,
+    );
+  }
+  return ngmyWorksheetProjectShareBundle(
+    ownerEmail: ownerEmail,
+    project: project,
+    thumbnailOverride: thumb,
+  );
+}
+
+Future<String> ngmyWorksheetProjectShareJson({
+  required String ownerEmail,
+  required WorksheetProject project,
+  bool includeThumbnail = true,
+  bool compressForQr = false,
+}) async {
   return jsonEncode(
-    ngmyWorksheetProjectShareBundle(
+    await ngmyWorksheetProjectShareBundleAsync(
       ownerEmail: ownerEmail,
       project: project,
       includeThumbnail: includeThumbnail,
+      compressForQr: compressForQr,
     ),
   );
 }
 
-String ngmyWorksheetProjectQrPayload({
+Future<String> ngmyWorksheetProjectQrPayload({
   required String ownerEmail,
   required WorksheetProject project,
-}) {
-  final json = ngmyWorksheetProjectShareJson(
+}) async {
+  final json = await ngmyWorksheetProjectShareJson(
     ownerEmail: ownerEmail,
     project: project,
-    includeThumbnail: false,
+    includeThumbnail: true,
+    compressForQr: true,
   );
   return 'NGMY_WS:${base64Url.encode(utf8.encode(json))}';
 }
@@ -133,10 +158,11 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
   Future<void> _download(BuildContext context) async {
     Navigator.pop(context);
     await Future<void>.delayed(const Duration(milliseconds: 80));
-    final json = ngmyWorksheetProjectShareJson(
+    final json = await ngmyWorksheetProjectShareJson(
       ownerEmail: ownerEmail,
       project: project,
       includeThumbnail: true,
+      compressForQr: false,
     );
     final safeName = project.name.replaceAll(RegExp(r'[^\w\-.]+'), '_');
     final msg = await downloadNgmyAdvisorSyncJson(json, 'ngmy_project_$safeName');
@@ -144,9 +170,17 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  void _showQr(BuildContext context) {
+  Future<void> _showQr(BuildContext context) async {
     Navigator.pop(context);
-    final payload = ngmyWorksheetProjectQrPayload(ownerEmail: ownerEmail, project: project);
+    if (!context.mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator(color: WorksheetPalette.green)),
+    );
+    final payload = await ngmyWorksheetProjectQrPayload(ownerEmail: ownerEmail, project: project);
+    if (context.mounted) Navigator.pop(context);
+    if (!context.mounted) return;
     NgmyNavigator.push<void>(
       context,
       NgmyWorksheetProjectQrPage(projectName: project.name, payload: payload),
@@ -229,7 +263,7 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
                 p,
                 icon: Icons.qr_code_2_rounded,
                 label: 'Show QR code',
-                subtitle: 'NGMY logo · circle corners · scan to import',
+                subtitle: 'Includes thumbnail · NGMY logo · scan to import',
                 onTap: () => _showQr(context),
                 accent: true,
               ),
@@ -239,7 +273,7 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
                 p,
                 icon: Icons.download_rounded,
                 label: 'Download backup file',
-                subtitle: 'Save file, then upload on another phone',
+                subtitle: 'Full project with thumbnail — upload on another phone',
                 onTap: () => _download(context),
               ),
               const SizedBox(height: 8),

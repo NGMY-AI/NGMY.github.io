@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -27,6 +28,38 @@ Future<String?> ngmyPickImageBase64({
   if (img == null) return null;
   final bytes = await img.readAsBytes();
   return 'data:image/jpeg;base64,${base64Encode(bytes)}';
+}
+
+/// Shrinks a data-URL image for QR/file sharing while keeping enough quality for thumbnails.
+Future<String?> ngmyWorksheetShareThumbnail(
+  String? ref, {
+  bool forQr = false,
+}) async {
+  final raw = ref?.trim();
+  if (raw == null || raw.isEmpty) return null;
+  if (!raw.startsWith('data:image')) return raw;
+
+  final maxChars = forQr ? 1600 : 500000;
+  if (raw.length <= maxChars) return raw;
+
+  try {
+    final payload = raw.contains(',') ? raw.split(',').last : raw;
+    final bytes = base64Decode(payload);
+  var targetWidth = forQr ? 420 : 960;
+    while (targetWidth >= 96) {
+      final codec = await ui.instantiateImageCodec(bytes, targetWidth: targetWidth);
+      final frame = await codec.getNextFrame();
+      final byteData = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+      frame.image.dispose();
+      if (byteData == null) break;
+      final out = 'data:image/png;base64,${base64Encode(byteData.buffer.asUint8List())}';
+      if (out.length <= maxChars) return out;
+      targetWidth = (targetWidth * 0.72).round();
+    }
+  } catch (e) {
+    debugPrint('[worksheets] thumbnail shrink failed: $e');
+  }
+  return forQr ? null : raw;
 }
 
 ImageProvider? ngmyImageFromRef(String? ref) {

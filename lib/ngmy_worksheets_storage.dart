@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_network_resilience.dart';
+import 'ngmy_worksheet_helpers.dart';
 
 const String _projectsKeyPrefix = 'ngmy_worksheets_projects_v2_';
 const String _projectsIndexV3Prefix = 'ngmy_worksheets_index_v3_';
@@ -592,19 +593,32 @@ Future<bool> saveWorksheetProjects(
       if (project.id.isEmpty || project.name.trim().isEmpty) continue;
 
       final thumbnail = project.thumbnailPath?.trim();
+      WorksheetProject coreProject = project;
       if (thumbnail != null && thumbnail.isNotEmpty) {
-        await _safePrefsSetString(
+        var thumbToStore = thumbnail;
+        var thumbSaved = await _safePrefsSetString(
           prefs,
           _projectThumbV3Key(email, project.id),
-          thumbnail,
+          thumbToStore,
         );
+        if (!thumbSaved) {
+          final shrunk = await ngmyWorksheetShareThumbnail(thumbnail, forQr: false);
+          if (shrunk != null && shrunk.isNotEmpty) {
+            thumbToStore = shrunk;
+            thumbSaved = await _safePrefsSetString(
+              prefs,
+              _projectThumbV3Key(email, project.id),
+              thumbToStore,
+            );
+          }
+        }
+        coreProject = thumbSaved
+            ? project.copyWith(thumbnailPath: null)
+            : project.copyWith(thumbnailPath: thumbToStore);
       } else {
         await _safePrefsRemove(prefs, _projectThumbV3Key(email, project.id));
       }
 
-      final coreProject = (thumbnail != null && thumbnail.isNotEmpty)
-          ? project.copyWith(thumbnailPath: null)
-          : project;
       final coreSaved = await _safePrefsSetString(
         prefs,
         _projectItemV3Key(email, project.id),
