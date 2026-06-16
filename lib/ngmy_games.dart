@@ -75,9 +75,25 @@ Map<String, int> ngmyParseGameTimeLimits(dynamic raw) {
 
 /// Minimum questions / moves / parts per Game Center round.
 const int kNgmyQuestionsPerGame = 5;
+const int kNgmyMathQuestionsPerGame = 6;
 const int kNgmyTypingSentencesPerGame = 5;
 const int kNgmyPatternMovesPerGame = 7;
+const int kNgmyPatternRounds = 7;
 const int kNgmySimonWinRounds = 6;
+
+/// Pattern Memory: round 1 → 3 tiles, round 2 → 4, … capped at 7 by round 5+.
+int ngmyPatternMovesForRound(int round) {
+  assert(round >= 1);
+  return math.min(round + 2, kNgmyPatternMovesPerGame);
+}
+
+int get kNgmyPatternTotalMoves {
+  var sum = 0;
+  for (var r = 1; r <= kNgmyPatternRounds; r++) {
+    sum += ngmyPatternMovesForRound(r);
+  }
+  return sum;
+}
 
 int ngmyGameTimeLimitSeconds(String gameId, Map<String, int> limits) {
   return limits[gameId] ?? ngmyDefaultGameTimeLimits()[gameId] ?? 90;
@@ -183,77 +199,114 @@ List<String> _mathChoiceStrings(int ans, math.Random rng) {
   return choices;
 }
 
+List<String> _mathStringChoices(String ans, math.Random rng, List<String> wrongPool) {
+  final wrong = <String>{};
+  for (final w in wrongPool) {
+    if (w != ans) wrong.add(w);
+    if (wrong.length >= 3) break;
+  }
+  var salt = 0;
+  while (wrong.length < 3) {
+    wrong.add('${wrongPool[salt % wrongPool.length]}$salt');
+    salt++;
+  }
+  final choices = [ans, ...wrong.take(3)];
+  choices.shuffle(rng);
+  return choices;
+}
+
+String _mathSigned(int n) => n >= 0 ? '+ $n' : '− ${-n}';
+
 List<NgmyMathQuestion> buildNgmyMathBank() {
   final bank = <NgmyMathQuestion>[];
   final rng = math.Random(42);
   for (var i = 0; i < 200; i++) {
-    late String prompt;
-    late int ans;
-    if (i < 70) {
-      final a = 18 + rng.nextInt(120);
-      final b = 12 + rng.nextInt(95);
-      final op = i % 4;
-      if (op == 0) {
-        prompt = '$a + $b = ?';
-        ans = a + b;
-      } else if (op == 1) {
-        prompt = '$a × $b = ?';
-        ans = a * b;
-      } else if (op == 2) {
-        final hi = math.max(a, b);
-        final lo = math.min(a, b);
-        prompt = '$hi − $lo = ?';
-        ans = hi - lo;
+    final kind = i % 5;
+    if (kind == 0) {
+      // Simplify radicals — e.g. √512x³ → 16x√2x
+      final squares = [4, 9, 16, 25, 36, 49, 64, 81, 121, 144, 196, 256];
+      final sq = squares[rng.nextInt(squares.length)];
+      final factor = [2, 3, 5, 6, 7, 10, 11, 13][rng.nextInt(8)];
+      final rad = sq * factor;
+      final root = math.sqrt(sq).toInt();
+      final exp = 2 + rng.nextInt(4);
+      final prompt = 'Simplify √(${rad}x^$exp)';
+      final half = exp ~/ 2;
+      final String ans;
+      if (exp.isEven) {
+        ans = half == 1 ? '${root}√$factor' : '${root}x^$half√$factor';
       } else {
-        final d = math.max(2, b % 12 + 2);
-        final q = a ~/ d;
-        prompt = '$q × $d = ?';
-        ans = q * d;
+        ans = half == 0 ? '${root}√${factor}x' : '${root}x^$half√${factor}x';
       }
-    } else if (i < 140) {
-      final a = 25 + rng.nextInt(75);
-      final b = 15 + rng.nextInt(55);
-      final c = 4 + rng.nextInt(18);
-      final kind = i % 3;
-      if (kind == 0) {
-        prompt = '($a + $b) × $c = ?';
-        ans = (a + b) * c;
-      } else if (kind == 1) {
-        prompt = '$a² + $b = ?';
-        ans = a * a + b;
+      bank.add(NgmyMathQuestion(
+        prompt: prompt,
+        answer: ans,
+        choices: _mathStringChoices(ans, rng, [
+          '${root + 1}x^$half√$factor',
+          '${math.max(1, root - 1)}x^$half√$factor',
+          '${root}x^${half + 1}√$factor',
+          '${root}x^$half√${factor + 1}',
+          '${root * 2}x^$half√$factor',
+        ]),
+      ));
+    } else if (kind == 1) {
+      // Linear equations — e.g. x − 18 = −5
+      final x = 3 + rng.nextInt(35);
+      final a = rng.nextInt(4) == 0 ? 1 : 2 + rng.nextInt(4);
+      final b = rng.nextInt(41) - 20;
+      final c = a * x + b;
+      final lhs = a == 1 ? 'x' : '${a}x';
+      final prompt = 'Solve: $lhs ${_mathSigned(b)} = $c';
+      bank.add(NgmyMathQuestion(prompt: prompt, answer: '$x', choices: _mathChoiceStrings(x, rng)));
+    } else if (kind == 2) {
+      // Radical equations — √x−a = √−x+b
+      final x = 2 + rng.nextInt(18);
+      final a = rng.nextInt(12) + 1;
+      final b = 2 * x - a;
+      if (b <= x) {
+        final x2 = x + 1;
+        final a2 = rng.nextInt(10) + 2;
+        final b2 = 2 * x2 - a2;
+        final prompt = 'Solve: √(x − $a2) = √(−x + $b2)';
+        bank.add(NgmyMathQuestion(prompt: prompt, answer: '$x2', choices: _mathChoiceStrings(x2, rng)));
       } else {
-        final pct = 10 + rng.nextInt(8) * 5;
-        prompt = '$pct% of $a = ?';
-        ans = (a * pct / 100).round();
+        final prompt = 'Solve: √(x − $a) = √(−x + $b)';
+        bank.add(NgmyMathQuestion(prompt: prompt, answer: '$x', choices: _mathChoiceStrings(x, rng)));
       }
+    } else if (kind == 3) {
+      // Distance formula — find missing coordinate
+      final x1 = rng.nextInt(11) - 5;
+      final y1 = rng.nextInt(11) + 2;
+      final x2 = rng.nextInt(11) - 5;
+      final y2 = rng.nextInt(11) + 2;
+      final xMissing = x1 + (rng.nextBool() ? 1 : -1) * (rng.nextInt(9) + 3);
+      final dx = x1 - xMissing;
+      final dy = y1 - y2;
+      final distSq = dx * dx + dy * dy;
+      final dist = math.sqrt(distSq);
+      final distLabel = dist == dist.roundToDouble() ? '${dist.toInt()}' : '√$distSq';
+      final prompt = 'Find x. Distance between ($x1, x) and ($x2, $y2) is $distLabel';
+      bank.add(NgmyMathQuestion(prompt: prompt, answer: '$xMissing', choices: _mathChoiceStrings(xMissing, rng)));
     } else {
-      final a = 30 + rng.nextInt(90);
-      final b = 20 + rng.nextInt(70);
-      final c = 6 + rng.nextInt(24);
-      final kind = i % 4;
-      if (kind == 0) {
-        prompt = '$a × $b − $c = ?';
-        ans = a * b - c;
-      } else if (kind == 1) {
-        prompt = '($a − $b) × $c = ?';
-        ans = (a - b) * c;
-      } else if (kind == 2) {
-        final n = 2 + rng.nextInt(8);
-        prompt = '$nⁿ + $a = ?';
-        ans = math.pow(n, n).toInt() + a;
-      } else {
-        final d = math.max(3, c);
-        final rem = a % d;
-        final q = a ~/ d;
-        prompt = '$a ÷ $d = ? (quotient only)';
-        ans = q;
-        if (rem != 0) {
-          prompt = '$a ÷ $d = ? (ignore remainder)';
-          ans = q;
-        }
-      }
+      // Factor x⁴ + bx² + c — e.g. x⁴ + 18x² + 72
+      final p = 2 + rng.nextInt(10);
+      final q = p + 2 + rng.nextInt(10);
+      final b = p + q;
+      final c = p * q;
+      final prompt = 'Factor: x⁴ ${_mathSigned(b)}x² ${_mathSigned(c)}';
+      final ans = '(x² + $p)(x² + $q)';
+      bank.add(NgmyMathQuestion(
+        prompt: prompt,
+        answer: ans,
+        choices: _mathStringChoices(ans, rng, [
+          '(x² + ${p + 1})(x² + $q)',
+          '(x² + $p)(x² + ${q + 1})',
+          '(x² + ${p - 1})(x² + $q)',
+          '(x + $p)(x + $q)',
+          '(x² + $p)(x² + ${q - 1})',
+        ]),
+      ));
     }
-    bank.add(NgmyMathQuestion(prompt: prompt, answer: ans.toString(), choices: _mathChoiceStrings(ans, rng)));
   }
   return bank;
 }

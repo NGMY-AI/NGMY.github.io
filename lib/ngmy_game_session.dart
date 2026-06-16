@@ -1,3 +1,32 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+
+/// Bumped after wallet balance changes so pushed game routes repaint instantly.
+final ValueNotifier<int> ngmyBalanceTick = ValueNotifier<int>(0);
+
+void ngmyNotifyBalanceChanged() {
+  ngmyBalanceTick.value++;
+}
+
+/// Listen for [ngmyBalanceTick] and rebuild — use on game/home screens that show balance.
+mixin NgmyBalanceListener<T extends StatefulWidget> on State<T> {
+  @override
+  void initState() {
+    super.initState();
+    ngmyBalanceTick.addListener(_onNgmyBalanceTick);
+  }
+
+  void _onNgmyBalanceTick() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    ngmyBalanceTick.removeListener(_onNgmyBalanceTick);
+    super.dispose();
+  }
+}
+
 /// Tracks active Game Center play so unrelated app notifications stay quiet.
 class NgmyGameSession {
   static int _depth = 0;

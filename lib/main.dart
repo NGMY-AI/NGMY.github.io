@@ -11002,6 +11002,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     _markUserDirty(syncedUser!.email);
                   }
                   _markTransactionDirty(t.id);
+                  ngmyNotifyBalanceChanged();
                   unawaited(_persistLocalOnly());
                   if (t.status == TransactionStatus.approved && ngmyTransactionCountsAsIncome(t)) {
                     ngmyPlayIncomeSoundForTransaction(t);
@@ -11107,6 +11108,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   });
                   NgmyAdminLiveRefresh.notify();
                   _markTransactionDirty(t.id);
+                  ngmyNotifyBalanceChanged();
                   await _persistLocalOnly();
                   final syncedUserCopy = syncedUser;
                   final cloudSynced = await _syncWalletApprovalInBackground(t, syncedUserCopy);
@@ -12634,7 +12636,7 @@ class NgmyAdminLiveRefresh {
   }
 }
 
-class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, NgmyBalanceListener {
   int _idx = 0; Timer? _t; int _syncCounter = 0;
   bool _offline = false;
   bool _investPurchaseInFlight = false;
@@ -13555,7 +13557,7 @@ class HomeScreen extends StatefulWidget {
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver, NgmyBalanceListener {
   late AnimationController _smokeCtrl;
   late Animation<double> _smokeRot;
   Timer? _liveTicker;
@@ -15298,7 +15300,7 @@ class _GameDef {
   });
 }
 
-class _GameCenterScreenState extends State<GameCenterScreen> {
+class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceListener {
   int _sessionGamesPlayed = 0;
   Timer? _invitePoll;
   List<Map<String, dynamic>> _liveInvites = [];
@@ -15740,7 +15742,7 @@ class _NgmyDiceGameHost extends StatefulWidget {
   State<_NgmyDiceGameHost> createState() => _NgmyDiceGameHostState();
 }
 
-class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> {
+class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceListener {
   late NgmyDiceSettings _dice;
 
   @override
@@ -15786,6 +15788,7 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> {
           ),
         );
         widget.onDataChanged();
+        ngmyNotifyBalanceChanged();
         return true;
       },
       onPayout: (payout, note, {double bonus = 0}) {
@@ -15806,6 +15809,7 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> {
           ),
         );
         widget.onDataChanged();
+        ngmyNotifyBalanceChanged();
       },
     );
   }
@@ -15840,7 +15844,7 @@ class GameBetScreen extends StatefulWidget {
   State<GameBetScreen> createState() => _GameBetScreenState();
 }
 
-class _GameBetScreenState extends State<GameBetScreen> {
+class _GameBetScreenState extends State<GameBetScreen> with NgmyBalanceListener {
   final TextEditingController _customBetC = TextEditingController();
   double _bet = 2;
 
@@ -15893,6 +15897,7 @@ class _GameBetScreenState extends State<GameBetScreen> {
       ),
     );
     widget.onDataChanged();
+    ngmyNotifyBalanceChanged();
     NgmyNavigator.push(
       context,
       GamePlayScreen(
@@ -16077,7 +16082,7 @@ class GamePlayScreen extends StatefulWidget {
   State<GamePlayScreen> createState() => _GamePlayScreenState();
 }
 
-class _GamePlayScreenState extends State<GamePlayScreen> {
+class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListener {
   final math.Random _rng = math.Random();
   final TextEditingController _inputC = TextEditingController();
   static final List<NgmyMathQuestion> _mathBank = buildNgmyMathBank();
@@ -16091,6 +16096,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   Timer? _roundTimer;
   int _bankIndex = 0;
   String _scrambled = '';
+  List<String?> _scrambleSlots = [];
+  List<String> _scramblePool = [];
+  String _mathPromptText = '';
+  Timer? _reflexTimer;
   // Typing (2 sentences per round)
   List<String> _typingSentences = [];
   int _typingSentenceIdx = 0;
@@ -16130,6 +16139,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   List<int> _patternSeq = [];
   int _patternFlash = -1;
   int _patternProgress = 0;
+  int _patternRound = 1;
   bool _patternShowing = false;
   // Number sequence / math / scramble / color (multi-question rounds)
   int _sequenceQuestion = 0;
@@ -16205,7 +16215,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       case 'simon':
         return _simonCorrectTaps;
       case 'pattern':
-        return _patternProgress;
+        return _patternMovesCompleted();
       case 'sequence':
         return _sequenceQuestion;
       case 'math':
@@ -16222,6 +16232,16 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     }
   }
 
+  int _patternMovesCompleted() {
+    var done = _patternProgress;
+    for (var r = 1; r < _patternRound; r++) {
+      done += ngmyPatternMovesForRound(r);
+    }
+    return done;
+  }
+
+  int _currentPatternLength() => ngmyPatternMovesForRound(_patternRound);
+
   int _gameProgressTotal() {
     switch (widget.gameId) {
       case 'puzzle':
@@ -16237,13 +16257,14 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       case 'simon':
         return _simonTargetTaps;
       case 'pattern':
-        return kNgmyPatternMovesPerGame;
+        return kNgmyPatternTotalMoves;
       case 'sequence':
-      case 'math':
       case 'scramble':
       case 'color':
       case 'reflex':
         return kNgmyQuestionsPerGame;
+      case 'math':
+        return kNgmyMathQuestionsPerGame;
       default:
         if (_pro != null) return _pro!.progressTotal(widget.gameId);
         return 1;
@@ -16481,7 +16502,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   void _buildPatternSequence({int? seed}) {
     final rng = seed != null ? math.Random(seed) : _rng;
-    _patternSeq = List<int>.generate(kNgmyPatternMovesPerGame, (_) => rng.nextInt(9));
+    final len = _currentPatternLength();
+    _patternSeq = List<int>.generate(len, (_) => rng.nextInt(9));
     _patternProgress = 0;
     _patternFlash = -1;
   }
@@ -16496,7 +16518,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (!mounted) return;
     _buildPatternSequence(seed: seed);
     setState(() {
-      _prompt = 'Tap $kNgmyPatternMovesPerGame tiles in order — move 0/$kNgmyPatternMovesPerGame';
+      _prompt = 'Round $_patternRound/$kNgmyPatternRounds — tap ${_currentPatternLength()} tiles (0/${_currentPatternLength()})';
     });
     unawaited(_flashPattern());
   }
@@ -16537,7 +16559,9 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
             : kNgmyWordBank.length;
     final next = widget.gameId == 'typing'
         ? (_bankIndex + kNgmyTypingSentencesPerGame) % bankLen
-        : (_bankIndex + 1) % bankLen;
+        : widget.gameId == 'math'
+            ? (_bankIndex + kNgmyMathQuestionsPerGame) % bankLen
+            : (_bankIndex + 1) % bankLen;
     await prefs.setInt(key, next);
     _bankIndex = next;
   }
@@ -16678,6 +16702,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     _simonPlayGen++;
     _roundTimer?.cancel();
     _miniTicker?.cancel();
+    _reflexTimer?.cancel();
     _mpSyncTimer?.cancel();
     _mpGateTimer?.cancel();
     _inputC.dispose();
@@ -16708,7 +16733,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       case 'scramble':
         _scrambleQuestion = 0;
         _setupScrambleQuestion();
-        _prompt = 'Word 1 of $kNgmyQuestionsPerGame — unscramble';
+        _prompt = 'Word 1 of $kNgmyQuestionsPerGame — place letters in order';
         break;
       case 'typing':
         final i = _bankIndex % kNgmySentenceBank.length;
@@ -16725,7 +16750,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       case 'math':
         _mathQuestion = 0;
         _setupMathQuestion();
-        _prompt = 'Question 1 of $kNgmyQuestionsPerGame';
+        _prompt = 'Question 1 of ${kNgmyMathQuestionsPerGame}';
         break;
       case 'sequence':
         _sequenceQuestion = 0;
@@ -16750,11 +16775,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         if (_isMultiplayer) {
           _patternSeq = [];
           _patternProgress = 0;
+          _patternRound = 1;
           _patternFlash = -1;
           _prompt = 'Waiting to sync pattern with opponent…';
         } else {
+          _patternRound = 1;
           _buildPatternSequence();
-          _prompt = 'Tap $kNgmyPatternMovesPerGame tiles in order — move 0/$kNgmyPatternMovesPerGame';
+          _prompt = 'Round 1/$kNgmyPatternRounds — tap ${_currentPatternLength()} tiles (0/${_currentPatternLength()})';
           unawaited(_flashPattern());
         }
         break;
@@ -16768,6 +16795,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         _readyReflex = false;
         _reflexStart = null;
         _prompt = 'Round 1 of $kNgmyQuestionsPerGame — wait for green, tap fast';
+        _startReflexRound();
         break;
       default:
         if (kNgmyProGameIds.contains(widget.gameId)) {
@@ -16815,8 +16843,11 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   }
 
   void _setupMathQuestion() {
+    if (_mathQuestion == 0 && _bankIndex > _mathBank.length - kNgmyMathQuestionsPerGame) {
+      _bankIndex = 0;
+    }
     final q = _mathBank[(_bankIndex + _mathQuestion) % _mathBank.length];
-    _prompt = q.prompt;
+    _mathPromptText = q.prompt;
     _answer = q.answer;
     _optionChoices = q.choices;
   }
@@ -16825,6 +16856,100 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     final word = kNgmyWordBank[(_bankIndex + _scrambleQuestion) % kNgmyWordBank.length];
     _answer = word;
     _scrambled = scrambleWord(word);
+    _scrambleSlots = List<String?>.filled(word.length, null);
+    _scramblePool = _scrambled.split('');
+    _inputC.clear();
+  }
+
+  void _startReflexRound() {
+    _reflexTimer?.cancel();
+    _readyReflex = false;
+    _reflexStart = null;
+    _reflexTimer = Timer(Duration(milliseconds: 120 + _rng.nextInt(280)), () {
+      if (!mounted || _won) return;
+      setState(() {
+        _readyReflex = true;
+        _reflexStart = DateTime.now();
+      });
+    });
+  }
+
+  void _handleReflexTap() {
+    if (_won) return;
+    if (!_readyReflex) {
+      unawaited(_failMoveGame(reason: 'Too early — paid for $_reflexRoundDone/$kNgmyQuestionsPerGame.'));
+      return;
+    }
+    final ms = _reflexStart == null ? 999 : DateTime.now().difference(_reflexStart!).inMilliseconds;
+    if (ms < 520) {
+      setState(() {
+        _reflexRoundDone++;
+        _readyReflex = false;
+        _reflexStart = null;
+      });
+      if (_reflexRoundDone >= kNgmyQuestionsPerGame) {
+        unawaited(_advanceBank());
+        unawaited(_payoutWin(subtitle: 'All $kNgmyQuestionsPerGame reflex rounds — lightning fast!'));
+      } else {
+        _prompt = 'Round ${_reflexRoundDone + 1} of $kNgmyQuestionsPerGame — wait for green, tap fast';
+        _startReflexRound();
+        setState(() {});
+      }
+    } else {
+      unawaited(_failMoveGame(reason: 'Too slow (${ms}ms) — paid for $_reflexRoundDone/$kNgmyQuestionsPerGame.'));
+    }
+  }
+
+  void _tapScramblePoolLetter(int index) {
+    if (_won || index < 0 || index >= _scramblePool.length) return;
+    final letter = _scramblePool[index];
+    final slot = _scrambleSlots.indexWhere((s) => s == null);
+    if (slot < 0) return;
+    setState(() {
+      _scrambleSlots[slot] = letter;
+      _scramblePool.removeAt(index);
+    });
+  }
+
+  void _tapScrambleSlot(int slot) {
+    if (_won || slot < 0 || slot >= _scrambleSlots.length) return;
+    final letter = _scrambleSlots[slot];
+    if (letter == null) return;
+    setState(() {
+      _scrambleSlots[slot] = null;
+      _scramblePool.add(letter);
+    });
+  }
+
+  void _checkScramblePlacement() {
+    if (_won) return;
+    if (_scrambleSlots.any((s) => s == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Place every letter first')));
+      return;
+    }
+    final guess = _scrambleSlots.join();
+    final correct = guess.toUpperCase() == _answer.toUpperCase();
+    if (widget.gameId != 'scramble') return;
+    if (correct) {
+      setState(() => _scrambleQuestion++);
+      if (_isSkillMultiplayer) {
+        unawaited(_publishSkillMultiplayerProgress());
+      }
+      if (_scrambleQuestion >= kNgmyQuestionsPerGame) {
+        unawaited(_advanceBank());
+        if (_isSkillMultiplayer) {
+          unawaited(_settleSkillMultiplayer(forceComplete: true));
+        } else {
+          unawaited(_payoutWin(subtitle: 'All $kNgmyQuestionsPerGame words unscrambled!'));
+        }
+      } else {
+        _setupScrambleQuestion();
+        _prompt = 'Word ${_scrambleQuestion + 1} of $kNgmyQuestionsPerGame — place letters in order';
+        setState(() {});
+      }
+    } else {
+      unawaited(_failMoveGame(reason: 'Wrong word — paid for $_scrambleQuestion/$kNgmyQuestionsPerGame.'));
+    }
   }
 
   void _setupColorQuestion() {
@@ -16965,16 +17090,17 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (widget.gameId == 'math') {
       if (correct) {
         setState(() => _mathQuestion++);
-        if (_mathQuestion >= kNgmyQuestionsPerGame) {
+        if (_mathQuestion >= kNgmyMathQuestionsPerGame) {
           unawaited(_advanceBank());
-          unawaited(_payoutWin(subtitle: 'All $kNgmyQuestionsPerGame math questions correct!'));
+          unawaited(_payoutWin(subtitle: 'All $kNgmyMathQuestionsPerGame math questions correct!'));
         } else {
           _setupMathQuestion();
-          _prompt = 'Question ${_mathQuestion + 1} of $kNgmyQuestionsPerGame';
+          _prompt = 'Question ${_mathQuestion + 1} of $kNgmyMathQuestionsPerGame';
           setState(() {});
         }
       } else {
-        unawaited(_failMoveGame(reason: 'Wrong answer — paid for $_mathQuestion/$kNgmyQuestionsPerGame.'));
+        unawaited(_advanceBankPartial(_mathQuestion + 1));
+        unawaited(_failMoveGame(reason: 'Wrong answer — paid for $_mathQuestion/$kNgmyMathQuestionsPerGame.'));
       }
       return;
     }
@@ -17004,31 +17130,11 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   void _checkTextAnswer() {
     if (_won) return;
-    final correct = _inputC.text.trim().toUpperCase() == _answer.toUpperCase();
     if (widget.gameId == 'scramble') {
-      if (correct) {
-        setState(() => _scrambleQuestion++);
-        if (_isSkillMultiplayer) {
-          unawaited(_publishSkillMultiplayerProgress());
-        }
-        if (_scrambleQuestion >= kNgmyQuestionsPerGame) {
-          unawaited(_advanceBank());
-          if (_isSkillMultiplayer) {
-            unawaited(_settleSkillMultiplayer(forceComplete: true));
-          } else {
-            unawaited(_payoutWin(subtitle: 'All $kNgmyQuestionsPerGame words unscrambled!'));
-          }
-        } else {
-          _setupScrambleQuestion();
-          _prompt = 'Word ${_scrambleQuestion + 1} of $kNgmyQuestionsPerGame — unscramble';
-          _inputC.clear();
-          setState(() {});
-        }
-      } else {
-        unawaited(_failMoveGame(reason: 'Wrong word — paid for $_scrambleQuestion/$kNgmyQuestionsPerGame.'));
-      }
+      _checkScramblePlacement();
       return;
     }
+    final correct = _inputC.text.trim().toUpperCase() == _answer.toUpperCase();
     if (correct) {
       unawaited(_advanceBank());
       unawaited(_payoutWin());
@@ -17115,25 +17221,45 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (mounted) setState(() => _patternShowing = false);
   }
 
+  Future<void> _advanceBankPartial(int count) async {
+    if (count <= 0 || widget.gameId != 'math') return;
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'ngmy_game_${widget.gameId}_${widget.user.email.toLowerCase().trim()}';
+    final bankLen = _mathBank.length;
+    final next = (_bankIndex + count) % bankLen;
+    await prefs.setInt(key, next);
+    _bankIndex = next;
+  }
+
   void _tapPattern(int i) {
     if (_won || _patternShowing) return;
+    final len = _currentPatternLength();
     if (_patternSeq[_patternProgress] != i) {
-      unawaited(_failMoveGame(reason: 'Wrong tile — paid for $_patternProgress/$kNgmyPatternMovesPerGame moves.'));
+      unawaited(_failMoveGame(reason: 'Wrong tile — paid for ${_patternMovesCompleted()}/$kNgmyPatternTotalMoves moves.'));
       return;
     }
     setState(() {
       _patternProgress++;
-      _prompt = 'Tap $kNgmyPatternMovesPerGame tiles in order — move $_patternProgress/$kNgmyPatternMovesPerGame';
+      _prompt = 'Round $_patternRound/$kNgmyPatternRounds — tap $len tiles (${_patternProgress}/$len)';
     });
     if (_isSkillMultiplayer) {
       unawaited(_publishSkillMultiplayerProgress());
     }
-    if (_patternProgress >= kNgmyPatternMovesPerGame) {
-      unawaited(_advanceBank());
-      if (_isSkillMultiplayer) {
-        unawaited(_settleSkillMultiplayer(forceComplete: true));
+    if (_patternProgress >= len) {
+      if (_patternRound >= kNgmyPatternRounds) {
+        unawaited(_advanceBank());
+        if (_isSkillMultiplayer) {
+          unawaited(_settleSkillMultiplayer(forceComplete: true));
+        } else {
+          unawaited(_payoutWin(subtitle: 'All $kNgmyPatternRounds pattern rounds correct!'));
+        }
       } else {
-        unawaited(_payoutWin(subtitle: 'All $kNgmyPatternMovesPerGame moves correct!'));
+        setState(() {
+          _patternRound++;
+          _buildPatternSequence();
+          _prompt = 'Round $_patternRound/$kNgmyPatternRounds — watch ${_currentPatternLength()} tiles';
+        });
+        unawaited(_flashPattern());
       }
     }
   }
@@ -17603,28 +17729,76 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         children: [
           Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
           Text('Words $_scrambleQuestion/$kNgmyQuestionsPerGame', style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w800, fontSize: 12)),
-          const SizedBox(height: 8),
-          FittedBox(
-            child: Text(_scrambled, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: 4)),
+          const SizedBox(height: 12),
+          Text('Tap letters below to fill each slot', style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 11)),
+          const SizedBox(height: 10),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 6,
+            runSpacing: 6,
+            children: List.generate(_scrambleSlots.length, (i) {
+              final letter = _scrambleSlots[i];
+              return Material(
+                color: letter == null ? Colors.white.withOpacity(0.08) : const Color(0xFF22C55E).withOpacity(0.35),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: () => _tapScrambleSlot(i),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 36,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withOpacity(0.25)),
+                    ),
+                    child: Text(
+                      letter ?? '',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20, letterSpacing: 1),
+                    ),
+                  ),
+                ),
+              );
+            }),
           ),
           const SizedBox(height: 16),
-          TextField(
-            controller: _inputC,
-            textCapitalization: TextCapitalization.characters,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 2),
-            decoration: InputDecoration(
-              hintText: 'Your answer',
-              hintStyle: const TextStyle(color: Colors.white38),
-              filled: true,
-              fillColor: Colors.black26,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            ),
-            onSubmitted: (_) => _checkTextAnswer(),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(_scramblePool.length, (i) {
+              final letter = _scramblePool[i];
+              return Material(
+                color: Colors.white.withOpacity(0.18),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: () => _tapScramblePoolLetter(i),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 40,
+                    height: 44,
+                    alignment: Alignment.center,
+                    child: Text(
+                      letter,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20, letterSpacing: 1),
+                    ),
+                  ),
+                ),
+              );
+            }),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(onPressed: _checkTextAnswer, child: const Text('Submit')),
+            child: ElevatedButton(
+              onPressed: _checkScramblePlacement,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7C3AED),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text('Check word', style: TextStyle(fontWeight: FontWeight.w900)),
+            ),
           ),
         ],
       );
@@ -17674,14 +17848,15 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
             Text(
               widget.gameId == 'sequence'
                   ? 'Answered $_sequenceQuestion/$kNgmyQuestionsPerGame'
-                  : 'Correct $_mathQuestion/$kNgmyQuestionsPerGame',
+                  : 'Correct $_mathQuestion/$kNgmyMathQuestionsPerGame',
               style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w800, fontSize: 12),
             ),
           const SizedBox(height: 12),
           FittedBox(
             child: Text(
-              widget.gameId == 'sequence' ? '$_sequencePrompt, ?' : _prompt,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26),
+              widget.gameId == 'sequence' ? '$_sequencePrompt, ?' : _mathPromptText,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22),
+              textAlign: TextAlign.center,
             ),
           ),
           const SizedBox(height: 16),
@@ -17795,7 +17970,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
           return Column(
             children: [
               Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-              Text('Move $_patternProgress/$kNgmyPatternMovesPerGame', style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w800, fontSize: 12)),
+              Text('Move ${_patternMovesCompleted()}/$kNgmyPatternTotalMoves', style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w800, fontSize: 12)),
+              Text('Round $_patternRound/$kNgmyPatternRounds · ${_currentPatternLength()} tiles', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11)),
               Expanded(
                 child: Center(
                   child: SizedBox(
@@ -17863,70 +18039,37 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     }
 
     if (widget.gameId == 'reflex') {
-      return LayoutBuilder(
-        builder: (context, c) {
-          final tapSize = math.min(math.min(c.maxWidth, c.maxHeight) * 0.62, 240.0);
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(_prompt, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              Text('Fast taps $_reflexRoundDone/$kNgmyQuestionsPerGame', style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w800, fontSize: 12)),
-              const SizedBox(height: 12),
-              Expanded(
-                child: Center(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      if (!_readyReflex) {
-                        Future.delayed(Duration(milliseconds: 350 + _rng.nextInt(550)), () {
-                          if (!mounted || _won) return;
-                          setState(() {
-                            _readyReflex = true;
-                            _reflexStart = DateTime.now();
-                          });
-                        });
-                        return;
-                      }
-                      final ms = _reflexStart == null ? 999 : DateTime.now().difference(_reflexStart!).inMilliseconds;
-                      if (ms < 520) {
-                        setState(() {
-                          _reflexRoundDone++;
-                          _readyReflex = false;
-                          _reflexStart = null;
-                        });
-                        if (_reflexRoundDone >= kNgmyQuestionsPerGame) {
-                          unawaited(_advanceBank());
-                          unawaited(_payoutWin(subtitle: 'All $kNgmyQuestionsPerGame reflex rounds — lightning fast!'));
-                        } else {
-                          _prompt = 'Round ${_reflexRoundDone + 1} of $kNgmyQuestionsPerGame — wait for green, tap fast';
-                          setState(() {});
-                        }
-                      } else {
-                        unawaited(_failMoveGame(reason: 'Too slow (${ms}ms) — paid for $_reflexRoundDone/$kNgmyQuestionsPerGame.'));
-                      }
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 90),
-                      width: tapSize,
-                      height: tapSize,
-                      decoration: BoxDecoration(
-                        color: _readyReflex ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
-                        shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(color: (_readyReflex ? Colors.green : Colors.red).withOpacity(0.5), blurRadius: 24)],
-                      ),
-                      child: Center(
-                        child: Text(
-                          _readyReflex ? 'TAP!' : 'WAIT',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: tapSize * 0.16),
-                        ),
-                      ),
-                    ),
+      final bg = _readyReflex ? const Color(0xFF22C55E) : const Color(0xFFF97316);
+      return SizedBox.expand(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _handleReflexTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 80),
+            color: bg,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(_prompt, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600), textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                Text('Fast taps $_reflexRoundDone/$kNgmyQuestionsPerGame', style: const TextStyle(color: Color(0xFFFDE68A), fontWeight: FontWeight.w800, fontSize: 14)),
+                const Spacer(),
+                Text(
+                  _readyReflex ? 'TAP!' : 'WAIT…',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: math.min(MediaQuery.sizeOf(context).width * 0.18, 72)),
+                ),
+                const Spacer(),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    _readyReflex ? 'Tap anywhere now!' : 'Tap when the screen turns green',
+                    style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12, fontWeight: FontWeight.w600),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            ),
+          ),
+        ),
       );
     }
 
