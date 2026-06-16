@@ -9,6 +9,7 @@ import 'ngmy_communicate_sync_download_io.dart'
 import 'ngmy_nav.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_worksheet_helpers.dart';
+import 'ngmy_worksheet_project_qr_stash.dart';
 import 'ngmy_worksheets_storage.dart';
 
 const _kWorksheetProjectBundleType = 'ngmy_worksheet_project_v1';
@@ -77,25 +78,46 @@ Future<String> ngmyWorksheetProjectShareJson({
   );
 }
 
-/// Builds a QR payload immediately — no image processing (avoids web hang).
-String ngmyWorksheetProjectQrPayload({
+/// Lite inline QR (offline fallback) — no thumbnail, small enough to scan.
+String ngmyWorksheetProjectQrPayloadLite({
   required String ownerEmail,
   required WorksheetProject project,
 }) {
-  final thumb = project.thumbnailPath?.trim();
-  String? includedThumb;
-  if (thumb != null && thumb.isNotEmpty && thumb.length <= 2000) {
-    includedThumb = thumb;
-  }
   final json = jsonEncode(
     ngmyWorksheetProjectShareBundle(
       ownerEmail: ownerEmail,
       project: project,
-      thumbnailOverride: includedThumb,
+      thumbnailOverride: null,
     ),
   );
   return 'NGMY_WS:${base64Url.encode(utf8.encode(json))}';
 }
+
+/// Preferred QR: tiny token in cloud (full project + thumbnail). Falls back to lite inline QR.
+Future<String> ngmyWorksheetProjectQrPayloadForDisplay({
+  required String ownerEmail,
+  required WorksheetProject project,
+}) async {
+  final shareJson = await ngmyWorksheetProjectShareJson(
+    ownerEmail: ownerEmail,
+    project: project,
+    includeThumbnail: true,
+  );
+  final stash = await NgmyWorksheetProjectQrStash.createFromShareJson(
+    shareJson,
+    ownerEmail: ownerEmail,
+    projectId: project.id,
+  );
+  if (stash != null) return stash.qrPayload;
+  return ngmyWorksheetProjectQrPayloadLite(ownerEmail: ownerEmail, project: project);
+}
+
+@Deprecated('Use ngmyWorksheetProjectQrPayloadLite')
+String ngmyWorksheetProjectQrPayload({
+  required String ownerEmail,
+  required WorksheetProject project,
+}) =>
+    ngmyWorksheetProjectQrPayloadLite(ownerEmail: ownerEmail, project: project);
 
 String? _barcodeScanText(Barcode barcode) {
   final raw = barcode.rawValue?.trim();
@@ -109,6 +131,7 @@ String? _barcodeScanText(Barcode barcode) {
 bool ngmyWorksheetScanAcceptsPayload(String raw) {
   final t = raw.trim();
   if (t.isEmpty) return false;
+  if (t.startsWith('$kNgmyWorksheetProjectQrPrefixV2|')) return true;
   if (t.startsWith('NGMY_WS:')) return true;
   if (t.contains('ngmy_worksheet_project_v1')) return true;
   if (t.startsWith('{')) {
@@ -124,6 +147,11 @@ String? ngmyWorksheetScanPayloadFromBarcode(Barcode barcode) {
   final text = _barcodeScanText(barcode);
   if (text == null) return null;
   if (ngmyWorksheetScanAcceptsPayload(text)) return text;
+  final v2 = text.indexOf('$kNgmyWorksheetProjectQrPrefixV2|');
+  if (v2 >= 0) {
+    final slice = text.substring(v2).trim();
+    if (ngmyWorksheetScanAcceptsPayload(slice)) return slice;
+  }
   final idx = text.indexOf('NGMY_WS:');
   if (idx >= 0) {
     final slice = text.substring(idx).trim();
@@ -135,6 +163,7 @@ String? ngmyWorksheetScanPayloadFromBarcode(Barcode barcode) {
 WorksheetProject? ngmyWorksheetProjectFromShareRaw(String raw) {
   final trimmed = raw.trim();
   if (trimmed.isEmpty) return null;
+  if (trimmed.startsWith('$kNgmyWorksheetProjectQrPrefixV2|')) return null;
   try {
     Map<String, dynamic> map;
     if (trimmed.startsWith('NGMY_WS:')) {
@@ -150,6 +179,21 @@ WorksheetProject? ngmyWorksheetProjectFromShareRaw(String raw) {
   } catch (_) {
     return null;
   }
+}
+
+Future<WorksheetProject?> ngmyWorksheetProjectFromShareRawAsync(String raw) async {
+  final trimmed = raw.trim();
+  if (trimmed.startsWith('$kNgmyWorksheetProjectQrPrefixV2|')) {
+    final parts = trimmed.split('|');
+    if (parts.length >= 2) {
+      final json = await NgmyWorksheetProjectQrStash.consumeToken(parts[1]);
+      if (json != null && json.trim().isNotEmpty) {
+        return ngmyWorksheetProjectFromShareRaw(json);
+      }
+    }
+    return null;
+  }
+  return ngmyWorksheetProjectFromShareRaw(trimmed);
 }
 
 WorksheetProject ngmyWorksheetProjectCopyForImport(WorksheetProject imported) {
@@ -222,10 +266,12 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
 
   void _showQr(BuildContext context) {
     Navigator.pop(context);
-    final payload = ngmyWorksheetProjectQrPayload(ownerEmail: ownerEmail, project: project);
     NgmyNavigator.push<void>(
       context,
-      NgmyWorksheetProjectQrPage(projectName: project.name, payload: payload),
+      NgmyWorksheetProjectQrPage(
+        ownerEmail: ownerEmail,
+        project: project,
+      ),
       routeName: 'NgmyWorksheetProjectQr',
     );
   }
@@ -234,7 +280,7 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
     Navigator.pop(context);
     final raw = await ngmyScanWorksheetProjectQrPayload(context);
     if (raw == null || raw.trim().isEmpty) return;
-    final imported = ngmyWorksheetProjectFromShareRaw(raw);
+    final imported = await ngmyWorksheetProjectFromShareRawAsync(raw);
     if (imported == null) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -305,7 +351,7 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
                 p,
                 icon: Icons.qr_code_2_rounded,
                 label: 'Show QR code',
-                subtitle: 'Includes thumbnail · NGMY logo · scan to import',
+                subtitle: 'Small scannable code · full project in cloud',
                 onTap: () => _showQr(context),
                 accent: true,
               ),
@@ -388,21 +434,50 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
   }
 }
 
-class NgmyWorksheetProjectQrPage extends StatelessWidget {
+class NgmyWorksheetProjectQrPage extends StatefulWidget {
   const NgmyWorksheetProjectQrPage({
     super.key,
-    required this.projectName,
-    required this.payload,
+    required this.ownerEmail,
+    required this.project,
   });
 
-  final String projectName;
-  final String payload;
+  final String ownerEmail;
+  final WorksheetProject project;
+
+  @override
+  State<NgmyWorksheetProjectQrPage> createState() => _NgmyWorksheetProjectQrPageState();
+}
+
+class _NgmyWorksheetProjectQrPageState extends State<NgmyWorksheetProjectQrPage> {
+  String? _payload;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final payload = await ngmyWorksheetProjectQrPayloadForDisplay(
+        ownerEmail: widget.ownerEmail,
+        project: widget.project,
+      );
+      if (!mounted) return;
+      setState(() => _payload = payload);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not create QR. Check your connection and try again.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
     final card = isDark ? const Color(0xFF151B28) : Colors.white;
+    final isCloud = _payload?.startsWith('$kNgmyWorksheetProjectQrPrefixV2|') ?? false;
 
     return Scaffold(
       backgroundColor: bg,
@@ -429,7 +504,7 @@ class NgmyWorksheetProjectQrPage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      projectName,
+                      widget.project.name,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
@@ -438,10 +513,17 @@ class NgmyWorksheetProjectQrPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    NgmyBrandedQrWidget(data: payload, large: true),
+                    if (_error != null)
+                      Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.redAccent))
+                    else if (_payload == null)
+                      const CircularProgressIndicator(color: WorksheetPalette.green)
+                    else
+                      NgmyBrandedQrWidget(data: _payload!, large: true),
                     const SizedBox(height: 14),
                     Text(
-                      'Scan with Worksheets → Share → Scan QR',
+                      isCloud
+                          ? 'Scan with Worksheets → Scan QR. Includes thumbnail & all items.'
+                          : 'Offline QR — scan on the same network or use Download backup file for full copy.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF64748B)),
                     ),
@@ -489,6 +571,13 @@ class _NgmyWorksheetProjectScanPageState extends State<NgmyWorksheetProjectScanP
       final payload = ngmyWorksheetScanPayloadFromBarcode(barcode);
       if (payload != null) {
         _acceptPayload(payload);
+        return;
+      }
+      // Accept compact cloud token even if helper missed it.
+      final text = _barcodeScanText(barcode);
+      if (text != null && text.contains('$kNgmyWorksheetProjectQrPrefixV2|')) {
+        final idx = text.indexOf('$kNgmyWorksheetProjectQrPrefixV2|');
+        _acceptPayload(text.substring(idx).trim());
         return;
       }
     }

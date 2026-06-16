@@ -135,14 +135,20 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     } else if (choice == 'scan') {
       final raw = await ngmyScanWorksheetProjectQrPayload(context);
       if (raw != null && raw.trim().isNotEmpty) {
-        imported = ngmyWorksheetProjectFromShareRaw(raw);
+        imported = await ngmyWorksheetProjectFromShareRawAsync(raw);
       }
     }
     if (imported == null) {
       if (choice != 'file' && choice != 'scan') return;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not read that project backup.')),
+        SnackBar(
+          content: Text(
+            choice == 'scan'
+                ? 'Could not read that QR. Stay online for cloud project codes, or try Upload file.'
+                : 'Could not read that project backup.',
+          ),
+        ),
       );
       return;
     }
