@@ -24,19 +24,18 @@ void ngmyNotifyBalanceChanged({String? email, double? balance}) {
   ngmyBalanceTick.value++;
 }
 
+/// Keep live balance cache aligned with a ledger balance value.
+void ngmySyncLiveBalanceFor(String email, double balance) {
+  ngmyNotifyBalanceChanged(email: email, balance: balance);
+}
+
 double ngmyLiveBalanceFor(String email, {double Function()? fallback}) {
   final key = _ngmyEmailKey(email);
-  final live = fallback?.call();
   if (key.isNotEmpty) {
     final cached = ngmyLiveBalanceCache.value[key];
-    if (cached != null && live != null) {
-      // Prefer the user ledger when cache lags (same object updated in onAddTransaction).
-      if ((live - cached).abs() > 0.0001) return live;
-      return cached;
-    }
     if (cached != null) return cached;
   }
-  return live ?? 0.0;
+  return fallback?.call() ?? 0.0;
 }
 
 Listenable get ngmyLiveBalanceListenable =>

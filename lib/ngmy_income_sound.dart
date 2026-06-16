@@ -242,6 +242,8 @@ class NgmyIncomeSound {
 
     String? dedupeKey,
 
+    bool force = false,
+
   }) async {
 
     if (amount < 0.01) return;
@@ -272,7 +274,7 @@ class NgmyIncomeSound {
 
     final now = DateTime.now();
 
-    if (_lastPlayedAt != null && now.difference(_lastPlayedAt!) < _debounce) return;
+    if (!force && _lastPlayedAt != null && now.difference(_lastPlayedAt!) < _debounce) return;
 
     _lastPlayedAt = now;
 

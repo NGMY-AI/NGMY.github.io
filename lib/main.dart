@@ -577,6 +577,14 @@ void ngmyReconcileUserAccountBalance(UserData user, List<AppTransaction> transac
   user.accountBalance = ngmyResolveAccountBalance(user.email, user.accountBalance, transactions);
 }
 
+bool ngmyIsGameLedgerTransaction(AppTransaction t) {
+  final d = (t.sourceDetails ?? '').toLowerCase();
+  if (d.contains('game bet:') || d.contains('game payout:') || d.contains('game partial:')) return true;
+  if (d.contains('multiplayer payout:')) return true;
+  if (d.contains('dice') && t.method == PaymentMethod.system) return true;
+  return false;
+}
+
 void ngmyApplyPendingWithdrawalHold(UserData user, AppTransaction t, Set<String> appliedHoldIds) {
   if (t.type != TransactionType.withdrawal || t.status != TransactionStatus.pending) return;
   if (t.id.isEmpty || appliedHoldIds.contains(t.id)) return;
@@ -623,12 +631,13 @@ bool ngmyTransactionCountsAsIncome(AppTransaction t) {
   return t.amount >= 0.01;
 }
 
-void ngmyPlayIncomeSoundForTransaction(AppTransaction t) {
+void ngmyPlayIncomeSoundForTransaction(AppTransaction t, {bool force = false}) {
   if (!ngmyTransactionCountsAsIncome(t)) return;
   unawaited(NgmyIncomeSound.playForUser(
     beneficiaryEmail: t.userEmail,
     amount: t.amount,
     dedupeKey: 'txn_${t.id}',
+    force: force,
   ));
 }
 
@@ -636,11 +645,13 @@ void ngmyPlayIncomeSoundForAmount({
   required String beneficiaryEmail,
   required double amount,
   String? dedupeKey,
+  bool force = false,
 }) {
   unawaited(NgmyIncomeSound.playForUser(
     beneficiaryEmail: beneficiaryEmail,
     amount: amount,
     dedupeKey: dedupeKey,
+    force: force,
   ));
 }
 
@@ -9849,12 +9860,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               unawaited(_pushUserToCloudFast(updatedUser));
               _currentUser = null;
               unawaited(_persistSessionImmediately());
+            } else if (_dirtyUserEmails.contains(email)) {
+              // Local session owns balance during our own cloud write — avoid swapping in a stale user row.
+              ngmyReconcileUserAccountBalance(_currentUser!, _allTransactions);
+              ngmySyncLiveBalanceFor(_currentUser!.email, _currentUser!.accountBalance);
             } else {
               updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
               _preserveLocalSessionState(_currentUser!, updatedUser);
               _ngmyReconcileClockInSession(updatedUser, _allTransactions);
               ngmyReconcileUserAccountBalance(updatedUser, _allTransactions);
               _currentUser = updatedUser;
+              ngmySyncLiveBalanceFor(_currentUser!.email, _currentUser!.accountBalance);
             }
           }
           ngmyReconcileUserAccountBalance(updatedUser, _allTransactions);
@@ -9928,6 +9944,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         final becameApproved = tx.status == TransactionStatus.approved &&
             (previous == null || previous!.status != TransactionStatus.approved);
+        final ownDirtyTxn = _dirtyTransactionIds.contains(tx.id);
         final userKey = tx.userEmail.toLowerCase().trim();
         final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
         if (userIdx >= 0 && ngmyIsWalletDepositOrWithdraw(tx)) {
@@ -9953,7 +9970,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (becameApproved && previous?.status == TransactionStatus.pending) {
             unawaited(_pushUserToCloudFast(_allUsers[userIdx]));
           }
-        } else if (becameApproved && ngmyTransactionCountsAsIncome(tx)) {
+        } else if (becameApproved && ngmyTransactionCountsAsIncome(tx) && !ownDirtyTxn) {
           if (userIdx >= 0) {
             ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], tx);
             if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
@@ -9964,7 +9981,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final isLiveInsert = previous == null &&
               DateTime.now().difference(tx.timestamp) <= const Duration(minutes: 3);
           if (isFreshApproval || isLiveInsert) {
-            ngmyPlayIncomeSoundForTransaction(tx);
+            ngmyPlayIncomeSoundForTransaction(tx, force: ngmyIsGameLedgerTransaction(tx));
           }
         }
         if (userIdx >= 0 &&
@@ -9976,6 +9993,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           }
         }
         _reconcileAllUserBalances();
+        if (_currentUser != null) {
+          ngmySyncLiveBalanceFor(_currentUser!.email, _currentUser!.accountBalance);
+        }
         if (tx.status == TransactionStatus.pending &&
             (tx.type == TransactionType.deposit || tx.type == TransactionType.withdrawal) &&
             (previous == null || previous!.status != TransactionStatus.pending)) {
@@ -10997,7 +11017,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   });
                   unawaited(_pushTransactionToCloudReliable(t));
                   unawaited(_pushTransactionToCloudFast(t));
-                  if (syncedUser != null) {
+                  if (syncedUser != null && !ngmyIsGameLedgerTransaction(t)) {
                     unawaited(_pushUserToCloudFast(syncedUser!));
                     _markUserDirty(syncedUser!.email);
                   }
@@ -11012,7 +11032,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   }
                   unawaited(_persistLocalOnly());
                   if (t.status == TransactionStatus.approved && ngmyTransactionCountsAsIncome(t)) {
-                    ngmyPlayIncomeSoundForTransaction(t);
+                    ngmyPlayIncomeSoundForTransaction(t, force: ngmyIsGameLedgerTransaction(t));
                   }
                   if (t.status == TransactionStatus.pending &&
                       (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal)) {
@@ -12503,11 +12523,25 @@ class _NgmyLazyTabSlotState extends State<_NgmyLazyTabSlot> {
   @override
   void initState() {
     super.initState();
+    ngmyBalanceTick.addListener(_refreshOnBalanceChange);
     if (widget.tabIndex == widget.activeIndex) {
       _content = widget.buildContent();
       return;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _schedulePrefetch());
+  }
+
+  void _refreshOnBalanceChange() {
+    if (!mounted) return;
+    if (_content != null) {
+      setState(() => _content = widget.buildContent());
+    }
+  }
+
+  @override
+  void dispose() {
+    ngmyBalanceTick.removeListener(_refreshOnBalanceChange);
+    super.dispose();
   }
 
   void _schedulePrefetch() {
@@ -15763,7 +15797,6 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
       onChargeBet: (bet, note) {
         if (widget.user.accountBalance < bet) return false;
         widget.user.points += 20;
-        unawaited(_pushUserToCloudFast(widget.user));
         // Every successful roll/bet counts as a game (+20 points each time).
         widget.onGameStarted();
         widget.onAddTransaction(
@@ -15779,14 +15812,9 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
           ),
         );
         widget.onDataChanged();
-        ngmyNotifyBalanceChanged(email: widget.user.email, balance: widget.user.accountBalance);
         return true;
       },
       onPayout: (payout, note, {double bonus = 0}) {
-        ngmyPlayIncomeSoundForAmount(
-          beneficiaryEmail: widget.user.email,
-          amount: payout,
-        );
         widget.onAddTransaction(
           AppTransaction(
             id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -15800,7 +15828,6 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
           ),
         );
         widget.onDataChanged();
-        ngmyNotifyBalanceChanged(email: widget.user.email, balance: widget.user.accountBalance);
       },
     );
   }
@@ -15853,6 +15880,7 @@ class _GameBetScreenState extends State<GameBetScreen> with NgmyBalanceListener 
   }
 
   void _startGame() {
+    unawaited(NgmyIncomeSound.unlockForWebUserGesture());
     if (widget.inviteId != null && widget.inviteId!.trim().isNotEmpty) {
       final inv = findInviteById(widget.config.gameInvites, widget.inviteId!.trim());
       if (inv != null && inviteSeriesComplete(inv)) {
@@ -15874,7 +15902,6 @@ class _GameBetScreenState extends State<GameBetScreen> with NgmyBalanceListener 
     }
     widget.user.points += 20;
     widget.onGameStarted();
-    unawaited(_pushUserToCloudFast(widget.user));
     widget.onAddTransaction(
       AppTransaction(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -16155,6 +16182,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
   NgmyGamePlayContext? _playCtx;
   bool _mpPublishing = false;
   Timer? _mpGateTimer;
+  DateTime? _lastMpProgressPublish;
   bool _mpWaiting = false;
   DateTime? _mpStartAt;
   String _mpGateTitle = '';
@@ -17270,13 +17298,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     setState(() {
       widget.user.totalProfit += (payout - widget.wager);
     });
-    ngmyPlayIncomeSoundForAmount(
-      beneficiaryEmail: widget.user.email,
-      amount: payout,
-    );
+    final txnId = DateTime.now().microsecondsSinceEpoch.toString();
     widget.onAddTransaction(
       AppTransaction(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: txnId,
         userEmail: widget.user.email,
         amount: payout,
         type: TransactionType.reimbursement,
@@ -17313,8 +17338,16 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     }
   }
 
-  Future<void> _publishSkillMultiplayerProgress() async {
+  Future<void> _publishSkillMultiplayerProgress({bool force = false}) async {
     if (!_isSkillMultiplayer || widget.inviteId == null) return;
+    if (!force) {
+      final now = DateTime.now();
+      if (_lastMpProgressPublish != null &&
+          now.difference(_lastMpProgressPublish!) < const Duration(seconds: 3)) {
+        return;
+      }
+      _lastMpProgressPublish = now;
+    }
     final id = widget.inviteId!.trim();
     if (id.isEmpty) return;
     try {
@@ -17359,7 +17392,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
       return;
     }
 
-    await _publishSkillMultiplayerProgress();
+    await _publishSkillMultiplayerProgress(force: true);
     final id = widget.inviteId!.trim();
     final key = widget.user.email.toLowerCase().trim();
     final invite = await ngmyFetchInviteByIdMerged(id, widget.config.gameInvites, forceRefresh: true);
@@ -17418,10 +17451,6 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
       // Profit: solo profit component only (keeps same solo economics).
       widget.user.totalProfit += (soloPayout - widget.wager * yourRatio);
     });
-    ngmyPlayIncomeSoundForAmount(
-      beneficiaryEmail: widget.user.email,
-      amount: totalPayout,
-    );
 
     widget.onAddTransaction(
       AppTransaction(
@@ -17464,10 +17493,6 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     setState(() {
       widget.user.totalProfit += (payout - widget.wager * ratio);
     });
-    ngmyPlayIncomeSoundForAmount(
-      beneficiaryEmail: widget.user.email,
-      amount: payout,
-    );
     widget.onAddTransaction(
       AppTransaction(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
