@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
+import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_family_tree.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_worksheet_dialogs.dart';
 import 'ngmy_worksheet_helpers.dart';
 import 'ngmy_worksheet_project.dart';
+import 'ngmy_worksheet_project_share.dart';
 import 'ngmy_worksheets_storage.dart';
 
 enum _WorksheetTab { projects, cashier, familyTree }
@@ -84,6 +87,63 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> {
     await _reload();
   }
 
+  Future<void> _importSharedProject() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Import shared project'),
+        content: const Text('Scan a project QR code or upload a backup file from someone who shared their worksheet project.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, 'file'), child: const Text('Upload file')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'scan'),
+            style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.green),
+            child: const Text('Scan QR'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+
+    String? raw;
+    if (choice == 'file') {
+      raw = await ngmyPickBackupJsonViaBrowser();
+    } else if (choice == 'scan') {
+      raw = await NgmyNavigator.push<String>(
+        context,
+        const _NgmyWorksheetProjectScanPage(),
+        routeName: 'NgmyWorksheetProjectScan',
+        fullscreenDialog: true,
+      );
+    }
+    if (raw == null || raw.trim().isEmpty) return;
+
+    final imported = ngmyWorksheetProjectFromShareRaw(raw);
+    if (imported == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not read that project backup.')),
+      );
+      return;
+    }
+
+    final project = WorksheetProject(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      name: imported.name.trim().isEmpty ? 'Shared project' : imported.name,
+      thumbnailPath: imported.thumbnailPath,
+      items: imported.items,
+      createdAt: DateTime.now(),
+    );
+    await upsertWorksheetProject(widget.userEmail, project);
+    await _reload();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Imported "${project.name}"')),
+    );
+    _openProject(project);
+  }
+
   void _openSettings(WorksheetPalette p) {
     showModalBottomSheet(
       context: context,
@@ -101,6 +161,15 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> {
               Text('Worksheets Settings',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.primaryText)),
               const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.file_download_outlined, color: WorksheetPalette.green),
+                title: Text('Import shared project', style: TextStyle(color: p.primaryText)),
+                subtitle: Text('From QR or backup file', style: TextStyle(color: p.secondaryText, fontSize: 12)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _importSharedProject();
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
                 title: Text('Clear all projects', style: TextStyle(color: p.primaryText)),
@@ -562,6 +631,39 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> {
           Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.4)),
         ],
       ),
+    );
+  }
+}
+
+class _NgmyWorksheetProjectScanPage extends StatefulWidget {
+  const _NgmyWorksheetProjectScanPage();
+
+  @override
+  State<_NgmyWorksheetProjectScanPage> createState() => _NgmyWorksheetProjectScanPageState();
+}
+
+class _NgmyWorksheetProjectScanPageState extends State<_NgmyWorksheetProjectScanPage> {
+  bool _handled = false;
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_handled) return;
+    final raw = capture.barcodes.firstOrNull?.rawValue?.trim();
+    if (raw == null || raw.isEmpty) return;
+    if (!raw.startsWith('NGMY_WS:') && !raw.contains('"ngmy_worksheet_project_v1"')) return;
+    _handled = true;
+    NgmyNavigator.pop(context, raw);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Scan project QR'),
+        backgroundColor: const Color(0xFF0B1018),
+        foregroundColor: Colors.white,
+      ),
+      backgroundColor: Colors.black,
+      body: MobileScanner(onDetect: _onDetect),
     );
   }
 }

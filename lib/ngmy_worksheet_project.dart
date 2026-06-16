@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_worksheet_dialogs.dart';
 import 'ngmy_worksheet_helpers.dart';
+import 'ngmy_worksheet_project_share.dart';
 import 'ngmy_worksheets_storage.dart';
 
 class NgmyWorksheetProjectScreen extends StatefulWidget {
@@ -141,14 +142,40 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
                         color: WorksheetPalette.green,
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Column(
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Project Total', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
-                          const SizedBox(height: 4),
-                          Text(
-                            ngmyFormatMoney(_project.totalSpending),
-                            style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Project Total',
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  ngmyFormatMoney(_project.totalSpending),
+                                  style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Material(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(12),
+                            child: InkWell(
+                              onTap: () => showNgmyWorksheetProjectShareSheet(
+                                context,
+                                ownerEmail: widget.userEmail,
+                                project: _project,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              child: const Padding(
+                                padding: EdgeInsets.all(10),
+                                child: Icon(Icons.ios_share_rounded, color: Colors.white, size: 22),
+                              ),
+                            ),
                           ),
                         ],
                       ),
