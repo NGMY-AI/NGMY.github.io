@@ -13562,13 +13562,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver, NgmyBalanceListener {
   late AnimationController _smokeCtrl;
   late Animation<double> _smokeRot;
-  Timer? _liveTicker;
-  int _liveStart = 0;
   int _unreadNewsCount = 0;
   bool _heavySectionsReady = true;
   bool _clockUiReady = true;
   DateTime? _homeMountedAt;
-  int _liveCacheStart = -1;
   int _liveCacheTxnLen = -1;
   List<AppTransaction> _liveCacheShown = const [];
 
@@ -13622,10 +13619,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _homeMountedAt = DateTime.now();
     _smokeCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 10));
     _smokeRot = Tween<double>(begin: 0, end: 2 * math.pi).animate(_smokeCtrl);
-    _liveTicker = Timer.periodic(const Duration(seconds: 6), (_) {
-      if (!mounted) return;
-      setState(() => _liveStart++);
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
@@ -13659,14 +13652,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         oldWidget.user.todayDailyGoal != widget.user.todayDailyGoal ||
         oldWidget.user.email != widget.user.email ||
         oldWidget.allTransactions.length != widget.allTransactions.length) {
-      _liveCacheStart = -1;
+      _liveCacheTxnLen = -1;
       if (mounted) setState(() {});
     }
   }
 
   @override void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _liveTicker?.cancel();
     if (_smokeCtrl.isAnimating) _smokeCtrl.stop();
     _smokeCtrl.dispose();
     super.dispose();
@@ -13866,10 +13858,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ],
           ),
           const SizedBox(height: 8),
-          FittedBox(
-            alignment: Alignment.centerLeft,
-            child: Text(value, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: valueColor)),
-          ),
+          isToday
+              ? FittedBox(
+                  alignment: Alignment.centerLeft,
+                  child: Text(value, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: valueColor)),
+                )
+              : FittedBox(
+                  alignment: Alignment.centerLeft,
+                  child: NgmyLiveBalance(
+                    balanceOf: () => widget.user.accountBalance,
+                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: valueColor),
+                  ),
+                ),
         ],
       ),
     );
@@ -14839,7 +14839,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   List<AppTransaction> _liveShown() {
-    if (_liveCacheStart == _liveStart && _liveCacheTxnLen == widget.allTransactions.length) {
+    if (_liveCacheTxnLen == widget.allTransactions.length) {
       return _liveCacheShown;
     }
     AppTransaction? first;
@@ -14867,20 +14867,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       consider(t);
     }
 
-    final recent = <AppTransaction>[
+    final shown = <AppTransaction>[
       if (first != null) first!,
       if (second != null) second!,
       if (third != null) third!,
     ];
-    final shown = <AppTransaction>[];
-    if (recent.isNotEmpty) {
-      final count = recent.length < 3 ? recent.length : 3;
-      final start = _liveStart % recent.length;
-      for (var i = 0; i < count; i++) {
-        shown.add(recent[(start + i) % recent.length]);
-      }
-    }
-    _liveCacheStart = _liveStart;
     _liveCacheTxnLen = widget.allTransactions.length;
     _liveCacheShown = shown;
     return shown;
@@ -15727,8 +15718,8 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
                               children: [
                                 const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 16),
                                 const SizedBox(width: 5),
-                                Text(
-                                  '\$${formatCurrency(widget.user.accountBalance)}',
+                                NgmyLiveBalance(
+                                  balanceOf: () => widget.user.accountBalance,
                                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
                                 ),
                               ],
@@ -15797,7 +15788,7 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
   @override
   Widget build(BuildContext context) {
     return NgmyDiceGameScreen(
-      balance: widget.user.accountBalance,
+      balanceOf: () => widget.user.accountBalance,
       userEmail: widget.user.email,
       diceSettings: _dice,
       onDiceSettingsChanged: () {
@@ -15971,7 +15962,12 @@ class _GameBetScreenState extends State<GameBetScreen> with NgmyBalanceListener 
             margin: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(12)),
-            child: Center(child: Text('\$${formatCurrency(widget.user.accountBalance)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900))),
+            child: Center(
+              child: NgmyLiveBalance(
+                balanceOf: () => widget.user.accountBalance,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+              ),
+            )),
           ),
         ],
       ),
@@ -17578,7 +17574,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(10)),
-                    child: Text('\$${formatCurrency(widget.user.accountBalance)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                    child: NgmyLiveBalance(
+                      balanceOf: () => widget.user.accountBalance,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
+                    ),
                   ),
                 ],
               ),

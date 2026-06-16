@@ -1,11 +1,50 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 /// Bumped after wallet balance changes so pushed game routes repaint instantly.
 final ValueNotifier<int> ngmyBalanceTick = ValueNotifier<int>(0);
 
 void ngmyNotifyBalanceChanged() {
   ngmyBalanceTick.value++;
+}
+
+/// Reads [balanceOf] on every balance tick — fixes in-place UserData mutation not triggering rebuilds.
+class NgmyLiveBalance extends StatelessWidget {
+  final double Function() balanceOf;
+  final TextStyle? style;
+  final TextAlign? textAlign;
+  final bool showDollarSign;
+
+  const NgmyLiveBalance({
+    super.key,
+    required this.balanceOf,
+    this.style,
+    this.textAlign,
+    this.showDollarSign = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: ngmyBalanceTick,
+      builder: (context, _, __) {
+        final formatted = _formatBalance(balanceOf());
+        return Text(
+          showDollarSign ? '\$$formatted' : formatted,
+          style: style,
+          textAlign: textAlign,
+        );
+      },
+    );
+  }
+
+  static String _formatBalance(double amount) {
+    String str = amount.toStringAsFixed(2);
+    final parts = str.split('.');
+    final reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    parts[0] = parts[0].replaceAllMapped(reg, (m) => '${m[1]},');
+    return parts.join('.');
+  }
 }
 
 /// Listen for [ngmyBalanceTick] and rebuild — use on game/home screens that show balance.

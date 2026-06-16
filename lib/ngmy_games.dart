@@ -319,7 +319,7 @@ String scrambleWord(String word) {
 
 /// Full-screen dice game — roll lands on +1, +2, +3 (win) or −1, −2 (lose).
 class NgmyDiceGameScreen extends StatefulWidget {
-  final double balance;
+  final double Function() balanceOf;
   final String userEmail;
   final NgmyDiceSettings diceSettings;
   final VoidCallback onDiceSettingsChanged;
@@ -329,7 +329,7 @@ class NgmyDiceGameScreen extends StatefulWidget {
 
   const NgmyDiceGameScreen({
     super.key,
-    required this.balance,
+    required this.balanceOf,
     required this.userEmail,
     required this.diceSettings,
     required this.onDiceSettingsChanged,
@@ -373,7 +373,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
       return;
     }
     if (!_betLocked) {
-      if (widget.balance < wager) {
+      if (widget.balanceOf() < wager) {
         _toast('Insufficient balance.');
         return;
       }
@@ -487,7 +487,6 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bal = widget.balance;
     final wager = _effectiveBet();
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final diceSize = math.min(MediaQuery.sizeOf(context).width * 0.44, 200.0);
@@ -517,8 +516,8 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                       children: [
                         const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 18),
                         const SizedBox(width: 6),
-                        Text(
-                          '\$${bal.toStringAsFixed(2)}',
+                        NgmyLiveBalance(
+                          balanceOf: widget.balanceOf,
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                       ],
