@@ -21,6 +21,8 @@ DateTime? _inviteCloudFetchedAt;
 
 /// Multiplayer-capable game ids.
 const Set<String> kNgmyMultiplayerGameIds = {
+  'checkers_deluxe',
+  'tic_tac_go',
   'memory',
   'typing',
   'scramble',
@@ -35,10 +37,16 @@ const Set<String> kNgmySkillMultiplayerGameIds = {
   'pattern',
 };
 
-/// Retired casino/classic pro games (removed from Game Center).
-const List<String> kNgmyProGameIds = <String>[];
+/// Board classics still in Game Center (casino games removed).
+const List<String> kNgmyProGameIds = [
+  'checkers_deluxe',
+  'tic_tac_go',
+];
 
-const Map<String, String> kNgmyProGameTitles = <String, String>{};
+const Map<String, String> kNgmyProGameTitles = {
+  'checkers_deluxe': 'Checkers Deluxe',
+  'tic_tac_go': 'Tic Tac Go',
+};
 
 const String _kConfigRowId = '1';
 

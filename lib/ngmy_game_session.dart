@@ -1,23 +1,59 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// Bumped after wallet balance changes so pushed game routes repaint instantly.
+/// Bumped after wallet balance changes so all screens repaint instantly.
 final ValueNotifier<int> ngmyBalanceTick = ValueNotifier<int>(0);
 
-void ngmyNotifyBalanceChanged() {
+/// Authoritative live balance per user email (lowercase). Updated on every ledger change.
+final ValueNotifier<Map<String, double>> ngmyLiveBalanceCache = ValueNotifier<Map<String, double>>({});
+
+String _ngmyEmailKey(String email) => email.toLowerCase().trim();
+
+void ngmySeedLiveBalance(String email, double balance) {
+  final key = _ngmyEmailKey(email);
+  if (key.isEmpty) return;
+  final next = Map<String, double>.from(ngmyLiveBalanceCache.value);
+  next[key] = balance;
+  ngmyLiveBalanceCache.value = next;
+}
+
+void ngmyNotifyBalanceChanged({String? email, double? balance}) {
+  if (email != null && balance != null) {
+    ngmySeedLiveBalance(email, balance);
+  }
   ngmyBalanceTick.value++;
 }
 
-/// Reads [balanceOf] on every balance tick — fixes in-place UserData mutation not triggering rebuilds.
+double ngmyLiveBalanceFor(String email, {double Function()? fallback}) {
+  final key = _ngmyEmailKey(email);
+  final live = fallback?.call();
+  if (key.isNotEmpty) {
+    final cached = ngmyLiveBalanceCache.value[key];
+    if (cached != null && live != null) {
+      // Prefer the user ledger when cache lags (same object updated in onAddTransaction).
+      if ((live - cached).abs() > 0.0001) return live;
+      return cached;
+    }
+    if (cached != null) return cached;
+  }
+  return live ?? 0.0;
+}
+
+Listenable get ngmyLiveBalanceListenable =>
+    Listenable.merge([ngmyBalanceTick, ngmyLiveBalanceCache]);
+
+/// Balance text that updates instantly on every wallet change (home, Game Center, games).
 class NgmyLiveBalance extends StatelessWidget {
-  final double Function() balanceOf;
+  final String userEmail;
+  final double Function()? fallback;
   final TextStyle? style;
   final TextAlign? textAlign;
   final bool showDollarSign;
 
   const NgmyLiveBalance({
     super.key,
-    required this.balanceOf,
+    required this.userEmail,
+    this.fallback,
     this.style,
     this.textAlign,
     this.showDollarSign = true,
@@ -25,10 +61,11 @@ class NgmyLiveBalance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<int>(
-      valueListenable: ngmyBalanceTick,
-      builder: (context, _, __) {
-        final formatted = _formatBalance(balanceOf());
+    return ListenableBuilder(
+      listenable: ngmyLiveBalanceListenable,
+      builder: (context, _) {
+        final amount = ngmyLiveBalanceFor(userEmail, fallback: fallback);
+        final formatted = _formatBalance(amount);
         return Text(
           showDollarSign ? '\$$formatted' : formatted,
           style: style,

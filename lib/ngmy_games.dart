@@ -24,6 +24,7 @@ const List<String> kNgmyGameIds = [
   'scramble',
   'pattern',
   'sequence',
+  ...kNgmyProGameIds,
 ];
 
 const Map<String, String> kNgmyGameTitles = {
@@ -35,6 +36,7 @@ const Map<String, String> kNgmyGameTitles = {
   'scramble': 'Word Scramble',
   'pattern': 'Pattern Memory',
   'sequence': 'Number Sequence',
+  ...kNgmyProGameTitles,
 };
 
 /// Dice roll lands on one of these five outcomes.
@@ -317,8 +319,8 @@ String scrambleWord(String word) {
 
 /// Full-screen dice game — roll lands on +1, +2, +3 (win) or −1, −2 (lose).
 class NgmyDiceGameScreen extends StatefulWidget {
-  final double Function() balanceOf;
   final String userEmail;
+  final double Function() balanceOf;
   final NgmyDiceSettings diceSettings;
   final VoidCallback onDiceSettingsChanged;
   final bool Function(double bet, String note) onChargeBet;
@@ -515,7 +517,8 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                         const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 18),
                         const SizedBox(width: 6),
                         NgmyLiveBalance(
-                          balanceOf: widget.balanceOf,
+                          userEmail: widget.userEmail,
+                          fallback: widget.balanceOf,
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                       ],

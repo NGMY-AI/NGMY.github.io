@@ -11002,7 +11002,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     _markUserDirty(syncedUser!.email);
                   }
                   _markTransactionDirty(t.id);
-                  ngmyNotifyBalanceChanged();
+                  if (syncedUser != null) {
+                    ngmyNotifyBalanceChanged(
+                      email: syncedUser!.email,
+                      balance: syncedUser!.accountBalance,
+                    );
+                  } else {
+                    ngmyNotifyBalanceChanged();
+                  }
                   unawaited(_persistLocalOnly());
                   if (t.status == TransactionStatus.approved && ngmyTransactionCountsAsIncome(t)) {
                     ngmyPlayIncomeSoundForTransaction(t);
@@ -11108,7 +11115,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   });
                   NgmyAdminLiveRefresh.notify();
                   _markTransactionDirty(t.id);
-                  ngmyNotifyBalanceChanged();
+                  if (syncedUser != null) {
+                    ngmyNotifyBalanceChanged(
+                      email: syncedUser!.email,
+                      balance: syncedUser!.accountBalance,
+                    );
+                  } else {
+                    ngmyNotifyBalanceChanged();
+                  }
                   await _persistLocalOnly();
                   final syncedUserCopy = syncedUser;
                   final cloudSynced = await _syncWalletApprovalInBackground(t, syncedUserCopy);
@@ -12534,7 +12548,7 @@ class _NgmyHomeTabHost extends StatefulWidget {
   State<_NgmyHomeTabHost> createState() => _NgmyHomeTabHostState();
 }
 
-class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with WidgetsBindingObserver {
+class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with WidgetsBindingObserver, NgmyBalanceListener {
   @override
   void initState() {
     super.initState();
@@ -12871,7 +12885,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     } else if (oldWidget.allTransactions.length != widget.allTransactions.length) {
       _sortedTxCacheLen = null;
       _warmTransactionCacheAfterFrame();
-    } else if (oldWidget.currentThemeMode != widget.currentThemeMode) {
+    }
+    if (oldWidget.user.accountBalance != widget.user.accountBalance) {
+      ngmySeedLiveBalance(widget.user.email, widget.user.accountBalance);
+    }
+    if (oldWidget.currentThemeMode != widget.currentThemeMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() {});
       });
@@ -12951,6 +12969,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
     _scheduleMainShellRepaint();
     NgmyIncomeSound.bindSession(widget.user.email);
+    ngmySeedLiveBalance(widget.user.email, widget.user.accountBalance);
     unawaited(NgmyIncomeSound.preload());
     NgmyPopupOrchestrator.resolveVideoUrl = _resolveSupabaseStorageUrlResilient;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -13864,7 +13883,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               : FittedBox(
                   alignment: Alignment.centerLeft,
                   child: NgmyLiveBalance(
-                    balanceOf: () => widget.user.accountBalance,
+                    userEmail: widget.user.email,
+                    fallback: () => widget.user.accountBalance,
                     style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: valueColor),
                   ),
                 ),
@@ -15347,6 +15367,8 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
     _GameDef(id: 'scramble', title: 'Word Scramble', subtitle: 'Place letters in order — solo or invite', emoji: '🔤', icon: Icons.abc_rounded, colors: [Color(0xFF7C3AED), Color(0xFF9333EA)]),
     _GameDef(id: 'pattern', title: 'Pattern Memory', subtitle: 'Remember the pattern — solo or multiplayer', emoji: '🎯', icon: Icons.extension_rounded, colors: [Color(0xFF4F46E5), Color(0xFF4338CA)]),
     _GameDef(id: 'sequence', title: 'Number Sequence', subtitle: 'Find patterns, win rewards', emoji: '🔢', icon: Icons.numbers_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
+    _GameDef(id: 'checkers_deluxe', title: 'Checkers Deluxe', subtitle: 'Wood board — play solo or invite a friend', emoji: '⚫', icon: Icons.grid_on_rounded, colors: [Color(0xFF8B4513), Color(0xFF5D4037)]),
+    _GameDef(id: 'tic_tac_go', title: 'Tic Tac Go', subtitle: '3 in a row — real-time multiplayer', emoji: '❌', icon: Icons.close_rounded, colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
   ];
 
   void _sendInvite(_GameDef g, String toAccountId, int matchesTotal) async {
@@ -15660,7 +15682,8 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
                                 const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 16),
                                 const SizedBox(width: 5),
                                 NgmyLiveBalance(
-                                  balanceOf: () => widget.user.accountBalance,
+                                  userEmail: widget.user.email,
+                                  fallback: () => widget.user.accountBalance,
                                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
                                 ),
                               ],
@@ -15756,7 +15779,7 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
           ),
         );
         widget.onDataChanged();
-        ngmyNotifyBalanceChanged();
+        ngmyNotifyBalanceChanged(email: widget.user.email, balance: widget.user.accountBalance);
         return true;
       },
       onPayout: (payout, note, {double bonus = 0}) {
@@ -15777,7 +15800,7 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
           ),
         );
         widget.onDataChanged();
-        ngmyNotifyBalanceChanged();
+        ngmyNotifyBalanceChanged(email: widget.user.email, balance: widget.user.accountBalance);
       },
     );
   }
@@ -15865,7 +15888,6 @@ class _GameBetScreenState extends State<GameBetScreen> with NgmyBalanceListener 
       ),
     );
     widget.onDataChanged();
-    ngmyNotifyBalanceChanged();
     NgmyNavigator.push(
       context,
       GamePlayScreen(
@@ -15905,7 +15927,8 @@ class _GameBetScreenState extends State<GameBetScreen> with NgmyBalanceListener 
             decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(12)),
             child: Center(
               child: NgmyLiveBalance(
-                balanceOf: () => widget.user.accountBalance,
+                userEmail: widget.user.email,
+                fallback: () => widget.user.accountBalance,
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
               ),
             ),
@@ -17516,7 +17539,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(10)),
                     child: NgmyLiveBalance(
-                      balanceOf: () => widget.user.accountBalance,
+                      userEmail: widget.user.email,
+                      fallback: () => widget.user.accountBalance,
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
                     ),
                   ),
@@ -20717,7 +20741,7 @@ class WalletScreen extends StatefulWidget {
   });
   @override State<WalletScreen> createState() => _WalletScreenState();
 }
-class _WalletScreenState extends State<WalletScreen> {
+class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
   final _amt = TextEditingController(); final _handle = TextEditingController(); PaymentMethod _method = PaymentMethod.cashApp;
   int _view = 0; // 0: Deposit, 1: Withdraw, 2: History
   _WalletHistoryFilter _historyFilter = _WalletHistoryFilter.all;
@@ -20877,7 +20901,7 @@ class _WalletScreenState extends State<WalletScreen> {
             child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 40),
           ),
         ),
-        Column(mainAxisAlignment: MainAxisAlignment.center, children: [const SizedBox(height: 10), const Text('Available Balance', style: TextStyle(color: Colors.white70, fontSize: 14)), const SizedBox(height: 5), Text('\$${formatCurrency(widget.user.accountBalance)}', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900))]),
+        Column(mainAxisAlignment: MainAxisAlignment.center, children: [const SizedBox(height: 10), const Text('Available Balance', style: TextStyle(color: Colors.white70, fontSize: 14)), const SizedBox(height: 5), NgmyLiveBalance(userEmail: widget.user.email, fallback: () => widget.user.accountBalance, style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900))]),
       ])),
       const SizedBox(height: 30),
       Row(children: [
@@ -21141,7 +21165,12 @@ class _WalletScreenState extends State<WalletScreen> {
               children: [
                 Text('Available:', style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w500)),
                 const Spacer(),
-                Text(formatCurrency(widget.user.accountBalance), style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
+                NgmyLiveBalance(
+                  userEmail: widget.user.email,
+                  fallback: () => widget.user.accountBalance,
+                  showDollarSign: false,
+                  style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87),
+                ),
               ],
             ),
           ),
