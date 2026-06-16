@@ -21,12 +21,9 @@ const List<String> kNgmyGameIds = [
   'typing',
   'memory',
   'math',
-  'reflex',
   'scramble',
   'pattern',
   'sequence',
-  'simon',
-  'color',
   ...kNgmyProGameIds,
 ];
 
@@ -36,12 +33,9 @@ const Map<String, String> kNgmyGameTitles = {
   'typing': 'Typing Speed',
   'memory': 'Memory Match',
   'math': 'Math Quiz',
-  'reflex': 'Reflex Test',
   'scramble': 'Word Scramble',
   'pattern': 'Pattern Memory',
   'sequence': 'Number Sequence',
-  'simon': 'Simon Says',
-  'color': 'Color Rush',
   ...kNgmyProGameTitles,
 };
 

@@ -26,7 +26,6 @@ const Set<String> kNgmyMultiplayerGameIds = {
   'chess_royale',
   'connect_four_pro',
   'backgammon_pro',
-  'pool_8ball',
   'poker_texas',
   'memory',
   'typing',
@@ -45,7 +44,6 @@ const Set<String> kNgmySkillMultiplayerGameIds = {
 const List<String> kNgmyProGameIds = [
   'checkers_deluxe',
   'tic_tac_go',
-  'pool_8ball',
   'blackjack_vegas',
   'roulette_euro',
   'slots_jackpot',
@@ -68,7 +66,6 @@ const List<String> kNgmyProGameIds = [
 const Map<String, String> kNgmyProGameTitles = {
   'checkers_deluxe': 'Checkers Deluxe',
   'tic_tac_go': 'Tic Tac Go',
-  'pool_8ball': '8-Ball Pool',
   'blackjack_vegas': 'Blackjack Vegas',
   'roulette_euro': 'European Roulette',
   'slots_jackpot': 'Slots Jackpot',

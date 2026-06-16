@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_multiplayer.dart';
 import 'ngmy_games.dart' show kNgmyQuestionsPerGame;
+import 'ngmy_premium_game_ui.dart';
 
 /// Outcome of a board-game move.
 enum NgmyProMoveResult { continueGame, youWin, youLose, draw }
@@ -99,11 +100,10 @@ class NgmyProState {
         slotsReels = [rng.nextInt(6), rng.nextInt(6), rng.nextInt(6)];
         prompt = 'Match 3 symbols for jackpot';
         break;
-      case 'pool_8ball':
-      case 'billiards_snooker':
+    case 'billiards_snooker':
         goal = 1;
         poolAngle = rng.nextDouble() * math.pi * 2;
-        prompt = vsComputer ? 'Aim and shoot — beat NGMY to the 8-ball' : 'Aim and shoot — pocket the 8-ball';
+        prompt = vsComputer ? 'Aim and shoot — beat NGMY on the snooker table' : 'Aim and shoot — pocket balls';
         break;
       case 'connect_four_pro':
         goal = 1;
@@ -764,7 +764,6 @@ Widget buildNgmyProGameBoard({
       return _roulette(state, rng, onChanged, () => finish(NgmyProMoveResult.youWin));
     case 'slots_jackpot':
       return _slots(state, rng, onChanged, () => finish(NgmyProMoveResult.youWin));
-    case 'pool_8ball':
     case 'billiards_snooker':
       return _poolTable(state, rng, onChanged, () => finish(NgmyProMoveResult.youWin));
     case 'connect_four_pro':
@@ -918,8 +917,30 @@ Widget _blackjack(NgmyProState state, math.Random rng, VoidCallback onChanged, V
   return Column(
     children: [
       _turnBanner(state),
-      Text('Dealer: ${state.bjStand ? fmt(state.bjDealer) : "${state.bjDealer[0]}, ?"}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-      Text('You: ${fmt(state.bjPlayer)} = ${state.bjTotal(state.bjPlayer)}', style: const TextStyle(color: Color(0xFF4ADE80), fontSize: 18, fontWeight: FontWeight.w900)),
+      const Text('DEALER', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1)),
+      const SizedBox(height: 6),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (state.bjStand)
+            ...state.bjDealer.map((c) => Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: ngmyPlayingCard(c)))
+          else ...[
+            ngmyPlayingCard(state.bjDealer[0]),
+            const SizedBox(width: 6),
+            ngmyPlayingCard(0, hidden: true),
+          ],
+        ],
+      ),
+      const SizedBox(height: 14),
+      const Text('YOUR HAND', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1)),
+      Text('Total: ${state.bjTotal(state.bjPlayer)}', style: const TextStyle(color: Color(0xFF4ADE80), fontSize: 14, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 6),
+      Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 6,
+        runSpacing: 6,
+        children: state.bjPlayer.map((c) => ngmyPlayingCard(c)).toList(),
+      ),
       const Spacer(),
       Row(
         children: [
@@ -952,15 +973,24 @@ Widget _roulette(NgmyProState state, math.Random rng, VoidCallback onChanged, Vo
   return Column(
     children: [
       _turnBanner(state),
+      ngmyRouletteWheel(result: state.rouletteResult),
       if (state.rouletteResult != null)
-        Text('Result: ${state.rouletteResult}', style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 32, fontWeight: FontWeight.w900)),
-      Expanded(child: Center(child: Icon(Icons.circle, size: 120, color: Colors.red.shade700))),
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text('Result: ${state.rouletteResult}', style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 28, fontWeight: FontWeight.w900)),
+        ),
+      const SizedBox(height: 12),
       Wrap(
         spacing: 6,
+        runSpacing: 6,
+        alignment: WrapAlignment.center,
         children: List.generate(6, (i) {
           final n = i * 6;
           return ActionChip(
-            label: Text('$n'),
+            label: Text('$n', style: const TextStyle(fontWeight: FontWeight.w800)),
+            backgroundColor: const Color(0xFF1E293B),
+            labelStyle: const TextStyle(color: Colors.white),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
             onPressed: () {
               state.spinRoulette(rng, n);
               onChanged();
@@ -978,28 +1008,13 @@ Widget _slots(NgmyProState state, math.Random rng, VoidCallback onChanged, VoidC
   return Column(
     children: [
       _turnBanner(state),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: state.slotsReels
-            .map((r) => Container(
-                  margin: const EdgeInsets.all(8),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFF4C1D95)]),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFFBBF24), width: 2),
-                  ),
-                  child: Text(symbols[r], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-                ))
-            .toList(),
-      ),
-      FilledButton(
-        onPressed: () {
+      ngmySlotMachineFrame(
+        symbols: state.slotsReels.map((r) => symbols[r]).toList(),
+        onSpin: () {
           state.spinSlots(rng);
           onChanged();
           if (state.score >= 1) onFullWin();
         },
-        child: const Text('SPIN'),
       ),
     ],
   );
@@ -1011,24 +1026,69 @@ Widget _poolTable(NgmyProState state, math.Random rng, VoidCallback onChanged, V
       _turnBanner(state),
       Expanded(
         child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
           decoration: BoxDecoration(
-            color: const Color(0xFF166534),
+            gradient: const RadialGradient(
+              center: Alignment(0, -0.2),
+              radius: 1.1,
+              colors: [Color(0xFF166534), Color(0xFF14532D), Color(0xFF052E16)],
+            ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF5D4037), width: 10),
+            border: Border.all(color: const Color(0xFF78350F), width: 12),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 8))],
           ),
-          child: const Center(child: Icon(Icons.sports_baseball_rounded, color: Colors.white, size: 40)),
+          child: Stack(
+            children: [
+              Positioned(
+                left: 24,
+                top: 24,
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white, boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)]),
+                ),
+              ),
+              Positioned(
+                right: 32,
+                bottom: 28,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF0F172A)),
+                ),
+              ),
+              Center(
+                child: Transform.rotate(
+                  angle: state.poolAngle,
+                  child: Container(
+                    width: 120,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFBBF24),
+                      borderRadius: BorderRadius.circular(2),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 4)],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      Slider(value: state.poolPower, onChanged: (v) {
-        state.poolPower = v;
-        onChanged();
-      }),
+      Slider(
+        value: state.poolPower,
+        activeColor: const Color(0xFF22C55E),
+        onChanged: (v) {
+          state.poolPower = v;
+          onChanged();
+        },
+      ),
       FilledButton(
         onPressed: () {
           if (state.shootPool(rng)) onFullWin();
           onChanged();
         },
-        child: const Text('Shoot'),
+        child: const Text('Shoot cue ball'),
       ),
     ],
   );
@@ -1108,28 +1168,15 @@ Widget _profit(NgmyProState state, math.Random rng, VoidCallback onChanged, Void
 }
 
 Widget _casinoPlaceholder(String gameId, NgmyProState state, math.Random rng, VoidCallback onChanged, VoidCallback onFullWin) {
-  return Column(
-    children: [
-      _turnBanner(state),
-      const Spacer(),
-      Icon(Icons.casino_rounded, size: 72, color: Colors.amber.shade300),
-      const SizedBox(height: 12),
-      Text(kNgmyProGameTitles[gameId] ?? gameId, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-      const SizedBox(height: 8),
-      Text(
-        state.vsComputer ? 'Play against NGMY — skill & luck combined' : 'Play against ${state.playCtx?.opponentLabel ?? 'your rival'}',
-        style: const TextStyle(color: Colors.white54),
-        textAlign: TextAlign.center,
-      ),
-      const Spacer(),
-      FilledButton(
-        onPressed: () {
-          if (rng.nextDouble() > 0.45) state.score = 1;
-          onChanged();
-          if (state.score >= 1) onFullWin();
-        },
-        child: const Text('Play Round'),
-      ),
-    ],
+  return ngmyThemedCasinoTable(
+    gameId: gameId,
+    prompt: state.prompt,
+    vsComputer: state.vsComputer,
+    opponentLabel: state.playCtx?.opponentLabel,
+    onPlay: () {
+      if (rng.nextDouble() > 0.45) state.score = 1;
+      onChanged();
+      if (state.score >= 1) onFullWin();
+    },
   );
 }
