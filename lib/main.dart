@@ -2943,6 +2943,7 @@ Future<void> _pushUserToCloudFast(UserData u, {bool includeFreeTrial = false}) a
   if (!await ngmyCanReachCloud()) return;
   try {
     await Supabase.instance.client.from('users').upsert(_userRowForBulkSync(u, includeFreeTrial: includeFreeTrial));
+    unawaited(ngmyRegisterReferralCodesForUser(u));
   } catch (e) {
     debugPrint('[user] fast upsert: $e');
   }
@@ -6811,6 +6812,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (remote.isNotEmpty) {
             _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
             _reconcileAllUserBalances();
+            unawaited(ngmyRegisterReferralCodesForUsers(remote));
           } else {
             debugPrint('[admin] cloud users empty — keeping ${_allUsers.length} local users');
           }
@@ -10423,6 +10425,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               if (remote.isNotEmpty) {
                 _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
                 _reconcileAllUserBalances();
+                unawaited(ngmyRegisterReferralCodesForUsers(remote));
               } else {
                 debugPrint('[admin] bootstrap users empty — keeping local cache');
                 _allUsers = localUsersBeforeFetch.values.toList();
@@ -10444,6 +10447,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               _allUsers.add(remote);
             }
             _reconcileAllUserBalances();
+            unawaited(ngmyRegisterReferralCodesForUser(remote));
           }
         }
         for (final u in _allUsers) {
@@ -23486,6 +23490,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _syncProfileAvatarCache();
     _referralInputC.addListener(_scheduleReferralPreview);
     unawaited(_loadLinkedReferrerDisplay());
+    unawaited(ngmyRegisterReferralCodesForUser(widget.user));
   }
 
   Future<void> _loadLinkedReferrerDisplay() async {

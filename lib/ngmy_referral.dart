@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -6,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_network_resilience.dart';
+
+const Duration kNgmyReferralLookupTimeout = Duration(seconds: 25);
 
 String ngmyNormalizeReferralCode(String raw) {
   var code = raw.trim().toUpperCase();
@@ -136,6 +139,7 @@ Future<Map<String, dynamic>?> ngmyLookupReferrerUserRow(
 }) {
   return ngmyWithTimeout(
     () => _ngmyLookupReferrerUserRowImpl(rawCode, localUsers: localUsers),
+    timeout: kNgmyReferralLookupTimeout,
     onTimeout: () {
       debugPrint('[referral] lookup timed out for $rawCode');
       return null;
@@ -153,34 +157,48 @@ Future<Map<String, dynamic>?> _ngmyLookupReferrerUserRowImpl(
   final local = ngmyLookupReferrerUserRowLocal(rawCode, localUsers: localUsers);
   if (local != null) return local;
 
-  if (!await ngmyCanReachCloud()) return null;
+  try {
+    final fromIndex = await ngmyLookupReferrerFromIndex(rawCode);
+    if (fromIndex != null) return fromIndex;
+  } catch (e) {
+    debugPrint('[referral] index lookup skipped: $e');
+  }
+
   try {
     final client = Supabase.instance.client;
     try {
       final byColumn = await client
           .from('users')
-          .select()
+          .select('email, username, fullName, referralCount, points, referredByCode, referralCode')
           .eq('referralCode', normalized)
           .maybeSingle()
           .timeout(kNgmyCloudLoadTimeout);
       if (byColumn != null) {
-        return Map<String, dynamic>.from(byColumn);
+        final row = Map<String, dynamic>.from(byColumn);
+        if ((row['email'] ?? '').toString().trim().isNotEmpty) {
+          unawaited(ngmyRegisterReferralCodesForUser(row));
+          return row;
+        }
       }
     } catch (e) {
       debugPrint('[referral] referralCode column lookup skipped: $e');
     }
 
     const pageSize = 500;
-    for (var from = 0; from < 10000; from += pageSize) {
+    for (var from = 0; from < 20000; from += pageSize) {
       final rows = await client
           .from('users')
           .select('email, username, fullName, referralCount, points, referredByCode, referralCode')
+          .order('email')
           .range(from, from + pageSize - 1)
           .timeout(kNgmyCloudLoadTimeout);
       if (rows.isEmpty) break;
       for (final raw in rows) {
         final row = Map<String, dynamic>.from(raw);
-        if (_rowMatchesReferralCode(row, normalized)) return row;
+        if (_rowMatchesReferralCode(row, normalized)) {
+          unawaited(ngmyRegisterReferralCodesForUser(row));
+          return row;
+        }
       }
       if (rows.length < pageSize) break;
     }
@@ -208,4 +226,94 @@ bool ngmyReferralCodeBelongsToEmail(String email, String rawCode) {
   final normalized = ngmyNormalizeReferralCode(rawCode);
   if (normalized.isEmpty) return false;
   return ngmyReferralCodesForEmail(email).any((c) => c.toUpperCase() == normalized);
+}
+
+const String _kReferralIndexKeyPrefix = 'ngmy_refcode_';
+
+String _referralIndexKey(String normalizedCode) => '$_kReferralIndexKeyPrefix$normalizedCode';
+
+Map<String, dynamic> _indexValueForUser(dynamic user) {
+  Map<String, dynamic> row;
+  if (user is Map<String, dynamic>) {
+    row = user;
+  } else {
+    try {
+      row = Map<String, dynamic>.from((user as dynamic).toJson() as Map);
+    } catch (_) {
+      return {};
+    }
+  }
+  final email = (row['email'] ?? '').toString().trim();
+  if (email.isEmpty) return {};
+  return {
+    'email': email,
+    'username': (row['username'] ?? '').toString().trim(),
+    'fullName': (row['fullName'] ?? '').toString().trim(),
+    'referralCode': ngmyReferralCodeForEmail(email),
+    'referralCount': row['referralCount'] ?? 0,
+    'points': row['points'] ?? 0,
+    'referredByCode': (row['referredByCode'] ?? '').toString(),
+    'updatedAt': DateTime.now().toUtc().toIso8601String(),
+  };
+}
+
+/// Publishes referral code(s) to ngmy_settings so any user can resolve them.
+Future<void> ngmyRegisterReferralCodesForUser(dynamic user) async {
+  final value = _indexValueForUser(user);
+  final email = (value['email'] ?? '').toString().trim();
+  if (email.isEmpty) return;
+  try {
+    final client = Supabase.instance.client;
+    final rows = <Map<String, dynamic>>[];
+    for (final code in ngmyReferralCodesForEmail(email)) {
+      final normalized = ngmyNormalizeReferralCode(code);
+      if (normalized.isEmpty) continue;
+      rows.add({
+        'key': _referralIndexKey(normalized),
+        'value': {...value, 'referralCode': normalized},
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    }
+    if (rows.isEmpty) return;
+    await client.from('ngmy_settings').upsert(rows, onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+  } catch (e) {
+    debugPrint('[referral] register index: $e');
+  }
+}
+
+Future<void> ngmyRegisterReferralCodesForUsers(Iterable<dynamic> users) async {
+  for (final user in users) {
+    await ngmyRegisterReferralCodesForUser(user);
+  }
+}
+
+Future<Map<String, dynamic>?> ngmyLookupReferrerFromIndex(String rawCode) async {
+  final normalized = ngmyNormalizeReferralCode(rawCode);
+  if (normalized.isEmpty) return null;
+  try {
+    final row = await Supabase.instance.client
+        .from('ngmy_settings')
+        .select()
+        .eq('key', _referralIndexKey(normalized))
+        .maybeSingle()
+        .timeout(kNgmyCloudLoadTimeout);
+    if (row == null) return null;
+    final value = row['value'];
+    if (value is! Map) return null;
+    final parsed = Map<String, dynamic>.from(value);
+    final email = (parsed['email'] ?? '').toString().trim();
+    if (email.isEmpty) return null;
+    return {
+      'email': email,
+      'username': (parsed['username'] ?? '').toString().trim(),
+      'fullName': (parsed['fullName'] ?? '').toString().trim(),
+      'referralCode': (parsed['referralCode'] ?? normalized).toString().trim(),
+      'referralCount': parsed['referralCount'] ?? 0,
+      'points': parsed['points'] ?? 0,
+      'referredByCode': (parsed['referredByCode'] ?? '').toString(),
+    };
+  } catch (e) {
+    debugPrint('[referral] index lookup: $e');
+    return null;
+  }
 }
