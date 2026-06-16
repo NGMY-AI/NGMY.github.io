@@ -1,6 +1,7 @@
 // ignore: avoid_web_libraries_in_flutter
 
 import 'dart:html' as html;
+import 'dart:js_util' as js_util;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,10 +21,21 @@ Future<bool> ngmyPushRequestPermission() async {
   return result == 'granted';
 }
 
-Future<void> ngmyPushShow({required String title, required String body, String? tag}) async {
+Future<void> ngmyPushShow({
+  required String title,
+  required String body,
+  String? tag,
+  bool silent = false,
+}) async {
   if (!await ngmyPushHasPermission()) return;
   try {
-    html.Notification(title, body: body, tag: tag ?? title);
+    final options = <String, Object?>{
+      'body': body,
+      if (tag != null && tag.isNotEmpty) 'tag': tag,
+      if (silent) 'silent': true,
+    };
+    final ctor = js_util.getProperty(html.window, 'Notification');
+    js_util.callConstructor(ctor, [title, js_util.jsify(options)]);
   } catch (e) {
     debugPrint('[ngmy push] show failed: $e');
   }
@@ -56,7 +68,7 @@ Future<void> ngmyPushMaybePrompt(BuildContext context, String userEmail) async {
         ],
       ),
       content: const Text(
-        'Allow NGMY to send you push alerts for transactions, earnings, and news announcements — even when the app is in the background.',
+        'Allow NGMY to send push alerts when you receive money or make purchases outside Game Center — even when the app is in the background.',
         style: TextStyle(height: 1.35),
       ),
       actions: [

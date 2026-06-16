@@ -590,6 +590,15 @@ bool ngmyIsStoreLedgerTransaction(AppTransaction t) {
   return d.contains('ngmy store sale') || d.contains('ngmy store purchase');
 }
 
+/// Game Center bets / wagers — no browser push (in-game alerts only).
+bool ngmyIsGameSpendTransaction(AppTransaction t) {
+  if (!ngmyIsGameLedgerTransaction(t)) return false;
+  if (t.status != TransactionStatus.approved) return false;
+  return t.type == TransactionType.adminRemove;
+}
+
+enum NgmyPushSoundKind { incomeCash, spendDefault }
+
 void ngmyDeliverTransactionAlerts(AppTransaction t, {bool forceIncomeSound = false}) {
   if (t.status != TransactionStatus.approved) return;
   if (ngmyTransactionCountsAsIncome(t)) {
@@ -8883,6 +8892,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     required String body,
     String? tag,
     Duration cooldown = const Duration(seconds: 8),
+    NgmyPushSoundKind sound = NgmyPushSoundKind.spendDefault,
+    AppTransaction? incomeTransaction,
+    double? incomeAmount,
   }) async {
     if (_currentUser == null) return;
     final dedupeKey = tag ?? '${title.trim()}|${body.trim()}';
@@ -8890,24 +8902,28 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (last != null && DateTime.now().difference(last) < cooldown) return;
     _notificationCooldown[dedupeKey] = DateTime.now();
 
+    final useCashSound = sound == NgmyPushSoundKind.incomeCash;
+    final silentPush = useCashSound;
+
     if (kIsWeb) {
-      await ngmyPushShow(title: title, body: body, tag: tag ?? title);
+      await ngmyPushShow(title: title, body: body, tag: tag ?? title, silent: silentPush);
     } else if (_notificationsReady) {
       try {
-        const androidDetails = AndroidNotificationDetails(
+        final androidDetails = AndroidNotificationDetails(
           'ngmy_transactions',
           'NGMY Transactions',
           channelDescription: 'Transaction, earnings, and store sale alerts',
           importance: Importance.max,
           priority: Priority.high,
+          playSound: !useCashSound,
         );
-        const darwinDetails = DarwinNotificationDetails(
+        final darwinDetails = DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
-          presentSound: true,
+          presentSound: !useCashSound,
         );
         const linuxDetails = LinuxNotificationDetails();
-        const details = NotificationDetails(
+        final details = NotificationDetails(
           android: androidDetails,
           iOS: darwinDetails,
           macOS: darwinDetails,
@@ -8921,6 +8937,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         );
       } catch (e) {
         debugPrint('Push alert failed: $e');
+      }
+    }
+
+    if (useCashSound) {
+      if (incomeTransaction != null) {
+        ngmyPlayIncomeSoundForTransaction(incomeTransaction);
+      } else if (incomeAmount != null && incomeAmount >= 0.01) {
+        ngmyPlayIncomeSoundForAmount(
+          beneficiaryEmail: _currentUser!.email,
+          amount: incomeAmount,
+          dedupeKey: tag ?? dedupeKey,
+        );
       }
     }
   }
@@ -9141,6 +9169,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _notifyTransactionEvent(AppTransaction t, {bool statusChanged = false}) async {
     if (_ngmyIsClockInSessionStartTransaction(t)) return;
+    if (ngmyIsGameSpendTransaction(t)) return;
     if (kNgmySuppressClockInPopups) {
       final sd = (t.sourceDetails ?? '').toLowerCase();
       if (sd.contains('clock-in')) return;
@@ -9149,10 +9178,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (currentEmail == null || currentEmail.isEmpty) return;
     if (t.userEmail.toLowerCase().trim() != currentEmail) return;
     if (!_tryClaimTransactionNotification(t, statusChanged: statusChanged)) return;
+    final isIncome = ngmyTransactionCountsAsIncome(t);
     await _pushUserPushAlert(
       title: _notificationTitleForTransaction(t, statusChanged: statusChanged),
       body: _notificationBodyForTransaction(t, statusChanged: statusChanged),
       tag: statusChanged ? 'txn_${t.id}_${t.status.name}' : 'txn_${t.id}',
+      sound: isIncome ? NgmyPushSoundKind.incomeCash : NgmyPushSoundKind.spendDefault,
+      incomeTransaction: isIncome ? t : null,
     );
   }
 
@@ -9419,6 +9451,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _seenRealtimeStoreOrderIds.add(id);
       final title = (o['title'] ?? 'Item').toString();
       final pay = (o['paymentStatus'] ?? '').toString();
+      final orderTotal = ((o['total'] as num?)?.toDouble() ??
+          (((o['price'] as num?) ?? 0).toDouble() + ((o['deliveryFee'] as num?) ?? 0).toDouble()));
       if (pay == 'awaiting_proof') {
         unawaited(_pushUserPushAlert(
           title: 'Payment proof to review',
@@ -9430,6 +9464,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           title: 'New sale',
           body: 'Payment confirmed for $title. Open Store → Sales to ship.',
           tag: 'store_sale_$id',
+          sound: NgmyPushSoundKind.incomeCash,
+          incomeAmount: orderTotal > 0 ? orderTotal : null,
         ));
       } else {
         final via = (o['paidVia'] ?? '').toString();
