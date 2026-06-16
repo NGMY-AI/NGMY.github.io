@@ -16,6 +16,35 @@ String ngmyFormatMoney(double amount) {
   return '$sign\$$wholeStr.${frac.toString().padLeft(2, '0')}';
 }
 
+/// Styled money text for worksheet cards (whole + cents split for large totals).
+Widget ngmyWorksheetMoneyText(
+  double amount, {
+  Color color = Colors.white,
+  bool large = false,
+  FontWeight weight = FontWeight.w900,
+}) {
+  final abs = amount.abs();
+  final whole = abs.floor();
+  final frac = ((abs - whole) * 100).round().clamp(0, 99);
+  final sign = amount < 0 ? '-' : '';
+  final wholeStr = whole.toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]},',
+      );
+  final wholeSize = large ? 34.0 : 16.0;
+  final centSize = large ? 18.0 : 12.0;
+  return Text.rich(
+    TextSpan(
+      children: [
+        if (sign.isNotEmpty) TextSpan(text: sign, style: TextStyle(color: color, fontWeight: weight, fontSize: wholeSize * 0.7)),
+        TextSpan(text: '\$', style: TextStyle(color: color.withValues(alpha: 0.82), fontWeight: FontWeight.w700, fontSize: centSize)),
+        TextSpan(text: wholeStr, style: TextStyle(color: color, fontWeight: weight, fontSize: wholeSize, height: 1.05, letterSpacing: -0.6)),
+        TextSpan(text: '.${frac.toString().padLeft(2, '0')}', style: TextStyle(color: color.withValues(alpha: 0.88), fontWeight: FontWeight.w800, fontSize: centSize)),
+      ],
+    ),
+  );
+}
+
 Future<String?> ngmyPickImageBase64({
   int imageQuality = 78,
   int maxWidth = 1920,

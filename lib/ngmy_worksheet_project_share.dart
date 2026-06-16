@@ -97,6 +97,41 @@ String ngmyWorksheetProjectQrPayload({
   return 'NGMY_WS:${base64Url.encode(utf8.encode(json))}';
 }
 
+String? _barcodeScanText(Barcode barcode) {
+  final raw = barcode.rawValue?.trim();
+  if (raw != null && raw.isNotEmpty) return raw;
+  final display = barcode.displayValue?.trim();
+  if (display != null && display.isNotEmpty) return display;
+  return null;
+}
+
+/// True when camera text looks like a worksheet project share payload.
+bool ngmyWorksheetScanAcceptsPayload(String raw) {
+  final t = raw.trim();
+  if (t.isEmpty) return false;
+  if (t.startsWith('NGMY_WS:')) return true;
+  if (t.contains('ngmy_worksheet_project_v1')) return true;
+  if (t.startsWith('{')) {
+    try {
+      final map = jsonDecode(t);
+      if (map is Map && (map['type'] ?? '').toString() == _kWorksheetProjectBundleType) return true;
+    } catch (_) {}
+  }
+  return false;
+}
+
+String? ngmyWorksheetScanPayloadFromBarcode(Barcode barcode) {
+  final text = _barcodeScanText(barcode);
+  if (text == null) return null;
+  if (ngmyWorksheetScanAcceptsPayload(text)) return text;
+  final idx = text.indexOf('NGMY_WS:');
+  if (idx >= 0) {
+    final slice = text.substring(idx).trim();
+    if (ngmyWorksheetScanAcceptsPayload(slice)) return slice;
+  }
+  return null;
+}
+
 WorksheetProject? ngmyWorksheetProjectFromShareRaw(String raw) {
   final trimmed = raw.trim();
   if (trimmed.isEmpty) return null;
@@ -429,17 +464,34 @@ class NgmyWorksheetProjectScanPage extends StatefulWidget {
 }
 
 class _NgmyWorksheetProjectScanPageState extends State<NgmyWorksheetProjectScanPage> {
+  final MobileScannerController _camera = MobileScannerController(
+    detectionSpeed: DetectionSpeed.unrestricted,
+    facing: CameraFacing.back,
+  );
   bool _handled = false;
+  bool _torchOn = false;
+
+  @override
+  void dispose() {
+    _camera.dispose();
+    super.dispose();
+  }
+
+  void _acceptPayload(String raw) {
+    if (_handled || !mounted) return;
+    _handled = true;
+    NgmyNavigator.pop(context, raw);
+  }
 
   void _onDetect(BarcodeCapture capture) {
     if (_handled) return;
-    final barcodes = capture.barcodes;
-    if (barcodes.isEmpty) return;
-    final raw = barcodes.first.rawValue?.trim();
-    if (raw == null || raw.isEmpty) return;
-    if (!raw.startsWith('NGMY_WS:') && !raw.contains('"ngmy_worksheet_project_v1"')) return;
-    _handled = true;
-    NgmyNavigator.pop(context, raw);
+    for (final barcode in capture.barcodes) {
+      final payload = ngmyWorksheetScanPayloadFromBarcode(barcode);
+      if (payload != null) {
+        _acceptPayload(payload);
+        return;
+      }
+    }
   }
 
   @override
@@ -449,9 +501,58 @@ class _NgmyWorksheetProjectScanPageState extends State<NgmyWorksheetProjectScanP
         title: const Text('Scan project QR'),
         backgroundColor: const Color(0xFF0B1018),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: Icon(_torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded),
+            onPressed: () async {
+              await _camera.toggleTorch();
+              if (mounted) setState(() => _torchOn = !_torchOn);
+            },
+          ),
+        ],
       ),
       backgroundColor: Colors.black,
-      body: MobileScanner(onDetect: _onDetect),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          MobileScanner(controller: _camera, onDetect: _onDetect),
+          Center(
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: WorksheetPalette.green, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: WorksheetPalette.green.withValues(alpha: 0.35),
+                    blurRadius: 24,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 32,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: WorksheetPalette.green.withValues(alpha: 0.45)),
+              ),
+              child: const Text(
+                'Hold steady — worksheet QR scans instantly when in frame.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600, height: 1.35),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
