@@ -15967,7 +15967,7 @@ class _GameBetScreenState extends State<GameBetScreen> with NgmyBalanceListener 
                 balanceOf: () => widget.user.accountBalance,
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
               ),
-            )),
+            ),
           ),
         ],
       ),
