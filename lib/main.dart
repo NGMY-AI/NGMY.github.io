@@ -6504,6 +6504,10 @@ String? ngmyApplyReferralCodeToUser({
   UserData? referrer;
   if (referrerRow != null) {
     referrer = UserData.fromJson(referrerRow);
+    final directEmail = ngmyReferrerEmailFromRow(referrerRow);
+    if (referrer.email.trim().isEmpty && directEmail != null) {
+      referrer.email = directEmail;
+    }
   }
   if (referrer == null || referrer.email.trim().isEmpty) {
     for (final u in allUsers) {
@@ -23520,14 +23524,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     final row = await ngmyLookupReferrerUserRow(raw, localUsers: widget.allUsers);
-    final name = row == null
-        ? null
-        : await ngmyReferrerDisplayNameForCode(raw, localUsers: widget.allUsers);
     if (!mounted) return;
     setState(() {
       _referralPreviewCode = normalized;
       _referralPreviewReferrerRow = row;
-      _referralPreviewName = name;
+      _referralPreviewName = row == null ? null : ngmyDisplayNameFromReferrerRow(row);
       _referralPreviewInvalid = row == null;
     });
   }
@@ -23673,15 +23674,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You cannot use your own referral code.')));
       return;
     }
+    if (_referralPreviewInvalid && _referralInputC.text.trim().isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid referral code.')));
+      return;
+    }
     setState(() => _referralSubmitting = true);
     try {
       final normalized = ngmyNormalizeReferralCode(code);
       Map<String, dynamic>? referrerRow;
-      if (_referralPreviewReferrerRow != null && _referralPreviewCode == normalized) {
+      if (_referralPreviewReferrerRow != null &&
+          _referralPreviewCode == normalized &&
+          _referralPreviewName != null) {
         referrerRow = _referralPreviewReferrerRow;
-      } else {
-        referrerRow = await ngmyLookupReferrerUserRow(code, localUsers: widget.allUsers);
       }
+      referrerRow ??= ngmyLookupReferrerUserRowLocal(code, localUsers: widget.allUsers);
+      referrerRow ??= await ngmyLookupReferrerUserRow(code, localUsers: widget.allUsers);
       if (!mounted) return;
       if (referrerRow == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid referral code.')));
@@ -23698,7 +23705,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid referral code.')));
         return;
       }
-      final referrerName = (referrerRow['username'] ?? referrerRow['fullName'] ?? '').toString().trim();
+      final referrerName = ngmyDisplayNameFromReferrerRow(referrerRow) ?? '';
       setState(() {
         _referralPreviewName = null;
         _referralPreviewInvalid = false;
@@ -24003,7 +24010,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
                         hintText: 'ENTER CODE',
-                        errorText: _referralPreviewInvalid && _referralInputC.text.trim().isNotEmpty
+                        errorText: _referralPreviewInvalid &&
+                                (_referralPreviewName == null || _referralPreviewName!.isEmpty) &&
+                                _referralInputC.text.trim().isNotEmpty
                             ? 'Invalid referral code'
                             : null,
                       ),

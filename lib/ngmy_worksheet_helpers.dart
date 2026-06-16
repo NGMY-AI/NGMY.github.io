@@ -30,7 +30,7 @@ Future<String?> ngmyPickImageBase64({
   return 'data:image/jpeg;base64,${base64Encode(bytes)}';
 }
 
-/// Shrinks a data-URL image for QR/file sharing while keeping enough quality for thumbnails.
+/// Shrinks a data-URL image for file sharing (skipped for QR — QR uses instant path).
 Future<String?> ngmyWorksheetShareThumbnail(
   String? ref, {
   bool forQr = false,
@@ -38,16 +38,18 @@ Future<String?> ngmyWorksheetShareThumbnail(
   final raw = ref?.trim();
   if (raw == null || raw.isEmpty) return null;
   if (!raw.startsWith('data:image')) return raw;
+  if (forQr) return raw.length <= 2000 ? raw : null;
 
-  final maxChars = forQr ? 1600 : 500000;
+  final maxChars = 500000;
   if (raw.length <= maxChars) return raw;
 
   try {
     final payload = raw.contains(',') ? raw.split(',').last : raw;
     final bytes = base64Decode(payload);
-  var targetWidth = forQr ? 420 : 960;
+    var targetWidth = 960;
     while (targetWidth >= 96) {
-      final codec = await ui.instantiateImageCodec(bytes, targetWidth: targetWidth);
+      final codec = await ui.instantiateImageCodec(bytes, targetWidth: targetWidth)
+          .timeout(const Duration(seconds: 2));
       final frame = await codec.getNextFrame();
       final byteData = await frame.image.toByteData(format: ui.ImageByteFormat.png);
       frame.image.dispose();
@@ -59,7 +61,7 @@ Future<String?> ngmyWorksheetShareThumbnail(
   } catch (e) {
     debugPrint('[worksheets] thumbnail shrink failed: $e');
   }
-  return forQr ? null : raw;
+  return raw;
 }
 
 ImageProvider? ngmyImageFromRef(String? ref) {

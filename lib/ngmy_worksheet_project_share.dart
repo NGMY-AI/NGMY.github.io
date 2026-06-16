@@ -58,6 +58,15 @@ Future<String> ngmyWorksheetProjectShareJson({
   bool includeThumbnail = true,
   bool compressForQr = false,
 }) async {
+  if (!includeThumbnail || !compressForQr) {
+    return jsonEncode(
+      ngmyWorksheetProjectShareBundle(
+        ownerEmail: ownerEmail,
+        project: project,
+        thumbnailOverride: includeThumbnail ? project.thumbnailPath : null,
+      ),
+    );
+  }
   return jsonEncode(
     await ngmyWorksheetProjectShareBundleAsync(
       ownerEmail: ownerEmail,
@@ -68,15 +77,22 @@ Future<String> ngmyWorksheetProjectShareJson({
   );
 }
 
-Future<String> ngmyWorksheetProjectQrPayload({
+/// Builds a QR payload immediately — no image processing (avoids web hang).
+String ngmyWorksheetProjectQrPayload({
   required String ownerEmail,
   required WorksheetProject project,
-}) async {
-  final json = await ngmyWorksheetProjectShareJson(
-    ownerEmail: ownerEmail,
-    project: project,
-    includeThumbnail: true,
-    compressForQr: true,
+}) {
+  final thumb = project.thumbnailPath?.trim();
+  String? includedThumb;
+  if (thumb != null && thumb.isNotEmpty && thumb.length <= 2000) {
+    includedThumb = thumb;
+  }
+  final json = jsonEncode(
+    ngmyWorksheetProjectShareBundle(
+      ownerEmail: ownerEmail,
+      project: project,
+      thumbnailOverride: includedThumb,
+    ),
   );
   return 'NGMY_WS:${base64Url.encode(utf8.encode(json))}';
 }
@@ -162,7 +178,6 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
       ownerEmail: ownerEmail,
       project: project,
       includeThumbnail: true,
-      compressForQr: false,
     );
     final safeName = project.name.replaceAll(RegExp(r'[^\w\-.]+'), '_');
     final msg = await downloadNgmyAdvisorSyncJson(json, 'ngmy_project_$safeName');
@@ -170,17 +185,9 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Future<void> _showQr(BuildContext context) async {
+  void _showQr(BuildContext context) {
     Navigator.pop(context);
-    if (!context.mounted) return;
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator(color: WorksheetPalette.green)),
-    );
-    final payload = await ngmyWorksheetProjectQrPayload(ownerEmail: ownerEmail, project: project);
-    if (context.mounted) Navigator.pop(context);
-    if (!context.mounted) return;
+    final payload = ngmyWorksheetProjectQrPayload(ownerEmail: ownerEmail, project: project);
     NgmyNavigator.push<void>(
       context,
       NgmyWorksheetProjectQrPage(projectName: project.name, payload: payload),

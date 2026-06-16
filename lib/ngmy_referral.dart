@@ -59,6 +59,34 @@ bool _rowMatchesReferralCode(Map<String, dynamic> row, String normalized) {
   return false;
 }
 
+String? ngmyDisplayNameFromReferrerRow(Map<String, dynamic> row) {
+  final username = (row['username'] ?? row['fullName'] ?? '').toString().trim();
+  if (username.isNotEmpty) return username;
+  final email = (row['email'] ?? '').toString().trim();
+  if (email.contains('@')) return email.split('@').first;
+  return email.isEmpty ? null : email;
+}
+
+String? ngmyReferrerEmailFromRow(Map<String, dynamic>? row) {
+  if (row == null) return null;
+  final email = (row['email'] ?? '').toString().trim();
+  return email.isEmpty ? null : email;
+}
+
+/// Instant lookup against users already on this device (no network).
+Map<String, dynamic>? ngmyLookupReferrerUserRowLocal(
+  String rawCode, {
+  List<dynamic> localUsers = const [],
+}) {
+  final normalized = ngmyNormalizeReferralCode(rawCode);
+  if (normalized.isEmpty) return null;
+  for (final u in localUsers) {
+    final row = _userRowFromLocal(u);
+    if (_rowMatchesReferralCode(row, normalized)) return row;
+  }
+  return null;
+}
+
 /// Finds a referrer user row by referral code (local cache first, then Supabase).
 Future<Map<String, dynamic>?> ngmyLookupReferrerUserRow(
   String rawCode, {
@@ -80,10 +108,8 @@ Future<Map<String, dynamic>?> _ngmyLookupReferrerUserRowImpl(
   final normalized = ngmyNormalizeReferralCode(rawCode);
   if (normalized.isEmpty) return null;
 
-  for (final u in localUsers) {
-    final row = _userRowFromLocal(u);
-    if (_rowMatchesReferralCode(row, normalized)) return row;
-  }
+  final local = ngmyLookupReferrerUserRowLocal(rawCode, localUsers: localUsers);
+  if (local != null) return local;
 
   if (!await ngmyCanReachCloud()) return null;
   try {
@@ -123,11 +149,7 @@ Future<String?> ngmyReferrerDisplayNameForCode(
 }) async {
   final row = await ngmyLookupReferrerUserRow(rawCode, localUsers: localUsers);
   if (row == null) return null;
-  final username = (row['username'] ?? row['fullName'] ?? '').toString().trim();
-  if (username.isNotEmpty) return username;
-  final email = (row['email'] ?? '').toString().trim();
-  if (email.contains('@')) return email.split('@').first;
-  return email.isEmpty ? null : email;
+  return ngmyDisplayNameFromReferrerRow(row);
 }
 
 Map<String, dynamic> ngmyReferralCodePatchForEmail(String email) => {
