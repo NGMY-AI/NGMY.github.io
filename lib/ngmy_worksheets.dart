@@ -107,23 +107,26 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     await _reload();
   }
 
-  Future<void> _importSharedProject() async {
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Import shared project'),
-        content: const Text('Scan a project QR code or upload a backup file from someone who shared their worksheet project.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, 'file'), child: const Text('Upload file')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, 'scan'),
-            style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.green),
-            child: const Text('Scan QR'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _importSharedProject({String? mode}) async {
+    String? choice = mode;
+    if (choice == null) {
+      choice = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Import shared project'),
+          content: const Text('Scan a project QR code or upload a backup file from someone who shared their worksheet project.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(ctx, 'file'), child: const Text('Upload file')),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, 'scan'),
+              style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.green),
+              child: const Text('Scan QR'),
+            ),
+          ],
+        ),
+      );
+    }
     if (choice == null || !mounted) return;
 
     WorksheetProject? imported;
@@ -145,9 +148,15 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     }
 
     final project = ngmyWorksheetProjectCopyForImport(imported);
-    await upsertWorksheetProject(widget.userEmail, project);
+    final saved = await upsertWorksheetProject(widget.userEmail, project);
     await _reload();
     if (!mounted) return;
+    if (!saved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save imported project to this device. Please try again.')),
+      );
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Imported "${project.name}"')),
     );
@@ -497,7 +506,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     if (_projects.isEmpty) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
+        padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
         decoration: BoxDecoration(
           color: p.cardBg,
           borderRadius: BorderRadius.circular(16),
@@ -506,22 +515,64 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
         ),
         child: Column(
           children: [
-            Icon(Icons.folder_open_outlined, size: 56, color: p.secondaryText.withValues(alpha: 0.45)),
-            const SizedBox(height: 16),
+            Container(
+              width: 108,
+              height: 108,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [WorksheetPalette.green, WorksheetPalette.greenDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: WorksheetPalette.green.withValues(alpha: 0.5),
+                    blurRadius: 28,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.folder_open_rounded, color: Colors.white, size: 52),
+            ),
+            const SizedBox(height: 20),
             Text('No Projects Yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.primaryText)),
             const SizedBox(height: 8),
             Text(
-              'Create your first project with a 16:9 thumbnail and budget items.',
+              'Create a new project, or import one someone shared with you.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.4),
             ),
             const SizedBox(height: 22),
+            Row(
+              children: [
+                Expanded(
+                  child: _emptyImportAction(
+                    p: p,
+                    icon: Icons.qr_code_scanner_rounded,
+                    label: 'Scan QR',
+                    onTap: () => _importSharedProject(mode: 'scan'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _emptyImportAction(
+                    p: p,
+                    icon: Icons.upload_file_rounded,
+                    label: 'Upload file',
+                    onTap: () => _importSharedProject(mode: 'file'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
             FilledButton(
               onPressed: _createProject,
               style: FilledButton.styleFrom(
                 backgroundColor: WorksheetPalette.green,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                minimumSize: const Size(double.infinity, 48),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Create Project', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
@@ -532,6 +583,45 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     }
 
     return Column(children: _projects.map((proj) => _projectTile(proj, p)).toList());
+  }
+
+  Widget _emptyImportAction({
+    required WorksheetPalette p,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: WorksheetPalette.green.withValues(alpha: p.isDark ? 0.18 : 0.1),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: WorksheetPalette.green.withValues(alpha: 0.45)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: WorksheetPalette.greenDark, size: 26),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: WorksheetPalette.greenDark,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _projectTile(WorksheetProject project, WorksheetPalette p) {
