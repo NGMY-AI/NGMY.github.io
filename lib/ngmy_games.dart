@@ -24,7 +24,6 @@ const List<String> kNgmyGameIds = [
   'scramble',
   'pattern',
   'sequence',
-  ...kNgmyProGameIds,
 ];
 
 const Map<String, String> kNgmyGameTitles = {
@@ -36,7 +35,6 @@ const Map<String, String> kNgmyGameTitles = {
   'scramble': 'Word Scramble',
   'pattern': 'Pattern Memory',
   'sequence': 'Number Sequence',
-  ...kNgmyProGameTitles,
 };
 
 /// Dice roll lands on one of these five outcomes.

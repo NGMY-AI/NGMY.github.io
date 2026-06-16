@@ -21,12 +21,6 @@ DateTime? _inviteCloudFetchedAt;
 
 /// Multiplayer-capable game ids.
 const Set<String> kNgmyMultiplayerGameIds = {
-  'checkers_deluxe',
-  'tic_tac_go',
-  'chess_royale',
-  'connect_four_pro',
-  'backgammon_pro',
-  'poker_texas',
   'memory',
   'typing',
   'scramble',
@@ -41,49 +35,10 @@ const Set<String> kNgmySkillMultiplayerGameIds = {
   'pattern',
 };
 
-const List<String> kNgmyProGameIds = [
-  'checkers_deluxe',
-  'tic_tac_go',
-  'blackjack_vegas',
-  'roulette_euro',
-  'slots_jackpot',
-  'poker_texas',
-  'chess_royale',
-  'connect_four_pro',
-  'domino_block',
-  'plinko_prizes',
-  'spin_wheel',
-  'baccarat_punto',
-  'craps_table',
-  'casino_war',
-  'bingo_live',
-  'solitaire_klondike',
-  'backgammon_pro',
-  'billiards_snooker',
-  'profit_solve',
-];
+/// Retired casino/classic pro games (removed from Game Center).
+const List<String> kNgmyProGameIds = <String>[];
 
-const Map<String, String> kNgmyProGameTitles = {
-  'checkers_deluxe': 'Checkers Deluxe',
-  'tic_tac_go': 'Tic Tac Go',
-  'blackjack_vegas': 'Blackjack Vegas',
-  'roulette_euro': 'European Roulette',
-  'slots_jackpot': 'Slots Jackpot',
-  'poker_texas': 'Texas Hold\'em',
-  'chess_royale': 'Chess Royale',
-  'connect_four_pro': 'Connect Four Pro',
-  'domino_block': 'Domino Block',
-  'plinko_prizes': 'Plinko Prizes',
-  'spin_wheel': 'Spin Wheel',
-  'baccarat_punto': 'Baccarat',
-  'craps_table': 'Craps Table',
-  'casino_war': 'Casino War',
-  'bingo_live': 'Bingo Live',
-  'solitaire_klondike': 'Solitaire Klondike',
-  'backgammon_pro': 'Backgammon Pro',
-  'billiards_snooker': 'Billiards Snooker',
-  'profit_solve': 'Profit Solve',
-};
+const Map<String, String> kNgmyProGameTitles = <String, String>{};
 
 const String _kConfigRowId = '1';
 

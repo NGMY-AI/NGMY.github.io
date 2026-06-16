@@ -43,8 +43,6 @@ import 'ngmy_translate_payments.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_games.dart';
-import 'ngmy_premium_game_ui.dart';
-import 'ngmy_premium_game_ui.dart';
 import 'ngmy_game_admin_sheet.dart';
 import 'ngmy_game_center_persist.dart';
 import 'ngmy_game_result_popup.dart';
@@ -15349,25 +15347,6 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
     _GameDef(id: 'scramble', title: 'Word Scramble', subtitle: 'Place letters in order — solo or invite', emoji: '🔤', icon: Icons.abc_rounded, colors: [Color(0xFF7C3AED), Color(0xFF9333EA)]),
     _GameDef(id: 'pattern', title: 'Pattern Memory', subtitle: 'Remember the pattern — solo or multiplayer', emoji: '🎯', icon: Icons.extension_rounded, colors: [Color(0xFF4F46E5), Color(0xFF4338CA)]),
     _GameDef(id: 'sequence', title: 'Number Sequence', subtitle: 'Find patterns, win rewards', emoji: '🔢', icon: Icons.numbers_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
-    _GameDef(id: 'checkers_deluxe', title: 'Checkers Deluxe', subtitle: 'Wood board — play solo or invite a friend', emoji: '⚫', icon: Icons.grid_on_rounded, colors: [Color(0xFF8B4513), Color(0xFF5D4037)]),
-    _GameDef(id: 'tic_tac_go', title: 'Tic Tac Go', subtitle: '3 in a row — real-time multiplayer', emoji: '❌', icon: Icons.close_rounded, colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
-    _GameDef(id: 'blackjack_vegas', title: 'Blackjack Vegas', subtitle: 'Beat the dealer at the felt table', emoji: '🃏', icon: Icons.style_rounded, colors: [Color(0xFF0F172A), Color(0xFF334155)]),
-    _GameDef(id: 'roulette_euro', title: 'European Roulette', subtitle: 'Spin the wheel — pick your lucky number', emoji: '🎡', icon: Icons.trip_origin_rounded, colors: [Color(0xFF7F1D1D), Color(0xFFB91C1C)]),
-    _GameDef(id: 'slots_jackpot', title: 'Slots Jackpot', subtitle: 'Match symbols for big wins', emoji: '🎰', icon: Icons.casino_rounded, colors: [Color(0xFF7C3AED), Color(0xFFDB2777)]),
-    _GameDef(id: 'poker_texas', title: 'Texas Hold\'em', subtitle: 'Poker skill — invite opponents', emoji: '♠️', icon: Icons.account_balance_wallet_rounded, colors: [Color(0xFF15803D), Color(0xFF166534)]),
-    _GameDef(id: 'chess_royale', title: 'Chess Royale', subtitle: 'Classic chess — multiplayer', emoji: '♟️', icon: Icons.extension_rounded, colors: [Color(0xFF1E293B), Color(0xFF475569)]),
-    _GameDef(id: 'connect_four_pro', title: 'Connect Four Pro', subtitle: 'Drop discs — beat your rival', emoji: '🔴', icon: Icons.view_column_rounded, colors: [Color(0xFFDC2626), Color(0xFF991B1B)]),
-    _GameDef(id: 'domino_block', title: 'Domino Block', subtitle: 'Strategic domino tiles', emoji: '🁓', icon: Icons.view_module_rounded, colors: [Color(0xFFF5F5F4), Color(0xFF78716C)]),
-    _GameDef(id: 'plinko_prizes', title: 'Plinko Prizes', subtitle: 'Drop the chip — win prizes', emoji: '💎', icon: Icons.grain_rounded, colors: [Color(0xFF06B6D4), Color(0xFF0891B2)]),
-    _GameDef(id: 'spin_wheel', title: 'Spin Wheel', subtitle: 'Spin for cash multipliers', emoji: '🎡', icon: Icons.attractions_rounded, colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
-    _GameDef(id: 'baccarat_punto', title: 'Baccarat', subtitle: 'High-stakes punto banco', emoji: '💎', icon: Icons.diamond_rounded, colors: [Color(0xFF1E1B4B), Color(0xFF312E81)]),
-    _GameDef(id: 'craps_table', title: 'Craps Table', subtitle: 'Roll the dice — casino table', emoji: '🎲', icon: Icons.casino_outlined, colors: [Color(0xFF065F46), Color(0xFF047857)]),
-    _GameDef(id: 'casino_war', title: 'Casino War', subtitle: 'Higher card wins the pot', emoji: '⚔️', icon: Icons.compare_arrows_rounded, colors: [Color(0xFFBE123C), Color(0xFF9F1239)]),
-    _GameDef(id: 'bingo_live', title: 'Bingo Live', subtitle: 'Mark numbers — shout bingo', emoji: '🎱', icon: Icons.apps_rounded, colors: [Color(0xFFEC4899), Color(0xFFBE185D)]),
-    _GameDef(id: 'solitaire_klondike', title: 'Solitaire Klondike', subtitle: 'Clear the deck — earn rewards', emoji: '🃏', icon: Icons.filter_none_rounded, colors: [Color(0xFF22C55E), Color(0xFF16A34A)]),
-    _GameDef(id: 'backgammon_pro', title: 'Backgammon Pro', subtitle: 'Race your pieces home', emoji: '🎲', icon: Icons.dashboard_rounded, colors: [Color(0xFFB45309), Color(0xFF92400E)]),
-    _GameDef(id: 'billiards_snooker', title: 'Billiards Snooker', subtitle: 'Pro snooker table physics', emoji: '🎱', icon: Icons.sports_rounded, colors: [Color(0xFF14532D), Color(0xFF052E16)]),
-    _GameDef(id: 'profit_solve', title: 'Profit Solve', subtitle: 'Business profit — type the answer', emoji: '💰', icon: Icons.attach_money_rounded, colors: [Color(0xFF10B981), Color(0xFF047857)]),
   ];
 
   void _sendInvite(_GameDef g, String toAccountId, int matchesTotal) async {
@@ -15533,22 +15512,6 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
   }
 
   Widget _gameTile(_GameDef g) {
-    if (kNgmyPremiumCasinoGameIds.contains(g.id)) {
-      final mp = kNgmyMultiplayerGameIds.contains(g.id);
-      return ngmyPremiumGameCenterTile(
-        gameId: g.id,
-        title: g.title,
-        subtitle: g.subtitle,
-        onTap: () => _openGame(g),
-        onInvite: mp
-            ? () => showMultiplayerInviteDialog(
-                  context: context,
-                  gameTitle: g.title,
-                  onSend: (id, total) => _sendInvite(g, id, total),
-                )
-            : null,
-      );
-    }
     final mp = kNgmyMultiplayerGameIds.contains(g.id);
     return InkWell(
       onTap: () => _openGame(g),
@@ -15636,29 +15599,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
                   ),
                   const SizedBox(height: 10),
                   _inviteBanner(),
-                  ..._games.where((g) => !kNgmyPremiumCasinoGameIds.contains(g.id)).map(_gameTile),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [const Color(0xFF1E1B4B).withValues(alpha: 0.9), const Color(0xFF312E81).withValues(alpha: 0.85)],
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFFBBF24).withValues(alpha: 0.35)),
-                    ),
-                    child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('✨  Casino & Classics', style: TextStyle(color: Color(0xFFFDE047), fontWeight: FontWeight.w900, fontSize: 15)),
-                        SizedBox(height: 2),
-                        Text('Premium tables — realistic casino & strategy games', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  ..._games.where((g) => kNgmyPremiumCasinoGameIds.contains(g.id)).map(_gameTile),
+                  ..._games.map(_gameTile),
                 ],
               ),
             ),
