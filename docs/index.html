@@ -322,7 +322,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260616203902";
+      var CURRENT = "20260616205910";
 
       function showError(msg) {
 
@@ -379,7 +379,7 @@
 
   <script>
     (function () {
-      var deployId = '20260616203902';
+      var deployId = '20260616205910';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
@@ -507,6 +507,30 @@
         }, Promise.resolve(true));
       }
 
+      function waitForServiceWorkerControl(maxMs) {
+        if (!('serviceWorker' in navigator)) return Promise.resolve(false);
+        if (navigator.serviceWorker.controller) return Promise.resolve(true);
+        return new Promise(function (resolve) {
+          var done = false;
+          var finish = function (ok) {
+            if (done) return;
+            done = true;
+            resolve(!!ok);
+          };
+          var timer = setTimeout(function () { finish(navigator.serviceWorker.controller); }, maxMs || 12000);
+          navigator.serviceWorker.addEventListener('controllerchange', function () {
+            clearTimeout(timer);
+            finish(navigator.serviceWorker.controller);
+          }, { once: true });
+          if (navigator.serviceWorker.ready) {
+            navigator.serviceWorker.ready.then(function () {
+              clearTimeout(timer);
+              finish(navigator.serviceWorker.controller);
+            }).catch(function () { finish(false); });
+          }
+        });
+      }
+
       function registerServiceWorkerAndWait() {
         if (!('serviceWorker' in navigator)) return Promise.resolve(null);
         return navigator.serviceWorker
@@ -600,31 +624,33 @@
       function startApp() {
         var bootTimer = setTimeout(function () {
           showBootstrapError('NGMY is taking too long to start. Open once with Wi-Fi, wait for the home screen, then try offline again.');
-        }, 28000);
+        }, 32000);
         window.addEventListener('flutter-first-frame', function () { clearTimeout(bootTimer); }, { once: true });
 
-        registerServiceWorkerAndWait().then(function () {
-          var hasController = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
-          if (hasController || navigator.onLine) {
+        registerServiceWorkerAndWait()
+          .then(function () { return waitForServiceWorkerControl(12000); })
+          .then(function (controlled) {
+            window.__ngmyHideSplash && window.__ngmyHideSplash();
+            // When SW controls the page it serves cached shell offline â€” avoid blob bootstrap on iOS.
+            if (controlled) {
+              bootFromNetwork();
+              return;
+            }
+            if (navigator.onLine) {
+              bootFromNetwork();
+              return;
+            }
+            return openOfflineCache().then(function (cache) {
+              return offlineShellReady(cache).then(function (ready) {
+                if (ready) return runBootstrapFromCache(cache);
+                showBootstrapError('Open NGMY once with Wi-Fi on, wait for the home screen, then you can use it offline.');
+              });
+            });
+          })
+          .catch(function () {
             window.__ngmyHideSplash && window.__ngmyHideSplash();
             bootFromNetwork();
-            return;
-          }
-          return openOfflineCache().then(function (cache) {
-            return offlineShellReady(cache).then(function (ready) {
-              window.__ngmyHideSplash && window.__ngmyHideSplash();
-              if (ready) return runBootstrapFromCache(cache);
-              if (!navigator.onLine) {
-                showBootstrapError('Open NGMY once with Wi-Fi on, wait for the home screen, then you can use it offline.');
-                return;
-              }
-              bootFromNetwork();
-            });
           });
-        }).catch(function () {
-          window.__ngmyHideSplash && window.__ngmyHideSplash();
-          bootFromNetwork();
-        });
       }
 
       if (document.readyState === 'loading') {

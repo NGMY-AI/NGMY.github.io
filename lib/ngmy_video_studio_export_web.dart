@@ -218,20 +218,85 @@ int? _sampleCanvasPixel(html.CanvasRenderingContext2D ctx, int x, int y) {
   }
 }
 
+html.VideoElement? _exportAudioElement;
+html.VideoElement? _ngmyWebAudioSourceVideo;
+
 void _applyExportVideoStaging(html.VideoElement v) {
-  // Keep native video dimensions — forcing width/height distorts export frames.
+  final vw = v.videoWidth > 0 ? v.videoWidth : 720;
+  final vh = v.videoHeight > 0 ? v.videoHeight : 1280;
   v
     ..style.position = 'fixed'
-    ..style.left = '0'
+    ..style.left = '-9999px'
     ..style.top = '0'
-    ..style.width = '2px'
-    ..style.height = '2px'
+    ..style.width = '${vw}px'
+    ..style.height = '${vh}px'
     ..style.objectFit = 'contain'
     ..style.opacity = '0.01'
     ..style.pointerEvents = 'none'
     ..style.zIndex = '1'
     ..style.transform = 'translateZ(0)';
   v.style.setProperty('will-change', 'transform');
+}
+
+void _cleanupExportElements() {
+  try {
+    _exportAudioElement?.pause();
+    _exportAudioElement?.remove();
+  } catch (_) {}
+  _exportAudioElement = null;
+  _ngmyWebAudioSourceVideo = null;
+}
+
+Future<html.VideoElement?> _ensureExportAudioElement(html.VideoElement source) async {
+  if (_exportAudioElement != null) return _exportAudioElement;
+  final src = source.currentSrc.isNotEmpty ? source.currentSrc : source.src;
+  if (src.trim().isEmpty) return null;
+  final el = html.VideoElement();
+  el.src = src;
+  el.preload = 'auto';
+  el.muted = false;
+  el.defaultMuted = false;
+  el.volume = 1.0;
+  el.autoplay = false;
+  el.setAttribute('playsinline', 'true');
+  el.setAttribute('webkit-playsinline', 'true');
+  el.removeAttribute('muted');
+  if (src.startsWith('http') && !src.startsWith('blob:')) {
+    el.crossOrigin = 'anonymous';
+  }
+  el
+    ..style.position = 'fixed'
+    ..style.left = '-9999px'
+    ..style.top = '0'
+    ..style.width = '2px'
+    ..style.height = '2px'
+    ..style.opacity = '0.01'
+    ..style.pointerEvents = 'none';
+  html.document.body?.append(el);
+  for (var i = 0; i < 80; i++) {
+    if (el.readyState >= html.MediaElement.HAVE_METADATA) break;
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  }
+  _exportAudioElement = el;
+  return el;
+}
+
+Future<void> _syncExportAudioPlayback(html.VideoElement? primary, {required bool playing}) async {
+  final audio = _exportAudioElement;
+  if (audio == null || primary == null) return;
+  try {
+    final t = primary.currentTime;
+    if ((audio.currentTime - t).abs() > 0.2) {
+      audio.currentTime = t;
+    }
+    if (playing) {
+      if (audio.paused) await _playVideoForRecord(audio);
+    } else {
+      audio.pause();
+    }
+  } catch (e) {
+    debugPrint('[studio export] audio sync: $e');
+  }
 }
 
 /// Match studio preview (`object-fit: cover` / BoxFit.cover) — no stretch.
@@ -683,7 +748,8 @@ Future<List<html.Blob>> _recordCanvasExport({
   await Future<void>.delayed(const Duration(milliseconds: 200));
 
   final primary = primaryVideo ?? _pickPrimaryVideo(videoList);
-  final audioVideo = withAudio ? primary : null;
+  final useDedicatedAudio = withAudio && _exportAudioElement != null;
+  final audioVideo = withAudio && !useDedicatedAudio ? primary : null;
 
   for (final v in videoList) {
     v.pause();
@@ -698,6 +764,14 @@ Future<List<html.Blob>> _recordCanvasExport({
     } else {
       v.muted = true;
     }
+  }
+  if (useDedicatedAudio && _exportAudioElement != null) {
+    _exportAudioElement!
+      ..pause()
+      ..currentTime = 0
+      ..playbackRate = 1.0
+      ..muted = false
+      ..volume = 1.0;
   }
   paintFrame();
 
@@ -725,6 +799,9 @@ Future<List<html.Blob>> _recordCanvasExport({
       v.currentTime = 0;
       await _playVideoForRecord(v);
     }
+    if (useDedicatedAudio) {
+      await _syncExportAudioPlayback(primary, playing: true);
+    }
     await _awaitVideoFramePulse(videoList);
     paintFrame();
 
@@ -749,6 +826,9 @@ Future<List<html.Blob>> _recordCanvasExport({
         try {
           js_util.callMethod(recorder, 'requestData', const []);
         } catch (_) {}
+      }
+      if (useDedicatedAudio && tick % 12 == 0) {
+        await _syncExportAudioPlayback(primary, playing: true);
       }
 
       final t = primary != null ? primary.currentTime.toDouble() : 0.0;
@@ -832,6 +912,9 @@ Future<List<html.Blob>> _recordCanvasExport({
     v.pause();
     v.playbackRate = 1.0;
   }
+  if (_exportAudioElement != null) {
+    _exportAudioElement!.pause();
+  }
 
   paintFrame();
   await Future<void>.delayed(Duration(milliseconds: appleMobile ? 500 : 280));
@@ -861,12 +944,13 @@ Future<void> _recordWallClockFrames({
   final fullMs = totalDurationMs ?? durationMs;
   final startSec = (wallOffsetMs / 1000.0).clamp(0.0, fullSec);
   final primary = audioVideo ?? _pickPrimaryVideo(videoList);
+  final useDedicatedAudio = withAudio && _exportAudioElement != null;
 
   for (final v in videoList) {
     v.pause();
     v.playbackRate = 1.0;
     v.currentTime = startSec;
-    if (withAudio && v == audioVideo) {
+    if (withAudio && !useDedicatedAudio && v == audioVideo) {
       v
         ..muted = false
         ..volume = 1.0
@@ -876,6 +960,12 @@ Future<void> _recordWallClockFrames({
       v.muted = true;
     }
       await _playVideoForRecord(v);
+  }
+  if (useDedicatedAudio) {
+    if (_exportAudioElement != null) {
+      _exportAudioElement!.currentTime = startSec;
+    }
+    await _syncExportAudioPlayback(primary, playing: true);
   }
   await _awaitVideoFramePulse(videoList);
   paintFrame();
@@ -889,6 +979,9 @@ Future<void> _recordWallClockFrames({
       DateTime.now().isBefore(attemptEnd)) {
     if (_exportWasCancelled) break;
     await _awaitVideoFramePulse(videoList);
+    if (useDedicatedAudio) {
+      await _syncExportAudioPlayback(primary, playing: true);
+    }
     paintFrame();
 
     final elapsedMs = DateTime.now().difference(wallStart).inMilliseconds;
@@ -916,8 +1009,6 @@ bool _webSupportsComposedCapture() {
 }
 
 (int, int) _exportDimensions(NgmyVideoStudioExportConfig config) => (config.outputWidth, config.outputHeight);
-
-html.VideoElement? _ngmyWebAudioSourceVideo;
 
 void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video) {
   if (composed.getAudioTracks().isNotEmpty) return;
@@ -957,18 +1048,14 @@ void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video)
   }
 }
 
+Future<void> _attachExportAudio(html.MediaStream recordStream, html.VideoElement primary) async {
+  final audioEl = await _ensureExportAudioElement(primary);
+  _appendVideoAudioTracks(recordStream, audioEl ?? primary);
+}
+
 html.VideoElement? _pickPrimaryVideo(List<html.VideoElement> videoList) {
   if (videoList.isEmpty) return null;
   return videoList.first;
-}
-
-void _attachExportAudio(html.MediaStream recordStream, html.VideoElement primary) {
-  primary
-    ..muted = false
-    ..volume = 1.0
-    ..defaultMuted = false;
-  primary.removeAttribute('muted');
-  _appendVideoAudioTracks(recordStream, primary);
 }
 
 html.MediaStream? _safeCaptureStream(dynamic element, {int fps = _exportCanvasFps}) {
@@ -1063,7 +1150,7 @@ Future<String> exportNgmyVideoStudioComposed({
   void Function(double progress, String status)? onProgress,
 }) async {
   _resetExportCancel();
-  _ngmyWebAudioSourceVideo = null;
+  _cleanupExportElements();
   final sources = config.videoSourcesBySlot;
   if (sources.isEmpty || sources.values.every((s) => s.trim().isEmpty)) {
     return 'Upload at least one video into a screen frame before downloading.';
@@ -1290,21 +1377,23 @@ Future<String> exportNgmyVideoStudioComposed({
     final primaryMime = mimeCandidates.first;
     final fallbackMime = mimeCandidates.length > 1 ? mimeCandidates[1] : primaryMime;
 
-    Future<List<html.Blob>> tryRecord(String mime, {required bool withAudio, required bool realtime}) async {
-      if (_exportWasCancelled) return const [];
+    Future<({List<html.Blob> chunks, bool hadAudio})> tryRecord(
+      String mime, {
+      required bool withAudio,
+      required bool realtime,
+    }) async {
+      if (_exportWasCancelled) return (chunks: const <html.Blob>[], hadAudio: false);
       final recordStream = _videoOnlyStream(canvasStream);
+      var hadAudio = false;
       if (withAudio) {
         final audioSrc = primaryVideo ?? _pickPrimaryVideo(videoList);
         if (audioSrc != null) {
-          _attachExportAudio(recordStream, audioSrc);
+          await _attachExportAudio(recordStream, audioSrc);
+          hadAudio = recordStream.getAudioTracks().isNotEmpty;
         }
       }
-      if (recordStream.getVideoTracks().isEmpty) return const [];
-      if (withAudio && recordStream.getAudioTracks().isEmpty) {
-        debugPrint('[studio export] no audio tracks attached — skipping silent attempt');
-        return const [];
-      }
-      return _recordCanvasExport(
+      if (recordStream.getVideoTracks().isEmpty) return (chunks: const <html.Blob>[], hadAudio: false);
+      final chunks = await _recordCanvasExport(
         stream: recordStream,
         mimeType: mime,
         paintFrame: paintFrame,
@@ -1314,8 +1403,9 @@ Future<String> exportNgmyVideoStudioComposed({
         durationSec: durationSec,
         onProgress: (p, s) => onProgress?.call(p, s),
         realtimePlayback: realtime,
-        withAudio: withAudio && recordStream.getAudioTracks().isNotEmpty,
+        withAudio: hadAudio,
       );
+      return (chunks: chunks, hadAudio: hadAudio);
     }
 
     final appleMobile = _ngmyIsAppleMobileBrowser();
@@ -1336,6 +1426,9 @@ Future<String> exportNgmyVideoStudioComposed({
             (mime: fallbackMime, audio: false, realtime: false),
           ];
 
+    List<html.Blob>? silentFallbackChunks;
+    String? silentFallbackMime;
+
     for (var i = 0; i < plans.length; i++) {
       if (_exportWasCancelled) break;
       final plan = plans[i];
@@ -1343,13 +1436,25 @@ Future<String> exportNgmyVideoStudioComposed({
         0.05 + (i * 0.01),
         'Recording template… (attempt ${i + 1}/${plans.length})',
       );
-      chunks = await tryRecord(plan.mime, withAudio: plan.audio, realtime: plan.realtime);
+      final result = await tryRecord(plan.mime, withAudio: plan.audio, realtime: plan.realtime);
       if (_exportWasCancelled) break;
-      if (chunks.isNotEmpty) {
+      if (result.chunks.isEmpty) {
+        debugPrint('[studio export] retry mime=${plan.mime} audio=${plan.audio} realtime=${plan.realtime}');
+        continue;
+      }
+      if (result.hadAudio) {
+        chunks = result.chunks;
         mimeType = plan.mime;
         break;
       }
-      debugPrint('[studio export] retry mime=${plan.mime} audio=${plan.audio} realtime=${plan.realtime}');
+      silentFallbackChunks ??= result.chunks;
+      silentFallbackMime ??= plan.mime;
+      debugPrint('[studio export] video ok, no audio yet — mime=${plan.mime}');
+    }
+
+    if (chunks.isEmpty && silentFallbackChunks != null) {
+      chunks = silentFallbackChunks;
+      mimeType = silentFallbackMime;
     }
 
     if (_exportWasCancelled) {
@@ -1421,6 +1526,7 @@ Future<String> exportNgmyVideoStudioComposed({
     }
     return _fallbackComposedExport(config, sources, reason: 'export crashed');
   } finally {
+    _cleanupExportElements();
     try {
       exportCanvas?.remove();
     } catch (_) {}

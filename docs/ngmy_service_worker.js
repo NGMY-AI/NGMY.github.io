@@ -7,7 +7,7 @@ function ngmySwBasePath() {
   return p.replace(/[^/]*$/, '') || '/';
 }
 const SCOPE_PATH = ngmySwBasePath();
-const CACHE_NAME = CACHE_PREFIX + '20260616203902';
+const CACHE_NAME = CACHE_PREFIX + '20260616205910';
 
 const PRECACHE_URLS = ['./','./.last_build_id','./.nojekyll','./404.html','./assets/AssetManifest.bin','./assets/AssetManifest.bin.json','./assets/assets/sounds/income_cash.mp3','./assets/assets/sounds/README.md','./assets/assets/sounds/YTMP3GG_YouTube_Kaching-sound-effect-sound-sounds-sounde_Media_a7Vue-A0BOY_007_128k.mp3','./assets/assets/video_studio/yt_news_desk.png','./assets/assets/video_studio/yt_studio_curved.png','./assets/FontManifest.json','./assets/fonts/MaterialIcons-Regular.otf','./assets/NOTICES','./assets/packages/cupertino_icons/assets/CupertinoIcons.ttf','./assets/packages/flutter_map/lib/assets/flutter_map_logo.png','./assets/shaders/ink_sparkle.frag','./assets/shaders/stretch_effect.frag','./canvaskit/canvaskit.js','./canvaskit/canvaskit.js.symbols','./canvaskit/canvaskit.wasm','./canvaskit/chromium/canvaskit.js','./canvaskit/chromium/canvaskit.js.symbols','./canvaskit/chromium/canvaskit.wasm','./canvaskit/experimental_webparagraph/canvaskit.js','./canvaskit/experimental_webparagraph/canvaskit.js.symbols','./canvaskit/experimental_webparagraph/canvaskit.wasm','./canvaskit/skwasm.js','./canvaskit/skwasm.js.symbols','./canvaskit/skwasm.wasm','./canvaskit/skwasm_heavy.js','./canvaskit/skwasm_heavy.js.symbols','./canvaskit/skwasm_heavy.wasm','./canvaskit/wimp.js','./canvaskit/wimp.js.symbols','./canvaskit/wimp.wasm','./CNAME','./favicon.png','./flutter.js','./flutter_bootstrap.js','./icons/Icon-192.png','./icons/Icon-512.png','./icons/Icon-maskable-192.png','./icons/Icon-maskable-512.png','./index.html','./main.dart.js','./manifest.json','./version.json'];
 
@@ -168,21 +168,7 @@ self.addEventListener('fetch', (event) => {
       const shellAsset =
         isAppShellAsset(url) || isCriticalScript(url) || isCriticalFont(url);
 
-      if (!self.navigator.onLine && shellAsset) {
-        if (cached) return cached;
-        const offlineFallback = await cacheLookupByPathname(url);
-        if (offlineFallback) return offlineFallback;
-        if (isCriticalScript(url) || url.pathname.indexOf('canvaskit') !== -1) {
-          const alt = await cache.match('./canvaskit/canvaskit.wasm')
-            || await cache.match('canvaskit/canvaskit.wasm');
-          if (alt && url.pathname.endsWith('.wasm')) return alt;
-        }
-        return new Response('Offline â€” asset not cached: ' + url.pathname, {
-          status: 503,
-          statusText: 'Offline cache miss',
-        });
-      }
-
+      // Cache-first for shell assets â€” required for iOS offline (onLine is unreliable).
       if (shellAsset && cached) {
         if (self.navigator.onLine) {
           event.waitUntil(
@@ -194,6 +180,22 @@ self.addEventListener('fetch', (event) => {
           );
         }
         return cached;
+      }
+
+      if (!self.navigator.onLine && shellAsset) {
+        const offlineFallback = await cacheLookupByPathname(url);
+        if (offlineFallback) return offlineFallback;
+        if (url.pathname.indexOf('canvaskit') !== -1) {
+          const alt = await cache.match('./canvaskit/canvaskit.wasm')
+            || await cache.match('canvaskit/canvaskit.wasm')
+            || await cache.match('./canvaskit/canvaskit.js')
+            || await cache.match('canvaskit/canvaskit.js');
+          if (alt) return alt;
+        }
+        return new Response('Offline â€” asset not cached: ' + url.pathname, {
+          status: 503,
+          statusText: 'Offline cache miss',
+        });
       }
 
       if (event.request.mode === 'navigate') {

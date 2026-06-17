@@ -168,21 +168,7 @@ self.addEventListener('fetch', (event) => {
       const shellAsset =
         isAppShellAsset(url) || isCriticalScript(url) || isCriticalFont(url);
 
-      if (!self.navigator.onLine && shellAsset) {
-        if (cached) return cached;
-        const offlineFallback = await cacheLookupByPathname(url);
-        if (offlineFallback) return offlineFallback;
-        if (isCriticalScript(url) || url.pathname.indexOf('canvaskit') !== -1) {
-          const alt = await cache.match('./canvaskit/canvaskit.wasm')
-            || await cache.match('canvaskit/canvaskit.wasm');
-          if (alt && url.pathname.endsWith('.wasm')) return alt;
-        }
-        return new Response('Offline — asset not cached: ' + url.pathname, {
-          status: 503,
-          statusText: 'Offline cache miss',
-        });
-      }
-
+      // Cache-first for shell assets — required for iOS offline (onLine is unreliable).
       if (shellAsset && cached) {
         if (self.navigator.onLine) {
           event.waitUntil(
@@ -194,6 +180,22 @@ self.addEventListener('fetch', (event) => {
           );
         }
         return cached;
+      }
+
+      if (!self.navigator.onLine && shellAsset) {
+        const offlineFallback = await cacheLookupByPathname(url);
+        if (offlineFallback) return offlineFallback;
+        if (url.pathname.indexOf('canvaskit') !== -1) {
+          const alt = await cache.match('./canvaskit/canvaskit.wasm')
+            || await cache.match('canvaskit/canvaskit.wasm')
+            || await cache.match('./canvaskit/canvaskit.js')
+            || await cache.match('canvaskit/canvaskit.js');
+          if (alt) return alt;
+        }
+        return new Response('Offline — asset not cached: ' + url.pathname, {
+          status: 503,
+          statusText: 'Offline cache miss',
+        });
       }
 
       if (event.request.mode === 'navigate') {
