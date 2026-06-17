@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:typed_data';
 
@@ -9,37 +10,30 @@ bool _ngmyIsAppleMobileBrowser() {
       (ua.contains('macintosh') && ua.contains('mobile'));
 }
 
-/// iOS Share sheet → user picks Calendar (leaves the PWA webview).
-Future<bool> _shareIcsFile(Uint8List bytes, String filename, String title) async {
-  final nav = html.window.navigator;
+/// Triggers iOS/WebKit "site wants to show a calendar invite" — NOT the share sheet.
+bool _openCalendarInviteAnchor(String icsText) {
   try {
-    final name = filename.endsWith('.ics') ? filename : '$filename.ics';
-    final blob = html.Blob([bytes], 'text/calendar');
-    final file = html.File([blob], name, {'type': 'text/calendar'});
-    final shareData = <Object, Object?>{
-      'title': title,
-      'text': 'Add this event to your Calendar',
-      'files': [file],
-    };
-    await nav.share(shareData);
-    return true;
-  } catch (e) {
-    return false;
-  }
+    final dataUri = 'data:text/calendar;charset=utf-8,${Uri.encodeComponent(icsText)}';
+    if (dataUri.length < 1_500_000) {
+      final anchor = html.AnchorElement()
+        ..href = dataUri
+        ..type = 'text/calendar';
+      html.document.body?.append(anchor);
+      anchor.click();
+      anchor.remove();
+      return true;
+    }
+  } catch (_) {}
+  return false;
 }
 
-/// Same-tab anchor click — avoids the in-PWA white browser tab from window.open.
-Future<bool> _anchorOpenIcs(Uint8List bytes, String filename, {required bool appleMobile}) async {
+bool _openCalendarInviteBlob(Uint8List bytes) {
   try {
-    final name = filename.endsWith('.ics') ? filename : '$filename.ics';
-    final blob = html.Blob([bytes], 'text/calendar');
+    final blob = html.Blob([bytes], 'text/calendar;charset=utf-8');
     final url = html.Url.createObjectUrlFromBlob(blob);
     final anchor = html.AnchorElement()
       ..href = url
       ..type = 'text/calendar';
-    if (!appleMobile) {
-      anchor.download = name;
-    }
     html.document.body?.append(anchor);
     anchor.click();
     anchor.remove();
@@ -54,35 +48,29 @@ Future<bool> _anchorOpenIcs(Uint8List bytes, String filename, {required bool app
   }
 }
 
-/// Opens the user's real phone Calendar app (Apple Calendar on iPhone).
-/// Must be called directly from a user tap.
+/// Opens the native calendar-invite prompt (Allow / Ignore on iPhone). No share sheet.
 Future<String> ngmyDownloadIcsFile(
   Uint8List bytes,
   String filename, {
   String? eventTitle,
 }) async {
-  final safeName = filename.replaceAll(RegExp(r'[^\w\-.]+'), '_');
-  final name = safeName.endsWith('.ics') ? safeName : '$safeName.ics';
-  final title = (eventTitle ?? 'NGMY Event').trim();
+  final icsText = utf8.decode(bytes);
   final appleMobile = _ngmyIsAppleMobileBrowser();
 
-  if (appleMobile) {
-    final shared = await _shareIcsFile(bytes, name, title);
-    if (shared) {
-      return 'On the share screen, scroll and tap Calendar, then tap Add.';
-    }
-    final anchored = await _anchorOpenIcs(bytes, name, appleMobile: true);
-    if (anchored) {
-      return 'If Calendar opens, tap Add to save the event.';
-    }
-    return 'Could not open Calendar. Update iOS and try again, or add from Safari (not Home Screen icon).';
+  if (_openCalendarInviteAnchor(icsText)) {
+    return appleMobile
+        ? 'Allow the ngmy.org calendar invite on the next prompt.'
+        : 'Open the calendar invite to add the event.';
   }
 
-  final anchored = await _anchorOpenIcs(bytes, name, appleMobile: false);
-  if (anchored) {
-    return 'Calendar file ready — open it to add the event.';
+  if (_openCalendarInviteBlob(bytes)) {
+    return appleMobile
+        ? 'Allow the ngmy.org calendar invite on the next prompt.'
+        : 'Calendar invite ready — confirm to add the event.';
   }
 
+  final safeName = filename.replaceAll(RegExp(r'[^\w\-.]+'), '_');
+  final name = safeName.endsWith('.ics') ? safeName : '$safeName.ics';
   try {
     final blob = html.Blob([bytes], 'text/calendar');
     final url = html.Url.createObjectUrlFromBlob(blob);
@@ -96,7 +84,6 @@ Future<String> ngmyDownloadIcsFile(
   return 'Could not open Calendar. Tap Add to Calendar again.';
 }
 
-/// Fallback: open Google Calendar add-event page in the same tab (external https, not blob).
 Future<String> ngmyOpenGoogleCalendarUrl(String url) async {
   try {
     html.window.location.assign(url);

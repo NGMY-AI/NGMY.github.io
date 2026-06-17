@@ -39197,7 +39197,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       );
       return;
     }
-    final result = await ngmyRunPhoneAction(action, context: context, skipConfirmation: true);
+    final result = await ngmyRunPhoneAction(action, context: context);
     if (!mounted || result == null) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(result), backgroundColor: const Color(0xFF16A34A)),

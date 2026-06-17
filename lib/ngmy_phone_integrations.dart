@@ -7,6 +7,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_calendar_download_stub.dart' if (dart.library.html) 'ngmy_calendar_download_web.dart';
 import 'ngmy_calendar_native_stub.dart' if (dart.library.io) 'ngmy_calendar_native_io.dart';
+import 'ngmy_phone_action_ui.dart';
+
+export 'ngmy_phone_action_ui.dart';
 
 /// Apps NGMY Helper AI can open on the user's phone right now.
 const List<({String id, String label, String example})> kNgmyPhoneConnectedApps = [
@@ -270,18 +273,8 @@ Future<String?> ngmyRunPhoneAction(
   bool skipConfirmation = false,
 }) async {
   if (_needsConfirmation(action) && context != null && context.mounted && !skipConfirmation) {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(action.label),
-        content: Text(action.summary),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(action.label)),
-        ],
-      ),
-    );
-    if (ok != true) return 'Cancelled.';
+    final ok = await ngmyShowPhoneActionSheet(context: context, action: action);
+    if (!ok) return 'Cancelled.';
   }
 
   switch (action.type) {
@@ -344,70 +337,6 @@ Future<String?> _runCalendar(NgmyPhoneAction action) async {
   final url = _googleCalendarUrl(title: title, start: start, end: end, notes: notes, location: location);
   final ok = await _launchExternal(Uri.parse(url));
   return ok ? 'Opened Calendar to add "$title".' : 'Could not open Calendar. Tap Add to Calendar below.';
-}
-
-/// Big tap target — iOS requires a user tap to open the real Calendar app from the web.
-Future<void> ngmyPresentPhoneCalendarSheet({
-  required BuildContext context,
-  required NgmyPhoneAction action,
-  required Future<void> Function(String? result) onDone,
-}) async {
-  if (!context.mounted) return;
-  await showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (ctx) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Icon(Icons.calendar_month_rounded, size: 44, color: Color(0xFF00B25A)),
-              const SizedBox(height: 12),
-              const Text(
-                'Add to your phone Calendar',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                action.summary,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.35),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                kIsWeb
-                    ? 'On iPhone: tap the button below, then on the share screen choose Calendar → Add. Do not use a new browser tab inside NGMY.'
-                    : 'Tap below to save this on your phone Calendar app.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.35),
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: () async {
-                  final result = await ngmyRunPhoneAction(action, skipConfirmation: true);
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  await onDone(result);
-                },
-                icon: const Icon(Icons.event_available_rounded),
-                label: const Text('Add to iPhone Calendar'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF00B25A),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Not now')),
-            ],
-          ),
-        ),
-      );
-    },
-  );
 }
 
 Future<String?> _runMaps(NgmyPhoneAction action) async {
@@ -484,7 +413,7 @@ Widget ngmyPhoneActionChips({
             avatar: Icon(action.icon, size: 16, color: const Color(0xFF00B25A)),
             label: Text(action.summary, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
             backgroundColor: isDark ? const Color(0xFF1C2433) : const Color(0xFFE8F8EF),
-            side: BorderSide(color: const Color(0xFF00B25A).withOpacity(0.45)),
+            side: BorderSide(color: const Color(0xFF00B25A).withValues(alpha: 0.45)),
             onPressed: () => onTap(action),
           ),
       ],
