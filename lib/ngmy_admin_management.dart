@@ -894,6 +894,9 @@ Future<void> _persistCommunicateSettingsLocal(AppConfig config) async {
   }
 }
 
+Future<void> ngmyPersistCommunicateSettingsLocalBackup(AppConfig config) =>
+    _persistCommunicateSettingsLocal(config);
+
 Future<void> ngmyHydrateCommunicateSettingsFromAllBackups(AppConfig config) async {
   await NgmyCommunicateAvatarCache.hydrateRamFromDisk();
   try {

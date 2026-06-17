@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -292,6 +293,9 @@ class NgmyAdvisorSyncThread {
     required this.messages,
     this.partner,
     this.translatorLangs,
+    this.avatarUrl,
+    this.avatarB64,
+    this.profileSnapshot,
   });
 
   final String profileId;
@@ -300,6 +304,9 @@ class NgmyAdvisorSyncThread {
   final List<Map<String, dynamic>> messages;
   final Map<String, dynamic>? partner;
   final Map<String, String>? translatorLangs;
+  final String? avatarUrl;
+  final String? avatarB64;
+  final Map<String, dynamic>? profileSnapshot;
 
   Map<String, dynamic> toMap() => {
         'profileId': profileId,
@@ -308,6 +315,9 @@ class NgmyAdvisorSyncThread {
         'messages': messages,
         if (partner != null) 'partner': partner,
         if (translatorLangs != null) 'translatorLangs': translatorLangs,
+        if ((avatarUrl ?? '').trim().isNotEmpty) 'avatarUrl': avatarUrl,
+        if ((avatarB64 ?? '').trim().isNotEmpty) 'avatarB64': avatarB64,
+        if (profileSnapshot != null && profileSnapshot!.isNotEmpty) 'profileSnapshot': profileSnapshot,
       };
 
   factory NgmyAdvisorSyncThread.fromMap(Map<String, dynamic> map) {
@@ -328,6 +338,15 @@ class NgmyAdvisorSyncThread {
       messages: msgs,
       partner: partner,
       translatorLangs: langs,
+      avatarUrl: (map['avatarUrl'] ?? map['avatar_url'] ?? '').toString().trim().isEmpty
+          ? null
+          : (map['avatarUrl'] ?? map['avatar_url']).toString(),
+      avatarB64: (map['avatarB64'] ?? map['avatar_b64'] ?? '').toString().trim().isEmpty
+          ? null
+          : (map['avatarB64'] ?? map['avatar_b64']).toString(),
+      profileSnapshot: map['profileSnapshot'] is Map
+          ? Map<String, dynamic>.from(map['profileSnapshot'] as Map)
+          : null,
     );
   }
 }
@@ -403,6 +422,133 @@ class NgmyAdvisorSyncBundle {
 
 class NgmyCommunicateSyncService {
   static String _emailKey(String email) => email.toLowerCase().trim();
+
+  static String _profileAvatarUrlFromConfig(dynamic config, String id) {
+    final raw = (config as dynamic).communicateProfiles;
+    if (raw is List) {
+      for (final e in raw) {
+        if (e is Map && (e['id'] ?? '').toString() == id) {
+          return (e['avatarUrl'] ?? e['avatar_url'] ?? '').toString();
+        }
+      }
+    }
+    return '';
+  }
+
+  static Future<({String? avatarUrl, String? avatarB64})> _avatarPayloadForExport(
+    dynamic config,
+    String profileId,
+    List<Map<String, dynamic>> messages,
+  ) async {
+    final id = profileId.trim();
+    if (id.isEmpty) return (avatarUrl: null, avatarB64: null);
+    var avatarUrl = _profileAvatarUrlFromConfig(config, id).trim();
+    var bytes = NgmyCommunicateAvatarCache.bytesInRam(id) ?? await NgmyCommunicateAvatarCache.loadBytes(id);
+    if ((bytes == null || bytes.isEmpty) && avatarUrl.startsWith('data:image')) {
+      try {
+        bytes = base64Decode(avatarUrl.split(',').last);
+        if (bytes.isNotEmpty) await NgmyCommunicateAvatarCache.saveBytes(id, bytes);
+      } catch (_) {}
+    }
+    if ((bytes == null || bytes.isEmpty) && avatarUrl.startsWith('http')) {
+      await NgmyCommunicateAvatarCache.ensureCached(id, avatarUrl);
+      bytes = NgmyCommunicateAvatarCache.bytesInRam(id) ?? await NgmyCommunicateAvatarCache.loadBytes(id);
+    }
+    if (bytes == null || bytes.isEmpty) {
+      final fromChat = _latestAdvisorImageB64FromMessages(messages);
+      if (fromChat != null && fromChat.isNotEmpty) {
+        try {
+          bytes = base64Decode(fromChat);
+          if (bytes.isNotEmpty) {
+            avatarUrl = 'data:image/jpeg;base64,$fromChat';
+            await NgmyCommunicateAvatarCache.saveBytes(id, bytes);
+          }
+        } catch (_) {}
+      }
+    }
+    if (bytes != null && bytes.isNotEmpty) {
+      return (avatarUrl: avatarUrl.isEmpty ? 'data:image/jpeg;base64,${base64Encode(bytes)}' : avatarUrl, avatarB64: base64Encode(bytes));
+    }
+    if (avatarUrl.isNotEmpty) return (avatarUrl: avatarUrl, avatarB64: null);
+    return (avatarUrl: null, avatarB64: null);
+  }
+
+  static String? _latestAdvisorImageB64FromMessages(List<Map<String, dynamic>> messages) {
+    for (var i = messages.length - 1; i >= 0; i--) {
+      final m = messages[i];
+      if ((m['role'] ?? '').toString() != 'ai') continue;
+      final img = (m['imageB64'] ?? '').toString().trim();
+      if (img.isNotEmpty) return img;
+    }
+    return null;
+  }
+
+  static Map<String, dynamic>? _profileMapFromConfig(dynamic config, String profileId) {
+    final raw = (config as dynamic).communicateProfiles;
+    if (raw is! List) return null;
+    for (final e in raw) {
+      if (e is Map && (e['id'] ?? '').toString().trim() == profileId.trim()) {
+        return Map<String, dynamic>.from(e);
+      }
+    }
+    return null;
+  }
+
+  static Future<void> _mergeProfileSnapshotIntoConfig(
+    dynamic config,
+    NgmyAdvisorSyncThread thread,
+  ) async {
+    final id = thread.profileId.trim();
+    if (id.isEmpty) return;
+    final raw = (config as dynamic).communicateProfiles;
+    final profiles = raw is List
+        ? raw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+        : <Map<String, dynamic>>[];
+    var idx = profiles.indexWhere((p) => (p['id'] ?? '').toString().trim() == id);
+    if (idx < 0) {
+      profiles.add({
+        'id': id,
+        'name': thread.profileName,
+        'role': thread.profileRole,
+        'active': true,
+        'gender': 'female',
+        'personality': '',
+        'bio': '',
+        'emoji': '💬',
+      });
+      idx = profiles.length - 1;
+    }
+    final row = Map<String, dynamic>.from(profiles[idx]);
+    if (thread.profileName.trim().isNotEmpty) row['name'] = thread.profileName;
+    if (thread.profileRole.trim().isNotEmpty) row['role'] = thread.profileRole;
+    if (thread.profileSnapshot != null && thread.profileSnapshot!.isNotEmpty) {
+      row.addAll(thread.profileSnapshot!);
+      row['id'] = id;
+    }
+    profiles[idx] = row;
+    (config as dynamic).communicateProfiles = profiles;
+  }
+
+  static Future<void> _restoreAvatarForThread(NgmyAdvisorSyncThread thread, dynamic config) async {
+    final id = thread.profileId.trim();
+    if (id.isEmpty) return;
+    Uint8List? bytes;
+    final b64 = (thread.avatarB64 ?? '').trim();
+    if (b64.isNotEmpty) {
+      try {
+        bytes = base64Decode(b64);
+      } catch (e) {
+        debugPrint('[advisor sync avatar] decode: $e');
+      }
+    }
+    final url = (thread.avatarUrl ?? '').trim();
+    await NgmyCommunicateAvatarCache.patchProfileAvatarInConfig(
+      config,
+      id,
+      avatarUrl: url.isEmpty ? null : url,
+      bytes: bytes,
+    );
+  }
 
   static String _profileNameFromConfig(dynamic config, String id) {
     final raw = (config as dynamic).communicateProfiles;
@@ -481,6 +627,8 @@ class NgmyCommunicateSyncService {
       if (msgs.isEmpty) continue;
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(id);
       final langs = await NgmyTranslatorLanguageStore.load(email, id);
+      final avatar = await _avatarPayloadForExport(config, id, msgs);
+      final snapshot = _profileMapFromConfig(config, id);
       threads.add(
         NgmyAdvisorSyncThread(
           profileId: id,
@@ -489,6 +637,9 @@ class NgmyCommunicateSyncService {
           messages: msgs,
           partner: partner,
           translatorLangs: langs,
+          avatarUrl: avatar.avatarUrl,
+          avatarB64: avatar.avatarB64,
+          profileSnapshot: snapshot,
         ),
       );
     }
@@ -568,9 +719,34 @@ class NgmyCommunicateSyncService {
 
     var threadCount = 0;
     var messageCount = 0;
+    var avatarsRestored = 0;
     for (final thread in bundle.threads) {
       if (thread.profileId.isEmpty || thread.messages.isEmpty) continue;
+      await _mergeProfileSnapshotIntoConfig(config, thread);
       await NgmyCommunicateMemoryStore.restoreMerged(email, thread.profileId, thread.messages);
+      if ((thread.avatarB64 ?? '').trim().isNotEmpty ||
+          (thread.avatarUrl ?? '').trim().isNotEmpty ||
+          _latestAdvisorImageB64FromMessages(thread.messages) != null) {
+        var restoreThread = thread;
+        if ((thread.avatarB64 ?? '').trim().isEmpty) {
+          final chatImg = _latestAdvisorImageB64FromMessages(thread.messages);
+          if (chatImg != null) {
+            restoreThread = NgmyAdvisorSyncThread(
+              profileId: thread.profileId,
+              profileName: thread.profileName,
+              profileRole: thread.profileRole,
+              messages: thread.messages,
+              partner: thread.partner,
+              translatorLangs: thread.translatorLangs,
+              avatarUrl: thread.avatarUrl ?? 'data:image/jpeg;base64,$chatImg',
+              avatarB64: chatImg,
+              profileSnapshot: thread.profileSnapshot,
+            );
+          }
+        }
+        await _restoreAvatarForThread(restoreThread, config);
+        avatarsRestored += 1;
+      }
       if (thread.partner != null) {
         final p = thread.partner!;
         await NgmyCommunicateRelationshipStore.setPartner(
@@ -591,6 +767,12 @@ class NgmyCommunicateSyncService {
       }
       threadCount += 1;
       messageCount += thread.messages.length;
+    }
+    if (avatarsRestored > 0) {
+      await NgmyCommunicateAvatarCache.persistConfigProfilesLocally(config);
+    }
+    if (threadCount > 0) {
+      await NgmyCommunicateAvatarCache.persistConfigProfilesLocally(config);
     }
     if (threadCount == 0) return null;
     return (threads: threadCount, messages: messageCount);

@@ -7361,8 +7361,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (b.users.isNotEmpty) _allUsers = List<UserData>.from(b.users);
     if (b.transactions.isNotEmpty) _allTransactions = List<AppTransaction>.from(b.transactions);
     _seedWithdrawalHoldTxnIds();
-    if (b.media.isNotEmpty) _allMedia = const [];
-    _allAnnouncements = const [];
+    if (b.media.isNotEmpty) _allMedia = List<MediaPost>.from(b.media);
+    if (b.announcements.isNotEmpty) _allAnnouncements = List<Announcement>.from(b.announcements);
     if (b.config != null) _config = b.config!;
     if (b.plans.isNotEmpty) _globalPlans = List<InvestmentPlan>.from(b.plans);
     for (final a in _allAnnouncements) {
@@ -7374,6 +7374,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     _appShellSig = _computeAppShellSig();
     _reconcileAllUserBalances();
+    if (_currentUser != null) {
+      ngmySeedLiveBalance(_currentUser!.email, _currentUser!.accountBalance);
+    }
     _launchCacheHydrated = true;
   }
 
@@ -10268,15 +10271,22 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _persistLocalSnapshot() async {
+    await NgmyCommunicateAvatarCache.hydrateRamFromDisk();
+    final configMap = _config.toJson();
+    try {
+      configMap['communicateProfiles'] =
+          await NgmyCommunicateAvatarCache.profilesWithEmbeddedAvatars(_config.communicateProfiles);
+    } catch (_) {}
     await NgmyLocalCache.persistSnapshot(
       users: _allUsers.map((e) => e.toJson()).toList(),
       transactions: _allTransactions.map((e) => e.toJson()).toList(),
       media: _allMedia.map((e) => e.toJson()).toList(),
       announcements: _allAnnouncements.map((e) => e.toJson()).toList(),
-      config: _config.toJson(),
+      config: configMap,
       investmentPlans: _globalPlans.map((e) => e.toJson()).toList(),
       currentUser: _currentUser?.toJson(),
     );
+    await NgmyCommunicateAvatarCache.persistConfigProfilesLocally(_config);
   }
 
   Future<void> _loadData() async {
@@ -10423,11 +10433,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       _reconcileAllUserBalances();
 
-      if (mounted && !_launchCacheHydrated) {
+      if (mounted) {
         _appShellSig = _computeAppShellSig();
-        _applySystemUiForMode(_effectiveThemeMode);
+        if (!_launchCacheHydrated) {
+          _applySystemUiForMode(_effectiveThemeMode);
+          _launchCacheHydrated = true;
+        }
+        if (_currentUser != null) {
+          ngmySeedLiveBalance(_currentUser!.email, _currentUser!.accountBalance);
+        }
         setState(() {});
-        _launchCacheHydrated = true;
       }
 
       // Cloud sync runs in background — UI refresh is debounced to avoid a second flash.
@@ -10456,6 +10471,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         debugPrint('[ngmy] offline or slow network — using cached local data');
         if (localMedia.isNotEmpty) _allMedia = localMedia;
         if (localAnnouncements.isNotEmpty) _allAnnouncements = localAnnouncements;
+        await _finalizeBootstrapSession(prefs: prefs, safeGet: safeGet, localCurrent: localCurrent);
         if (mounted) setState(() => _appOffline = true);
         await _persistLocalSnapshot();
         return;
@@ -10566,9 +10582,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _applyWalletDecisionLedgerToTransactions();
         }
         _reconcileAllUserBalances();
-
-        _allMedia = const [];
-        _allAnnouncements = const [];
 
         final localStoreListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
         final localStoreInquiries = List<Map<String, dynamic>>.from(_config.storeInquiries.map((e) => Map<String, dynamic>.from(e)));
@@ -10692,7 +10705,24 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       }, timeout: kNgmyCloudLoadTimeout);
 
-      // 3. Handle Current User Session
+      await _finalizeBootstrapSession(prefs: prefs, safeGet: safeGet, localCurrent: localCurrent);
+    } catch (e) {
+      debugPrint('[ngmy] cloud bootstrap: $e');
+    }
+    if (!mounted) return;
+    if (_ngmySessionIsAdmin(_currentUser)) {
+      unawaited(_refreshAdminDashboardFromCloud());
+    }
+    setState(() {});
+    _scheduleDeferredStartupRebuild();
+  }
+
+  Future<void> _finalizeBootstrapSession({
+    required SharedPreferences prefs,
+    required String? Function(String key) safeGet,
+    required UserData? localCurrent,
+  }) async {
+      // Handle current user session and reconcile cached wallet data.
       if (!_userExplicitlyLoggedOut) {
         final userJson = safeGet('current_user');
         if (userJson != null) {
@@ -10763,6 +10793,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (_currentUser != null) {
         NgmyMediaProfile.normalizeUserMediaFields(_currentUser);
         _ngmyReconcileClockInSession(_currentUser!, _allTransactions);
+        ngmySeedLiveBalance(_currentUser!.email, _currentUser!.accountBalance);
         final localReads = await NgmyAnnouncementReads.loadLocal(_currentUser!.email);
         if (localReads.isNotEmpty) {
           _currentUser!.readAnnouncementIds =
@@ -10808,15 +10839,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _allowConfigDiffNotifications = true;
       await _persistLocalSnapshot();
       unawaited(_notifyStoreMarketDayListings());
-    } catch (e) {
-      debugPrint('[ngmy] cloud bootstrap: $e');
-    }
-    if (!mounted) return;
-    if (_ngmySessionIsAdmin(_currentUser)) {
-      unawaited(_refreshAdminDashboardFromCloud());
-    }
-    setState(() {});
-    _scheduleDeferredStartupRebuild();
   }
 
   bool _isMissingTableError(Object error, String table) {
@@ -11092,14 +11114,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (child != null) _materialAppShellChild = child;
           final body = child ?? _materialAppShellChild;
           if (body == null) return ColoredBox(color: shellBg);
-          if (!_appOffline) return body;
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              body,
-              Positioned(top: 0, left: 0, right: 0, child: _offlineBanner()),
-            ],
-          );
+          return body;
         },
         home: _currentUser == null
             ? AuthScreen(
@@ -11177,7 +11192,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 },
               )
             : MainScreen(
-                key: ValueKey('main_${_currentUser!.email.toLowerCase().trim()}'),
+                key: ValueKey(
+                  'main_${_currentUser!.email.toLowerCase().trim()}_'
+                  '${_currentUser!.accountBalance.toStringAsFixed(2)}_${_allTransactions.length}',
+                ),
                 user: _currentUser!, allTransactions: _allTransactions, allUsers: _allUsers, globalPlans: _globalPlans,
                 allMedia: _allMedia,
                 allAnnouncements: _allAnnouncements,
@@ -13618,35 +13636,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
                 ),
               ),
             ),
-            if (_offline)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: SafeArea(
-                  bottom: false,
-                  child: Container(
-                    margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7C3AED).withOpacity(0.92),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Offline or slow connection — using data saved on this device.',
-                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
         bottomNavigationBar: Material(

@@ -827,7 +827,8 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
       user: widget.user,
       config: widget.config,
       isAdmin: _isAdmin,
-      onRestored: () {
+      onRestored: () async {
+        await ngmyWarmCommunicateAvatarsFromConfig(widget.config);
         if (mounted) setState(() {});
       },
     );
@@ -1783,7 +1784,16 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final imgResult = await ngmyGenerateRomanticChatImage(imgPrompt, creds: creds);
         if (imgResult.bytes != null && imgResult.bytes!.isNotEmpty) {
           final b64 = base64Encode(imgResult.bytes!);
-          await NgmyCommunicateAvatarCache.saveBytes(widget.profile.id, imgResult.bytes!);
+          final dataUrl = 'data:image/jpeg;base64,$b64';
+          await NgmyCommunicateAvatarCache.patchProfileAvatarInConfig(
+            widget.config,
+            widget.profile.id,
+            avatarUrl: dataUrl,
+            bytes: imgResult.bytes,
+          );
+          await NgmyCommunicateAvatarCache.persistConfigProfilesLocally(widget.config);
+          unawaited(widget.onPersistConfig?.call() ?? Future.value(false));
+          widget.onDataChanged?.call();
           const reply = 'Here — just for you.';
           if (!mounted) return;
           setState(() => _messages.add({'role': 'ai', 'text': reply, 'imageB64': b64}));

@@ -408,6 +408,54 @@ class NgmyCommunicateAvatarCache {
     return raw != null && raw.isNotEmpty;
   }
 
+  static Future<void> patchProfileAvatarInConfig(
+    dynamic config,
+    String profileId, {
+    String? avatarUrl,
+    Uint8List? bytes,
+  }) async {
+    final id = profileId.trim();
+    if (id.isEmpty) return;
+    if (bytes != null && bytes.isNotEmpty) {
+      await saveBytes(id, bytes);
+    }
+    final raw = (config as dynamic).communicateProfiles;
+    if (raw is! List) return;
+    final profiles = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final idx = profiles.indexWhere((p) => (p['id'] ?? '').toString().trim() == id);
+    if (idx < 0) return;
+    final url = (avatarUrl ?? '').trim();
+    if (url.startsWith('data:image')) {
+      profiles[idx]['avatarUrl'] = url;
+      await saveFromDataUrl(id, url);
+    } else {
+      final cached = bytes ?? bytesInRam(id) ?? await loadBytes(id);
+      if (cached != null && cached.isNotEmpty) {
+        profiles[idx]['avatarUrl'] = 'data:image/jpeg;base64,${base64Encode(cached)}';
+      }
+    }
+    (config as dynamic).communicateProfiles = profiles;
+  }
+
+  static Future<void> persistConfigProfilesLocally(dynamic config) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = (config as dynamic).communicateProfiles;
+      if (raw is! List) return;
+      final embedded = await profilesWithEmbeddedAvatars(raw);
+      await prefs.setString(
+        'ngmy_communicate_settings_v1',
+        jsonEncode({
+          'communicateEnabled': (config as dynamic).communicateEnabled == true,
+          'communicateProfiles': embedded,
+          'savedAt': DateTime.now().toUtc().toIso8601String(),
+        }),
+      );
+    } catch (e) {
+      debugPrint('[communicate avatars] local backup: $e');
+    }
+  }
+
   /// Embed cached avatar bytes as data URLs so profiles survive offline reloads.
   static Future<List<Map<String, dynamic>>> profilesWithEmbeddedAvatars(
     Iterable<dynamic> rawProfiles,

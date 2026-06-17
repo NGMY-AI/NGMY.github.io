@@ -8,7 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
-import 'ngmy_communicate.dart' show kNgmyAdvisorsHubAccent;
+import 'ngmy_communicate.dart' show kNgmyAdvisorsHubAccent, ngmyWarmCommunicateAvatarsFromConfig;
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_sync.dart';
 import 'ngmy_nav.dart';
@@ -168,7 +168,9 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
           return;
         }
         widget.onRestored?.call();
-        _toast('Restored ${result.messages} messages across ${result.threads} advisor${result.threads == 1 ? '' : 's'}.');
+        await ngmyWarmCommunicateAvatarsFromConfig(widget.config);
+        if (mounted) setState(() {});
+        _toast('Restored ${result.messages} messages across ${result.threads} advisor${result.threads == 1 ? '' : 's'}. Profile photos included when available.');
         await _refresh();
       } catch (e) {
         if (!mounted) return;
