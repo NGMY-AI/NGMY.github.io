@@ -131,7 +131,10 @@
 
   <link rel="manifest" href="manifest.json">
 
-  <!-- Preload icon fonts so Fun & Games / Game Center icons stay visible on slow networks -->
+  <!-- Preload bundled fonts so iOS Safari PWA shows text offline (CanvasKit must not hit fonts.gstatic.com). -->
+  <link rel="preload" href="assets/assets/fonts/Roboto-Regular.ttf" as="font" type="font/ttf" crossorigin="anonymous">
+  <link rel="preload" href="assets/assets/fonts/Roboto-Medium.ttf" as="font" type="font/ttf" crossorigin="anonymous">
+  <link rel="preload" href="assets/assets/fonts/Roboto-Bold.ttf" as="font" type="font/ttf" crossorigin="anonymous">
   <link rel="preload" href="assets/fonts/MaterialIcons-Regular.otf" as="font" type="font/otf" crossorigin="anonymous">
   <link rel="preload" href="assets/packages/cupertino_icons/assets/CupertinoIcons.ttf" as="font" type="font/ttf" crossorigin="anonymous">
 

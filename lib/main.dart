@@ -11049,6 +11049,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         title: 'NGMY', debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
+          fontFamily: 'Roboto',
           colorSchemeSeed: const Color(0xFF00B25A),
           brightness: Brightness.light,
           scaffoldBackgroundColor: Colors.white,
@@ -11079,6 +11080,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         ),
         darkTheme: ThemeData(
           useMaterial3: true,
+          fontFamily: 'Roboto',
           colorSchemeSeed: const Color(0xFFBB86FC),
           brightness: Brightness.dark,
           scaffoldBackgroundColor: const Color(0xFF121212),
