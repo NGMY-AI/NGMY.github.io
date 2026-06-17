@@ -299,8 +299,25 @@ Future<void> _syncExportAudioPlayback(html.VideoElement? primary, {required bool
   }
 }
 
-/// Match studio preview (`object-fit: cover` / BoxFit.cover) — no stretch.
-void _drawVideoCoverInRect(
+/// Export at the uploaded clip's native size — template overlays only, no crop.
+(int, int) _resolveExportCanvasSize(NgmyVideoStudioExportConfig config, html.VideoElement? primary) {
+  if (primary != null) {
+    var vw = primary.videoWidth;
+    var vh = primary.videoHeight;
+    if (vw > 0 && vh > 0) {
+      if (vw.isOdd) vw++;
+      if (vh.isOdd) vh++;
+      return (vw, vh);
+    }
+  }
+  return _exportDimensions(config);
+}
+
+bool _isFullFrameSlot(Rect r) =>
+    r.left <= 0.001 && r.top <= 0.001 && r.width >= 0.99 && r.height >= 0.99;
+
+/// Fit entire frame inside slot — no cropping (letterbox only when slot ≠ video aspect).
+void _drawVideoContainInRect(
   html.CanvasRenderingContext2D ctx,
   html.VideoElement video,
   double dx,
@@ -311,10 +328,6 @@ void _drawVideoCoverInRect(
   var vw = video.videoWidth;
   var vh = video.videoHeight;
   if (vw <= 0 || vh <= 0) {
-    vw = video.clientWidth;
-    vh = video.clientHeight;
-  }
-  if (vw <= 0 || vh <= 0) {
     ctx.drawImageScaled(video, dx, dy, dw, dh);
     return;
   }
@@ -323,15 +336,33 @@ void _drawVideoCoverInRect(
   double drawW;
   double drawH;
   if (videoAspect > slotAspect) {
-    drawH = dh;
-    drawW = dh * videoAspect;
-  } else {
     drawW = dw;
     drawH = dw / videoAspect;
+  } else {
+    drawH = dh;
+    drawW = dh * videoAspect;
   }
   final drawX = dx + (dw - drawW) / 2;
   final drawY = dy + (dh - drawH) / 2;
   ctx.drawImageScaled(video, drawX, drawY, drawW, drawH);
+}
+
+void _drawVideoInSlot(
+  html.CanvasRenderingContext2D ctx,
+  html.VideoElement video,
+  Rect slot,
+  double dx,
+  double dy,
+  double dw,
+  double dh,
+  int canvasW,
+  int canvasH,
+) {
+  if (_isFullFrameSlot(slot)) {
+    ctx.drawImageScaled(video, 0, 0, canvasW.toDouble(), canvasH.toDouble());
+    return;
+  }
+  _drawVideoContainInRect(ctx, video, dx, dy, dw, dh);
 }
 
 double _resolveRecordingDuration(Iterable<html.VideoElement> videos) {
@@ -367,7 +398,7 @@ DateTime _exportAttemptDeadline(double durationSec) {
 
 Future<void> _playVideoForRecord(html.VideoElement v) async {
   try {
-    await v.play().timeout(const Duration(seconds: 4));
+    await v.play().timeout(const Duration(seconds: 8));
   } catch (e) {
     debugPrint('[studio export] play for record: $e');
   }
@@ -1218,9 +1249,17 @@ Future<String> exportNgmyVideoStudioComposed({
 
     var durationSec = await _resolveRecordingDurationAsync(videos.values);
 
+    html.VideoElement? primaryVideo;
+    for (final e in config.slotRects.entries) {
+      if ((config.slotKinds[e.key] ?? NgmySlotKind.video) == NgmySlotKind.video) {
+        primaryVideo = videos[e.key];
+        if (primaryVideo != null) break;
+      }
+    }
+
     onProgress?.call(0.08, 'Preparing overlay (${_formatDurationLabel(durationSec)})…');
 
-    final (w, h) = _exportDimensions(config);
+    final (w, h) = _resolveExportCanvasSize(config, primaryVideo);
     for (final v in videos.values) {
       _applyExportVideoStaging(v);
     }
@@ -1247,13 +1286,6 @@ Future<String> exportNgmyVideoStudioComposed({
     } catch (_) {}
 
     int? paintFingerprint;
-    html.VideoElement? primaryVideo;
-    for (final e in config.slotRects.entries) {
-      if ((config.slotKinds[e.key] ?? NgmySlotKind.video) == NgmySlotKind.video) {
-        primaryVideo = videos[e.key];
-        if (primaryVideo != null) break;
-      }
-    }
 
     void paintFrame() {
       if (backdrop != null) {
@@ -1289,7 +1321,7 @@ Future<String> exportNgmyVideoStudioComposed({
         }
         try {
           if (video.readyState >= html.MediaElement.HAVE_CURRENT_DATA) {
-            _drawVideoCoverInRect(ctx, video, dx, dy, dw, dh);
+            _drawVideoInSlot(ctx, video, r, dx, dy, dw, dh, w, h);
             if (video == primaryVideo) {
               paintFingerprint = _sampleCanvasPixel(
                 ctx,
