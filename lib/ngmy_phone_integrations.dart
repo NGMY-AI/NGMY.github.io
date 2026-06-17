@@ -374,7 +374,7 @@ Future<String?> _runMaps(NgmyPhoneAction action) async {
 
 Future<String?> _runCall(NgmyPhoneAction action) async {
   final phone = (action.fields['phone'] ?? '').replaceAll(RegExp(r'[^\d+]+'), '');
-  if (phone.isEmpty) return 'No phone number — link contacts or say the number.';
+  if (phone.isEmpty) return 'Could not find a phone number for that name.';
   final ok = await _launchExternal(Uri.parse('tel:$phone'));
   final who = action.fields['contactName'] ?? action.fields['name'] ?? '';
   return ok
@@ -384,7 +384,7 @@ Future<String?> _runCall(NgmyPhoneAction action) async {
 
 Future<String?> _runSms(NgmyPhoneAction action) async {
   final phone = (action.fields['phone'] ?? '').replaceAll(RegExp(r'[^\d+]+'), '');
-  if (phone.isEmpty) return 'No phone number — link contacts or say the number.';
+  if (phone.isEmpty) return 'Could not find a phone number for that name.';
   final body = action.fields['body']?.trim() ?? '';
   final uri = body.isEmpty
       ? Uri.parse('sms:$phone')
@@ -398,7 +398,7 @@ Future<String?> _runSms(NgmyPhoneAction action) async {
 
 Future<String?> _runWhatsApp(NgmyPhoneAction action) async {
   final phone = (action.fields['phone'] ?? '').replaceAll(RegExp(r'[^\d]'), '');
-  if (phone.isEmpty) return 'No phone number — link contacts or say the number.';
+  if (phone.isEmpty) return 'Could not find a phone number for that name.';
   final body = action.fields['body']?.trim() ?? '';
   final params = body.isNotEmpty ? '?text=${Uri.encodeComponent(body)}' : '';
   final candidates = [

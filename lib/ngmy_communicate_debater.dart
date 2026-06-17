@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_phone_contact_resolve.dart';
 import 'ngmy_phone_integrations.dart';
@@ -102,13 +103,25 @@ Future<void> ngmyDebateSendReply({
 
   if (channel == 'messenger') {
     await Clipboard.setData(ClipboardData(text: text));
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Copied — paste into Messenger and send.'),
-          backgroundColor: Color(0xFF2563EB),
-        ),
-      );
+    try {
+      final opened = await launchUrl(Uri.parse('fb-messenger://'), mode: LaunchMode.externalApplication);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(opened ? 'Opening Messenger — message copied, paste to send.' : 'Message copied — open Messenger and paste.'),
+            backgroundColor: const Color(0xFF2563EB),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Copied — paste into Messenger and send.'),
+            backgroundColor: Color(0xFF2563EB),
+          ),
+        );
+      }
     }
     return;
   }
@@ -134,7 +147,7 @@ Future<void> ngmyDebateSendReply({
     ngmyUsers: ngmyUsers,
   );
   if (actions.isEmpty || !context.mounted) return;
-  await ngmyRunPhoneAction(actions.first, context: context);
+  await ngmyRunPhoneAction(actions.first, context: context, skipConfirmation: true);
 }
 
 /// Debate toolbar above the chat input — opponent name, channel, paste mode.

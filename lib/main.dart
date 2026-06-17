@@ -72,7 +72,6 @@ import 'ngmy_phone_contact_intent.dart';
 import 'ngmy_helper_call_memory.dart';
 import 'ngmy_helper_calendar_memory.dart';
 import 'ngmy_helper_permissions.dart';
-import 'ngmy_helper_connections_panel.dart';
 import 'ngmy_helper_superpowers.dart';
 import 'ngmy_voice_input.dart';
 import 'ngmy_invoice_templates.dart';
@@ -38572,7 +38571,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   DateTime? _helperUnlockAt;
   bool _kbMode = false;
   bool _kbVoluntaryBrowse = false;
-  bool _connectionsExpanded = false;
   NgmyHelperPermissions _helperPerms = NgmyHelperPermissions.empty;
   int _contactCount = 0;
   int _callMemoryCount = 0;
@@ -39282,7 +39280,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         );
         continue;
       }
-      final result = await ngmyRunPhoneAction(action, context: context);
+      final result = await ngmyRunPhoneAction(
+        action,
+        context: context,
+        skipConfirmation: action.type == 'call' || action.type == 'sms' || action.type == 'whatsapp',
+      );
       if (!mounted || result == null) continue;
       if (action.type == 'call') {
         final name = (action.fields['name'] ?? '').trim();
@@ -39319,7 +39321,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       );
       return;
     }
-    final result = await ngmyRunPhoneAction(action, context: context);
+    final result = await ngmyRunPhoneAction(
+      action,
+      context: context,
+      skipConfirmation: action.type == 'call' || action.type == 'sms' || action.type == 'whatsapp',
+    );
     if (!mounted || result == null) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(result), backgroundColor: const Color(0xFF16A34A)),
@@ -39530,31 +39536,12 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                     ),
                   ),
                   IconButton(
-                    tooltip: _connectionsExpanded ? 'Hide connections' : 'Phone connections',
-                    onPressed: () => setState(() => _connectionsExpanded = !_connectionsExpanded),
-                    icon: Icon(
-                      _connectionsExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                      color: Colors.white,
-                    ),
-                  ),
-                  IconButton(
                     onPressed: () => NgmyNavigator.pop(context),
                     icon: const Icon(Icons.close_rounded, color: Colors.white),
                   ),
                 ],
               ),
             ),
-            if (_connectionsExpanded && _activeTab == 0)
-              NgmyHelperConnectionsPanel(
-                isDark: isDark,
-                permissions: _helperPerms,
-                contactCount: _contactCount,
-                callMemoryCount: _callMemoryCount,
-                calendarCount: _calendarCount,
-                isAdmin: widget.user.isAdmin,
-                kbMode: _kbMode,
-                onToggleKbMode: widget.user.isAdmin ? _toggleKbModeForAdmin : null,
-              ),
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
