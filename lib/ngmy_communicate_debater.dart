@@ -1,9 +1,10 @@
+import 'dart:async';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_phone_contact_resolve.dart';
 import 'ngmy_phone_integrations.dart';
@@ -45,34 +46,53 @@ class NgmyDebateSessionStore {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key(email, profileId));
     if (raw == null || raw.isEmpty) {
-      return {'opponentName': '', 'channel': 'sms'};
+      return {'opponentName': '', 'opponentPhone': '', 'channel': 'sms'};
     }
     try {
       final map = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      var channel = (map['channel'] ?? 'sms').toString();
+      if (channel == 'messenger' || channel == 'app') channel = 'sms';
       return {
         'opponentName': (map['opponentName'] ?? '').toString(),
-        'channel': (map['channel'] ?? 'sms').toString(),
+        'opponentPhone': (map['opponentPhone'] ?? '').toString(),
+        'channel': channel,
       };
     } catch (_) {
-      return {'opponentName': '', 'channel': 'sms'};
+      return {'opponentName': '', 'opponentPhone': '', 'channel': 'sms'};
     }
   }
 
-  static Future<void> save(String email, String profileId, {required String opponentName, required String channel}) async {
+  static Future<void> save(
+    String email,
+    String profileId, {
+    required String opponentName,
+    required String opponentPhone,
+    required String channel,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _key(email, profileId),
-      jsonEncode({'opponentName': opponentName.trim(), 'channel': channel}),
+      jsonEncode({
+        'opponentName': opponentName.trim(),
+        'opponentPhone': opponentPhone.trim(),
+        'channel': channel,
+      }),
     );
   }
 }
 
 String ngmyDebateChannelLabel(String channel) => switch (channel) {
       'whatsapp' => 'WhatsApp',
-      'messenger' => 'Messenger',
-      'sms' => 'iMessage / SMS',
-      _ => 'In-app only',
+      'sms' => 'iMessage',
+      _ => 'iMessage',
     };
+
+String ngmyNormalizeDebatePhone(String raw) {
+  final t = raw.trim();
+  if (t.isEmpty) return '';
+  final digits = t.replaceAll(RegExp(r'[^\d+]'), '');
+  return digits.isNotEmpty ? digits : t;
+}
 
 String ngmyDebatePastePrompt(String opponentText, {String? opponentName, String channel = 'sms'}) {
   final who = opponentName?.trim().isNotEmpty == true ? opponentName!.trim() : 'the person they are debating';
@@ -89,71 +109,69 @@ String ngmyDebateAskQuestionPrompt({String? opponentName, String? topic}) {
       'It should challenge their belief respectfully and advance the Christian position.\n';
 }
 
-Future<void> ngmyDebateSendReply({
+Future<String?> ngmyDebateSendReply({
   required BuildContext context,
   required String userEmail,
   required String opponentName,
+  required String opponentPhone,
   required String channel,
   required String message,
   List<Map<String, dynamic>> ngmyUsers = const [],
 }) async {
   final text = message.trim();
-  if (text.isEmpty) return;
-  if (!context.mounted) return;
+  if (text.isEmpty) return 'Nothing to send.';
+  if (!context.mounted) return null;
 
-  if (channel == 'messenger') {
-    await Clipboard.setData(ClipboardData(text: text));
-    try {
-      final opened = await launchUrl(Uri.parse('fb-messenger://'), mode: LaunchMode.externalApplication);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(opened ? 'Opening Messenger — message copied, paste to send.' : 'Message copied — open Messenger and paste.'),
-            backgroundColor: const Color(0xFF2563EB),
-          ),
-        );
-      }
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Copied — paste into Messenger and send.'),
-            backgroundColor: Color(0xFF2563EB),
-          ),
-        );
-      }
-    }
-    return;
-  }
-
-  if (channel == 'app' || opponentName.trim().isEmpty) {
-    await Clipboard.setData(ClipboardData(text: text));
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reply copied to clipboard.'), backgroundColor: Color(0xFF16A34A)),
-      );
-    }
-    return;
+  final name = opponentName.trim();
+  final phone = ngmyNormalizeDebatePhone(opponentPhone);
+  if (name.isEmpty && phone.isEmpty) {
+    return 'Add opponent name or phone number in Debate mode above.';
   }
 
   final type = channel == 'whatsapp' ? 'whatsapp' : 'sms';
-  var actions = [
-    NgmyPhoneAction(type: type, fields: {'name': opponentName.trim(), 'body': text}),
-  ];
-  actions = await ngmyResolvePhoneActionsByName(
-    context: context,
-    userEmail: userEmail,
-    actions: actions,
-    ngmyUsers: ngmyUsers,
-  );
-  if (actions.isEmpty || !context.mounted) return;
-  await ngmyRunPhoneAction(actions.first, context: context, skipConfirmation: true);
+  List<NgmyPhoneAction> actions;
+
+  if (phone.isNotEmpty) {
+    actions = [
+      NgmyPhoneAction(
+        type: type,
+        fields: {
+          'phone': phone,
+          if (name.isNotEmpty) 'name': name,
+          'contactName': name.isNotEmpty ? name : phone,
+          'body': text,
+        },
+      ),
+    ];
+  } else {
+    actions = [
+      NgmyPhoneAction(type: type, fields: {'name': name, 'body': text}),
+    ];
+    actions = await ngmyResolvePhoneActionsByName(
+      context: context,
+      userEmail: userEmail,
+      actions: actions,
+      ngmyUsers: ngmyUsers,
+    );
+    if (actions.isEmpty) {
+      return 'Could not find "$name" — add their phone number in Debate mode.';
+    }
+    final resolved = actions.first;
+    if ((resolved.fields['phone'] ?? '').trim().isEmpty) {
+      return 'Could not find a number for "$name" — add their phone number above.';
+    }
+  }
+
+  if (!context.mounted) return null;
+  final result = await ngmyRunPhoneAction(actions.first, context: context, skipConfirmation: true);
+  return result ?? 'Could not open ${ngmyDebateChannelLabel(channel)}.';
 }
 
-/// Debate toolbar above the chat input — opponent name, channel, paste mode.
+/// Debate toolbar above the chat input — opponent name, phone, channel.
 Widget ngmyDebateChatToolbar({
   required bool isDark,
   required TextEditingController opponentController,
+  required TextEditingController opponentPhoneController,
   required String channel,
   required bool pasteMode,
   required ValueChanged<String> onChannelChanged,
@@ -166,6 +184,7 @@ Widget ngmyDebateChatToolbar({
   final fg = isDark ? Colors.white : const Color(0xFF111827);
   final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
   final bg = isDark ? const Color(0xFF1A1028).withValues(alpha: 0.92) : Colors.white.withValues(alpha: 0.95);
+  final fieldFill = isDark ? const Color(0xFF0F111A) : const Color(0xFFF8FAFC);
 
   return Container(
     margin: const EdgeInsets.only(bottom: 8),
@@ -196,64 +215,112 @@ Widget ngmyDebateChatToolbar({
         if (expanded) ...[
           const SizedBox(height: 8),
           TextField(
-          controller: opponentController,
-          style: TextStyle(color: fg, fontSize: 13),
-          decoration: InputDecoration(
-            isDense: true,
-            labelText: 'Opponent name (for auto-send)',
-            labelStyle: TextStyle(color: muted, fontSize: 12),
-            hintText: 'e.g. Ahmed, Sarah',
-            hintStyle: TextStyle(color: muted.withValues(alpha: 0.7)),
-            filled: true,
-            fillColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF8FAFC),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            controller: opponentController,
+            style: TextStyle(color: fg, fontSize: 13),
+            textCapitalization: TextCapitalization.words,
+            decoration: InputDecoration(
+              isDense: true,
+              labelText: 'Opponent name',
+              labelStyle: TextStyle(color: muted, fontSize: 12),
+              hintText: 'e.g. Ahmed, Sarah',
+              hintStyle: TextStyle(color: muted.withValues(alpha: 0.7)),
+              filled: true,
+              fillColor: fieldFill,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final ch in ['sms', 'whatsapp', 'messenger', 'app'])
-              ChoiceChip(
-                label: Text(ngmyDebateChannelLabel(ch), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                selected: channel == ch,
-                selectedColor: accent.withValues(alpha: 0.22),
-                onSelected: (_) => onChannelChanged(ch),
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onTogglePasteMode,
-                icon: Icon(Icons.content_paste_rounded, size: 16, color: pasteMode ? accent : muted),
-                label: Text(pasteMode ? 'Pasting opponent…' : 'Paste opponent', style: TextStyle(fontSize: 11, color: pasteMode ? accent : fg)),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: pasteMode ? accent : muted.withValues(alpha: 0.4)),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+          const SizedBox(height: 8),
+          TextField(
+            controller: opponentPhoneController,
+            style: TextStyle(color: fg, fontSize: 13),
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              isDense: true,
+              labelText: 'Opponent phone (for iMessage / WhatsApp)',
+              labelStyle: TextStyle(color: muted, fontSize: 12),
+              hintText: '+1 555 123 4567',
+              hintStyle: TextStyle(color: muted.withValues(alpha: 0.7)),
+              filled: true,
+              fillColor: fieldFill,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final ch in ['sms', 'whatsapp'])
+                ChoiceChip(
+                  label: Text(ngmyDebateChannelLabel(ch), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                  selected: channel == ch,
+                  selectedColor: accent.withValues(alpha: 0.22),
+                  onSelected: (_) => onChannelChanged(ch),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onTogglePasteMode,
+                  icon: Icon(Icons.content_paste_rounded, size: 16, color: pasteMode ? accent : muted),
+                  label: Text(pasteMode ? 'Pasting opponent…' : 'Paste opponent', style: TextStyle(fontSize: 11, color: pasteMode ? accent : fg)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: pasteMode ? accent : muted.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onAskQuestion,
-                icon: Icon(Icons.help_outline_rounded, size: 16, color: accent),
-                label: Text('Ask question', style: TextStyle(fontSize: 11, color: fg)),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: accent.withValues(alpha: 0.45)),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+              const SizedBox(width: 6),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onAskQuestion,
+                  icon: Icon(Icons.help_outline_rounded, size: 16, color: accent),
+                  label: Text('Ask question', style: TextStyle(fontSize: 11, color: fg)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: accent.withValues(alpha: 0.45)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ],
       ],
+    ),
+  );
+}
+
+Widget _debateTapButton({
+  required IconData icon,
+  required String label,
+  required Color accent,
+  required VoidCallback onTap,
+}) {
+  return Material(
+    color: accent.withValues(alpha: 0.18),
+    borderRadius: BorderRadius.circular(22),
+    child: InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(22),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: accent),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: accent)),
+          ],
+        ),
+      ),
     ),
   );
 }
@@ -261,34 +328,38 @@ Widget ngmyDebateChatToolbar({
 Widget ngmyDebateReplyActions({
   required String replyText,
   required String opponentName,
+  required String opponentPhone,
   required String channel,
   required Color accent,
-  required VoidCallback onCopy,
-  required VoidCallback onSend,
+  required Future<void> Function() onCopy,
+  required Future<void> Function() onSend,
 }) {
-  final canAutoSend = channel != 'app' && channel != 'messenger' && opponentName.trim().isNotEmpty;
+  final hasTarget = opponentName.trim().isNotEmpty || opponentPhone.trim().isNotEmpty;
+  final canSend = hasTarget && (channel == 'sms' || channel == 'whatsapp');
+
   return Padding(
-    padding: const EdgeInsets.only(top: 8),
+    padding: const EdgeInsets.only(top: 10),
     child: Wrap(
-      spacing: 6,
-      runSpacing: 6,
+      spacing: 8,
+      runSpacing: 8,
       children: [
-        ActionChip(
-          avatar: Icon(Icons.copy_rounded, size: 14, color: accent),
-          label: const Text('Copy', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-          onPressed: onCopy,
+        _debateTapButton(
+          icon: Icons.copy_rounded,
+          label: 'Copy',
+          accent: accent,
+          onTap: () => unawaited(onCopy()),
         ),
-        if (channel == 'messenger')
-          ActionChip(
-            avatar: const Icon(Icons.send_rounded, size: 14, color: Color(0xFF2563EB)),
-            label: const Text('Copy for Messenger', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-            onPressed: onSend,
+        if (canSend)
+          _debateTapButton(
+            icon: Icons.send_rounded,
+            label: 'Send via ${ngmyDebateChannelLabel(channel)}',
+            accent: channel == 'whatsapp' ? const Color(0xFF25D366) : accent,
+            onTap: () => unawaited(onSend()),
           )
-        else if (canAutoSend)
-          ActionChip(
-            avatar: Icon(Icons.send_rounded, size: 14, color: accent),
-            label: Text('Send via ${ngmyDebateChannelLabel(channel)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-            onPressed: onSend,
+        else if (channel == 'sms' || channel == 'whatsapp')
+          Text(
+            'Add opponent name or phone above to send',
+            style: TextStyle(fontSize: 11, color: accent.withValues(alpha: 0.85), fontStyle: FontStyle.italic),
           ),
       ],
     ),

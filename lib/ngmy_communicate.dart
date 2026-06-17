@@ -1342,6 +1342,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   bool get _isBibleTeacher => ngmyCommunicateNormalizeRole(widget.profile.role) == 'bible_study_teacher';
   bool get _isDebater => ngmyCommunicateRoleIsDebater(widget.profile.role);
   final _debateOpponentC = TextEditingController();
+  final _debateOpponentPhoneC = TextEditingController();
   String _debateChannel = 'sms';
   bool _debatePasteMode = false;
   bool _debateAskQuestionNext = false;
@@ -1353,6 +1354,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       _email,
       widget.profile.id,
       opponentName: _debateOpponentC.text,
+      opponentPhone: _debateOpponentPhoneC.text,
       channel: _debateChannel,
     );
   }
@@ -1440,8 +1442,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (_isDebater) {
       final session = await NgmyDebateSessionStore.load(_email, widget.profile.id);
       _debateOpponentC.text = session['opponentName'] ?? '';
+      _debateOpponentPhoneC.text = session['opponentPhone'] ?? '';
       _debateChannel = session['channel'] ?? 'sms';
       _debateOpponentC.addListener(() => unawaited(_saveDebateSession()));
+      _debateOpponentPhoneC.addListener(() => unawaited(_saveDebateSession()));
     }
     if (!mounted) return;
     setState(() {
@@ -1542,6 +1546,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _debateOpponentC.dispose();
+    _debateOpponentPhoneC.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -1646,12 +1651,23 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   Future<void> _sendDebateReply(String text) async {
     await _saveDebateSession();
     if (!mounted) return;
-    await ngmyDebateSendReply(
+    HapticFeedback.mediumImpact();
+    final result = await ngmyDebateSendReply(
       context: context,
       userEmail: _email,
       opponentName: _debateOpponentC.text.trim(),
+      opponentPhone: _debateOpponentPhoneC.text.trim(),
       channel: _debateChannel,
       message: text,
+    );
+    if (!mounted) return;
+    final msg = result ?? 'Could not open ${ngmyDebateChannelLabel(_debateChannel)}.';
+    final ok = result != null && !msg.toLowerCase().contains('could not') && !msg.toLowerCase().contains('add opponent');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: ok ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+      ),
     );
   }
 
@@ -1950,6 +1966,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                           ngmyDebateReplyActions(
                             replyText: m['text'] ?? '',
                             opponentName: _debateOpponentC.text.trim(),
+                            opponentPhone: _debateOpponentPhoneC.text.trim(),
                             channel: _debateChannel,
                             accent: accent,
                             onCopy: () => _copyDebateReply(m['text'] ?? ''),
@@ -2033,6 +2050,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                       ngmyDebateChatToolbar(
                         isDark: isDark,
                         opponentController: _debateOpponentC,
+                        opponentPhoneController: _debateOpponentPhoneC,
                         channel: _debateChannel,
                         pasteMode: _debatePasteMode,
                         accent: accent,
