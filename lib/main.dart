@@ -69,6 +69,9 @@ import 'ngmy_phone_calendar_intent.dart';
 import 'ngmy_phone_contacts.dart';
 import 'ngmy_phone_contact_resolve.dart';
 import 'ngmy_phone_contact_intent.dart';
+import 'ngmy_helper_call_memory.dart';
+import 'ngmy_helper_superpowers.dart';
+import 'ngmy_helper_superpowers_ui.dart';
 import 'ngmy_voice_input.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
@@ -38567,6 +38570,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   DateTime? _helperUnlockAt;
   bool _kbMode = false;
   bool _kbVoluntaryBrowse = false;
+  bool _superpowerProcessing = false;
   List<NgmyHelperKbCategory> _kbCategories = ngmyHelperKbDefaultCategories();
   Timer? _chatGateTimer;
   Timer? _helperQuotaTimer;
@@ -38592,16 +38596,16 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   List<String> get _quickPrompts => _isBoss
       ? const [
+          'NGMY morning brief',
+          'Who called me at 2 AM today?',
           'Brief me on NGMY today, Sir',
           'Add a CEO strategy session Friday at 10am to my calendar',
-          'What should I focus on as CEO?',
-          'Give me a motivational check-in, Boss',
         ]
       : const [
-          'How do withdrawals work?',
+          'Who called me at 2 AM today?',
+          'NGMY morning brief',
           'Text Mom saying I am on my way',
           'Call John',
-          'What is NGMY Store?',
         ];
 
   @override
@@ -38713,6 +38717,102 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       userEmail: widget.user.email,
       ngmyUsers: ngmyUsersToContactMaps(widget.allUsers),
     );
+  }
+
+  Future<void> _openSuperpowerAttach() async {
+    if (_isTyping || _superpowerProcessing) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pick = await showNgmySuperpowerAttachSheet(context, isDark: isDark);
+    if (pick == null || !mounted) return;
+
+    if (!widget.user.isAdmin) {
+      final limit = widget.config.ngmyHelperDailyMessageLimit;
+      if (limit > 0) {
+        final allowed = await NgmyHelperAiLimit.tryConsume(widget.user.email, limit);
+        if (!allowed) {
+          if (!mounted) return;
+          await _refreshHelperQuota();
+          setState(() => _kbMode = true);
+          return;
+        }
+        await _refreshHelperQuota();
+      }
+    }
+
+    setState(() => _superpowerProcessing = true);
+    try {
+      await _refreshGeminiKeyFromCloud();
+      var apiKey = widget.config.geminiApiKey.trim();
+      if (apiKey.isEmpty) {
+        apiKey = await _fetchRemoteGeminiApiKey();
+        if (apiKey.isNotEmpty && mounted) setState(() => widget.config.geminiApiKey = apiKey);
+      }
+      if (apiKey.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AI is not available right now — try again later.')),
+        );
+        return;
+      }
+      final creds = ngmyParseAiCredentials(apiKey);
+      late final ({List<NgmyCallMemoryEntry> entries, String summary}) extracted;
+      final kind = pick.kind;
+      if (kind == NgmySuperpowerAttachKind.voicemailPaste && pick.pastedText != null) {
+        extracted = await ngmyExtractCallsFromText(creds, pick.pastedText!);
+      } else if (kind == NgmySuperpowerAttachKind.invoice && pick.imageB64 != null) {
+        extracted = await ngmyExtractCallsFromInvoice(creds, imageB64: pick.imageB64!, mime: pick.mime ?? 'image/jpeg');
+      } else if (kind == NgmySuperpowerAttachKind.callScreenshot && pick.imageB64 != null) {
+        extracted = await ngmyExtractCallsFromVision(
+          creds,
+          '',
+          imageB64: pick.imageB64!,
+          mime: pick.mime ?? 'image/jpeg',
+        );
+      } else {
+        return;
+      }
+      if (extracted.entries.isNotEmpty) {
+        await NgmyCallMemoryStore.addAll(widget.user.email, extracted.entries);
+      }
+      if (!mounted) return;
+      final label = switch (kind) {
+        NgmySuperpowerAttachKind.callScreenshot => 'Call log screenshot',
+        NgmySuperpowerAttachKind.invoice => 'Invoice photo',
+        NgmySuperpowerAttachKind.voicemailPaste => 'Voicemail text',
+        null => 'Superpower',
+      };
+      final userNote = '⚡ $label saved to Call Detective';
+      final aiNote = extracted.summary.isNotEmpty
+          ? extracted.summary
+          : (extracted.entries.isEmpty
+              ? 'I could not read anything — try a clearer image or paste the voicemail text.'
+              : 'Saved ${extracted.entries.length} item(s). You can now ask "Who called me at 2 AM?"');
+      setState(() {
+        _messages.add({
+          'role': 'user',
+          'text': userNote,
+          'at': DateTime.now().toUtc().toIso8601String(),
+        });
+        _messages.add({
+          'role': 'ai',
+          'text': aiNote,
+          'at': DateTime.now().toUtc().toIso8601String(),
+        });
+        _sortMessagesChronological();
+      });
+      unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'user', text: userNote));
+      unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: aiNote));
+      _scrollToBottom();
+      unawaited(_persistChatMemory());
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not process that — check your connection and try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _superpowerProcessing = false);
+      if (!widget.user.isAdmin) unawaited(_refreshHelperQuota());
+    }
   }
 
   Future<void> _openKbAdmin() async {
@@ -39108,9 +39208,15 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       );
       final contactsDir = NgmyPhoneContactsStore.directoryForAi(contacts);
       final phoneCtx = ngmyHelperPhoneIntegrationContext(contactsDirectory: contactsDir);
+      final callMemory = await NgmyCallMemoryStore.load(widget.user.email);
+      final callDir = NgmyCallMemoryStore.directoryForAi(callMemory);
+      final superCtx = ngmyHelperSuperpowersContext(callMemoryDirectory: callDir);
+      final preflight = await ngmyHelperSuperpowerPreflight(userEmail: widget.user.email, userText: text);
       final prompt = '${_ngmyHelperSystemContext(user: widget.user)}'
+          '\n$superCtx\n'
           '\n$phoneCtx\n'
           '${liveDb.isNotEmpty ? '\n$liveDb\n' : ''}'
+          '${preflight.isNotEmpty ? '\n$preflight\n' : ''}'
           '${_messages.isNotEmpty ? '\n${NgmyAiMemoryStore.transcriptForPrompt(_messages)}\n' : ''}'
           '\nUser: $text';
       final aiResult = await ngmyAiGenerateWithCredentials(creds, prompt);
@@ -39456,6 +39562,17 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'NGMY Superpowers',
+                    onPressed: (_isTyping || _superpowerProcessing) ? null : _openSuperpowerAttach,
+                    icon: _superpowerProcessing
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFF59E0B)),
+                          )
+                        : const Icon(Icons.bolt_rounded, color: Color(0xFFF59E0B)),
+                  ),
+                  IconButton(
                     tooltip: 'Link phone contacts',
                     onPressed: _openPhoneContactsLink,
                     icon: const Icon(Icons.contacts_rounded, color: Colors.white),
@@ -39618,6 +39735,13 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (_memoryLoaded && _messages.length <= 1)
+                        ngmySuperpowerChips(
+                          isDark: isDark,
+                          disabled: _isTyping || _superpowerProcessing,
+                          onTap: _sendQuickPrompt,
+                        ),
+                      if (_memoryLoaded && _messages.length <= 1) const SizedBox(height: 8),
+                      if (_memoryLoaded && _messages.length <= 1)
                         SizedBox(
                           height: 36,
                           child: ListView.separated(
@@ -39628,7 +39752,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                               label: Text(_quickPrompts[i], style: const TextStyle(fontSize: 11)),
                               backgroundColor: primaryColor.withOpacity(0.12),
                               side: BorderSide(color: primaryColor.withOpacity(0.35)),
-                              onPressed: _isTyping ? null : () => _sendQuickPrompt(_quickPrompts[i]),
+                              onPressed: (_isTyping || _superpowerProcessing) ? null : () => _sendQuickPrompt(_quickPrompts[i]),
                             ),
                           ),
                         ),
@@ -39636,6 +39760,25 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
+                          Material(
+                            color: const Color(0xFFF59E0B).withOpacity(0.15),
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              onTap: (_isTyping || _superpowerProcessing) ? null : _openSuperpowerAttach,
+                              customBorder: const CircleBorder(),
+                              child: SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: _superpowerProcessing
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(10),
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFF59E0B)),
+                                      )
+                                    : const Icon(Icons.bolt_rounded, color: Color(0xFFF59E0B), size: 22),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
                           Expanded(
                             child: TextField(
                               controller: _chatController,
