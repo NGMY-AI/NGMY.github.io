@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_ai_client.dart';
+import 'ngmy_communicate_debater.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_storage.dart';
 import 'ngmy_communicate_sync.dart';
@@ -29,6 +30,7 @@ const kNgmyCommunicateRoles = <String, String>{
   'financial_advisor': 'Financial Advisor',
   'pastor': 'Pastor',
   'bible_study_teacher': 'Bible Study Teacher',
+  'debater': 'Debater',
   'marriage_advisor': 'Marriage Advisor',
   'doctor': 'Doctor',
   'counselor': 'Counselor',
@@ -52,6 +54,7 @@ const kNgmyCommunicateProfessionalRoles = <String>{
   'financial_advisor',
   'pastor',
   'bible_study_teacher',
+  'debater',
   'marriage_advisor',
   'doctor',
   'mentor',
@@ -69,6 +72,7 @@ const kNgmyRoleSearchAliases = <String, List<String>>{
   'financial_advisor': ['finance', 'financial', 'money', 'budget', 'invest', 'saving', 'debt'],
   'pastor': ['church', 'faith', 'spiritual', 'prayer', 'god', 'bible', 'ministry'],
   'bible_study_teacher': ['bible', 'scripture', 'gospel', 'john', 'corinthians', 'trinity', 'christian', 'study', 'jesus'],
+  'debater': ['debate', 'debating', 'apologetics', 'muslim', 'islam', 'atheist', 'argue', 'defend', 'christian'],
   'marriage_advisor': ['marriage', 'wedding', 'husband', 'wife', 'couple', 'african', 'traditional', 'muslim', 'quran', 'islam'],
   'doctor': ['medical', 'health', 'medicine', 'physician', 'nurse', 'symptom'],
   'therapist': ['therapy', 'mental', 'anxiety', 'depression', 'counsel'],
@@ -354,6 +358,8 @@ class NgmyCommunicateProfile {
         'pastor' => 'Compassionate, faithful, wise — spiritual guidance with love and respect.',
         'bible_study_teacher' =>
           'Warm, sharp Bible Study Teacher — opens the text, uses Hebrew/Greek when it helps, never repetitive.',
+        'debater' =>
+          'Fearless Christian debater — sharp, respectful, always ready to defend Scripture against any religion or worldview.',
         'marriage_advisor' => 'Wise, traditional African marriage elder — firm, respectful, rooted in faith.',
         'doctor' => 'Caring and knowledgeable — health guidance with empathy (not a replacement for in-person medical care).',
         'counselor' => 'Gentle, listening, hopeful — helps people process life challenges.',
@@ -410,6 +416,7 @@ class NgmyCommunicateProfile {
           '- In debates: stay calm, respectful, firm. Dismantle false ideas with Scripture + logic + key original-language words when needed. Never concede Trinity as biblical.\n'
           '- In teach mode: no aggressive debating — nurture understanding first.\n'
           '- Tailor depth to the person — beginner gets simple; scholar gets deeper Greek/Hebrew word studies on keywords only.\n',
+        'debater' => ngmyDebaterRolePromptBlock(),
         'mshauri' =>
           'ROLE: Mshauri — Community Advisor (Swahili: counselor / wise guide). You serve Babembe people and the wider Congolese diaspora, especially families from Fizi territory, South Kivu, DRC, now building life in America.\n'
           'HOW YOU TALK (critical — read every reply):\n'
@@ -1333,6 +1340,21 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   bool get _isTranslator => ngmyCommunicateNormalizeRole(widget.profile.role) == 'translator';
   bool get _isMshauri => ngmyCommunicateNormalizeRole(widget.profile.role) == 'mshauri';
   bool get _isBibleTeacher => ngmyCommunicateNormalizeRole(widget.profile.role) == 'bible_study_teacher';
+  bool get _isDebater => ngmyCommunicateRoleIsDebater(widget.profile.role);
+  final _debateOpponentC = TextEditingController();
+  String _debateChannel = 'sms';
+  bool _debatePasteMode = false;
+  bool _debateAskQuestionNext = false;
+
+  Future<void> _saveDebateSession() async {
+    if (!_isDebater) return;
+    await NgmyDebateSessionStore.save(
+      _email,
+      widget.profile.id,
+      opponentName: _debateOpponentC.text,
+      channel: _debateChannel,
+    );
+  }
 
   Future<String> _advisorExtraContext(String text, List<Map<String, dynamic>> mem) async {
     final buf = StringBuffer();
@@ -1357,6 +1379,21 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     }
     if (_isBibleTeacher) {
       buf.writeln(ngmyBibleStudyModeHint(text));
+      buf.writeln(ngmyBibleStudyOriginalLanguageHint(text));
+    }
+    if (_isDebater) {
+      if (_debateAskQuestionNext) {
+        buf.writeln(ngmyDebateAskQuestionPrompt(
+          opponentName: _debateOpponentC.text.trim(),
+          topic: text.trim().isNotEmpty ? text : null,
+        ));
+      } else if (_debatePasteMode) {
+        buf.writeln(ngmyDebatePastePrompt(
+          text,
+          opponentName: _debateOpponentC.text.trim(),
+          channel: _debateChannel,
+        ));
+      }
       buf.writeln(ngmyBibleStudyOriginalLanguageHint(text));
     }
     return buf.toString();
@@ -1398,6 +1435,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         _translatorNativeLang = langs['native'] ?? '';
         _translatorLearningLang = langs['learning'] ?? '';
       }
+    }
+    if (_isDebater) {
+      final session = await NgmyDebateSessionStore.load(_email, widget.profile.id);
+      _debateOpponentC.text = session['opponentName'] ?? '';
+      _debateChannel = session['channel'] ?? 'sms';
+      _debateOpponentC.addListener(() => unawaited(_saveDebateSession()));
     }
     if (!mounted) return;
     setState(() {
@@ -1497,6 +1540,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     _flushSessionTime();
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
+    _debateOpponentC.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -1588,6 +1632,44 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         'List mentally all questions you see, then answer using that content. $style '
         'Never ask the user to retype questions already visible on their photo. '
         'If something is blurry or cut off, say what you can see and ask only about the missing part.\n';
+  }
+
+  Future<void> _copyDebateReply(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Debate reply copied.'), backgroundColor: Color(0xFF16A34A)),
+    );
+  }
+
+  Future<void> _sendDebateReply(String text) async {
+    await _saveDebateSession();
+    if (!mounted) return;
+    await ngmyDebateSendReply(
+      context: context,
+      userEmail: _email,
+      opponentName: _debateOpponentC.text.trim(),
+      channel: _debateChannel,
+      message: text,
+    );
+  }
+
+  void _toggleDebatePaste() {
+    setState(() {
+      _debatePasteMode = !_debatePasteMode;
+      if (_debatePasteMode) _debateAskQuestionNext = false;
+    });
+  }
+
+  Future<void> _triggerDebateQuestion() async {
+    setState(() {
+      _debateAskQuestionNext = true;
+      _debatePasteMode = false;
+    });
+    if (_controller.text.trim().isEmpty) {
+      _controller.text = 'Give me a debate question to send';
+    }
+    await _send();
   }
 
   Future<String> _resolveApiKey() => ngmyResolveGeminiApiKey(localKey: widget.apiKey, config: widget.config);
@@ -1734,7 +1816,16 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         }));
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          if (_isDebater) {
+            _debatePasteMode = false;
+            _debateAskQuestionNext = false;
+          }
+        });
+        if (_isDebater) unawaited(_saveDebateSession());
+      }
       _scrollBottom();
     }
   }
@@ -1756,14 +1847,22 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         ? 'Unlimited until ${_formatAdvisorPassDate(passUntil)}'
         : '~$remMin min free · then choose a pass';
     final topPad = MediaQuery.paddingOf(context).top + 76;
-    final bottomPad = MediaQuery.paddingOf(context).bottom + 88;
-    final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF3F7FF);
+    final bottomPad = MediaQuery.paddingOf(context).bottom + (_isDebater ? 200 : 88);
     final mutedText = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black45;
     final panelFg = isDark ? Colors.white : const Color(0xFF111827);
     final panelFgMuted = isDark ? Colors.white.withValues(alpha: 0.7) : Colors.black54;
     final panelHint = isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black38;
-    final accent = ngmyCommunicateRoleIsRomantic(widget.profile.role) ? const Color(0xFFEC4899) : kNgmyAdvisorsHubAccent;
-    final accent2 = ngmyCommunicateRoleIsRomantic(widget.profile.role) ? const Color(0xFF9333EA) : kNgmyAdvisorsHubAccent2;
+    final accent = _isDebater
+        ? const Color(0xFFB45309)
+        : ngmyCommunicateRoleIsRomantic(widget.profile.role)
+            ? const Color(0xFFEC4899)
+            : kNgmyAdvisorsHubAccent;
+    final accent2 = _isDebater
+        ? const Color(0xFFDC2626)
+        : ngmyCommunicateRoleIsRomantic(widget.profile.role)
+            ? const Color(0xFF9333EA)
+            : kNgmyAdvisorsHubAccent2;
+    final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF3F7FF);
 
     return Scaffold(
       backgroundColor: scaffoldBg,
@@ -1777,7 +1876,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               itemCount: _messages.length + (_busy ? 1 : 0) + (_messages.isEmpty && _loaded ? 1 : 0),
               itemBuilder: (context, i) {
                 if (_messages.isEmpty && _loaded && i == 0) {
-                  final emptyHint = _isTranslator
+                  final emptyHint = _isDebater
+                      ? 'Debate here anytime — or paste what they said on iMessage/WhatsApp and get a reply to send back.'
+                      : _isTranslator
                       ? 'Tell ${widget.profile.name} what you want to practice in $_translatorLearningLang — simple words only.'
                       : _isMshauri
                           ? 'Say hi to ${widget.profile.name} — talk normal, like texting someone from the community.'
@@ -1844,6 +1945,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                           ),
                         if ((m['text'] ?? '').toString().isNotEmpty)
                           Text(m['text'] ?? '', style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.white)),
+                        if (!user && _isDebater && (m['text'] ?? '').toString().trim().isNotEmpty)
+                          ngmyDebateReplyActions(
+                            replyText: m['text'] ?? '',
+                            opponentName: _debateOpponentC.text.trim(),
+                            channel: _debateChannel,
+                            accent: accent,
+                            onCopy: () => _copyDebateReply(m['text'] ?? ''),
+                            onSend: () => _sendDebateReply(m['text'] ?? ''),
+                          ),
                       ],
                     ),
                   ),
@@ -1918,6 +2028,20 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (_isDebater)
+                      ngmyDebateChatToolbar(
+                        isDark: isDark,
+                        opponentController: _debateOpponentC,
+                        channel: _debateChannel,
+                        pasteMode: _debatePasteMode,
+                        accent: accent,
+                        onChannelChanged: (ch) {
+                          setState(() => _debateChannel = ch);
+                          unawaited(_saveDebateSession());
+                        },
+                        onTogglePasteMode: _toggleDebatePaste,
+                        onAskQuestion: _triggerDebateQuestion,
+                      ),
                     if (_pendingImageB64 != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
@@ -1974,7 +2098,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                                 maxLines: 4,
                                 style: TextStyle(color: panelFg),
                                 decoration: InputDecoration(
-                                  hintText: _allowsPhotoUpload
+                                  hintText: _isDebater
+                                      ? (_debatePasteMode
+                                          ? 'Paste their message here…'
+                                          : 'Debate topic or your argument…')
+                                      : _allowsPhotoUpload
                                       ? 'Ask anything or send a homework photo…'
                                       : ngmyCommunicateRoleIsRomantic(widget.profile.role)
                                           ? 'Write from the heart…'
