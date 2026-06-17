@@ -32,6 +32,10 @@
 	<string>NGMY saves QR codes you download to your photo gallery.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>NGMY uses your location for live store package tracking while you deliver orders.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>NGMY Helper AI can add events to your calendar when you ask it to schedule something.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>NGMY Helper AI can add events to your calendar when you ask it to schedule something.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

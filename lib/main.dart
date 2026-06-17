@@ -64,6 +64,8 @@ import 'ngmy_helper_quota_popup.dart';
 import 'ngmy_helper_kb.dart';
 import 'ngmy_helper_kb_ui.dart';
 import 'ngmy_helper_kb_admin.dart';
+import 'ngmy_phone_integrations.dart';
+import 'ngmy_phone_calendar_intent.dart';
 import 'ngmy_voice_input.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
@@ -6185,6 +6187,7 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n'
           'Community News may be closed for posting — that never disables you. Always answer NGMY Helper AI questions normally.\n'
           'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n'
+          '${ngmyHelperPhoneIntegrationContext()}'
       : 'You are the helpful assistant for the NGMY platform (Next Generation - Make Yours). '
           '$founderFacts'
           'NGMY offers investment plans, daily clock-in earnings, loans, NGMY Store, job marketplace, and civic registry. '
@@ -6195,7 +6198,8 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'The AI is connected and working — never say you are waiting for an API key or that Gemini is unreachable. '
           'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n'
           'Community News may be closed for posting — that never disables you. Always answer NGMY Helper AI questions normally.\n'
-          'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n';
+          'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n'
+          '${ngmyHelperPhoneIntegrationContext()}';
 }
 
 Future<String?> _geminiGenerateReply(
@@ -38588,13 +38592,13 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   List<String> get _quickPrompts => _isBoss
       ? const [
           'Brief me on NGMY today, Sir',
-          'Help me with a relationship situation',
+          'Add a CEO strategy session Friday at 10am to my calendar',
           'What should I focus on as CEO?',
           'Give me a motivational check-in, Boss',
         ]
       : const [
           'How do withdrawals work?',
-          'Tell me about investments',
+          'Add team meeting tomorrow at 2pm to my calendar',
           'How do I clock in?',
           'What is NGMY Store?',
         ];
@@ -39094,18 +39098,28 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           '\nUser: $text';
       final aiResult = await ngmyAiGenerateWithCredentials(creds, prompt);
       if (!mounted) return;
-      final reply = (aiResult.text != null && aiResult.text!.isNotEmpty)
+      final rawReply = (aiResult.text != null && aiResult.text!.isNotEmpty)
           ? aiResult.text!
           : ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: aiResult.error);
+      final parsed = ngmyParseHelperPhoneActions(rawReply);
+      var phoneActions = parsed.actions;
+      if (phoneActions.isEmpty) {
+        phoneActions = ngmyInferCalendarActionsFromUserMessage(text);
+      }
+      final reply = parsed.text.isNotEmpty ? parsed.text : rawReply;
       setState(() {
         _messages.add({
           'role': 'ai',
           'text': reply,
           'at': DateTime.now().toUtc().toIso8601String(),
+          if (phoneActions.isNotEmpty) 'phoneActions': phoneActions.map(_phoneActionToJson).toList(),
         });
         _sortMessagesChronological();
       });
       unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: reply));
+      if (phoneActions.isNotEmpty && mounted) {
+        unawaited(_runHelperPhoneActions(phoneActions));
+      }
     } catch (e) {
       const err = 'Connection error. Please check your internet and try again.';
       setState(() {
@@ -39125,6 +39139,69 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   void _sendQuickPrompt(String text) {
     _chatController.text = text;
     _sendMessage();
+  }
+
+  Map<String, dynamic> _phoneActionToJson(NgmyPhoneAction action) => {
+        'type': action.type,
+        ...action.fields,
+      };
+
+  List<NgmyPhoneAction> _phoneActionsFromMessage(Map<String, dynamic> m) {
+    final raw = m['phoneActions'];
+    if (raw is! List) return const [];
+    final out = <NgmyPhoneAction>[];
+    for (final item in raw) {
+      if (item is Map) {
+        final action = NgmyPhoneAction.fromJson(Map<String, dynamic>.from(item));
+        if (action != null) out.add(action);
+      }
+    }
+    return out;
+  }
+
+  Future<void> _runHelperPhoneActions(List<NgmyPhoneAction> actions) async {
+    for (final action in actions) {
+      if (!mounted) return;
+      if (action.type == 'calendar') {
+        await ngmyPresentPhoneCalendarSheet(
+          context: context,
+          action: action,
+          onDone: (result) async {
+            if (!mounted || result == null) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(result), backgroundColor: const Color(0xFF16A34A)),
+            );
+          },
+        );
+        continue;
+      }
+      final result = await ngmyRunPhoneAction(action, context: context);
+      if (!mounted || result == null) continue;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result), backgroundColor: const Color(0xFF16A34A)),
+      );
+    }
+  }
+
+  Future<void> _tapHelperPhoneAction(NgmyPhoneAction action) async {
+    if (action.type == 'calendar') {
+      await ngmyPresentPhoneCalendarSheet(
+        context: context,
+        action: action,
+        onDone: (result) async {
+          if (!mounted || result == null) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result), backgroundColor: const Color(0xFF16A34A)),
+          );
+        },
+      );
+      return;
+    }
+    final result = await ngmyRunPhoneAction(action, context: context, skipConfirmation: true);
+    if (!mounted || result == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result), backgroundColor: const Color(0xFF16A34A)),
+    );
   }
 
   ImageProvider? _avatarForEmail(String email) {
@@ -39893,6 +39970,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   Widget _chatBubble(Map<String, dynamic> m, bool isDark, {bool typing = false}) {
     final isUser = m['role'] == 'user';
+    final phoneActions = isUser ? const <NgmyPhoneAction>[] : _phoneActionsFromMessage(m);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -39943,6 +40021,12 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                           ),
                         ),
                 ),
+                if (!isUser && phoneActions.isNotEmpty)
+                  ngmyPhoneActionChips(
+                    actions: phoneActions,
+                    isDark: isDark,
+                    onTap: _tapHelperPhoneAction,
+                  ),
               ],
             ),
           ),
