@@ -328,11 +328,17 @@ Future<String?> _runCalendar(NgmyPhoneAction action) async {
   if (kIsWeb) {
     try {
       final bytes = _buildIcs(title: title, start: start, end: end, notes: notes, location: location);
-      final msg = await ngmyDownloadIcsFile(bytes, '${title.replaceAll(RegExp(r'[^\w]+'), '_')}.ics');
-      return msg;
+      final msg = await ngmyDownloadIcsFile(
+        bytes,
+        '${title.replaceAll(RegExp(r'[^\w]+'), '_')}.ics',
+        eventTitle: title,
+      );
+      if (!msg.startsWith('Could not')) return msg;
     } catch (e) {
       debugPrint('[phone] ics open error: $e');
     }
+    final gUrl = _googleCalendarUrl(title: title, start: start, end: end, notes: notes, location: location);
+    return ngmyOpenGoogleCalendarUrl(gUrl);
   }
 
   final url = _googleCalendarUrl(title: title, start: start, end: end, notes: notes, location: location);
@@ -375,7 +381,7 @@ Future<void> ngmyPresentPhoneCalendarSheet({
               const SizedBox(height: 8),
               Text(
                 kIsWeb
-                    ? 'Tap below — your iPhone Calendar app opens so you can tap Add. This is your real Calendar, not inside NGMY.'
+                    ? 'On iPhone: tap the button below, then on the share screen choose Calendar → Add. Do not use a new browser tab inside NGMY.'
                     : 'Tap below to save this on your phone Calendar app.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.35),
@@ -383,8 +389,8 @@ Future<void> ngmyPresentPhoneCalendarSheet({
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: () async {
-                  Navigator.pop(ctx);
                   final result = await ngmyRunPhoneAction(action, skipConfirmation: true);
+                  if (ctx.mounted) Navigator.pop(ctx);
                   await onDone(result);
                 },
                 icon: const Icon(Icons.event_available_rounded),
