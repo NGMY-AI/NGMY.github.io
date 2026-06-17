@@ -10354,6 +10354,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
       }
 
+      final localAnnouncementsJson = safeGet('all_announcements');
+      List<Announcement> localAnnouncements = [];
+      if (localAnnouncementsJson != null) {
+        try {
+          localAnnouncements = (jsonDecode(localAnnouncementsJson) as List)
+              .map((e) => Announcement.fromJson(e))
+              .toList();
+          _allAnnouncements = localAnnouncements;
+        } catch (_) {
+          prefs.remove('all_announcements');
+        }
+      }
+
       final uLocalEarly = safeGet('all_users');
       if (uLocalEarly != null) {
         try {
@@ -10401,13 +10414,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       _reconcileAllUserBalances();
 
-      _allMedia = const [];
-      _allAnnouncements = const [];
-      try {
-        await prefs.remove('all_media');
-        await prefs.remove('all_announcements');
-      } catch (_) {}
-
       if (mounted && !_launchCacheHydrated) {
         _appShellSig = _computeAppShellSig();
         _applySystemUiForMode(_effectiveThemeMode);
@@ -10420,6 +10426,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         prefs: prefs,
         safeGet: safeGet,
         localMedia: localMedia,
+        localAnnouncements: localAnnouncements,
         localCurrent: _currentUser,
       ));
     } catch (e) {
@@ -10431,12 +10438,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     required SharedPreferences prefs,
     required String? Function(String key) safeGet,
     required List<MediaPost> localMedia,
+    required List<Announcement> localAnnouncements,
     required UserData? localCurrent,
   }) async {
     try {
       _disabledSupabaseTables.clear();
       if (!await ngmyCanReachCloud()) {
         debugPrint('[ngmy] offline or slow network — using cached local data');
+        if (localMedia.isNotEmpty) _allMedia = localMedia;
+        if (localAnnouncements.isNotEmpty) _allAnnouncements = localAnnouncements;
         if (mounted) setState(() => _appOffline = true);
         await _persistLocalSnapshot();
         return;

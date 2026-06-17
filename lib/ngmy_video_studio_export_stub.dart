@@ -12,3 +12,5 @@ Future<String> exportNgmyVideoStudioDirect({
 }) async {
   return 'Direct download works in the NGMY web app (Chrome or Edge).';
 }
+
+void cancelNgmyVideoStudioExport() {}

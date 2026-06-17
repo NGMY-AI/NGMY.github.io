@@ -167,16 +167,52 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
 
   Future<void> _closeStudio() async {
     if (_exporting) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please wait for export to finish.')),
-        );
-      }
+      final cancel = await _confirmCancelExport();
+      if (!cancel) return;
+      await _cancelExport();
       return;
     }
     FocusManager.instance.primaryFocus?.unfocus();
     await _disposeAllMedia();
     if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<bool> _confirmCancelExport() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _panel,
+        title: const Text('Cancel export?', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Template recording is in progress. Cancel and go back?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep recording')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Cancel export'),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  Future<void> _cancelExport() async {
+    cancelNgmyVideoStudioExport();
+    if (mounted) {
+      setState(() {
+        _exporting = false;
+        _exportStatus = '';
+        _exportProgress = 0;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Export cancelled.')),
+      );
+    }
   }
 
   @override
@@ -504,6 +540,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
             );
       if (mounted) {
         final lower = msg.toLowerCase();
+        if (lower.contains('export cancelled')) {
+          return;
+        }
         if (ngmyHasStagedIosStudioVideo || lower.contains('tap open & save')) {
           await _showIosSaveVideoDialog(msg);
         } else if (lower.startsWith('export failed') ||
@@ -539,18 +578,23 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width > 760;
     return PopScope(
-      canPop: !_picking && !_exporting,
-      onPopInvokedWithResult: (didPop, _) {
+      canPop: !_picking,
+      onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        if (_picking || _exporting) {
+        if (_picking) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_exporting ? 'Export in progress…' : 'Loading video…'),
-            ),
+            const SnackBar(content: Text('Loading video…')),
           );
+          return;
+        }
+        if (_exporting) {
+          final cancel = await _confirmCancelExport();
+          if (cancel && mounted) await _cancelExport();
         }
       },
-      child: Scaffold(
+      child: Stack(
+        children: [
+          Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
         backgroundColor: _panel,
@@ -611,6 +655,58 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                 ..._controlSections(),
               ],
             ),
+      ),
+          if (_exporting) _exportOverlay(),
+        ],
+      ),
+    );
+  }
+
+  Widget _exportOverlay() {
+    final pct = (_exportProgress.clamp(0.0, 1.0) * 100).round();
+    return Positioned.fill(
+      child: Material(
+        color: Colors.black54,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Card(
+              color: _panel,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Recording template',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                    ),
+                    const SizedBox(height: 14),
+                    LinearProgressIndicator(
+                      value: _exportProgress > 0 ? _exportProgress.clamp(0.02, 0.99) : null,
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(6),
+                      backgroundColor: Colors.white12,
+                      color: const Color(0xFF00B25A),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _exportStatus.isNotEmpty ? _exportStatus : '$pct%',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton(
+                      onPressed: _cancelExport,
+                      style: OutlinedButton.styleFrom(foregroundColor: Colors.white70),
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

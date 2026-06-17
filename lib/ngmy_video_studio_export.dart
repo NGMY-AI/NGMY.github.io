@@ -13,3 +13,7 @@ Future<String> exportNgmyVideoStudioDirect({
 }) {
   return impl.exportNgmyVideoStudioDirect(videoSourceUrl: videoSourceUrl);
 }
+
+void cancelNgmyVideoStudioExport() {
+  impl.cancelNgmyVideoStudioExport();
+}

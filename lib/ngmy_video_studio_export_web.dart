@@ -20,6 +20,18 @@ const _exportAudioBitsPerSecond = 192000;
 const _recorderTimesliceMs = 250;
 const _exportWallCapSec = 150.0;
 
+bool _ngmyExportCancelled = false;
+
+void cancelNgmyVideoStudioExport() {
+  _ngmyExportCancelled = true;
+}
+
+void _resetExportCancel() {
+  _ngmyExportCancelled = false;
+}
+
+bool get _exportWasCancelled => _ngmyExportCancelled;
+
 String _ngmyRecordingStatus(double progress) {
   final pct = (progress.clamp(0.0, 1.0) * 100).round();
   if (pct >= 98) return 'Saving your video…';
@@ -247,6 +259,19 @@ Future<double> _resolveRecordingDurationAsync(Iterable<html.VideoElement> videos
 DateTime _exportDeadlineFor(double durationSec) {
   final budgetSec = (durationSec + 120).ceil().clamp(180, (_maxRecordSeconds + 120).round());
   return DateTime.now().add(Duration(seconds: budgetSec));
+}
+
+DateTime _exportAttemptDeadline(double durationSec) {
+  final cap = math.min(_exportWallCapSec, durationSec + 20);
+  return DateTime.now().add(Duration(seconds: cap.ceil()));
+}
+
+Future<void> _playVideoForRecord(html.VideoElement v) async {
+  try {
+    await v.play().timeout(const Duration(seconds: 4));
+  } catch (e) {
+    debugPrint('[studio export] play for record: $e');
+  }
 }
 
 double _exportProgress(double durationSec, double videoTimeSec, int wallMs, int durationMs) {
@@ -643,6 +668,7 @@ Future<List<html.Blob>> _recordCanvasExport({
 
   final durationMs = (durationSec * 1000).ceil().clamp(_minRecordMs, (_maxRecordSeconds * 1000).round());
   final deadline = _exportDeadlineFor(durationSec);
+  final attemptDeadline = _exportAttemptDeadline(durationSec);
   final wallStart = DateTime.now();
   final wallEnd = wallStart.add(Duration(milliseconds: durationMs + 2000));
   final stallLimit = math.max(480, (durationSec * 8).round());
@@ -650,7 +676,9 @@ Future<List<html.Blob>> _recordCanvasExport({
   final startupGraceMs = 3500;
 
   if (realtimePlayback) {
+    onProgress(0.06, 'Starting playback…');
     for (final v in videoList) {
+      if (_exportWasCancelled) return const [];
       v.playbackRate = 1.0;
       if (withAudio && v == audioVideo) {
         v
@@ -660,11 +688,7 @@ Future<List<html.Blob>> _recordCanvasExport({
         v.muted = true;
       }
       v.currentTime = 0;
-      try {
-        await v.play();
-      } catch (e) {
-        debugPrint('[studio export] play for record: $e');
-      }
+      await _playVideoForRecord(v);
     }
     await _awaitVideoFramePulse(videoList);
     paintFrame();
@@ -676,10 +700,16 @@ Future<List<html.Blob>> _recordCanvasExport({
     int? lastFingerprint;
     var lastFingerprintT = -1.0;
 
-    while (DateTime.now().isBefore(wallEnd) && DateTime.now().isBefore(deadline)) {
+    while (DateTime.now().isBefore(wallEnd) &&
+        DateTime.now().isBefore(deadline) &&
+        DateTime.now().isBefore(attemptDeadline)) {
+      if (_exportWasCancelled) break;
       await _awaitVideoFramePulse(videoList);
       paintFrame();
       tick++;
+      if (tick % 3 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
       if (tick % 6 == 0) {
         try {
           js_util.callMethod(recorder, 'requestData', const []);
@@ -746,6 +776,7 @@ Future<List<html.Blob>> _recordCanvasExport({
       }
     }
   } else {
+    if (_exportWasCancelled) return const [];
     await _recordWallClockFrames(
       videoList: videoList,
       paintFrame: paintFrame,
@@ -773,6 +804,7 @@ Future<List<html.Blob>> _recordCanvasExport({
     js_util.callMethod(recorder, 'requestData', const []);
   } catch (_) {}
   await _stopRecorderDrain(recorder, done);
+  if (_exportWasCancelled) return const [];
   return chunks;
 }
 
@@ -808,19 +840,19 @@ Future<void> _recordWallClockFrames({
     } else {
       v.muted = true;
     }
-    try {
-      await v.play();
-    } catch (e) {
-      debugPrint('[studio export] wall-clock play: $e');
-    }
+      await _playVideoForRecord(v);
   }
   await _awaitVideoFramePulse(videoList);
   paintFrame();
 
   final segmentEnd = wallStart.add(Duration(milliseconds: durationMs));
   final globalEndMs = wallOffsetMs + durationMs;
+  final attemptEnd = _exportAttemptDeadline(durationSec);
 
-  while (DateTime.now().isBefore(segmentEnd) && DateTime.now().isBefore(deadline)) {
+  while (DateTime.now().isBefore(segmentEnd) &&
+      DateTime.now().isBefore(deadline) &&
+      DateTime.now().isBefore(attemptEnd)) {
+    if (_exportWasCancelled) break;
     await _awaitVideoFramePulse(videoList);
     paintFrame();
 
@@ -992,6 +1024,7 @@ Future<String> exportNgmyVideoStudioComposed({
   required NgmyVideoStudioExportConfig config,
   void Function(double progress, String status)? onProgress,
 }) async {
+  _resetExportCancel();
   final sources = config.videoSourcesBySlot;
   if (sources.isEmpty || sources.values.every((s) => s.trim().isEmpty)) {
     return 'Upload at least one video into a screen frame before downloading.';
@@ -1219,6 +1252,7 @@ Future<String> exportNgmyVideoStudioComposed({
     final fallbackMime = mimeCandidates.length > 1 ? mimeCandidates[1] : primaryMime;
 
     Future<List<html.Blob>> tryRecord(String mime, {required bool withAudio, required bool realtime}) async {
+      if (_exportWasCancelled) return const [];
       final recordStream = _videoOnlyStream(canvasStream);
       if (withAudio) {
         _attachExportAudio(recordStream, videoList);
@@ -1238,20 +1272,41 @@ Future<String> exportNgmyVideoStudioComposed({
     }
 
     final appleMobile = _ngmyIsAppleMobileBrowser();
-    for (final plan in [
-      (mime: primaryMime, audio: true, realtime: true),
-      (mime: primaryMime, audio: true, realtime: false),
-      if (!appleMobile) (mime: primaryMime, audio: false, realtime: true),
-      (mime: primaryMime, audio: false, realtime: false),
-      (mime: fallbackMime, audio: true, realtime: false),
-      (mime: fallbackMime, audio: false, realtime: false),
-    ]) {
+    final plans = appleMobile
+        ? [
+            (mime: primaryMime, audio: false, realtime: false),
+            (mime: primaryMime, audio: false, realtime: true),
+            (mime: primaryMime, audio: true, realtime: false),
+            (mime: fallbackMime, audio: false, realtime: false),
+            (mime: fallbackMime, audio: true, realtime: false),
+          ]
+        : [
+            (mime: primaryMime, audio: true, realtime: true),
+            (mime: primaryMime, audio: true, realtime: false),
+            if (!appleMobile) (mime: primaryMime, audio: false, realtime: true),
+            (mime: primaryMime, audio: false, realtime: false),
+            (mime: fallbackMime, audio: true, realtime: false),
+            (mime: fallbackMime, audio: false, realtime: false),
+          ];
+
+    for (var i = 0; i < plans.length; i++) {
+      if (_exportWasCancelled) break;
+      final plan = plans[i];
+      onProgress?.call(
+        0.05 + (i * 0.01),
+        'Recording template… (attempt ${i + 1}/${plans.length})',
+      );
       chunks = await tryRecord(plan.mime, withAudio: plan.audio, realtime: plan.realtime);
+      if (_exportWasCancelled) break;
       if (chunks.isNotEmpty) {
         mimeType = plan.mime;
         break;
       }
       debugPrint('[studio export] retry mime=${plan.mime} audio=${plan.audio} realtime=${plan.realtime}');
+    }
+
+    if (_exportWasCancelled) {
+      return 'Export cancelled.';
     }
 
     onProgress?.call(1.0, 'Saving your file…');

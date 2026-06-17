@@ -322,7 +322,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260616201042";
+      var CURRENT = "20260616202647";
 
       function showError(msg) {
 
@@ -379,7 +379,7 @@
 
   <script>
     (function () {
-      var deployId = '20260616201042';
+      var deployId = '20260616202647';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
@@ -493,17 +493,36 @@
 
       function offlineShellReady(cache) {
         if (!cache) return Promise.resolve(false);
-        return loadFromCache(cache, 'flutter_bootstrap.js').then(function (a) {
-          if (!a) return false;
-          return loadFromCache(cache, 'main.dart.js').then(function (b) { return !!b; });
-        });
+        var required = [
+          'flutter_bootstrap.js',
+          'main.dart.js',
+          'canvaskit/canvaskit.js',
+          'canvaskit/canvaskit.wasm',
+        ];
+        return required.reduce(function (chain, path) {
+          return chain.then(function (ok) {
+            if (!ok) return false;
+            return loadFromCache(cache, path).then(function (hit) { return !!hit; });
+          });
+        }, Promise.resolve(true));
+      }
+
+      function registerServiceWorkerAndWait() {
+        if (!('serviceWorker' in navigator)) return Promise.resolve(null);
+        return navigator.serviceWorker
+          .register('ngmy_service_worker.js?v=' + deployId, { scope: swScope })
+          .then(function (reg) {
+            if (navigator.serviceWorker.controller) return reg;
+            return navigator.serviceWorker.ready.then(function () { return reg; }).catch(function () { return reg; });
+          })
+          .catch(function (e) {
+            console.warn('[ngmy] sw register', e);
+            return null;
+          });
       }
 
       function registerServiceWorkerBackground() {
-        if (!('serviceWorker' in navigator)) return;
-        navigator.serviceWorker
-          .register('ngmy_service_worker.js?v=' + deployId, { scope: swScope })
-          .catch(function (e) { console.warn('[ngmy] sw register', e); });
+        registerServiceWorkerAndWait();
       }
 
       function runBootstrapFromCache(cache) {
@@ -559,13 +578,15 @@
             if (!cache) return;
             offlineShellReady(cache).then(function (ready) {
               if (ready) runBootstrapFromCache(cache);
+              else showBootstrapError();
             });
           });
-        }, 4000);
+        }, 12000);
+        window.addEventListener('flutter-first-frame', function () { clearTimeout(timer); }, { once: true });
         var s = document.createElement('script');
-        s.src = 'flutter_bootstrap.js';
+        s.src = 'flutter_bootstrap.js?v=' + deployId;
         s.async = false;
-        s.onload = function () { clearTimeout(timer); warmOfflineCache(); };
+        s.onload = function () { warmOfflineCache(); };
         s.onerror = function () {
           clearTimeout(timer);
           openOfflineCache().then(function (cache) {
@@ -577,20 +598,32 @@
       }
 
       function startApp() {
-        window.__ngmyHideSplash && window.__ngmyHideSplash();
-        registerServiceWorkerBackground();
+        var bootTimer = setTimeout(function () {
+          showBootstrapError('NGMY is taking too long to start. Open once with Wi-Fi, wait for the home screen, then try offline again.');
+        }, 28000);
+        window.addEventListener('flutter-first-frame', function () { clearTimeout(bootTimer); }, { once: true });
 
-        openOfflineCache().then(function (cache) {
-          return offlineShellReady(cache).then(function (ready) {
-            if (ready) {
-              return runBootstrapFromCache(cache);
-            }
-            if (!navigator.onLine) {
-              showBootstrapError('Open NGMY once with Wi-Fi on, wait for the home screen, then you can use it offline.');
-              return;
-            }
+        registerServiceWorkerAndWait().then(function () {
+          var hasController = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+          if (hasController || navigator.onLine) {
+            window.__ngmyHideSplash && window.__ngmyHideSplash();
             bootFromNetwork();
+            return;
+          }
+          return openOfflineCache().then(function (cache) {
+            return offlineShellReady(cache).then(function (ready) {
+              window.__ngmyHideSplash && window.__ngmyHideSplash();
+              if (ready) return runBootstrapFromCache(cache);
+              if (!navigator.onLine) {
+                showBootstrapError('Open NGMY once with Wi-Fi on, wait for the home screen, then you can use it offline.');
+                return;
+              }
+              bootFromNetwork();
+            });
           });
+        }).catch(function () {
+          window.__ngmyHideSplash && window.__ngmyHideSplash();
+          bootFromNetwork();
         });
       }
 

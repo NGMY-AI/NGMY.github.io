@@ -172,6 +172,11 @@ self.addEventListener('fetch', (event) => {
         if (cached) return cached;
         const offlineFallback = await cacheLookupByPathname(url);
         if (offlineFallback) return offlineFallback;
+        if (isCriticalScript(url) || url.pathname.indexOf('canvaskit') !== -1) {
+          const alt = await cache.match('./canvaskit/canvaskit.wasm')
+            || await cache.match('canvaskit/canvaskit.wasm');
+          if (alt && url.pathname.endsWith('.wasm')) return alt;
+        }
         return new Response('Offline — asset not cached: ' + url.pathname, {
           status: 503,
           statusText: 'Offline cache miss',
