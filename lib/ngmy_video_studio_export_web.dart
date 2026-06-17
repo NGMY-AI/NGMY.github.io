@@ -221,21 +221,26 @@ int? _sampleCanvasPixel(html.CanvasRenderingContext2D ctx, int x, int y) {
 html.VideoElement? _exportAudioElement;
 html.VideoElement? _ngmyWebAudioSourceVideo;
 
-void _applyExportVideoStaging(html.VideoElement v) {
-  final vw = v.videoWidth > 0 ? v.videoWidth : 720;
-  final vh = v.videoHeight > 0 ? v.videoHeight : 1280;
+void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH}) {
+  // iOS Safari freezes off-screen videos — keep in viewport at near-zero opacity.
+  final w = preferW ?? (v.videoWidth > 0 ? v.videoWidth : 720);
+  final h = preferH ?? (v.videoHeight > 0 ? v.videoHeight : 1280);
   v
     ..style.position = 'fixed'
-    ..style.left = '-9999px'
+    ..style.left = '0'
     ..style.top = '0'
-    ..style.width = '${vw}px'
-    ..style.height = '${vh}px'
+    ..style.width = '${w}px'
+    ..style.height = '${h}px'
     ..style.objectFit = 'contain'
-    ..style.opacity = '0.01'
+    ..style.opacity = '0.02'
     ..style.pointerEvents = 'none'
-    ..style.zIndex = '1'
+    ..style.zIndex = '2147483640'
     ..style.transform = 'translateZ(0)';
   v.style.setProperty('will-change', 'transform');
+}
+
+void _applyExportVideoStaging(html.VideoElement v) {
+  _stageHiddenVideoElement(v);
 }
 
 void _cleanupExportElements() {
@@ -264,15 +269,8 @@ Future<html.VideoElement?> _ensureExportAudioElement(html.VideoElement source) a
   if (src.startsWith('http') && !src.startsWith('blob:')) {
     el.crossOrigin = 'anonymous';
   }
-  el
-    ..style.position = 'fixed'
-    ..style.left = '-9999px'
-    ..style.top = '0'
-    ..style.width = '2px'
-    ..style.height = '2px'
-    ..style.opacity = '0.01'
-    ..style.pointerEvents = 'none';
   html.document.body?.append(el);
+  _stageHiddenVideoElement(el);
   for (var i = 0; i < 80; i++) {
     if (el.readyState >= html.MediaElement.HAVE_METADATA) break;
     await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -864,6 +862,10 @@ Future<List<html.Blob>> _recordCanvasExport({
 
       final t = primary != null ? primary.currentTime.toDouble() : 0.0;
       final wallMs = DateTime.now().difference(wallStart).inMilliseconds;
+      if (wallMs > 6000 && t < 0.08) {
+        debugPrint('[studio export] video frozen at t=$t — aborting attempt');
+        break;
+      }
       if (wallMs >= startupGraceMs) {
         if ((t - lastT).abs() < 0.006) {
           stallTicks++;
@@ -1018,6 +1020,10 @@ Future<void> _recordWallClockFrames({
     final elapsedMs = DateTime.now().difference(wallStart).inMilliseconds;
     final globalMs = wallOffsetMs + elapsedMs;
     final t = primary?.currentTime.toDouble() ?? (globalMs / 1000.0);
+    if (elapsedMs > 6000 && t < startSec + 0.08) {
+      debugPrint('[studio export] wall-clock video frozen — aborting');
+      break;
+    }
     final p = _exportProgress(fullSec, t, globalMs, fullMs);
     onProgress(p, _ngmyRecordingStatus(p));
 
@@ -1443,11 +1449,12 @@ Future<String> exportNgmyVideoStudioComposed({
     final appleMobile = _ngmyIsAppleMobileBrowser();
     final plans = appleMobile
         ? [
-            (mime: primaryMime, audio: true, realtime: false),
             (mime: primaryMime, audio: true, realtime: true),
+            (mime: primaryMime, audio: true, realtime: false),
+            (mime: fallbackMime, audio: true, realtime: true),
             (mime: fallbackMime, audio: true, realtime: false),
+            (mime: primaryMime, audio: false, realtime: true),
             (mime: primaryMime, audio: false, realtime: false),
-            (mime: fallbackMime, audio: false, realtime: false),
           ]
         : [
             (mime: primaryMime, audio: true, realtime: true),

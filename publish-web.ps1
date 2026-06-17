@@ -107,6 +107,28 @@ if (Test-Path $bootPath) {
     Set-Content -Path $bootPath -Value $boot -Encoding UTF8 -NoNewline
     Write-Host "  Patched flutter_bootstrap.js (disabled Flutter unregister-only worker)" -ForegroundColor DarkGray
 }
+# Force local CanvasKit (required for iOS offline — default loads from gstatic CDN).
+if (Test-Path $bootPath) {
+    $boot = Get-Content $bootPath -Raw
+    $loaderPatch = @'
+_flutter.loader.load({
+  config: {
+    canvasKitBaseUrl: "./canvaskit/",
+    useLocalCanvasKit: true
+  }
+}).catch(function (e) {
+  console.error("[ngmy] Flutter load failed", e);
+  window.__ngmyShowLoadError && window.__ngmyShowLoadError(
+    "NGMY could not load the app engine. Tap Reload. If you are offline, open once on Wi-Fi and wait for the home screen."
+  );
+});
+'@
+    if ($boot -match '_flutter\.loader\.load\(\{\}\);') {
+        $boot = $boot -replace '_flutter\.loader\.load\(\{\}\);', $loaderPatch
+        Set-Content -Path $bootPath -Value $boot -Encoding UTF8 -NoNewline
+        Write-Host "  Patched flutter_bootstrap.js (local CanvasKit for iOS offline)" -ForegroundColor DarkGray
+    }
+}
 $flutterSw = Join-Path $PSScriptRoot "docs\flutter_service_worker.js"
 if (Test-Path $flutterSw) {
     Remove-Item $flutterSw -Force

@@ -310,7 +310,7 @@
 
     <p style="font-size:18px;font-weight:800">NGMY could not start</p>
 
-    <p id="ngmy-error-msg" style="opacity:0.8;max-width:320px"></p>
+    <p id="ngmy-error-msg" style="opacity:0.8;max-width:320px;line-height:1.45"></p>
 
     <button onclick="location.reload()" style="margin-top:16px;padding:12px 24px;border:none;border-radius:8px;background:#00B25A;color:#fff;font-weight:700">Reload</button>
 
@@ -322,7 +322,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260616211304";
+      var CURRENT = "20260616212843";
 
       function showError(msg) {
 
@@ -379,7 +379,7 @@
 
   <script>
     (function () {
-      var deployId = '20260616211304';
+      var deployId = '20260616212843';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
@@ -390,6 +390,8 @@
         'main.dart.js',
         'canvaskit/canvaskit.js',
         'canvaskit/canvaskit.wasm',
+        'canvaskit/chromium/canvaskit.js',
+        'canvaskit/chromium/canvaskit.wasm',
         'assets/AssetManifest.bin.json',
         'assets/FontManifest.json',
       ];
@@ -498,6 +500,8 @@
           'main.dart.js',
           'canvaskit/canvaskit.js',
           'canvaskit/canvaskit.wasm',
+          'canvaskit/chromium/canvaskit.js',
+          'canvaskit/chromium/canvaskit.wasm',
         ];
         return required.reduce(function (chain, path) {
           return chain.then(function (ok) {
@@ -619,8 +623,8 @@
 
       function startApp() {
         var bootTimer = setTimeout(function () {
-          showBootstrapError('NGMY is still loading. On iPhone the first open can take 1â€“2 minutes â€” keep the app open and try again.');
-        }, 120000);
+          showBootstrapError('NGMY is still loading. Please wait up to 3 minutes on iPhone, then tap Reload.');
+        }, 180000);
         window.addEventListener('flutter-first-frame', function () { clearTimeout(bootTimer); }, { once: true });
 
         registerServiceWorkerAndWait();
