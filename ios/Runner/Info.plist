@@ -36,6 +36,8 @@
 	<string>NGMY Helper AI can add events to your calendar when you ask it to schedule something.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>NGMY Helper AI can add events to your calendar when you ask it to schedule something.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>NGMY Helper AI can call and message people by name from your phone contacts when you ask.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

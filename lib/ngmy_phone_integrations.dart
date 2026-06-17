@@ -15,42 +15,47 @@ export 'ngmy_phone_action_ui.dart';
 const List<({String id, String label, String example})> kNgmyPhoneConnectedApps = [
   (id: 'calendar', label: 'Calendar', example: 'Add dentist Friday at 3pm'),
   (id: 'maps', label: 'Maps', example: 'Open directions to 123 Main St'),
-  (id: 'phone', label: 'Phone', example: 'Call my doctor at 555-0100'),
-  (id: 'sms', label: 'Messages', example: 'Text Mom I am on my way'),
+  (id: 'call', label: 'Phone', example: 'Call Mom'),
+  (id: 'sms', label: 'iMessage / Messages', example: 'Text Sarah I am on my way'),
+  (id: 'whatsapp', label: 'WhatsApp', example: 'WhatsApp John saying hello'),
   (id: 'email', label: 'Mail', example: 'Email support about my order'),
   (id: 'browser', label: 'Safari / Chrome', example: 'Open ngmy.org'),
 ];
 
-/// Instructions appended to Helper AI prompts so the model can trigger phone actions.
-String ngmyHelperPhoneIntegrationContext({DateTime? now}) {
+String ngmyHelperPhoneIntegrationContext({
+  DateTime? now,
+  String contactsDirectory = '',
+}) {
   final today = (now ?? DateTime.now()).toLocal();
   final todayLabel =
       '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')} '
       '${today.hour.toString().padLeft(2, '0')}:${today.minute.toString().padLeft(2, '0')} (user local time)';
   return '''
-PHONE INTEGRATIONS — CRITICAL: When the user asks to add/book/schedule a meeting or event on their PHONE calendar (Apple Calendar, Google Calendar, etc. — NOT anything inside the NGMY app), you MUST append the block below. Without it, their real calendar will not update.
+PHONE INTEGRATIONS — You can open real apps on the user's phone. Use the person's NAME (not phone number) when they say a name — the app looks up contacts automatically.
 
-Today is $todayLabel. Use this for "tomorrow", "Friday", "next week", etc.
+${contactsDirectory.isNotEmpty ? '$contactsDirectory\n' : ''}
+Today is $todayLabel.
 
-Reply in plain language first, then append EXACTLY:
+When the user asks to call, text, WhatsApp, iMessage, calendar, maps, email, or open a link, reply in plain language first, then append:
 
 [[NGMY_PHONE_ACTIONS]]
-[{"type":"calendar","title":"Team meeting","start":"2026-06-20T14:00:00","end":"2026-06-20T15:00:00","notes":"optional","location":"optional"}]
+[{"type":"call","name":"Mom"}]
 [[/NGMY_PHONE_ACTIONS]]
 
-Supported action types (JSON array):
-- calendar — title (required), start (ISO 8601 local datetime), end (optional, default +1 hour), notes, location
-- maps — query or address (required)
-- call — phone (required)
-- sms — phone (required), body (optional)
-- email — to (required), subject, body
-- open_url — url (required)
+Action types (JSON array):
+- calendar — title, start (ISO local), end (optional), notes, location
+- call — name (preferred) OR phone
+- sms — name OR phone, body (optional) — opens iMessage/Messages on iPhone
+- whatsapp — name OR phone, body (optional)
+- maps — query or address
+- email — to (email or name if in contacts), subject, body
+- open_url — url
 
 Rules:
-- REQUIRED for any calendar / meeting / appointment request — never skip the block.
-- start/end must be valid ISO datetimes in the user's local timezone.
-- Never invent phone numbers or emails — ask if missing.
-- Do not tell them to use NGMY's in-app admin calendar — this is their real iPhone/Android calendar.
+- When user says "call Mom" or "text John on WhatsApp", use "name" — NEVER invent phone numbers.
+- If the name is not in PHONE CONTACTS, tell them to link contacts in Helper AI.
+- REQUIRED calendar block for any meeting/appointment request.
+- start/end must be valid ISO datetimes in local timezone.
 ''';
 }
 
@@ -66,6 +71,7 @@ class NgmyPhoneAction {
         'maps' => 'Open Maps',
         'call' => 'Call',
         'sms' => 'Send Text',
+        'whatsapp' => 'WhatsApp',
         'email' => 'Send Email',
         'open_url' => 'Open Link',
         _ => 'Run',
@@ -76,6 +82,7 @@ class NgmyPhoneAction {
         'maps' => Icons.map_rounded,
         'call' => Icons.phone_rounded,
         'sms' => Icons.sms_rounded,
+        'whatsapp' => Icons.chat_rounded,
         'email' => Icons.email_rounded,
         'open_url' => Icons.open_in_new_rounded,
         _ => Icons.phonelink_rounded,
@@ -94,7 +101,12 @@ class NgmyPhoneAction {
         return fields['query'] ?? fields['address'] ?? 'Open location';
       case 'call':
       case 'sms':
-        return fields['phone'] ?? '';
+      case 'whatsapp':
+        final who = fields['contactName'] ?? fields['name'] ?? '';
+        final phone = fields['phone'] ?? '';
+        if (who.isNotEmpty && phone.isNotEmpty) return '$who · $phone';
+        if (who.isNotEmpty) return who;
+        return phone;
       case 'email':
         return fields['to'] ?? fields['subject'] ?? 'Email';
       case 'open_url':
@@ -160,7 +172,7 @@ class NgmyPhoneAction {
     if (actions.isNotEmpty) return (text: text, actions: actions);
   }
 
-  final loose = RegExp(r'(\[\s*\{[\s\S]*?"type"\s*:\s*"(?:calendar|maps|call|sms|email|open_url)"[\s\S]*?\}\s*\])');
+  final loose = RegExp(r'(\[\s*\{[\s\S]*?"type"\s*:\s*"(?:calendar|maps|call|sms|whatsapp|email|open_url)"[\s\S]*?\}\s*\])');
   final looseMatch = loose.firstMatch(raw);
   if (looseMatch != null) {
     text = raw.replaceFirst(loose, '').trim();
@@ -264,7 +276,11 @@ Future<bool> _launchExternal(Uri uri, {LaunchMode mode = LaunchMode.externalAppl
 }
 
 bool _needsConfirmation(NgmyPhoneAction action) {
-  return action.type == 'calendar' || action.type == 'call' || action.type == 'sms' || action.type == 'email';
+  return action.type == 'calendar' ||
+      action.type == 'call' ||
+      action.type == 'sms' ||
+      action.type == 'whatsapp' ||
+      action.type == 'email';
 }
 
 Future<String?> ngmyRunPhoneAction(
@@ -286,6 +302,8 @@ Future<String?> ngmyRunPhoneAction(
       return _runCall(action);
     case 'sms':
       return _runSms(action);
+    case 'whatsapp':
+      return _runWhatsApp(action);
     case 'email':
       return _runEmail(action);
     case 'open_url':
@@ -356,20 +374,44 @@ Future<String?> _runMaps(NgmyPhoneAction action) async {
 
 Future<String?> _runCall(NgmyPhoneAction action) async {
   final phone = (action.fields['phone'] ?? '').replaceAll(RegExp(r'[^\d+]+'), '');
-  if (phone.isEmpty) return 'No phone number provided.';
+  if (phone.isEmpty) return 'No phone number — link contacts or say the number.';
   final ok = await _launchExternal(Uri.parse('tel:$phone'));
-  return ok ? 'Opening Phone…' : 'Could not start a call.';
+  final who = action.fields['contactName'] ?? action.fields['name'] ?? '';
+  return ok
+      ? (who.isNotEmpty ? 'Calling $who…' : 'Opening Phone…')
+      : 'Could not start a call.';
 }
 
 Future<String?> _runSms(NgmyPhoneAction action) async {
   final phone = (action.fields['phone'] ?? '').replaceAll(RegExp(r'[^\d+]+'), '');
-  if (phone.isEmpty) return 'No phone number provided.';
+  if (phone.isEmpty) return 'No phone number — link contacts or say the number.';
   final body = action.fields['body']?.trim() ?? '';
   final uri = body.isEmpty
       ? Uri.parse('sms:$phone')
       : Uri.parse('sms:$phone?body=${Uri.encodeComponent(body)}');
   final ok = await _launchExternal(uri);
-  return ok ? 'Opening Messages…' : 'Could not open Messages.';
+  final who = action.fields['contactName'] ?? action.fields['name'] ?? '';
+  return ok
+      ? (who.isNotEmpty ? 'Opening Messages to $who…' : 'Opening Messages…')
+      : 'Could not open Messages.';
+}
+
+Future<String?> _runWhatsApp(NgmyPhoneAction action) async {
+  final phone = (action.fields['phone'] ?? '').replaceAll(RegExp(r'[^\d]'), '');
+  if (phone.isEmpty) return 'No phone number — link contacts or say the number.';
+  final body = action.fields['body']?.trim() ?? '';
+  final params = body.isNotEmpty ? '?text=${Uri.encodeComponent(body)}' : '';
+  final candidates = [
+    Uri.parse('https://wa.me/$phone$params'),
+    Uri.parse('whatsapp://send?phone=$phone${body.isNotEmpty ? '&text=${Uri.encodeComponent(body)}' : ''}'),
+  ];
+  for (final uri in candidates) {
+    if (await _launchExternal(uri)) {
+      final who = action.fields['contactName'] ?? action.fields['name'] ?? '';
+      return who.isNotEmpty ? 'Opening WhatsApp to $who…' : 'Opening WhatsApp…';
+    }
+  }
+  return 'Could not open WhatsApp.';
 }
 
 Future<String?> _runEmail(NgmyPhoneAction action) async {

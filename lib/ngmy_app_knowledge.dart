@@ -23,7 +23,7 @@ class NgmyAppKnowledge {
       ..writeln('- Home: balance, clock-in, quick actions, games, loans, civic registry links')
       ..writeln('- Media Hub: posts, stories, likes, comments, profiles')
       ..writeln('- NGMY Store: listings, cart, orders, seller tools')
-      ..writeln('- News & NGMY Helper: announcements + AI chat (this screen)')
+      ..writeln('- News & NGMY Helper: announcements + AI chat — can call/text/calendar/maps on your phone by name')
       ..writeln('- Profile: settings, wallet, transaction history, theme, logout')
       ..writeln('- Invest: investment plans, purchase, ROI / clock-in earnings')
       ..writeln('- Jobs marketplace, worksheets, family tree, QR tools, fun games (from Home)')

@@ -66,6 +66,9 @@ import 'ngmy_helper_kb_ui.dart';
 import 'ngmy_helper_kb_admin.dart';
 import 'ngmy_phone_integrations.dart';
 import 'ngmy_phone_calendar_intent.dart';
+import 'ngmy_phone_contacts.dart';
+import 'ngmy_phone_contact_resolve.dart';
+import 'ngmy_phone_contact_intent.dart';
 import 'ngmy_voice_input.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
@@ -6187,7 +6190,6 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n'
           'Community News may be closed for posting — that never disables you. Always answer NGMY Helper AI questions normally.\n'
           'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n'
-          '${ngmyHelperPhoneIntegrationContext()}'
       : 'You are the helpful assistant for the NGMY platform (Next Generation - Make Yours). '
           '$founderFacts'
           'NGMY offers investment plans, daily clock-in earnings, loans, NGMY Store, job marketplace, and civic registry. '
@@ -6198,8 +6200,7 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'The AI is connected and working — never say you are waiting for an API key or that Gemini is unreachable. '
           'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n'
           'Community News may be closed for posting — that never disables you. Always answer NGMY Helper AI questions normally.\n'
-          'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n'
-          '${ngmyHelperPhoneIntegrationContext()}';
+          'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n';
 }
 
 Future<String?> _geminiGenerateReply(
@@ -38598,8 +38599,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         ]
       : const [
           'How do withdrawals work?',
-          'Add team meeting tomorrow at 2pm to my calendar',
-          'How do I clock in?',
+          'Text Mom saying I am on my way',
+          'Call John',
           'What is NGMY Store?',
         ];
 
@@ -38703,6 +38704,14 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         if (!mounted) return;
         setState(() => _kbVoluntaryBrowse = true);
       },
+    );
+  }
+
+  Future<void> _openPhoneContactsLink() async {
+    await ngmyShowLinkContactsSheet(
+      context,
+      userEmail: widget.user.email,
+      ngmyUsers: ngmyUsersToContactMaps(widget.allUsers),
     );
   }
 
@@ -39092,7 +39101,15 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
       final creds = ngmyParseAiCredentials(apiKey);
       final liveDb = widget.liveAppKnowledge?.call() ?? '';
+      final ngmyUserMaps = ngmyUsersToContactMaps(widget.allUsers);
+      final contacts = await NgmyPhoneContactsStore.ensureHydrated(
+        widget.user.email,
+        ngmyUsers: ngmyUserMaps,
+      );
+      final contactsDir = NgmyPhoneContactsStore.directoryForAi(contacts);
+      final phoneCtx = ngmyHelperPhoneIntegrationContext(contactsDirectory: contactsDir);
       final prompt = '${_ngmyHelperSystemContext(user: widget.user)}'
+          '\n$phoneCtx\n'
           '${liveDb.isNotEmpty ? '\n$liveDb\n' : ''}'
           '${_messages.isNotEmpty ? '\n${NgmyAiMemoryStore.transcriptForPrompt(_messages)}\n' : ''}'
           '\nUser: $text';
@@ -39104,8 +39121,17 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       final parsed = ngmyParseHelperPhoneActions(rawReply);
       var phoneActions = parsed.actions;
       if (phoneActions.isEmpty) {
-        phoneActions = ngmyInferCalendarActionsFromUserMessage(text);
+        phoneActions = [
+          ...ngmyInferCalendarActionsFromUserMessage(text),
+          ...ngmyInferContactActionsFromUserMessage(text),
+        ];
       }
+      phoneActions = await ngmyResolvePhoneActionsByName(
+        context: context,
+        userEmail: widget.user.email,
+        actions: phoneActions,
+        ngmyUsers: ngmyUserMaps,
+      );
       final reply = parsed.text.isNotEmpty ? parsed.text : rawReply;
       setState(() {
         _messages.add({
@@ -39428,6 +39454,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                         ),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'Link phone contacts',
+                    onPressed: _openPhoneContactsLink,
+                    icon: const Icon(Icons.contacts_rounded, color: Colors.white),
                   ),
                   IconButton(
                     onPressed: () => NgmyNavigator.pop(context),

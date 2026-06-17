@@ -17,6 +17,7 @@ Color _accentForType(String type) => switch (type) {
       'calendar' => const Color(0xFF00B25A),
       'call' => const Color(0xFF2563EB),
       'sms' => const Color(0xFF7C3AED),
+      'whatsapp' => const Color(0xFF25D366),
       'email' => const Color(0xFFEA580C),
       'maps' => const Color(0xFF0891B2),
       _ => const Color(0xFF00B25A),
@@ -25,7 +26,8 @@ Color _accentForType(String type) => switch (type) {
 String _headlineFor(NgmyPhoneAction action) => switch (action.type) {
       'calendar' => 'Add to iPhone Calendar',
       'call' => 'Place a phone call',
-      'sms' => 'Send a text message',
+      'sms' => 'Send iMessage / text',
+      'whatsapp' => 'Send WhatsApp message',
       'email' => 'Compose an email',
       'maps' => 'Open in Maps',
       'open_url' => 'Open link',
@@ -35,8 +37,9 @@ String _headlineFor(NgmyPhoneAction action) => switch (action.type) {
 String _subtitleFor(NgmyPhoneAction action) => switch (action.type) {
       'calendar' =>
         'Tap continue — iPhone will ask if ngmy.org may show a calendar invite. Tap Allow, then Add.',
-      'call' => 'This opens your Phone app to dial this number.',
-      'sms' => 'This opens Messages with this number ready.',
+      'call' => 'Opens your Phone app to call this contact.',
+      'sms' => 'Opens Messages / iMessage with this person.',
+      'whatsapp' => 'Opens WhatsApp with this person and your message.',
       'email' => 'This opens Mail with the address filled in.',
       'maps' => 'This opens Maps for this location.',
       'open_url' => 'This opens the link in your browser.',
@@ -47,6 +50,7 @@ String _primaryLabelFor(NgmyPhoneAction action) => switch (action.type) {
       'calendar' => 'Show calendar invite',
       'call' => 'Call now',
       'sms' => 'Open Messages',
+      'whatsapp' => 'Open WhatsApp',
       'email' => 'Open Mail',
       'maps' => 'Open Maps',
       'open_url' => 'Open link',
@@ -55,7 +59,7 @@ String _primaryLabelFor(NgmyPhoneAction action) => switch (action.type) {
 
 Widget _detailCard(NgmyPhoneAction action, Color accent, bool isDark) {
   final detail = switch (action.type) {
-    'call' || 'sms' => ngmyFormatPhoneDisplay(action.fields['phone'] ?? action.summary),
+    'call' || 'sms' || 'whatsapp' => action.summary,
     _ => action.summary,
   };
   return Container(
