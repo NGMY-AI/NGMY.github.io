@@ -218,21 +218,55 @@ int? _sampleCanvasPixel(html.CanvasRenderingContext2D ctx, int x, int y) {
   }
 }
 
-void _applyExportVideoStaging(html.VideoElement v, int w, int h) {
-  v.width = w;
-  v.height = h;
+void _applyExportVideoStaging(html.VideoElement v) {
+  // Keep native video dimensions — forcing width/height distorts export frames.
   v
     ..style.position = 'fixed'
     ..style.left = '0'
     ..style.top = '0'
-    ..style.width = '${w}px'
-    ..style.height = '${h}px'
+    ..style.width = '2px'
+    ..style.height = '2px'
     ..style.objectFit = 'contain'
-    ..style.opacity = '0.05'
+    ..style.opacity = '0.01'
     ..style.pointerEvents = 'none'
     ..style.zIndex = '1'
     ..style.transform = 'translateZ(0)';
   v.style.setProperty('will-change', 'transform');
+}
+
+/// Match studio preview (`object-fit: cover` / BoxFit.cover) — no stretch.
+void _drawVideoCoverInRect(
+  html.CanvasRenderingContext2D ctx,
+  html.VideoElement video,
+  double dx,
+  double dy,
+  double dw,
+  double dh,
+) {
+  var vw = video.videoWidth;
+  var vh = video.videoHeight;
+  if (vw <= 0 || vh <= 0) {
+    vw = video.clientWidth;
+    vh = video.clientHeight;
+  }
+  if (vw <= 0 || vh <= 0) {
+    ctx.drawImageScaled(video, dx, dy, dw, dh);
+    return;
+  }
+  final videoAspect = vw / vh;
+  final slotAspect = dw / dh;
+  double drawW;
+  double drawH;
+  if (videoAspect > slotAspect) {
+    drawH = dh;
+    drawW = dh * videoAspect;
+  } else {
+    drawW = dw;
+    drawH = dw / videoAspect;
+  }
+  final drawX = dx + (dw - drawW) / 2;
+  final drawY = dy + (dh - drawH) / 2;
+  ctx.drawImageScaled(video, drawX, drawY, drawW, drawH);
 }
 
 double _resolveRecordingDuration(Iterable<html.VideoElement> videos) {
@@ -608,6 +642,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   required void Function() paintFrame,
   required int? Function()? samplePaintFingerprint,
   required List<html.VideoElement> videoList,
+  required html.VideoElement? primaryVideo,
   required double durationSec,
   required void Function(double progress, String status) onProgress,
   required bool realtimePlayback,
@@ -647,7 +682,7 @@ Future<List<html.Blob>> _recordCanvasExport({
 
   await Future<void>.delayed(const Duration(milliseconds: 200));
 
-  final primary = _pickPrimaryVideo(videoList);
+  final primary = primaryVideo ?? _pickPrimaryVideo(videoList);
   final audioVideo = withAudio ? primary : null;
 
   for (final v in videoList) {
@@ -825,7 +860,7 @@ Future<void> _recordWallClockFrames({
   final fullSec = totalDurationSec ?? durationSec;
   final fullMs = totalDurationMs ?? durationMs;
   final startSec = (wallOffsetMs / 1000.0).clamp(0.0, fullSec);
-  final primary = _pickPrimaryVideo(videoList);
+  final primary = audioVideo ?? _pickPrimaryVideo(videoList);
 
   for (final v in videoList) {
     v.pause();
@@ -882,6 +917,8 @@ bool _webSupportsComposedCapture() {
 
 (int, int) _exportDimensions(NgmyVideoStudioExportConfig config) => (config.outputWidth, config.outputHeight);
 
+html.VideoElement? _ngmyWebAudioSourceVideo;
+
 void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video) {
   if (composed.getAudioTracks().isNotEmpty) return;
   video
@@ -898,15 +935,16 @@ void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video)
   } catch (e) {
     debugPrint('[studio export] captureStream audio failed: $e');
   }
+  if (_ngmyWebAudioSourceVideo == video) return;
   try {
     final ctor = js_util.getProperty(html.window, 'AudioContext') ??
         js_util.getProperty(html.window, 'webkitAudioContext');
     if (ctor == null) return;
     final ctx = js_util.callConstructor(ctor, []);
     final src = js_util.callMethod(ctx, 'createMediaElementSource', [video]);
+    _ngmyWebAudioSourceVideo = video;
     final dest = js_util.callMethod(ctx, 'createMediaStreamDestination', []);
     js_util.callMethod(src, 'connect', [dest]);
-    js_util.callMethod(src, 'connect', [js_util.getProperty(ctx, 'destination')]);
     final stream = js_util.getProperty(dest, 'stream');
     if (stream is html.MediaStream) {
       for (final t in stream.getAudioTracks()) {
@@ -924,12 +962,12 @@ html.VideoElement? _pickPrimaryVideo(List<html.VideoElement> videoList) {
   return videoList.first;
 }
 
-void _attachExportAudio(html.MediaStream recordStream, List<html.VideoElement> videoList) {
-  final primary = _pickPrimaryVideo(videoList);
-  if (primary == null) return;
+void _attachExportAudio(html.MediaStream recordStream, html.VideoElement primary) {
   primary
     ..muted = false
-    ..volume = 1.0;
+    ..volume = 1.0
+    ..defaultMuted = false;
+  primary.removeAttribute('muted');
   _appendVideoAudioTracks(recordStream, primary);
 }
 
@@ -1025,6 +1063,7 @@ Future<String> exportNgmyVideoStudioComposed({
   void Function(double progress, String status)? onProgress,
 }) async {
   _resetExportCancel();
+  _ngmyWebAudioSourceVideo = null;
   final sources = config.videoSourcesBySlot;
   if (sources.isEmpty || sources.values.every((s) => s.trim().isEmpty)) {
     return 'Upload at least one video into a screen frame before downloading.';
@@ -1096,7 +1135,7 @@ Future<String> exportNgmyVideoStudioComposed({
 
     final (w, h) = _exportDimensions(config);
     for (final v in videos.values) {
-      _applyExportVideoStaging(v, w, h);
+      _applyExportVideoStaging(v);
     }
     html.ImageElement? bannerOverlay;
     if (config.newsBannerStyle != null) {
@@ -1163,7 +1202,7 @@ Future<String> exportNgmyVideoStudioComposed({
         }
         try {
           if (video.readyState >= html.MediaElement.HAVE_CURRENT_DATA) {
-            ctx.drawImageScaled(video, dx, dy, dw, dh);
+            _drawVideoCoverInRect(ctx, video, dx, dy, dw, dh);
             if (video == primaryVideo) {
               paintFingerprint = _sampleCanvasPixel(
                 ctx,
@@ -1255,15 +1294,23 @@ Future<String> exportNgmyVideoStudioComposed({
       if (_exportWasCancelled) return const [];
       final recordStream = _videoOnlyStream(canvasStream);
       if (withAudio) {
-        _attachExportAudio(recordStream, videoList);
+        final audioSrc = primaryVideo ?? _pickPrimaryVideo(videoList);
+        if (audioSrc != null) {
+          _attachExportAudio(recordStream, audioSrc);
+        }
       }
       if (recordStream.getVideoTracks().isEmpty) return const [];
+      if (withAudio && recordStream.getAudioTracks().isEmpty) {
+        debugPrint('[studio export] no audio tracks attached — skipping silent attempt');
+        return const [];
+      }
       return _recordCanvasExport(
         stream: recordStream,
         mimeType: mime,
         paintFrame: paintFrame,
         samplePaintFingerprint: () => paintFingerprint,
         videoList: videoList,
+        primaryVideo: primaryVideo,
         durationSec: durationSec,
         onProgress: (p, s) => onProgress?.call(p, s),
         realtimePlayback: realtime,
@@ -1274,11 +1321,11 @@ Future<String> exportNgmyVideoStudioComposed({
     final appleMobile = _ngmyIsAppleMobileBrowser();
     final plans = appleMobile
         ? [
-            (mime: primaryMime, audio: false, realtime: false),
-            (mime: primaryMime, audio: false, realtime: true),
             (mime: primaryMime, audio: true, realtime: false),
-            (mime: fallbackMime, audio: false, realtime: false),
+            (mime: primaryMime, audio: true, realtime: true),
             (mime: fallbackMime, audio: true, realtime: false),
+            (mime: primaryMime, audio: false, realtime: false),
+            (mime: fallbackMime, audio: false, realtime: false),
           ]
         : [
             (mime: primaryMime, audio: true, realtime: true),
