@@ -1345,6 +1345,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   String _debateChannel = 'sms';
   bool _debatePasteMode = false;
   bool _debateAskQuestionNext = false;
+  bool _debateToolbarExpanded = true;
 
   Future<void> _saveDebateSession() async {
     if (!_isDebater) return;
@@ -2035,6 +2036,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                         channel: _debateChannel,
                         pasteMode: _debatePasteMode,
                         accent: accent,
+                        expanded: _debateToolbarExpanded,
+                        onToggleExpanded: () => setState(() => _debateToolbarExpanded = !_debateToolbarExpanded),
                         onChannelChanged: (ch) {
                           setState(() => _debateChannel = ch);
                           unawaited(_saveDebateSession());

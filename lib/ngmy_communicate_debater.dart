@@ -147,6 +147,8 @@ Widget ngmyDebateChatToolbar({
   required VoidCallback onTogglePasteMode,
   required VoidCallback onAskQuestion,
   required Color accent,
+  bool expanded = true,
+  VoidCallback? onToggleExpanded,
 }) {
   final fg = isDark ? Colors.white : const Color(0xFF111827);
   final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
@@ -163,15 +165,24 @@ Widget ngmyDebateChatToolbar({
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Icon(Icons.gavel_rounded, color: accent, size: 18),
-            const SizedBox(width: 6),
-            Text('Debate mode', style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 13)),
-          ],
+        InkWell(
+          onTap: onToggleExpanded,
+          borderRadius: BorderRadius.circular(8),
+          child: Row(
+            children: [
+              Icon(Icons.gavel_rounded, color: accent, size: 18),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text('Debate mode', style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 13)),
+              ),
+              if (onToggleExpanded != null)
+                Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: muted, size: 22),
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
-        TextField(
+        if (expanded) ...[
+          const SizedBox(height: 8),
+          TextField(
           controller: opponentController,
           style: TextStyle(color: fg, fontSize: 13),
           decoration: InputDecoration(
@@ -228,6 +239,7 @@ Widget ngmyDebateChatToolbar({
             ),
           ],
         ),
+        ],
       ],
     ),
   );

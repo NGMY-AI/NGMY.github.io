@@ -5,34 +5,34 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_helper_call_memory.dart';
+import 'ngmy_helper_calendar_memory.dart';
+import 'ngmy_helper_permissions.dart';
 
 /// Exclusive NGMY Helper abilities — showcase in UI and AI prompt.
-const List<({String id, String label, String tryPrompt})> kNgmyHelperSuperpowers = [
-  (id: 'call_detective', label: 'Call Detective', tryPrompt: 'Who called me at 2 AM today?'),
-  (id: 'voicemail', label: 'Voicemail Reader', tryPrompt: 'Paste voicemail text and summarize who called'),
-  (id: 'invoice', label: 'Invoice Snap', tryPrompt: 'Read this invoice and remind me to pay'),
-  (id: 'brief', label: 'NGMY Brief', tryPrompt: 'NGMY morning brief'),
-  (id: 'chain', label: 'Smart Chain', tryPrompt: 'Remind me Friday 10am to call Mom about the invoice'),
-  (id: 'clipboard', label: 'Clipboard', tryPrompt: 'What is in my clipboard?'),
-];
-
-String ngmyHelperSuperpowersContext({String callMemoryDirectory = ''}) {
-  final lines = kNgmyHelperSuperpowers.map((s) => '- ${s.label}: e.g. "${s.tryPrompt}"').join('\n');
+String ngmyHelperSuperpowersContext({
+  String callMemoryDirectory = '',
+  String calendarDirectory = '',
+  String connectionsSummary = '',
+}) {
   return '''
-NGMY EXCLUSIVE SUPERPOWERS (other generic AIs cannot do these on the user's phone):
-$lines
+NGMY EXCLUSIVE SUPERPOWERS — user commands only; NEVER ask for screenshots, invoices, or manual uploads.
+
+The user talks naturally. You do the work:
+- "Who called me at 2 AM?" → search CALL MEMORY (if access granted). Give name, number, what they said.
+- "What's on my calendar?" → read CALENDAR MEMORY below.
+- "Call Mom" / "Text John" → phone actions by contact name.
+- "NGMY morning brief" → summarize calls + calendar + wallet from LIVE DB.
+- "Allow access" / "Yes connect" → confirm everything is now linked permanently on this device.
 
 CALL DETECTIVE rules:
-- iPhone does not let websites read the call log directly. NGMY learns calls when the user uploads a Recent Calls screenshot or pastes voicemail text (⚡ button).
-- When user asks "who called at 2am", search NGMY CALL MEMORY below first. If a match exists, answer with name, number, time, and voicemail summary.
-- If memory is empty, tell them to tap ⚡ → "Call log screenshot" or paste voicemail once — then ask again.
-- After learning a call, confirm what you saved.
+- iPhone/web cannot read Apple's call log directly. After user says "allow access" ONCE, NGMY remembers calls from device sync (when available) and calls made through NGMY.
+- NEVER ask the user to upload call screenshots or paste voicemail unless they voluntarily send it in chat.
+- If access not granted yet, ask ONCE: "Say allow access once and I'll connect your contacts, calendar, and calls on this phone permanently."
+- If access granted but no match, say you checked memory and found nothing at that time — suggest they may have had a blocked/private number.
 
-INVOICE SNAP: When user sends a bill/invoice image, extract company, amount, due date, phone — suggest calendar reminder + call/text actions using phone integrations.
-
-SMART CHAIN: One request can trigger calendar + optional sms/call actions in the action block.
-
+${connectionsSummary.isNotEmpty ? '$connectionsSummary\n' : ''}
 ${callMemoryDirectory.isNotEmpty ? '$callMemoryDirectory\n' : ''}
+${calendarDirectory.isNotEmpty ? '$calendarDirectory\n' : ''}
 ''';
 }
 
@@ -165,8 +165,18 @@ If a callback phone is on the invoice, also add to calls array with note "invoic
 Future<String> ngmyHelperSuperpowerPreflight({
   required String userEmail,
   required String userText,
+  NgmyHelperPermissions permissions = NgmyHelperPermissions.empty,
 }) async {
   final buf = StringBuffer();
+
+  if (!permissions.allGrantedOnce && ngmyUserNeedsHelperAccess(userText)) {
+    buf.writeln(
+      'PERMISSION NEEDED: User asked for phone data but has not said "allow access" yet. '
+      'Ask ONCE: "Say allow access once and I will permanently connect your contacts, calendar, and calls on this phone." '
+      'Do NOT ask for screenshots or manual steps.',
+    );
+  }
+
   if (ngmyUserAsksWhoCalled(userText)) {
     final queryTime = ngmyParseCallQueryTime(userText);
     if (queryTime != null) {
@@ -179,8 +189,10 @@ Future<String> ngmyHelperSuperpowerPreflight({
             buf.writeln('  Said: ${h.transcript}');
           }
         }
+      } else if (permissions.calls) {
+        buf.writeln('CALL DETECTIVE: access granted but no saved calls near that time. Tell user you checked — nothing logged yet.');
       } else {
-        buf.writeln('CALL DETECTIVE: no saved calls near that time. Tell user to upload call log screenshot via ⚡ once.');
+        buf.writeln('CALL DETECTIVE: need one-time "allow access" before checking calls.');
       }
     }
   }
@@ -197,6 +209,11 @@ Future<String> ngmyHelperSuperpowerPreflight({
       buf.writeln('CLIPBOARD: could not read — ask user to paste the text.\n');
     }
   }
+  if (ngmyUserAsksCalendarRead(userText)) {
+    final events = await NgmyHelperCalendarMemoryStore.load(userEmail);
+    buf.writeln(NgmyHelperCalendarMemoryStore.directoryForAi(events));
+  }
+
   if (ngmyUserWantsMorningBrief(userText)) {
     final calls = await NgmyCallMemoryStore.load(userEmail);
     buf.writeln('NGMY MORNING BRIEF — include recent calls/voicemails from memory, wallet highlights from LIVE DB if present, and 1-2 actionable suggestions (calendar/call/text).');

@@ -70,8 +70,10 @@ import 'ngmy_phone_contacts.dart';
 import 'ngmy_phone_contact_resolve.dart';
 import 'ngmy_phone_contact_intent.dart';
 import 'ngmy_helper_call_memory.dart';
+import 'ngmy_helper_calendar_memory.dart';
+import 'ngmy_helper_permissions.dart';
+import 'ngmy_helper_connections_panel.dart';
 import 'ngmy_helper_superpowers.dart';
-import 'ngmy_helper_superpowers_ui.dart';
 import 'ngmy_voice_input.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_invoice_signature.dart';
@@ -38570,7 +38572,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   DateTime? _helperUnlockAt;
   bool _kbMode = false;
   bool _kbVoluntaryBrowse = false;
-  bool _superpowerProcessing = false;
+  bool _connectionsExpanded = false;
+  NgmyHelperPermissions _helperPerms = NgmyHelperPermissions.empty;
+  int _contactCount = 0;
+  int _callMemoryCount = 0;
+  int _calendarCount = 0;
   List<NgmyHelperKbCategory> _kbCategories = ngmyHelperKbDefaultCategories();
   Timer? _chatGateTimer;
   Timer? _helperQuotaTimer;
@@ -38602,10 +38608,10 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           'Add a CEO strategy session Friday at 10am to my calendar',
         ]
       : const [
+          'Allow access to my phone',
+          'What is on my calendar today?',
           'Who called me at 2 AM today?',
-          'NGMY morning brief',
-          'Text Mom saying I am on my way',
-          'Call John',
+          'Call Mom',
         ];
 
   @override
@@ -38619,6 +38625,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     }
     _loadChatMemory();
     unawaited(_loadHelperKb());
+    unawaited(_bootstrapHelperConnections());
     _startChatGateWatcher();
     _startHelperQuotaWatcher();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -38711,108 +38718,30 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     );
   }
 
-  Future<void> _openPhoneContactsLink() async {
-    await ngmyShowLinkContactsSheet(
-      context,
-      userEmail: widget.user.email,
-      ngmyUsers: ngmyUsersToContactMaps(widget.allUsers),
-    );
-  }
-
-  Future<void> _openSuperpowerAttach() async {
-    if (_isTyping || _superpowerProcessing) return;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pick = await showNgmySuperpowerAttachSheet(context, isDark: isDark);
-    if (pick == null || !mounted) return;
-
-    if (!widget.user.isAdmin) {
-      final limit = widget.config.ngmyHelperDailyMessageLimit;
-      if (limit > 0) {
-        final allowed = await NgmyHelperAiLimit.tryConsume(widget.user.email, limit);
-        if (!allowed) {
-          if (!mounted) return;
-          await _refreshHelperQuota();
-          setState(() => _kbMode = true);
-          return;
-        }
-        await _refreshHelperQuota();
+  Future<void> _bootstrapHelperConnections({bool forceSync = false}) async {
+    final email = widget.user.email;
+    final ngmyUserMaps = ngmyUsersToContactMaps(widget.allUsers);
+    await NgmyPhoneContactsStore.ensureHydrated(email, ngmyUsers: ngmyUserMaps);
+    var perms = await NgmyHelperPermissionStore.load(email);
+    if (perms.contacts || forceSync || !kIsWeb) {
+      if (!kIsWeb) {
+        await NgmyPhoneContactsStore.syncFromDevice(email);
       }
     }
-
-    setState(() => _superpowerProcessing = true);
-    try {
-      await _refreshGeminiKeyFromCloud();
-      var apiKey = widget.config.geminiApiKey.trim();
-      if (apiKey.isEmpty) {
-        apiKey = await _fetchRemoteGeminiApiKey();
-        if (apiKey.isNotEmpty && mounted) setState(() => widget.config.geminiApiKey = apiKey);
-      }
-      if (apiKey.isEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('AI is not available right now — try again later.')),
-        );
-        return;
-      }
-      final creds = ngmyParseAiCredentials(apiKey);
-      late final ({List<NgmyCallMemoryEntry> entries, String summary}) extracted;
-      final kind = pick.kind;
-      if (kind == NgmySuperpowerAttachKind.voicemailPaste && pick.pastedText != null) {
-        extracted = await ngmyExtractCallsFromText(creds, pick.pastedText!);
-      } else if (kind == NgmySuperpowerAttachKind.invoice && pick.imageB64 != null) {
-        extracted = await ngmyExtractCallsFromInvoice(creds, imageB64: pick.imageB64!, mime: pick.mime ?? 'image/jpeg');
-      } else if (kind == NgmySuperpowerAttachKind.callScreenshot && pick.imageB64 != null) {
-        extracted = await ngmyExtractCallsFromVision(
-          creds,
-          '',
-          imageB64: pick.imageB64!,
-          mime: pick.mime ?? 'image/jpeg',
-        );
-      } else {
-        return;
-      }
-      if (extracted.entries.isNotEmpty) {
-        await NgmyCallMemoryStore.addAll(widget.user.email, extracted.entries);
-      }
-      if (!mounted) return;
-      final label = switch (kind) {
-        NgmySuperpowerAttachKind.callScreenshot => 'Call log screenshot',
-        NgmySuperpowerAttachKind.invoice => 'Invoice photo',
-        NgmySuperpowerAttachKind.voicemailPaste => 'Voicemail text',
-        null => 'Superpower',
-      };
-      final userNote = '⚡ $label saved to Call Detective';
-      final aiNote = extracted.summary.isNotEmpty
-          ? extracted.summary
-          : (extracted.entries.isEmpty
-              ? 'I could not read anything — try a clearer image or paste the voicemail text.'
-              : 'Saved ${extracted.entries.length} item(s). You can now ask "Who called me at 2 AM?"');
-      setState(() {
-        _messages.add({
-          'role': 'user',
-          'text': userNote,
-          'at': DateTime.now().toUtc().toIso8601String(),
-        });
-        _messages.add({
-          'role': 'ai',
-          'text': aiNote,
-          'at': DateTime.now().toUtc().toIso8601String(),
-        });
-        _sortMessagesChronological();
-      });
-      unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'user', text: userNote));
-      unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: aiNote));
-      _scrollToBottom();
-      unawaited(_persistChatMemory());
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not process that — check your connection and try again.')),
-      );
-    } finally {
-      if (mounted) setState(() => _superpowerProcessing = false);
-      if (!widget.user.isAdmin) unawaited(_refreshHelperQuota());
+    var contacts = await NgmyPhoneContactsStore.load(email);
+    if (!perms.contacts && contacts.isNotEmpty) {
+      perms = perms.copyWith(contacts: true);
+      await NgmyHelperPermissionStore.save(email, perms);
     }
+    final calls = await NgmyCallMemoryStore.load(email);
+    final cals = await NgmyHelperCalendarMemoryStore.load(email);
+    if (!mounted) return;
+    setState(() {
+      _helperPerms = perms;
+      _contactCount = contacts.length;
+      _callMemoryCount = calls.length;
+      _calendarCount = cals.length;
+    });
   }
 
   Future<void> _openKbAdmin() async {
@@ -39202,21 +39131,51 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       final creds = ngmyParseAiCredentials(apiKey);
       final liveDb = widget.liveAppKnowledge?.call() ?? '';
       final ngmyUserMaps = ngmyUsersToContactMaps(widget.allUsers);
+
+      if (ngmyUserGrantsHelperAccess(text)) {
+        _helperPerms = await NgmyHelperPermissionStore.grantAll(widget.user.email);
+        await _bootstrapHelperConnections(forceSync: true);
+      }
+
       final contacts = await NgmyPhoneContactsStore.ensureHydrated(
         widget.user.email,
         ngmyUsers: ngmyUserMaps,
       );
+      if (_helperPerms.contacts && !kIsWeb) {
+        await NgmyPhoneContactsStore.syncFromDevice(widget.user.email);
+      }
       final contactsDir = NgmyPhoneContactsStore.directoryForAi(contacts);
       final phoneCtx = ngmyHelperPhoneIntegrationContext(contactsDirectory: contactsDir);
       final callMemory = await NgmyCallMemoryStore.load(widget.user.email);
       final callDir = NgmyCallMemoryStore.directoryForAi(callMemory);
-      final superCtx = ngmyHelperSuperpowersContext(callMemoryDirectory: callDir);
-      final preflight = await ngmyHelperSuperpowerPreflight(userEmail: widget.user.email, userText: text);
+      final calendarEvents = await NgmyHelperCalendarMemoryStore.load(widget.user.email);
+      final calendarDir = NgmyHelperCalendarMemoryStore.directoryForAi(calendarEvents);
+      final connectionsSummary = NgmyHelperPermissionStore.summaryForAi(
+        _helperPerms,
+        contactCount: _contactCount,
+        callMemoryCount: _callMemoryCount,
+        calendarCount: _calendarCount,
+      );
+      final superCtx = ngmyHelperSuperpowersContext(
+        callMemoryDirectory: callDir,
+        calendarDirectory: calendarDir,
+        connectionsSummary: connectionsSummary,
+      );
+      final preflight = await ngmyHelperSuperpowerPreflight(
+        userEmail: widget.user.email,
+        userText: text,
+        permissions: _helperPerms,
+      );
+      var grantNote = '';
+      if (ngmyUserGrantsHelperAccess(text)) {
+        grantNote = '\nACCESS GRANTED: User just said allow access — confirm contacts, calendar, and calls are now permanently connected on this device. Never ask again.\n';
+      }
       final prompt = '${_ngmyHelperSystemContext(user: widget.user)}'
           '\n$superCtx\n'
           '\n$phoneCtx\n'
           '${liveDb.isNotEmpty ? '\n$liveDb\n' : ''}'
           '${preflight.isNotEmpty ? '\n$preflight\n' : ''}'
+          '$grantNote'
           '${_messages.isNotEmpty ? '\n${NgmyAiMemoryStore.transcriptForPrompt(_messages)}\n' : ''}'
           '\nUser: $text';
       final aiResult = await ngmyAiGenerateWithCredentials(creds, prompt);
@@ -39300,6 +39259,22 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           action: action,
           onDone: (result) async {
             if (!mounted || result == null) return;
+            final start = DateTime.tryParse(action.fields['start'] ?? '');
+            final end = DateTime.tryParse(action.fields['end'] ?? '');
+            if (start != null) {
+              await NgmyHelperCalendarMemoryStore.add(
+                widget.user.email,
+                NgmyCalendarMemoryEntry(
+                  id: 'cal_${DateTime.now().microsecondsSinceEpoch}',
+                  title: (action.fields['title'] ?? 'Event').trim(),
+                  start: start.toLocal(),
+                  end: (end ?? start.add(const Duration(hours: 1))).toLocal(),
+                  notes: action.fields['notes'],
+                  location: action.fields['location'],
+                ),
+              );
+              unawaited(_bootstrapHelperConnections());
+            }
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(result), backgroundColor: const Color(0xFF16A34A)),
             );
@@ -39309,6 +39284,21 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       }
       final result = await ngmyRunPhoneAction(action, context: context);
       if (!mounted || result == null) continue;
+      if (action.type == 'call') {
+        final name = (action.fields['name'] ?? '').trim();
+        final phone = (action.fields['phone'] ?? '').trim();
+        await NgmyCallMemoryStore.addAll(widget.user.email, [
+          NgmyCallMemoryEntry(
+            id: 'out_${DateTime.now().microsecondsSinceEpoch}',
+            when: DateTime.now(),
+            phone: phone.isNotEmpty ? phone : null,
+            name: name.isNotEmpty ? name : null,
+            note: 'Outgoing call via NGMY',
+            source: 'ngmy',
+          ),
+        ]);
+        unawaited(_bootstrapHelperConnections());
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result), backgroundColor: const Color(0xFF16A34A)),
       );
@@ -39507,35 +39497,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _isBoss ? 'NGMY Helper · Your AI' : 'NGMY Helper',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
-                              ),
-                            ),
-                            if (widget.user.isAdmin)
-                              Material(
-                                color: Colors.white.withOpacity(0.18),
-                                borderRadius: BorderRadius.circular(10),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(10),
-                                  onTap: _toggleKbModeForAdmin,
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(_kbMode ? Icons.smart_toy_rounded : Icons.grid_view_rounded, color: Colors.white, size: 14),
-                                        const SizedBox(width: 4),
-                                        Text(_kbMode ? 'AI' : 'Topics', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
+                        Text(
+                          'NGMY Helper',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
                         ),
                         const SizedBox(height: 2),
                         Row(
@@ -39549,10 +39515,12 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                                         ? 'Help Topics • AI returns when your 24h limit resets'
                                         : 'Help Topics • Instant answers')
                                     : (_isBoss
-                                        ? 'Online • Personal assistant for Sir'
+                                        ? 'Your AI · Online'
                                         : (widget.config.ngmyHelperDailyMessageLimit > 0 && _helperRemaining >= 0
                                             ? 'Online • $_helperRemaining messages left today'
-                                            : 'Online • Chat & community updates')),
+                                            : 'Online • Just tell me what you need')),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w500),
                               ),
                             ),
@@ -39562,20 +39530,12 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'NGMY Superpowers',
-                    onPressed: (_isTyping || _superpowerProcessing) ? null : _openSuperpowerAttach,
-                    icon: _superpowerProcessing
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFF59E0B)),
-                          )
-                        : const Icon(Icons.bolt_rounded, color: Color(0xFFF59E0B)),
-                  ),
-                  IconButton(
-                    tooltip: 'Link phone contacts',
-                    onPressed: _openPhoneContactsLink,
-                    icon: const Icon(Icons.contacts_rounded, color: Colors.white),
+                    tooltip: _connectionsExpanded ? 'Hide connections' : 'Phone connections',
+                    onPressed: () => setState(() => _connectionsExpanded = !_connectionsExpanded),
+                    icon: Icon(
+                      _connectionsExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                      color: Colors.white,
+                    ),
                   ),
                   IconButton(
                     onPressed: () => NgmyNavigator.pop(context),
@@ -39584,6 +39544,17 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                 ],
               ),
             ),
+            if (_connectionsExpanded && _activeTab == 0)
+              NgmyHelperConnectionsPanel(
+                isDark: isDark,
+                permissions: _helperPerms,
+                contactCount: _contactCount,
+                callMemoryCount: _callMemoryCount,
+                calendarCount: _calendarCount,
+                isAdmin: widget.user.isAdmin,
+                kbMode: _kbMode,
+                onToggleKbMode: widget.user.isAdmin ? _toggleKbModeForAdmin : null,
+              ),
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -39735,13 +39706,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (_memoryLoaded && _messages.length <= 1)
-                        ngmySuperpowerChips(
-                          isDark: isDark,
-                          disabled: _isTyping || _superpowerProcessing,
-                          onTap: _sendQuickPrompt,
-                        ),
-                      if (_memoryLoaded && _messages.length <= 1) const SizedBox(height: 8),
-                      if (_memoryLoaded && _messages.length <= 1)
                         SizedBox(
                           height: 36,
                           child: ListView.separated(
@@ -39752,7 +39716,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                               label: Text(_quickPrompts[i], style: const TextStyle(fontSize: 11)),
                               backgroundColor: primaryColor.withOpacity(0.12),
                               side: BorderSide(color: primaryColor.withOpacity(0.35)),
-                              onPressed: (_isTyping || _superpowerProcessing) ? null : () => _sendQuickPrompt(_quickPrompts[i]),
+                              onPressed: _isTyping ? null : () => _sendQuickPrompt(_quickPrompts[i]),
                             ),
                           ),
                         ),
@@ -39760,25 +39724,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Material(
-                            color: const Color(0xFFF59E0B).withOpacity(0.15),
-                            shape: const CircleBorder(),
-                            child: InkWell(
-                              onTap: (_isTyping || _superpowerProcessing) ? null : _openSuperpowerAttach,
-                              customBorder: const CircleBorder(),
-                              child: SizedBox(
-                                width: 40,
-                                height: 40,
-                                child: _superpowerProcessing
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(10),
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFF59E0B)),
-                                      )
-                                    : const Icon(Icons.bolt_rounded, color: Color(0xFFF59E0B), size: 22),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
                           Expanded(
                             child: TextField(
                               controller: _chatController,

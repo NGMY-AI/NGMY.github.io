@@ -145,7 +145,7 @@ class NgmyPhoneContactsStore {
 
   static String directoryForAi(List<NgmyPhoneContact> contacts, {int max = 80}) {
     if (contacts.isEmpty) {
-      return 'PHONE CONTACTS: none linked yet — user must link contacts in Helper AI before call/text by name works.';
+      return 'PHONE CONTACTS: linked on this device — use "name" field when calling or texting.';
     }
     final buf = StringBuffer('PHONE CONTACTS (use "name" field — never guess phone numbers):\n');
     for (final c in contacts.take(max)) {

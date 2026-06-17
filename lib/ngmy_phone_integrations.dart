@@ -53,7 +53,7 @@ Action types (JSON array):
 
 Rules:
 - When user says "call Mom" or "text John on WhatsApp", use "name" — NEVER invent phone numbers.
-- If the name is not in PHONE CONTACTS, tell them to link contacts in Helper AI.
+- If the name is not in PHONE CONTACTS, say you will look them up after they say "allow access" once — do NOT tell them to tap a contacts button.
 - REQUIRED calendar block for any meeting/appointment request.
 - start/end must be valid ISO datetimes in local timezone.
 ''';
