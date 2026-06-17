@@ -31,6 +31,7 @@ String ngmyDebaterRolePromptBlock() {
       '- Replies should be ready to TEXT — concise paragraphs unless they need a longer answer.\n'
       '- When user pastes an opponent message, write the reply THEY should send back — first person optional ("You could say…") or direct quote they can copy.\n'
       '- When user asks you to ask a question, write ONE strong debate question they can send.\n'
+      '- The user can change the opponent name or contact anytime in Debate mode — ALWAYS use the LIVE DEBATE TARGET block in each message (ignore old names from earlier chat).\n'
       '- Never say you are AI. You are their debate coach and Christian apologist partner.\n'
       'SCRIPTURE POOL (rotate — do not repeat the same two verses every time):\n'
       'John 17:3; 1 Cor 8:6; Deut 6:4; Mark 12:29; John 20:17; John 14:28; 1 Tim 2:5; Matt 16:16; John 10:36; Psalm 2:7; Heb 1:5; Rom 1:3-4; Acts 2:22; Col 1:15; Rev 3:14; Isa 9:6; Micah 5:2; John 1:14.\n';
@@ -87,11 +88,44 @@ String ngmyDebateChannelLabel(String channel) => switch (channel) {
       _ => 'iMessage',
     };
 
-String ngmyNormalizeDebatePhone(String raw) {
+bool ngmyDebateContactIsEmail(String raw) {
+  final t = raw.trim();
+  return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(t);
+}
+
+/// Phone number or Apple ID / iMessage email.
+String ngmyNormalizeDebateContact(String raw) {
   final t = raw.trim();
   if (t.isEmpty) return '';
+  if (ngmyDebateContactIsEmail(t)) return t.toLowerCase();
   final digits = t.replaceAll(RegExp(r'[^\d+]'), '');
   return digits.isNotEmpty ? digits : t;
+}
+
+@Deprecated('Use ngmyNormalizeDebateContact')
+String ngmyNormalizeDebatePhone(String raw) => ngmyNormalizeDebateContact(raw);
+
+/// Injected on EVERY debater message — current opponent overrides chat history.
+String ngmyDebateLiveTargetBlock({
+  required String opponentName,
+  required String opponentContact,
+  required String channel,
+}) {
+  final name = opponentName.trim();
+  final contact = opponentContact.trim();
+  final who = name.isNotEmpty ? name : (contact.isNotEmpty ? contact : 'their opponent');
+  final contactLine = contact.isEmpty
+      ? '(no phone/email yet — user may add one in Debate mode)'
+      : ngmyDebateContactIsEmail(contact)
+          ? 'iMessage email/Apple ID: $contact'
+          : 'Phone: $contact';
+  return '''
+LIVE DEBATE TARGET (authoritative — use THIS on every reply; user may have changed the name since earlier messages):
+- Opponent name RIGHT NOW: ${name.isNotEmpty ? name : '(not set — say "opponent" or ask user)'}
+- Send channel: ${ngmyDebateChannelLabel(channel)}
+- $contactLine
+RULES: If the name above differs from names in older chat messages, the name above wins. Address $who in replies meant to be sent via ${ngmyDebateChannelLabel(channel)}. Do not keep using a previous opponent name.
+''';
 }
 
 String ngmyDebatePastePrompt(String opponentText, {String? opponentName, String channel = 'sms'}) {
@@ -123,22 +157,26 @@ Future<String?> ngmyDebateSendReply({
   if (!context.mounted) return null;
 
   final name = opponentName.trim();
-  final phone = ngmyNormalizeDebatePhone(opponentPhone);
-  if (name.isEmpty && phone.isEmpty) {
-    return 'Add opponent name or phone number in Debate mode above.';
+  final contact = ngmyNormalizeDebateContact(opponentPhone);
+  if (name.isEmpty && contact.isEmpty) {
+    return 'Add opponent name or phone/email in Debate mode above.';
   }
 
   final type = channel == 'whatsapp' ? 'whatsapp' : 'sms';
+  if (channel == 'whatsapp' && contact.isNotEmpty && ngmyDebateContactIsEmail(contact)) {
+    return 'WhatsApp needs a phone number — use a number or switch to iMessage for email.';
+  }
+
   List<NgmyPhoneAction> actions;
 
-  if (phone.isNotEmpty) {
+  if (contact.isNotEmpty) {
     actions = [
       NgmyPhoneAction(
         type: type,
         fields: {
-          'phone': phone,
+          'phone': contact,
           if (name.isNotEmpty) 'name': name,
-          'contactName': name.isNotEmpty ? name : phone,
+          'contactName': name.isNotEmpty ? name : contact,
           'body': text,
         },
       ),
@@ -154,11 +192,11 @@ Future<String?> ngmyDebateSendReply({
       ngmyUsers: ngmyUsers,
     );
     if (actions.isEmpty) {
-      return 'Could not find "$name" — add their phone number in Debate mode.';
+      return 'Could not find "$name" — add their phone or iMessage email in Debate mode.';
     }
     final resolved = actions.first;
     if ((resolved.fields['phone'] ?? '').trim().isEmpty) {
-      return 'Could not find a number for "$name" — add their phone number above.';
+      return 'Could not find a number for "$name" — add phone or Apple ID email above.';
     }
   }
 
@@ -234,12 +272,12 @@ Widget ngmyDebateChatToolbar({
           TextField(
             controller: opponentPhoneController,
             style: TextStyle(color: fg, fontSize: 13),
-            keyboardType: TextInputType.phone,
+            keyboardType: TextInputType.emailAddress,
             decoration: InputDecoration(
               isDense: true,
-              labelText: 'Opponent phone (for iMessage / WhatsApp)',
+              labelText: channel == 'whatsapp' ? 'Opponent phone (WhatsApp)' : 'Phone or Apple ID email (iMessage)',
               labelStyle: TextStyle(color: muted, fontSize: 12),
-              hintText: '+1 555 123 4567',
+              hintText: channel == 'whatsapp' ? '+1 555 123 4567' : '+1 555… or name@icloud.com',
               hintStyle: TextStyle(color: muted.withValues(alpha: 0.7)),
               filled: true,
               fillColor: fieldFill,
@@ -358,7 +396,7 @@ Widget ngmyDebateReplyActions({
           )
         else if (channel == 'sms' || channel == 'whatsapp')
           Text(
-            'Add opponent name or phone above to send',
+            'Add opponent name or phone/email above to send',
             style: TextStyle(fontSize: 11, color: accent.withValues(alpha: 0.85), fontStyle: FontStyle.italic),
           ),
       ],

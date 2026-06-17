@@ -383,14 +383,17 @@ Future<String?> _runCall(NgmyPhoneAction action) async {
 }
 
 Future<String?> _runSms(NgmyPhoneAction action) async {
-  final phone = (action.fields['phone'] ?? '').replaceAll(RegExp(r'[^\d+]+'), '');
-  if (phone.isEmpty) return 'Could not find a phone number for that name.';
+  final raw = (action.fields['phone'] ?? action.fields['email'] ?? '').trim();
+  if (raw.isEmpty) return 'Could not find a phone number or email for that contact.';
   final body = action.fields['body']?.trim() ?? '';
-  final uri = body.isEmpty
-      ? Uri.parse('sms:$phone')
-      : Uri.parse('sms:$phone?body=${Uri.encodeComponent(body)}');
-  final ok = await _launchExternal(uri);
   final who = action.fields['contactName'] ?? action.fields['name'] ?? '';
+  final isEmail = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(raw);
+  final address = isEmail ? raw.toLowerCase() : raw.replaceAll(RegExp(r'[^\d+]'), '');
+  if (address.isEmpty) return 'Could not find a phone number or email for that contact.';
+  final uri = body.isEmpty
+      ? Uri.parse('sms:$address')
+      : Uri.parse('sms:$address?body=${Uri.encodeComponent(body)}');
+  final ok = await _launchExternal(uri);
   return ok
       ? (who.isNotEmpty ? 'Opening Messages to $who…' : 'Opening Messages…')
       : 'Could not open Messages.';

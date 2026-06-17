@@ -1385,6 +1385,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       buf.writeln(ngmyBibleStudyOriginalLanguageHint(text));
     }
     if (_isDebater) {
+      buf.writeln(ngmyDebateLiveTargetBlock(
+        opponentName: _debateOpponentC.text.trim(),
+        opponentContact: _debateOpponentPhoneC.text.trim(),
+        channel: _debateChannel,
+      ));
       if (_debateAskQuestionNext) {
         buf.writeln(ngmyDebateAskQuestionPrompt(
           opponentName: _debateOpponentC.text.trim(),
