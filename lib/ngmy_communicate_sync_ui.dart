@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -153,7 +154,7 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
     return ngmyPickBackupJsonViaBrowser();
   }
 
-  Future<void> _importRaw(String raw) async {
+  Future<void> _importRaw(String raw, {bool restoreHelper = false}) async {
     await _withWork(() async {
       try {
         final result = await NgmyCommunicateSyncService.importBundle(
@@ -161,6 +162,7 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
           config: widget.config,
           isAdmin: widget.isAdmin,
           raw: raw,
+          restoreHelper: restoreHelper,
         );
         if (!mounted) return;
         if (result == null) {
@@ -170,13 +172,17 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
         widget.onRestored?.call();
         await ngmyWarmCommunicateAvatarsFromConfig(widget.config);
         if (mounted) setState(() {});
-        _toast('Restored ${result.messages} messages across ${result.threads} advisor${result.threads == 1 ? '' : 's'}. Profile photos included when available.');
+        var msg = 'Restored ${result.messages} messages across ${result.threads} advisor${result.threads == 1 ? '' : 's'}. Profile photos included when available.';
+        if (result.helperMessages > 0) {
+          msg += ' NGMY Helper chat restored (${result.helperMessages} messages).';
+        }
+        _toast(msg);
         await _refresh();
       } catch (e) {
         if (!mounted) return;
         _toast(e.toString().replaceFirst('StateError: ', ''));
       }
-    }, busyLabel: 'Restoring chats…');
+    }, busyLabel: restoreHelper ? 'Restoring chats + Helper…' : 'Restoring chats…');
   }
 
   Future<void> _importFile() async {
@@ -216,14 +222,14 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
       _toast('Use a phone camera to scan, or upload the backup file on desktop.');
       return;
     }
-    final raw = await Navigator.of(context).push<String>(
-      MaterialPageRoute<String>(
+    final result = await Navigator.of(context).push<({String raw, bool restoreHelper})>(
+      MaterialPageRoute<({String raw, bool restoreHelper})>(
         fullscreenDialog: true,
         builder: (_) => const _NgmyAdvisorSyncScanPage(),
       ),
     );
-    if (raw != null && raw.trim().isNotEmpty) {
-      await _importRaw(raw);
+    if (result != null && result.raw.trim().isNotEmpty) {
+      await _importRaw(result.raw, restoreHelper: result.restoreHelper);
     }
   }
 
@@ -340,7 +346,7 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
               _SyncActionTile(
                 icon: Icons.qr_code_scanner_rounded,
                 label: 'Scan QR to restore',
-                subtitle: 'Import from another device — no advisor pass required',
+                subtitle: 'Import from another device — toggle Helper restore in the scanner',
                 card: card,
                 border: border,
                 accent: !_canExport,
@@ -612,6 +618,7 @@ class _NgmyAdvisorQrDisplayPageState extends State<_NgmyAdvisorQrDisplayPage> {
             const SizedBox(height: 16),
             Text(
               'Scan this QR on another phone to restore all advisor conversations. '
+              'NGMY Helper chats are included when available. '
               'Each QR works only $kNgmyAdvisorSyncQrMaxUses times total.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, height: 1.45, color: isDark ? Colors.white60 : const Color(0xFF64748B)),
@@ -678,6 +685,7 @@ class _NgmyAdvisorSyncScanPageState extends State<_NgmyAdvisorSyncScanPage> {
     facing: CameraFacing.back,
   );
   bool _handled = false;
+  bool _restoreHelper = false;
 
   @override
   void dispose() {
@@ -691,7 +699,7 @@ class _NgmyAdvisorSyncScanPageState extends State<_NgmyAdvisorSyncScanPage> {
       final raw = b.rawValue?.trim() ?? '';
       if (raw.startsWith(kNgmyAdvisorSyncQrPrefixV2) || raw.startsWith(kNgmyAdvisorSyncQrPrefix)) {
         _handled = true;
-        Navigator.pop(context, raw);
+        Navigator.pop(context, (raw: raw, restoreHelper: _restoreHelper));
         return;
       }
     }
@@ -711,19 +719,75 @@ class _NgmyAdvisorSyncScanPageState extends State<_NgmyAdvisorSyncScanPage> {
         children: [
           MobileScanner(controller: _camera, onDetect: _onDetect),
           Positioned(
-            left: 24,
-            right: 24,
-            bottom: 36,
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Text(
-                'Point at the NGMY Advisors restore QR code.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+            left: 16,
+            right: 16,
+            bottom: 28,
+            child: SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Point at the NGMY Advisors restore QR code.',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.95),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.only(left: 8, right: 4, top: 4, bottom: 4),
+                      decoration: BoxDecoration(
+                        color: _restoreHelper
+                            ? kNgmyAdvisorsHubAccent.withValues(alpha: 0.22)
+                            : Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _restoreHelper
+                              ? kNgmyAdvisorsHubAccent.withValues(alpha: 0.75)
+                              : Colors.white.withValues(alpha: 0.28),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Helper',
+                            style: TextStyle(
+                              color: _restoreHelper ? Colors.white : Colors.white70,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          SizedBox(
+                            height: 28,
+                            child: FittedBox(
+                              fit: BoxFit.contain,
+                              child: CupertinoSwitch(
+                                value: _restoreHelper,
+                                onChanged: _handled ? null : (v) => setState(() => _restoreHelper = v),
+                                activeTrackColor: kNgmyAdvisorsHubAccent,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

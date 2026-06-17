@@ -73,6 +73,37 @@ class NgmyAiMemoryStore {
     await saveAll(key, list);
   }
 
+  /// Merge imported helper messages into local chat (keeps all history).
+  static Future<int> restoreMerged(String email, List<Map<String, dynamic>> imported) async {
+    if (email.trim().isEmpty || imported.isEmpty) return 0;
+    final existing = await load(email);
+    final byKey = <String, Map<String, dynamic>>{};
+    for (final m in existing) {
+      byKey[_messageMergeKey(m)] = m;
+    }
+    for (final m in imported) {
+      final role = (m['role'] ?? '').toString();
+      final text = (m['text'] ?? '').toString().trim();
+      if (text.isEmpty || (role != 'user' && role != 'ai')) continue;
+      byKey[_messageMergeKey(m)] = {
+        'role': role,
+        'text': text,
+        'at': (DateTime.tryParse((m['at'] ?? '').toString()) ?? DateTime.now()).toUtc().toIso8601String(),
+      };
+    }
+    final merged = byKey.values.toList()
+      ..sort((a, b) => (a['at'] ?? '').toString().compareTo((b['at'] ?? '').toString()));
+    await saveAll(email, merged);
+    return merged.length;
+  }
+
+  static String _messageMergeKey(Map<String, dynamic> m) {
+    final at = (m['at'] ?? '').toString();
+    final role = (m['role'] ?? '').toString();
+    final text = (m['text'] ?? '').toString();
+    return '$at|$role|$text';
+  }
+
   static Future<void> _persist(String email, List<Map<String, dynamic>> list) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_storageKey(email), jsonEncode(list));

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_ai_memory.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_storage.dart';
 import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
@@ -357,12 +358,14 @@ class NgmyAdvisorSyncBundle {
     required this.ownerEmail,
     required this.threads,
     required this.exportedAt,
+    this.helperMessages = const [],
   });
 
   final String code;
   final String ownerEmail;
   final List<NgmyAdvisorSyncThread> threads;
   final DateTime exportedAt;
+  final List<Map<String, dynamic>> helperMessages;
 
   Map<String, dynamic> toMap() => {
         kNgmyAdvisorSyncMarker: kNgmyAdvisorSyncVersion,
@@ -370,6 +373,7 @@ class NgmyAdvisorSyncBundle {
         'ownerEmail': ownerEmail,
         'exportedAt': exportedAt.toUtc().toIso8601String(),
         'threads': threads.map((t) => t.toMap()).toList(),
+        if (helperMessages.isNotEmpty) 'helperMessages': helperMessages,
       };
 
   String toJson() => jsonEncode(toMap());
@@ -416,7 +420,20 @@ class NgmyAdvisorSyncBundle {
         ? rawThreads.map((e) => e is Map ? NgmyAdvisorSyncThread.fromMap(Map<String, dynamic>.from(e)) : null).whereType<NgmyAdvisorSyncThread>().toList()
         : <NgmyAdvisorSyncThread>[];
     final exportedAt = DateTime.tryParse((map['exportedAt'] ?? '').toString()) ?? DateTime.now();
-    return NgmyAdvisorSyncBundle(code: code, ownerEmail: owner, threads: threads, exportedAt: exportedAt);
+    final rawHelper = map['helperMessages'];
+    final helperMessages = rawHelper is List
+        ? rawHelper
+            .map((e) => e is Map ? Map<String, dynamic>.from(e) : null)
+            .whereType<Map<String, dynamic>>()
+            .toList()
+        : <Map<String, dynamic>>[];
+    return NgmyAdvisorSyncBundle(
+      code: code,
+      ownerEmail: owner,
+      threads: threads,
+      exportedAt: exportedAt,
+      helperMessages: helperMessages,
+    );
   }
 }
 
@@ -645,11 +662,14 @@ class NgmyCommunicateSyncService {
     }
     if (threads.isEmpty) return null;
 
+    final helperMessages = await NgmyAiMemoryStore.load(email);
+
     return NgmyAdvisorSyncBundle(
       code: code,
       ownerEmail: _emailKey(email),
       threads: threads,
       exportedAt: DateTime.now(),
+      helperMessages: helperMessages,
     );
   }
 
@@ -685,11 +705,12 @@ class NgmyCommunicateSyncService {
     return (qrPayload: stash.qrPayload, code: bundle.code, usesRemaining: stash.usesRemaining);
   }
 
-  static Future<({int threads, int messages})?> importBundle({
+  static Future<({int threads, int messages, int helperMessages})?> importBundle({
     required String email,
     required dynamic config,
     required bool isAdmin,
     required String raw,
+    bool restoreHelper = false,
   }) async {
     final bundle = await NgmyAdvisorSyncBundle.parseAsync(raw);
     if (bundle == null) return null;
@@ -774,8 +795,13 @@ class NgmyCommunicateSyncService {
     if (threadCount > 0) {
       await NgmyCommunicateAvatarCache.persistConfigProfilesLocally(config);
     }
-    if (threadCount == 0) return null;
-    return (threads: threadCount, messages: messageCount);
+    var helperCount = 0;
+    if (restoreHelper && bundle.helperMessages.isNotEmpty) {
+      helperCount = await NgmyAiMemoryStore.restoreMerged(email, bundle.helperMessages);
+    }
+
+    if (threadCount == 0 && helperCount == 0) return null;
+    return (threads: threadCount, messages: messageCount, helperMessages: helperCount);
   }
 
   static bool userCanSync(dynamic user, dynamic config) {
