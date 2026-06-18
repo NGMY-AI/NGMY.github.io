@@ -47,7 +47,6 @@ Future<void> showNgmyRepairEstimateFlow({
   if (!context.mounted) return;
   await showDialog<void>(
     context: context,
-    useRootNavigator: true,
     barrierColor: const Color(0xFF060B14),
     builder: (ctx) => Dialog(
       backgroundColor: const Color(0xFF0A1222),

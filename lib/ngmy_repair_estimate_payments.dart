@@ -55,6 +55,7 @@ class NgmyRepairEstimatePayments {
     required VoidCallback onDataChanged,
     required Future<bool> Function() onPersistConfig,
   }) async {
+    if ((user as dynamic).isAdmin == true) return true;
     final fee = monthlyFeeFromConfig(config);
     final email = ((user as dynamic).email as String?) ?? '';
     if (fee <= 0 || hasActiveSubscription(config, email)) return true;

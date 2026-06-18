@@ -25519,11 +25519,8 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   }
 
   void _openRepairEstimateFromCalculator(BuildContext dialogContext) {
-    Navigator.of(dialogContext, rootNavigator: true).pop();
-    Future.delayed(const Duration(milliseconds: 320), () {
-      if (!mounted) return;
-      showNgmyRepairEstimateFlow(
-      context: context,
+    showNgmyRepairEstimateFlow(
+      context: dialogContext,
       geminiApiKey: widget.config.geminiApiKey,
       refreshApiKey: () async {
         final remote = await _fetchRemoteGeminiApiKey();
@@ -25550,7 +25547,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
         onAddTransaction: widget.onAddTransaction,
       ),
     );
-    });
   }
 
   void _openInvoiceFromGDialog(BuildContext dialogContext) {
@@ -25844,7 +25840,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                                           onPressed: () async {
                                             final tpl = ngmyNormalizeInvoiceTemplateId((inv['template'] ?? 'modern').toString());
                                             if (NgmyInvoicePayments.requiresPayment(tpl, widget.config) &&
-                                                !NgmyInvoicePayments.hasAccess(widget.config, widget.user.email, tpl)) {
+                                                !NgmyInvoicePayments.hasAccess(widget.config, widget.user.email, tpl, isAdmin: widget.user.isAdmin)) {
                                               final ok = await NgmyInvoicePayments.requestAccess(
                                                 context: context,
                                                 user: widget.user,
@@ -26071,9 +26067,11 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     );
   }
 
-  bool _invoiceContentLocked() =>
-      NgmyInvoicePayments.requiresPayment(_invoiceTemplate, widget.config) &&
-      !NgmyInvoicePayments.hasAccess(widget.config, widget.user.email, _invoiceTemplate);
+  bool _invoiceContentLocked() {
+    if (widget.user.isAdmin) return false;
+    return NgmyInvoicePayments.requiresPayment(_invoiceTemplate, widget.config) &&
+        !NgmyInvoicePayments.hasAccess(widget.config, widget.user.email, _invoiceTemplate, isAdmin: widget.user.isAdmin);
+  }
 
   Future<bool> _ensureInvoiceTemplatePaid(BuildContext ctx, VoidCallback refresh) {
     return NgmyInvoicePayments.requestAccess(

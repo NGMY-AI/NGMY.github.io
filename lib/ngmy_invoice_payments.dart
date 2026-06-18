@@ -86,7 +86,8 @@ class NgmyInvoicePayments {
     return raw.map((k, v) => MapEntry(k.toString().toLowerCase().trim(), v.toString()));
   }
 
-  static bool hasAccess(dynamic config, String email, String templateId) {
+  static bool hasAccess(dynamic config, String email, String templateId, {bool isAdmin = false}) {
+    if (isAdmin) return true;
     if (!requiresPayment(templateId, config)) return true;
     final tier = tierForTemplate(templateId)!;
     final key = _key(email);
@@ -208,6 +209,7 @@ class NgmyInvoicePayments {
     required Future<bool> Function(double amount, String description) onCharge,
     VoidCallback? onGranted,
   }) async {
+    if ((user as dynamic).isAdmin == true) return true;
     if (!requiresPayment(templateId, config)) return true;
     if (hasAccess(config, (user as dynamic).email as String, templateId)) return true;
 
