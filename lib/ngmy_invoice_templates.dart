@@ -115,7 +115,7 @@ List<NgmyInvoiceTemplate> ngmyInvoiceTemplates() => const [
   NgmyInvoiceTemplate(id: 'essential_amber', label: 'Amber Flash', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.essentialFlash, gradient: [Color(0xFF120A02), Color(0xFF422006), Color(0xFF1A0F03)], accent: Color(0xFFF59E0B), accent2: Color(0xFFFBBF24), essentialLuxury: true),
   NgmyInvoiceTemplate(id: 'essential_ocean', label: 'Ocean Dispatch', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.essentialDispatch, gradient: [Color(0xFF021018), Color(0xFF0E4D64), Color(0xFF031820)], accent: Color(0xFF0891B2), accent2: Color(0xFF22D3EE), essentialLuxury: true),
   NgmyInvoiceTemplate(id: 'essential_rose', label: 'Rose Edition', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.essentialRose, gradient: [Color(0xFF12060A), Color(0xFF4C0519), Color(0xFF1A0810)], accent: Color(0xFFE11D48), accent2: Color(0xFFF43F5E), essentialLuxury: true),
-  NgmyInvoiceTemplate(id: 'essential_midnight', label: 'Midnight News', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.essentialMidnight, gradient: [Color(0xFF000000), Color(0xFF111827), Color(0xFF030303)], accent: Color(0xFFEF4444), accent2: Color(0xFFF87171), essentialLuxury: true),
+  NgmyInvoiceTemplate(id: 'essential_midnight', label: 'Midnight News', category: kNgmyInvoiceLuxuryCategory, layout: NgmyInvoiceLayout.essentialMidnight, gradient: [Color(0xFF050508), Color(0xFF111827), Color(0xFF0F172A)], accent: Color(0xFFD4AF37), accent2: Color(0xFF94A3B8), essentialLuxury: true),
 ];
 
 NgmyInvoiceTemplate? ngmyInvoiceTemplateById(String id) {

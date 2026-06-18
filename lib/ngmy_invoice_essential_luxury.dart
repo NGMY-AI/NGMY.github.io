@@ -271,73 +271,52 @@ class _EssentialLuxuryCtx {
 
   Widget totalPlaque({String label = 'TOTAL DUE'}) {
     final dueLabel = isPaid ? 'BALANCE DUE' : label;
-    final plaqueGradient = isPaid
-        ? [accent, accent2]
-        : [_luxGoldDark, _luxGold, _luxGoldLight, _luxGold];
-    final amountColor = isPaid ? Colors.white : _luxBlack;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (isPaid) ...[paidRibbon(), const SizedBox(height: 8)],
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: plaqueGradient),
-            borderRadius: BorderRadius.circular(4),
-            border: isPaid ? Border.all(color: Colors.white.withOpacity(0.35), width: 1.2) : null,
-            boxShadow: [BoxShadow(color: (isPaid ? accent : _luxGold).withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 3))],
-          ),
-          child: Row(
-            children: [
-              Icon(isPaid ? Icons.verified_rounded : Icons.workspace_premium_rounded, color: amountColor.withOpacity(0.85), size: 18),
-              const SizedBox(width: 8),
-              Text(dueLabel, style: TextStyle(color: amountColor.withOpacity(0.9), fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2)),
-              const Spacer(),
-              Text('\$$balanceDue', style: TextStyle(color: amountColor, fontWeight: FontWeight.w900, fontSize: 22, height: 1)),
-            ],
-          ),
-        ),
-      ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [_luxGoldDark, _luxGold, _luxGoldLight, _luxGold]),
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: [BoxShadow(color: _luxGold.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 3))],
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.workspace_premium_rounded, color: _luxBlack.withOpacity(0.7), size: 18),
+          const SizedBox(width: 8),
+          Text(dueLabel, style: TextStyle(color: _luxBlack.withOpacity(0.85), fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2)),
+          const Spacer(),
+          Text('\$$balanceDue', style: const TextStyle(color: _luxBlack, fontWeight: FontWeight.w900, fontSize: 22, height: 1)),
+        ],
+      ),
     );
   }
 
-  Widget paidRibbon() => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [accent.withOpacity(0.95), accent2]),
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: _luxGold.withOpacity(0.7), width: 1.4),
-          boxShadow: [BoxShadow(color: accent.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 2))],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
-            const SizedBox(width: 8),
-            Text(
-              'PAID IN FULL',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 2.4),
-            ),
-          ],
-        ),
-      );
-
+  /// Gold crown stamp — same on every Essential Luxury template when paid.
   Widget paidStampSeal() => Transform.rotate(
         angle: -0.32,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(5),
-            border: Border.all(color: accent, width: 2.2),
-            color: Colors.black.withOpacity(0.45),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: _luxGold, width: 2.4),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [_luxGoldDark.withOpacity(0.92), _luxBlack.withOpacity(0.82)],
+            ),
+            boxShadow: [
+              BoxShadow(color: _luxGold.withOpacity(0.5), blurRadius: 12, offset: const Offset(0, 2)),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.verified_rounded, color: accent2, size: 16),
-              Text('PAID', style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 2.8)),
+              Icon(Icons.workspace_premium_rounded, color: _luxGoldLight, size: 18),
+              const SizedBox(height: 2),
+              const Text(
+                'PAID',
+                style: TextStyle(color: _luxGoldLight, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 2.6),
+              ),
             ],
           ),
         ),
@@ -921,145 +900,73 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
     );
   }
 
-  /// 10 Midnight News — breaking broadcast editorial (red/silver night desk).
+  /// 10 Midnight News — full royal layout, circular portrait, gold & silver night desk.
   Widget _midnight(_EssentialLuxuryCtx c) {
-    final red = c.accent;
-    final redSoft = c.accent2;
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF020202), Color(0xFF0B0F17), Color(0xFF111827)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+    return c.royalShell(
+      showCrownBand: false,
+      topBand: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF050508), Color(0xFF1E293B), Color(0xFF050508)],
+          ),
+          border: Border(bottom: BorderSide(color: _luxGold.withOpacity(0.55), width: 1.2)),
         ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: red.withOpacity(0.55), width: 2),
-        boxShadow: [
-          BoxShadow(color: red.withOpacity(0.28), blurRadius: 22, spreadRadius: 1),
-          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 16, offset: const Offset(0, 8)),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Stack(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [red, redSoft]),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    color: Colors.white,
-                    child: Text('LIVE', style: TextStyle(color: red, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1)),
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'MIDNIGHT NEWS · OFFICIAL INVOICE',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1.6),
-                    ),
-                  ),
-                  Icon(Icons.podcasts_rounded, color: Colors.white.withOpacity(0.9), size: 16),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: red, width: 2),
-                          boxShadow: [BoxShadow(color: red.withOpacity(0.35), blurRadius: 12)],
-                        ),
-                        child: ClipRRect(borderRadius: BorderRadius.circular(8), child: c.photo(size: 78, shape: BoxShape.rectangle, radius: BorderRadius.circular(8))),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(c.biz, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.6)),
-                            const SizedBox(height: 4),
-                            Text(
-                              c.headline.toUpperCase(),
-                              style: TextStyle(color: redSoft, fontWeight: FontWeight.w900, fontSize: 13, height: 1.15, letterSpacing: 0.4),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(c.summary, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(color: _luxIvory.withOpacity(0.72), fontSize: 9, height: 1.35)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.04),
-                      border: Border(left: BorderSide(color: red, width: 3)),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(child: _detailLine(Icons.person_outline_rounded, c.client)),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('${c.docLabel} #${c.invNo}', style: TextStyle(color: red, fontWeight: FontWeight.w900, fontSize: 9)),
-                            Text('Due ${c.due}', style: TextStyle(color: _luxIvory.withOpacity(0.5), fontSize: 8)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  c.luxeTable(),
-                  const SizedBox(height: 8),
-                  c.totalPlaque(label: 'TOTAL DUE'),
-                  const SizedBox(height: 8),
-                  if (c.data.paymentInfo.trim().isNotEmpty) c.paymentHonorBlock(),
-                  if (c.data.paymentInfo.trim().isNotEmpty) const SizedBox(height: 8),
-                  c.sigRow(),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      c.royalSeal(),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'MIDNIGHT NEWS DESK · POWERED BY NGMY',
-                          style: TextStyle(color: _luxIvory.withOpacity(0.45), fontSize: 7, letterSpacing: 1.3, fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 3,
-                    decoration: BoxDecoration(gradient: LinearGradient(colors: [red.withOpacity(0.2), red, redSoft, red.withOpacity(0.2)])),
-                  ),
-                ],
-              ),
-            ),
-              ],
-            ),
-            if (c.isPaid) Positioned(right: 14, top: 52, child: c.paidStampSeal()),
+            Icon(Icons.nightlight_round, color: _luxGold.withOpacity(0.9), size: 14),
+            const SizedBox(width: 8),
+            c.royalTitle('MIDNIGHT NEWS', size: 11),
+            const SizedBox(width: 8),
+            Icon(Icons.nightlight_round, color: _luxGold.withOpacity(0.9), size: 14),
           ],
         ),
+      ),
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            c.isEstimate ? 'CERTIFIED NIGHT DESK ESTIMATE' : 'OFFICIAL MIDNIGHT EDITION',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: _luxIvory.withOpacity(0.55), fontSize: 8, letterSpacing: 1.8, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          c.royalTitle(c.biz, size: 17),
+          c.subtitle('EXECUTIVE NIGHT BULLETIN · ${c.docLabel} #${c.invNo}'),
+          c.goldRule(),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              c.photo(size: 96),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(c.client, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w900, fontSize: 13)),
+                    if (c.data.clientEmail.isNotEmpty)
+                      Text(c.data.clientEmail, style: TextStyle(color: _luxIvory.withOpacity(0.55), fontSize: 8)),
+                    const SizedBox(height: 8),
+                    Text(c.headline, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w700, fontSize: 12, height: 1.2)),
+                    const SizedBox(height: 6),
+                    Text(c.summary, style: TextStyle(color: _luxIvory.withOpacity(0.72), fontSize: 9, height: 1.35)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              c.metaChip('ISSUED', c.issued),
+              const SizedBox(width: 6),
+              c.metaChip('DUE', c.due),
+            ],
+          ),
+          c.bottomBar(),
+        ],
       ),
     );
   }
