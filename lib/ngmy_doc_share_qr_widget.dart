@@ -11,7 +11,7 @@ import 'ngmy_studio_hub.dart';
 
 const String kNgmyDocShareQrLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
-/// Thick-module NGMY QR — white circle, square finder eyes, center logo (reference style).
+/// Thick-module NGMY QR — white circle, chunky squares, center logo (reference style).
 class NgmyDocShareQrWidget extends StatefulWidget {
   const NgmyDocShareQrWidget({
     super.key,
@@ -38,7 +38,7 @@ class NgmyDocShareQrWidget extends StatefulWidget {
     return bytes?.buffer.asUint8List();
   }
 
-  static Future<ImageProvider?> _circularLogoProvider(String url, int px) async {
+  static Future<ImageProvider?> circularLogoProvider(String url, int px) async {
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode != 200 || response.bodyBytes.isEmpty) return null;
@@ -76,24 +76,17 @@ class _NgmyDocShareQrWidgetState extends State<NgmyDocShareQrWidget> {
   @override
   void initState() {
     super.initState();
-    if (NgmyDocShareQrPayload.showCenterLogo(widget.data)) {
-      unawaited(_loadLogo());
-    }
+    unawaited(_loadLogo());
   }
 
   @override
   void didUpdateWidget(covariant NgmyDocShareQrWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.data != widget.data) {
-      _logo = null;
-      if (NgmyDocShareQrPayload.showCenterLogo(widget.data)) {
-        unawaited(_loadLogo());
-      }
-    }
+    if (oldWidget.data != widget.data) unawaited(_loadLogo());
   }
 
   Future<void> _loadLogo() async {
-    final provider = await NgmyDocShareQrWidget._circularLogoProvider(kNgmyDocShareQrLogoUrl, 180);
+    final provider = await NgmyDocShareQrWidget.circularLogoProvider(kNgmyDocShareQrLogoUrl, 200);
     if (mounted) setState(() => _logo = provider);
   }
 
@@ -101,12 +94,11 @@ class _NgmyDocShareQrWidgetState extends State<NgmyDocShareQrWidget> {
   Widget build(BuildContext context) {
     final cap = widget.maxSide ?? (widget.large ? 256.0 : 228.0);
     final qrSide = NgmyDocShareQrPayload.qrSizeForData(widget.data, maxSide: cap);
-    final disc = qrSide + 28;
+    final disc = qrSide + 32;
     final showLogo = NgmyDocShareQrPayload.showCenterLogo(widget.data);
-    final logoSide = showLogo ? (qrSide * NgmyDocShareQrPayload.logoSizeFraction(widget.data)).clamp(44.0, 58.0) : 0.0;
+    final logoSide = showLogo ? (qrSide * NgmyDocShareQrPayload.logoSizeFraction(widget.data)).clamp(46.0, 62.0) : 0.0;
     final ecLevel = NgmyDocShareQrPayload.errorLevelForData(widget.data);
-    final qrVersion = NgmyDocShareQrPayload.qrVersionForData(widget.data);
-    final logo = _logo ?? const NetworkImage(kNgmyDocShareQrLogoUrl);
+    final embedLogo = showLogo && _logo != null;
 
     return RepaintBoundary(
       key: widget.captureKey,
@@ -142,7 +134,7 @@ class _NgmyDocShareQrWidgetState extends State<NgmyDocShareQrWidget> {
                   child: QrImageView(
                     data: widget.data,
                     size: qrSide,
-                    version: qrVersion,
+                    version: QrVersions.auto,
                     padding: EdgeInsets.zero,
                     backgroundColor: Colors.white,
                     errorCorrectionLevel: ecLevel,
@@ -155,26 +147,13 @@ class _NgmyDocShareQrWidgetState extends State<NgmyDocShareQrWidget> {
                       dataModuleShape: QrDataModuleShape.square,
                       color: NgmyDocShareQrWidget._ink,
                     ),
-                    embeddedImage: showLogo ? logo : null,
-                    embeddedImageStyle: showLogo
+                    embeddedImage: embedLogo ? _logo : null,
+                    embeddedImageStyle: embedLogo
                         ? QrEmbeddedImageStyle(size: Size(logoSide, logoSide))
                         : null,
                   ),
                 ),
-                if (showLogo)
-                  IgnorePointer(
-                    child: Container(
-                      width: logoSide + 8,
-                      height: logoSide + 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: kNgmyStudioHubAccent, width: 2.5),
-                        boxShadow: const [
-                          BoxShadow(color: Color(0x22000000), blurRadius: 4, offset: Offset(0, 1)),
-                        ],
-                      ),
-                    ),
-                  ),
+                if (showLogo) _CenterLogoBadge(logo: _logo, size: logoSide),
               ],
             ),
           ),
@@ -199,7 +178,49 @@ class _NgmyDocShareQrWidgetState extends State<NgmyDocShareQrWidget> {
   }
 }
 
-/// L-shaped scan brackets like the reference artwork.
+class _CenterLogoBadge extends StatelessWidget {
+  const _CenterLogoBadge({required this.logo, required this.size});
+
+  final ImageProvider? logo;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size + 12,
+        height: size + 12,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+          border: Border.all(color: kNgmyStudioHubAccent, width: 2.5),
+          boxShadow: const [
+            BoxShadow(color: Color(0x22000000), blurRadius: 4, offset: Offset(0, 1)),
+          ],
+        ),
+        padding: const EdgeInsets.all(3),
+        child: ClipOval(
+          child: logo != null
+              ? Image(image: logo!, fit: BoxFit.cover, width: size, height: size)
+              : ColoredBox(
+                  color: Colors.white,
+                  child: Center(
+                    child: Text(
+                      'NGMY',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: size * 0.22,
+                        color: kNgmyStudioHubAccent,
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CornerBracketPainter extends CustomPainter {
   const _CornerBracketPainter({
     required this.color,

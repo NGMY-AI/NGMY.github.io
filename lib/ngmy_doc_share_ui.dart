@@ -231,7 +231,8 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        isDismissible: created.mode != NgmyDocShareQrMode.lanDirect,
+        isDismissible: created.mode != NgmyDocShareQrMode.lanDirect &&
+            created.mode != NgmyDocShareQrMode.relayLink,
         builder: (ctx) => _DocShareQrSheet(
           payload: created.qrPayload,
           fileCount: created.fileCount,
@@ -279,7 +280,9 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     if (raw == null || raw.isEmpty) return;
     final scan = raw.trim();
 
-    if (scan.startsWith('NGMYDOCSYNC3|') || scan.startsWith('NGMYDOCSYNC3|z|')) {
+    if (scan.startsWith('NGMYDOCSYNC4|') ||
+        scan.startsWith('NGMYDOCSYNC3|') ||
+        scan.startsWith('NGMYDOCSYNC3|z|')) {
       await _withWork(() async {
         final session = await NgmyDocShareSync.beginWebRtcReceive(
           raw: scan,
@@ -392,12 +395,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _working ? null : _pickUpload,
-        backgroundColor: kNgmyStudioHubAccent2,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add', style: TextStyle(fontWeight: FontWeight.w800)),
-      ),
+      floatingActionButton: null,
       body: Column(
         children: [
           if (_status != null)
@@ -452,14 +450,14 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                     child: Padding(
                       padding: const EdgeInsets.all(28),
                       child: Text(
-                        'No files yet.\nTap Upload to add videos, photos, or documents.',
+                        'No files yet.\nTap + at the top to add videos, photos, or documents.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.5), height: 1.5),
                       ),
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 90),
+                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
                     itemCount: _items.length,
                     itemBuilder: (_, i) {
                       final item = _items[i];
@@ -715,12 +713,43 @@ class _DocShareQrSheet extends StatefulWidget {
 
 class _DocShareQrSheetState extends State<_DocShareQrSheet> {
   final _qrCaptureKey = GlobalKey();
+  bool _relayWaiting = false;
+  String? _relayStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.mode == NgmyDocShareQrMode.relayLink) {
+      unawaited(_waitRelayConnect());
+    }
+  }
+
+  Future<void> _waitRelayConnect() async {
+    setState(() {
+      _relayWaiting = true;
+      _relayStatus = 'Waiting for receiver to scan…';
+    });
+    final ok = await NgmyDocShareSync.waitForRelayAnswer();
+    if (!mounted) return;
+    setState(() {
+      _relayWaiting = false;
+      _relayStatus = ok ? 'Connected — sending files now…' : 'Still waiting — ask receiver to scan';
+    });
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connected — sending files now…')),
+      );
+    }
+  }
+
   String get _modeLabel {
     switch (widget.mode) {
       case NgmyDocShareQrMode.inlineInstant:
         return 'Instant restore';
       case NgmyDocShareQrMode.lanDirect:
         return 'Direct transfer — any size';
+      case NgmyDocShareQrMode.relayLink:
+        return 'Fast share — any size';
       case NgmyDocShareQrMode.webrtcLink:
         return 'QR link — any size';
     }
@@ -732,6 +761,8 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
         return 'Receiver scans once — files restore instantly on their phone.';
       case NgmyDocShareQrMode.lanDirect:
         return 'Keep this open. Receiver scans on same Wi‑Fi — videos & folders copy straight to their phone.';
+      case NgmyDocShareQrMode.relayLink:
+        return 'Receiver scans this thick QR once — files transfer automatically. Keep this screen open.';
       case NgmyDocShareQrMode.webrtcLink:
         return 'Receiver scans this QR, then shows a short answer QR — tap Scan answer below when they do.';
     }
@@ -914,6 +945,18 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
                   style: TextButton.styleFrom(foregroundColor: Colors.white60),
                 ),
               ],
+            ],
+            if (widget.mode == NgmyDocShareQrMode.relayLink && _relayStatus != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _relayStatus!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _relayWaiting ? kNgmyStudioHubAccent2 : Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
             if (widget.mode == NgmyDocShareQrMode.webrtcLink) ...[
               const SizedBox(height: 12),

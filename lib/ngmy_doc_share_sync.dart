@@ -21,7 +21,7 @@ typedef NgmyDocShareQrResult = ({
   NgmyDocShareQrMode mode,
 });
 
-enum NgmyDocShareQrMode { inlineInstant, lanDirect, webrtcLink }
+enum NgmyDocShareQrMode { inlineInstant, lanDirect, webrtcLink, relayLink }
 
 class NgmyDocShareSync {
   static String _norm(String email) => email.toLowerCase().trim();
@@ -52,10 +52,13 @@ class NgmyDocShareSync {
       }
       final offer = await webrtc.createOfferQr(ownerEmail: ownerEmail, items: items);
       if (offer != null) {
+        final mode = offer.startsWith('NGMYDOCSYNC4|')
+            ? NgmyDocShareQrMode.relayLink
+            : NgmyDocShareQrMode.webrtcLink;
         return (
           qrPayload: offer,
           fileCount: items.length,
-          mode: NgmyDocShareQrMode.webrtcLink,
+          mode: mode,
         );
       }
     }
@@ -86,6 +89,8 @@ class NgmyDocShareSync {
   }
 
   static Future<void> applyWebRtcAnswer(String raw) => webrtc.applyAnswerQr(raw);
+
+  static Future<bool> waitForRelayAnswer() => webrtc.waitForRelayAnswer();
 
   static Future<({String answerQr, Future<List<NgmyDocShareItem>> transfer})?> beginWebRtcReceive({
     required String raw,

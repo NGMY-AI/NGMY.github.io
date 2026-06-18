@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:archive/archive.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'ngmy_doc_share_relay.dart';
+
 /// Gzip + base64 so WebRTC / large Doc Share QRs stay sparse and easy to scan.
 class NgmyDocShareQrPayload {
   static String gzipBase64(String text) {
@@ -62,9 +64,17 @@ class NgmyDocShareQrPayload {
     return QrErrorCorrectLevel.L;
   }
 
-  static bool showCenterLogo(String data) => data.length <= 1200;
+  static bool showCenterLogo(String data) {
+    if (data.startsWith('$kNgmyDocShareRelayOfferPrefix|') ||
+        data.startsWith('$kNgmyDocShareRelayAnswerPrefix|') ||
+        data.startsWith('NGMYDOCSYNC2|')) {
+      return true;
+    }
+    return data.length <= 200;
+  }
 
   static double logoSizeFraction(String data) {
+    if (data.length <= 30) return 0.24;
     if (data.length <= 120) return 0.22;
     if (data.length <= 400) return 0.16;
     return 0.12;
