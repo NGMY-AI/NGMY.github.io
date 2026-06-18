@@ -16,11 +16,13 @@ class NgmyHelpCenterScreen extends StatefulWidget {
     required this.configMap,
     required this.clientName,
     this.clientEmail = '',
+    this.clientPhone = '',
   });
 
   final Map<String, dynamic> configMap;
   final String clientName;
   final String clientEmail;
+  final String clientPhone;
 
   @override
   State<NgmyHelpCenterScreen> createState() => _NgmyHelpCenterScreenState();
@@ -32,6 +34,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
   late final TextEditingController _notesC;
   late final TextEditingController _qtyC;
   late final TextEditingController _priceC;
+  late final TextEditingController _receiverC;
   late final AnimationController _pulse;
   String _reference = '';
 
@@ -42,6 +45,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     _notesC = TextEditingController();
     _qtyC = TextEditingController();
     _priceC = TextEditingController();
+    _receiverC = TextEditingController();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
   }
 
@@ -50,6 +54,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     _notesC.dispose();
     _qtyC.dispose();
     _priceC.dispose();
+    _receiverC.dispose();
     _pulse.dispose();
     super.dispose();
   }
@@ -61,8 +66,18 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
       _qtyC.text = s.defaultQty;
       _priceC.text = s.defaultPrice;
       _notesC.clear();
+      _receiverC.clear();
       _reference = 'HC-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}-${1000 + DateTime.now().millisecond % 9000}';
     });
+  }
+
+  bool get _isSendMoney => _selected != null && ngmyHelpCenterIsSendMoney(_selected!);
+
+  bool get _canContact {
+    if (_selected == null) return false;
+    if (_isSendMoney && _receiverC.text.trim().isEmpty) return false;
+    if (_isSendMoney && (double.tryParse(_priceC.text.trim()) ?? 0) <= 0) return false;
+    return true;
   }
 
   String get _message {
@@ -72,6 +87,8 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
       service: s,
       clientName: widget.clientName,
       clientEmail: widget.clientEmail,
+      clientPhone: widget.clientPhone,
+      receiverName: _receiverC.text,
       notes: _notesC.text,
       qty: _qtyC.text,
       price: _priceC.text,
@@ -80,6 +97,10 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
   }
 
   Future<void> _openWhatsApp() async {
+    if (!_canContact) {
+      _snack(_isSendMoney ? 'Enter receiver name and transfer amount first.' : 'Complete your request first.');
+      return;
+    }
     final url = _cfg.resolvedWhatsAppUrl(prefilledText: _message);
     if (url.isEmpty) {
       _snack('WhatsApp link is not configured yet.');
@@ -92,6 +113,10 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
   }
 
   Future<void> _callPhone() async {
+    if (!_canContact) {
+      _snack(_isSendMoney ? 'Enter receiver name and transfer amount first.' : 'Complete your request first.');
+      return;
+    }
     final digits = _cfg.digitsPhone();
     if (digits.isEmpty) {
       _snack('Phone number is not configured yet.');
@@ -333,7 +358,12 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
                     if (double.tryParse(s.defaultPrice) != null && (double.tryParse(s.defaultPrice) ?? 0) > 0)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
-                        child: Text('From \$${double.tryParse(s.defaultPrice)!.toStringAsFixed(2)}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _accent)),
+                        child: Text(
+                          ngmyHelpCenterIsSendMoney(s)
+                              ? '15% service fee applies'
+                              : 'From \$${double.tryParse(s.defaultPrice)!.toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _accent),
+                        ),
                       ),
                   ],
                 ),
@@ -348,6 +378,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
 
   Widget _summaryCard(bool isDark) {
     final s = _selected!;
+    final isMoney = ngmyHelpCenterIsSendMoney(s);
+    final amount = double.tryParse(_priceC.text.trim()) ?? 0;
+    final fee = amount * kNgmyHelpCenterMoneyTransferFeeRate;
+    final recipientGets = amount - fee;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -370,15 +405,53 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
           ),
           const SizedBox(height: 12),
           _summaryLine('Service', s.name, isDark),
-          _summaryLine('Client', widget.clientName, isDark),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: _field('Qty', _qtyC, isDark, onChanged: (_) => setState(() {}))),
-              const SizedBox(width: 10),
-              Expanded(child: _field('Est. rate (\$)', _priceC, isDark, onChanged: (_) => setState(() {}))),
-            ],
-          ),
+          _summaryLine('Your name', widget.clientName, isDark),
+          if (widget.clientEmail.trim().isNotEmpty) _summaryLine('Your email', widget.clientEmail, isDark),
+          if (widget.clientPhone.trim().isNotEmpty) _summaryLine('Your phone', widget.clientPhone, isDark),
+          if (isMoney) ...[
+            const SizedBox(height: 10),
+            TextField(
+              controller: _receiverC,
+              onChanged: (_) => setState(() {}),
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: 'Receiver full name *',
+                filled: true,
+                fillColor: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 10),
+            _field('Transfer amount (\$) *', _priceC, isDark, onChanged: (_) => setState(() {})),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFF59E0B).withOpacity(isDark ? 0.12 : 0.1),
+                border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.45)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('15% NGMY service fee', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: isDark ? Colors.amber : const Color(0xFFB45309))),
+                  const SizedBox(height: 6),
+                  _summaryLine('Transfer', '\$${amount.toStringAsFixed(2)}', isDark),
+                  _summaryLine('Fee (15%)', '\$${fee.toStringAsFixed(2)}', isDark),
+                  _summaryLine('Recipient gets', '\$${recipientGets.toStringAsFixed(2)}', isDark),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _field('Qty', _qtyC, isDark, onChanged: (_) => setState(() {}))),
+                const SizedBox(width: 10),
+                Expanded(child: _field('Est. rate (\$)', _priceC, isDark, onChanged: (_) => setState(() {}))),
+              ],
+            ),
+          ],
           const SizedBox(height: 10),
           TextField(
             controller: _notesC,
@@ -448,7 +521,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
       children: [
         if (_cfg.whatsappEnabled)
           FilledButton.icon(
-            onPressed: _openWhatsApp,
+            onPressed: _canContact ? _openWhatsApp : null,
             icon: const Icon(Icons.chat_rounded),
             label: Text(_cfg.whatsappButtonLabel, style: const TextStyle(fontWeight: FontWeight.w900)),
             style: FilledButton.styleFrom(
@@ -461,7 +534,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
         if (_cfg.whatsappEnabled && _cfg.callEnabled) const SizedBox(height: 10),
         if (_cfg.callEnabled)
           OutlinedButton.icon(
-            onPressed: _callPhone,
+            onPressed: _canContact ? _callPhone : null,
             icon: const Icon(Icons.phone_in_talk_rounded),
             label: Text(_cfg.callButtonLabel, style: const TextStyle(fontWeight: FontWeight.w800)),
             style: OutlinedButton.styleFrom(

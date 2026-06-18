@@ -2,6 +2,17 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+/// Money transfer service id in Help Center — 15% service fee applies.
+const String kNgmyHelpCenterSendMoneyId = 'send_money';
+
+/// NGMY fee on send-money transfers (15%).
+const double kNgmyHelpCenterMoneyTransferFeeRate = 0.15;
+
+bool ngmyHelpCenterIsSendMoney(NgmyHelpCenterService service) =>
+    service.id == kNgmyHelpCenterSendMoneyId ||
+    service.name.toLowerCase().contains('send money') ||
+    service.name.toLowerCase().contains('money transfer');
+
 /// One selectable service in the Help Center (admin-configurable).
 class NgmyHelpCenterService {
   const NgmyHelpCenterService({
@@ -116,9 +127,9 @@ class NgmyHelpCenterConfig {
         NgmyHelpCenterService(
           id: 'send_money',
           name: 'Send Money',
-          description: 'Money transfer & remittance help',
+          description: 'Money transfer — 15% NGMY service fee applies',
           icon: 'send_rounded',
-          defaultPrice: '0',
+          defaultPrice: '100',
           defaultQty: '1',
         ),
         NgmyHelpCenterService(
@@ -167,30 +178,51 @@ class NgmyHelpCenterConfig {
     required NgmyHelpCenterService service,
     required String clientName,
     String clientEmail = '',
+    String clientPhone = '',
+    String receiverName = '',
     String notes = '',
     String? qty,
     String? price,
     String? reference,
   }) {
     final ref = reference ?? _newReference();
-    final q = qty ?? service.defaultQty;
-    final p = _fmt(price ?? service.defaultPrice);
-    final total = (double.tryParse(q) ?? 1) * (double.tryParse(p) ?? 0);
+    final isMoney = ngmyHelpCenterIsSendMoney(service);
     final buf = StringBuffer()
       ..writeln('*${supportName.trim().isEmpty ? 'NGMY Help Request' : supportName.trim()}*')
       ..writeln('━━━━━━━━━━━━━━━━')
       ..writeln('Service: *${service.name}*')
       ..writeln('Reference: $ref')
-      ..writeln('Client: ${clientName.trim().isEmpty ? 'Client' : clientName.trim()}');
-    if (clientEmail.trim().isNotEmpty) buf.writeln('Email: ${clientEmail.trim()}');
-    buf
-      ..writeln('Qty: $q')
-      ..writeln('Est. rate: \$$p')
-      ..writeln('Est. total: \$${total.toStringAsFixed(2)}');
-    if (service.description.trim().isNotEmpty) buf.writeln('Details: ${service.description.trim()}');
+      ..writeln('Sender: ${clientName.trim().isEmpty ? 'Client' : clientName.trim()}');
+    if (clientEmail.trim().isNotEmpty) buf.writeln('Sender email: ${clientEmail.trim()}');
+    if (clientPhone.trim().isNotEmpty) buf.writeln('Sender phone: ${clientPhone.trim()}');
+
+    if (isMoney) {
+      final amount = double.tryParse((price ?? service.defaultPrice).trim()) ?? 0;
+      final fee = amount * kNgmyHelpCenterMoneyTransferFeeRate;
+      final recipientGets = amount - fee;
+      if (receiverName.trim().isNotEmpty) buf.writeln('Receiver name: *${receiverName.trim()}*');
+      buf
+        ..writeln('Transfer amount: \$${amount.toStringAsFixed(2)}')
+        ..writeln('NGMY service fee (15%): \$${fee.toStringAsFixed(2)}')
+        ..writeln('Recipient receives: \$${recipientGets.toStringAsFixed(2)}');
+    } else {
+      final q = qty ?? service.defaultQty;
+      final p = _fmt(price ?? service.defaultPrice);
+      final total = (double.tryParse(q) ?? 1) * (double.tryParse(p) ?? 0);
+      buf
+        ..writeln('Qty: $q')
+        ..writeln('Est. rate: \$$p')
+        ..writeln('Est. total: \$${total.toStringAsFixed(2)}');
+    }
+
+    if (!isMoney && service.description.trim().isNotEmpty) {
+      buf.writeln('Details: ${service.description.trim()}');
+    }
     if (notes.trim().isNotEmpty) buf.writeln('Notes: ${notes.trim()}');
     buf.writeln();
-    buf.writeln('Please contact me about this service. Thank you!');
+    buf.writeln(isMoney
+        ? 'Please process this money transfer request. I understand the 15% NGMY service fee applies.'
+        : 'Please contact me about this service. Thank you!');
     return buf.toString().trim();
   }
 

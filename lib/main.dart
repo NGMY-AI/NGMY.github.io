@@ -98,6 +98,7 @@ import 'ngmy_studio_hub.dart';
 import 'ngmy_help_center.dart';
 import 'ngmy_help_center_ui.dart';
 import 'ngmy_help_center_admin.dart';
+import 'ngmy_phone_required_gate.dart';
 import 'ngmy_loans.dart';
 import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_civic_read_state.dart';
@@ -13717,6 +13718,21 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
   }
 
+  Future<bool> _saveUserPhone(String phone) async {
+    final trimmed = phone.trim();
+    if (!ngmyUserPhoneOnFile(trimmed)) return false;
+    final myEmail = widget.user.email.toLowerCase().trim();
+    final taken = widget.allUsers.any(
+      (u) => u.email.toLowerCase().trim() != myEmail && u.phone.trim() == trimmed,
+    );
+    if (taken) return false;
+    widget.user.phone = trimmed;
+    widget.onDataChanged();
+    await widget.onPushUserToCloud?.call(widget.user);
+    if (mounted) setState(() {});
+    return true;
+  }
+
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final shellBg = Theme.of(context).scaffoldBackgroundColor;
@@ -13739,7 +13755,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
             ),
       child: Listener(
         onPointerDown: (_) => unawaited(NgmyIncomeSound.unlockForWebUserGesture()),
-        child: Scaffold(
+        child: NgmyPhoneRequiredGate(
+          phone: widget.user.phone,
+          email: widget.user.email,
+          onSavePhone: _saveUserPhone,
+          child: Scaffold(
         extendBody: true,
         backgroundColor: shellBg,
         body: Stack(
@@ -13772,6 +13792,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
           elevation: 0,
           color: Colors.transparent,
           child: _buildBottomNavBar(),
+        ),
         ),
         ),
       ),
@@ -25474,6 +25495,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         configMap: widget.config.helpCenterHub,
                         clientName: widget.user.username.trim().isNotEmpty ? widget.user.username.trim() : widget.user.email,
                         clientEmail: widget.user.email,
+                        clientPhone: widget.user.phone,
                       ),
                       routeName: 'NgmyHelpCenterScreen',
                     ),
