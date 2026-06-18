@@ -87,7 +87,7 @@ class NgmyDocShareLocalServer {
     server.listen((req) => unawaited(_handle(req, session)));
 
     return (
-      qrPayload: 'NGMYDOCSYNC2|$_baseUrl/$session',
+      qrPayload: 'N2|$_baseUrl/$session',
       fileCount: items.length,
     );
   }

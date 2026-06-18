@@ -24,7 +24,6 @@ class NgmyDocShareQrPayload {
     return '$prefix|z|${gzipBase64(jsonText)}';
   }
 
-  /// Returns decoded JSON/text after [prefix]| or [prefix]|z| — null if not a match.
   static String? unwrapAfterPrefix(String raw, String prefix) {
     final text = raw.trim();
     final zHead = '$prefix|z|';
@@ -43,42 +42,42 @@ class NgmyDocShareQrPayload {
     return null;
   }
 
-  /// Short LAN URLs → low QR version → thick modules on screen.
-  static int qrVersionForData(String data) => QrVersions.auto;
+  /// Short LAN / relay codes → fewer modules → bigger squares on screen.
+  static bool isThickPayload(String data) {
+    final t = data.trim();
+    return t.startsWith('N2|') ||
+        t.startsWith('NGMYDOCSYNC2|') ||
+        t.startsWith('NGMYDOCSYNC0|');
+  }
 
-  /// Display size — short payloads fill the circle with chunky squares.
-  static double qrSizeForData(String data, {double maxSide = 256}) {
+  static double qrSizeForData(String data, {double maxSide = 320}) {
     final len = data.length;
-    if (len < 120) return maxSide.clamp(228, 256);
-    if (len < 350) return (maxSide - 10).clamp(218, 246);
-    if (len < 800) return (maxSide - 18).clamp(208, 236);
-    return (maxSide - 26).clamp(200, 228);
+    if (len < 60) return maxSide.clamp(300, 340);
+    if (len < 120) return maxSide.clamp(288, 320);
+    if (len < 350) return (maxSide - 12).clamp(272, 304);
+    if (len < 800) return (maxSide - 24).clamp(256, 288);
+    return (maxSide - 36).clamp(240, 272);
   }
 
   static int errorLevelForData(String data) {
+    if (isThickPayload(data)) return QrErrorCorrectLevel.H;
     final len = data.length;
-    if (len <= 120) return QrErrorCorrectLevel.H;
     if (len <= 400) return QrErrorCorrectLevel.M;
     return QrErrorCorrectLevel.L;
   }
 
-  static bool showCenterLogo(String data) {
-    if (data.startsWith('NGMYDOCSYNC2|')) return true;
-    return data.length <= 200;
-  }
+  static bool showCenterLogo(String data) => isThickPayload(data) || data.length <= 200;
 
   static double logoSizeFraction(String data) {
-    if (data.length <= 30) return 0.24;
+    if (data.length <= 40) return 0.26;
     if (data.length <= 120) return 0.22;
     if (data.length <= 400) return 0.16;
     return 0.12;
   }
 
-  /// Strip non-essential SDP lines so WebRTC QRs stay smaller.
   static String minifySdp(String sdp) {
     final out = <String>[];
     var candidates = 0;
-    const maxCandidates = 2;
     for (final line in sdp.split('\n')) {
       final l = line.trim();
       if (l.isEmpty) continue;
@@ -94,7 +93,7 @@ class NgmyDocShareQrPayload {
       if (l.startsWith('a=setup:')) continue;
       if (l.startsWith('a=ice-options:')) continue;
       if (l.startsWith('a=candidate')) {
-        if (candidates >= maxCandidates) continue;
+        if (candidates >= 2) continue;
         candidates++;
       }
       out.add(l);

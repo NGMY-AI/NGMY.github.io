@@ -9,7 +9,8 @@ import 'ngmy_doc_share_qr_payload.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_webrtc_web.dart' as webrtc;
 
-const String kNgmyDocShareQrPrefixLan = 'NGMYDOCSYNC2';
+const String kNgmyDocShareQrPrefixLan = 'N2';
+const String kNgmyDocShareQrPrefixLanLegacy = 'NGMYDOCSYNC2';
 const String kNgmyDocShareQrPrefixInline = 'NGMYDOCSYNC0';
 const String kNgmyDocShareBundleMarker = 'ngmyDocShareBundle';
 const int kNgmyDocShareInlineQrMaxChars = 2900;
@@ -128,8 +129,16 @@ class NgmyDocShareSync {
       return _importFromLan(recipientEmail: recipientEmail, baseUrl: url, onProgress: onProgress);
     }
 
-    if (text.startsWith('http://') || text.startsWith('https://')) {
-      return _importFromLan(recipientEmail: recipientEmail, baseUrl: text, onProgress: onProgress);
+    if (text.startsWith('$kNgmyDocShareQrPrefixLanLegacy|')) {
+      final url = text.substring(kNgmyDocShareQrPrefixLanLegacy.length + 1).trim();
+      return _importFromLan(recipientEmail: recipientEmail, baseUrl: url, onProgress: onProgress);
+    }
+
+    final httpMatch = RegExp(r'https?://\S+').firstMatch(text);
+    if (httpMatch != null) {
+      var url = httpMatch.group(0)!;
+      if (url.endsWith('/')) url = url.substring(0, url.length - 1);
+      return _importFromLan(recipientEmail: recipientEmail, baseUrl: url, onProgress: onProgress);
     }
 
     if (text.contains(kNgmyDocShareBundleMarker)) {

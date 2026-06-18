@@ -11,7 +11,7 @@ import 'ngmy_studio_hub.dart';
 
 const String kNgmyDocShareQrLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
-/// Thick-module NGMY QR — white circle, chunky squares, center logo (reference style).
+/// Thick-module NGMY QR — white circle, chunky squares, center logo.
 class NgmyDocShareQrWidget extends StatefulWidget {
   const NgmyDocShareQrWidget({
     super.key,
@@ -26,7 +26,7 @@ class NgmyDocShareQrWidget extends StatefulWidget {
   final bool large;
   final double? maxSide;
 
-  static const _ink = Color(0xFF0A0A12);
+  static const _ink = Color(0xFF000000);
 
   static Future<Uint8List?> capturePng(GlobalKey key, {double pixelRatio = 5}) async {
     final ctx = key.currentContext;
@@ -86,18 +86,19 @@ class _NgmyDocShareQrWidgetState extends State<NgmyDocShareQrWidget> {
   }
 
   Future<void> _loadLogo() async {
-    final provider = await NgmyDocShareQrWidget.circularLogoProvider(kNgmyDocShareQrLogoUrl, 200);
+    final provider = await NgmyDocShareQrWidget.circularLogoProvider(kNgmyDocShareQrLogoUrl, 220);
     if (mounted) setState(() => _logo = provider);
   }
 
   @override
   Widget build(BuildContext context) {
-    final cap = widget.maxSide ?? (widget.large ? 256.0 : 228.0);
+    final cap = widget.maxSide ?? (widget.large ? 320.0 : 280.0);
     final qrSide = NgmyDocShareQrPayload.qrSizeForData(widget.data, maxSide: cap);
-    final disc = qrSide + 32;
+    final disc = qrSide + 28;
     final showLogo = NgmyDocShareQrPayload.showCenterLogo(widget.data);
-    final logoSide = showLogo ? (qrSide * NgmyDocShareQrPayload.logoSizeFraction(widget.data)).clamp(46.0, 62.0) : 0.0;
+    final logoSide = showLogo ? (qrSide * NgmyDocShareQrPayload.logoSizeFraction(widget.data)).clamp(50.0, 72.0) : 0.0;
     final ecLevel = NgmyDocShareQrPayload.errorLevelForData(widget.data);
+    final useGapless = !NgmyDocShareQrPayload.isThickPayload(widget.data);
     final embedLogo = showLogo && _logo != null;
 
     return RepaintBoundary(
@@ -113,7 +114,6 @@ class _NgmyDocShareQrWidgetState extends State<NgmyDocShareQrWidget> {
               color: Colors.white,
               boxShadow: const [
                 BoxShadow(color: Color(0x33000000), blurRadius: 18, offset: Offset(0, 6)),
-                BoxShadow(color: Color(0x1A000000), blurRadius: 4, offset: Offset(0, 1)),
               ],
             ),
             child: Stack(
@@ -124,8 +124,8 @@ class _NgmyDocShareQrWidgetState extends State<NgmyDocShareQrWidget> {
                   painter: _CornerBracketPainter(
                     color: kNgmyStudioHubAccent.withValues(alpha: 0.85),
                     stroke: 4.5,
-                    arm: disc * 0.11,
-                    inset: disc * 0.07,
+                    arm: disc * 0.1,
+                    inset: disc * 0.06,
                   ),
                 ),
                 SizedBox(
@@ -138,7 +138,7 @@ class _NgmyDocShareQrWidgetState extends State<NgmyDocShareQrWidget> {
                     padding: EdgeInsets.zero,
                     backgroundColor: Colors.white,
                     errorCorrectionLevel: ecLevel,
-                    gapless: true,
+                    gapless: useGapless,
                     eyeStyle: const QrEyeStyle(
                       eyeShape: QrEyeShape.square,
                       color: NgmyDocShareQrWidget._ink,
@@ -153,7 +153,7 @@ class _NgmyDocShareQrWidgetState extends State<NgmyDocShareQrWidget> {
                         : null,
                   ),
                 ),
-                if (showLogo) _CenterLogoBadge(logo: _logo, size: logoSide),
+                if (showLogo && !embedLogo) _CenterLogoBadge(logo: _logo, size: logoSide),
               ],
             ),
           ),
@@ -188,30 +188,24 @@ class _CenterLogoBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return IgnorePointer(
       child: Container(
-        width: size + 12,
-        height: size + 12,
+        width: size + 14,
+        height: size + 14,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white,
-          border: Border.all(color: kNgmyStudioHubAccent, width: 2.5),
-          boxShadow: const [
-            BoxShadow(color: Color(0x22000000), blurRadius: 4, offset: Offset(0, 1)),
-          ],
+          border: Border.all(color: kNgmyStudioHubAccent, width: 3),
         ),
-        padding: const EdgeInsets.all(3),
+        padding: const EdgeInsets.all(4),
         child: ClipOval(
           child: logo != null
-              ? Image(image: logo!, fit: BoxFit.cover, width: size, height: size)
-              : ColoredBox(
-                  color: Colors.white,
-                  child: Center(
-                    child: Text(
-                      'NGMY',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: size * 0.22,
-                        color: kNgmyStudioHubAccent,
-                      ),
+              ? Image(image: logo!, fit: BoxFit.cover)
+              : Center(
+                  child: Text(
+                    'NGMY',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: size * 0.2,
+                      color: kNgmyStudioHubAccent,
                     ),
                   ),
                 ),
@@ -240,8 +234,7 @@ class _CornerBracketPainter extends CustomPainter {
       ..color = color
       ..strokeWidth = stroke
       ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.square
-      ..strokeJoin = StrokeJoin.miter;
+      ..strokeCap = StrokeCap.square;
 
     void corner(double x, double y, {required bool flipX, required bool flipY}) {
       final dx = flipX ? -1.0 : 1.0;
@@ -260,8 +253,7 @@ class _CornerBracketPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CornerBracketPainter oldDelegate) =>
-      color != oldDelegate.color || stroke != oldDelegate.stroke;
+  bool shouldRepaint(covariant _CornerBracketPainter oldDelegate) => false;
 }
 
 void unawaited(Future<void> f) {}
