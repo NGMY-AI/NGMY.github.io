@@ -13625,7 +13625,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
         onSyncMediaPost: widget.onSyncAdminMediaPost,
         onSyncUserMedia: widget.onSyncAdminUserMedia,
       ),
-      5: () => const SizedBox.shrink(),
+      5: () => NgmyCreatorHubTab(
+        userEmail: widget.user.email,
+        bottomScrollPadding: _ngmyBottomNavScrollPadding(context),
+      ),
       6: () => ProfileScreen(
         user: widget.user,
         allUsers: widget.allUsers,
@@ -13730,11 +13733,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () => showNgmyStudioHub(context, userEmail: widget.user.email),
+            onTap: () => setState(() {
+              _idx = 5;
+              _visitedTabs.add(5);
+            }),
             customBorder: const CircleBorder(),
             child: SizedBox(
               height: NgmyBottomNavMetrics.barHeight,
-              child: Center(child: NgmyStudioHubNavIcon(dimmed: false, size: 30)),
+              child: Center(child: NgmyStudioHubNavIcon(dimmed: _idx != 5, size: 30)),
             ),
           ),
         ),

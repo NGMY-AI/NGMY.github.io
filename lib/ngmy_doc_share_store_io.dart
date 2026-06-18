@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -13,6 +14,15 @@ import 'ngmy_doc_share_models.dart';
 String _emailKey(String email) => email.toLowerCase().trim();
 
 String _indexPrefsKey(String email) => 'ngmy_doc_share_index_v1_${_emailKey(email)}';
+
+String _newId() => '${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(99999)}';
+
+String _safeExt(String name) {
+  final dot = name.lastIndexOf('.');
+  if (dot <= 0 || dot >= name.length - 1) return 'bin';
+  final ext = name.substring(dot + 1).replaceAll(RegExp(r'[^\w]+'), '').toLowerCase();
+  return ext.isEmpty ? 'bin' : ext;
+}
 
 Future<Directory> _userDir(String email) async {
   final docs = await getApplicationDocumentsDirectory();
@@ -39,7 +49,16 @@ Future<void> _writeIndex(String email, List<NgmyDocShareItem> items) async {
   await prefs.setString(_indexPrefsKey(email), jsonEncode(items.map((e) => e.toJson()).toList()));
 }
 
-File _fileForItem(Directory root, NgmyDocShareItem item) => File('${root.path}/${item.id}.bin');
+Future<File?> _fileForId(Directory root, String id) async {
+  await for (final entity in root.list()) {
+    if (entity is File && entity.uri.pathSegments.last.startsWith('$id.')) {
+      return entity;
+    }
+  }
+  final legacy = File('${root.path}/$id.bin');
+  if (await legacy.exists()) return legacy;
+  return null;
+}
 
 class NgmyDocShareStore {
   static Future<List<NgmyDocShareItem>> list(String email) => _readIndex(email);
@@ -53,7 +72,7 @@ class NgmyDocShareStore {
     String? fromSender,
   }) async {
     if (email.trim().isEmpty || bytes.isEmpty) return null;
-    final id = '${DateTime.now().microsecondsSinceEpoch}';
+    final id = _newId();
     final item = NgmyDocShareItem(
       id: id,
       name: name.trim().isEmpty ? 'file' : name.trim(),
@@ -64,10 +83,46 @@ class NgmyDocShareStore {
       fromSender: fromSender,
     );
     final root = await _userDir(email);
-    await _fileForItem(root, item).writeAsBytes(bytes, flush: true);
+    final ext = _safeExt(item.name);
+    await File('${root.path}/$id.$ext').writeAsBytes(bytes, flush: true);
     final items = await _readIndex(email)..add(item);
     await _writeIndex(email, items);
     return item;
+  }
+
+  static Future<int> addFromDirectory({
+    required String email,
+    required String dirPath,
+  }) async {
+    if (email.trim().isEmpty || dirPath.trim().isEmpty) return 0;
+    final root = Directory(dirPath);
+    if (!await root.exists()) return 0;
+    final folderName = root.uri.pathSegments.where((s) => s.isNotEmpty).lastOrNull ?? 'folder';
+    var count = 0;
+    await for (final entity in root.list(recursive: true, followLinks: false)) {
+      if (entity is! File) continue;
+      final relative = entity.path.replaceFirst(root.path, '').replaceAll('\\', '/').replaceFirst(RegExp(r'^/'), '');
+      final displayName = relative.isEmpty ? entity.uri.pathSegments.last : '$folderName/$relative';
+      final bytes = await entity.length();
+      if (bytes <= 0) continue;
+      final mime = _guessMime(displayName, null);
+      final id = _newId();
+      final item = NgmyDocShareItem(
+        id: id,
+        name: displayName,
+        mime: mime,
+        sizeBytes: bytes,
+        createdAt: DateTime.now().toUtc().toIso8601String(),
+        note: 'From folder',
+      );
+      final userRoot = await _userDir(email);
+      final ext = _safeExt(displayName);
+      await entity.copy('${userRoot.path}/$id.$ext');
+      final items = await _readIndex(email)..add(item);
+      await _writeIndex(email, items);
+      count++;
+    }
+    return count;
   }
 
   static Future<NgmyDocShareItem?> addFromPlatformFile({
@@ -75,17 +130,40 @@ class NgmyDocShareStore {
     required PlatformFile file,
     String? note,
   }) async {
-    Uint8List? bytes = file.bytes;
-    if ((bytes == null || bytes.isEmpty) && file.path != null && !kIsWeb) {
-      bytes = await File(file.path!).readAsBytes();
-    }
-    if (bytes == null || bytes.isEmpty) return null;
     final mime = _guessMime(file.name, file.extension);
-    return addBytes(email: email, name: file.name, mime: mime, bytes: bytes, note: note);
+    final name = file.name.trim().isEmpty ? 'file' : file.name.trim();
+
+    if (!kIsWeb && file.path != null && file.path!.isNotEmpty) {
+      final src = File(file.path!);
+      if (await src.exists()) {
+        final id = _newId();
+        final size = await src.length();
+        if (size <= 0) return null;
+        final item = NgmyDocShareItem(
+          id: id,
+          name: name,
+          mime: mime,
+          sizeBytes: size,
+          createdAt: DateTime.now().toUtc().toIso8601String(),
+          note: note,
+        );
+        final root = await _userDir(email);
+        final ext = _safeExt(name);
+        await src.copy('${root.path}/$id.$ext');
+        final items = await _readIndex(email)..add(item);
+        await _writeIndex(email, items);
+        return item;
+      }
+    }
+
+    Uint8List? bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) return null;
+    return addBytes(email: email, name: name, mime: mime, bytes: bytes, note: note);
   }
 
   static String _guessMime(String name, String? ext) {
-    final lower = (ext ?? name.split('.').last).toLowerCase();
+    final parts = name.split('.');
+    final lower = (ext ?? (parts.length > 1 ? parts.last : '')).toLowerCase();
     switch (lower) {
       case 'jpg':
       case 'jpeg':
@@ -96,10 +174,19 @@ class NgmyDocShareStore {
         return 'image/gif';
       case 'webp':
         return 'image/webp';
+      case 'heic':
+        return 'image/heic';
       case 'mp4':
+      case 'm4v':
         return 'video/mp4';
       case 'mov':
         return 'video/quicktime';
+      case 'webm':
+        return 'video/webm';
+      case 'avi':
+        return 'video/x-msvideo';
+      case 'mkv':
+        return 'video/x-matroska';
       case 'pdf':
         return 'application/pdf';
       case 'txt':
@@ -108,6 +195,12 @@ class NgmyDocShareStore {
         return 'application/msword';
       case 'docx':
         return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'zip':
+        return 'application/zip';
       default:
         return 'application/octet-stream';
     }
@@ -115,19 +208,25 @@ class NgmyDocShareStore {
 
   static Future<Uint8List?> readBytes(String email, NgmyDocShareItem item) async {
     final root = await _userDir(email);
-    final f = _fileForItem(root, item);
-    if (!await f.exists()) return null;
+    final f = await _fileForId(root, item.id);
+    if (f == null) return null;
     return f.readAsBytes();
+  }
+
+  static Future<String?> filePath(String email, NgmyDocShareItem item) async {
+    final root = await _userDir(email);
+    final f = await _fileForId(root, item.id);
+    return f?.path;
   }
 
   static Future<void> delete(String email, String id) async {
     final items = await _readIndex(email);
     final idx = items.indexWhere((e) => e.id == id);
     if (idx < 0) return;
-    final removed = items.removeAt(idx);
+    items.removeAt(idx);
     final root = await _userDir(email);
-    final f = _fileForItem(root, removed);
-    if (await f.exists()) await f.delete();
+    final f = await _fileForId(root, id);
+    if (f != null && await f.exists()) await f.delete();
     await _writeIndex(email, items);
   }
 
@@ -146,11 +245,11 @@ class NgmyDocShareStore {
       if (item.isVideo) {
         final hasAccess = await Gal.hasAccess(toAlbum: true);
         if (!hasAccess) await Gal.requestAccess(toAlbum: true);
-        final root = await _userDir(email);
-        final temp = File('${root.path}/export_$safeName');
-        await temp.writeAsBytes(bytes, flush: true);
-        await Gal.putVideo(temp.path);
-        return 'Saved to your photo gallery.';
+        final path = await filePath(email, item);
+        if (path != null) {
+          await Gal.putVideo(path);
+          return 'Saved to your photo gallery.';
+        }
       }
     }
 
