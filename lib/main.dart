@@ -4523,9 +4523,10 @@ const kNgmyAdminEmails = <String>[
 
 bool ngmyEmailIsAdmin(String email) => kNgmyAdminEmails.contains(email.toLowerCase().trim());
 
-/// App sign-up users only — excludes Civic Registry enrollments from admin Users list.
-bool ngmyIsAppSignupUser(UserData u) {
+/// App sign-up users only — excludes Civic Registry members from admin Users list.
+bool ngmyIsAppSignupUser(UserData u, [AppConfig? config]) {
   if (u.isEnrolledInRegistry) return false;
+  if (config != null && NgmyCivicRegistryMembers.isEnrolled(config, u.email)) return false;
   return u.email.trim().isNotEmpty;
 }
 
@@ -20894,44 +20895,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ));
   }
 
-  List<UserData> _adminAllUsersMerged() {
-    final byEmail = <String, UserData>{};
-    for (final u in widget.allUsers) {
-      final key = u.email.toLowerCase().trim();
-      if (key.isEmpty) continue;
-      byEmail[key] = u;
-    }
-    for (final u in _civicRegistryMembersForDisplay(widget.config, widget.allUsers)) {
-      final key = u.email.toLowerCase().trim();
-      if (key.isEmpty) continue;
-      byEmail.putIfAbsent(key, () => u);
-    }
-    return byEmail.values.toList();
-  }
+  List<UserData> _adminAppSignupUsers() =>
+      widget.allUsers.where((u) => ngmyIsAppSignupUser(u, widget.config)).toList();
 
   Widget _adminUsers(bool isDark) {
     for (final u in widget.allUsers) {
       ngmyReconcileUserAccountBalance(u, widget.allTransactions);
     }
     final q = _query.trim().toLowerCase();
-    final filtered = _adminAllUsersMerged()
+    final filtered = _adminAppSignupUsers()
         .where((u) => _userMatchesQuery(u, q))
         .toList()
       ..sort((a, b) => a.username.toLowerCase().compareTo(b.username.toLowerCase()));
     if (_selectedUserEmail != null) {
       UserData? selected;
-      for (final x in _adminAllUsersMerged()) {
+      for (final x in _adminAppSignupUsers()) {
         if (x.email.toLowerCase() == _selectedUserEmail!.toLowerCase()) {
           selected = x;
           break;
-        }
-      }
-      if (selected == null) {
-        for (final x in widget.allUsers) {
-          if (x.email.toLowerCase() == _selectedUserEmail!.toLowerCase()) {
-            selected = x;
-            break;
-          }
         }
       }
       if (selected != null) return _adminUserDetail(selected, isDark);
@@ -20942,7 +20923,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       Padding(
         padding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
         child: Text(
-          'All accounts (${filtered.length} users) — balances from wallet ledger + cloud sync.',
+          'App sign-ups only (${filtered.length} users) — Civic Registry members are managed in Civic Registry.',
           style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
         ),
       ),
@@ -28947,6 +28928,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ),
                     ),
                   const SizedBox(height: 20),
+                  if (_canManageCivicRegistry()) _passportAdminPanel(u, isDark),
                   Row(
                     children: [
                       Expanded(
@@ -29689,6 +29671,203 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  Map<String, dynamic>? _civicPassportForCurrentUser() => NgmyCivicRegistryMembers.passportForAppUser(
+        widget.config,
+        email: widget.user.email,
+        phone: widget.user.phone,
+      );
+
+  Future<void> _grantRegistryPassport(UserData member) async {
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, member.email);
+    if (raw == null) return;
+    final linkEmail = NgmyCivicRegistryMembers.findLinkableAppEmail(widget.allUsers, raw);
+    if (linkEmail == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No app user has signed up with this member\'s email or phone yet.')),
+      );
+      return;
+    }
+    UserData? appUser;
+    for (final u in widget.allUsers) {
+      if (NgmyCivicRegistryMembers.emailKey(u.email) == linkEmail) {
+        appUser = u;
+        break;
+      }
+    }
+    final appLabel = appUser?.username ?? linkEmail;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Grant Registry Passport?'),
+        content: Text(
+          'Link app user "$appLabel" to ${member.fullName ?? member.username} and grant their Registry ID '
+          '(${member.registryId ?? 'pending'}). They will see it at the top of Civic Registry when logged in.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Grant Passport')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    setState(() => NgmyCivicRegistryMembers.grantPassport(widget.config, member.email, linkEmail));
+    final ok = await ngmyPersistCivicRegistryMembers(widget.config);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+    } catch (_) {}
+    widget.onDataChanged();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Registry passport granted to $appLabel.' : 'Passport saved locally — will sync when online.'),
+        backgroundColor: ok ? Colors.green : Colors.orange,
+      ),
+    );
+  }
+
+  Widget _civicPassportBanner(bool isDark) {
+    final record = _civicPassportForCurrentUser();
+    if (record == null) return const SizedBox.shrink();
+    final name = (record['fullName'] ?? widget.user.fullName ?? widget.user.username).toString();
+    final registryId = (record['registryId'] ?? '').toString().trim();
+    final state = (record['state'] ?? widget.user.state).toString();
+    final idType = (record['idType'] ?? 'Registry ID').toString();
+    if (registryId.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F766E), Color(0xFF059669)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(color: const Color(0xFF059669).withOpacity(0.25), blurRadius: 14, offset: const Offset(0, 6))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(14)),
+                child: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 28),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Your Registry Passport', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                    Text('Official Civic Registry identity', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.14),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20)),
+                const SizedBox(height: 6),
+                Text(registryId, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26, letterSpacing: 1.2)),
+                const SizedBox(height: 8),
+                Text('$idType · $state', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _passportAdminPanel(UserData member, bool isDark) {
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, member.email);
+    if (raw == null) return const SizedBox.shrink();
+    final granted = NgmyCivicRegistryMembers.passportGranted(raw);
+    final linkEmail = NgmyCivicRegistryMembers.findLinkableAppEmail(widget.allUsers, raw);
+    UserData? appUser;
+    if (linkEmail != null) {
+      for (final u in widget.allUsers) {
+        if (NgmyCivicRegistryMembers.emailKey(u.email) == linkEmail) {
+          appUser = u;
+          break;
+        }
+      }
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A2233) : const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFF86EFAC)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.link_rounded, color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D), size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'App account link',
+                style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF14532D)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (granted) ...[
+            Text(
+              'Passport granted${appUser != null ? ' to ${appUser.username}' : ''}.',
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF166534)),
+            ),
+            if ((raw['linkedAppEmail'] ?? '').toString().trim().isNotEmpty)
+              Text(
+                'Linked: ${raw['linkedAppEmail']}',
+                style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+              ),
+          ] else if (appUser != null) ...[
+            Text(
+              'App user "${appUser.username}" signed up with the same email or phone.',
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF166534)),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => _grantRegistryPassport(member),
+                icon: const Icon(Icons.verified_user_outlined, size: 18),
+                label: const Text('Grant Registry Passport'),
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF059669)),
+              ),
+            ),
+          ] else
+            Text(
+              'No matching app sign-up yet. When someone logs in with this email or phone, you can grant their passport here.',
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     _queueHelpModeLifecycleMaintenance();
@@ -29792,6 +29971,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
             ),
             const SizedBox(height: 20),
+
+            _civicPassportBanner(isDark),
+            if (_civicPassportForCurrentUser() != null) const SizedBox(height: 20),
 
             if (_canCurrentUserSeeHelpMode()) ...[
               Container(
@@ -30038,6 +30220,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _enrollSection(bool isDark) {
     final availableAppUsers = widget.allUsers.where((u) =>
+      ngmyIsAppSignupUser(u, widget.config) &&
       !NgmyCivicRegistryMembers.isEnrolled(widget.config, u.email) &&
       (u.username.toLowerCase().contains(_enrollSearchC.text.toLowerCase()) ||
        u.email.toLowerCase().contains(_enrollSearchC.text.toLowerCase()))

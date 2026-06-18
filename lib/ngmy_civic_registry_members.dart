@@ -63,11 +63,81 @@ class NgmyCivicRegistryMembers {
       next['helps'] = next['helps'] ?? keep['helps'] ?? 0;
       next['missed'] = next['missed'] ?? keep['missed'] ?? 0;
       next['enrolledAt'] = keep['enrolledAt'] ?? next['enrolledAt'];
+      next['passportGranted'] = next['passportGranted'] ?? keep['passportGranted'] ?? false;
+      next['linkedAppEmail'] = (next['linkedAppEmail'] ?? keep['linkedAppEmail'] ?? '').toString();
+      next['passportGrantedAt'] = keep['passportGrantedAt'] ?? next['passportGrantedAt'];
       members[idx] = next;
     } else {
       members.add(next);
     }
     setList(config, members);
+  }
+
+  static bool passportGranted(Map<String, dynamic> member) => member['passportGranted'] == true;
+
+  static String _phoneKey(String phone) => phone.replaceAll(RegExp(r'\D'), '');
+
+  /// Email of an app account matching this civic record by email or phone.
+  static String? findLinkableAppEmail(List<dynamic> allUsers, Map<String, dynamic> member) {
+    final memberEmail = emailKey((member['email'] ?? '').toString());
+    final memberPhone = _phoneKey((member['phone'] ?? '').toString());
+    String? byPhone;
+    for (final raw in allUsers) {
+      final email = emailKey((raw.email ?? '').toString());
+      final phone = _phoneKey((raw.phone ?? '').toString());
+      if (email.isEmpty) continue;
+      if (memberEmail.isNotEmpty && email == memberEmail) return email;
+      if (memberPhone.length >= 7 && phone == memberPhone) byPhone ??= email;
+    }
+    return byPhone;
+  }
+
+  /// Civic passport visible to a logged-in app user (granted + email or phone match).
+  static Map<String, dynamic>? passportForAppUser(
+    dynamic config, {
+    required String email,
+    required String phone,
+  }) {
+    final userEmail = emailKey(email);
+    final userPhone = _phoneKey(phone);
+    for (final m in listFrom(config)) {
+      if (!passportGranted(m)) continue;
+      final linked = emailKey((m['linkedAppEmail'] ?? '').toString());
+      if (linked.isNotEmpty && linked == userEmail) return m;
+      final memberEmail = emailKey((m['email'] ?? '').toString());
+      if (memberEmail.isNotEmpty && memberEmail == userEmail) return m;
+      final memberPhone = _phoneKey((m['phone'] ?? '').toString());
+      if (userPhone.length >= 7 && memberPhone.isNotEmpty && memberPhone == userPhone) return m;
+    }
+    return null;
+  }
+
+  static void grantPassport(dynamic config, String memberEmail, String linkedAppEmail) {
+    final m = findByEmail(config, memberEmail);
+    if (m == null) return;
+    upsert(
+      config,
+      {
+        ...m,
+        'passportGranted': true,
+        'linkedAppEmail': emailKey(linkedAppEmail),
+        'passportGrantedAt': DateTime.now().toUtc().toIso8601String(),
+      },
+    );
+  }
+
+  static void revokePassport(dynamic config, String memberEmail) {
+    final m = findByEmail(config, memberEmail);
+    if (m == null) return;
+    upsert(
+      config,
+      {
+        ...m,
+        'passportGranted': false,
+        'linkedAppEmail': '',
+        'passportGrantedAt': null,
+      },
+    );
   }
 
   static void removeByEmail(dynamic config, String email) {
