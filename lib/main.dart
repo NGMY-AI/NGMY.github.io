@@ -583,7 +583,14 @@ double ngmyPendingWithdrawalTotal(String email, List<AppTransaction> transaction
 
 /// Authoritative balance from the transaction ledger (approved credits/debits + pending withdrawal holds).
 double ngmyResolveAccountBalance(String email, double storedBalance, List<AppTransaction> transactions) {
-  return ngmyBalanceFromApprovedTransactions(email, transactions);
+  final key = ngmyNormalizeEmail(email);
+  final ledger = ngmyBalanceFromApprovedTransactions(email, transactions);
+  if (key.isEmpty) return storedBalance.clamp(0.0, double.infinity);
+  final txnCount = transactions.where((t) => ngmyNormalizeEmail(t.userEmail) == key).length;
+  if (txnCount == 0) return storedBalance.clamp(0.0, double.infinity);
+  // Local txn cache may be truncated — keep cloud-stored balance when ledger would under-report.
+  if (storedBalance > ledger + 0.01) return storedBalance.clamp(0.0, double.infinity);
+  return ledger;
 }
 
 void ngmyReconcileUserAccountBalance(UserData user, List<AppTransaction> transactions) {
@@ -6861,7 +6868,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           .from('transactions')
           .select()
           .order('timestamp', ascending: false)
-          .limit(lightweight ? 200 : 2000);
+          .limit(lightweight ? 400 : 5000);
       if (transData != null) {
         final remoteTransactions =
             (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
@@ -20649,6 +20656,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 final amt = double.tryParse(val) ?? 0;
                 if (amt <= 0) return;
                 widget.onAddTransaction(AppTransaction(id: DateTime.now().toString(), userEmail: u.email, amount: amt, type: TransactionType.adminAdd, method: PaymentMethod.system, sourceDetails: 'Admin credit', status: TransactionStatus.approved, timestamp: DateTime.now()));
+                ngmyReconcileUserAccountBalance(u, widget.allTransactions);
                 widget.onDataChanged();
                 setState(() {});
               })),
@@ -20656,6 +20664,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 final amt = double.tryParse(val) ?? 0;
                 if (amt <= 0) return;
                 widget.onAddTransaction(AppTransaction(id: DateTime.now().toString(), userEmail: u.email, amount: amt, type: TransactionType.adminRemove, method: PaymentMethod.system, sourceDetails: 'Admin debit', status: TransactionStatus.approved, timestamp: DateTime.now()));
+                ngmyReconcileUserAccountBalance(u, widget.allTransactions);
                 widget.onDataChanged();
                 setState(() {});
               })),
@@ -20712,6 +20721,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 final amt = double.tryParse(val) ?? 0;
                 if (amt <= 0) return;
                 widget.onAddTransaction(AppTransaction(id: DateTime.now().toString(), userEmail: u.email, amount: amt, type: TransactionType.reimbursement, method: PaymentMethod.system, sourceDetails: 'Admin reimbursement', status: TransactionStatus.approved, timestamp: DateTime.now()));
+                ngmyReconcileUserAccountBalance(u, widget.allTransactions);
                 widget.onDataChanged();
                 setState(() {});
               })),
@@ -20884,18 +20894,44 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ));
   }
 
+  List<UserData> _adminAllUsersMerged() {
+    final byEmail = <String, UserData>{};
+    for (final u in widget.allUsers) {
+      final key = u.email.toLowerCase().trim();
+      if (key.isEmpty) continue;
+      byEmail[key] = u;
+    }
+    for (final u in _civicRegistryMembersForDisplay(widget.config, widget.allUsers)) {
+      final key = u.email.toLowerCase().trim();
+      if (key.isEmpty) continue;
+      byEmail.putIfAbsent(key, () => u);
+    }
+    return byEmail.values.toList();
+  }
+
   Widget _adminUsers(bool isDark) {
+    for (final u in widget.allUsers) {
+      ngmyReconcileUserAccountBalance(u, widget.allTransactions);
+    }
     final q = _query.trim().toLowerCase();
-    final filtered = widget.allUsers
-        .where((u) => ngmyIsAppSignupUser(u) && _userMatchesQuery(u, q))
+    final filtered = _adminAllUsersMerged()
+        .where((u) => _userMatchesQuery(u, q))
         .toList()
-      ..sort((a, b) => a.username.compareTo(b.username));
+      ..sort((a, b) => a.username.toLowerCase().compareTo(b.username.toLowerCase()));
     if (_selectedUserEmail != null) {
       UserData? selected;
-      for (final x in widget.allUsers) {
+      for (final x in _adminAllUsersMerged()) {
         if (x.email.toLowerCase() == _selectedUserEmail!.toLowerCase()) {
           selected = x;
           break;
+        }
+      }
+      if (selected == null) {
+        for (final x in widget.allUsers) {
+          if (x.email.toLowerCase() == _selectedUserEmail!.toLowerCase()) {
+            selected = x;
+            break;
+          }
         }
       }
       if (selected != null) return _adminUserDetail(selected, isDark);
@@ -20906,7 +20942,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       Padding(
         padding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
         child: Text(
-          'App sign-ups only (${filtered.length} users). Civic Registry members are not listed here.',
+          'All accounts (${filtered.length} users) — balances from wallet ledger + cloud sync.',
           style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
         ),
       ),
@@ -20932,6 +20968,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           itemCount: filtered.length,
           itemBuilder: (_, i) {
             final u = filtered[i];
+            ngmyReconcileUserAccountBalance(u, widget.allTransactions);
             final statusColor = u.status == 'active' ? Colors.green : u.status == 'suspended' ? Colors.orange : Colors.red;
             return Card(
               elevation: 0,
@@ -20953,7 +20990,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ],
                 ),
                 isThreeLine: true,
-                trailing: Icon(Icons.chevron_right, color: isDark ? Colors.white38 : Colors.black38),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '\$${formatCurrency(u.accountBalance)}',
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF00B25A)),
+                    ),
+                    Icon(Icons.chevron_right, color: isDark ? Colors.white38 : Colors.black38, size: 18),
+                  ],
+                ),
               ),
             );
           },
