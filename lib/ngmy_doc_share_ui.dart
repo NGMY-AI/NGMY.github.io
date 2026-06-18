@@ -224,15 +224,18 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       final created = await NgmyDocShareSync.createQrForItems(ownerEmail: widget.email, items: batch);
       if (!mounted) return;
       if (created == null) {
-        _toast('Turn on Wi‑Fi and try again. Both phones must be on the same network.');
+        if (kIsWeb) {
+          _toast('File too large for web QR. Use the phone app on same Wi‑Fi, or tap Export.');
+        } else {
+          _toast('Turn on Wi‑Fi and try again. Both phones must be on the same network.');
+        }
         return;
       }
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        isDismissible: created.mode != NgmyDocShareQrMode.lanDirect &&
-            created.mode != NgmyDocShareQrMode.relayLink,
+        isDismissible: created.mode != NgmyDocShareQrMode.lanDirect,
         builder: (ctx) => _DocShareQrSheet(
           payload: created.qrPayload,
           fileCount: created.fileCount,
@@ -280,9 +283,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     if (raw == null || raw.isEmpty) return;
     final scan = raw.trim();
 
-    if (scan.startsWith('NGMYDOCSYNC4|') ||
-        scan.startsWith('NGMYDOCSYNC3|') ||
-        scan.startsWith('NGMYDOCSYNC3|z|')) {
+    if (scan.startsWith('NGMYDOCSYNC3|') || scan.startsWith('NGMYDOCSYNC3|z|')) {
       await _withWork(() async {
         final session = await NgmyDocShareSync.beginWebRtcReceive(
           raw: scan,
@@ -415,7 +416,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                 border: Border.all(color: kNgmyStudioHubAccent2.withValues(alpha: 0.3)),
               ),
               child: Text(
-                'Share anything via QR — videos, photos, folders. No cloud. Receiver scans to restore files on their phone.',
+                'Share via QR — local only, no cloud. Phone app + same Wi‑Fi for videos. Small files work on web too.',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12, height: 1.4),
               ),
             ),
@@ -713,34 +714,6 @@ class _DocShareQrSheet extends StatefulWidget {
 
 class _DocShareQrSheetState extends State<_DocShareQrSheet> {
   final _qrCaptureKey = GlobalKey();
-  bool _relayWaiting = false;
-  String? _relayStatus;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.mode == NgmyDocShareQrMode.relayLink) {
-      unawaited(_waitRelayConnect());
-    }
-  }
-
-  Future<void> _waitRelayConnect() async {
-    setState(() {
-      _relayWaiting = true;
-      _relayStatus = 'Waiting for receiver to scan…';
-    });
-    final ok = await NgmyDocShareSync.waitForRelayAnswer();
-    if (!mounted) return;
-    setState(() {
-      _relayWaiting = false;
-      _relayStatus = ok ? 'Connected — sending files now…' : 'Still waiting — ask receiver to scan';
-    });
-    if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Connected — sending files now…')),
-      );
-    }
-  }
 
   String get _modeLabel {
     switch (widget.mode) {
@@ -748,8 +721,6 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
         return 'Instant restore';
       case NgmyDocShareQrMode.lanDirect:
         return 'Direct transfer — any size';
-      case NgmyDocShareQrMode.relayLink:
-        return 'Fast share — any size';
       case NgmyDocShareQrMode.webrtcLink:
         return 'QR link — any size';
     }
@@ -761,8 +732,6 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
         return 'Receiver scans once — files restore instantly on their phone.';
       case NgmyDocShareQrMode.lanDirect:
         return 'Keep this open. Receiver scans on same Wi‑Fi — videos & folders copy straight to their phone.';
-      case NgmyDocShareQrMode.relayLink:
-        return 'Receiver scans this thick QR once — files transfer automatically. Keep this screen open.';
       case NgmyDocShareQrMode.webrtcLink:
         return 'Receiver scans this QR, then shows a short answer QR — tap Scan answer below when they do.';
     }
@@ -945,18 +914,6 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
                   style: TextButton.styleFrom(foregroundColor: Colors.white60),
                 ),
               ],
-            ],
-            if (widget.mode == NgmyDocShareQrMode.relayLink && _relayStatus != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _relayStatus!,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: _relayWaiting ? kNgmyStudioHubAccent2 : Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
             ],
             if (widget.mode == NgmyDocShareQrMode.webrtcLink) ...[
               const SizedBox(height: 12),

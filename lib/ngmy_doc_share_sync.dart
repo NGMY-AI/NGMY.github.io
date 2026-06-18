@@ -21,12 +21,12 @@ typedef NgmyDocShareQrResult = ({
   NgmyDocShareQrMode mode,
 });
 
-enum NgmyDocShareQrMode { inlineInstant, lanDirect, webrtcLink, relayLink }
+enum NgmyDocShareQrMode { inlineInstant, lanDirect, webrtcLink }
 
 class NgmyDocShareSync {
   static String _norm(String email) => email.toLowerCase().trim();
 
-  /// QR always works: LAN direct (native, any size) → WebRTC (web) → inline tiny fallback.
+  /// Local only: LAN on phone (any size) or inline QR (small files). No cloud database.
   static Future<NgmyDocShareQrResult?> createQrForItems({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
@@ -45,22 +45,9 @@ class NgmyDocShareSync {
     }
 
     if (kIsWeb) {
-      final totalBytes = items.fold<int>(0, (s, e) => s + e.sizeBytes);
-      if (totalBytes <= _inlineMaxTotalBytes && items.length <= 3) {
-        final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items);
-        if (inline != null) return inline;
-      }
-      final offer = await webrtc.createOfferQr(ownerEmail: ownerEmail, items: items);
-      if (offer != null) {
-        final mode = offer.startsWith('NGMYDOCSYNC4|')
-            ? NgmyDocShareQrMode.relayLink
-            : NgmyDocShareQrMode.webrtcLink;
-        return (
-          qrPayload: offer,
-          fileCount: items.length,
-          mode: mode,
-        );
-      }
+      final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items);
+      if (inline != null) return inline;
+      return null;
     }
 
     final totalBytes = items.fold<int>(0, (s, e) => s + e.sizeBytes);
@@ -89,8 +76,6 @@ class NgmyDocShareSync {
   }
 
   static Future<void> applyWebRtcAnswer(String raw) => webrtc.applyAnswerQr(raw);
-
-  static Future<bool> waitForRelayAnswer() => webrtc.waitForRelayAnswer();
 
   static Future<({String answerQr, Future<List<NgmyDocShareItem>> transfer})?> beginWebRtcReceive({
     required String raw,
