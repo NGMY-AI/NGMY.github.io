@@ -65,4 +65,15 @@ class NgmyDocShareLanDownload {
       return null;
     }
   }
+
+  static Future<String?> fetchText(Uri uri) async {
+    try {
+      final res = await http.get(uri).timeout(const Duration(minutes: 5));
+      if (res.statusCode != 200) return null;
+      return res.body;
+    } catch (e) {
+      debugPrint('[doc share lan text web] $e');
+      return null;
+    }
+  }
 }

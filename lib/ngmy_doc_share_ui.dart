@@ -20,6 +20,17 @@ import 'ngmy_qr_generator.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_studio_slot_video_io.dart' if (dart.library.html) 'ngmy_studio_slot_video_stub.dart' as studio_video;
 
+({Color bg, Color card, Color fg, Color muted, Color border}) _docShareColors(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return (
+    bg: isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB),
+    card: isDark ? const Color(0xFF151B28) : Colors.white,
+    fg: isDark ? Colors.white : const Color(0xFF0F172A),
+    muted: isDark ? Colors.white60 : const Color(0xFF64748B),
+    border: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+  );
+}
+
 class NgmyDocSharePage extends StatefulWidget {
   const NgmyDocSharePage({super.key, required this.email});
 
@@ -134,24 +145,25 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   }
 
   Future<void> _pickUpload() async {
+    final c = _docShareColors(context);
     final choice = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: const Color(0xFF0F1419),
+      backgroundColor: c.card,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.upload_file_rounded, color: Colors.white),
-              title: const Text('Upload files', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-              subtitle: Text('Photos, videos, documents', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12)),
+              leading: Icon(Icons.upload_file_rounded, color: c.fg),
+              title: Text('Upload files', style: TextStyle(color: c.fg, fontWeight: FontWeight.w700)),
+              subtitle: Text('Photos, videos, documents', style: TextStyle(color: c.muted, fontSize: 12)),
               onTap: () => Navigator.pop(ctx, 'files'),
             ),
             ListTile(
-              leading: const Icon(Icons.folder_open_rounded, color: Colors.white),
-              title: const Text('Upload folder', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-              subtitle: Text('Entire folder of pictures or videos', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12)),
+              leading: Icon(Icons.folder_open_rounded, color: c.fg),
+              title: Text('Upload folder', style: TextStyle(color: c.fg, fontWeight: FontWeight.w700)),
+              subtitle: Text('Entire folder of pictures or videos', style: TextStyle(color: c.muted, fontSize: 12)),
               onTap: () => Navigator.pop(ctx, 'folder'),
             ),
           ],
@@ -234,7 +246,15 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       final created = await NgmyDocShareSync.createQrForItems(ownerEmail: widget.email, items: batch);
       if (!mounted) return;
       if (created == null) {
-        _toast('Could not start share. Try Export or use the phone app.');
+        if (kIsWeb) {
+          _toast('On web, use Export for large files. For big-dot QR share, open NGMY on your phone (same Wi‑Fi).');
+        } else {
+          _toast('Could not start local share. Connect both phones to the same Wi‑Fi (or hotspot), then try again.');
+        }
+        return;
+      }
+      if (!NgmyDocShareSync.payloadFitsBrandedQr(created.qrPayload)) {
+        _toast('This file is too large for a scannable QR here. Use Export, or Share QR in the phone app.');
         return;
       }
       await Navigator.of(context).push<void>(
@@ -327,8 +347,8 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         },
       );
       if (imported == null || imported.isEmpty) {
-        final hint = scan.contains('http://')
-            ? 'Could not reach sender. Keep their QR screen open and try Paste with the copied link.'
+        final hint = scan.startsWith('N2|') || scan.contains('http://')
+            ? 'Could not reach sender. Same Wi‑Fi or hotspot, keep their QR screen open, then try Paste.'
             : 'Could not restore files. Try scanning again or paste the share code.';
         _toast(hint);
         return;
@@ -372,13 +392,14 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF06080F);
+    final c = _docShareColors(context);
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: c.bg,
       appBar: AppBar(
-        backgroundColor: bg,
-        foregroundColor: Colors.white,
-        title: const Text('Doc Share', style: TextStyle(fontWeight: FontWeight.w900)),
+        backgroundColor: c.bg,
+        foregroundColor: c.fg,
+        elevation: 0,
+        title: Text('Doc Share', style: TextStyle(fontWeight: FontWeight.w900, color: c.fg)),
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded), onPressed: () => Navigator.pop(context)),
         actions: [
           if (_items.isNotEmpty)
@@ -408,9 +429,9 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       body: Column(
         children: [
           if (_status != null)
-            const LinearProgressIndicator(
+            LinearProgressIndicator(
               minHeight: 3,
-              backgroundColor: Colors.white10,
+              backgroundColor: c.border,
               color: kNgmyStudioHubAccent,
             ),
           Padding(
@@ -419,13 +440,13 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFF0F1419),
+                color: c.card,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: kNgmyStudioHubAccent2.withValues(alpha: 0.3)),
+                border: Border.all(color: kNgmyStudioHubAccent2.withValues(alpha: 0.35)),
               ),
               child: Text(
-                'Share via QR — any size. Videos use direct transfer (phone Wi‑Fi or web link). No cloud storage.',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12, height: 1.4),
+                'Local share only — no cloud. On your phone: Share QR uses the same big-dot style as NGMY Advisors. On web, use Export for large files.',
+                style: TextStyle(color: c.muted, fontSize: 12, height: 1.4),
               ),
             ),
           ),
@@ -445,7 +466,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _working ? null : _exportBundle,
-                      style: OutlinedButton.styleFrom(foregroundColor: Colors.white70),
                       icon: const Icon(Icons.ios_share_rounded, size: 18),
                       label: const Text('Export'),
                     ),
@@ -461,7 +481,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                       child: Text(
                         'No files yet.\nTap + at the top to add videos, photos, or documents.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), height: 1.5),
+                        style: TextStyle(color: c.muted, height: 1.5),
                       ),
                     ),
                   )
@@ -472,11 +492,11 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                       final item = _items[i];
                       final checked = _selected.contains(item.id);
                       return Card(
-                        color: const Color(0xFF0F1419),
+                        color: c.card,
                         margin: const EdgeInsets.only(bottom: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: checked ? kNgmyStudioHubAccent : Colors.white10),
+                          side: BorderSide(color: checked ? kNgmyStudioHubAccent : c.border),
                         ),
                         child: ListTile(
                           onTap: () => unawaited(_openItem(item)),
@@ -502,13 +522,13 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                           ),
                           title: Text(
                             item.name,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                            style: TextStyle(color: c.fg, fontWeight: FontWeight.w700, fontSize: 14),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                           subtitle: Text(
                             '${item.sizeLabel}${item.isVideo ? ' · Tap to play' : ''}${item.fromSender != null ? ' · from ${item.fromSender}' : ''}',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
+                            style: TextStyle(color: c.muted, fontSize: 11),
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -526,7 +546,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                                   }),
                                 ),
                               PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert_rounded, color: Colors.white54),
+                                icon: Icon(Icons.more_vert_rounded, color: c.muted),
                                 onSelected: (v) {
                                   if (v == 'qr') unawaited(_showQrForOne(item));
                                   if (v == 'save') unawaited(_saveItem(item));
@@ -639,13 +659,15 @@ class _DocShareVideoPageState extends State<_DocShareVideoPage> {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF06080F);
+    final c = _docShareColors(context);
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: c.bg,
       appBar: AppBar(
-        backgroundColor: bg,
-        foregroundColor: Colors.white,
-        title: Text(widget.item.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        backgroundColor: c.bg,
+        foregroundColor: c.fg,
+        elevation: 0,
+        iconTheme: IconThemeData(color: c.fg),
+        title: Text(widget.item.name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: c.fg)),
         actions: [
           IconButton(
             tooltip: 'Download',
@@ -660,7 +682,7 @@ class _DocShareVideoPageState extends State<_DocShareVideoPage> {
             : _error != null
                 ? Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+                    child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: c.muted)),
                   )
                 : _controller != null && _controller!.value.isInitialized
                     ? AspectRatio(
@@ -728,7 +750,7 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
       case NgmyDocShareQrMode.inlineInstant:
         return 'Instant restore';
       case NgmyDocShareQrMode.lanDirect:
-        return 'Direct transfer';
+        return 'Local transfer';
       case NgmyDocShareQrMode.webrtcLink:
         return 'Direct link';
     }
@@ -737,9 +759,9 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
   String get _hint {
     switch (widget.mode) {
       case NgmyDocShareQrMode.inlineInstant:
-        return 'Receiver scans once — files restore instantly. No Wi‑Fi needed.';
+        return 'Receiver scans once — tiny file restores instantly. No internet needed.';
       case NgmyDocShareQrMode.lanDirect:
-        return 'Keep this screen open until the other phone finishes. They scan with Doc Share → Scan QR.';
+        return 'Keep this screen open. Receiver scans with Doc Share → Scan QR. Same Wi‑Fi or hotspot — fully local, no cloud.';
       case NgmyDocShareQrMode.webrtcLink:
         return 'Receiver scans this QR. If scan fails, tap Copy and paste on their phone. Keep this screen open.';
     }
@@ -790,17 +812,19 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
 
   String? get _lanUrl {
     if (widget.mode != NgmyDocShareQrMode.lanDirect) return null;
-    if (widget.payload.startsWith('http://')) return widget.payload.trim();
-    if (widget.payload.startsWith('N2|')) return widget.payload.substring(3).trim();
+    final p = widget.payload.trim();
+    if (p.startsWith('N2|')) return p.substring(3).trim();
+    if (p.startsWith('http://') || p.startsWith('https://')) return p;
     const legacy = 'NGMYDOCSYNC2|';
-    if (widget.payload.startsWith(legacy)) return widget.payload.substring(legacy.length).trim();
+    if (p.startsWith(legacy)) return p.substring(legacy.length).trim();
     return null;
   }
 
   Future<void> _copyLanLink(BuildContext context) async {
     final url = _lanUrl;
     if (url == null) return;
-    await Clipboard.setData(ClipboardData(text: url));
+    final text = url.startsWith('http') ? url : 'N2|$url';
+    await Clipboard.setData(ClipboardData(text: text));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied')));
     }
@@ -813,10 +837,8 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
-    final card = isDark ? const Color(0xFF151B28) : Colors.white;
-    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final c = _docShareColors(context);
+    final shareCode = widget.payload.length > 48 ? '${widget.payload.substring(0, 44)}…' : widget.payload;
 
     return PopScope(
       canPop: widget.mode != NgmyDocShareQrMode.lanDirect,
@@ -824,11 +846,12 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
         if (didPop) unawaited(NgmyDocShareSync.stopLanShare());
       },
       child: Scaffold(
-        backgroundColor: bg,
+        backgroundColor: c.bg,
         appBar: AppBar(
-          backgroundColor: bg,
+          backgroundColor: c.bg,
+          foregroundColor: c.fg,
           elevation: 0,
-          title: const Text('Share via QR', style: TextStyle(fontWeight: FontWeight.w900)),
+          title: Text('Share via QR', style: TextStyle(fontWeight: FontWeight.w900, color: c.fg)),
           centerTitle: true,
           leading: widget.mode == NgmyDocShareQrMode.lanDirect
               ? null
@@ -838,7 +861,7 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
                 ),
         ),
         body: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          padding: const EdgeInsets.all(20),
           child: Column(
             children: [
               Expanded(
@@ -846,27 +869,47 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: card,
+                    color: c.card,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(color: kNgmyStudioHubAccent.withValues(alpha: 0.35)),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      const SizedBox(height: 8),
+                      NgmyBrandedQrWidget(data: widget.payload, large: true, captureKey: _qrCaptureKey),
+                      const SizedBox(height: 18),
                       Text(
                         '${widget.fileCount} file(s) · $_modeLabel',
-                        style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 13),
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: c.fg),
                       ),
-                      const SizedBox(height: 16),
-                      NgmyBrandedQrWidget(data: widget.payload, large: true, captureKey: _qrCaptureKey),
+                      if (widget.mode == NgmyDocShareQrMode.lanDirect) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: kNgmyStudioHubAccent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'Local · offline',
+                            style: TextStyle(color: kNgmyStudioHubAccent, fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       Text(
                         _hint,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: muted, fontSize: 12, height: 1.45),
+                        style: TextStyle(color: c.muted, fontSize: 12, height: 1.45),
                       ),
                       if (widget.mode == NgmyDocShareQrMode.lanDirect && _lanUrl != null) ...[
                         const SizedBox(height: 10),
+                        Text(
+                          'Code: $shareCode',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: c.muted, fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
                         TextButton.icon(
                           onPressed: () => _copyLanLink(context),
                           icon: const Icon(Icons.link_rounded, size: 16),
@@ -886,7 +929,15 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
+              Text(
+                widget.mode == NgmyDocShareQrMode.lanDirect
+                    ? 'Same big-dot QR as NGMY Advisors. Receiver opens Doc Share → Scan QR on the same Wi‑Fi.'
+                    : 'Receiver scans once to restore this tiny file. No internet needed.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, height: 1.45, color: c.muted),
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(

@@ -6,6 +6,7 @@ import 'ngmy_doc_share_lan_download.dart';
 import 'ngmy_doc_share_local_server.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_qr_payload.dart';
+import 'ngmy_doc_share_qr_stash.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_webrtc_web.dart' as webrtc;
 
@@ -13,7 +14,10 @@ const String kNgmyDocShareQrPrefixLan = 'N2';
 const String kNgmyDocShareQrPrefixLanLegacy = 'NGMYDOCSYNC2';
 const String kNgmyDocShareQrPrefixInline = 'NGMYDOCSYNC0';
 const String kNgmyDocShareBundleMarker = 'ngmyDocShareBundle';
-const int kNgmyDocShareInlineQrMaxChars = 2900;
+const int kNgmyDocShareInlineQrMaxChars = 800;
+const int kNgmyDocShareInlineMaxBytes = 2048;
+/// Above this, QR modules shrink — Advisors-style big dots need a short payload.
+const int kNgmyDocShareBrandedQrMaxPayloadChars = 80;
 
 typedef NgmyDocShareQrResult = ({
   String qrPayload,
@@ -21,20 +25,17 @@ typedef NgmyDocShareQrResult = ({
   NgmyDocShareQrMode mode,
 });
 
-enum NgmyDocShareQrMode { inlineInstant, lanDirect, webrtcLink }
+enum NgmyDocShareQrMode { lanDirect, inlineInstant, webrtcLink }
 
 class NgmyDocShareSync {
   static String _norm(String email) => email.toLowerCase().trim();
 
-  /// Inline first (no network, like Advisors). LAN for large native files. WebRTC on web.
+  /// Local LAN first (short QR, big dots like Advisors). No cloud — fully offline on same Wi‑Fi.
   static Future<NgmyDocShareQrResult?> createQrForItems({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
   }) async {
     if (items.isEmpty) return null;
-
-    final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items);
-    if (inline != null) return inline;
 
     if (!kIsWeb) {
       final lan = await NgmyDocShareLocalServer.start(ownerEmail: ownerEmail, items: items);
@@ -47,19 +48,13 @@ class NgmyDocShareSync {
       }
     }
 
-    if (kIsWeb) {
-      final offer = await webrtc.createOfferQr(ownerEmail: ownerEmail, items: items);
-      if (offer != null) {
-        return (
-          qrPayload: offer,
-          fileCount: items.length,
-          mode: NgmyDocShareQrMode.webrtcLink,
-        );
-      }
-    }
-
-    return null;
+    // Web: never pack WebRTC SDP in QR (creates tiny unreadable dots). Tiny inline only.
+    final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items);
+    return inline;
   }
+
+  static bool payloadFitsBrandedQr(String payload) =>
+      payload.trim().length <= kNgmyDocShareBrandedQrMaxPayloadChars;
 
   static Future<void> stopLanShare() async {
     await NgmyDocShareLocalServer.stop();
@@ -84,6 +79,9 @@ class NgmyDocShareSync {
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
   }) async {
+    if (items.length != 1) return null;
+    final only = items.first;
+    if (only.sizeBytes > kNgmyDocShareInlineMaxBytes) return null;
     final jsonText = await exportBundleFile(ownerEmail: ownerEmail, items: items);
     final payload = NgmyDocShareQrPayload.wrapCompressed(kNgmyDocShareQrPrefixInline, jsonText);
     if (payload.length > kNgmyDocShareInlineQrMaxChars) return null;
@@ -94,6 +92,21 @@ class NgmyDocShareSync {
     );
   }
 
+  static String _lanFetchRoot(String baseUrl) {
+    var root = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    if (root.startsWith('$kNgmyDocShareQrPrefixLan|')) {
+      root = root.substring(kNgmyDocShareQrPrefixLan.length + 1).trim();
+    }
+    const legacy = '$kNgmyDocShareQrPrefixLanLegacy|';
+    if (root.startsWith(legacy)) {
+      root = root.substring(legacy.length).trim();
+    }
+    if (!root.startsWith('http://') && !root.startsWith('https://')) {
+      root = 'http://$root';
+    }
+    return root;
+  }
+
   static Future<List<NgmyDocShareItem>?> importFromScan({
     required String recipientEmail,
     required String raw,
@@ -101,6 +114,19 @@ class NgmyDocShareSync {
   }) async {
     var text = raw.trim();
     if (text.startsWith('\uFEFF')) text = text.substring(1);
+
+    if (text.startsWith('$kNgmyDocShareQrPrefixCloud|')) {
+      final token = text.substring(kNgmyDocShareQrPrefixCloud.length + 1).trim();
+      try {
+        final jsonText = await NgmyDocShareQrStash.consumeToken(token);
+        if (jsonText == null) return null;
+        onProgress?.call(1, 1);
+        return importBundleText(recipientEmail: recipientEmail, jsonText: jsonText);
+      } catch (e) {
+        debugPrint('[doc share cloud qr] $e');
+        return null;
+      }
+    }
 
     if (text.startsWith('$kNgmyDocShareQrPrefixInline|')) {
       try {
@@ -132,6 +158,7 @@ class NgmyDocShareSync {
     }
 
     if (text.contains(kNgmyDocShareBundleMarker)) {
+      onProgress?.call(1, 1);
       return importBundleText(recipientEmail: recipientEmail, jsonText: text);
     }
 
@@ -143,24 +170,38 @@ class NgmyDocShareSync {
     required String baseUrl,
     void Function(int received, int total)? onProgress,
   }) async {
-    final root = baseUrl.replaceAll(RegExp(r'/+$'), '');
-    var manifestUri = root.endsWith('manifest.json') ? Uri.parse(root) : Uri.parse('$root/manifest.json');
+    final root = _lanFetchRoot(baseUrl);
+    final sessionRoot = root.endsWith('manifest.json')
+        ? root.substring(0, root.length - 'manifest.json'.length).replaceAll(RegExp(r'/+$'), '')
+        : root;
+    final manifestUri = Uri.parse('$sessionRoot/manifest.json');
+    final bundleUri = Uri.parse('$sessionRoot/bundle.json');
 
     try {
       var decoded = await NgmyDocShareLanDownload.fetchManifest(manifestUri);
-      decoded ??= await NgmyDocShareLanDownload.fetchManifest(Uri.parse(root));
+      decoded ??= await NgmyDocShareLanDownload.fetchManifest(Uri.parse(sessionRoot));
       if (decoded == null) return null;
+
       final files = decoded['files'];
       if (files is! List || files.isEmpty) return null;
 
       final owner = (decoded['ownerEmail'] ?? '').toString();
-      final imported = await NgmyDocShareLanDownload.pullAll(
+      var imported = await NgmyDocShareLanDownload.pullAll(
         recipientEmail: recipientEmail,
         manifestUri: manifestUri,
         files: files,
         ownerEmail: owner,
         onProgress: onProgress,
       );
+
+      if (imported.isEmpty) {
+        final bundleJson = await NgmyDocShareLanDownload.fetchText(bundleUri);
+        if (bundleJson != null && bundleJson.contains(kNgmyDocShareBundleMarker)) {
+          onProgress?.call(1, 1);
+          imported = await importBundleText(recipientEmail: recipientEmail, jsonText: bundleJson) ?? [];
+        }
+      }
+
       return imported.isEmpty ? null : imported;
     } catch (e) {
       debugPrint('[doc share lan import] $e');

@@ -28,27 +28,34 @@ class NgmyDocShareLocalServer {
     try {
       final interfaces = await NetworkInterface.list(
         type: InternetAddressType.IPv4,
-        includeLinkLocal: true,
+        includeLinkLocal: false,
       );
-      String? fallback;
+      String? hotspot;
       String? wifiLike;
+      String? fallback;
       for (final iface in interfaces) {
         final name = iface.name.toLowerCase();
-        final preferIface = name.contains('wlan') ||
+        final isHotspot = name.contains('ap') ||
+            name.contains('hotspot') ||
+            name.contains('rndis') ||
+            name.contains('wlan1');
+        final isWifi = name.contains('wlan') ||
             name.contains('wifi') ||
             name.contains('en0') ||
-            name.contains('eth');
+            name.contains('eth') ||
+            name.contains('wifi_p2p');
         for (final addr in iface.addresses) {
           if (addr.isLoopback) continue;
           final ip = addr.address;
-          if (ip.startsWith('192.168.') || ip.startsWith('10.') || _isPrivate172(ip)) {
-            if (preferIface) return ip;
-            wifiLike ??= ip;
+          if (!ip.startsWith('192.168.') && !ip.startsWith('10.') && !_isPrivate172(ip)) {
+            continue;
           }
+          if (isHotspot) return ip;
+          if (isWifi) wifiLike ??= ip;
           fallback ??= ip;
         }
       }
-      return wifiLike ?? fallback;
+      return hotspot ?? wifiLike ?? fallback;
     } catch (e) {
       debugPrint('[doc share lan] ip: $e');
     }
@@ -70,17 +77,36 @@ class NgmyDocShareLocalServer {
     if (items.isEmpty) return null;
     await stop();
 
+    for (final item in items) {
+      final bytes = await NgmyDocShareStore.readBytes(ownerEmail, item);
+      if (bytes == null || bytes.isEmpty) {
+        debugPrint('[doc share lan] missing file bytes: ${item.name}');
+        return null;
+      }
+    }
+
     final ip = await _localIp();
     if (ip == null) return null;
 
     final session = _generateSession();
     HttpServer? server;
+    InternetAddress? bindAddr;
+    try {
+      bindAddr = InternetAddress(ip);
+    } catch (_) {
+      bindAddr = InternetAddress.anyIPv4;
+    }
     for (var port = 8765; port < 9765; port++) {
       try {
-        server = await HttpServer.bind(InternetAddress.anyIPv4, port, shared: true);
+        server = await HttpServer.bind(bindAddr, port, shared: true);
         break;
       } on SocketException {
-        continue;
+        try {
+          server = await HttpServer.bind(InternetAddress.anyIPv4, port, shared: true);
+          break;
+        } on SocketException {
+          continue;
+        }
       }
     }
     if (server == null) return null;
@@ -93,9 +119,9 @@ class NgmyDocShareLocalServer {
 
     server.listen((req) => unawaited(_handle(req, session)));
 
-    // Bare LAN URL — shortest QR (same scannability as NGMY Advisors stash codes).
+    // Short local code — big QR dots (same style as NGMY Advisors stash codes).
     return (
-      qrPayload: '$_baseUrl/$session',
+      qrPayload: 'N2|$ip:${server.port}/$session',
       fileCount: items.length,
     );
   }
@@ -113,7 +139,7 @@ class NgmyDocShareLocalServer {
         return;
       }
       if (path.startsWith('$prefix/file/') && req.method == 'GET') {
-        final fileId = path.substring('$prefix/file/'.length);
+        final fileId = Uri.decodeComponent(path.substring('$prefix/file/'.length));
         await _serveFile(req, fileId);
         return;
       }
@@ -134,6 +160,7 @@ class NgmyDocShareLocalServer {
 
   static Future<void> _serveManifest(HttpRequest req) async {
     final owner = (_ownerEmail ?? '').trim();
+    final base = _baseUrl ?? '';
     final files = <Map<String, dynamic>>[];
     for (final item in _items) {
       files.add({
@@ -141,7 +168,7 @@ class NgmyDocShareLocalServer {
         'name': item.name,
         'mime': item.mime,
         'sizeBytes': item.sizeBytes,
-        'url': '/$_sessionId/file/${item.id}',
+        'url': '$base/$_sessionId/file/${Uri.encodeComponent(item.id)}',
       });
     }
     final body = jsonEncode({

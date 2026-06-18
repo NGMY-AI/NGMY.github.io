@@ -6,11 +6,11 @@ import 'package:flutter/foundation.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_store.dart';
 
-/// Parallel LAN pulls with streaming writes — large files land fast like AirDrop.
+/// Sequential LAN pulls with streaming writes — reliable for phone-to-phone transfer.
 class NgmyDocShareLanDownload {
   static final HttpClient _client = HttpClient()
-    ..connectionTimeout = const Duration(seconds: 20)
-    ..idleTimeout = const Duration(seconds: 120);
+    ..connectionTimeout = const Duration(seconds: 25)
+    ..idleTimeout = const Duration(seconds: 180);
 
   static Future<List<NgmyDocShareItem>> pullAll({
     required String recipientEmail,
@@ -21,9 +21,10 @@ class NgmyDocShareLanDownload {
   }) async {
     final total = files.length;
     var received = 0;
+    final imported = <NgmyDocShareItem>[];
 
-    final futures = files.map((raw) async {
-      if (raw is! Map) return null;
+    for (final raw in files) {
+      if (raw is! Map) continue;
       final name = (raw['name'] ?? 'file').toString();
       final mime = (raw['mime'] ?? 'application/octet-stream').toString();
       final rel = (raw['url'] ?? '').toString();
@@ -32,8 +33,12 @@ class NgmyDocShareLanDownload {
       try {
         final request = await _client.getUrl(fileUri);
         request.headers.set(HttpHeaders.acceptEncodingHeader, 'identity');
-        final response = await request.close();
-        if (response.statusCode != HttpStatus.ok) return null;
+        request.headers.set(HttpHeaders.userAgentHeader, 'NGMY-DocShare/1');
+        final response = await request.close().timeout(const Duration(minutes: 10));
+        if (response.statusCode != HttpStatus.ok) {
+          debugPrint('[doc share lan stream] $name: HTTP ${response.statusCode}');
+          continue;
+        }
 
         final saved = await NgmyDocShareStore.addFromHttpStream(
           email: recipientEmail,
@@ -45,29 +50,27 @@ class NgmyDocShareLanDownload {
           note: 'Received via QR',
         );
         if (saved != null) {
+          imported.add(saved);
           received++;
           onProgress?.call(received, total);
         }
-        return saved;
       } catch (e) {
         debugPrint('[doc share lan stream] $name: $e');
-        return null;
       }
-    });
+    }
 
-    final results = await Future.wait(futures);
-    return results.whereType<NgmyDocShareItem>().toList();
+    return imported;
   }
 
   static Future<Map<String, dynamic>?> fetchManifest(Uri manifestUri) async {
-    for (var attempt = 0; attempt < 4; attempt++) {
+    for (var attempt = 0; attempt < 5; attempt++) {
       try {
         final request = await _client.getUrl(manifestUri);
         request.headers.set(HttpHeaders.userAgentHeader, 'NGMY-DocShare/1');
-        final response = await request.close().timeout(const Duration(seconds: 25));
+        final response = await request.close().timeout(const Duration(seconds: 30));
         if (response.statusCode != HttpStatus.ok) {
-          if (attempt < 3) {
-            await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+          if (attempt < 4) {
+            await Future<void>.delayed(Duration(milliseconds: 500 * (attempt + 1)));
             continue;
           }
           return null;
@@ -77,9 +80,27 @@ class NgmyDocShareLanDownload {
         return decoded is Map<String, dynamic> ? decoded : null;
       } catch (e) {
         debugPrint('[doc share lan manifest] attempt ${attempt + 1}: $e');
-        if (attempt < 3) {
-          await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+        if (attempt < 4) {
+          await Future<void>.delayed(Duration(milliseconds: 500 * (attempt + 1)));
           continue;
+        }
+      }
+    }
+    return null;
+  }
+
+  static Future<String?> fetchText(Uri uri) async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final request = await _client.getUrl(uri);
+        request.headers.set(HttpHeaders.userAgentHeader, 'NGMY-DocShare/1');
+        final response = await request.close().timeout(const Duration(minutes: 5));
+        if (response.statusCode != HttpStatus.ok) return null;
+        return await response.transform(utf8.decoder).join();
+      } catch (e) {
+        debugPrint('[doc share lan text] attempt ${attempt + 1}: $e');
+        if (attempt < 2) {
+          await Future<void>.delayed(Duration(milliseconds: 600 * (attempt + 1)));
         }
       }
     }
