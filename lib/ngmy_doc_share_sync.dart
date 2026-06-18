@@ -7,11 +7,13 @@ import 'package:http/http.dart' as http;
 import 'ngmy_doc_share_local_server.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_store.dart';
+import 'ngmy_doc_share_webrtc_stub.dart' if (dart.library.html) 'ngmy_doc_share_webrtc_web.dart' as webrtc;
 
 const String kNgmyDocShareQrPrefixLan = 'NGMYDOCSYNC2';
 const String kNgmyDocShareQrPrefixInline = 'NGMYDOCSYNC0';
 const String kNgmyDocShareBundleMarker = 'ngmyDocShareBundle';
 const int kNgmyDocShareInlineQrMaxChars = 2900;
+const int _inlineMaxTotalBytes = 120000;
 
 typedef NgmyDocShareQrResult = ({
   String qrPayload,
@@ -19,20 +21,45 @@ typedef NgmyDocShareQrResult = ({
   NgmyDocShareQrMode mode,
 });
 
-enum NgmyDocShareQrMode { inlineInstant, lanDirect, exportOnly }
+enum NgmyDocShareQrMode { inlineInstant, lanDirect, webrtcLink }
 
 class NgmyDocShareSync {
   static String _norm(String email) => email.toLowerCase().trim();
 
-  /// Local-only QR: tiny bundles embed in QR; folders/large sets use LAN direct transfer.
+  /// QR always works: LAN direct (native, any size) → WebRTC (web) → inline tiny fallback.
   static Future<NgmyDocShareQrResult?> createQrForItems({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
   }) async {
     if (items.isEmpty) return null;
 
-    final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items);
-    if (inline != null) return inline;
+    if (!kIsWeb) {
+      final lan = await NgmyDocShareLocalServer.start(ownerEmail: ownerEmail, items: items);
+      if (lan != null) {
+        return (
+          qrPayload: lan.qrPayload,
+          fileCount: lan.fileCount,
+          mode: NgmyDocShareQrMode.lanDirect,
+        );
+      }
+    }
+
+    if (kIsWeb) {
+      final offer = await webrtc.createOfferQr(ownerEmail: ownerEmail, items: items);
+      if (offer != null) {
+        return (
+          qrPayload: offer,
+          fileCount: items.length,
+          mode: NgmyDocShareQrMode.webrtcLink,
+        );
+      }
+    }
+
+    final totalBytes = items.fold<int>(0, (s, e) => s + e.sizeBytes);
+    if (totalBytes <= _inlineMaxTotalBytes && items.length <= 3) {
+      final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items);
+      if (inline != null) return inline;
+    }
 
     if (!kIsWeb) {
       final lan = await NgmyDocShareLocalServer.start(ownerEmail: ownerEmail, items: items);
@@ -48,7 +75,25 @@ class NgmyDocShareSync {
     return null;
   }
 
-  static Future<void> stopLanShare() => NgmyDocShareLocalServer.stop();
+  static Future<void> stopLanShare() async {
+    await NgmyDocShareLocalServer.stop();
+    await webrtc.stopWebRtc();
+  }
+
+  static Future<void> applyWebRtcAnswer(String raw) => webrtc.applyAnswerQr(raw);
+
+  static Future<({String answerQr, Future<List<NgmyDocShareItem>> transfer})?> beginWebRtcReceive({
+    required String raw,
+    required String recipientEmail,
+    void Function(int received, int total)? onProgress,
+  }) {
+    if (!kIsWeb) return Future.value(null);
+    return webrtc.beginReceiveOffer(
+      raw: raw,
+      recipientEmail: recipientEmail,
+      onProgress: onProgress,
+    );
+  }
 
   static Future<NgmyDocShareQrResult?> _tryInlineQr({
     required String ownerEmail,
@@ -109,7 +154,7 @@ class NgmyDocShareSync {
     final manifestUri = root.endsWith('manifest.json') ? Uri.parse(root) : Uri.parse('$root/manifest.json');
 
     try {
-      final manifestRes = await http.get(manifestUri).timeout(const Duration(seconds: 8));
+      final manifestRes = await http.get(manifestUri).timeout(const Duration(seconds: 15));
       if (manifestRes.statusCode != 200) return null;
 
       final decoded = jsonDecode(manifestRes.body);
@@ -138,7 +183,9 @@ class NgmyDocShareSync {
                 path: rel.startsWith('/') ? rel : '/$rel',
               );
 
-        final res = await http.get(fileUri).timeout(const Duration(minutes: 5));
+        final res = await http
+            .get(fileUri)
+            .timeout(const Duration(hours: 12));
         if (res.statusCode != 200 || res.bodyBytes.isEmpty) return null;
 
         final saved = await NgmyDocShareStore.addBytes(
@@ -147,7 +194,7 @@ class NgmyDocShareSync {
           mime: mime,
           bytes: Uint8List.fromList(res.bodyBytes),
           fromSender: owner.isNotEmpty ? owner : null,
-          note: 'Received via QR (local)',
+          note: 'Received via QR',
         );
         received++;
         onProgress?.call(received, total);
@@ -214,7 +261,7 @@ class NgmyDocShareSync {
           mime: mime,
           bytes: bytes,
           fromSender: owner.isNotEmpty ? owner : null,
-          note: 'Imported locally',
+          note: 'Received via QR',
         );
         if (saved != null) imported.add(saved);
       }

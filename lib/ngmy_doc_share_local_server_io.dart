@@ -28,21 +28,32 @@ class NgmyDocShareLocalServer {
     try {
       final interfaces = await NetworkInterface.list(
         type: InternetAddressType.IPv4,
-        includeLinkLocal: false,
+        includeLinkLocal: true,
       );
+      String? fallback;
       for (final iface in interfaces) {
         for (final addr in iface.addresses) {
           if (addr.isLoopback) continue;
           final ip = addr.address;
-          if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+          if (ip.startsWith('192.168.') || ip.startsWith('10.') || _isPrivate172(ip)) {
             return ip;
           }
+          fallback ??= ip;
         }
       }
+      return fallback;
     } catch (e) {
       debugPrint('[doc share lan] ip: $e');
     }
     return null;
+  }
+
+  static bool _isPrivate172(String ip) {
+    if (!ip.startsWith('172.')) return false;
+    final parts = ip.split('.');
+    if (parts.length < 2) return false;
+    final second = int.tryParse(parts[1]) ?? 0;
+    return second >= 16 && second <= 31;
   }
 
   static Future<({String qrPayload, int fileCount})?> start({
@@ -57,7 +68,7 @@ class NgmyDocShareLocalServer {
 
     final session = _generateSession();
     HttpServer? server;
-    for (var port = 8765; port < 8865; port++) {
+    for (var port = 8765; port < 9765; port++) {
       try {
         server = await HttpServer.bind(InternetAddress.anyIPv4, port, shared: true);
         break;

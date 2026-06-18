@@ -17,8 +17,16 @@ class NgmyDocShareItem {
   final String? note;
   final String? fromSender;
 
-  bool get isImage => mime.startsWith('image/');
-  bool get isVideo => mime.startsWith('video/');
+  bool get isImage => mime.startsWith('image/') || _extMatch(const ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'bmp']);
+
+  bool get isVideo =>
+      mime.startsWith('video/') || _extMatch(const ['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv', '3gp']);
+
+  bool _extMatch(List<String> exts) {
+    final dot = name.lastIndexOf('.');
+    if (dot < 0 || dot >= name.length - 1) return false;
+    return exts.contains(name.substring(dot + 1).toLowerCase());
+  }
 
   String get sizeLabel {
     if (sizeBytes < 1024) return '$sizeBytes B';

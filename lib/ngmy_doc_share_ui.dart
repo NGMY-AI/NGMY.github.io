@@ -209,24 +209,23 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     });
   }
 
-  Future<void> _showQrForSelection() async {
-    final ids = _selected.isEmpty ? _items.map((e) => e.id).toSet() : _selected;
-    final batch = _items.where((e) => ids.contains(e.id)).toList();
+  Future<void> _showQrForItems(List<NgmyDocShareItem> batch) async {
     if (batch.isEmpty) {
-      _toast('Upload files first, then share.');
+      _toast('Nothing selected to share.');
       return;
     }
     await _withWork(() async {
       final created = await NgmyDocShareSync.createQrForItems(ownerEmail: widget.email, items: batch);
       if (!mounted) return;
       if (created == null) {
-        _toast('Too large for QR — use Export, or share fewer/smaller files.');
+        _toast('Turn on Wi‑Fi and try again. Both phones must be on the same network.');
         return;
       }
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
+        isDismissible: created.mode != NgmyDocShareQrMode.lanDirect,
         builder: (ctx) => _DocShareQrSheet(
           payload: created.qrPayload,
           fileCount: created.fileCount,
@@ -236,6 +235,18 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       await NgmyDocShareSync.stopLanShare();
     }, label: 'Preparing QR…');
   }
+
+  Future<void> _showQrForSelection() async {
+    final ids = _selected.isEmpty ? _items.map((e) => e.id).toSet() : _selected;
+    final batch = _items.where((e) => ids.contains(e.id)).toList();
+    if (batch.isEmpty) {
+      _toast('Add files first, then share via QR.');
+      return;
+    }
+    await _showQrForItems(batch);
+  }
+
+  Future<void> _showQrForOne(NgmyDocShareItem item) => _showQrForItems([item]);
 
   Future<void> _exportBundle() async {
     final ids = _selected.isEmpty ? _items.map((e) => e.id).toSet() : _selected;
@@ -260,6 +271,37 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       MaterialPageRoute(builder: (_) => const _DocShareScanPage()),
     );
     if (raw == null || raw.isEmpty) return;
+
+    if (raw.startsWith('NGMYDOCSYNC3|') && kIsWeb) {
+      await _withWork(() async {
+        final session = await NgmyDocShareSync.beginWebRtcReceive(
+          raw: raw,
+          recipientEmail: widget.email,
+          onProgress: (r, t) {
+            if (mounted) setState(() => _status = 'Receiving $r of $t…');
+          },
+        );
+        if (!mounted || session == null) {
+          _toast('Could not start receive. Try again.');
+          return;
+        }
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => _DocShareAnswerQrDialog(answerPayload: session.answerQr),
+        );
+        final imported = await session.transfer;
+        if (!mounted) return;
+        if (imported.isEmpty) {
+          _toast('Transfer incomplete. Ask sender to scan your answer QR.');
+          return;
+        }
+        await _refresh();
+        _toast('Restored ${imported.length} file(s) to this phone.');
+      }, label: 'Connecting…');
+      return;
+    }
+
     await _withWork(() async {
       final imported = await NgmyDocShareSync.importFromScan(
         recipientEmail: widget.email,
@@ -269,11 +311,11 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         },
       );
       if (imported == null || imported.isEmpty) {
-        _toast('Could not receive files. Stay on same Wi‑Fi as sender and keep their QR screen open.');
+        _toast('Could not receive. Same Wi‑Fi as sender — keep their QR screen open.');
         return;
       }
       await _refresh();
-      _toast('Got ${imported.length} file(s) instantly — saved on this device.');
+      _toast('Restored ${imported.length} file(s) to this phone.');
     }, label: 'Receiving…');
   }
 
@@ -355,7 +397,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                 border: Border.all(color: kNgmyStudioHubAccent2.withValues(alpha: 0.3)),
               ),
               child: Text(
-                '100% on your device — no cloud. Share folders of photos, videos, or files via QR. Small sets transfer instantly; folders use fast direct Wi‑Fi transfer.',
+                'Share anything via QR — videos, photos, folders. No cloud. Receiver scans to restore files on their phone.',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12, height: 1.4),
               ),
             ),
@@ -459,11 +501,13 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                               PopupMenuButton<String>(
                                 icon: const Icon(Icons.more_vert_rounded, color: Colors.white54),
                                 onSelected: (v) {
+                                  if (v == 'qr') unawaited(_showQrForOne(item));
                                   if (v == 'save') unawaited(_saveItem(item));
                                   if (v == 'delete') unawaited(_deleteItem(item));
                                   if (v == 'play' && item.isVideo) unawaited(_openItem(item));
                                 },
                                 itemBuilder: (_) => [
+                                  const PopupMenuItem(value: 'qr', child: Text('Share via QR')),
                                   if (item.isVideo) const PopupMenuItem(value: 'play', child: Text('Play video')),
                                   const PopupMenuItem(value: 'save', child: Text('Download / save')),
                                   const PopupMenuItem(value: 'delete', child: Text('Delete')),
@@ -529,7 +573,8 @@ class _DocShareVideoPageState extends State<_DocShareVideoPage> {
         return;
       }
       _controller = c;
-      await c.initialize();
+      c.addListener(_onVideoTick);
+      await c.initialize().timeout(const Duration(seconds: 60));
       if (!mounted) return;
       setState(() => _loading = false);
       await c.play();
@@ -543,8 +588,16 @@ class _DocShareVideoPageState extends State<_DocShareVideoPage> {
     }
   }
 
+  void _onVideoTick() {
+    if (!mounted || _controller == null) return;
+    if (_controller!.value.hasError && _error == null) {
+      setState(() => _error = 'Video playback error.');
+    }
+  }
+
   @override
   void dispose() {
+    _controller?.removeListener(_onVideoTick);
     _controller?.dispose();
     NgmyDocSharePlayback.revokeUri(_uri);
     super.dispose();
@@ -625,7 +678,7 @@ class _DocShareVideoPageState extends State<_DocShareVideoPage> {
   }
 }
 
-class _DocShareQrSheet extends StatelessWidget {
+class _DocShareQrSheet extends StatefulWidget {
   const _DocShareQrSheet({
     required this.payload,
     required this.fileCount,
@@ -636,39 +689,65 @@ class _DocShareQrSheet extends StatelessWidget {
   final int fileCount;
   final NgmyDocShareQrMode mode;
 
+  @override
+  State<_DocShareQrSheet> createState() => _DocShareQrSheetState();
+}
+
+class _DocShareQrSheetState extends State<_DocShareQrSheet> {
   String get _modeLabel {
-    switch (mode) {
+    switch (widget.mode) {
       case NgmyDocShareQrMode.inlineInstant:
-        return 'Instant — embedded in QR';
+        return 'Instant restore';
       case NgmyDocShareQrMode.lanDirect:
-        return 'Fast direct — same Wi‑Fi';
-      case NgmyDocShareQrMode.exportOnly:
-        return 'Export file';
+        return 'Direct transfer — any size';
+      case NgmyDocShareQrMode.webrtcLink:
+        return 'QR link — any size';
     }
   }
 
   String get _hint {
-    switch (mode) {
+    switch (widget.mode) {
       case NgmyDocShareQrMode.inlineInstant:
-        return 'Receiver scans once — photos & files appear instantly. No internet needed.';
+        return 'Receiver scans once — files restore instantly on their phone.';
       case NgmyDocShareQrMode.lanDirect:
-        return 'Keep this screen open. Receiver scans on the same Wi‑Fi — files copy directly from your phone (no cloud).';
-      case NgmyDocShareQrMode.exportOnly:
-        return 'Use Export for very large folders.';
+        return 'Keep this open. Receiver scans on same Wi‑Fi — videos & folders copy straight to their phone.';
+      case NgmyDocShareQrMode.webrtcLink:
+        return 'Receiver scans this QR, then shows a short answer QR — tap Scan answer below when they do.';
+    }
+  }
+
+  Future<void> _scanAnswer() async {
+    if (!barcode_platform.ngmyBarcodeUseCamera) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Use the phone app camera to scan the answer QR.')),
+        );
+      }
+      return;
+    }
+    final raw = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const _DocShareAnswerScanPage()),
+    );
+    if (raw == null || raw.isEmpty) return;
+    await NgmyDocShareSync.applyWebRtcAnswer(raw);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connected — sending files now…')),
+      );
     }
   }
 
   Future<void> _copy(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: payload));
+    await Clipboard.setData(ClipboardData(text: widget.payload));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code copied to clipboard')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code copied')));
     }
   }
 
   Future<void> _savePng(BuildContext context) async {
     try {
       final painter = QrPainter(
-        data: payload,
+        data: widget.payload,
         version: QrVersions.auto,
         eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF1E1035)),
         dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Color(0xFF1E1035)),
@@ -739,7 +818,7 @@ class _DocShareQrSheet extends StatelessWidget {
                     children: [
                       const Text('Share via QR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
                       Text(
-                        '$fileCount file(s) · $_modeLabel',
+                        '${widget.fileCount} file(s) · $_modeLabel',
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 12),
                       ),
                     ],
@@ -762,7 +841,7 @@ class _DocShareQrSheet extends StatelessWidget {
                 ],
               ),
               child: QrImageView(
-                data: payload,
+                data: widget.payload,
                 size: 240,
                 backgroundColor: Colors.white,
                 eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF1E1035)),
@@ -775,7 +854,7 @@ class _DocShareQrSheet extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12, height: 1.45),
             ),
-            if (mode == NgmyDocShareQrMode.lanDirect) ...[
+            if (widget.mode == NgmyDocShareQrMode.lanDirect) ...[
               const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -796,6 +875,15 @@ class _DocShareQrSheet extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+            ],
+            if (widget.mode == NgmyDocShareQrMode.webrtcLink) ...[
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _scanAnswer,
+                style: FilledButton.styleFrom(backgroundColor: kNgmyStudioHubAccent),
+                icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                label: const Text('Scan receiver answer QR'),
               ),
             ],
             const SizedBox(height: 18),
@@ -834,6 +922,87 @@ class _DocShareQrSheet extends StatelessWidget {
   }
 }
 
+class _DocShareAnswerQrDialog extends StatelessWidget {
+  const _DocShareAnswerQrDialog({required this.answerPayload});
+
+  final String answerPayload;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF0F1419),
+      title: const Text('Show this to sender', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Sender taps "Scan receiver answer QR" and points at this code.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+              child: QrImageView(data: answerPayload, size: 200, backgroundColor: Colors.white),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Done'),
+        ),
+      ],
+    );
+  }
+}
+
+class _DocShareAnswerScanPage extends StatefulWidget {
+  const _DocShareAnswerScanPage();
+
+  @override
+  State<_DocShareAnswerScanPage> createState() => _DocShareAnswerScanPageState();
+}
+
+class _DocShareAnswerScanPageState extends State<_DocShareAnswerScanPage> {
+  final _controller = MobileScannerController();
+  bool _handled = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_handled) return;
+    for (final b in capture.barcodes) {
+      final raw = b.rawValue?.trim() ?? '';
+      if (raw.startsWith('NGMYDOCSYNC3A|')) {
+        _handled = true;
+        Navigator.pop(context, raw);
+        return;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('Scan answer QR'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
+      body: MobileScanner(controller: _controller, onDetect: _onDetect),
+    );
+  }
+}
+
 class _DocShareScanPage extends StatefulWidget {
   const _DocShareScanPage();
 
@@ -856,6 +1025,11 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
     for (final b in capture.barcodes) {
       final raw = b.rawValue?.trim() ?? '';
       if (raw.isEmpty) continue;
+      if (raw.startsWith('NGMYDOCSYNC3|')) {
+        _handled = true;
+        Navigator.pop(context, raw);
+        return;
+      }
       if (raw.startsWith('NGMYDOCSYNC2|') ||
           raw.startsWith('NGMYDOCSYNC0|') ||
           raw.startsWith('http://') ||
