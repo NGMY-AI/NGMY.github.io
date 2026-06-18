@@ -125,6 +125,12 @@ class NgmyDocShareStore {
     return count;
   }
 
+  static Future<int> addWebFolderFiles({
+    required String email,
+    required List<dynamic> files,
+  }) async =>
+      0;
+
   static Future<NgmyDocShareItem?> addFromPlatformFile({
     required String email,
     required PlatformFile file,
@@ -211,6 +217,23 @@ class NgmyDocShareStore {
     final f = await _fileForId(root, item.id);
     if (f == null) return null;
     return f.readAsBytes();
+  }
+
+  static Future<Uint8List?> readByteRange(String email, NgmyDocShareItem item, int start, int end) async {
+    if (end <= start) return Uint8List(0);
+    final root = await _userDir(email);
+    final f = await _fileForId(root, item.id);
+    if (f == null) return null;
+    final len = await f.length();
+    if (start >= len) return null;
+    final safeEnd = end > len ? len : end;
+    return f.openRead(start, safeEnd).fold<BytesBuilder>(
+      BytesBuilder(copy: false),
+      (b, data) {
+        b.add(data);
+        return b;
+      },
+    ).then((b) => Uint8List.fromList(b.takeBytes()));
   }
 
   /// Stream HTTP body straight to disk — fast for large videos (AirDrop-style).

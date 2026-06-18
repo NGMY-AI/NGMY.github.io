@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
 import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
+import 'ngmy_doc_share_folder.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_playback.dart';
 import 'ngmy_doc_share_qr_payload.dart';
@@ -102,7 +103,16 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
 
   Future<void> _uploadFolder() async {
     if (kIsWeb) {
-      _toast('On web, select multiple files at once. Folder pick works in the phone app.');
+      await _withWork(() async {
+        final picked = await pickWebFolderFiles();
+        if (picked.isEmpty) {
+          _toast('No folder selected.');
+          return;
+        }
+        final count = await NgmyDocShareStore.addWebFolderFiles(email: widget.email, files: picked);
+        await _refresh();
+        _toast(count == 0 ? 'No files found in that folder.' : 'Added $count file(s) from folder.');
+      }, label: 'Reading folder…');
       return;
     }
     await _withWork(() async {
@@ -226,11 +236,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       final created = await NgmyDocShareSync.createQrForItems(ownerEmail: widget.email, items: batch);
       if (!mounted) return;
       if (created == null) {
-        if (kIsWeb) {
-          _toast('Large files: open Doc Share in the NGMY phone app (same Wi‑Fi), or tap Export.');
-        } else {
-          _toast('Turn on Wi‑Fi. Both phones must be on the same network.');
-        }
+        _toast('Could not start share. Check Wi‑Fi or try Export.');
         return;
       }
       await showModalBottomSheet<void>(
@@ -418,7 +424,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                 border: Border.all(color: kNgmyStudioHubAccent2.withValues(alpha: 0.3)),
               ),
               child: Text(
-                'Share via QR — local only, no cloud. Phone app + same Wi‑Fi for videos. Small files work on web too.',
+                'Share via QR — any size. Videos use direct transfer (phone Wi‑Fi or web link). No cloud storage.',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12, height: 1.4),
               ),
             ),
@@ -724,7 +730,7 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
       case NgmyDocShareQrMode.lanDirect:
         return 'Direct transfer — any size';
       case NgmyDocShareQrMode.webrtcLink:
-        return 'QR link — any size';
+        return 'Direct link — any size';
     }
   }
 
@@ -735,7 +741,7 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
       case NgmyDocShareQrMode.lanDirect:
         return 'Keep this open. Receiver scans on same Wi‑Fi — videos & folders copy straight to their phone.';
       case NgmyDocShareQrMode.webrtcLink:
-        return 'Receiver scans this QR, then shows a short answer QR — tap Scan answer below when they do.';
+        return 'Receiver scans this QR. If scan fails, tap Copy and paste on their phone. Keep this screen open until done.';
     }
   }
 
@@ -1081,7 +1087,7 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
     if (text.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Copy the Wi‑Fi link from sender first.')),
+          const SnackBar(content: Text('Copy the share code or Wi‑Fi link from sender first.')),
         );
       }
       return;

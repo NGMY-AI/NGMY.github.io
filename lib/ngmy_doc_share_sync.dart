@@ -27,7 +27,7 @@ enum NgmyDocShareQrMode { inlineInstant, lanDirect, webrtcLink }
 class NgmyDocShareSync {
   static String _norm(String email) => email.toLowerCase().trim();
 
-  /// Local only: LAN on phone (any size) or inline QR (small files). No cloud database.
+  /// Local: LAN on phone (any size) or WebRTC / inline on web. No file data in cloud.
   static Future<NgmyDocShareQrResult?> createQrForItems({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
@@ -48,6 +48,14 @@ class NgmyDocShareSync {
     if (kIsWeb) {
       final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items);
       if (inline != null) return inline;
+      final offer = await webrtc.createOfferQr(ownerEmail: ownerEmail, items: items);
+      if (offer != null) {
+        return (
+          qrPayload: offer,
+          fileCount: items.length,
+          mode: NgmyDocShareQrMode.webrtcLink,
+        );
+      }
       return null;
     }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:math';
@@ -33,7 +34,10 @@ String _bytesPrefsKey(String email, String id) => 'ngmy_doc_share_blob_${_emailK
 
 String _newId() => '${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(99999)}';
 
+const int _prefsMaxBytes = 3 * 1024 * 1024;
+
 final Map<String, Uint8List> _memoryBlobs = {};
+final Map<String, html.File> _webFiles = {};
 
 class NgmyDocShareStore {
   static Future<List<NgmyDocShareItem>> list(String email) => _readIndex(email);
@@ -58,11 +62,15 @@ class NgmyDocShareStore {
       fromSender: fromSender,
     );
     final key = _bytesPrefsKey(email, id);
-    final prefs = await SharedPreferences.getInstance();
-    try {
-      final ok = await prefs.setString(key, base64Encode(bytes));
-      if (!ok) _memoryBlobs[key] = bytes;
-    } catch (_) {
+    if (bytes.length <= _prefsMaxBytes) {
+      final prefs = await SharedPreferences.getInstance();
+      try {
+        final ok = await prefs.setString(key, base64Encode(bytes));
+        if (!ok) _memoryBlobs[key] = bytes;
+      } catch (_) {
+        _memoryBlobs[key] = bytes;
+      }
+    } else {
       _memoryBlobs[key] = bytes;
     }
     final items = await _readIndex(email)..add(item);
@@ -72,15 +80,70 @@ class NgmyDocShareStore {
 
   static Future<int> addFromDirectory({required String email, required String dirPath}) async => 0;
 
+  /// Web folder picker — keeps [html.File] refs for large videos (no full RAM load until transfer).
+  static Future<int> addWebFolderFiles({
+    required String email,
+    required List<({String name, html.File file})> files,
+  }) async {
+    if (email.trim().isEmpty || files.isEmpty) return 0;
+    var count = 0;
+    final items = await _readIndex(email);
+    for (final entry in files) {
+      if (entry.file.size <= 0) continue;
+      final id = _newId();
+      final mime = _guessMime(entry.name, null);
+      final item = NgmyDocShareItem(
+        id: id,
+        name: entry.name,
+        mime: mime,
+        sizeBytes: entry.file.size,
+        createdAt: DateTime.now().toUtc().toIso8601String(),
+        note: 'From folder',
+      );
+      _webFiles[id] = entry.file;
+      items.add(item);
+      count++;
+    }
+    if (count > 0) await _writeIndex(email, items);
+    return count;
+  }
+
   static Future<NgmyDocShareItem?> addFromPlatformFile({
     required String email,
     required PlatformFile file,
     String? note,
   }) async {
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) return null;
     final mime = _guessMime(file.name, file.extension);
-    return addBytes(email: email, name: file.name, mime: mime, bytes: bytes, note: note);
+    final bytes = file.bytes;
+    if (bytes != null && bytes.isNotEmpty) {
+      return addBytes(email: email, name: file.name, mime: mime, bytes: bytes, note: note);
+    }
+    return null;
+  }
+
+  static Future<Uint8List?> readByteRange(String email, NgmyDocShareItem item, int start, int end) async {
+    if (end <= start) return Uint8List(0);
+    final webFile = _webFiles[item.id];
+    if (webFile != null) {
+      final slice = webFile.slice(start, end);
+      final reader = html.FileReader();
+      final done = Completer<Uint8List?>();
+      reader.onLoadEnd.listen((_) {
+        final result = reader.result;
+        if (result is ByteBuffer) {
+          done.complete(Uint8List.view(result));
+        } else {
+          done.complete(null);
+        }
+      });
+      reader.onError.listen((_) => done.complete(null));
+      reader.readAsArrayBuffer(slice);
+      return done.future.timeout(const Duration(minutes: 30), onTimeout: () => null);
+    }
+    final all = await readBytes(email, item);
+    if (all == null || start >= all.length) return null;
+    final safeEnd = end > all.length ? all.length : end;
+    return Uint8List.sublistView(all, start, safeEnd);
   }
 
   static String _guessMime(String name, String? ext) {
@@ -103,12 +166,12 @@ class NgmyDocShareStore {
         return 'video/quicktime';
       case 'webm':
         return 'video/webm';
+      case 'mkv':
+        return 'video/x-matroska';
+      case 'avi':
+        return 'video/x-msvideo';
       case 'pdf':
         return 'application/pdf';
-      case 'doc':
-        return 'application/msword';
-      case 'docx':
-        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
       default:
         return 'application/octet-stream';
     }
@@ -118,6 +181,10 @@ class NgmyDocShareStore {
     final key = _bytesPrefsKey(email, item.id);
     final mem = _memoryBlobs[key];
     if (mem != null) return mem;
+    final webFile = _webFiles[item.id];
+    if (webFile != null) {
+      return readByteRange(email, item, 0, webFile.size);
+    }
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(key);
     if (raw == null || raw.isEmpty) return null;
@@ -135,6 +202,7 @@ class NgmyDocShareStore {
     items.removeWhere((e) => e.id == id);
     final key = _bytesPrefsKey(email, id);
     _memoryBlobs.remove(key);
+    _webFiles.remove(id);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(key);
     await _writeIndex(email, items);

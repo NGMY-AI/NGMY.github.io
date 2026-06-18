@@ -95,17 +95,19 @@ Future<void> _pushFiles(RTCDataChannel channel) async {
   if (email == null) return;
   try {
     for (final item in _sendItems) {
-      final bytes = await NgmyDocShareStore.readBytes(email, item);
-      if (bytes == null || bytes.isEmpty) continue;
+      final size = item.sizeBytes;
+      if (size <= 0) continue;
       channel.send(RTCDataChannelMessage(jsonEncode({
         'type': 'meta',
         'name': item.name,
         'mime': item.mime,
-        'size': bytes.length,
+        'size': size,
       })));
-      for (var i = 0; i < bytes.length; i += _chunkSize) {
-        final end = (i + _chunkSize < bytes.length) ? i + _chunkSize : bytes.length;
-        channel.send(RTCDataChannelMessage.fromBinary(bytes.sublist(i, end)));
+      for (var i = 0; i < size; i += _chunkSize) {
+        final end = (i + _chunkSize < size) ? i + _chunkSize : size;
+        final chunk = await NgmyDocShareStore.readByteRange(email, item, i, end);
+        if (chunk == null || chunk.isEmpty) continue;
+        channel.send(RTCDataChannelMessage.fromBinary(chunk));
       }
     }
     channel.send(RTCDataChannelMessage(jsonEncode({'type': 'done'})));
