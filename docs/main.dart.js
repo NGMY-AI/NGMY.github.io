@@ -61763,9 +61763,9 @@ this.b=b
 this.c=c},
 cPy(a){if(a<=0)return 0
 if(a<30)return 2
-return a*0.05},
+return a*0.07},
 dfp(a){if(a<30)return"NGMY service fee ($2 flat under $30)"
-return"NGMY service fee (5%)"},
+return"NGMY service fee (7%)"},
 qA(a){var s
 if(a.a!=="send_money"){s=a.b
 s=B.a.t(s.toLowerCase(),"send money")||B.a.t(s.toLowerCase(),"money transfer")}else s=!0
@@ -207803,7 +207803,7 @@ q=A.cy(b7)
 s=s+("Qty: "+a4+"\n")+("Est. rate: $"+b7+"\n")+("Est. total: $"+B.i.Z(r*(q==null?0:q),2)+"\n")}if(!a6&&!a7&&!a8&&!a9&&B.a.k(c0.c).length!==0)s+="Details: "+B.a.k(c0.c)+"\n"
 r=B.a.k(a2)
 if(r.length!==0)s+="Notes: "+r+"\n"
-if(a6)r="Please process this money transfer request. I understand the NGMY service fee applies ($2 under $30, otherwise 5%). I paid via Cash App."
+if(a6)r="Please process this money transfer request. I understand the NGMY service fee applies ($2 under $30, otherwise 7%). I paid via Cash App."
 else if(a8)r="Please confirm this moving/delivery request. Thank you!"
 else r=a9?"Please confirm this home repair request. Thank you!":"Please contact me about this service. Thank you!"
 r=s+"\n"+(r+"\n")
@@ -207976,7 +207976,7 @@ q=A.cy(B.a.k(r.a.a))
 if(q==null)q=0
 p=A.cPy(q)
 o=q<30
-n=o?"Fee ($2 flat)":"Fee (5%)"
+n=o?"Fee ($2 flat)":"Fee (7%)"
 m=A.n(20)
 l=a4?B.aay:B.c
 k=A.Y(A.u(89,B.bG.i()>>>16&255,B.bG.i()>>>8&255,B.bG.i()&255),B.o,1)
@@ -207997,7 +207997,7 @@ h===$&&A.c()
 h=a1.bgT("Receiver phone number *",h,a4,B.hK,new A.bSc(a1))
 f=a1.z
 f===$&&A.c()
-f=a1.bgU("Destination country *",f,a4,"e.g. USA, Ghana, Nigeria",new A.bSd(a1),B.lV)
+f=a1.bgU("Destination country *",f,a4,"e.g. Tanzania, DRC Congo, Kenya",new A.bSd(a1),B.lV)
 r=a1.Pd("Transfer amount ($) *",r,a4,new A.bSo(a1))
 e=a1.Q
 e===$&&A.c()
@@ -208005,7 +208005,7 @@ e=a1.Jv("Your Cash App tag *",e,a4,"$YourTag \u2014 so we know who paid",new A.b
 d=A.n(12)
 c=A.u(B.i.V(255*(a4?0.12:0.1)),B.aG.i()>>>16&255,B.aG.i()>>>8&255,B.aG.i()&255)
 b=A.Y(A.u(115,B.aG.i()>>>16&255,B.aG.i()>>>8&255,B.aG.i()&255),B.o,1)
-o=o?"NGMY service fee \u2014 $2 flat (under $30)":"NGMY service fee \u2014 5%"
+o=o?"NGMY service fee $2 flat (under $30)":"NGMY service fee 7%"
 B.d.A(a3,A.a([B.z,i,B.z,h,B.z,f,B.z,r,B.z,e,B.z,A.w(a2,A.C(A.a([A.d(o,a2,a2,a2,a2,A.l(a2,a2,a4?B.f1:B.fd,a2,a2,a2,a2,a2,a2,a2,a2,10,a2,a2,B.u,a2,a2,!0,a2,a2,a2,a2,a2,a2,a2,a2),a2,a2,a2),B.ae,a1.oe("Transfer","$"+B.i.Z(q,2),a4),a1.oe(n,"$"+B.i.Z(p,2),a4),a1.oe("Recipient gets","$"+B.i.Z(q-p,2),a4)],g),B.af,B.e,B.f,0,B.l),B.h,a2,a2,new A.v(c,a2,b,d,a2,a2,B.k),a2,a2,a2,B.aK,a2,a2,a2)],g))}else{o=a1.e
 if(o!=null&&A.aDY(o)){r=A.d("Tell us what you need \u2014 add as much detail as you want.",a2,a2,a2,a2,A.l(a2,a2,a4?B.U:B.eA,a2,a2,a2,a2,a2,a2,a2,a2,11,a2,a2,B.G,a2,a2,!0,a2,a2,a2,a2,a2,a2,a2,a2),a2,a2,a2)
 o=a1.as
@@ -233606,7 +233606,7 @@ B.biZ=new A.fm("Sign Up",null,null,B.bW,null,null,null,null,null,null,B.bnk)
 B.ay1=s([B.bj_,B.biZ],t.VO)
 B.ay2=s([0,0.22,0.5,0.78,1],t.n)
 B.aN2=new A.ja("house_fixture","House Fixture","Repairs, installs, and home fixes","home_repair_service","150","1",!0)
-B.aN3=new A.ja("send_money","Send Money","Money transfer \u2014 5% fee ($2 flat under $30)","attach_money","100","1",!0)
+B.aN3=new A.ja("send_money","Send Money","Money transfer \u2014 7% fee ($2 flat under $30)","attach_money","100","1",!0)
 B.aN1=new A.ja("moving_delivery","Moving & Delivery","$2.50/mile over 10 mi \xb7 under 10 mi quoted on WhatsApp","local_shipping","0","1",!0)
 B.aN4=new A.ja("general_help","General Help","Ask us anything \u2014 describe your full request","support_agent","0","1",!0)
 B.lv=s([B.aN2,B.aN3,B.aN1,B.aN4],t.Ou)

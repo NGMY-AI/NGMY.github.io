@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 /// Money transfer service id in Help Center.
 const String kNgmyHelpCenterSendMoneyId = 'send_money';
 
-/// NGMY fee on send-money transfers (5% when amount is \$30 or more).
-const double kNgmyHelpCenterMoneyTransferFeeRate = 0.05;
+/// NGMY fee on send-money transfers (7% when amount is \$30 or more).
+const double kNgmyHelpCenterMoneyTransferFeeRate = 0.07;
 
 /// Transfers under this amount use a flat fee instead of the percentage.
 const double kNgmyHelpCenterMoneyTransferMinAmount = 30.0;
@@ -24,7 +24,7 @@ String ngmyHelpCenterMoneyTransferFeeDescription(double amount) {
   if (amount < kNgmyHelpCenterMoneyTransferMinAmount) {
     return 'NGMY service fee (\$2 flat under \$30)';
   }
-  return 'NGMY service fee (5%)';
+  return 'NGMY service fee (7%)';
 }
 
 bool ngmyHelpCenterIsSendMoney(NgmyHelpCenterService service) =>
@@ -183,7 +183,7 @@ class NgmyHelpCenterConfig {
         NgmyHelpCenterService(
           id: 'send_money',
           name: 'Send Money',
-          description: 'Money transfer — 5% fee (\$2 flat under \$30)',
+          description: 'Money transfer — 7% fee (\$2 flat under \$30)',
           icon: 'attach_money',
           defaultPrice: '100',
           defaultQty: '1',
@@ -351,7 +351,7 @@ class NgmyHelpCenterConfig {
     if (notes.trim().isNotEmpty) buf.writeln('Notes: ${notes.trim()}');
     buf.writeln();
     buf.writeln(isMoney
-        ? 'Please process this money transfer request. I understand the NGMY service fee applies (\$2 under \$30, otherwise 5%). I paid via Cash App.'
+        ? 'Please process this money transfer request. I understand the NGMY service fee applies (\$2 under \$30, otherwise 7%). I paid via Cash App.'
         : isDelivery
             ? 'Please confirm this moving/delivery request. Thank you!'
             : isHouse

@@ -567,7 +567,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     final recipientGets = amount - fee;
     final feeLabel = amount < kNgmyHelpCenterMoneyTransferMinAmount
         ? 'Fee (\$2 flat)'
-        : 'Fee (5%)';
+        : 'Fee (7%)';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -600,7 +600,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
             const SizedBox(height: 10),
             _textField('Receiver phone number *', _receiverPhoneC, isDark, onChanged: (_) => _resetCashApp(), keyboard: TextInputType.phone),
             const SizedBox(height: 10),
-            _textField('Destination country *', _receiverCountryC, isDark, onChanged: (_) => _resetCashApp(), textCapitalization: TextCapitalization.words, hint: 'e.g. USA, Ghana, Nigeria'),
+            _textField('Destination country *', _receiverCountryC, isDark, onChanged: (_) => _resetCashApp(), textCapitalization: TextCapitalization.words, hint: 'e.g. Tanzania, DRC Congo, Kenya'),
             const SizedBox(height: 10),
             _field('Transfer amount (\$) *', _priceC, isDark, onChanged: (_) => _resetCashApp()),
             const SizedBox(height: 10),
@@ -618,8 +618,8 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
                 children: [
                   Text(
                     amount < kNgmyHelpCenterMoneyTransferMinAmount
-                        ? 'NGMY service fee — \$2 flat (under \$30)'
-                        : 'NGMY service fee — 5%',
+                        ? 'NGMY service fee \$2 flat (under \$30)'
+                        : 'NGMY service fee 7%',
                     style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: isDark ? Colors.amber : const Color(0xFFB45309)),
                   ),
                   const SizedBox(height: 6),
