@@ -1451,6 +1451,7 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
 /// Fast path — local + ngmy_settings only (opens management panels instantly).
 Future<void> ngmyAdminRefreshManagementConfigLight(AppConfig config) async {
   await ngmyHydrateManagementListsFromAllBackups(config);
+  await ngmyHydrateHelpCenterHubFromAllBackups(config);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
 }
 
@@ -1552,4 +1553,55 @@ Future<void> _refreshPopupsFromCloudStatic(AppConfig config) async {
   } catch (e) {
     debugPrint('[admin mgmt] popups refresh: $e');
   }
+}
+
+const String _kNgmyHelpCenterSettingsKey = 'help_center_hub_settings';
+const String _kNgmyHelpCenterPrefsKey = 'ngmy_help_center_hub_settings_v1';
+
+Map<String, dynamic> _helpCenterHubPayload(AppConfig config) => Map<String, dynamic>.from(config.helpCenterHub);
+
+void _applyHelpCenterHubPayload(AppConfig config, Map<String, dynamic> payload) {
+  if (payload.isEmpty) return;
+  config.helpCenterHub = Map<String, dynamic>.from(payload);
+}
+
+Future<void> _persistHelpCenterHubLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyHelpCenterPrefsKey, jsonEncode(_helpCenterHubPayload(config)));
+  } catch (e) {
+    debugPrint('[help center] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateHelpCenterHubFromAllBackups(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyHelpCenterPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyHelpCenterHubPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[help center] local hydrate: $e');
+  }
+  if (config.helpCenterHub.isEmpty) {
+    config.helpCenterHub = NgmyHelpCenterConfig.defaults().toMap();
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyHelpCenterSettingsKey);
+    if (row != null && row.isNotEmpty) _applyHelpCenterHubPayload(config, row);
+  }
+}
+
+Future<bool> ngmyPersistHelpCenterHubSettings(AppConfig config) async {
+  await _persistHelpCenterHubLocal(config);
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyHelpCenterSettingsKey, _helpCenterHubPayload(config));
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
 }

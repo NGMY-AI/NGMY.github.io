@@ -95,6 +95,9 @@ import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_studio_hub.dart';
+import 'ngmy_help_center.dart';
+import 'ngmy_help_center_ui.dart';
+import 'ngmy_help_center_admin.dart';
 import 'ngmy_loans.dart';
 import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_civic_read_state.dart';
@@ -335,6 +338,7 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
 
     if (config != null) {
       await ngmyHydrateCommunicateSettingsFromAllBackups(config);
+      await ngmyHydrateHelpCenterHubFromAllBackups(config);
     } else {
       await NgmyCommunicateAvatarCache.hydrateRamFromDisk();
     }
@@ -1152,6 +1156,7 @@ class AppConfig {
   List<Map<String, dynamic>> helpHelperApplications;
   List<Map<String, dynamic>> helpRequests;
   List<Map<String, dynamic>> helpBusinesses;
+  Map<String, dynamic> helpCenterHub;
   int maxMediaPostsPerWeek;
   /// Max NGMY Helper AI user messages per rolling 24h (0 = unlimited).
   int ngmyHelperDailyMessageLimit;
@@ -1276,6 +1281,7 @@ class AppConfig {
     this.helpHelperApplications = const [],
     this.helpRequests = const [],
     this.helpBusinesses = const [],
+    Map<String, dynamic>? helpCenterHub,
     this.maxMediaPostsPerWeek = 3,
     this.ngmyHelperDailyMessageLimit = kNgmyHelperDefaultDailyMessageLimit,
     this.investmentPlans = const [],
@@ -1377,7 +1383,8 @@ class AppConfig {
         ngmyPopups = ngmyPopups ?? NgmyPopupDefaults.allDefaultPopups(),
         ngmyVideoPopups = ngmyVideoPopups ?? NgmyPopupDefaults.buildVideoPopups(),
         mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(mediaVirtualProfiles),
-        mediaDeliveryQueue = mediaDeliveryQueue ?? const [];
+        mediaDeliveryQueue = mediaDeliveryQueue ?? const [],
+        helpCenterHub = helpCenterHub ?? NgmyHelpCenterConfig.defaults().toMap();
   Map<String, dynamic> toJson() => {
     'officialCashApp': officialCashApp,
     'officialBitcoin': officialBitcoin,
@@ -1414,6 +1421,7 @@ class AppConfig {
     'helpHelperApplications': helpHelperApplications,
     'helpRequests': helpRequests,
     'helpBusinesses': helpBusinesses,
+    'helpCenterHub': helpCenterHub,
     'maxMediaPostsPerWeek': maxMediaPostsPerWeek,
     'ngmyHelperDailyMessageLimit': ngmyHelperDailyMessageLimit,
     'investmentPlans': investmentPlans,
@@ -1530,6 +1538,9 @@ class AppConfig {
     helpHelperApplications: List<Map<String, dynamic>>.from((json['helpHelperApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     helpRequests: List<Map<String, dynamic>>.from((json['helpRequests'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     helpBusinesses: List<Map<String, dynamic>>.from((json['helpBusinesses'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
+    helpCenterHub: json['helpCenterHub'] is Map && (json['helpCenterHub'] as Map).isNotEmpty
+        ? Map<String, dynamic>.from(json['helpCenterHub'] as Map)
+        : NgmyHelpCenterConfig.defaults().toMap(),
     maxMediaPostsPerWeek: json['maxMediaPostsPerWeek'] ?? 3,
     ngmyHelperDailyMessageLimit: (json['ngmyHelperDailyMessageLimit'] as num?)?.toInt() ?? kNgmyHelperDefaultDailyMessageLimit,
     investmentPlans: List<Map<String, dynamic>>.from((json['investmentPlans'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
@@ -7067,6 +7078,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
     await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
+    await ngmyHydrateHelpCenterHubFromAllBackups(_config);
     await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
     await ngmyHydrateWalletPaymentsFromAllBackups(_config);
     await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
@@ -10422,6 +10434,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
     await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
+    await ngmyHydrateHelpCenterHubFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
@@ -10683,6 +10696,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
     await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
+    await ngmyHydrateHelpCenterHubFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
@@ -19033,6 +19047,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => unawaited(_openJobApplicationsAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingJobWorkerApplications(widget.config.jobWorkerApplications)),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => unawaited(_openPopupsAdmin(isDark)), isDark),
             _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => unawaited(_openGamesAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingGameInvites(widget.config.gameInvites)),
+            _menuFrame('Help Center', Icons.support_agent_rounded, const Color(0xFF00B4D8), () => unawaited(_openHelpCenterAdmin(isDark)), isDark),
           ],
         ),
         const SizedBox(height: 28),
@@ -19101,6 +19116,31 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _openGamesAdmin(bool isDark) async {
     _showGamesAdmin(isDark);
     unawaited(_refreshManagementInBackground());
+  }
+
+  Future<void> _openHelpCenterAdmin(bool isDark) async {
+    _showHelpCenterAdmin(isDark);
+    unawaited(_refreshManagementInBackground());
+  }
+
+  void _showHelpCenterAdmin(bool isDark) {
+    showNgmyHelpCenterAdminSheet(
+      context: context,
+      isDark: isDark,
+      initialConfig: widget.config.helpCenterHub,
+      onSave: (map) async {
+        widget.config.helpCenterHub = Map<String, dynamic>.from(map);
+        widget.onDataChanged();
+        final ok = await ngmyPersistHelpCenterHubSettings(widget.config);
+        if (!context.mounted) return ok;
+        ngmyAdminShowCloudSaveSnackBar(
+          context,
+          cloudOk: ok,
+          success: 'Help Center saved for all users.',
+        );
+        return ok;
+      },
+    );
   }
 
   void _showGamesAdmin(bool isDark) {
@@ -25431,10 +25471,9 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     () => NgmyNavigator.push(
                       context,
                       NgmyHelpCenterScreen(
-                        user: widget.user,
-                        allUsers: widget.allUsers,
-                        config: widget.config,
-                        onDataChanged: widget.onDataChanged,
+                        configMap: widget.config.helpCenterHub,
+                        clientName: widget.user.username.trim().isNotEmpty ? widget.user.username.trim() : widget.user.email,
+                        clientEmail: widget.user.email,
                       ),
                       routeName: 'NgmyHelpCenterScreen',
                     ),
@@ -37757,33 +37796,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       itemCount: items.length,
       itemBuilder: (_, i) => _listingCard(items[i], showBuy: showBuy, showManage: showManage),
-    );
-  }
-}
-
-class NgmyHelpCenterScreen extends StatelessWidget {
-  final UserData user;
-  final List<UserData> allUsers;
-  final AppConfig config;
-  final VoidCallback onDataChanged;
-
-  const NgmyHelpCenterScreen({super.key, required this.user, required this.allUsers, required this.config, required this.onDataChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return NgmyComingSoonScreen(
-      title: 'Help Center',
-      icon: Icons.volunteer_activism_rounded,
-      message: 'Help Center is being rebuilt with a lighter, faster experience.',
-      appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded), onPressed: () => NgmyNavigator.pop(context)),
-        title: const Text('Help Center', style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: isDark ? Colors.white : Colors.black87,
-      ),
     );
   }
 }
