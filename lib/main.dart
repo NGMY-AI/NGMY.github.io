@@ -551,6 +551,8 @@ String formatCurrency(double amount) {
 
 String ngmyNormalizeEmail(String email) => email.toLowerCase().trim();
 
+const int kNgmyUserTxnFetchMax = 5000;
+
 bool _ngmyTxnIncreasesBalance(AppTransaction t) {
   return t.type == TransactionType.deposit ||
       t.type == TransactionType.adminAdd ||
@@ -597,6 +599,9 @@ double ngmyResolveAccountBalance(String email, double storedBalance, List<AppTra
   if (txnCount == 0) return storedBalance.clamp(0.0, double.infinity);
   // Local txn cache may be truncated — keep cloud-stored balance when ledger would under-report.
   if (storedBalance > ledger + 0.01) return storedBalance.clamp(0.0, double.infinity);
+  if (txnCount >= kNgmyUserTxnFetchMax && (storedBalance - ledger).abs() > 0.01) {
+    return storedBalance.clamp(0.0, double.infinity);
+  }
   return ledger;
 }
 
@@ -1111,6 +1116,26 @@ Future<bool> _safeUpsertTransactionRows(
         continue;
       }
       debugPrint('[transactions] upsert error: $e');
+      return false;
+    }
+  }
+  return false;
+}
+
+Future<bool> _safeUpsertUserRow(Map<String, dynamic> row) async {
+  if (row.isEmpty) return true;
+  var working = Map<String, dynamic>.from(row);
+  for (var i = 0; i < 12; i++) {
+    try {
+      await Supabase.instance.client.from('users').upsert(working).timeout(kNgmyCloudWriteTimeout);
+      return true;
+    } catch (e) {
+      final missing = _missingColumnFromPostgrestError(e) ?? _missingColumnFromError(e);
+      if (missing != null && missing.isNotEmpty) {
+        working.remove(missing);
+        continue;
+      }
+      debugPrint('[users] upsert error: $e');
       return false;
     }
   }
@@ -3013,14 +3038,16 @@ Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
   }
 }
 
-Future<void> _pushUserToCloudFast(UserData u, {bool includeFreeTrial = false}) async {
-  if (!await ngmyCanReachCloud()) return;
-  try {
-    await Supabase.instance.client.from('users').upsert(_userRowForBulkSync(u, includeFreeTrial: includeFreeTrial));
-    unawaited(ngmyRegisterReferralCodesForUser(u));
-  } catch (e) {
-    debugPrint('[user] fast upsert: $e');
+Future<bool> _pushUserToCloudFast(UserData u, {bool includeFreeTrial = false}) async {
+  if (!await ngmyCanReachCloud()) return false;
+  final row = _userRowForBulkSync(u, includeFreeTrial: includeFreeTrial);
+  final photo = (row['profilePicturePath'] ?? '').toString().trim();
+  if (photo.startsWith('data:image')) {
+    row.remove('profilePicturePath');
   }
+  final ok = await _safeUpsertUserRow(row);
+  if (ok) unawaited(ngmyRegisterReferralCodesForUser(u));
+  return ok;
 }
 
 Future<bool> _pushUserMediaProfileFast(UserData u) async {
@@ -4812,6 +4839,23 @@ String ngmyUserDisplayAccountId(UserData u) {
 
 final Map<String, ImageProvider> _ngmyProfileImageCache = {};
 
+bool _ngmyIsCloudProfilePhoto(String? path) {
+  final t = (path ?? '').trim();
+  return t.startsWith('http') || t.startsWith('supabase://') || t.startsWith('blob:');
+}
+
+String? ngmyProfileImageNetworkUrl(String? path) {
+  if (path == null || path.trim().isEmpty) return null;
+  final src = path.trim();
+  if (src.startsWith('supabase://')) {
+    final ref = _parseSupabaseStorageRef(src);
+    if (ref == null) return null;
+    return Supabase.instance.client.storage.from(ref.bucket).getPublicUrl(ref.path);
+  }
+  if (src.startsWith('http') || src.startsWith('blob:')) return src;
+  return null;
+}
+
 ImageProvider? ngmyCachedProfileImage(String? path) {
   if (path == null || path.trim().isEmpty) return null;
   final src = path.trim();
@@ -4822,9 +4866,9 @@ ImageProvider? ngmyCachedProfileImage(String? path) {
       return null;
     }
   }
-  if (src.startsWith('blob:') || src.startsWith('http')) {
-    if (kIsWeb) return NetworkImage(src);
-    return null;
+  final networkUrl = ngmyProfileImageNetworkUrl(src);
+  if (networkUrl != null && networkUrl.isNotEmpty) {
+    return _ngmyProfileImageCache.putIfAbsent(networkUrl, () => NetworkImage(networkUrl));
   }
   if (!kIsWeb) return FileImage(File(src));
   return null;
@@ -5729,6 +5773,29 @@ Future<String> _adminUploadVirtualProfilePic(String src) async {
     return upload.ref ?? src;
   } catch (_) {
     return src;
+  }
+}
+
+Future<String?> _uploadUserProfileAvatar({required String email, required Uint8List bytes}) async {
+  final key = ngmyNormalizeEmail(email);
+  if (key.isEmpty) return null;
+  final safeKey = key.replaceAll(RegExp(r'[^a-z0-9@._-]'), '_');
+  final path = 'avatars/$safeKey.jpg';
+  final upload = await _uploadNgmyMediaBytes(bytes: bytes, storagePath: path, contentType: 'image/jpeg');
+  return upload.ref;
+}
+
+Future<void> _maybeUploadLocalProfilePhotoToCloud(UserData u) async {
+  final photo = (u.profilePicturePath ?? '').trim();
+  if (!photo.startsWith('data:image')) return;
+  try {
+    final bytes = base64Decode(photo.split(',').last);
+    final ref = await _uploadUserProfileAvatar(email: u.email, bytes: bytes);
+    if (ref == null || ref.isEmpty) return;
+    u.profilePicturePath = ref;
+    await _pushUserToCloudFast(u);
+  } catch (e) {
+    debugPrint('[user] profile avatar migrate: $e');
   }
 }
 
@@ -7167,6 +7234,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     unawaited(_pushUserToCloudFast(_currentUser!, includeFreeTrial: true));
     _restartSyncLoopsForCurrentUser();
     unawaited(_refreshUserTransactionsFromCloud(force: true));
+    unawaited(_refreshCurrentUserFromCloud());
+    unawaited(_maybeUploadLocalProfilePhotoToCloud(_currentUser!));
   }
 
   Future<void> _pushReferralPairToCloud(UserData invitee, String referrerEmail) async {
@@ -7281,30 +7350,40 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final raw = email.trim();
     final key = ngmyNormalizeEmail(raw);
     if (key.isEmpty) return [];
-    dynamic transData;
-    try {
-      transData = await supabase
-          .from('transactions')
-          .select()
-          .ilike('userEmail', key)
-          .order('timestamp', ascending: false)
-          .limit(500)
-          .timeout(kNgmyCloudLoadTimeout);
-    } catch (e) {
-      debugPrint('[user] txn ilike fetch: $e');
-      transData = await supabase
-          .from('transactions')
-          .select()
-          .eq('userEmail', raw)
-          .order('timestamp', ascending: false)
-          .limit(500)
-          .timeout(kNgmyCloudLoadTimeout);
+    const pageSize = 1000;
+    final all = <AppTransaction>[];
+    var offset = 0;
+    while (offset < kNgmyUserTxnFetchMax) {
+      final limit = math.min(pageSize, kNgmyUserTxnFetchMax - offset);
+      dynamic transData;
+      try {
+        transData = await supabase
+            .from('transactions')
+            .select()
+            .ilike('userEmail', key)
+            .order('timestamp', ascending: false)
+            .range(offset, offset + limit - 1)
+            .timeout(kNgmyCloudLoadTimeout);
+      } catch (e) {
+        debugPrint('[user] txn ilike fetch: $e');
+        transData = await supabase
+            .from('transactions')
+            .select()
+            .eq('userEmail', raw)
+            .order('timestamp', ascending: false)
+            .range(offset, offset + limit - 1)
+            .timeout(kNgmyCloudLoadTimeout);
+      }
+      if (transData == null) break;
+      final batch = (transData as List)
+          .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e as Map)))
+          .where((t) => ngmyNormalizeEmail(t.userEmail) == key)
+          .toList();
+      all.addAll(batch);
+      if (batch.length < limit) break;
+      offset += batch.length;
     }
-    if (transData == null) return [];
-    return (transData as List)
-        .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e as Map)))
-        .where((t) => ngmyNormalizeEmail(t.userEmail) == key)
-        .toList();
+    return all;
   }
 
   Future<List<AppTransaction>> _fetchCloudApprovedContributions() => ngmyFetchApprovedContributionsFromCloud();
@@ -7635,6 +7714,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final rowMap = Map<String, dynamic>.from(row);
       final remote = UserData.fromJson(rowMap);
       final key = email.toLowerCase().trim();
+      await _maybeUploadLocalProfilePhotoToCloud(_currentUser!);
+      if (!mounted) return;
       setState(() {
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
         if (idx >= 0) {
@@ -10126,6 +10207,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               // Local session owns balance during our own cloud write — avoid swapping in a stale user row.
               ngmyReconcileUserAccountBalance(_currentUser!, _allTransactions);
               ngmySyncLiveBalanceFor(_currentUser!.email, _currentUser!.accountBalance);
+              final remotePhoto = (updatedUser.profilePicturePath ?? '').trim();
+              if (_ngmyIsCloudProfilePhoto(remotePhoto)) {
+                _currentUser!.profilePicturePath = updatedUser.profilePicturePath;
+                final uIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+                if (uIdx >= 0) _allUsers[uIdx].profilePicturePath = updatedUser.profilePicturePath;
+              }
             } else {
               updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
               _preserveLocalSessionState(_currentUser!, updatedUser);
@@ -10309,7 +10396,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     final localPhoto = (local.profilePicturePath ?? '').trim();
     final remotePhoto = (remote.profilePicturePath ?? '').trim();
-    if (localPhoto.isNotEmpty && (remotePhoto.isEmpty || (localPhoto.startsWith('data:image') && remotePhoto != localPhoto))) {
+    if (_ngmyIsCloudProfilePhoto(remotePhoto)) {
+      // Cloud URL is the cross-device source of truth.
+    } else if (_ngmyIsCloudProfilePhoto(localPhoto)) {
+      remote.profilePicturePath = local.profilePicturePath;
+    } else if (localPhoto.isNotEmpty && remotePhoto.isEmpty) {
       remote.profilePicturePath = local.profilePicturePath;
     }
     _mergeUserMediaProfileFields(local, remote);
@@ -11054,7 +11145,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await _syncAdminOperationalToCloud();
       } else {
         if (_currentUser != null) {
-          await _pushUserToCloudFast(_currentUser!);
+          final pushed = await _pushUserToCloudFast(_currentUser!);
+          if (pushed) {
+            _dirtyUserEmails.remove(userEmail);
+          }
         }
         if (userEmail.isNotEmpty) {
           final mine = _allTransactions
@@ -23991,6 +24085,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _referralInputC = TextEditingController();
   ImageProvider? _profileAvatar;
   String _profileAvatarPath = '';
+  bool _profileAvatarUploading = false;
   String? _referralPreviewName;
   bool _referralPreviewInvalid = false;
   bool _referralSubmitting = false;
@@ -24427,17 +24522,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(children: [
       const FloatingTitle(title: 'MY PROFILE'), const SizedBox(height: 30),
       GestureDetector(
-        onTap: () async {
+        onTap: _profileAvatarUploading
+            ? null
+            : () async {
           final img = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 78, maxWidth: 1000);
-          if (img != null) {
-            final bytes = await img.readAsBytes();
-            final value = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+          if (img == null || !mounted) return;
+          final bytes = await img.readAsBytes();
+          final localPreview = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+          setState(() {
+            _profileAvatarUploading = true;
+            widget.user.profilePicturePath = localPreview;
+            _profileAvatarPath = localPreview;
+            _profileAvatar = ngmyCachedProfileImage(localPreview);
+          });
+          final cloudRef = await _uploadUserProfileAvatar(email: widget.user.email, bytes: bytes);
+          if (!mounted) return;
+          if (cloudRef != null && cloudRef.isNotEmpty) {
             setState(() {
-              widget.user.profilePicturePath = value;
-              _profileAvatarPath = value;
-              _profileAvatar = ngmyCachedProfileImage(value);
+              widget.user.profilePicturePath = cloudRef;
+              _profileAvatarPath = cloudRef;
+              _profileAvatar = ngmyCachedProfileImage(cloudRef);
+              _profileAvatarUploading = false;
             });
             widget.onDataChanged();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile photo saved to your account'), behavior: SnackBarBehavior.floating),
+            );
+          } else {
+            setState(() => _profileAvatarUploading = false);
+            widget.onDataChanged();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Photo saved on this device — cloud upload failed. Try again when online.'), behavior: SnackBarBehavior.floating),
+            );
           }
         },
         child: RepaintBoundary(
@@ -24473,6 +24589,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           if (widget.user.status == 'verified') Positioned(bottom: 0, right: 0, child: Container(padding: const EdgeInsets.all(2), decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: const Icon(Icons.verified, color: Colors.blue, size: 24))),
           if (widget.user.status != 'active' && widget.user.status != 'verified') Positioned(top: 0, right: 0, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)), child: Text(widget.user.status.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)))),
+          if (_profileAvatarUploading)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
+                child: const Center(child: SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))),
+              ),
+            ),
         ]),
         ),
       ),
@@ -24507,11 +24630,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           child: Column(
             children: [
-              _row(Icons.person_outline, 'Username', widget.user.username),
+              _row(Icons.person_outline, 'Username', widget.user.username, copyText: widget.user.username),
               const SizedBox(height: 10),
-              _row(Icons.email_outlined, 'Email', widget.user.email),
+              _row(Icons.email_outlined, 'Email', widget.user.email, copyText: widget.user.email),
               const SizedBox(height: 10),
-              _row(Icons.phone_android_outlined, 'Phone', widget.user.phone.isEmpty ? 'Not set' : widget.user.phone),
+              _row(Icons.phone_android_outlined, 'Phone', widget.user.phone.isEmpty ? 'Not set' : widget.user.phone, copyText: widget.user.phone.isEmpty ? null : widget.user.phone),
             ],
           ),
         ),
@@ -24933,7 +25056,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       },
     );
   }
-  Widget _row(IconData i, String l, String v) => Container(
+  Future<void> _copyProfileField(String label, String value) async {
+    if (value.trim().isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: value.trim()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$label copied'), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  Widget _row(IconData i, String l, String v, {String? copyText}) => Container(
     width: double.infinity,
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     decoration: BoxDecoration(
@@ -24954,6 +25086,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         ),
+        if (copyText != null && copyText.trim().isNotEmpty)
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            tooltip: 'Copy $l',
+            icon: const Icon(Icons.copy_rounded, size: 18, color: Colors.grey),
+            onPressed: () => _copyProfileField(l, copyText),
+          ),
       ],
     ),
   );
