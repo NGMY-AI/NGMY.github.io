@@ -4523,11 +4523,12 @@ const kNgmyAdminEmails = <String>[
 
 bool ngmyEmailIsAdmin(String email) => kNgmyAdminEmails.contains(email.toLowerCase().trim());
 
-/// App sign-up users only — excludes Civic Registry members from admin Users list.
-bool ngmyIsAppSignupUser(UserData u, [AppConfig? config]) {
-  if (u.isEnrolledInRegistry) return false;
-  if (config != null && NgmyCivicRegistryMembers.isEnrolled(config, u.email)) return false;
-  return u.email.trim().isNotEmpty;
+/// Every NGMY app account with an email. Civic-only registry entries are not in [allUsers].
+bool ngmyIsAppSignupUser(UserData u, [AppConfig? config]) => u.email.trim().isNotEmpty;
+
+List<String> ngmyGamePaywallMissedDays(UserData user) {
+  NgmyClockInMissPolicy.rolloverMonthIfNeeded(user);
+  return List<String>.from(user.clockInMissedDays.map((e) => e.toString()));
 }
 
 int _ngmyMinutesSinceMidnight(DateTime now) {
@@ -14313,8 +14314,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Future<void> _openGameCenter() async {
     if (!NgmyGameAccess.hasActiveInvestment(widget.user)) {
-      if (await NgmyGameAccess.freePlayUsed(widget.user.email)) {
-        await NgmyGameInvestmentPaywall.show(context, onGoToInvest: widget.onOpenInvest);
+      if (!await NgmyGameAccess.canStartGame(widget.user)) {
+        await NgmyGameInvestmentPaywall.show(
+          context,
+          onGoToInvest: widget.onOpenInvest,
+          missedDays: ngmyGamePaywallMissedDays(widget.user),
+        );
         return;
       }
     }
@@ -15603,8 +15608,22 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
   Timer? _invitePoll;
   List<Map<String, dynamic>> _liveInvites = [];
   Map<String, String> _emailToUsername = {};
+  bool _showInvestmentGate = false;
+  bool _gateChecked = false;
 
   int get _sessionPointsEarned => _sessionGamesPlayed * 20;
+
+  List<String> get _missedDaysForPaywall => ngmyGamePaywallMissedDays(widget.user);
+
+  Future<void> _evaluateGameGate() async {
+    final blocked = !NgmyGameAccess.hasActiveInvestment(widget.user) &&
+        !await NgmyGameAccess.canStartGame(widget.user);
+    if (!mounted) return;
+    setState(() {
+      _showInvestmentGate = blocked;
+      _gateChecked = true;
+    });
+  }
 
   Future<void> _loadUsernameMap() async {
     final map = await ngmyLoadEmailToUsernameMap();
@@ -15619,6 +15638,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
     _liveInvites = widget.config.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
     unawaited(_loadUsernameMap());
     unawaited(_refreshInvites());
+    unawaited(_evaluateGameGate());
     _invitePoll = Timer.periodic(const Duration(seconds: 15), (_) => _refreshInvites());
   }
 
@@ -15692,14 +15712,21 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
       }
     }
     if (!await NgmyGameAccess.canStartGame(widget.user)) {
-      await NgmyGameInvestmentPaywall.show(context, onGoToInvest: widget.onGoToInvest);
+      await NgmyGameInvestmentPaywall.show(
+        context,
+        onGoToInvest: widget.onGoToInvest,
+        missedDays: _missedDaysForPaywall,
+      );
       return;
     }
-    final markFreePlayIfNeeded = () {
+    final markFreePlayIfNeeded = () async {
       if (!NgmyGameAccess.hasActiveInvestment(widget.user)) {
-        unawaited(NgmyGameAccess.markFreePlayUsed(widget.user.email));
+        await NgmyGameAccess.markFreePlayUsed(widget.user.email);
+        if (mounted) {
+          setState(() => _showInvestmentGate = true);
+        }
       }
-      setState(() => _sessionGamesPlayed++);
+      if (mounted) setState(() => _sessionGamesPlayed++);
     };
     if (g.id == 'dice') {
       NgmyNavigator.push(
@@ -15709,7 +15736,9 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
           config: widget.config,
           onAddTransaction: widget.onAddTransaction,
           onDataChanged: widget.onDataChanged,
-          onGameStarted: markFreePlayIfNeeded,
+          onGameStarted: () => unawaited(markFreePlayIfNeeded()),
+          onGoToInvest: widget.onGoToInvest,
+          missedDays: _missedDaysForPaywall,
         ),
         routeName: kRouteDiceGame,
       );
@@ -15726,10 +15755,20 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
         colors: g.colors,
         onAddTransaction: widget.onAddTransaction,
         onDataChanged: widget.onDataChanged,
-        onGameStarted: markFreePlayIfNeeded,
+        onGameStarted: () => unawaited(markFreePlayIfNeeded()),
+        onGoToInvest: widget.onGoToInvest,
         inviteId: inviteId,
       ),
       routeName: kRouteGameBet,
+    );
+  }
+
+  Widget _investmentGatePage() {
+    return NgmyGameInvestmentPaywall(
+      fullPage: true,
+      missedDays: _missedDaysForPaywall,
+      onGoToInvest: widget.onGoToInvest,
+      onBack: _exitGameCenter,
     );
   }
 
@@ -15890,6 +15929,15 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
 
   @override
   Widget build(BuildContext context) {
+    if (!_gateChecked) {
+      return ngmyGameScreenShell(
+        backgroundColor: const Color(0xFF2B1454),
+        child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+    }
+    if (_showInvestmentGate) {
+      return _investmentGatePage();
+    }
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, _) {
@@ -16018,12 +16066,16 @@ class _NgmyDiceGameHost extends StatefulWidget {
   final Function(AppTransaction) onAddTransaction;
   final VoidCallback onDataChanged;
   final VoidCallback onGameStarted;
+  final VoidCallback? onGoToInvest;
+  final List<String> missedDays;
   const _NgmyDiceGameHost({
     required this.user,
     required this.config,
     required this.onAddTransaction,
     required this.onDataChanged,
     required this.onGameStarted,
+    this.onGoToInvest,
+    this.missedDays = const [],
   });
 
   @override
@@ -16058,9 +16110,19 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
         setState(() {});
       },
       onChargeBet: (bet, note) {
+        if (!NgmyGameAccess.hasActiveInvestment(widget.user)) {
+          if (NgmyGameAccess.sessionFreePlayConsumed(widget.user.email)) {
+            unawaited(NgmyGameInvestmentPaywall.show(
+              context,
+              onGoToInvest: widget.onGoToInvest,
+              missedDays: widget.missedDays,
+            ));
+            return false;
+          }
+          unawaited(NgmyGameAccess.markFreePlayUsed(widget.user.email));
+        }
         if (widget.user.accountBalance < bet) return false;
         widget.user.points += 20;
-        // Every successful roll/bet counts as a game (+20 points each time).
         widget.onGameStarted();
         widget.onAddTransaction(
           AppTransaction(
@@ -16106,6 +16168,7 @@ class GameBetScreen extends StatefulWidget {
   final Function(AppTransaction) onAddTransaction;
   final VoidCallback onDataChanged;
   final VoidCallback onGameStarted;
+  final VoidCallback? onGoToInvest;
   final String? inviteId;
   const GameBetScreen({
     super.key,
@@ -16118,6 +16181,7 @@ class GameBetScreen extends StatefulWidget {
     required this.onAddTransaction,
     required this.onDataChanged,
     required this.onGameStarted,
+    this.onGoToInvest,
     this.inviteId,
   });
 
@@ -16142,8 +16206,17 @@ class _GameBetScreenState extends State<GameBetScreen> with NgmyBalanceListener 
     super.dispose();
   }
 
-  void _startGame() {
+  void _startGame() async {
     unawaited(NgmyIncomeSound.unlockForWebUserGesture());
+    if (!await NgmyGameAccess.canStartGame(widget.user)) {
+      if (!mounted) return;
+      await NgmyGameInvestmentPaywall.show(
+        context,
+        onGoToInvest: widget.onGoToInvest,
+        missedDays: ngmyGamePaywallMissedDays(widget.user),
+      );
+      return;
+    }
     if (widget.inviteId != null && widget.inviteId!.trim().isNotEmpty) {
       final inv = findInviteById(widget.config.gameInvites, widget.inviteId!.trim());
       if (inv != null && inviteSeriesComplete(inv)) {
@@ -20896,7 +20969,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   List<UserData> _adminAppSignupUsers() =>
-      widget.allUsers.where((u) => ngmyIsAppSignupUser(u, widget.config)).toList();
+      widget.allUsers.where(ngmyIsAppSignupUser).toList();
 
   Widget _adminUsers(bool isDark) {
     for (final u in widget.allUsers) {
@@ -20923,7 +20996,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       Padding(
         padding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
         child: Text(
-          'App sign-ups only (${filtered.length} users) — Civic Registry members are managed in Civic Registry.',
+          'All NGMY accounts (${filtered.length} users) — balances from wallet ledger + cloud sync.',
           style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
         ),
       ),
@@ -30220,7 +30293,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _enrollSection(bool isDark) {
     final availableAppUsers = widget.allUsers.where((u) =>
-      ngmyIsAppSignupUser(u, widget.config) &&
+      ngmyIsAppSignupUser(u) &&
       !NgmyCivicRegistryMembers.isEnrolled(widget.config, u.email) &&
       (u.username.toLowerCase().contains(_enrollSearchC.text.toLowerCase()) ||
        u.email.toLowerCase().contains(_enrollSearchC.text.toLowerCase()))
