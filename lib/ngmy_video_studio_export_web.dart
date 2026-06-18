@@ -220,6 +220,43 @@ int? _sampleCanvasPixel(html.CanvasRenderingContext2D ctx, int x, int y) {
 
 html.VideoElement? _exportAudioElement;
 html.VideoElement? _ngmyWebAudioSourceVideo;
+Object? _ngmyExportAudioContext;
+
+Future<void> _resumeExportAudioContext() async {
+  try {
+    final ctor = js_util.getProperty(html.window, 'AudioContext') ??
+        js_util.getProperty(html.window, 'webkitAudioContext');
+    if (ctor == null) return;
+    final ctxObj = (_ngmyExportAudioContext ?? js_util.callConstructor(ctor, const [])) as Object;
+    _ngmyExportAudioContext = ctxObj;
+    final state = js_util.getProperty(ctxObj, 'state');
+    if (state == 'suspended') {
+      await js_util.promiseToFuture(js_util.callMethod(ctxObj, 'resume', const []));
+    }
+  } catch (e) {
+    debugPrint('[studio export] AudioContext resume: $e');
+  }
+}
+
+Future<void> _waitNextVideoFrame(html.VideoElement? video) async {
+  if (video == null) {
+    await Future<void>.delayed(const Duration(milliseconds: 33));
+    return;
+  }
+  if (js_util.hasProperty(video, 'requestVideoFrameCallback')) {
+    final done = Completer<void>();
+    js_util.callMethod(video, 'requestVideoFrameCallback', [
+      js_util.allowInterop((_, __) {
+        if (!done.isCompleted) done.complete();
+      }),
+    ]);
+    try {
+      await done.future.timeout(const Duration(milliseconds: 120));
+      return;
+    } catch (_) {}
+  }
+  await _waitVideoFrameReady(video);
+}
 
 void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH}) {
   // iOS Safari freezes off-screen videos — keep in viewport at near-zero opacity.
@@ -250,6 +287,7 @@ void _cleanupExportElements() {
   } catch (_) {}
   _exportAudioElement = null;
   _ngmyWebAudioSourceVideo = null;
+  _ngmyExportAudioContext = null;
 }
 
 Future<html.VideoElement?> _ensureExportAudioElement(html.VideoElement source) async {
@@ -271,10 +309,15 @@ Future<html.VideoElement?> _ensureExportAudioElement(html.VideoElement source) a
   }
   html.document.body?.append(el);
   _stageHiddenVideoElement(el);
-  for (var i = 0; i < 80; i++) {
+  for (var i = 0; i < 120; i++) {
     if (el.readyState >= html.MediaElement.HAVE_METADATA) break;
     await Future<void>.delayed(const Duration(milliseconds: 100));
   }
+  try {
+    await el.play().timeout(const Duration(seconds: 1));
+    el.pause();
+    el.currentTime = 0;
+  } catch (_) {}
   _exportAudioElement = el;
   return el;
 }
@@ -845,7 +888,7 @@ Future<List<html.Blob>> _recordCanvasExport({
         DateTime.now().isBefore(deadline) &&
         DateTime.now().isBefore(attemptDeadline)) {
       if (_exportWasCancelled) break;
-      await _awaitVideoFramePulse(videoList);
+      await _waitNextVideoFrame(primary);
       paintFrame();
       tick++;
       if (tick % 3 == 0) {
@@ -895,28 +938,7 @@ Future<List<html.Blob>> _recordCanvasExport({
       final ended = primary != null &&
           (primary.ended || primary.currentTime >= durationSec - 0.05);
       if (frozenPaintTicks > frozenLimit && wallMs > startupGraceMs + 1500) {
-        debugPrint('[studio export] frozen canvas — switching to wall-clock capture');
-        for (final v in videoList) {
-          if (withAudio && v == audioVideo) continue;
-          v.pause();
-          v.playbackRate = 1.0;
-        }
-        final elapsedMs = DateTime.now().difference(wallStart).inMilliseconds;
-        final remainingMs = math.max(1500, durationMs - elapsedMs);
-        await _recordWallClockFrames(
-          videoList: videoList,
-          paintFrame: paintFrame,
-          durationSec: remainingMs / 1000.0,
-          wallStart: DateTime.now(),
-          durationMs: remainingMs,
-          onProgress: onProgress,
-          deadline: deadline,
-          withAudio: withAudio,
-          audioVideo: audioVideo,
-          totalDurationSec: durationSec,
-          totalDurationMs: durationMs,
-          wallOffsetMs: elapsedMs,
-        );
+        debugPrint('[studio export] frozen canvas — will retry with seek-sync capture');
         break;
       }
       if (ended || t >= durationSec - 0.04 || wallMs >= durationMs || stallTicks > stallLimit) {
@@ -978,58 +1000,79 @@ Future<void> _recordWallClockFrames({
   final startSec = (wallOffsetMs / 1000.0).clamp(0.0, fullSec);
   final primary = audioVideo ?? _pickPrimaryVideo(videoList);
   final useDedicatedAudio = withAudio && _exportAudioElement != null;
+  final fps = _exportFps();
+  final frameMs = (1000 / fps).round().clamp(16, 50);
 
   for (final v in videoList) {
     v.pause();
     v.playbackRate = 1.0;
-    v.currentTime = startSec;
-    if (withAudio && !useDedicatedAudio && v == audioVideo) {
-      v
-        ..muted = false
-        ..volume = 1.0
-        ..defaultMuted = false;
-      v.removeAttribute('muted');
-    } else {
-      v.muted = true;
-    }
-      await _playVideoForRecord(v);
+    v.muted = true;
+    await _seekVideoTo(v, startSec);
   }
-  if (useDedicatedAudio) {
-    if (_exportAudioElement != null) {
-      _exportAudioElement!.currentTime = startSec;
-    }
-    await _syncExportAudioPlayback(primary, playing: true);
-  }
-  await _awaitVideoFramePulse(videoList);
-  paintFrame();
 
+  if (useDedicatedAudio && _exportAudioElement != null) {
+    _exportAudioElement!
+      ..pause()
+      ..currentTime = startSec
+      ..muted = false
+      ..volume = 1.0
+      ..defaultMuted = false;
+    _exportAudioElement!.removeAttribute('muted');
+    await _playVideoForRecord(_exportAudioElement!);
+  } else if (withAudio && audioVideo != null) {
+    audioVideo
+      ..muted = false
+      ..volume = 1.0
+      ..defaultMuted = false;
+    audioVideo.removeAttribute('muted');
+    audioVideo.currentTime = startSec;
+    await _playVideoForRecord(audioVideo);
+  }
+
+  paintFrame();
+  var lastPaintMs = DateTime.now().millisecondsSinceEpoch;
   final segmentEnd = wallStart.add(Duration(milliseconds: durationMs));
   final globalEndMs = wallOffsetMs + durationMs;
-  final attemptEnd = _exportAttemptDeadline(durationSec);
+  final attemptEnd = _exportAttemptDeadline(fullSec);
 
   while (DateTime.now().isBefore(segmentEnd) &&
       DateTime.now().isBefore(deadline) &&
       DateTime.now().isBefore(attemptEnd)) {
     if (_exportWasCancelled) break;
-    await _awaitVideoFramePulse(videoList);
-    if (useDedicatedAudio) {
-      await _syncExportAudioPlayback(primary, playing: true);
-    }
-    paintFrame();
 
     final elapsedMs = DateTime.now().difference(wallStart).inMilliseconds;
     final globalMs = wallOffsetMs + elapsedMs;
-    final t = primary?.currentTime.toDouble() ?? (globalMs / 1000.0);
-    if (elapsedMs > 6000 && t < startSec + 0.08) {
-      debugPrint('[studio export] wall-clock video frozen — aborting');
+    final t = useDedicatedAudio && _exportAudioElement != null
+        ? _exportAudioElement!.currentTime.toDouble()
+        : (withAudio && audioVideo != null
+            ? audioVideo.currentTime.toDouble()
+            : (startSec + elapsedMs / 1000.0));
+
+    for (final v in videoList) {
+      if ((v.currentTime - t).abs() > 0.045) {
+        v.currentTime = t.clamp(0.0, fullSec);
+        await _waitVideoFrameReady(v);
+      }
+    }
+
+    paintFrame();
+
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final wait = frameMs - (nowMs - lastPaintMs);
+    if (wait > 0) {
+      await Future<void>.delayed(Duration(milliseconds: wait));
+    }
+    lastPaintMs = DateTime.now().millisecondsSinceEpoch;
+
+    if (elapsedMs > 6000 && t < startSec + 0.08 && !useDedicatedAudio) {
+      debugPrint('[studio export] seek-sync video frozen — aborting');
       break;
     }
     final p = _exportProgress(fullSec, t, globalMs, fullMs);
     onProgress(p, _ngmyRecordingStatus(p));
 
-    final ended = primary != null &&
-        (primary.ended || primary.currentTime >= fullSec - 0.05);
-    if (ended || globalMs >= globalEndMs - 40 || t >= fullSec - 0.04) break;
+    final ended = primary != null && (primary.ended || t >= fullSec - 0.04);
+    if (ended || globalMs >= globalEndMs - 40) break;
   }
 
   onProgress(0.99, _ngmyRecordingStatus(0.99));
@@ -1047,6 +1090,31 @@ bool _webSupportsComposedCapture() {
 
 (int, int) _exportDimensions(NgmyVideoStudioExportConfig config) => (config.outputWidth, config.outputHeight);
 
+void _appendWebAudioFromVideo(html.MediaStream composed, html.VideoElement video) {
+  if (composed.getAudioTracks().isNotEmpty) return;
+  if (_ngmyWebAudioSourceVideo == video) return;
+  try {
+    final ctor = js_util.getProperty(html.window, 'AudioContext') ??
+        js_util.getProperty(html.window, 'webkitAudioContext');
+    if (ctor == null) return;
+    final ctxObj = (_ngmyExportAudioContext ?? js_util.callConstructor(ctor, const [])) as Object;
+    _ngmyExportAudioContext = ctxObj;
+    final src = js_util.callMethod(ctxObj, 'createMediaElementSource', [video]);
+    _ngmyWebAudioSourceVideo = video;
+    final dest = js_util.callMethod(ctxObj, 'createMediaStreamDestination', const []);
+    js_util.callMethod(src, 'connect', [dest]);
+    final stream = js_util.getProperty(dest, 'stream');
+    if (stream is html.MediaStream) {
+      for (final t in stream.getAudioTracks()) {
+        composed.addTrack(t);
+      }
+    }
+    js_util.callMethod(ctxObj, 'resume', const []);
+  } catch (e) {
+    debugPrint('[studio export] WebAudio audio attach failed: $e');
+  }
+}
+
 void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video) {
   if (composed.getAudioTracks().isNotEmpty) return;
   video
@@ -1054,6 +1122,8 @@ void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video)
     ..volume = 1.0
     ..defaultMuted = false;
   video.removeAttribute('muted');
+  _appendWebAudioFromVideo(composed, video);
+  if (composed.getAudioTracks().isNotEmpty) return;
   try {
     final cap = video.captureStream();
     for (final t in cap.getAudioTracks()) {
@@ -1062,26 +1132,6 @@ void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video)
     }
   } catch (e) {
     debugPrint('[studio export] captureStream audio failed: $e');
-  }
-  if (_ngmyWebAudioSourceVideo == video) return;
-  try {
-    final ctor = js_util.getProperty(html.window, 'AudioContext') ??
-        js_util.getProperty(html.window, 'webkitAudioContext');
-    if (ctor == null) return;
-    final ctx = js_util.callConstructor(ctor, []);
-    final src = js_util.callMethod(ctx, 'createMediaElementSource', [video]);
-    _ngmyWebAudioSourceVideo = video;
-    final dest = js_util.callMethod(ctx, 'createMediaStreamDestination', []);
-    js_util.callMethod(src, 'connect', [dest]);
-    final stream = js_util.getProperty(dest, 'stream');
-    if (stream is html.MediaStream) {
-      for (final t in stream.getAudioTracks()) {
-        composed.addTrack(t);
-      }
-    }
-    js_util.callMethod(ctx, 'resume', []);
-  } catch (e) {
-    debugPrint('[studio export] WebAudio audio attach failed: $e');
   }
 }
 
@@ -1188,6 +1238,7 @@ Future<String> exportNgmyVideoStudioComposed({
 }) async {
   _resetExportCancel();
   _cleanupExportElements();
+  await _resumeExportAudioContext();
   final sources = config.videoSourcesBySlot;
   if (sources.isEmpty || sources.values.every((s) => s.trim().isEmpty)) {
     return 'Upload at least one video into a screen frame before downloading.';
@@ -1451,17 +1502,14 @@ Future<String> exportNgmyVideoStudioComposed({
         ? [
             (mime: primaryMime, audio: true, realtime: true),
             (mime: primaryMime, audio: true, realtime: false),
-            (mime: fallbackMime, audio: true, realtime: true),
             (mime: fallbackMime, audio: true, realtime: false),
-            (mime: primaryMime, audio: false, realtime: true),
-            (mime: primaryMime, audio: false, realtime: false),
+            (mime: fallbackMime, audio: true, realtime: true),
           ]
         : [
             (mime: primaryMime, audio: true, realtime: true),
             (mime: primaryMime, audio: true, realtime: false),
-            if (!appleMobile) (mime: primaryMime, audio: false, realtime: true),
-            (mime: primaryMime, audio: false, realtime: false),
             (mime: fallbackMime, audio: true, realtime: false),
+            (mime: primaryMime, audio: false, realtime: false),
             (mime: fallbackMime, audio: false, realtime: false),
           ];
 
@@ -1507,9 +1555,13 @@ Future<String> exportNgmyVideoStudioComposed({
       return _fallbackComposedExport(
         config,
         sources,
-        reason: 'recording produced no data',
+        reason: 'recording produced no data — try Chrome on desktop for smooth export with sound',
         allowRawFallback: false,
       );
+    }
+
+    if (chunks.isNotEmpty && mimeType != null && silentFallbackChunks != null && chunks == silentFallbackChunks) {
+      debugPrint('[studio export] warning: exported without audio track');
     }
 
     final apple = _ngmyIsAppleMobileBrowser();
