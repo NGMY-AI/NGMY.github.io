@@ -8,7 +8,7 @@ import 'ngmy_doc_share_local_server.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_qr_payload.dart';
 import 'ngmy_doc_share_store.dart';
-import 'ngmy_doc_share_webrtc_stub.dart' if (dart.library.html) 'ngmy_doc_share_webrtc_web.dart' as webrtc;
+import 'ngmy_doc_share_webrtc_web.dart' as webrtc;
 
 const String kNgmyDocShareQrPrefixLan = 'NGMYDOCSYNC2';
 const String kNgmyDocShareQrPrefixInline = 'NGMYDOCSYNC0';
@@ -46,6 +46,11 @@ class NgmyDocShareSync {
     }
 
     if (kIsWeb) {
+      final totalBytes = items.fold<int>(0, (s, e) => s + e.sizeBytes);
+      if (totalBytes <= _inlineMaxTotalBytes && items.length <= 3) {
+        final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items);
+        if (inline != null) return inline;
+      }
       final offer = await webrtc.createOfferQr(ownerEmail: ownerEmail, items: items);
       if (offer != null) {
         return (
@@ -88,7 +93,6 @@ class NgmyDocShareSync {
     required String recipientEmail,
     void Function(int received, int total)? onProgress,
   }) {
-    if (!kIsWeb) return Future.value(null);
     return webrtc.beginReceiveOffer(
       raw: raw,
       recipientEmail: recipientEmail,
@@ -115,7 +119,8 @@ class NgmyDocShareSync {
     required String raw,
     void Function(int received, int total)? onProgress,
   }) async {
-    final text = raw.trim();
+    var text = raw.trim();
+    if (text.startsWith('\uFEFF')) text = text.substring(1);
 
     if (text.startsWith('$kNgmyDocShareQrPrefixInline|')) {
       try {
