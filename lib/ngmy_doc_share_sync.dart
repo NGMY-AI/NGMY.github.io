@@ -37,6 +37,10 @@ class NgmyDocShareSync {
   }) async {
     if (items.isEmpty) return null;
 
+    if (items.any((i) => i.isVideo)) {
+      return _createQrForVideos(ownerEmail: ownerEmail, items: items);
+    }
+
     final bundleJson = await exportBundleFile(ownerEmail: ownerEmail, items: items);
     try {
       final decoded = jsonDecode(bundleJson);
@@ -85,6 +89,8 @@ class NgmyDocShareSync {
 
   static Future<void> applyWebRtcAnswer(String raw) => webrtc.applyAnswerQr(raw);
 
+  static Future<String?> pollWebRtcAnswer(String offerToken) => webrtc.pollAnswerForOffer(offerToken);
+
   static Future<({String answerQr, Future<List<NgmyDocShareItem>> transfer})?> beginWebRtcReceive({
     required String raw,
     required String recipientEmail,
@@ -95,6 +101,47 @@ class NgmyDocShareSync {
       recipientEmail: recipientEmail,
       onProgress: onProgress,
     );
+  }
+
+  /// Videos stream over LAN (phone) or WebRTC (web) — never embed file bytes in QR.
+  static Future<NgmyDocShareQrResult?> _createQrForVideos({
+    required String ownerEmail,
+    required List<NgmyDocShareItem> items,
+  }) async {
+    if (!await _itemsReadyForStreamTransfer(ownerEmail, items)) return null;
+
+    if (!kIsWeb) {
+      final lan = await NgmyDocShareLocalServer.start(ownerEmail: ownerEmail, items: items);
+      if (lan != null) {
+        return (
+          qrPayload: lan.qrPayload,
+          fileCount: lan.fileCount,
+          mode: NgmyDocShareQrMode.lanDirect,
+        );
+      }
+    }
+
+    if (kIsWeb) {
+      final qr = await webrtc.createShortOfferQr(ownerEmail: ownerEmail, items: items);
+      if (qr != null) {
+        return (
+          qrPayload: qr,
+          fileCount: items.length,
+          mode: NgmyDocShareQrMode.webrtcLink,
+        );
+      }
+    }
+
+    return null;
+  }
+
+  static Future<bool> _itemsReadyForStreamTransfer(String ownerEmail, List<NgmyDocShareItem> items) async {
+    for (final item in items) {
+      if (item.sizeBytes <= 0) return false;
+      final probe = await NgmyDocShareStore.readByteRange(ownerEmail, item, 0, 1);
+      if (probe == null || probe.isEmpty) return false;
+    }
+    return true;
   }
 
   static Future<NgmyDocShareQrResult?> _tryInlineQr({

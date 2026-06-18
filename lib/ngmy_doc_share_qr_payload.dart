@@ -46,8 +46,11 @@ class NgmyDocShareQrPayload {
   static bool isThickPayload(String data) {
     final t = data.trim();
     return t.startsWith('N2|') ||
+        t.startsWith('NGMYDOCSYNC1|') ||
         t.startsWith('NGMYDOCSYNC2|') ||
         t.startsWith('NGMYDOCSYNC0|') ||
+        t.startsWith('NGMYDOCSYNC3|WR') ||
+        t.startsWith('NGMYDOCSYNC3A|WR') ||
         t.startsWith('http://');
   }
 

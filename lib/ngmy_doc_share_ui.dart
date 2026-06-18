@@ -974,6 +974,45 @@ class _DocShareQrDisplayPage extends StatefulWidget {
 
 class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
   final _qrCaptureKey = GlobalKey();
+  Timer? _answerPoll;
+  bool _webrtcConnected = false;
+
+  String? get _webrtcOfferToken {
+    if (widget.mode != NgmyDocShareQrMode.webrtcLink) return null;
+    final p = widget.payload.trim();
+    const head = 'NGMYDOCSYNC3|';
+    if (!p.startsWith(head)) return null;
+    final body = p.substring(head.length).trim();
+    if (body.startsWith('WR')) return body;
+    return null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final token = _webrtcOfferToken;
+    if (token != null) {
+      _answerPoll = Timer.periodic(const Duration(seconds: 2), (_) => _pollWebRtcAnswer(token));
+    }
+  }
+
+  @override
+  void dispose() {
+    _answerPoll?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _pollWebRtcAnswer(String offerToken) async {
+    if (_webrtcConnected || !mounted) return;
+    final answerQr = await NgmyDocShareSync.pollWebRtcAnswer(offerToken);
+    if (answerQr == null || !mounted) return;
+    await NgmyDocShareSync.applyWebRtcAnswer(answerQr);
+    if (!mounted) return;
+    setState(() => _webrtcConnected = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Connected — sending files now…')),
+    );
+  }
 
   String get _modeLabel {
     switch (widget.mode) {
@@ -997,7 +1036,7 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
       case NgmyDocShareQrMode.lanDirect:
         return 'Keep this screen open until the other phone finishes. They scan with Doc Share → Scan QR.';
       case NgmyDocShareQrMode.webrtcLink:
-        return 'Receiver scans this QR. If scan fails, tap Copy and paste on their phone.';
+        return 'Receiver scans this QR. Connection completes automatically when they accept.';
     }
   }
 
@@ -1075,7 +1114,7 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
     final shareCode = widget.payload.length > 48 ? '${widget.payload.substring(0, 44)}…' : widget.payload;
 
     return PopScope(
-      canPop: widget.mode != NgmyDocShareQrMode.lanDirect,
+      canPop: widget.mode != NgmyDocShareQrMode.lanDirect && widget.mode != NgmyDocShareQrMode.webrtcLink,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) unawaited(NgmyDocShareSync.stopLanShare());
       },
@@ -1087,7 +1126,7 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
           elevation: 0,
           title: Text('Share via QR', style: TextStyle(fontWeight: FontWeight.w900, color: c.fg)),
           centerTitle: true,
-          leading: widget.mode == NgmyDocShareQrMode.lanDirect
+          leading: widget.mode == NgmyDocShareQrMode.lanDirect || widget.mode == NgmyDocShareQrMode.webrtcLink
               ? null
               : IconButton(
                   icon: const Icon(Icons.close_rounded),
@@ -1151,6 +1190,22 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
                         ),
                       ],
                       if (widget.mode == NgmyDocShareQrMode.webrtcLink) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: (_webrtcConnected ? Colors.green : kNgmyStudioHubAccent).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            _webrtcConnected ? 'Connected — sending…' : 'Keep screen open',
+                            style: TextStyle(
+                              color: _webrtcConnected ? Colors.green.shade700 : kNgmyStudioHubAccent,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         FilledButton.icon(
                           onPressed: _scanAnswer,

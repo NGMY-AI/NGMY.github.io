@@ -97,9 +97,9 @@ class NgmyCreatorHubTab extends StatelessWidget {
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
-                        mainAxisSpacing: 14,
-                        crossAxisSpacing: 14,
-                        childAspectRatio: 0.92,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 1.22,
                       ),
                       itemCount: tools.length,
                       itemBuilder: (_, i) => _CreatorToolCard(tool: tools[i]),
@@ -189,42 +189,43 @@ class _CreatorToolCard extends StatelessWidget {
         onTap: tool.onTap,
         borderRadius: BorderRadius.circular(22),
         child: Ink(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
           decoration: BoxDecoration(
             color: surface,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(color: tool.colors.first.withValues(alpha: 0.35)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: tool.colors),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(tool.icon, color: Colors.white, size: 26),
+                child: Icon(tool.icon, color: Colors.white, size: 32),
               ),
-              const Spacer(),
+              const SizedBox(height: 10),
               Text(
                 tool.title,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w900,
-                  fontSize: 15,
+                  fontSize: 14,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 tool.subtitle,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.62),
-                  fontSize: 11,
-                  height: 1.3,
+                  fontSize: 10.5,
+                  height: 1.25,
                 ),
               ),
             ],

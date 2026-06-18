@@ -78,9 +78,13 @@ class NgmyDocShareLocalServer {
     await stop();
 
     for (final item in items) {
-      final bytes = await NgmyDocShareStore.readBytes(ownerEmail, item);
-      if (bytes == null || bytes.isEmpty) {
-        debugPrint('[doc share lan] missing file bytes: ${item.name}');
+      if (item.sizeBytes <= 0) {
+        debugPrint('[doc share lan] empty file: ${item.name}');
+        return null;
+      }
+      final probe = await NgmyDocShareStore.readByteRange(ownerEmail, item, 0, 1);
+      if (probe == null || probe.isEmpty) {
+        debugPrint('[doc share lan] unreadable file: ${item.name}');
         return null;
       }
     }
