@@ -94,23 +94,12 @@ class NgmyDocShareLocalServer {
 
     final session = _generateSession();
     HttpServer? server;
-    InternetAddress? bindAddr;
-    try {
-      bindAddr = InternetAddress(ip);
-    } catch (_) {
-      bindAddr = InternetAddress.anyIPv4;
-    }
     for (var port = 8765; port < 9765; port++) {
       try {
-        server = await HttpServer.bind(bindAddr, port, shared: true);
+        server = await HttpServer.bind(InternetAddress.anyIPv4, port, shared: true);
         break;
       } on SocketException {
-        try {
-          server = await HttpServer.bind(InternetAddress.anyIPv4, port, shared: true);
-          break;
-        } on SocketException {
-          continue;
-        }
+        continue;
       }
     }
     if (server == null) return null;

@@ -9,8 +9,8 @@ import 'ngmy_doc_share_store.dart';
 /// Sequential LAN pulls with streaming writes — reliable for phone-to-phone transfer.
 class NgmyDocShareLanDownload {
   static final HttpClient _client = HttpClient()
-    ..connectionTimeout = const Duration(seconds: 25)
-    ..idleTimeout = const Duration(seconds: 180);
+    ..connectionTimeout = const Duration(seconds: 30)
+    ..idleTimeout = const Duration(hours: 6);
 
   static Future<List<NgmyDocShareItem>> pullAll({
     required String recipientEmail,
@@ -34,7 +34,7 @@ class NgmyDocShareLanDownload {
         final request = await _client.getUrl(fileUri);
         request.headers.set(HttpHeaders.acceptEncodingHeader, 'identity');
         request.headers.set(HttpHeaders.userAgentHeader, 'NGMY-DocShare/1');
-        final response = await request.close().timeout(const Duration(minutes: 10));
+        final response = await request.close().timeout(const Duration(hours: 6));
         if (response.statusCode != HttpStatus.ok) {
           debugPrint('[doc share lan stream] $name: HTTP ${response.statusCode}');
           continue;

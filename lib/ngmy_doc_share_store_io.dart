@@ -290,6 +290,99 @@ class NgmyDocShareStore {
     }
   }
 
+  static final Map<int, _DiskReceive> _diskReceives = {};
+  static int _nextDiskReceiveId = 1;
+
+  /// Stream incoming LAN/WebRTC bytes straight to disk (large videos).
+  static int beginDiskReceive({
+    required String email,
+    required String name,
+    required String mime,
+    String? note,
+    String? fromSender,
+  }) {
+    final id = _nextDiskReceiveId++;
+    _diskReceives[id] = _DiskReceive(
+      email: email,
+      name: name,
+      mime: mime,
+      note: note,
+      fromSender: fromSender,
+    );
+    return id;
+  }
+
+  static Future<bool> writeDiskReceive(int id, List<int> bytes) async {
+    final rx = _diskReceives[id];
+    if (rx == null || bytes.isEmpty) return false;
+    try {
+      if (rx.sink == null) {
+        final itemId = _newId();
+        final item = NgmyDocShareItem(
+          id: itemId,
+          name: rx.name.trim().isEmpty ? 'file' : rx.name.trim(),
+          mime: rx.mime.trim().isEmpty ? 'application/octet-stream' : rx.mime.trim(),
+          sizeBytes: 0,
+          createdAt: DateTime.now().toUtc().toIso8601String(),
+          note: rx.note,
+          fromSender: rx.fromSender,
+        );
+        final root = await _userDir(rx.email);
+        final ext = _safeExt(item.name);
+        final out = File('${root.path}/$itemId.$ext');
+        rx.item = item;
+        rx.file = out;
+        rx.sink = out.openWrite();
+      }
+      rx.sink!.add(bytes);
+      return true;
+    } catch (e) {
+      debugPrint('[doc share disk receive] write: $e');
+      return false;
+    }
+  }
+
+  static Future<NgmyDocShareItem?> finishDiskReceive(int id) async {
+    final rx = _diskReceives.remove(id);
+    if (rx == null || rx.sink == null || rx.file == null || rx.item == null) return null;
+    try {
+      await rx.sink!.close();
+      rx.sink = null;
+      final size = await rx.file!.length();
+      if (size <= 0) {
+        await rx.file!.delete();
+        return null;
+      }
+      final saved = NgmyDocShareItem(
+        id: rx.item!.id,
+        name: rx.item!.name,
+        mime: rx.item!.mime,
+        sizeBytes: size,
+        createdAt: rx.item!.createdAt,
+        note: rx.item!.note,
+        fromSender: rx.item!.fromSender,
+      );
+      final items = await _readIndex(rx.email)..add(saved);
+      await _writeIndex(rx.email, items);
+      return saved;
+    } catch (e) {
+      debugPrint('[doc share disk receive] finish: $e');
+      try {
+        if (rx.file != null && await rx.file!.exists()) await rx.file!.delete();
+      } catch (_) {}
+      return null;
+    }
+  }
+
+  static Future<void> abortDiskReceive(int id) async {
+    final rx = _diskReceives.remove(id);
+    if (rx == null) return;
+    try {
+      await rx.sink?.close();
+      if (rx.file != null && await rx.file!.exists()) await rx.file!.delete();
+    } catch (_) {}
+  }
+
   static Future<String?> filePath(String email, NgmyDocShareItem item) async {
     final root = await _userDir(email);
     final f = await _fileForId(root, item.id);
@@ -348,4 +441,23 @@ class NgmyDocShareStore {
     await file.writeAsBytes(bytes, flush: true);
     return 'Saved to ${file.path}';
   }
+}
+
+class _DiskReceive {
+  _DiskReceive({
+    required this.email,
+    required this.name,
+    required this.mime,
+    this.note,
+    this.fromSender,
+  });
+
+  final String email;
+  final String name;
+  final String mime;
+  final String? note;
+  final String? fromSender;
+  NgmyDocShareItem? item;
+  File? file;
+  IOSink? sink;
 }

@@ -132,6 +132,18 @@ class NgmyDocShareSync {
       }
     }
 
+    // LAN blocked (firewall / hotspot) — fall back to cloud-signaled WebRTC on phones too.
+    if (!kIsWeb) {
+      final qr = await webrtc.createShortOfferQr(ownerEmail: ownerEmail, items: items);
+      if (qr != null) {
+        return (
+          qrPayload: qr,
+          fileCount: items.length,
+          mode: NgmyDocShareQrMode.webrtcLink,
+        );
+      }
+    }
+
     return null;
   }
 

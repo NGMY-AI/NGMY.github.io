@@ -197,6 +197,51 @@ class NgmyDocShareStore {
 
   static Future<String?> filePath(String email, NgmyDocShareItem item) => Future.value(null);
 
+  static final Map<int, _WebDiskReceive> _diskReceives = {};
+  static int _nextDiskReceiveId = 1;
+
+  static int beginDiskReceive({
+    required String email,
+    required String name,
+    required String mime,
+    String? note,
+    String? fromSender,
+  }) {
+    final id = _nextDiskReceiveId++;
+    _diskReceives[id] = _WebDiskReceive(
+      email: email,
+      name: name,
+      mime: mime,
+      note: note,
+      fromSender: fromSender,
+    );
+    return id;
+  }
+
+  static Future<bool> writeDiskReceive(int id, List<int> bytes) async {
+    final rx = _diskReceives[id];
+    if (rx == null || bytes.isEmpty) return false;
+    rx.builder.add(bytes);
+    return true;
+  }
+
+  static Future<NgmyDocShareItem?> finishDiskReceive(int id) async {
+    final rx = _diskReceives.remove(id);
+    if (rx == null || rx.builder.length <= 0) return null;
+    return addBytes(
+      email: rx.email,
+      name: rx.name,
+      mime: rx.mime,
+      bytes: rx.builder.takeBytes(),
+      fromSender: rx.fromSender,
+      note: rx.note ?? 'Received via QR',
+    );
+  }
+
+  static Future<void> abortDiskReceive(int id) async {
+    _diskReceives.remove(id);
+  }
+
   static Future<void> delete(String email, String id) async {
     final items = await _readIndex(email);
     items.removeWhere((e) => e.id == id);
@@ -214,6 +259,23 @@ class NgmyDocShareStore {
     final safeName = item.name.replaceAll(RegExp(r'[^\w\-.]+'), '_');
     return _downloadBytesWeb(bytes, safeName, mime: item.mime);
   }
+}
+
+class _WebDiskReceive {
+  _WebDiskReceive({
+    required this.email,
+    required this.name,
+    required this.mime,
+    this.note,
+    this.fromSender,
+  });
+
+  final String email;
+  final String name;
+  final String mime;
+  final String? note;
+  final String? fromSender;
+  final BytesBuilder builder = BytesBuilder(copy: false);
 }
 
 Future<List<NgmyDocShareItem>> _readIndex(String email) async {

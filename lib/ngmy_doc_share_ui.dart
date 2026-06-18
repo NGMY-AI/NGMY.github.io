@@ -343,27 +343,37 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
           raw: scan,
           recipientEmail: widget.email,
           onProgress: (r, t) {
-            if (mounted) setState(() => _status = 'Receiving $r of $t…');
+            if (mounted) setState(() => _status = 'Receiving video $r of $t…');
           },
         );
         if (!mounted || session == null) {
-          _toast('Could not connect. Try again or use the phone app on same Wi‑Fi.');
+          _toast('Could not connect. Keep sender screen open and try again.');
           return;
         }
-        await showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => _DocShareAnswerQrDialog(answerPayload: session.answerQr),
+
+        final autoConnect = session.answerQr.contains('|WR');
+        if (!autoConnect) {
+          await showDialog<void>(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => _DocShareAnswerQrDialog(answerPayload: session.answerQr),
+          );
+        } else if (mounted) {
+          setState(() => _status = 'Receiving video… keep both screens open');
+        }
+
+        final imported = await session.transfer.timeout(
+          const Duration(hours: 6),
+          onTimeout: () => <NgmyDocShareItem>[],
         );
-        final imported = await session.transfer;
         if (!mounted) return;
         if (imported.isEmpty) {
-          _toast('Transfer incomplete. Sender must scan your answer QR.');
+          _toast('Video transfer incomplete. Sender must keep their QR screen open.');
           return;
         }
         await _refresh();
-        _toast('Restored ${imported.length} file(s) to this phone.');
-      }, label: 'Connecting…');
+        _toast('Received ${imported.length} video(s) to this phone.');
+      }, label: 'Receiving video…');
       return;
     }
 
@@ -372,19 +382,20 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         recipientEmail: widget.email,
         raw: scan,
         onProgress: (r, t) {
-          if (mounted) setState(() => _status = 'Receiving $r of $t…');
+          if (mounted) setState(() => _status = 'Receiving video $r of $t…');
         },
       );
       if (imported == null || imported.isEmpty) {
         final hint = scan.startsWith('N2|') || scan.contains('http://')
-            ? 'Could not reach sender. Same Wi‑Fi or hotspot, keep their QR screen open, then try Paste.'
+            ? 'Video did not arrive. Same Wi‑Fi or hotspot, keep sender QR screen open, then scan again.'
             : 'Could not restore files. Try scanning again or paste the share code.';
         _toast(hint);
         return;
       }
       await _refresh();
-      _toast('Restored ${imported.length} file(s) to this phone.');
-    }, label: 'Receiving…');
+      final videos = imported.where((e) => e.isVideo).length;
+      _toast(videos > 0 ? 'Received $videos video(s) to this phone.' : 'Restored ${imported.length} file(s) to this phone.');
+    }, label: 'Receiving video…');
   }
 
   Future<void> _saveItem(NgmyDocShareItem item) async {
@@ -992,7 +1003,8 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
     super.initState();
     final token = _webrtcOfferToken;
     if (token != null) {
-      _answerPoll = Timer.periodic(const Duration(seconds: 2), (_) => _pollWebRtcAnswer(token));
+      _pollWebRtcAnswer(token);
+      _answerPoll = Timer.periodic(const Duration(milliseconds: 800), (_) => _pollWebRtcAnswer(token));
     }
   }
 

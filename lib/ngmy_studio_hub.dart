@@ -197,7 +197,6 @@ class _CreatorToolCard extends StatelessWidget {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Container(
                 width: 52,
@@ -208,7 +207,7 @@ class _CreatorToolCard extends StatelessWidget {
                 ),
                 child: Icon(tool.icon, color: Colors.white, size: 32),
               ),
-              const SizedBox(height: 10),
+              const Spacer(),
               Text(
                 tool.title,
                 style: TextStyle(
