@@ -910,8 +910,25 @@ class NgmyBrandedQrWidget extends StatelessWidget {
   final String data;
   final bool compact;
   final bool large;
+  final GlobalKey? captureKey;
 
-  const NgmyBrandedQrWidget({super.key, required this.data, this.compact = false, this.large = false});
+  const NgmyBrandedQrWidget({
+    super.key,
+    required this.data,
+    this.compact = false,
+    this.large = false,
+    this.captureKey,
+  });
+
+  static Future<Uint8List?> capturePng(GlobalKey key, {double pixelRatio = 4}) async {
+    final ctx = key.currentContext;
+    if (ctx == null) return null;
+    final boundary = ctx.findRenderObject();
+    if (boundary is! RenderRepaintBoundary) return null;
+    final image = await boundary.toImage(pixelRatio: pixelRatio);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    return bytes?.buffer.asUint8List();
+  }
 
   static const _accent = Color(0xFF06B6D4);
   static const _accentDeep = Color(0xFF0891B2);
@@ -924,7 +941,9 @@ class NgmyBrandedQrWidget extends StatelessWidget {
     final ring = large ? 26.0 : (compact ? 14.0 : 22.0);
     final outerPad = large ? 36.0 : 28.0;
 
-    return SizedBox(
+    return RepaintBoundary(
+      key: captureKey,
+      child: SizedBox(
       width: size + outerPad,
       height: size + outerPad,
       child: Stack(
@@ -983,6 +1002,7 @@ class NgmyBrandedQrWidget extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

@@ -47,7 +47,8 @@ class NgmyDocShareQrPayload {
     final t = data.trim();
     return t.startsWith('N2|') ||
         t.startsWith('NGMYDOCSYNC2|') ||
-        t.startsWith('NGMYDOCSYNC0|');
+        t.startsWith('NGMYDOCSYNC0|') ||
+        t.startsWith('http://');
   }
 
   static double qrSizeForData(String data, {double maxSide = 320}) {

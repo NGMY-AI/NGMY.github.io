@@ -13,11 +13,10 @@ import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_com
 import 'ngmy_doc_share_folder.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_playback.dart';
-import 'ngmy_doc_share_qr_payload.dart';
-import 'ngmy_doc_share_qr_widget.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_sync.dart';
 import 'ngmy_qr_download.dart';
+import 'ngmy_qr_generator.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_studio_slot_video_io.dart' if (dart.library.html) 'ngmy_studio_slot_video_stub.dart' as studio_video;
 
@@ -232,22 +231,20 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       return;
     }
     await _withWork(() async {
-      await NgmyDocShareQrWidget.circularLogoProvider(kNgmyDocShareQrLogoUrl, 220);
       final created = await NgmyDocShareSync.createQrForItems(ownerEmail: widget.email, items: batch);
       if (!mounted) return;
       if (created == null) {
-        _toast('Could not start share. Check Wi‑Fi or try Export.');
+        _toast('Could not start share. Try Export or use the phone app.');
         return;
       }
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        isDismissible: created.mode != NgmyDocShareQrMode.lanDirect,
-        builder: (ctx) => _DocShareQrSheet(
-          payload: created.qrPayload,
-          fileCount: created.fileCount,
-          mode: created.mode,
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          fullscreenDialog: true,
+          builder: (_) => _DocShareQrDisplayPage(
+            payload: created.qrPayload,
+            fileCount: created.fileCount,
+            mode: created.mode,
+          ),
         ),
       );
       await NgmyDocShareSync.stopLanShare();
@@ -330,7 +327,10 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         },
       );
       if (imported == null || imported.isEmpty) {
-        _toast('Could not receive files. Same Wi‑Fi as sender? Keep their QR screen open.');
+        final hint = scan.contains('http://')
+            ? 'Could not reach sender. Keep their QR screen open and try Paste with the copied link.'
+            : 'Could not restore files. Try scanning again or paste the share code.';
+        _toast(hint);
         return;
       }
       await _refresh();
@@ -705,8 +705,8 @@ class _DocShareVideoPageState extends State<_DocShareVideoPage> {
   }
 }
 
-class _DocShareQrSheet extends StatefulWidget {
-  const _DocShareQrSheet({
+class _DocShareQrDisplayPage extends StatefulWidget {
+  const _DocShareQrDisplayPage({
     required this.payload,
     required this.fileCount,
     required this.mode,
@@ -717,10 +717,10 @@ class _DocShareQrSheet extends StatefulWidget {
   final NgmyDocShareQrMode mode;
 
   @override
-  State<_DocShareQrSheet> createState() => _DocShareQrSheetState();
+  State<_DocShareQrDisplayPage> createState() => _DocShareQrDisplayPageState();
 }
 
-class _DocShareQrSheetState extends State<_DocShareQrSheet> {
+class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
   final _qrCaptureKey = GlobalKey();
 
   String get _modeLabel {
@@ -728,20 +728,20 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
       case NgmyDocShareQrMode.inlineInstant:
         return 'Instant restore';
       case NgmyDocShareQrMode.lanDirect:
-        return 'Direct transfer — any size';
+        return 'Direct transfer';
       case NgmyDocShareQrMode.webrtcLink:
-        return 'Direct link — any size';
+        return 'Direct link';
     }
   }
 
   String get _hint {
     switch (widget.mode) {
       case NgmyDocShareQrMode.inlineInstant:
-        return 'Receiver scans once — files restore instantly on their phone.';
+        return 'Receiver scans once — files restore instantly. No Wi‑Fi needed.';
       case NgmyDocShareQrMode.lanDirect:
-        return 'Keep this open. Receiver scans on same Wi‑Fi — videos & folders copy straight to their phone.';
+        return 'Keep this screen open until the other phone finishes. They scan with Doc Share → Scan QR.';
       case NgmyDocShareQrMode.webrtcLink:
-        return 'Receiver scans this QR. If scan fails, tap Copy and paste on their phone. Keep this screen open until done.';
+        return 'Receiver scans this QR. If scan fails, tap Copy and paste on their phone. Keep this screen open.';
     }
   }
 
@@ -769,13 +769,13 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
   Future<void> _copy(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: widget.payload));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code copied')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Share code copied')));
     }
   }
 
   Future<void> _savePng(BuildContext context) async {
     try {
-      final bytes = await NgmyDocShareQrWidget.capturePng(_qrCaptureKey, pixelRatio: 4);
+      final bytes = await NgmyBrandedQrWidget.capturePng(_qrCaptureKey, pixelRatio: 4);
       if (bytes == null || bytes.isEmpty) return;
       final msg = await downloadNgmyQrImage(bytes, 'ngmy_doc_share_qr.png');
       if (context.mounted) {
@@ -790,13 +790,10 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
 
   String? get _lanUrl {
     if (widget.mode != NgmyDocShareQrMode.lanDirect) return null;
-    if (widget.payload.startsWith('N2|')) {
-      return widget.payload.substring(3).trim();
-    }
+    if (widget.payload.startsWith('http://')) return widget.payload.trim();
+    if (widget.payload.startsWith('N2|')) return widget.payload.substring(3).trim();
     const legacy = 'NGMYDOCSYNC2|';
-    if (widget.payload.startsWith(legacy)) {
-      return widget.payload.substring(legacy.length).trim();
-    }
+    if (widget.payload.startsWith(legacy)) return widget.payload.substring(legacy.length).trim();
     return null;
   }
 
@@ -805,177 +802,127 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
     if (url == null) return;
     await Clipboard.setData(ClipboardData(text: url));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wi‑Fi link copied')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied')));
     }
+  }
+
+  Future<void> _done() async {
+    await NgmyDocShareSync.stopLanShare();
+    if (mounted) Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.paddingOf(context).bottom;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1E1035), Color(0xFF0F1419)],
-        ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: kNgmyStudioHubAccent.withValues(alpha: 0.4)),
-        boxShadow: [
-          BoxShadow(
-            color: kNgmyStudioHubAccent.withValues(alpha: 0.25),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(16, 14, 16, 14 + bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [kNgmyStudioHubAccent, kNgmyStudioHubAccent2]),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 22),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
+    final card = isDark ? const Color(0xFF151B28) : Colors.white;
+    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+
+    return PopScope(
+      canPop: widget.mode != NgmyDocShareQrMode.lanDirect,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) unawaited(NgmyDocShareSync.stopLanShare());
+      },
+      child: Scaffold(
+        backgroundColor: bg,
+        appBar: AppBar(
+          backgroundColor: bg,
+          elevation: 0,
+          title: const Text('Share via QR', style: TextStyle(fontWeight: FontWeight.w900)),
+          centerTitle: true,
+          leading: widget.mode == NgmyDocShareQrMode.lanDirect
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: _done,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
+        ),
+        body: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: Column(
+            children: [
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: card,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: kNgmyStudioHubAccent.withValues(alpha: 0.35)),
+                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('Share via QR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
                       Text(
                         '${widget.fileCount} file(s) · $_modeLabel',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 12),
+                        style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 13),
                       ),
+                      const SizedBox(height: 16),
+                      NgmyBrandedQrWidget(data: widget.payload, large: true, captureKey: _qrCaptureKey),
+                      const SizedBox(height: 16),
+                      Text(
+                        _hint,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: muted, fontSize: 12, height: 1.45),
+                      ),
+                      if (widget.mode == NgmyDocShareQrMode.lanDirect && _lanUrl != null) ...[
+                        const SizedBox(height: 10),
+                        TextButton.icon(
+                          onPressed: () => _copyLanLink(context),
+                          icon: const Icon(Icons.link_rounded, size: 16),
+                          label: const Text('Copy link for Paste'),
+                        ),
+                      ],
+                      if (widget.mode == NgmyDocShareQrMode.webrtcLink) ...[
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: _scanAnswer,
+                          style: FilledButton.styleFrom(backgroundColor: kNgmyStudioHubAccent),
+                          icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                          label: const Text('Scan receiver answer QR'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final maxQr = (constraints.maxWidth - 4).clamp(280.0, 320.0);
-                return Center(
-                  child: NgmyDocShareQrWidget(
-                    captureKey: _qrCaptureKey,
-                    data: widget.payload,
-                    maxSide: maxQr,
-                  ),
-                );
-              },
-            ),
-            if (!NgmyDocShareQrPayload.isThickPayload(widget.payload)) ...[
-              const SizedBox(height: 8),
-              Text(
-                'This QR is outdated — refresh ngmy.org (private tab) and share again.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.orange.shade300, fontSize: 11, fontWeight: FontWeight.w700),
               ),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              _hint,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12, height: 1.45),
-            ),
-            Text(
-              'Hold steady · fill the frame · good light helps scanning',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11),
-            ),
-            if (widget.mode == NgmyDocShareQrMode.lanDirect) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: kNgmyStudioHubAccent2.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: kNgmyStudioHubAccent2.withValues(alpha: 0.35)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.wifi_rounded, size: 18, color: kNgmyStudioHubAccent2.withValues(alpha: 0.9)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Same Wi‑Fi · keep this open until done',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11, fontWeight: FontWeight.w700),
-                      ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _copy(context),
+                      icon: const Icon(Icons.copy_rounded, size: 18),
+                      label: const Text('Copy code'),
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _savePng(context),
+                      style: FilledButton.styleFrom(backgroundColor: kNgmyStudioHubAccent),
+                      icon: const Icon(Icons.download_rounded, size: 18),
+                      label: const Text('Save QR'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _done,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kNgmyStudioHubAccent2,
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                  child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w800)),
                 ),
               ),
-              if (_lanUrl != null) ...[
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () => _copyLanLink(context),
-                  icon: const Icon(Icons.link_rounded, size: 16),
-                  label: const Text('Copy Wi‑Fi link'),
-                  style: TextButton.styleFrom(foregroundColor: Colors.white60),
-                ),
-              ],
             ],
-            if (widget.mode == NgmyDocShareQrMode.webrtcLink) ...[
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: _scanAnswer,
-                style: FilledButton.styleFrom(backgroundColor: kNgmyStudioHubAccent),
-                icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                label: const Text('Scan receiver answer QR'),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _copy(context),
-                    style: OutlinedButton.styleFrom(foregroundColor: Colors.white70),
-                    icon: const Icon(Icons.copy_rounded, size: 18),
-                    label: const Text('Copy'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => _savePng(context),
-                    style: FilledButton.styleFrom(backgroundColor: kNgmyStudioHubAccent2),
-                    icon: const Icon(Icons.download_rounded, size: 18),
-                    label: const Text('Save QR'),
-                  ),
-                ),
-              ],
-            ),
-            TextButton(
-              onPressed: () async {
-                await NgmyDocShareSync.stopLanShare();
-                if (context.mounted) Navigator.pop(context);
-              },
-              child: const Text('Done', style: TextStyle(color: Colors.white60)),
-            ),
-              ],
-            ),
           ),
         ),
+      ),
     );
   }
 }
@@ -1003,7 +950,7 @@ class _DocShareAnswerQrDialog extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-              child: NgmyDocShareQrWidget(data: answerPayload, large: true),
+              child: NgmyBrandedQrWidget(data: answerPayload, large: true),
             ),
           ],
         ),
@@ -1027,9 +974,8 @@ class _DocShareAnswerScanPage extends StatefulWidget {
 
 class _DocShareAnswerScanPageState extends State<_DocShareAnswerScanPage> {
   final _controller = MobileScannerController(
-    detectionSpeed: DetectionSpeed.noDuplicates,
+    detectionSpeed: DetectionSpeed.normal,
     facing: CameraFacing.back,
-    formats: const [BarcodeFormat.qrCode],
   );
   bool _handled = false;
 
@@ -1076,10 +1022,18 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
   final _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.normal,
     facing: CameraFacing.back,
-    formats: const [BarcodeFormat.qrCode],
   );
   bool _handled = false;
   bool _torch = false;
+
+  bool _isDocSharePayload(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return false;
+    return t.startsWith('NGMYDOCSYNC') ||
+        t.startsWith('N2|') ||
+        t.startsWith('http://') ||
+        t.contains(kNgmyDocShareBundleMarker);
+  }
 
   Future<void> _pasteLink() async {
     final clip = await Clipboard.getData(Clipboard.kTextPlain);
@@ -1105,7 +1059,7 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
     if (_handled) return;
     for (final b in capture.barcodes) {
       final raw = b.rawValue?.trim() ?? '';
-      if (raw.isEmpty) continue;
+      if (!_isDocSharePayload(raw)) continue;
       _handled = true;
       Navigator.pop(context, raw);
       return;

@@ -14,7 +14,6 @@ const String kNgmyDocShareQrPrefixLanLegacy = 'NGMYDOCSYNC2';
 const String kNgmyDocShareQrPrefixInline = 'NGMYDOCSYNC0';
 const String kNgmyDocShareBundleMarker = 'ngmyDocShareBundle';
 const int kNgmyDocShareInlineQrMaxChars = 2900;
-const int _inlineMaxTotalBytes = 120000;
 
 typedef NgmyDocShareQrResult = ({
   String qrPayload,
@@ -27,12 +26,15 @@ enum NgmyDocShareQrMode { inlineInstant, lanDirect, webrtcLink }
 class NgmyDocShareSync {
   static String _norm(String email) => email.toLowerCase().trim();
 
-  /// Local: LAN on phone (any size) or WebRTC / inline on web. No file data in cloud.
+  /// Inline first (no network, like Advisors). LAN for large native files. WebRTC on web.
   static Future<NgmyDocShareQrResult?> createQrForItems({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
   }) async {
     if (items.isEmpty) return null;
+
+    final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items);
+    if (inline != null) return inline;
 
     if (!kIsWeb) {
       final lan = await NgmyDocShareLocalServer.start(ownerEmail: ownerEmail, items: items);
@@ -46,32 +48,12 @@ class NgmyDocShareSync {
     }
 
     if (kIsWeb) {
-      final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items);
-      if (inline != null) return inline;
       final offer = await webrtc.createOfferQr(ownerEmail: ownerEmail, items: items);
       if (offer != null) {
         return (
           qrPayload: offer,
           fileCount: items.length,
           mode: NgmyDocShareQrMode.webrtcLink,
-        );
-      }
-      return null;
-    }
-
-    final totalBytes = items.fold<int>(0, (s, e) => s + e.sizeBytes);
-    if (totalBytes <= _inlineMaxTotalBytes && items.length <= 3) {
-      final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items);
-      if (inline != null) return inline;
-    }
-
-    if (!kIsWeb) {
-      final lan = await NgmyDocShareLocalServer.start(ownerEmail: ownerEmail, items: items);
-      if (lan != null) {
-        return (
-          qrPayload: lan.qrPayload,
-          fileCount: lan.fileCount,
-          mode: NgmyDocShareQrMode.lanDirect,
         );
       }
     }
@@ -162,10 +144,11 @@ class NgmyDocShareSync {
     void Function(int received, int total)? onProgress,
   }) async {
     final root = baseUrl.replaceAll(RegExp(r'/+$'), '');
-    final manifestUri = root.endsWith('manifest.json') ? Uri.parse(root) : Uri.parse('$root/manifest.json');
+    var manifestUri = root.endsWith('manifest.json') ? Uri.parse(root) : Uri.parse('$root/manifest.json');
 
     try {
-      final decoded = await NgmyDocShareLanDownload.fetchManifest(manifestUri);
+      var decoded = await NgmyDocShareLanDownload.fetchManifest(manifestUri);
+      decoded ??= await NgmyDocShareLanDownload.fetchManifest(Uri.parse(root));
       if (decoded == null) return null;
       final files = decoded['files'];
       if (files is! List || files.isEmpty) return null;

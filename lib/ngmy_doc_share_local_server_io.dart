@@ -31,17 +31,24 @@ class NgmyDocShareLocalServer {
         includeLinkLocal: true,
       );
       String? fallback;
+      String? wifiLike;
       for (final iface in interfaces) {
+        final name = iface.name.toLowerCase();
+        final preferIface = name.contains('wlan') ||
+            name.contains('wifi') ||
+            name.contains('en0') ||
+            name.contains('eth');
         for (final addr in iface.addresses) {
           if (addr.isLoopback) continue;
           final ip = addr.address;
           if (ip.startsWith('192.168.') || ip.startsWith('10.') || _isPrivate172(ip)) {
-            return ip;
+            if (preferIface) return ip;
+            wifiLike ??= ip;
           }
           fallback ??= ip;
         }
       }
-      return fallback;
+      return wifiLike ?? fallback;
     } catch (e) {
       debugPrint('[doc share lan] ip: $e');
     }
@@ -86,8 +93,9 @@ class NgmyDocShareLocalServer {
 
     server.listen((req) => unawaited(_handle(req, session)));
 
+    // Bare LAN URL — shortest QR (same scannability as NGMY Advisors stash codes).
     return (
-      qrPayload: 'N2|$_baseUrl/$session',
+      qrPayload: '$_baseUrl/$session',
       fileCount: items.length,
     );
   }
@@ -96,6 +104,10 @@ class NgmyDocShareLocalServer {
     try {
       final path = req.uri.path;
       final prefix = '/$session';
+      if ((path == prefix || path == '$prefix/') && req.method == 'GET') {
+        await _serveManifest(req);
+        return;
+      }
       if (path == '$prefix/manifest.json' && req.method == 'GET') {
         await _serveManifest(req);
         return;

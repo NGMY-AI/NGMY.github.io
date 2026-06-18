@@ -9,8 +9,8 @@ import 'ngmy_doc_share_store.dart';
 /// Parallel LAN pulls with streaming writes — large files land fast like AirDrop.
 class NgmyDocShareLanDownload {
   static final HttpClient _client = HttpClient()
-    ..connectionTimeout = const Duration(seconds: 10)
-    ..idleTimeout = const Duration(seconds: 60);
+    ..connectionTimeout = const Duration(seconds: 20)
+    ..idleTimeout = const Duration(seconds: 120);
 
   static Future<List<NgmyDocShareItem>> pullAll({
     required String recipientEmail,
@@ -60,16 +60,29 @@ class NgmyDocShareLanDownload {
   }
 
   static Future<Map<String, dynamic>?> fetchManifest(Uri manifestUri) async {
-    try {
-      final request = await _client.getUrl(manifestUri);
-      final response = await request.close();
-      if (response.statusCode != HttpStatus.ok) return null;
-      final body = await response.transform(utf8.decoder).join();
-      final decoded = jsonDecode(body);
-      return decoded is Map<String, dynamic> ? decoded : null;
-    } catch (e) {
-      debugPrint('[doc share lan manifest] $e');
-      return null;
+    for (var attempt = 0; attempt < 4; attempt++) {
+      try {
+        final request = await _client.getUrl(manifestUri);
+        request.headers.set(HttpHeaders.userAgentHeader, 'NGMY-DocShare/1');
+        final response = await request.close().timeout(const Duration(seconds: 25));
+        if (response.statusCode != HttpStatus.ok) {
+          if (attempt < 3) {
+            await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+            continue;
+          }
+          return null;
+        }
+        final body = await response.transform(utf8.decoder).join();
+        final decoded = jsonDecode(body);
+        return decoded is Map<String, dynamic> ? decoded : null;
+      } catch (e) {
+        debugPrint('[doc share lan manifest] attempt ${attempt + 1}: $e');
+        if (attempt < 3) {
+          await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+          continue;
+        }
+      }
     }
+    return null;
   }
 }

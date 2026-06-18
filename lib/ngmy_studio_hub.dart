@@ -92,31 +92,6 @@ class NgmyCreatorHubTab extends StatelessWidget {
                   children: [
                     const _CreatorHubTitle(),
                     const SizedBox(height: 18),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            kNgmyStudioHubAccent.withValues(alpha: 0.22),
-                            kNgmyStudioHubAccent2.withValues(alpha: 0.12),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: kNgmyStudioHubAccent.withValues(alpha: 0.28)),
-                      ),
-                      child: Text(
-                        'Your workspace for videos, documents, and more — works offline on your device.',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.78),
-                          fontSize: 13,
-                          height: 1.45,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 22),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
