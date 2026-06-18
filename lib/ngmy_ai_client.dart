@@ -802,19 +802,87 @@ Future<({Uint8List? bytes, String? error})> ngmyAiGenerateImage(
   return (bytes: null, error: primary.error ?? fallback.error ?? 'Could not generate image.');
 }
 
-const _kNgmyOutfitTryOnPrompt = '''
-You are a world-class fashion photo editor performing virtual try-on.
+const _kNgmyOutfitVisionBriefPrompt = '''
+You are a fashion stylist preparing a virtual try-on brief. Study both images carefully.
 
-IMAGE 1 (first): A photo of a real person. Preserve their face, skin tone, body proportions, pose, hair, hands, and background.
-IMAGE 2 (second): A reference photo of clothing or an outfit they should wear.
+IMAGE 1: The real person who must appear in the final photo (preserve their identity).
+IMAGE 2: The outfit/clothing they must wear (study every garment piece).
 
-Create ONE photorealistic result: the same person from IMAGE 1 naturally wearing the outfit from IMAGE 2.
-- Match fabric, color, pattern, cut, and style of the outfit precisely.
-- Fit clothes realistically with natural folds, seams, shadows, and lighting that match the original photo.
-- Do NOT overlay a flat cutout — the result must look like a real photograph.
-- Keep the person's identity unchanged. Do not alter face features or ethnicity.
-- Output only the final edited photograph.
+Reply in plain text with these exact section headers:
+
+PERSON_IDENTITY:
+Face, skin tone, hair style, facial hair, approximate age, body build — for identity lock.
+
+CURRENT_CLOTHING_TO_REMOVE:
+List every garment visible on the person in image 1 that must be fully replaced.
+
+OUTFIT_TO_WEAR:
+Describe the COMPLETE outfit from image 2 in exhaustive detail — every layer (shirt, blazer, vest, pants, shoes, belt, etc.), colors, fabrics, patterns, fit, buttons, lapels, sleeves, footwear. If image 2 shows a full look on a model, transfer that entire look.
+
+Be specific. This brief drives photorealistic full-body dressing — not overlays.
 ''';
+
+String ngmyBuildOutfitTryOnPrompt({
+  required String visionBrief,
+  String styleNotes = '',
+}) {
+  final creative = styleNotes.trim();
+  return '''
+PROFESSIONAL FASHION PHOTOGRAPH — COMPLETE VIRTUAL TRY-ON
+
+Generate ONE photorealistic photograph. It must look like a real camera shot from a luxury fashion lookbook — NOT an edit, collage, or overlay.
+
+=== STYLIST BRIEF (from reference photos) ===
+$visionBrief
+
+=== USER CREATIVE DIRECTION ===
+${creative.isEmpty ? 'Confident natural pose. Premium editorial lighting. Person fully wearing the entire outfit head-to-toe.' : creative}
+
+=== INPUT PHOTO ===
+The attached image is the REAL PERSON. Preserve their exact face, skin tone, hair, facial features, and body identity.
+
+=== TASK ===
+Create a NEW photo of THIS SAME PERSON wearing the COMPLETE outfit described above — every garment piece, head to toe.
+
+CRITICAL — DO NOT VIOLATE:
+1. FULL GARMENT REPLACEMENT: Remove ALL original clothing and dress the person in the entire new outfit. Torso, arms, legs, and feet must show the new clothes only.
+2. NO OVERLAYS: Never paste, float, or stick clothing pieces on shoulders, chest, or body. No partial jackets/vests sitting on top of old shirts. No cutout stickers.
+3. NATURAL FIT: Clothes must wrap the body with correct anatomy — folds at elbows, lapels following chest, pants following legs, shoes on feet with proper perspective.
+4. LIGHTING & SHADOWS: Match scene lighting. Garments cast realistic shadows on skin and each other.
+5. ACCESSORIES: If user requested glasses, watches, or jewelry — place them naturally with correct scale, angle, and reflections. They must look worn, not pasted.
+6. SCENE & POSE: User may request a new location (luxury home, beach house, city street) and pose — you may change background and body pose. Identity stays the same.
+7. QUALITY: Sharp, editorial, photorealistic — like the person was professionally photographed wearing this outfit.
+
+FORBIDDEN OUTPUTS: flat overlays, visible garment edges, original purple/shirt fabric showing under new jacket, shoulder patches of fabric, AI collage artifacts.
+
+Output only the final photograph.
+''';
+}
+
+const _kNgmyOutfitRetryExtra = '''
+
+RETRY — previous attempt had overlay/cutout artifacts. This time: completely REPLACE all clothing on the body. The person must be INSIDE the outfit, not with clothes placed ON TOP of them. Full suit/blazer must wrap the torso with arms through sleeves.
+''';
+
+Future<String?> _ngmyOutfitVisionBrief({
+  required String apiKey,
+  required Uint8List personBytes,
+  required String personMime,
+  required Uint8List outfitBytes,
+  required String outfitMime,
+}) async {
+  final result = await _callGeminiDirect(
+    apiKey,
+    _kNgmyOutfitVisionBriefPrompt,
+    images: [
+      (mimeType: personMime, data: base64Encode(personBytes)),
+      (mimeType: outfitMime, data: base64Encode(outfitBytes)),
+    ],
+  );
+  final text = result.text?.trim();
+  if (text != null && text.length > 80) return text;
+  return null;
+}
 
 Uint8List? _extractGeminiImageFromResponse(Map<String, dynamic> data) {
   final candidates = data['candidates'];
@@ -840,29 +908,22 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitDirect({
   required String apiKey,
   required Uint8List personBytes,
   required String personMime,
-  required Uint8List outfitBytes,
-  required String outfitMime,
-  String prompt = _kNgmyOutfitTryOnPrompt,
+  required String prompt,
 }) async {
   const models = [
     'gemini-2.5-flash-image',
     'gemini-2.5-flash-image-preview',
     'gemini-2.0-flash-preview-image-generation',
   ];
+  // Person photo only — outfit is described in text to avoid paste/overlay artifacts.
   final parts = <Map<String, dynamic>>[
+    {'text': prompt},
     {
       'inline_data': {
         'mime_type': personMime.trim().isEmpty ? 'image/jpeg' : personMime,
         'data': base64Encode(personBytes),
       },
     },
-    {
-      'inline_data': {
-        'mime_type': outfitMime.trim().isEmpty ? 'image/jpeg' : outfitMime,
-        'data': base64Encode(outfitBytes),
-      },
-    },
-    {'text': prompt},
   ];
 
   Object? lastError;
@@ -882,6 +943,7 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitDirect({
               ],
               'generationConfig': {
                 'responseModalities': ['TEXT', 'IMAGE'],
+                'temperature': 0.35,
               },
             }),
           )
@@ -908,9 +970,7 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({
   required String apiKey,
   required Uint8List personBytes,
   required String personMime,
-  required Uint8List outfitBytes,
-  required String outfitMime,
-  String prompt = _kNgmyOutfitTryOnPrompt,
+  required String prompt,
 }) async {
   try {
     final client = Supabase.instance.client;
@@ -918,9 +978,9 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({
       'action': 'geminiVirtualOutfit',
       'apiKey': apiKey.trim(),
       'prompt': prompt,
+      'personOnly': true,
       'images': [
         {'mimeType': personMime, 'data': base64Encode(personBytes)},
-        {'mimeType': outfitMime, 'data': base64Encode(outfitBytes)},
       ],
     };
 
@@ -995,6 +1055,8 @@ Future<({Uint8List? bytes, String? error})> ngmyAiVirtualOutfitTryOn({
   required Uint8List outfitBytes,
   String personMime = 'image/jpeg',
   String outfitMime = 'image/jpeg',
+  String styleNotes = '',
+  void Function(String status)? onStatus,
 }) async {
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
@@ -1009,40 +1071,53 @@ Future<({Uint8List? bytes, String? error})> ngmyAiVirtualOutfitTryOn({
   if (personBytes.length < 1024) return (bytes: null, error: 'Person photo is too small or missing.');
   if (outfitBytes.length < 512) return (bytes: null, error: 'Outfit photo is too small or missing.');
 
-  Future<({Uint8List? bytes, String? error})> runDirect() => _callGeminiOutfitDirect(
-        apiKey: creds.apiKey,
-        personBytes: personBytes,
-        personMime: personMime,
-        outfitBytes: outfitBytes,
-        outfitMime: outfitMime,
-      );
-
-  if (kIsWeb) {
-    final proxied = await _callGeminiOutfitViaProxy(
-      apiKey: creds.apiKey,
-      personBytes: personBytes,
-      personMime: personMime,
-      outfitBytes: outfitBytes,
-      outfitMime: outfitMime,
-    );
-    if (proxied.bytes != null) return proxied;
-    final direct = await runDirect();
-    if (direct.bytes != null) return direct;
-    return (
-      bytes: null,
-      error: proxied.error ?? direct.error ?? 'Outfit AI failed on web. Deploy the ngmy-ai-chat proxy.',
-    );
-  }
-
-  final direct = await runDirect();
-  if (direct.bytes != null) return direct;
-  final proxied = await _callGeminiOutfitViaProxy(
+  onStatus?.call('Studying your photo and outfit…');
+  final brief = await _ngmyOutfitVisionBrief(
     apiKey: creds.apiKey,
     personBytes: personBytes,
     personMime: personMime,
     outfitBytes: outfitBytes,
     outfitMime: outfitMime,
   );
-  if (proxied.bytes != null) return proxied;
-  return (bytes: null, error: direct.error ?? proxied.error ?? 'Could not generate outfit image.');
+
+  final visionBrief = brief ??
+      'Dress the person in the complete outfit from the reference — full replacement of all original clothing.';
+  var prompt = ngmyBuildOutfitTryOnPrompt(visionBrief: visionBrief, styleNotes: styleNotes);
+
+  Future<({Uint8List? bytes, String? error})> runOnce(String p, {bool viaProxyFirst = kIsWeb}) async {
+    Future<({Uint8List? bytes, String? error})> direct() => _callGeminiOutfitDirect(
+          apiKey: creds.apiKey,
+          personBytes: personBytes,
+          personMime: personMime,
+          prompt: p,
+        );
+    Future<({Uint8List? bytes, String? error})> proxy() => _callGeminiOutfitViaProxy(
+          apiKey: creds.apiKey,
+          personBytes: personBytes,
+          personMime: personMime,
+          prompt: p,
+        );
+    if (viaProxyFirst) {
+      final proxied = await proxy();
+      if (proxied.bytes != null) return proxied;
+      return direct();
+    }
+    final d = await direct();
+    if (d.bytes != null) return d;
+    return proxy();
+  }
+
+  onStatus?.call('Dressing you in the full outfit — pass 1…');
+  var result = await runOnce(prompt);
+  if (result.bytes == null) {
+    onStatus?.call('Refining fit — pass 2…');
+    prompt = '$prompt$_kNgmyOutfitRetryExtra';
+    result = await runOnce(prompt);
+  }
+
+  if (result.bytes != null) return result;
+  return (
+    bytes: null,
+    error: result.error ?? 'Could not generate outfit image. Try clearer full-body photos.',
+  );
 }

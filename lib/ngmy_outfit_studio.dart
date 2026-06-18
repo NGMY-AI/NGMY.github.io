@@ -39,6 +39,7 @@ class _NgmyOutfitStudioPageState extends State<NgmyOutfitStudioPage> {
   bool _busy = false;
   String? _error;
   String? _status;
+  final _styleNotesC = TextEditingController();
 
   Future<Uint8List?> _pickToBytes(NgmyStudioLogoPick? pick) async {
     if (pick == null) return null;
@@ -106,6 +107,10 @@ class _NgmyOutfitStudioPageState extends State<NgmyOutfitStudioPage> {
         apiKey: apiKey,
         personBytes: personBytes,
         outfitBytes: outfitBytes,
+        styleNotes: _styleNotesC.text.trim(),
+        onStatus: (s) {
+          if (mounted) setState(() => _status = s);
+        },
       );
 
       if (!mounted) return;
@@ -130,6 +135,12 @@ class _NgmyOutfitStudioPageState extends State<NgmyOutfitStudioPage> {
         _error = e.toString();
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _styleNotesC.dispose();
+    super.dispose();
   }
 
   Future<void> _download() async {
@@ -176,6 +187,37 @@ class _NgmyOutfitStudioPageState extends State<NgmyOutfitStudioPage> {
               icon: Icons.checkroom_rounded,
               pick: _outfitPick,
               onTap: _busy ? null : _pickOutfit,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '3 · Style & scene (optional)',
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _styleNotesC,
+              enabled: !_busy,
+              maxLines: 4,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                hintText: 'e.g. Walking in a luxurious house, black aviator sunglasses, silver luxury watch, confident pose like a fashion lookbook…',
+                hintStyle: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF12182A) : Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: _accent.withValues(alpha: 0.25)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: _accent.withValues(alpha: 0.25)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Describe pose, location, glasses, watches, or vibe. AI dresses you fully in the outfit — not a piece on your shoulder.',
+              style: TextStyle(fontSize: 11, height: 1.35, color: isDark ? Colors.white54 : Colors.black54),
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
@@ -255,7 +297,7 @@ class _NgmyOutfitStudioPageState extends State<NgmyOutfitStudioPage> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Upload your photo and an outfit reference. NGMY AI dresses you photorealistically.',
+              'Upload your photo + outfit. Add style notes for pose, scene, glasses & watches. AI fully dresses you — head to toe.',
               style: TextStyle(fontSize: 12, height: 1.35, color: isDark ? Colors.white70 : const Color(0xFF334155)),
             ),
           ),

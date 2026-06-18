@@ -18,16 +18,17 @@ type GeminiImagePart = { mimeType?: string; data?: string };
 async function geminiVirtualOutfit(
   apiKey: string,
   prompt: string,
-  personImage: GeminiImagePart,
-  outfitImage: GeminiImagePart,
+  images: GeminiImagePart[],
+  personOnly = false,
 ): Promise<string> {
   const models = [
     "gemini-2.5-flash-image",
     "gemini-2.5-flash-image-preview",
     "gemini-2.0-flash-preview-image-generation",
   ];
-  const parts: unknown[] = [];
-  for (const img of [personImage, outfitImage]) {
+  const parts: unknown[] = [{ text: prompt }];
+  const imgs = personOnly ? images.slice(0, 1) : images;
+  for (const img of imgs) {
     const data = String(img?.data ?? "").trim();
     if (!data) continue;
     parts.push({
@@ -37,7 +38,6 @@ async function geminiVirtualOutfit(
       },
     });
   }
-  parts.push({ text: prompt });
 
   let lastErr = "Gemini image generation failed";
   for (const model of models) {
@@ -50,6 +50,7 @@ async function geminiVirtualOutfit(
         contents: [{ parts }],
         generationConfig: {
           responseModalities: ["TEXT", "IMAGE"],
+          temperature: 0.35,
         },
       }),
     });
@@ -242,14 +243,15 @@ serve(async (req) => {
     }
 
     if (action === "geminiVirtualOutfit") {
-      const prompt = String(body?.prompt ?? "").trim();
+      const outfitPrompt = String(body?.prompt ?? "").trim();
       const images: GeminiImagePart[] = Array.isArray(body?.images)
         ? body.images
         : [];
-      if (!apiKey || images.length < 2) {
+      const personOnly = Boolean(body?.personOnly);
+      if (!apiKey || !outfitPrompt || images.length < 1) {
         return new Response(
           JSON.stringify({
-            error: "apiKey, prompt, and two images (person + outfit) are required",
+            error: "apiKey, prompt, and at least one image (person) are required",
           }),
           {
             status: 400,
@@ -259,9 +261,9 @@ serve(async (req) => {
       }
       const imageBase64 = await geminiVirtualOutfit(
         apiKey,
-        prompt,
-        images[0],
-        images[1],
+        outfitPrompt,
+        images,
+        personOnly,
       );
       return new Response(JSON.stringify({ imageBase64 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
