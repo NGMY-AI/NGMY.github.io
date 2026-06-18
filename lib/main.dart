@@ -26418,6 +26418,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                             itemDesc: _itemDescC.text,
                             paymentInfo: _paymentInfoC.text,
                             subtotal: subtotal,
+                            isPaid: _invoicePaid,
                             providerSignature: _providerSignaturePoints,
                             clientSignature: _clientSignaturePoints,
                             providerPhotoBytes: _invoiceProviderPhotoBytes,

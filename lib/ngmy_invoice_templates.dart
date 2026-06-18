@@ -175,10 +175,12 @@ class NgmyInvoicePreviewData {
   final Uint8List? providerPhotoBytes;
   /// `estimate` uses repair-estimate copy on luxury templates; default `invoice`.
   final String documentKind;
+  final bool isPaid;
 
   const NgmyInvoicePreviewData({
     required this.templateId,
     this.documentKind = 'invoice',
+    this.isPaid = false,
     required this.businessName,
     required this.bizStreet,
     required this.bizCityStateZip,
@@ -231,6 +233,7 @@ class NgmyInvoicePreview extends StatelessWidget {
           children: [
             Positioned.fill(child: CustomPaint(painter: _LayoutDecorationPainter(t.layout, t.accent, t.accent2, t.lightBackground))),
             Positioned.fill(child: _InvoiceWatermarks(lightBackground: t.lightBackground)),
+            if (data.isPaid) Positioned(right: 18, top: 88, child: _paidStampSeal(t)),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
               child: DefaultTextStyle(
@@ -533,6 +536,8 @@ class NgmyInvoicePreview extends StatelessWidget {
   }
 
   Widget _totals(NgmyInvoiceTemplate t, Color c, Color panel, Color panelBorder) {
+    final due = data.isPaid ? 0.0 : data.subtotal;
+    final stamp = _paidStampStyle(t);
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
@@ -542,22 +547,124 @@ class NgmyInvoicePreview extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (data.isPaid) ...[
+              _paidBanner(t, stamp),
+              const SizedBox(height: 8),
+            ],
             Text('Subtotal', style: TextStyle(fontSize: 11, color: c.withOpacity(0.8))),
+            Text('\$${data.subtotal.toStringAsFixed(2)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c)),
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(color: t.accent, borderRadius: BorderRadius.circular(6)),
+              decoration: BoxDecoration(
+                gradient: data.isPaid
+                    ? LinearGradient(colors: [stamp.gradient.first.withOpacity(0.85), stamp.gradient.last.withOpacity(0.85)])
+                    : null,
+                color: data.isPaid ? null : t.accent,
+                borderRadius: BorderRadius.circular(6),
+                border: data.isPaid ? Border.all(color: stamp.borderColor.withOpacity(0.65), width: 1.2) : null,
+              ),
               child: Row(
                 children: [
-                  const Text('TOTAL DUE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.white)),
+                  Text(
+                    data.isPaid ? 'BALANCE DUE' : 'TOTAL DUE',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: data.isPaid ? stamp.textColor : Colors.white),
+                  ),
                   const Spacer(),
-                  Text('\$${data.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
+                  Text(
+                    '\$${due.toStringAsFixed(2)}',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: data.isPaid ? stamp.textColor : Colors.white),
+                  ),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _paidBanner(NgmyInvoiceTemplate t, _PaidStampStyle stamp) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: stamp.gradient),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: stamp.borderColor.withOpacity(0.75), width: 1.4),
+        boxShadow: [BoxShadow(color: stamp.gradient.first.withOpacity(0.35), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(stamp.icon, size: 16, color: stamp.textColor),
+          const SizedBox(width: 6),
+          Text(
+            'PAID',
+            style: TextStyle(color: stamp.textColor, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 2.2),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _paidStampSeal(NgmyInvoiceTemplate t) {
+    final stamp = _paidStampStyle(t);
+    return Transform.rotate(
+      angle: -0.28,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: stamp.borderColor, width: 2.4),
+          gradient: LinearGradient(
+            colors: [stamp.gradient.first.withOpacity(0.22), stamp.gradient.last.withOpacity(0.38)],
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(stamp.icon, color: stamp.borderColor, size: 18),
+            const SizedBox(height: 2),
+            Text(
+              'PAID',
+              style: TextStyle(color: stamp.borderColor, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 3),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  _PaidStampStyle _paidStampStyle(NgmyInvoiceTemplate t) {
+    if (t.category == kNgmyInvoiceLuxuryCategory) {
+      return _PaidStampStyle(
+        gradient: [t.accent, t.accent2],
+        textColor: t.lightBackground ? const Color(0xFF0F172A) : Colors.white,
+        borderColor: t.accent2,
+        icon: Icons.diamond_rounded,
+      );
+    }
+    if (t.category == kNgmyInvoicePremiumCategory) {
+      return _PaidStampStyle(
+        gradient: [t.accent, Color.lerp(t.accent, t.accent2, 0.55)!],
+        textColor: Colors.white,
+        borderColor: t.accent,
+        icon: Icons.workspace_premium_rounded,
+      );
+    }
+    if (t.lightBackground) {
+      return const _PaidStampStyle(
+        gradient: [Color(0xFF059669), Color(0xFF10B981)],
+        textColor: Colors.white,
+        borderColor: Color(0xFF047857),
+        icon: Icons.check_circle_rounded,
+      );
+    }
+    return _PaidStampStyle(
+      gradient: [t.accent, t.accent2],
+      textColor: Colors.white,
+      borderColor: t.accent,
+      icon: Icons.verified_rounded,
     );
   }
 
@@ -619,6 +726,20 @@ class NgmyInvoicePreview extends StatelessWidget {
 
   String _fmt(String v) => _num(v).toStringAsFixed(2);
   double _num(String v) => double.tryParse(v.trim()) ?? 0;
+}
+
+class _PaidStampStyle {
+  const _PaidStampStyle({
+    required this.gradient,
+    required this.textColor,
+    required this.borderColor,
+    required this.icon,
+  });
+
+  final List<Color> gradient;
+  final Color textColor;
+  final Color borderColor;
+  final IconData icon;
 }
 
 class _InvoiceWatermarks extends StatelessWidget {
