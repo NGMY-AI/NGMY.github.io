@@ -45,7 +45,13 @@ class _EssentialLuxuryCtx {
       ? data.paymentInfo.trim()
       : 'It is our honor to serve you with distinction and excellence.';
 
-  Widget royalShell({required Widget body, Widget? topBand, CustomPainter? overlay, bool showCrownBand = true}) {
+  Widget royalShell({
+    required Widget body,
+    Widget? topBand,
+    CustomPainter? overlay,
+    bool showCrownBand = true,
+    bool paidStampOnLeft = true,
+  }) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -74,7 +80,6 @@ class _EssentialLuxuryCtx {
             Positioned.fill(child: CustomPaint(painter: _LinenPainter(_luxGold.withOpacity(0.025)))),
             if (overlay != null) Positioned.fill(child: CustomPaint(painter: overlay)),
             Positioned.fill(child: CustomPaint(painter: _CornerFlourishPainter(_luxGold.withOpacity(0.82)))),
-            if (data.isPaid) Positioned(right: 20, top: 72, child: paidStampSeal()),
             Positioned.fill(
               child: IgnorePointer(
                 child: Center(
@@ -123,6 +128,13 @@ class _EssentialLuxuryCtx {
                 Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 14), child: body),
               ],
             ),
+            if (data.isPaid)
+              Positioned(
+                left: paidStampOnLeft ? 12 : null,
+                right: paidStampOnLeft ? null : 12,
+                top: 12,
+                child: paidStampSeal(),
+              ),
           ],
         ),
       ),
@@ -182,7 +194,7 @@ class _EssentialLuxuryCtx {
         style: TextStyle(color: _luxIvory.withOpacity(0.72), fontSize: 9, letterSpacing: 1.6, fontWeight: FontWeight.w600),
       );
 
-  Widget photo({double size = 92, BoxShape shape = BoxShape.circle, BorderRadius? radius}) {
+  Widget photo({double size = 92}) {
     final bytes = data.providerPhotoBytes;
     Widget img;
     if (bytes != null && bytes.isNotEmpty) {
@@ -203,18 +215,14 @@ class _EssentialLuxuryCtx {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        shape: shape,
-        borderRadius: shape == BoxShape.rectangle ? (radius ?? BorderRadius.circular(8)) : null,
+        shape: BoxShape.circle,
         border: Border.all(color: _luxGold, width: 2.5),
         boxShadow: [
           BoxShadow(color: _luxGold.withOpacity(0.45), blurRadius: 14),
           BoxShadow(color: accent.withOpacity(0.25), blurRadius: 6),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: shape == BoxShape.circle ? BorderRadius.circular(size) : (radius ?? BorderRadius.circular(6)),
-        child: img,
-      ),
+      child: ClipOval(child: img),
     );
   }
 
@@ -589,6 +597,7 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
   /// 3 Sapphire — Presidential letterhead.
   Widget _bulletin(_EssentialLuxuryCtx c) {
     return c.royalShell(
+      paidStampOnLeft: false,
       body: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -601,7 +610,7 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
             ),
             child: Row(
               children: [
-                c.photo(size: 68, shape: BoxShape.rectangle, radius: BorderRadius.circular(4)),
+                c.photo(size: 68),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -678,54 +687,18 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
 
   /// 5 Violet — Luxury gazette cover.
   Widget _gazette(_EssentialLuxuryCtx c) {
-    final bytes = c.data.providerPhotoBytes;
     return c.royalShell(
       body: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: SizedBox(
-              height: 118,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (bytes != null && bytes.isNotEmpty)
-                    Image.memory(bytes, fit: BoxFit.cover)
-                  else
-                    Container(
-                      decoration: BoxDecoration(gradient: LinearGradient(colors: [c.accent2, c.accent.withOpacity(0.4)])),
-                      child: Icon(Icons.photo_camera_front_outlined, size: 36, color: _luxGold.withOpacity(0.35)),
-                    ),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black.withOpacity(0.88)],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 12,
-                    bottom: 10,
-                    right: 12,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        c.royalTitle('GAZETTE', size: 22),
-                        Text(c.biz, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w800, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          Center(child: c.photo(size: 88)),
           const SizedBox(height: 10),
-          Text('Prepared for ${c.client}', style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w800, fontSize: 12)),
-          Text(c.headline, style: TextStyle(color: c.accent, fontWeight: FontWeight.w700, fontSize: 11)),
+          c.royalTitle('GAZETTE', size: 20),
+          Text(c.biz, textAlign: TextAlign.center, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w800, fontSize: 11)),
+          const SizedBox(height: 8),
+          Text('Prepared for ${c.client}', textAlign: TextAlign.center, style: const TextStyle(color: _luxIvory, fontWeight: FontWeight.w800, fontSize: 12)),
+          Text(c.headline, textAlign: TextAlign.center, style: TextStyle(color: c.accent, fontWeight: FontWeight.w700, fontSize: 11)),
           c.bottomBar(),
         ],
       ),
@@ -735,6 +708,7 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
   /// 6 Platinum — Executive wire ledger (luxury, not terminal).
   Widget _wire(_EssentialLuxuryCtx c) {
     return c.royalShell(
+      paidStampOnLeft: false,
       body: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -750,7 +724,7 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              c.photo(size: 64, shape: BoxShape.rectangle),
+              c.photo(size: 64),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -777,6 +751,7 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
   /// 7 Amber — Imperial flash decree.
   Widget _flash(_EssentialLuxuryCtx c) {
     return c.royalShell(
+      paidStampOnLeft: false,
       overlay: _DiagonalFlashPainter(c.accent.withOpacity(0.22)),
       body: Column(
         mainAxisSize: MainAxisSize.min,
@@ -826,6 +801,7 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
   Widget _dispatch(_EssentialLuxuryCtx c) {
     return c.royalShell(
       showCrownBand: false,
+      paidStampOnLeft: true,
       topBand: ClipPath(
         clipper: _WaveTopClipper(),
         child: Container(
@@ -883,7 +859,7 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
           c.royalTitle('ROYAL INVITATION TO PAY', size: 15),
           Text(c.biz, style: TextStyle(color: _luxIvory.withOpacity(0.8), fontSize: 10, letterSpacing: 2, fontStyle: FontStyle.italic)),
           const SizedBox(height: 10),
-          c.photo(size: 78, shape: BoxShape.rectangle, radius: BorderRadius.circular(40)),
+          c.photo(size: 78),
           const SizedBox(height: 10),
           Text('Dear ${c.client},', style: TextStyle(color: _luxIvory.withOpacity(0.9), fontSize: 11, fontStyle: FontStyle.italic)),
           const SizedBox(height: 6),
@@ -904,6 +880,7 @@ class _NgmyEssentialLuxuryInvoice extends StatelessWidget {
   Widget _midnight(_EssentialLuxuryCtx c) {
     return c.royalShell(
       showCrownBand: false,
+      paidStampOnLeft: false,
       topBand: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
         decoration: BoxDecoration(
