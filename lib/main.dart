@@ -25554,16 +25554,8 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   }
 
   void _openInvoiceFromGDialog(BuildContext dialogContext) {
-    // 1. Close current G-Services dialog immediately
-    Navigator.of(dialogContext, rootNavigator: true).pop();
-
-    // 2. Wait for the pop animation to finish and for the mouse tracker to stabilize.
-    // The previous crash was likely due to the dialog being replaced too fast
-    // while a hover/tooltip was active.
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (!mounted) return;
-      _openInvoiceGenerator();
-    });
+    // Open Create Invoice on top of Pick Two — no pop/back-to-hub flash.
+    _openInvoiceGenerator(presenterContext: dialogContext);
   }
 
   Directory _downloadDirectory() {
@@ -26116,7 +26108,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     );
   }
 
-  void _openInvoiceGenerator() async {
+  void _openInvoiceGenerator({BuildContext? presenterContext}) async {
     _providerSignaturePoints.clear();
     _clientSignaturePoints.clear();
     _invoicePaid = false;
@@ -26124,11 +26116,11 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     var savedCount = await savedInvoiceCount();
     final GlobalKey localPreviewKey = GlobalKey();
 
-    // Use SchedulerBinding to ensure we are outside of any current build/frame processing
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+    void presentInvoiceDialog() {
+      final host = presenterContext ?? context;
+      if (!mounted || !host.mounted) return;
       showDialog(
-        context: context,
+        context: host,
         builder: (ctx) => StatefulBuilder(
           builder: (ctx, setDialog) {
             final isDark = Theme.of(ctx).brightness == Brightness.dark;
@@ -26479,7 +26471,13 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
         },
       ),
     );
-    });
+    }
+
+    if (presenterContext != null) {
+      presentInvoiceDialog();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => presentInvoiceDialog());
+    }
   }
 
   Widget _ngmyServicesHeroCard({required bool isDark, required List<Color> topColors}) {
