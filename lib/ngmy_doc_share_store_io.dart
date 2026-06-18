@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_doc_share_models.dart';
 
@@ -387,6 +388,38 @@ class NgmyDocShareStore {
     final root = await _userDir(email);
     final f = await _fileForId(root, item.id);
     return f?.path;
+  }
+
+  static Future<File?> localFileForItem(String email, NgmyDocShareItem item) async {
+    final path = await filePath(email, item);
+    if (path == null) return null;
+    final f = File(path);
+    return await f.exists() ? f : null;
+  }
+
+  static Future<bool> uploadItemToSupabase({
+    required String ownerEmail,
+    required NgmyDocShareItem item,
+    required String bucket,
+    required String storagePath,
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    try {
+      final f = await localFileForItem(ownerEmail, item);
+      if (f == null) return false;
+      final total = await f.length();
+      onProgress?.call(0, total);
+      await Supabase.instance.client.storage.from(bucket).upload(
+            storagePath,
+            f,
+            fileOptions: FileOptions(upsert: true, contentType: item.mime),
+          );
+      onProgress?.call(total, total);
+      return true;
+    } catch (e) {
+      debugPrint('[doc share upload] ${item.name}: $e');
+      return false;
+    }
   }
 
   static Future<void> delete(String email, String id) async {

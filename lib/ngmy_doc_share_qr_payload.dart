@@ -49,6 +49,7 @@ class NgmyDocShareQrPayload {
         t.startsWith('NGMYDOCSYNC1|') ||
         t.startsWith('NGMYDOCSYNC2|') ||
         t.startsWith('NGMYDOCSYNC0|') ||
+        t.startsWith('NGMYDOCSYNC4|VT') ||
         t.startsWith('NGMYDOCSYNC3|WR') ||
         t.startsWith('NGMYDOCSYNC3A|WR') ||
         t.startsWith('http://');

@@ -986,7 +986,10 @@ class _DocShareQrDisplayPage extends StatefulWidget {
 class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
   final _qrCaptureKey = GlobalKey();
   Timer? _answerPoll;
+  Timer? _uploadPoll;
   bool _webrtcConnected = false;
+  bool _videoCloudReady = false;
+  double _videoUploadProgress = 0;
 
   String? get _webrtcOfferToken {
     if (widget.mode != NgmyDocShareQrMode.webrtcLink) return null;
@@ -998,6 +1001,16 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
     return null;
   }
 
+  String? get _videoCloudToken {
+    if (widget.mode != NgmyDocShareQrMode.videoCloud) return null;
+    final p = widget.payload.trim();
+    const head = 'NGMYDOCSYNC4|';
+    if (!p.startsWith(head)) return null;
+    final body = p.substring(head.length).trim();
+    if (body.startsWith('VT')) return body;
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1006,12 +1019,29 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
       _pollWebRtcAnswer(token);
       _answerPoll = Timer.periodic(const Duration(milliseconds: 800), (_) => _pollWebRtcAnswer(token));
     }
+    final videoToken = _videoCloudToken;
+    if (videoToken != null) {
+      _pollVideoCloudUpload(videoToken);
+      _uploadPoll = Timer.periodic(const Duration(seconds: 1), (_) => _pollVideoCloudUpload(videoToken));
+    }
   }
 
   @override
   void dispose() {
     _answerPoll?.cancel();
+    _uploadPoll?.cancel();
     super.dispose();
+  }
+
+  Future<void> _pollVideoCloudUpload(String token) async {
+    if (!mounted) return;
+    final ready = await NgmyDocShareSync.isVideoCloudReady(token);
+    final progress = await NgmyDocShareSync.videoCloudUploadProgress(token);
+    if (!mounted) return;
+    setState(() {
+      _videoCloudReady = ready;
+      _videoUploadProgress = progress ?? (ready ? 1.0 : _videoUploadProgress);
+    });
   }
 
   Future<void> _pollWebRtcAnswer(String offerToken) async {
@@ -1036,6 +1066,8 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
         return 'Direct transfer';
       case NgmyDocShareQrMode.webrtcLink:
         return 'Direct link';
+      case NgmyDocShareQrMode.videoCloud:
+        return 'Video share';
     }
   }
 
@@ -1049,6 +1081,10 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
         return 'Keep this screen open until the other phone finishes. They scan with Doc Share → Scan QR.';
       case NgmyDocShareQrMode.webrtcLink:
         return 'Receiver scans this QR. Connection completes automatically when they accept.';
+      case NgmyDocShareQrMode.videoCloud:
+        return _videoCloudReady
+            ? 'Video is ready. Receiver scans with Doc Share → Scan QR.'
+            : 'Uploading video to cloud… keep this screen open until ready.';
     }
   }
 
@@ -1126,7 +1162,9 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
     final shareCode = widget.payload.length > 48 ? '${widget.payload.substring(0, 44)}…' : widget.payload;
 
     return PopScope(
-      canPop: widget.mode != NgmyDocShareQrMode.lanDirect && widget.mode != NgmyDocShareQrMode.webrtcLink,
+      canPop: widget.mode != NgmyDocShareQrMode.lanDirect &&
+          widget.mode != NgmyDocShareQrMode.webrtcLink &&
+          widget.mode != NgmyDocShareQrMode.videoCloud,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) unawaited(NgmyDocShareSync.stopLanShare());
       },
@@ -1138,7 +1176,9 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
           elevation: 0,
           title: Text('Share via QR', style: TextStyle(fontWeight: FontWeight.w900, color: c.fg)),
           centerTitle: true,
-          leading: widget.mode == NgmyDocShareQrMode.lanDirect || widget.mode == NgmyDocShareQrMode.webrtcLink
+          leading: widget.mode == NgmyDocShareQrMode.lanDirect ||
+                  widget.mode == NgmyDocShareQrMode.webrtcLink ||
+                  widget.mode == NgmyDocShareQrMode.videoCloud
               ? null
               : IconButton(
                   icon: const Icon(Icons.close_rounded),
@@ -1199,6 +1239,26 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
                           onPressed: () => _copyLanLink(context),
                           icon: const Icon(Icons.link_rounded, size: 16),
                           label: const Text('Copy link for Paste'),
+                        ),
+                      ],
+                      if (widget.mode == NgmyDocShareQrMode.videoCloud) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: (_videoCloudReady ? Colors.green : kNgmyStudioHubAccent).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            _videoCloudReady
+                                ? 'Ready to receive'
+                                : 'Uploading ${(_videoUploadProgress * 100).clamp(0, 99).toStringAsFixed(0)}%',
+                            style: TextStyle(
+                              color: _videoCloudReady ? Colors.green.shade700 : kNgmyStudioHubAccent,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                       ],
                       if (widget.mode == NgmyDocShareQrMode.webrtcLink) ...[

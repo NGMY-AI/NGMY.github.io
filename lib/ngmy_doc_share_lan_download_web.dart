@@ -54,6 +54,33 @@ class NgmyDocShareLanDownload {
     return imported;
   }
 
+  static Future<NgmyDocShareItem?> pullSingleFromUrl({
+    required String recipientEmail,
+    required Uri fileUri,
+    required String name,
+    required String mime,
+    required String ownerEmail,
+  }) async {
+    try {
+      final request = http.Request('GET', fileUri);
+      final streamed = await http.Client().send(request).timeout(const Duration(hours: 6));
+      if (streamed.statusCode != 200) return null;
+      final bytes = await streamed.stream.toBytes();
+      if (bytes.isEmpty) return null;
+      return NgmyDocShareStore.addBytes(
+        email: recipientEmail,
+        name: name,
+        mime: mime,
+        bytes: bytes,
+        fromSender: ownerEmail.isNotEmpty ? ownerEmail : null,
+        note: 'Received via QR',
+      );
+    } catch (e) {
+      debugPrint('[doc share pull url web] $name: $e');
+      return null;
+    }
+  }
+
   static Future<Map<String, dynamic>?> fetchManifest(Uri manifestUri) async {
     try {
       final res = await http.get(manifestUri).timeout(const Duration(seconds: 15));

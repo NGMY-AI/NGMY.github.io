@@ -8,6 +8,7 @@ import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_qr_payload.dart';
 import 'ngmy_doc_share_qr_stash.dart' show NgmyDocShareQrStash, kNgmyDocShareQrPrefixCloud, kNgmyDocShareCloudStashMaxBytes;
 import 'ngmy_doc_share_store.dart';
+import 'ngmy_doc_share_video_cloud.dart' show NgmyDocShareVideoCloud, kNgmyDocShareQrPrefixVideoCloud;
 import 'ngmy_doc_share_webrtc_web.dart' as webrtc;
 
 const String kNgmyDocShareQrPrefixLan = 'N2';
@@ -25,7 +26,7 @@ typedef NgmyDocShareQrResult = ({
   NgmyDocShareQrMode mode,
 });
 
-enum NgmyDocShareQrMode { lanDirect, cloudStash, inlineInstant, webrtcLink }
+enum NgmyDocShareQrMode { lanDirect, cloudStash, inlineInstant, webrtcLink, videoCloud }
 
 class NgmyDocShareSync {
   static String _norm(String email) => email.toLowerCase().trim();
@@ -91,6 +92,10 @@ class NgmyDocShareSync {
 
   static Future<String?> pollWebRtcAnswer(String offerToken) => webrtc.pollAnswerForOffer(offerToken);
 
+  static Future<bool> isVideoCloudReady(String token) => NgmyDocShareVideoCloud.isReady(token);
+
+  static Future<double?> videoCloudUploadProgress(String token) => NgmyDocShareVideoCloud.uploadProgress(token);
+
   static Future<({String answerQr, Future<List<NgmyDocShareItem>> transfer})?> beginWebRtcReceive({
     required String raw,
     required String recipientEmail,
@@ -121,27 +126,13 @@ class NgmyDocShareSync {
       }
     }
 
-    if (kIsWeb) {
-      final qr = await webrtc.createShortOfferQr(ownerEmail: ownerEmail, items: items);
-      if (qr != null) {
-        return (
-          qrPayload: qr,
-          fileCount: items.length,
-          mode: NgmyDocShareQrMode.webrtcLink,
-        );
-      }
-    }
-
-    // LAN blocked (firewall / hotspot) — fall back to cloud-signaled WebRTC on phones too.
-    if (!kIsWeb) {
-      final qr = await webrtc.createShortOfferQr(ownerEmail: ownerEmail, items: items);
-      if (qr != null) {
-        return (
-          qrPayload: qr,
-          fileCount: items.length,
-          mode: NgmyDocShareQrMode.webrtcLink,
-        );
-      }
+    final cloud = await NgmyDocShareVideoCloud.beginShare(ownerEmail: ownerEmail, items: items);
+    if (cloud != null) {
+      return (
+        qrPayload: cloud.qrPayload,
+        fileCount: cloud.fileCount,
+        mode: NgmyDocShareQrMode.videoCloud,
+      );
     }
 
     return null;
@@ -196,6 +187,20 @@ class NgmyDocShareSync {
   }) async {
     var text = raw.trim();
     if (text.startsWith('\uFEFF')) text = text.substring(1);
+
+    if (text.startsWith('${kNgmyDocShareQrPrefixVideoCloud}|')) {
+      final token = text.substring(kNgmyDocShareQrPrefixVideoCloud.length + 1).trim();
+      try {
+        return NgmyDocShareVideoCloud.importToken(
+          recipientEmail: recipientEmail,
+          token: token,
+          onProgress: onProgress,
+        );
+      } catch (e) {
+        debugPrint('[doc share video cloud import] $e');
+        return null;
+      }
+    }
 
     if (text.startsWith('$kNgmyDocShareQrPrefixCloud|')) {
       final token = text.substring(kNgmyDocShareQrPrefixCloud.length + 1).trim();

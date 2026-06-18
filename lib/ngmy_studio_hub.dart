@@ -99,7 +99,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
                         crossAxisCount: 2,
                         mainAxisSpacing: 12,
                         crossAxisSpacing: 12,
-                        childAspectRatio: 1.22,
+                        childAspectRatio: 1.08,
                       ),
                       itemCount: tools.length,
                       itemBuilder: (_, i) => _CreatorToolCard(tool: tools[i]),
@@ -189,7 +189,7 @@ class _CreatorToolCard extends StatelessWidget {
         onTap: tool.onTap,
         borderRadius: BorderRadius.circular(22),
         child: Ink(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
           decoration: BoxDecoration(
             color: surface,
             borderRadius: BorderRadius.circular(20),
@@ -199,13 +199,13 @@ class _CreatorToolCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 52,
-                height: 52,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: tool.colors),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(tool.icon, color: Colors.white, size: 32),
+                child: Icon(tool.icon, color: Colors.white, size: 38),
               ),
               const Spacer(),
               Text(

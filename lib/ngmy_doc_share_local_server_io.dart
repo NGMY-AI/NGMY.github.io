@@ -127,6 +127,15 @@ class NgmyDocShareLocalServer {
         await _serveManifest(req);
         return;
       }
+      if (req.method == 'OPTIONS') {
+        req.response.headers
+          ..add('Access-Control-Allow-Origin', '*')
+          ..add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+          ..add('Access-Control-Allow-Headers', 'Content-Type, Range');
+        req.response.statusCode = HttpStatus.ok;
+        await req.response.close();
+        return;
+      }
       if (path == '$prefix/manifest.json' && req.method == 'GET') {
         await _serveManifest(req);
         return;

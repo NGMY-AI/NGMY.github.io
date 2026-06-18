@@ -5,8 +5,10 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_doc_share_models.dart';
 
@@ -196,6 +198,50 @@ class NgmyDocShareStore {
   }
 
   static Future<String?> filePath(String email, NgmyDocShareItem item) => Future.value(null);
+
+  static html.File? webFileForItem(String itemId) => _webFiles[itemId];
+
+  static Future<bool> uploadItemToSupabase({
+    required String ownerEmail,
+    required NgmyDocShareItem item,
+    required String bucket,
+    required String storagePath,
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    try {
+      final wf = webFileForItem(item.id);
+      Uint8List bytes;
+      if (wf != null) {
+        onProgress?.call(0, wf.size);
+        final reader = html.FileReader();
+        final done = Completer<ByteBuffer?>();
+        reader.onLoadEnd.listen((_) {
+          final result = reader.result;
+          done.complete(result is ByteBuffer ? result : null);
+        });
+        reader.onError.listen((_) => done.complete(null));
+        reader.readAsArrayBuffer(wf);
+        final buf = await done.future.timeout(const Duration(hours: 2), onTimeout: () => null);
+        if (buf == null) return false;
+        bytes = Uint8List.view(buf);
+      } else {
+        final mem = await readBytes(ownerEmail, item);
+        if (mem == null || mem.isEmpty) return false;
+        bytes = mem;
+      }
+      onProgress?.call(bytes.length ~/ 2, bytes.length);
+      await Supabase.instance.client.storage.from(bucket).uploadBinary(
+            storagePath,
+            bytes,
+            fileOptions: FileOptions(upsert: true, contentType: item.mime),
+          );
+      onProgress?.call(bytes.length, bytes.length);
+      return true;
+    } catch (e) {
+      debugPrint('[doc share upload web] ${item.name}: $e');
+      return false;
+    }
+  }
 
   static final Map<int, _WebDiskReceive> _diskReceives = {};
   static int _nextDiskReceiveId = 1;

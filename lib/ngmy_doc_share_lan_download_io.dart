@@ -62,6 +62,37 @@ class NgmyDocShareLanDownload {
     return imported;
   }
 
+  static Future<NgmyDocShareItem?> pullSingleFromUrl({
+    required String recipientEmail,
+    required Uri fileUri,
+    required String name,
+    required String mime,
+    required String ownerEmail,
+  }) async {
+    try {
+      final request = await _client.getUrl(fileUri);
+      request.headers.set(HttpHeaders.acceptEncodingHeader, 'identity');
+      request.headers.set(HttpHeaders.userAgentHeader, 'NGMY-DocShare/1');
+      final response = await request.close().timeout(const Duration(hours: 6));
+      if (response.statusCode != HttpStatus.ok) {
+        debugPrint('[doc share pull url] $name: HTTP ${response.statusCode}');
+        return null;
+      }
+      return NgmyDocShareStore.addFromHttpStream(
+        email: recipientEmail,
+        name: name,
+        mime: mime,
+        stream: response,
+        contentLength: response.contentLength > 0 ? response.contentLength : null,
+        fromSender: ownerEmail.isNotEmpty ? ownerEmail : null,
+        note: 'Received via QR',
+      );
+    } catch (e) {
+      debugPrint('[doc share pull url] $name: $e');
+      return null;
+    }
+  }
+
   static Future<Map<String, dynamic>?> fetchManifest(Uri manifestUri) async {
     for (var attempt = 0; attempt < 5; attempt++) {
       try {
