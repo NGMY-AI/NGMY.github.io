@@ -246,15 +246,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       final created = await NgmyDocShareSync.createQrForItems(ownerEmail: widget.email, items: batch);
       if (!mounted) return;
       if (created == null) {
-        if (kIsWeb) {
-          _toast('On web, use Export for large files. For big-dot QR share, open NGMY on your phone (same Wi‑Fi).');
-        } else {
-          _toast('Could not start local share. Connect both phones to the same Wi‑Fi (or hotspot), then try again.');
-        }
-        return;
-      }
-      if (!NgmyDocShareSync.payloadFitsBrandedQr(created.qrPayload)) {
-        _toast('This file is too large for a scannable QR here. Use Export, or Share QR in the phone app.');
+        _toast('Could not create share QR. Check your connection and try again.');
         return;
       }
       await Navigator.of(context).push<void>(
@@ -434,25 +426,9 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
               backgroundColor: c.border,
               color: kNgmyStudioHubAccent,
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: c.card,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: kNgmyStudioHubAccent2.withValues(alpha: 0.35)),
-              ),
-              child: Text(
-                'Local share only — no cloud. On your phone: Share QR uses the same big-dot style as NGMY Advisors. On web, use Export for large files.',
-                style: TextStyle(color: c.muted, fontSize: 12, height: 1.4),
-              ),
-            ),
-          ),
           if (_items.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
               child: Row(
                 children: [
                   Expanded(
@@ -747,10 +723,12 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
 
   String get _modeLabel {
     switch (widget.mode) {
+      case NgmyDocShareQrMode.cloudStash:
+        return 'Share QR';
       case NgmyDocShareQrMode.inlineInstant:
         return 'Instant restore';
       case NgmyDocShareQrMode.lanDirect:
-        return 'Local transfer';
+        return 'Direct transfer';
       case NgmyDocShareQrMode.webrtcLink:
         return 'Direct link';
     }
@@ -758,12 +736,14 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
 
   String get _hint {
     switch (widget.mode) {
+      case NgmyDocShareQrMode.cloudStash:
+        return 'Receiver scans once — files restore to their Doc Share library.';
       case NgmyDocShareQrMode.inlineInstant:
-        return 'Receiver scans once — tiny file restores instantly. No internet needed.';
+        return 'Receiver scans once — files restore instantly.';
       case NgmyDocShareQrMode.lanDirect:
-        return 'Keep this screen open. Receiver scans with Doc Share → Scan QR. Same Wi‑Fi or hotspot — fully local, no cloud.';
+        return 'Keep this screen open until the other phone finishes. They scan with Doc Share → Scan QR.';
       case NgmyDocShareQrMode.webrtcLink:
-        return 'Receiver scans this QR. If scan fails, tap Copy and paste on their phone. Keep this screen open.';
+        return 'Receiver scans this QR. If scan fails, tap Copy and paste on their phone.';
     }
   }
 
@@ -892,7 +872,7 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            'Local · offline',
+                            'Keep screen open',
                             style: TextStyle(color: kNgmyStudioHubAccent, fontWeight: FontWeight.w800, fontSize: 12),
                           ),
                         ),
@@ -928,14 +908,6 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                widget.mode == NgmyDocShareQrMode.lanDirect
-                    ? 'Same big-dot QR as NGMY Advisors. Receiver opens Doc Share → Scan QR on the same Wi‑Fi.'
-                    : 'Receiver scans once to restore this tiny file. No internet needed.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, height: 1.45, color: c.muted),
               ),
               const SizedBox(height: 12),
               Row(

@@ -11,8 +11,8 @@ const String kNgmyDocShareQrPrefixCloud = 'NGMYDOCSYNC1';
 
 const int kNgmyDocShareQrMaxUses = 25;
 
-/// Bundles larger than this skip cloud stash (use LAN for big videos).
-const int kNgmyDocShareCloudStashMaxBytes = 3 * 1024 * 1024;
+/// Bundles larger than this use phone LAN instead of cloud stash.
+const int kNgmyDocShareCloudStashMaxBytes = 12 * 1024 * 1024;
 
 const String _kDocShareQrStashKey = 'ngmy_doc_share_qr_stashes_v1';
 

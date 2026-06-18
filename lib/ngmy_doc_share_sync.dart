@@ -6,7 +6,7 @@ import 'ngmy_doc_share_lan_download.dart';
 import 'ngmy_doc_share_local_server.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_qr_payload.dart';
-import 'ngmy_doc_share_qr_stash.dart';
+import 'ngmy_doc_share_qr_stash.dart' show NgmyDocShareQrStash, kNgmyDocShareQrPrefixCloud, kNgmyDocShareCloudStashMaxBytes;
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_webrtc_web.dart' as webrtc;
 
@@ -25,17 +25,26 @@ typedef NgmyDocShareQrResult = ({
   NgmyDocShareQrMode mode,
 });
 
-enum NgmyDocShareQrMode { lanDirect, inlineInstant, webrtcLink }
+enum NgmyDocShareQrMode { lanDirect, cloudStash, inlineInstant, webrtcLink }
 
 class NgmyDocShareSync {
   static String _norm(String email) => email.toLowerCase().trim();
 
-  /// Local LAN first (short QR, big dots like Advisors). No cloud — fully offline on same Wi‑Fi.
+  /// Phone: local LAN (short QR). Web: cloud stash (short QR, same as Advisors). Never dense WebRTC in QR.
   static Future<NgmyDocShareQrResult?> createQrForItems({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
   }) async {
     if (items.isEmpty) return null;
+
+    final bundleJson = await exportBundleFile(ownerEmail: ownerEmail, items: items);
+    try {
+      final decoded = jsonDecode(bundleJson);
+      final files = decoded is Map ? decoded['files'] : null;
+      if (files is! List || files.isEmpty) return null;
+    } catch (_) {
+      return null;
+    }
 
     if (!kIsWeb) {
       final lan = await NgmyDocShareLocalServer.start(ownerEmail: ownerEmail, items: items);
@@ -48,9 +57,22 @@ class NgmyDocShareSync {
       }
     }
 
-    // Web: never pack WebRTC SDP in QR (creates tiny unreadable dots). Tiny inline only.
-    final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items);
-    return inline;
+    if (bundleJson.length <= kNgmyDocShareCloudStashMaxBytes) {
+      final stash = await NgmyDocShareQrStash.createFromBundleJson(
+        ownerEmail: ownerEmail,
+        bundleJson: bundleJson,
+        fileCount: items.length,
+      );
+      if (stash != null) {
+        return (
+          qrPayload: stash.qrPayload,
+          fileCount: items.length,
+          mode: NgmyDocShareQrMode.cloudStash,
+        );
+      }
+    }
+
+    return _tryInlineQr(ownerEmail: ownerEmail, items: items, bundleJson: bundleJson);
   }
 
   static bool payloadFitsBrandedQr(String payload) =>
@@ -78,11 +100,12 @@ class NgmyDocShareSync {
   static Future<NgmyDocShareQrResult?> _tryInlineQr({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
+    String? bundleJson,
   }) async {
     if (items.length != 1) return null;
     final only = items.first;
     if (only.sizeBytes > kNgmyDocShareInlineMaxBytes) return null;
-    final jsonText = await exportBundleFile(ownerEmail: ownerEmail, items: items);
+    final jsonText = bundleJson ?? await exportBundleFile(ownerEmail: ownerEmail, items: items);
     final payload = NgmyDocShareQrPayload.wrapCompressed(kNgmyDocShareQrPrefixInline, jsonText);
     if (payload.length > kNgmyDocShareInlineQrMaxChars) return null;
     return (
