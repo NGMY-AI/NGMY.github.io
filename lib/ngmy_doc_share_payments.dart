@@ -4,13 +4,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_doc_share_school.dart';
 
-/// Doc Share — free creations for individuals; wallet unlock; schools use org license.
+/// Doc Share — free creations for individuals; wallet unlock; organizations use org license.
 class NgmyDocSharePayments {
   static const int defaultIndividualFreeLimit = 10;
   static const double defaultIndividualUnlockFee = 4.99;
   static const double defaultSchoolLicenseFee = 49.99;
   static const _usagePrefsPrefix = 'ngmy_doc_share_usage_';
+  static const _pathPrefsPrefix = 'ngmy_doc_share_path_';
   static const int unlimitedRemaining = -1;
+
+  /// Saved user path: individual | member | org_owner
+  static const String pathIndividual = 'individual';
+  static const String pathMember = 'member';
+  static const String pathOrgOwner = 'org_owner';
 
   static int individualFreeLimitFromConfig(dynamic config) {
     final v = (config as dynamic).docShareIndividualFreeLimit;
@@ -51,6 +57,30 @@ class NgmyDocSharePayments {
   }
 
   static String _emailKey(String email) => email.toLowerCase().trim();
+
+  static Future<String?> savedPath(String email) async {
+    final key = _emailKey(email);
+    if (key.isEmpty) return null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('$_pathPrefsPrefix$key');
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<void> setSavedPath(String email, String path) async {
+    final key = _emailKey(email);
+    if (key.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('$_pathPrefsPrefix$key', path);
+  }
+
+  static Future<void> clearSavedPath(String email) async {
+    final key = _emailKey(email);
+    if (key.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_pathPrefsPrefix$key');
+  }
 
   static bool hasIndividualAccess(dynamic config, String email) {
     if (individualUnlockFeeFromConfig(config) <= 0) return true;
@@ -112,11 +142,21 @@ class NgmyDocSharePayments {
   static bool isUnlimitedRemaining(int remaining) =>
       remaining == unlimitedRemaining || remaining >= 999999;
 
-  static Future<bool> hasSchoolStudentAccess(String email) => NgmyDocShareSchool.hasActiveStudentSession(email);
+  static Future<bool> hasSchoolStudentAccess(String email, {dynamic config}) =>
+      NgmyDocShareSchool.hasActiveMemberSession(email, config: config);
+
+  static Future<bool> individualFreeExhausted(dynamic config, String email, {bool isAdmin = false}) async {
+    if (isAdmin) return false;
+    final limit = individualFreeLimitFromConfig(config);
+    if (limit <= 0) return false;
+    if (hasIndividualAccess(config, email)) return false;
+    final used = await lifetimeCreationCount(email);
+    return used >= limit;
+  }
 
   static Future<int> remainingFree(dynamic config, String email, {bool isAdmin = false}) async {
     if (isAdmin) return unlimitedRemaining;
-    if (await hasSchoolStudentAccess(email)) return unlimitedRemaining;
+    if (await hasSchoolStudentAccess(email, config: config)) return unlimitedRemaining;
     final limit = individualFreeLimitFromConfig(config);
     if (limit <= 0) return unlimitedRemaining;
     if (hasIndividualAccess(config, email)) return unlimitedRemaining;
@@ -126,15 +166,11 @@ class NgmyDocSharePayments {
 
   static Future<bool> needsIndividualPayment(dynamic config, String email, {bool isAdmin = false}) async {
     if (isAdmin) return false;
-    if (await hasSchoolStudentAccess(email)) return false;
-    final limit = individualFreeLimitFromConfig(config);
-    if (limit <= 0) return false;
-    if (hasIndividualAccess(config, email)) return false;
-    if (individualUnlockFeeFromConfig(config) <= 0) return false;
-    final used = await lifetimeCreationCount(email);
-    return used >= limit;
+    if (await hasSchoolStudentAccess(email, config: config)) return false;
+    return individualFreeExhausted(config, email, isAdmin: isAdmin);
   }
 
+  /// Individual users who exhausted free tier are sent back to role selection — no wallet popup.
   static Future<bool> ensureIndividualAccess({
     required BuildContext context,
     required dynamic user,
@@ -146,24 +182,7 @@ class NgmyDocSharePayments {
     final email = ((user as dynamic).email as String?) ?? '';
     final isAdmin = (user as dynamic).isAdmin == true;
     if (!await needsIndividualPayment(config, email, isAdmin: isAdmin)) return true;
-
-    final fee = individualUnlockFeeFromConfig(config);
-    final limit = individualFreeLimitFromConfig(config);
-    final ok = await NgmyFamilyTreeStyleCharge.confirmAndCharge(
-      context: context,
-      user: user,
-      amount: fee,
-      title: 'Doc Share',
-      message:
-          'You used your $limit free Doc Share uploads/shares. '
-          'Pay \$${fee.toStringAsFixed(2)} for unlimited Doc Share for 30 days.',
-      onCharge: onCharge,
-    );
-    if (!ok) return false;
-    grantIndividualAccess(config, email);
-    onDataChanged();
-    await onPersistConfig();
-    return true;
+    return false;
   }
 
   static Future<bool> ensureSchoolLicense({
@@ -191,10 +210,10 @@ class NgmyDocSharePayments {
       context: context,
       user: user,
       amount: fee,
-      title: 'Doc Share for Schools',
+      title: 'Doc Share for Organizations',
       message:
-          'Pay \$${fee.toStringAsFixed(2)} for a 1-year school license. '
-          'You can create a school login and password for your students.',
+          'Pay \$${fee.toStringAsFixed(2)} for a 1-year organization license. '
+          'Create an access code and password for your team members.',
       onCharge: onCharge,
     );
     if (!ok) return false;

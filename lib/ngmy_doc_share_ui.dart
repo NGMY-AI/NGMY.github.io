@@ -13,8 +13,11 @@ import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platfor
 import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
 import 'ngmy_doc_share_folder.dart';
 import 'ngmy_doc_share_models.dart';
+import 'ngmy_doc_share_gate_ui.dart';
+import 'ngmy_doc_share_org_settings.dart';
 import 'ngmy_doc_share_payments.dart';
 import 'ngmy_doc_share_playback.dart';
+import 'ngmy_doc_share_school.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_sync.dart';
 import 'ngmy_qr_download.dart';
@@ -41,6 +44,7 @@ class NgmyDocSharePage extends StatefulWidget {
     this.config,
     this.isAdmin = false,
     this.schoolMode = false,
+    this.orgOwnerMode = false,
     this.onCharge,
     this.onDataChanged,
     this.onPersistConfig,
@@ -51,6 +55,7 @@ class NgmyDocSharePage extends StatefulWidget {
   final dynamic config;
   final bool isAdmin;
   final bool schoolMode;
+  final bool orgOwnerMode;
   final Future<bool> Function(double amount, String description)? onCharge;
   final VoidCallback? onDataChanged;
   final Future<bool> Function()? onPersistConfig;
@@ -101,9 +106,11 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     }
   }
 
+  bool get _hasUnlimitedAccess => widget.isAdmin || widget.schoolMode || widget.orgOwnerMode;
+
   Future<bool> _ensureCanCreate() async {
     if (widget.isAdmin || widget.config == null) return true;
-    if (widget.schoolMode) return true;
+    if (_hasUnlimitedAccess) return true;
     final ok = await NgmyDocSharePayments.ensureIndividualAccess(
       context: context,
       user: widget.user ?? _GuestUser(widget.email),
@@ -112,11 +119,44 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       onDataChanged: widget.onDataChanged ?? () {},
       onPersistConfig: widget.onPersistConfig ?? () async => false,
     );
+    if (!ok && mounted) {
+      _toast('Free uploads used up. Choose Team Member or Organization Owner.');
+      await ngmyDocShareReturnToRoleGate(context, email: widget.email);
+      if (!mounted) return false;
+      await openNgmyDocShare(
+        context: context,
+        user: widget.user ?? _GuestUser(widget.email),
+        config: widget.config!,
+        onCharge: widget.onCharge ?? (_, __) async => false,
+        onDataChanged: widget.onDataChanged ?? () {},
+        onPersistConfig: widget.onPersistConfig ?? () async => false,
+      );
+    }
     return ok;
   }
 
+  Future<void> _openOrgSettings() async {
+    final portal = await NgmyDocShareSchool.ownerPortal(widget.email);
+    if (!mounted) return;
+    if (portal == null) {
+      _toast('No organization portal found.');
+      return;
+    }
+    final code = (portal['loginCode'] ?? '').toString();
+    final name = (portal['schoolName'] ?? portal['organizationName'] ?? 'Organization').toString();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => NgmyDocShareOrgSettingsPage(
+          ownerEmail: widget.email,
+          initialLoginCode: code,
+          initialOrgName: name,
+        ),
+      ),
+    );
+  }
+
   Future<void> _recordCreationIfNeeded({int count = 1}) async {
-    if (widget.isAdmin || widget.schoolMode) return;
+    if (_hasUnlimitedAccess) return;
     for (var i = 0; i < count; i++) {
       await NgmyDocSharePayments.recordCreation(widget.email);
     }
@@ -489,6 +529,12 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         title: Text('Doc Share', style: TextStyle(fontWeight: FontWeight.w900, color: c.fg)),
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded), onPressed: () => Navigator.pop(context)),
         actions: [
+          if (widget.orgOwnerMode)
+            IconButton(
+              tooltip: 'Organization settings',
+              onPressed: _working ? null : _openOrgSettings,
+              icon: const Icon(Icons.settings_rounded),
+            ),
           if (_items.isNotEmpty)
             IconButton(
               tooltip: 'Select all',

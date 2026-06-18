@@ -89,6 +89,7 @@ import 'ngmy_store_payment_notification.dart';
 import 'ngmy_document_scanner.dart';
 import 'ngmy_document_scan_payments.dart';
 import 'ngmy_doc_share_payments.dart';
+import 'ngmy_doc_share_school.dart';
 import 'ngmy_oauth.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
@@ -19176,6 +19177,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
     var communicatePayExpanded = false;
     var documentScanExpanded = false;
     var docShareExpanded = false;
+    var docShareOrgsLoading = false;
+    var docShareOrgs = <Map<String, dynamic>>[];
+
+    Future<void> refreshDocShareOrgs(void Function(void Function()) setST) async {
+      setST(() => docShareOrgsLoading = true);
+      final list = await NgmyDocShareSchool.listOrganizations();
+      setST(() {
+        docShareOrgs = list;
+        docShareOrgsLoading = false;
+      });
+    }
 
     Widget categoryShell({
       required String title,
@@ -19852,7 +19864,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                       categoryShell(
                         title: 'Doc Share',
-                        subtitle: 'Individual free uploads/shares, school license, wallet unlock',
+                        subtitle: 'Individual free tier, organization licenses, team access',
                         icon: Icons.qr_code_2_rounded,
                         accent: const Color(0xFF0D9488),
                         expanded: docShareExpanded,
@@ -19867,6 +19879,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             translateExpanded = false;
                             communicatePayExpanded = false;
                             documentScanExpanded = false;
+                            unawaited(refreshDocShareOrgs(setST));
                           }
                         }),
                         children: [
@@ -19886,7 +19899,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             decoration: const InputDecoration(
                               labelText: 'Individual unlock fee after free limit (\$)',
                               prefixIcon: Icon(Icons.lock_open_rounded),
-                              helperText: 'Unlimited Doc Share for 30 days. Set 0 for free.',
+                              helperText: 'Optional paid unlock. After free tier, users choose team or org path.',
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -19894,9 +19907,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             controller: docShareSchoolFeeC,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             decoration: const InputDecoration(
-                              labelText: 'School license fee (\$/year)',
-                              prefixIcon: Icon(Icons.school_rounded),
-                              helperText: 'Head of school pays once to create student login. Set 0 for free.',
+                              labelText: 'Organization license fee (\$/year)',
+                              prefixIcon: Icon(Icons.corporate_fare_rounded),
+                              helperText: 'Organization owners pay once per year to create team access.',
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -19923,6 +19936,104 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0D9488), minimumSize: const Size(double.infinity, 44)),
                             child: const Text('Save Doc Share', style: TextStyle(fontWeight: FontWeight.w800)),
                           ),
+                          const SizedBox(height: 18),
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text('Subscribed organizations', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                              ),
+                              TextButton.icon(
+                                onPressed: docShareOrgsLoading ? null : () => unawaited(refreshDocShareOrgs(setST)),
+                                icon: const Icon(Icons.refresh_rounded, size: 18),
+                                label: const Text('Refresh'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (docShareOrgsLoading)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
+                            )
+                          else if (docShareOrgs.isEmpty)
+                            Text(
+                              'No organization portals yet.',
+                              style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+                            )
+                          else
+                            ...docShareOrgs.map((org) {
+                              final owner = (org['ownerEmail'] ?? '').toString();
+                              final untilRaw = widget.config.docShareSchoolLicenseUntilByEmail[owner];
+                              final until = untilRaw == null ? null : DateTime.tryParse(untilRaw);
+                              final licenseLabel = until == null
+                                  ? 'No license on file'
+                                  : until.isAfter(DateTime.now())
+                                      ? 'License until ${until.toLocal().toString().split(' ').first}'
+                                      : 'License expired';
+                              final active = org['active'] == true;
+                              final code = (org['loginCode'] ?? '').toString();
+                              final name = (org['organizationName'] ?? 'Organization').toString();
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(name, style: const TextStyle(fontWeight: FontWeight.w800)),
+                                    const SizedBox(height: 4),
+                                    Text('Code: $code · Owner: $owner', style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF64748B))),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      active ? licenseLabel : 'Revoked',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: active && until != null && until.isAfter(DateTime.now())
+                                            ? const Color(0xFF059669)
+                                            : (isDark ? Colors.orangeAccent : Colors.orange.shade800),
+                                      ),
+                                    ),
+                                    if (active) ...[
+                                      const SizedBox(height: 8),
+                                      OutlinedButton.icon(
+                                        onPressed: () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (dCtx) => AlertDialog(
+                                              title: const Text('Revoke organization?'),
+                                              content: Text(
+                                                'Members using code "$code" will lose access on their next sign-in.',
+                                              ),
+                                              actions: [
+                                                TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Cancel')),
+                                                FilledButton(
+                                                  onPressed: () => Navigator.pop(dCtx, true),
+                                                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                                  child: const Text('Revoke'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm != true || !context.mounted) return;
+                                          final ok = await NgmyDocShareSchool.revokeOrganization(code);
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text(ok ? 'Organization revoked.' : 'Could not revoke organization.')),
+                                          );
+                                          if (ok) await refreshDocShareOrgs(setST);
+                                        },
+                                        icon: const Icon(Icons.block_rounded, size: 16),
+                                        label: const Text('Revoke access'),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            }),
                         ],
                       ),
                     ],
