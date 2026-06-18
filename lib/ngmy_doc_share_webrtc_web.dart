@@ -68,22 +68,15 @@ Future<String?> createOfferQr({
   await pc.setLocalDescription(offer);
   await _waitIceComplete(pc);
 
-  final sdp = (await pc.getLocalDescription())?.sdp;
-  if (sdp == null || sdp.isEmpty) {
+  final sdp = NgmyDocShareQrPayload.minifySdp((await pc.getLocalDescription())?.sdp ?? '');
+  if (sdp.isEmpty) {
     await stopWebRtc();
     return null;
   }
 
-  final manifest = items
-      .map((e) => {
-            'id': e.id,
-            'name': e.name,
-            'mime': e.mime,
-            'sizeBytes': e.sizeBytes,
-          })
-      .toList();
+  final manifest = items.map((e) => [e.name, e.mime]).toList();
 
-  final payload = jsonEncode({'sdp': sdp, 'manifest': manifest});
+  final payload = jsonEncode({'s': sdp, 'f': manifest});
   return NgmyDocShareQrPayload.wrapCompressed(kNgmyDocShareWebRtcOfferPrefix, payload);
 }
 
@@ -92,7 +85,7 @@ Future<void> applyAnswerQr(String raw) async {
   if (jsonText == null) return;
   final decoded = jsonDecode(jsonText);
   if (decoded is! Map) return;
-  final sdp = (decoded['sdp'] ?? '').toString();
+  final sdp = (decoded['s'] ?? decoded['sdp'] ?? '').toString();
   if (sdp.isEmpty || _senderPc == null) return;
   await _senderPc!.setRemoteDescription(RTCSessionDescription(sdp, 'answer'));
 }
@@ -132,8 +125,8 @@ Future<({String answerQr, Future<List<NgmyDocShareItem>> transfer})?> beginRecei
 
   final decoded = jsonDecode(jsonText);
   if (decoded is! Map) return null;
-  final offerSdp = (decoded['sdp'] ?? '').toString();
-  final manifest = decoded['manifest'];
+  final offerSdp = (decoded['s'] ?? decoded['sdp'] ?? '').toString();
+  final manifest = decoded['f'] ?? decoded['manifest'];
   if (offerSdp.isEmpty || manifest is! List) return null;
   final total = manifest.length;
 
@@ -205,12 +198,12 @@ Future<({String answerQr, Future<List<NgmyDocShareItem>> transfer})?> beginRecei
   await pc.setLocalDescription(answer);
   await _waitIceComplete(pc);
 
-  final answerSdp = (await pc.getLocalDescription())?.sdp;
-  if (answerSdp == null) return null;
+  final answerSdp = NgmyDocShareQrPayload.minifySdp((await pc.getLocalDescription())?.sdp ?? '');
+  if (answerSdp.isEmpty) return null;
 
   final answerQr = NgmyDocShareQrPayload.wrapCompressed(
     kNgmyDocShareWebRtcAnswerPrefix,
-    jsonEncode({'sdp': answerSdp}),
+    jsonEncode({'s': answerSdp}),
   );
 
   return (answerQr: answerQr, transfer: done.future);

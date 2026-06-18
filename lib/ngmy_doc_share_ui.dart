@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -13,7 +12,6 @@ import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platfor
 import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_playback.dart';
-import 'ngmy_doc_share_qr_payload.dart';
 import 'ngmy_doc_share_qr_widget.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_sync.dart';
@@ -695,6 +693,7 @@ class _DocShareQrSheet extends StatefulWidget {
 }
 
 class _DocShareQrSheetState extends State<_DocShareQrSheet> {
+  final _qrCaptureKey = GlobalKey();
   String get _modeLabel {
     switch (widget.mode) {
       case NgmyDocShareQrMode.inlineInstant:
@@ -747,12 +746,9 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
 
   Future<void> _savePng(BuildContext context) async {
     try {
-      final side = NgmyDocShareQrPayload.qrSizeForData(widget.payload);
-      final image = await NgmyDocShareQrWidget.renderQrImage(widget.payload, size: side);
-      if (image == null) return;
-      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (bytes == null) return;
-      final msg = await downloadNgmyQrImage(bytes.buffer.asUint8List(), 'ngmy_doc_share_qr.png');
+      final bytes = await NgmyDocShareQrWidget.capturePng(_qrCaptureKey, pixelRatio: 4);
+      if (bytes == null || bytes.isEmpty) return;
+      final msg = await downloadNgmyQrImage(bytes, 'ngmy_doc_share_qr.png');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }
@@ -784,11 +780,12 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
           ),
         ],
       ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(22, 22, 22, 18 + bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(22, 22, 22, 18 + bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
             Container(
               width: 40,
               height: 4,
@@ -825,7 +822,11 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
             ),
             const SizedBox(height: 20),
             Center(
-              child: NgmyDocShareQrWidget(data: widget.payload, large: true),
+              child: NgmyDocShareQrWidget(
+                captureKey: _qrCaptureKey,
+                data: widget.payload,
+                large: true,
+              ),
             ),
             const SizedBox(height: 10),
             Text(
@@ -899,9 +900,10 @@ class _DocShareQrSheetState extends State<_DocShareQrSheet> {
               },
               child: const Text('Done', style: TextStyle(color: Colors.white60)),
             ),
-          ],
+              ],
+            ),
+          ),
         ),
-      ),
     );
   }
 }
@@ -929,7 +931,7 @@ class _DocShareAnswerQrDialog extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-              child: NgmyDocShareQrWidget(data: answerPayload, large: false),
+              child: NgmyDocShareQrWidget(data: answerPayload, large: true),
             ),
           ],
         ),
@@ -1052,11 +1054,11 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
           MobileScanner(controller: _controller, onDetect: _onDetect),
           Center(
             child: Container(
-              width: 260,
-              height: 260,
+              width: 300,
+              height: 300,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: kNgmyStudioHubAccent2, width: 3),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: kNgmyStudioHubAccent2, width: 4),
               ),
             ),
           ),
