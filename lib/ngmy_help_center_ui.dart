@@ -35,6 +35,17 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
   late final TextEditingController _qtyC;
   late final TextEditingController _priceC;
   late final TextEditingController _receiverC;
+  late final TextEditingController _receiverPhoneC;
+  late final TextEditingController _receiverCountryC;
+  late final TextEditingController _senderCashAppC;
+  late final TextEditingController _helpTopicC;
+  late final TextEditingController _helpDetailsC;
+  late final TextEditingController _helpLocationC;
+  late final TextEditingController _preferredContactC;
+  late final TextEditingController _pickupC;
+  late final TextEditingController _deliveryC;
+  late final TextEditingController _mileageC;
+  late final TextEditingController _jobDescC;
   late final AnimationController _pulse;
   String _reference = '';
   bool _cashAppOpened = false;
@@ -47,6 +58,17 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     _qtyC = TextEditingController();
     _priceC = TextEditingController();
     _receiverC = TextEditingController();
+    _receiverPhoneC = TextEditingController();
+    _receiverCountryC = TextEditingController();
+    _senderCashAppC = TextEditingController();
+    _helpTopicC = TextEditingController();
+    _helpDetailsC = TextEditingController();
+    _helpLocationC = TextEditingController();
+    _preferredContactC = TextEditingController();
+    _pickupC = TextEditingController();
+    _deliveryC = TextEditingController();
+    _mileageC = TextEditingController();
+    _jobDescC = TextEditingController();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
   }
 
@@ -56,6 +78,17 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     _qtyC.dispose();
     _priceC.dispose();
     _receiverC.dispose();
+    _receiverPhoneC.dispose();
+    _receiverCountryC.dispose();
+    _senderCashAppC.dispose();
+    _helpTopicC.dispose();
+    _helpDetailsC.dispose();
+    _helpLocationC.dispose();
+    _preferredContactC.dispose();
+    _pickupC.dispose();
+    _deliveryC.dispose();
+    _mileageC.dispose();
+    _jobDescC.dispose();
     _pulse.dispose();
     super.dispose();
   }
@@ -68,6 +101,17 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
       _priceC.text = s.defaultPrice;
       _notesC.clear();
       _receiverC.clear();
+      _receiverPhoneC.clear();
+      _receiverCountryC.clear();
+      _senderCashAppC.clear();
+      _helpTopicC.clear();
+      _helpDetailsC.clear();
+      _helpLocationC.clear();
+      _preferredContactC.clear();
+      _pickupC.clear();
+      _deliveryC.clear();
+      _mileageC.clear();
+      _jobDescC.clear();
       _cashAppOpened = false;
       _reference = 'HC-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}-${1000 + DateTime.now().millisecond % 9000}';
     });
@@ -75,10 +119,31 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
 
   bool get _isSendMoney => _selected != null && ngmyHelpCenterIsSendMoney(_selected!);
 
+  bool get _isGeneralHelp => _selected != null && ngmyHelpCenterIsGeneralHelp(_selected!);
+
+  bool get _isMovingDelivery => _selected != null && ngmyHelpCenterIsMovingDelivery(_selected!);
+
+  void _resetCashApp() => setState(() => _cashAppOpened = false);
+
   bool get _canContact {
-    if (_selected == null) return false;
-    if (_isSendMoney && _receiverC.text.trim().isEmpty) return false;
-    if (_isSendMoney && (double.tryParse(_priceC.text.trim()) ?? 0) <= 0) return false;
+    final s = _selected;
+    if (s == null) return false;
+    if (_isSendMoney) {
+      if (_receiverC.text.trim().isEmpty) return false;
+      if (_receiverPhoneC.text.trim().length < 10) return false;
+      if (_receiverCountryC.text.trim().isEmpty) return false;
+      if (_senderCashAppC.text.trim().isEmpty) return false;
+      if ((double.tryParse(_priceC.text.trim()) ?? 0) <= 0) return false;
+      return true;
+    }
+    if (_isGeneralHelp) {
+      return _helpTopicC.text.trim().isNotEmpty && _helpDetailsC.text.trim().length >= 8;
+    }
+    if (_isMovingDelivery) {
+      return _pickupC.text.trim().isNotEmpty &&
+          _deliveryC.text.trim().isNotEmpty &&
+          (double.tryParse(_mileageC.text.trim()) ?? 0) > 0;
+    }
     return true;
   }
 
@@ -91,6 +156,17 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
       clientEmail: widget.clientEmail,
       clientPhone: widget.clientPhone,
       receiverName: _receiverC.text,
+      receiverPhone: _receiverPhoneC.text,
+      receiverCountry: _receiverCountryC.text,
+      senderCashAppTag: _senderCashAppC.text,
+      helpTopic: _helpTopicC.text,
+      helpDetails: _helpDetailsC.text,
+      helpLocation: _helpLocationC.text,
+      preferredContact: _preferredContactC.text,
+      pickupAddress: _pickupC.text,
+      deliveryAddress: _deliveryC.text,
+      mileage: _mileageC.text,
+      jobDescription: _jobDescC.text,
       notes: _notesC.text,
       qty: _qtyC.text,
       price: _priceC.text,
@@ -110,7 +186,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
 
   Future<void> _openCashApp() async {
     if (!_canContact) {
-      _snack('Enter receiver name and transfer amount first.');
+      _snack('Fill in receiver details, amount, and your Cash App tag first.');
       return;
     }
     final url = _cfg.resolvedCashAppUrl();
@@ -129,7 +205,15 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
 
   Future<void> _openWhatsApp() async {
     if (!_canContact) {
-      _snack(_isSendMoney ? 'Enter receiver name and transfer amount first.' : 'Complete your request first.');
+      if (_isSendMoney) {
+        _snack('Fill receiver name, phone, country, amount, and your Cash App tag.');
+      } else if (_isGeneralHelp) {
+        _snack('Add a topic and describe what you need help with.');
+      } else if (_isMovingDelivery) {
+        _snack('Enter pickup address, delivery address, and mileage.');
+      } else {
+        _snack('Complete your request first.');
+      }
       return;
     }
     if (_isSendMoney && _cfg.cashAppEnabled && _cfg.resolvedCashAppUrl().isNotEmpty && !_cashAppOpened) {
@@ -149,7 +233,15 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
 
   Future<void> _callPhone() async {
     if (!_canContact) {
-      _snack(_isSendMoney ? 'Enter receiver name and transfer amount first.' : 'Complete your request first.');
+      if (_isSendMoney) {
+        _snack('Fill receiver name, phone, country, amount, and your Cash App tag.');
+      } else if (_isGeneralHelp) {
+        _snack('Add a topic and describe what you need help with.');
+      } else if (_isMovingDelivery) {
+        _snack('Enter pickup address, delivery address, and mileage.');
+      } else {
+        _snack('Complete your request first.');
+      }
       return;
     }
     final digits = _cfg.digitsPhone();
@@ -390,14 +482,24 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
                     Text(s.name, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF0F172A))),
                     if (s.description.isNotEmpty)
                       Text(s.description, style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54)),
-                    if (double.tryParse(s.defaultPrice) != null && (double.tryParse(s.defaultPrice) ?? 0) > 0)
+                    if (double.tryParse(s.defaultPrice) != null && (double.tryParse(s.defaultPrice) ?? 0) > 0 && !ngmyHelpCenterIsMovingDelivery(s))
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           ngmyHelpCenterIsSendMoney(s)
                               ? '\$2 fee under \$30 · 5% at \$30+'
-                              : 'From \$${double.tryParse(s.defaultPrice)!.toStringAsFixed(2)}',
+                              : ngmyHelpCenterIsGeneralHelp(s)
+                                  ? 'Tell us anything you need'
+                                  : 'From \$${double.tryParse(s.defaultPrice)!.toStringAsFixed(2)}',
                           style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _accent),
+                        ),
+                      ),
+                    if (ngmyHelpCenterIsMovingDelivery(s))
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Text(
+                          '\$2.50/mi over 10 mi · under 10 mi on WhatsApp',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _accent),
                         ),
                       ),
                   ],
@@ -448,19 +550,15 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
           if (widget.clientPhone.trim().isNotEmpty) _summaryLine('Your phone', widget.clientPhone, isDark),
           if (isMoney) ...[
             const SizedBox(height: 10),
-            TextField(
-              controller: _receiverC,
-              onChanged: (_) => setState(() => _cashAppOpened = false),
-              textCapitalization: TextCapitalization.words,
-              decoration: InputDecoration(
-                labelText: 'Receiver full name *',
-                filled: true,
-                fillColor: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF8FAFC),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
+            _textField('Receiver full name *', _receiverC, isDark, onChanged: (_) => _resetCashApp(), textCapitalization: TextCapitalization.words),
             const SizedBox(height: 10),
-            _field('Transfer amount (\$) *', _priceC, isDark, onChanged: (_) => setState(() => _cashAppOpened = false)),
+            _textField('Receiver phone number *', _receiverPhoneC, isDark, onChanged: (_) => _resetCashApp(), keyboard: TextInputType.phone),
+            const SizedBox(height: 10),
+            _textField('Destination country *', _receiverCountryC, isDark, onChanged: (_) => _resetCashApp(), textCapitalization: TextCapitalization.words, hint: 'e.g. USA, Ghana, Nigeria'),
+            const SizedBox(height: 10),
+            _field('Transfer amount (\$) *', _priceC, isDark, onChanged: (_) => _resetCashApp()),
+            const SizedBox(height: 10),
+            _textField('Your Cash App tag *', _senderCashAppC, isDark, onChanged: (_) => _resetCashApp(), hint: r'$YourTag — so we know who paid'),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(12),
@@ -485,7 +583,32 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
                 ],
               ),
             ),
+          ] else if (_isGeneralHelp) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Tell us what you need — add as much detail as you want.',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+            ),
+            const SizedBox(height: 10),
+            _textField('What do you need help with? *', _helpTopicC, isDark, textCapitalization: TextCapitalization.sentences),
+            const SizedBox(height: 10),
+            _textField('Describe your request *', _helpDetailsC, isDark, maxLines: 4, hint: 'Explain the problem, what you tried, and what outcome you want…'),
+            const SizedBox(height: 10),
+            _textField('Your location (optional)', _helpLocationC, isDark, textCapitalization: TextCapitalization.words),
+            const SizedBox(height: 10),
+            _textField('Best time to contact you (optional)', _preferredContactC, isDark, hint: 'e.g. Weekdays after 5pm'),
+          ] else if (_isMovingDelivery) ...[
+            const SizedBox(height: 10),
+            _textField('Pickup address *', _pickupC, isDark, maxLines: 2, hint: 'Where items are coming from'),
+            const SizedBox(height: 10),
+            _textField('Delivery address *', _deliveryC, isDark, maxLines: 2, hint: 'Where items are going'),
+            const SizedBox(height: 10),
+            _field('Estimated mileage (miles) *', _mileageC, isDark, onChanged: (_) => setState(() {})),
+            const SizedBox(height: 10),
+            _deliveryFeeBox(isDark),
           ] else ...[
+            const SizedBox(height: 10),
+            _textField('Job description', _jobDescC, isDark, maxLines: 3, hint: 'What needs to be done?'),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -541,6 +664,65 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
           SizedBox(width: 72, child: Text(label, style: TextStyle(fontSize: 10, color: isDark ? Colors.white.withOpacity(0.45) : Colors.black45))),
           Expanded(child: Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)))),
         ],
+      ),
+    );
+  }
+
+  Widget _deliveryFeeBox(bool isDark) {
+    final miles = double.tryParse(_mileageC.text.trim()) ?? 0;
+    final est = ngmyHelpCenterDeliveryEstimate(_mileageC.text);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: _accent.withValues(alpha: isDark ? 0.1 : 0.06),
+        border: Border.all(color: _accent.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('DELIVERY PRICING', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: isDark ? _accent : const Color(0xFF0E7490))),
+          const SizedBox(height: 6),
+          if (miles <= 0)
+            Text('Enter mileage to see your estimate.', style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54))
+          else if (est != null) ...[
+            _summaryLine('Miles', miles.toStringAsFixed(1), isDark),
+            _summaryLine('Rate', '\$${kNgmyHelpCenterDeliveryRatePerMile.toStringAsFixed(2)}/mi', isDark),
+            _summaryLine('Est. fee', '\$${est.toStringAsFixed(2)}', isDark),
+          ] else ...[
+            _summaryLine('Miles', miles.toStringAsFixed(1), isDark),
+            Text(
+              '10 miles or less — we will confirm your price on WhatsApp.',
+              style: TextStyle(fontSize: 11, height: 1.35, fontWeight: FontWeight.w600, color: isDark ? Colors.amber.shade200 : const Color(0xFFB45309)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _textField(
+    String label,
+    TextEditingController c,
+    bool isDark, {
+    ValueChanged<String>? onChanged,
+    TextInputType? keyboard,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    int maxLines = 1,
+    String? hint,
+  }) {
+    return TextField(
+      controller: c,
+      onChanged: onChanged ?? (_) => setState(() {}),
+      keyboardType: keyboard,
+      textCapitalization: textCapitalization,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        filled: true,
+        fillColor: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF8FAFC),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       ),
     );
   }

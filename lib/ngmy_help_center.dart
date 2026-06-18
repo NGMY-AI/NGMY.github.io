@@ -32,6 +32,27 @@ bool ngmyHelpCenterIsSendMoney(NgmyHelpCenterService service) =>
     service.name.toLowerCase().contains('send money') ||
     service.name.toLowerCase().contains('money transfer');
 
+bool ngmyHelpCenterIsGeneralHelp(NgmyHelpCenterService service) =>
+    service.id == 'general_help' || service.name.toLowerCase().contains('general help');
+
+bool ngmyHelpCenterIsMovingDelivery(NgmyHelpCenterService service) =>
+    service.id == 'moving_delivery' ||
+    service.name.toLowerCase().contains('moving') ||
+    service.name.toLowerCase().contains('delivery');
+
+/// Delivery rate per mile when trip is over [kNgmyHelpCenterDeliveryMinMilesForRate].
+const double kNgmyHelpCenterDeliveryRatePerMile = 2.50;
+
+/// Under this mileage, price is confirmed on WhatsApp instead of auto-calculated.
+const double kNgmyHelpCenterDeliveryMinMilesForRate = 10.0;
+
+double? ngmyHelpCenterDeliveryEstimate(String mileageText) {
+  final miles = double.tryParse(mileageText.trim());
+  if (miles == null || miles <= 0) return null;
+  if (miles <= kNgmyHelpCenterDeliveryMinMilesForRate) return null;
+  return miles * kNgmyHelpCenterDeliveryRatePerMile;
+}
+
 /// One selectable service in the Help Center (admin-configurable).
 class NgmyHelpCenterService {
   const NgmyHelpCenterService({
@@ -160,15 +181,15 @@ class NgmyHelpCenterConfig {
         NgmyHelpCenterService(
           id: 'moving_delivery',
           name: 'Moving & Delivery',
-          description: 'Pickup, drop-off, and hauling',
+          description: '\$2.50/mile over 10 mi · under 10 mi quoted on WhatsApp',
           icon: 'local_shipping',
-          defaultPrice: '85',
+          defaultPrice: '0',
           defaultQty: '1',
         ),
         NgmyHelpCenterService(
           id: 'general_help',
           name: 'General Help',
-          description: 'Talk to us about anything',
+          description: 'Ask us anything — describe your full request',
           icon: 'support_agent',
           defaultPrice: '0',
           defaultQty: '1',
@@ -200,7 +221,7 @@ class NgmyHelpCenterConfig {
 
   String cashAppButtonLabelForAmount(double amount) {
     final base = cashAppButtonLabel.trim().isEmpty ? 'Pay on Cash App' : cashAppButtonLabel.trim();
-    if (amount > 0) return '$base — \$${amount.toStringAsFixed(2)}';
+    if (amount > 0) return '$base \$${amount.toStringAsFixed(2)}';
     return base;
   }
 
@@ -228,6 +249,17 @@ class NgmyHelpCenterConfig {
     String clientEmail = '',
     String clientPhone = '',
     String receiverName = '',
+    String receiverPhone = '',
+    String receiverCountry = '',
+    String senderCashAppTag = '',
+    String helpTopic = '',
+    String helpDetails = '',
+    String preferredContact = '',
+    String helpLocation = '',
+    String pickupAddress = '',
+    String deliveryAddress = '',
+    String mileage = '',
+    String jobDescription = '',
     String notes = '',
     String? qty,
     String? price,
@@ -235,6 +267,8 @@ class NgmyHelpCenterConfig {
   }) {
     final ref = reference ?? _newReference();
     final isMoney = ngmyHelpCenterIsSendMoney(service);
+    final isGeneral = ngmyHelpCenterIsGeneralHelp(service);
+    final isDelivery = ngmyHelpCenterIsMovingDelivery(service);
     final buf = StringBuffer()
       ..writeln('*${supportName.trim().isEmpty ? 'NGMY Help Request' : supportName.trim()}*')
       ..writeln('━━━━━━━━━━━━━━━━')
@@ -249,11 +283,36 @@ class NgmyHelpCenterConfig {
       final fee = ngmyHelpCenterMoneyTransferFee(amount);
       final recipientGets = amount - fee;
       if (receiverName.trim().isNotEmpty) buf.writeln('Receiver name: *${receiverName.trim()}*');
+      if (receiverPhone.trim().isNotEmpty) buf.writeln('Receiver phone: ${receiverPhone.trim()}');
+      if (receiverCountry.trim().isNotEmpty) buf.writeln('Destination country: ${receiverCountry.trim()}');
       buf
         ..writeln('Transfer amount: \$${amount.toStringAsFixed(2)}')
         ..writeln('${ngmyHelpCenterMoneyTransferFeeDescription(amount)}: \$${fee.toStringAsFixed(2)}')
         ..writeln('Recipient receives: \$${recipientGets.toStringAsFixed(2)}');
+      if (senderCashAppTag.trim().isNotEmpty) {
+        final tag = senderCashAppTag.trim().startsWith(r'$') ? senderCashAppTag.trim() : '\$${senderCashAppTag.trim()}';
+        buf.writeln('Sender Cash App (payment from): $tag');
+      }
+    } else if (isGeneral) {
+      if (helpTopic.trim().isNotEmpty) buf.writeln('Topic: *${helpTopic.trim()}*');
+      if (helpDetails.trim().isNotEmpty) buf.writeln('Details: ${helpDetails.trim()}');
+      if (helpLocation.trim().isNotEmpty) buf.writeln('Location: ${helpLocation.trim()}');
+      if (preferredContact.trim().isNotEmpty) buf.writeln('Best time to reach me: ${preferredContact.trim()}');
+    } else if (isDelivery) {
+      if (pickupAddress.trim().isNotEmpty) buf.writeln('Pickup address: ${pickupAddress.trim()}');
+      if (deliveryAddress.trim().isNotEmpty) buf.writeln('Delivery address: ${deliveryAddress.trim()}');
+      final miles = double.tryParse(mileage.trim());
+      if (miles != null && miles > 0) {
+        buf.writeln('Mileage: ${miles.toStringAsFixed(1)} mi');
+        final est = ngmyHelpCenterDeliveryEstimate(mileage);
+        if (est != null) {
+          buf.writeln('Est. delivery fee: \$${est.toStringAsFixed(2)} (\$${kNgmyHelpCenterDeliveryRatePerMile.toStringAsFixed(2)}/mi)');
+        } else {
+          buf.writeln('Est. delivery fee: Quote on WhatsApp (10 miles or less)');
+        }
+      }
     } else {
+      if (jobDescription.trim().isNotEmpty) buf.writeln('Job description: ${jobDescription.trim()}');
       final q = qty ?? service.defaultQty;
       final p = _fmt(price ?? service.defaultPrice);
       final total = (double.tryParse(q) ?? 1) * (double.tryParse(p) ?? 0);
@@ -263,14 +322,16 @@ class NgmyHelpCenterConfig {
         ..writeln('Est. total: \$${total.toStringAsFixed(2)}');
     }
 
-    if (!isMoney && service.description.trim().isNotEmpty) {
+    if (!isMoney && !isGeneral && !isDelivery && service.description.trim().isNotEmpty) {
       buf.writeln('Details: ${service.description.trim()}');
     }
     if (notes.trim().isNotEmpty) buf.writeln('Notes: ${notes.trim()}');
     buf.writeln();
     buf.writeln(isMoney
-        ? 'Please process this money transfer request. I understand the NGMY service fee applies (\$2 under \$30, otherwise 5%).'
-        : 'Please contact me about this service. Thank you!');
+        ? 'Please process this money transfer request. I understand the NGMY service fee applies (\$2 under \$30, otherwise 5%). I paid via Cash App.'
+        : isDelivery
+            ? 'Please confirm this moving/delivery request. Thank you!'
+            : 'Please contact me about this service. Thank you!');
     return buf.toString().trim();
   }
 
