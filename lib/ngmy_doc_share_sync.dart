@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'ngmy_doc_share_local_server.dart';
 import 'ngmy_doc_share_models.dart';
+import 'ngmy_doc_share_qr_payload.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_webrtc_stub.dart' if (dart.library.html) 'ngmy_doc_share_webrtc_web.dart' as webrtc;
 
@@ -100,8 +101,7 @@ class NgmyDocShareSync {
     required List<NgmyDocShareItem> items,
   }) async {
     final jsonText = await exportBundleFile(ownerEmail: ownerEmail, items: items);
-    final encoded = base64Encode(utf8.encode(jsonText));
-    final payload = '$kNgmyDocShareQrPrefixInline|$encoded';
+    final payload = NgmyDocShareQrPayload.wrapCompressed(kNgmyDocShareQrPrefixInline, jsonText);
     if (payload.length > kNgmyDocShareInlineQrMaxChars) return null;
     return (
       qrPayload: payload,
@@ -118,9 +118,9 @@ class NgmyDocShareSync {
     final text = raw.trim();
 
     if (text.startsWith('$kNgmyDocShareQrPrefixInline|')) {
-      final encoded = text.substring(kNgmyDocShareQrPrefixInline.length + 1);
       try {
-        final jsonText = utf8.decode(base64Decode(encoded));
+        final jsonText = NgmyDocShareQrPayload.unwrapAfterPrefix(text, kNgmyDocShareQrPrefixInline);
+        if (jsonText == null) return null;
         onProgress?.call(1, 1);
         return importBundleText(recipientEmail: recipientEmail, jsonText: jsonText);
       } catch (e) {

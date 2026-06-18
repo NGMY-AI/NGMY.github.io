@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import 'ngmy_doc_share_models.dart';
+import 'ngmy_doc_share_qr_payload.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_webrtc_stub.dart' show kNgmyDocShareWebRtcAnswerPrefix;
 
@@ -83,14 +84,13 @@ Future<String?> createOfferQr({
       .toList();
 
   final payload = jsonEncode({'sdp': sdp, 'manifest': manifest});
-  return '$kNgmyDocShareWebRtcOfferPrefix|${base64Encode(utf8.encode(payload))}';
+  return NgmyDocShareQrPayload.wrapCompressed(kNgmyDocShareWebRtcOfferPrefix, payload);
 }
 
 Future<void> applyAnswerQr(String raw) async {
-  final text = raw.trim();
-  if (!text.startsWith('$kNgmyDocShareWebRtcAnswerPrefix|')) return;
-  final encoded = text.substring(kNgmyDocShareWebRtcAnswerPrefix.length + 1);
-  final decoded = jsonDecode(utf8.decode(base64Decode(encoded)));
+  final jsonText = NgmyDocShareQrPayload.unwrapAfterPrefix(raw.trim(), kNgmyDocShareWebRtcAnswerPrefix);
+  if (jsonText == null) return;
+  final decoded = jsonDecode(jsonText);
   if (decoded is! Map) return;
   final sdp = (decoded['sdp'] ?? '').toString();
   if (sdp.isEmpty || _senderPc == null) return;
@@ -127,10 +127,10 @@ Future<({String answerQr, Future<List<NgmyDocShareItem>> transfer})?> beginRecei
   void Function(int received, int total)? onProgress,
 }) async {
   final text = raw.trim();
-  if (!text.startsWith('$kNgmyDocShareWebRtcOfferPrefix|')) return null;
+  final jsonText = NgmyDocShareQrPayload.unwrapAfterPrefix(text, kNgmyDocShareWebRtcOfferPrefix);
+  if (jsonText == null) return null;
 
-  final encoded = text.substring(kNgmyDocShareWebRtcOfferPrefix.length + 1);
-  final decoded = jsonDecode(utf8.decode(base64Decode(encoded)));
+  final decoded = jsonDecode(jsonText);
   if (decoded is! Map) return null;
   final offerSdp = (decoded['sdp'] ?? '').toString();
   final manifest = decoded['manifest'];
@@ -208,8 +208,10 @@ Future<({String answerQr, Future<List<NgmyDocShareItem>> transfer})?> beginRecei
   final answerSdp = (await pc.getLocalDescription())?.sdp;
   if (answerSdp == null) return null;
 
-  final answerQr =
-      '$kNgmyDocShareWebRtcAnswerPrefix|${base64Encode(utf8.encode(jsonEncode({'sdp': answerSdp})))}';
+  final answerQr = NgmyDocShareQrPayload.wrapCompressed(
+    kNgmyDocShareWebRtcAnswerPrefix,
+    jsonEncode({'sdp': answerSdp}),
+  );
 
   return (answerQr: answerQr, transfer: done.future);
 }
