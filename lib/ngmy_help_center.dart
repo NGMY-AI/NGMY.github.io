@@ -115,6 +115,9 @@ class NgmyHelpCenterConfig {
     this.callEnabled = true,
     this.whatsappButtonLabel = 'Send on WhatsApp',
     this.callButtonLabel = 'Call Now',
+    this.cashAppTag = 'NGMYpay',
+    this.cashAppEnabled = true,
+    this.cashAppButtonLabel = 'Pay on Cash App',
     this.supportName = 'NGMY Support',
     this.services = const [],
   });
@@ -131,6 +134,9 @@ class NgmyHelpCenterConfig {
   final bool callEnabled;
   final String whatsappButtonLabel;
   final String callButtonLabel;
+  final String cashAppTag;
+  final bool cashAppEnabled;
+  final String cashAppButtonLabel;
   final String supportName;
   final List<NgmyHelpCenterService> services;
 
@@ -174,6 +180,29 @@ class NgmyHelpCenterConfig {
   List<NgmyHelpCenterService> activeServices() => services.where((s) => s.enabled && s.name.trim().isNotEmpty).toList();
 
   String digitsPhone() => phone.replaceAll(RegExp(r'[^\d+]'), '');
+
+  String cashAppDisplayTag() {
+    final raw = cashAppTag.trim();
+    if (raw.isEmpty) return '';
+    return raw.startsWith(r'$') ? raw : '\$$raw';
+  }
+
+  String resolvedCashAppUrl() {
+    final raw = cashAppTag.trim();
+    if (raw.isEmpty) return '';
+    final handle = raw.startsWith(r'$') ? raw.substring(1) : raw;
+    if (handle.isEmpty) return '';
+    return 'https://cash.app/\$$handle';
+  }
+
+  String sendMoneyPayFirstNote() =>
+      'Send the full transfer amount on Cash App first. After payment, tap Send on WhatsApp with your request. If you skip Cash App, your money will not be sent.';
+
+  String cashAppButtonLabelForAmount(double amount) {
+    final base = cashAppButtonLabel.trim().isEmpty ? 'Pay on Cash App' : cashAppButtonLabel.trim();
+    if (amount > 0) return '$base — \$${amount.toStringAsFixed(2)}';
+    return base;
+  }
 
   String resolvedWhatsAppUrl({String? prefilledText}) {
     final custom = whatsappLink.trim();
@@ -258,6 +287,9 @@ class NgmyHelpCenterConfig {
         'callEnabled': callEnabled,
         'whatsappButtonLabel': whatsappButtonLabel,
         'callButtonLabel': callButtonLabel,
+        'cashAppTag': cashAppTag,
+        'cashAppEnabled': cashAppEnabled,
+        'cashAppButtonLabel': cashAppButtonLabel,
         'supportName': supportName,
         'services': services.map((s) => s.toMap()).toList(),
       };
@@ -284,6 +316,9 @@ class NgmyHelpCenterConfig {
       callEnabled: raw['callEnabled'] != false,
       whatsappButtonLabel: (raw['whatsappButtonLabel'] ?? 'Send on WhatsApp').toString(),
       callButtonLabel: (raw['callButtonLabel'] ?? 'Call Now').toString(),
+      cashAppTag: (raw['cashAppTag'] ?? 'NGMYpay').toString(),
+      cashAppEnabled: raw['cashAppEnabled'] != false,
+      cashAppButtonLabel: (raw['cashAppButtonLabel'] ?? 'Pay on Cash App').toString(),
       supportName: (raw['supportName'] ?? 'NGMY Support').toString(),
       services: services,
     );
@@ -302,6 +337,9 @@ class NgmyHelpCenterConfig {
     bool? callEnabled,
     String? whatsappButtonLabel,
     String? callButtonLabel,
+    String? cashAppTag,
+    bool? cashAppEnabled,
+    String? cashAppButtonLabel,
     String? supportName,
     List<NgmyHelpCenterService>? services,
   }) {
@@ -318,6 +356,9 @@ class NgmyHelpCenterConfig {
       callEnabled: callEnabled ?? this.callEnabled,
       whatsappButtonLabel: whatsappButtonLabel ?? this.whatsappButtonLabel,
       callButtonLabel: callButtonLabel ?? this.callButtonLabel,
+      cashAppTag: cashAppTag ?? this.cashAppTag,
+      cashAppEnabled: cashAppEnabled ?? this.cashAppEnabled,
+      cashAppButtonLabel: cashAppButtonLabel ?? this.cashAppButtonLabel,
       supportName: supportName ?? this.supportName,
       services: services ?? this.services,
     );

@@ -41,6 +41,7 @@ class _NgmyHelpCenterAdminSheetState extends State<_NgmyHelpCenterAdminSheet> {
   late bool _enabled;
   late bool _waOn;
   late bool _callOn;
+  late bool _cashAppOn;
   late final TextEditingController _titleC;
   late final TextEditingController _subtitleC;
   late final TextEditingController _headlineC;
@@ -49,6 +50,8 @@ class _NgmyHelpCenterAdminSheetState extends State<_NgmyHelpCenterAdminSheet> {
   late final TextEditingController _waLinkC;
   late final TextEditingController _waLabelC;
   late final TextEditingController _callLabelC;
+  late final TextEditingController _cashAppC;
+  late final TextEditingController _cashAppLabelC;
   late final TextEditingController _supportC;
   late final List<TextEditingController> _stepCs;
   final List<_ServiceDraft> _serviceDrafts = [];
@@ -61,6 +64,7 @@ class _NgmyHelpCenterAdminSheetState extends State<_NgmyHelpCenterAdminSheet> {
     _enabled = c.enabled;
     _waOn = c.whatsappEnabled;
     _callOn = c.callEnabled;
+    _cashAppOn = c.cashAppEnabled;
     _titleC = TextEditingController(text: c.title);
     _subtitleC = TextEditingController(text: c.subtitle);
     _headlineC = TextEditingController(text: c.posterHeadline);
@@ -69,6 +73,8 @@ class _NgmyHelpCenterAdminSheetState extends State<_NgmyHelpCenterAdminSheet> {
     _waLinkC = TextEditingController(text: c.whatsappLink);
     _waLabelC = TextEditingController(text: c.whatsappButtonLabel);
     _callLabelC = TextEditingController(text: c.callButtonLabel);
+    _cashAppC = TextEditingController(text: c.cashAppTag);
+    _cashAppLabelC = TextEditingController(text: c.cashAppButtonLabel);
     _supportC = TextEditingController(text: c.supportName);
     _stepCs = (c.steps.isEmpty ? NgmyHelpCenterConfig.defaults().steps : c.steps)
         .map((s) => TextEditingController(text: s))
@@ -81,7 +87,7 @@ class _NgmyHelpCenterAdminSheetState extends State<_NgmyHelpCenterAdminSheet> {
 
   @override
   void dispose() {
-    for (final c in [_titleC, _subtitleC, _headlineC, _bodyC, _phoneC, _waLinkC, _waLabelC, _callLabelC, _supportC, ..._stepCs]) {
+    for (final c in [_titleC, _subtitleC, _headlineC, _bodyC, _phoneC, _waLinkC, _waLabelC, _callLabelC, _cashAppC, _cashAppLabelC, _supportC, ..._stepCs]) {
       c.dispose();
     }
     for (final d in _serviceDrafts) {
@@ -105,6 +111,9 @@ class _NgmyHelpCenterAdminSheetState extends State<_NgmyHelpCenterAdminSheet> {
       callEnabled: _callOn,
       whatsappButtonLabel: _waLabelC.text.trim().isEmpty ? 'Send on WhatsApp' : _waLabelC.text.trim(),
       callButtonLabel: _callLabelC.text.trim().isEmpty ? 'Call Now' : _callLabelC.text.trim(),
+      cashAppTag: _cashAppC.text.trim().isEmpty ? 'NGMYpay' : _cashAppC.text.trim(),
+      cashAppEnabled: _cashAppOn,
+      cashAppButtonLabel: _cashAppLabelC.text.trim().isEmpty ? 'Pay on Cash App' : _cashAppLabelC.text.trim(),
       supportName: _supportC.text.trim(),
       services: services,
     );
@@ -183,6 +192,14 @@ class _NgmyHelpCenterAdminSheetState extends State<_NgmyHelpCenterAdminSheet> {
                     _section('Contact buttons'),
                     _tf(_supportC, 'Support / business name (in message)'),
                     _tf(_phoneC, 'Phone number', keyboard: TextInputType.phone),
+                    _tf(_cashAppC, 'Cash App tag (Send Money)', hint: r'$NGMYpay'),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Show Cash App button for Send Money'),
+                      value: _cashAppOn,
+                      onChanged: (v) => setState(() => _cashAppOn = v),
+                    ),
+                    _tf(_cashAppLabelC, 'Cash App button label'),
                     _tf(_waLinkC, 'WhatsApp link (optional — leave blank to use phone)', hint: 'https://wa.me/17066237963'),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,

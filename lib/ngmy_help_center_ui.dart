@@ -37,6 +37,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
   late final TextEditingController _receiverC;
   late final AnimationController _pulse;
   String _reference = '';
+  bool _cashAppOpened = false;
 
   @override
   void initState() {
@@ -67,6 +68,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
       _priceC.text = s.defaultPrice;
       _notesC.clear();
       _receiverC.clear();
+      _cashAppOpened = false;
       _reference = 'HC-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}-${1000 + DateTime.now().millisecond % 9000}';
     });
   }
@@ -96,9 +98,42 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     );
   }
 
+  bool get _canContactWhatsApp {
+    if (!_canContact) return false;
+    if (_isSendMoney && _cfg.cashAppEnabled && _cfg.resolvedCashAppUrl().isNotEmpty && !_cashAppOpened) {
+      return false;
+    }
+    return true;
+  }
+
+  double get _transferAmount => double.tryParse(_priceC.text.trim()) ?? 0;
+
+  Future<void> _openCashApp() async {
+    if (!_canContact) {
+      _snack('Enter receiver name and transfer amount first.');
+      return;
+    }
+    final url = _cfg.resolvedCashAppUrl();
+    if (url.isEmpty) {
+      _snack('Cash App is not configured yet.');
+      return;
+    }
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      _snack('Could not open Cash App.');
+      return;
+    }
+    setState(() => _cashAppOpened = true);
+    _snack('After you send ${_cfg.cashAppDisplayTag()}, tap Send on WhatsApp.');
+  }
+
   Future<void> _openWhatsApp() async {
     if (!_canContact) {
       _snack(_isSendMoney ? 'Enter receiver name and transfer amount first.' : 'Complete your request first.');
+      return;
+    }
+    if (_isSendMoney && _cfg.cashAppEnabled && _cfg.resolvedCashAppUrl().isNotEmpty && !_cashAppOpened) {
+      _snack('Pay on Cash App first, then send your WhatsApp request.');
       return;
     }
     final url = _cfg.resolvedWhatsAppUrl(prefilledText: _message);
@@ -415,7 +450,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
             const SizedBox(height: 10),
             TextField(
               controller: _receiverC,
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) => setState(() => _cashAppOpened = false),
               textCapitalization: TextCapitalization.words,
               decoration: InputDecoration(
                 labelText: 'Receiver full name *',
@@ -425,7 +460,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
               ),
             ),
             const SizedBox(height: 10),
-            _field('Transfer amount (\$) *', _priceC, isDark, onChanged: (_) => setState(() {})),
+            _field('Transfer amount (\$) *', _priceC, isDark, onChanged: (_) => setState(() => _cashAppOpened = false)),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(12),
@@ -487,7 +522,9 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
           ),
           const SizedBox(height: 8),
           Text(
-            'Nothing is sent from the app — tap WhatsApp or Call to reach us with this message.',
+            _isSendMoney
+                ? 'Step 1: Pay on Cash App · Step 2: Send on WhatsApp or call.'
+                : 'Nothing is sent from the app — tap WhatsApp or Call to reach us with this message.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 9, color: isDark ? Colors.white38 : Colors.black45, height: 1.3),
           ),
@@ -524,12 +561,52 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
   }
 
   Widget _contactButtons(bool isDark) {
+    final showCashApp = _isSendMoney && _cfg.cashAppEnabled && _cfg.resolvedCashAppUrl().isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (showCashApp) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xFF00D632).withValues(alpha: isDark ? 0.12 : 0.08),
+              border: Border.all(color: const Color(0xFF00D632).withValues(alpha: 0.45)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF00A82D)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _cfg.sendMoneyPayFirstNote(),
+                    style: TextStyle(fontSize: 11, height: 1.4, fontWeight: FontWeight.w600, color: isDark ? Colors.greenAccent.shade100 : const Color(0xFF166534)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: _canContact ? _openCashApp : null,
+            icon: const Icon(Icons.payments_rounded),
+            label: Text(
+              _cfg.cashAppButtonLabelForAmount(_transferAmount),
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF00D632),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+          ),
+          if (_cfg.whatsappEnabled) const SizedBox(height: 10),
+        ],
         if (_cfg.whatsappEnabled)
           FilledButton.icon(
-            onPressed: _canContact ? _openWhatsApp : null,
+            onPressed: _canContactWhatsApp ? _openWhatsApp : null,
             icon: const Icon(Icons.chat_rounded),
             label: Text(_cfg.whatsappButtonLabel, style: const TextStyle(fontWeight: FontWeight.w900)),
             style: FilledButton.styleFrom(
