@@ -122,6 +122,9 @@ import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_studio_access.dart';
 import 'ngmy_clock_in_investment_dialog.dart';
+import 'ngmy_clock_in_miss_policy.dart';
+import 'ngmy_game_access.dart';
+import 'ngmy_game_investment_paywall.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_storage.dart';
 import 'ngmy_invoice_protected_preview.dart';
@@ -6303,10 +6306,17 @@ class UserData {
   List<String> readAnnouncementIds;
   List<String> openedContributionReceiptKeys;
   List<String> dismissedContributionReceiptKeys;
+  /// Calendar month key e.g. 2026-06 — weekday check-in misses in this month.
+  String clockInMissMonth;
+  int clockInMissCount;
+  List<String> clockInMissedDays;
 
   UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isCivicRegistryKing = false, this.isCivicRegistryAdmin = false, this.civicRegistryStateSwitchesUsed = 0, this.civicRegistryAnchorState = '', this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.todayClockInEarned = 0.0, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.freeTrialActive = false, this.freeTrialDailyAmount = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds,
     List<String>? openedContributionReceiptKeys,
-    List<String>? dismissedContributionReceiptKeys}) : mediaFollowers = mediaFollowers ?? <String>[], mediaFollowing = mediaFollowing ?? <String>[], mediaHighlights = mediaHighlights ?? <Map<String, dynamic>>[], mediaStories = mediaStories ?? <Map<String, dynamic>>[], readAnnouncementIds = readAnnouncementIds ?? <String>[], openedContributionReceiptKeys = openedContributionReceiptKeys ?? <String>[], dismissedContributionReceiptKeys = dismissedContributionReceiptKeys ?? <String>[];
+    List<String>? dismissedContributionReceiptKeys,
+    this.clockInMissMonth = '',
+    this.clockInMissCount = 0,
+    List<String>? clockInMissedDays}) : mediaFollowers = mediaFollowers ?? <String>[], mediaFollowing = mediaFollowing ?? <String>[], mediaHighlights = mediaHighlights ?? <Map<String, dynamic>>[], mediaStories = mediaStories ?? <Map<String, dynamic>>[], readAnnouncementIds = readAnnouncementIds ?? <String>[], openedContributionReceiptKeys = openedContributionReceiptKeys ?? <String>[], dismissedContributionReceiptKeys = dismissedContributionReceiptKeys ?? <String>[], clockInMissedDays = clockInMissedDays ?? <String>[];
   bool get isOnFreeTrial => freeTrialActive && freeTrialDailyAmount > 0;
   double get totalInvestmentAmount {
     if (activeInvestment == null) return 0.0;
@@ -6374,7 +6384,7 @@ class UserData {
     if (full <= 0) return 0.0;
     return full * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
   }
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isCivicRegistryKing': isCivicRegistryKing, 'isCivicRegistryAdmin': isCivicRegistryAdmin, 'civicRegistryStateSwitchesUsed': civicRegistryStateSwitchesUsed, 'civicRegistryAnchorState': civicRegistryAnchorState, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'todayClockInEarned': todayClockInEarned, 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds, 'openedContributionReceiptKeys': openedContributionReceiptKeys, 'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isCivicRegistryKing': isCivicRegistryKing, 'isCivicRegistryAdmin': isCivicRegistryAdmin, 'civicRegistryStateSwitchesUsed': civicRegistryStateSwitchesUsed, 'civicRegistryAnchorState': civicRegistryAnchorState, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'todayClockInEarned': todayClockInEarned, 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds, 'openedContributionReceiptKeys': openedContributionReceiptKeys, 'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys, 'clockInMissMonth': clockInMissMonth, 'clockInMissCount': clockInMissCount, 'clockInMissedDays': clockInMissedDays};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -6456,6 +6466,11 @@ class UserData {
       readAnnouncementIds: _jsonStringList(json['readAnnouncementIds']),
       openedContributionReceiptKeys: _jsonStringList(json['openedContributionReceiptKeys']),
       dismissedContributionReceiptKeys: _jsonStringList(json['dismissedContributionReceiptKeys']),
+      clockInMissMonth: (json['clockInMissMonth'] ?? '').toString(),
+      clockInMissCount: (json['clockInMissCount'] ?? 0) is int
+          ? json['clockInMissCount'] as int
+          : int.tryParse('${json['clockInMissCount']}') ?? 0,
+      clockInMissedDays: _jsonStringList(json['clockInMissedDays']),
     );
   }
 }
@@ -12892,7 +12907,7 @@ class NgmyAdminLiveRefresh {
 }
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, NgmyBalanceListener {
-  int _idx = 0; Timer? _t; int _syncCounter = 0;
+  int _idx = 0; Timer? _t; int _syncCounter = 0; int _missPolicyCounter = 0;
   bool _offline = false;
   bool _investPurchaseInFlight = false;
   Timer? _onlineCheck;
@@ -13216,6 +13231,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _ngmyReconcileClockInSession(widget.user, widget.allTransactions);
+      _evaluateClockInMissPolicy();
     });
     _refreshOnlineStatus();
     _runScheduledPopups();
@@ -13289,7 +13305,34 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
           }
         }
       }
+      _missPolicyCounter++;
+      if (_missPolicyCounter >= 60) {
+        _missPolicyCounter = 0;
+        _evaluateClockInMissPolicy();
+      }
     });
+  }
+
+  void _evaluateClockInMissPolicy() {
+    final user = widget.user;
+    final now = DateTime.now();
+    NgmyClockInMissPolicy.rolloverMonthIfNeeded(user);
+    if (!NgmyClockInMissPolicy.shouldEvaluateMiss(user, now)) return;
+    final action = NgmyClockInMissPolicy.recordMissIfNeeded(user, now);
+    if (action == null) return;
+    widget.onDataChanged();
+    unawaited(widget.onPushUserToCloud?.call(user) ?? Future.value());
+    if (action == 'warn2') {
+      unawaited(NgmyClockInMissPolicy.notifySecondMiss(user.email));
+    } else if (action == 'reset') {
+      unawaited(NgmyClockInMissPolicy.notifyPlanReset(user.email));
+      if (mounted) {
+        unawaited(NgmyClockInMissResetDialog.show(
+          context,
+          onGoToInvest: () => setState(() => _idx = 1),
+        ));
+      }
+    }
   }
   @override
   void dispose() {
@@ -14261,6 +14304,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _openGameCenter() async {
+    if (!NgmyGameAccess.hasActiveInvestment(widget.user)) {
+      if (await NgmyGameAccess.freePlayUsed(widget.user.email)) {
+        await NgmyGameInvestmentPaywall.show(context, onGoToInvest: widget.onOpenInvest);
+        return;
+      }
+    }
     final result = await NgmyNavigator.push<Map<String, dynamic>>(
       context,
       GameCenterScreen(
@@ -14268,6 +14317,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         config: widget.config,
         onAddTransaction: widget.onAddTransaction,
         onDataChanged: widget.onDataChanged,
+        onGoToInvest: widget.onOpenInvest,
       ),
       routeName: kRouteGameCenter,
     );
@@ -15509,12 +15559,14 @@ class GameCenterScreen extends StatefulWidget {
   final AppConfig config;
   final Function(AppTransaction) onAddTransaction;
   final VoidCallback onDataChanged;
+  final VoidCallback? onGoToInvest;
   const GameCenterScreen({
     super.key,
     required this.user,
     required this.config,
     required this.onAddTransaction,
     required this.onDataChanged,
+    this.onGoToInvest,
   });
 
   @override
@@ -15621,7 +15673,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Invite sent to $toAccountId — ${g.title} ($gamesLabel)')));
   }
 
-  void _openGame(_GameDef g, {String? inviteId}) {
+  void _openGame(_GameDef g, {String? inviteId}) async {
     if (inviteId != null && inviteId.trim().isNotEmpty) {
       final inv = findInviteById(widget.config.gameInvites, inviteId.trim());
       if (inv != null && inviteSeriesComplete(inv)) {
@@ -15631,6 +15683,16 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
         return;
       }
     }
+    if (!await NgmyGameAccess.canStartGame(widget.user)) {
+      await NgmyGameInvestmentPaywall.show(context, onGoToInvest: widget.onGoToInvest);
+      return;
+    }
+    final markFreePlayIfNeeded = () {
+      if (!NgmyGameAccess.hasActiveInvestment(widget.user)) {
+        unawaited(NgmyGameAccess.markFreePlayUsed(widget.user.email));
+      }
+      setState(() => _sessionGamesPlayed++);
+    };
     if (g.id == 'dice') {
       NgmyNavigator.push(
         context,
@@ -15639,7 +15701,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
           config: widget.config,
           onAddTransaction: widget.onAddTransaction,
           onDataChanged: widget.onDataChanged,
-          onGameStarted: () => setState(() => _sessionGamesPlayed++),
+          onGameStarted: markFreePlayIfNeeded,
         ),
         routeName: kRouteDiceGame,
       );
@@ -15656,7 +15718,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
         colors: g.colors,
         onAddTransaction: widget.onAddTransaction,
         onDataChanged: widget.onDataChanged,
-        onGameStarted: () => setState(() => _sessionGamesPlayed++),
+        onGameStarted: markFreePlayIfNeeded,
         inviteId: inviteId,
       ),
       routeName: kRouteGameBet,
