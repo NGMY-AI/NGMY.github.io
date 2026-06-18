@@ -92,7 +92,7 @@ import 'ngmy_oauth.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
-import 'ngmy_video_studio.dart';
+import 'ngmy_studio_hub.dart';
 import 'ngmy_loans.dart';
 import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_civic_read_state.dart';
@@ -13730,11 +13730,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () => showNgmyVideoStudio(context),
+            onTap: () => showNgmyStudioHub(context, userEmail: widget.user.email),
             customBorder: const CircleBorder(),
             child: SizedBox(
               height: NgmyBottomNavMetrics.barHeight,
-              child: Center(child: NgmyStudioNavIcon(dimmed: false, size: 30)),
+              child: Center(child: NgmyStudioHubNavIcon(dimmed: false, size: 30)),
             ),
           ),
         ),
