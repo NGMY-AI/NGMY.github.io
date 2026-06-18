@@ -213,6 +213,60 @@ class NgmyDocShareStore {
     return f.readAsBytes();
   }
 
+  /// Stream HTTP body straight to disk — fast for large videos (AirDrop-style).
+  static Future<NgmyDocShareItem?> addFromHttpStream({
+    required String email,
+    required String name,
+    required String mime,
+    required Stream<List<int>> stream,
+    int? contentLength,
+    String? note,
+    String? fromSender,
+  }) async {
+    if (email.trim().isEmpty) return null;
+    final id = _newId();
+    final item = NgmyDocShareItem(
+      id: id,
+      name: name.trim().isEmpty ? 'file' : name.trim(),
+      mime: mime.trim().isEmpty ? 'application/octet-stream' : mime.trim(),
+      sizeBytes: contentLength ?? 0,
+      createdAt: DateTime.now().toUtc().toIso8601String(),
+      note: note,
+      fromSender: fromSender,
+    );
+    final root = await _userDir(email);
+    final ext = _safeExt(item.name);
+    final out = File('${root.path}/$id.$ext');
+    final sink = out.openWrite();
+    try {
+      await stream.pipe(sink);
+      await sink.close();
+      final size = await out.length();
+      if (size <= 0) {
+        await out.delete();
+        return null;
+      }
+      final saved = NgmyDocShareItem(
+        id: item.id,
+        name: item.name,
+        mime: item.mime,
+        sizeBytes: size,
+        createdAt: item.createdAt,
+        note: item.note,
+        fromSender: item.fromSender,
+      );
+      final items = await _readIndex(email)..add(saved);
+      await _writeIndex(email, items);
+      return saved;
+    } catch (_) {
+      try {
+        await sink.close();
+        if (await out.exists()) await out.delete();
+      } catch (_) {}
+      return null;
+    }
+  }
+
   static Future<String?> filePath(String email, NgmyDocShareItem item) async {
     final root = await _userDir(email);
     final f = await _fileForId(root, item.id);

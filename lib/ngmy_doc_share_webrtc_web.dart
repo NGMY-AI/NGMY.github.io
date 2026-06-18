@@ -11,7 +11,7 @@ import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_webrtc_stub.dart' show kNgmyDocShareWebRtcAnswerPrefix;
 
 const String kNgmyDocShareWebRtcOfferPrefix = 'NGMYDOCSYNC3';
-const int _chunkSize = 60000;
+const int _chunkSize = 262144;
 
 RTCPeerConnection? _senderPc;
 RTCDataChannel? _senderChannel;

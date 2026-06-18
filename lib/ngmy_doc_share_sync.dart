@@ -1,9 +1,8 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 
+import 'ngmy_doc_share_lan_download.dart';
 import 'ngmy_doc_share_local_server.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_qr_payload.dart';
@@ -159,57 +158,19 @@ class NgmyDocShareSync {
     final manifestUri = root.endsWith('manifest.json') ? Uri.parse(root) : Uri.parse('$root/manifest.json');
 
     try {
-      final manifestRes = await http.get(manifestUri).timeout(const Duration(seconds: 15));
-      if (manifestRes.statusCode != 200) return null;
-
-      final decoded = jsonDecode(manifestRes.body);
-      if (decoded is! Map) return null;
+      final decoded = await NgmyDocShareLanDownload.fetchManifest(manifestUri);
+      if (decoded == null) return null;
       final files = decoded['files'];
       if (files is! List || files.isEmpty) return null;
 
       final owner = (decoded['ownerEmail'] ?? '').toString();
-      final total = files.length;
-      var received = 0;
-      final imported = <NgmyDocShareItem>[];
-
-      final origin = Uri.parse(root);
-
-      final futures = files.map((raw) async {
-        if (raw is! Map) return null;
-        final name = (raw['name'] ?? 'file').toString();
-        final mime = (raw['mime'] ?? 'application/octet-stream').toString();
-        final rel = (raw['url'] ?? '').toString();
-        final fileUri = rel.startsWith('http')
-            ? Uri.parse(rel)
-            : Uri(
-                scheme: origin.scheme,
-                host: origin.host,
-                port: origin.port,
-                path: rel.startsWith('/') ? rel : '/$rel',
-              );
-
-        final res = await http
-            .get(fileUri)
-            .timeout(const Duration(hours: 12));
-        if (res.statusCode != 200 || res.bodyBytes.isEmpty) return null;
-
-        final saved = await NgmyDocShareStore.addBytes(
-          email: recipientEmail,
-          name: name,
-          mime: mime,
-          bytes: Uint8List.fromList(res.bodyBytes),
-          fromSender: owner.isNotEmpty ? owner : null,
-          note: 'Received via QR',
-        );
-        received++;
-        onProgress?.call(received, total);
-        return saved;
-      });
-
-      final results = await Future.wait(futures);
-      for (final item in results) {
-        if (item != null) imported.add(item);
-      }
+      final imported = await NgmyDocShareLanDownload.pullAll(
+        recipientEmail: recipientEmail,
+        manifestUri: manifestUri,
+        files: files,
+        ownerEmail: owner,
+        onProgress: onProgress,
+      );
       return imported.isEmpty ? null : imported;
     } catch (e) {
       debugPrint('[doc share lan import] $e');

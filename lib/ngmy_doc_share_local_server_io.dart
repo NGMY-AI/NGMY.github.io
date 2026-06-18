@@ -21,7 +21,7 @@ class NgmyDocShareLocalServer {
   static String _generateSession() {
     const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
     final r = Random.secure();
-    return List.generate(12, (_) => chars[r.nextInt(chars.length)]).join();
+    return List.generate(8, (_) => chars[r.nextInt(chars.length)]).join();
   }
 
   static Future<String?> _localIp() async {
@@ -192,9 +192,12 @@ class NgmyDocShareLocalServer {
     if (path != null) {
       final file = File(path);
       if (await file.exists()) {
+        final len = await file.length();
         req.response.headers
           ..contentType = ContentType.parse(item.mime)
+          ..contentLength = len
           ..add('Access-Control-Allow-Origin', '*')
+          ..add('Connection', 'keep-alive')
           ..add('Content-Disposition', 'inline; filename="${item.name.replaceAll('"', '')}"');
         await req.response.addStream(file.openRead());
         await req.response.close();
