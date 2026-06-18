@@ -43,6 +43,8 @@
       if (slug) {
         try { sessionStorage.setItem("ngmy_guest_app_slug", slug); } catch (e) {}
         try { document.title = "Loading app…"; } catch (e2) {}
+      } else {
+        try { sessionStorage.removeItem("ngmy_guest_app_slug"); } catch (e3) {}
       }
     })();
   </script>

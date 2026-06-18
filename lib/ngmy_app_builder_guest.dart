@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_app_builder.dart';
 import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
+import 'ngmy_app_builder_open_stub.dart' if (dart.library.html) 'ngmy_app_builder_open_web.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
 import 'ngmy_app_builder_urls.dart';
@@ -145,6 +146,7 @@ class _NgmyPublishedAppHostScreenState extends State<NgmyPublishedAppHostScreen>
       final app = await ngmyFetchPublishedAppBySlug(widget.slug);
       if (!mounted) return;
       if (app != null) {
+        ngmySetGuestAppDocumentTitle(app.name);
         setState(() {
           _project = app;
           _loading = false;
@@ -179,7 +181,14 @@ class _NgmyPublishedAppHostScreenState extends State<NgmyPublishedAppHostScreen>
       );
     }
     if (_project != null) {
-      return NgmyAppRuntimeScreen(project: _project!);
+      final app = _project!;
+      return Theme(
+        data: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: app.theme),
+          useMaterial3: true,
+        ),
+        child: NgmyAppRuntimeScreen(project: app),
+      );
     }
     return Scaffold(
       backgroundColor: Colors.white,

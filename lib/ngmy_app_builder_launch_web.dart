@@ -51,51 +51,28 @@ String? _slugFromPath(String path) {
 
 
 String? ngmyReadAppSlugFromLaunchUrl() {
-
-  final fromStore = _slugFromSessionStorage();
-
-  if (fromStore != null && fromStore.isNotEmpty) return fromStore;
-
-
-
   final uri = Uri.parse(html.window.location.href);
-
-
-
   final fromPath = _slugFromPath(uri.path);
-
   if (fromPath != null && fromPath.isNotEmpty) {
-
     try {
-
       html.window.sessionStorage['ngmy_guest_app_slug'] = fromPath;
-
     } catch (_) {}
-
     return fromPath;
-
   }
 
-
+  try {
+    html.window.sessionStorage.remove('ngmy_guest_app_slug');
+  } catch (_) {}
 
   final slug = uri.queryParameters['ngmy_app']?.trim();
-
   if (slug != null && slug.isNotEmpty) return slug.toLowerCase();
 
-
-
   final hash = uri.fragment.trim();
-
   if (hash.startsWith('app/')) {
-
     final fromHash = hash.substring(4).split('/').first.trim();
-
     if (fromHash.isNotEmpty) return fromHash.toLowerCase();
-
   }
-
   return null;
-
 }
 
 

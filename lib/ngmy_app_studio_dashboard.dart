@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -8,6 +9,7 @@ import 'ngmy_app_builder_layout_utils.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_templates.dart';
 import 'ngmy_app_builder_icon.dart';
+import 'ngmy_app_builder_urls.dart';
 import 'ngmy_app_studio_ai_panel.dart';
 
 /// Screenshot-style showcase cards → existing template ids.
@@ -109,6 +111,7 @@ class NgmyAppStudioDashboard extends StatefulWidget {
     required this.onUseTemplate,
     required this.onImport,
     required this.onPreviewRuntime,
+    this.onOpenPublishedApp,
     required this.onPublish,
     required this.onIntegrations,
     required this.onOpenScreenEditor,
@@ -139,6 +142,7 @@ class NgmyAppStudioDashboard extends StatefulWidget {
   final ValueChanged<NgmyAppTemplate> onUseTemplate;
   final Future<void> Function() onImport;
   final ValueChanged<NgmyAppProject> onPreviewRuntime;
+  final Future<bool> Function(NgmyAppProject)? onOpenPublishedApp;
   final ValueChanged<NgmyAppProject> onPublish;
   final VoidCallback onIntegrations;
   final void Function(NgmyAppProject project, int screenIndex) onOpenScreenEditor;
@@ -215,6 +219,17 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Use Exit in the menu to leave App Builder.')),
     );
+  }
+
+  void _viewApp(NgmyAppProject p) {
+    if (ngmyProjectHasStandaloneLink(p)) {
+      final open = widget.onOpenPublishedApp;
+      if (open != null) {
+        unawaited(open(p));
+        return;
+      }
+    }
+    widget.onPreviewRuntime(p);
   }
 
   void _openDragDropEditor() {
@@ -553,8 +568,8 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
           const Spacer(),
           if (compact) _modeToggle(compact: true),
           IconButton(
-            tooltip: 'View app',
-            onPressed: p == null ? null : () => widget.onPreviewRuntime(p),
+            tooltip: p != null && ngmyProjectHasStandaloneLink(p) ? 'Open live app' : 'Preview in builder',
+            onPressed: p == null ? null : () => _viewApp(p),
             icon: Icon(Icons.phone_iphone_rounded, color: p == null ? Colors.white24 : const Color(0xFF60A5FA), size: 22),
           ),
           if (!compact) ...[
@@ -1229,7 +1244,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                         trailing: PopupMenuButton<String>(
                           icon: const Icon(Icons.more_horiz_rounded, color: Colors.white54),
                           onSelected: (v) {
-                            if (v == 'view') widget.onPreviewRuntime(p);
+                            if (v == 'view') _viewApp(p);
                             if (v == 'edit') widget.onOpenScreenEditor(p, 0);
                             if (v == 'publish') _confirmPublishProject(p);
                             if (v == 'delete') _confirmDeleteProject(p);
@@ -1241,7 +1256,10 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                           itemBuilder: (_) => [
                             const PopupMenuItem(value: 'canvas', child: Text('Open in canvas')),
                             const PopupMenuItem(value: 'edit', child: Text('Edit screen')),
-                            const PopupMenuItem(value: 'view', child: Text('View app')),
+                            PopupMenuItem(
+                              value: 'view',
+                              child: Text(ngmyProjectHasStandaloneLink(p) ? 'Open live app' : 'Preview in builder'),
+                            ),
                             PopupMenuItem(
                               value: 'publish',
                               child: Text(widget.isAdmin ? 'Publish app' : 'Submit for review'),

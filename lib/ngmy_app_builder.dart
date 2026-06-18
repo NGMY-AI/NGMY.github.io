@@ -12,6 +12,7 @@ import 'ngmy_app_builder_screen_editor.dart';
 import 'ngmy_app_builder_cloud.dart';
 import 'ngmy_app_builder_guest.dart';
 import 'ngmy_app_builder_launch_stub.dart' if (dart.library.html) 'ngmy_app_builder_launch_web.dart';
+import 'ngmy_app_builder_open_stub.dart' if (dart.library.html) 'ngmy_app_builder_open_web.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_data.dart';
 import 'ngmy_app_builder_copilot_storage.dart';
@@ -40,11 +41,7 @@ void ngmyTryOpenPublishedAppFromUrl(
     var app = await ngmyFindPublishedAppBySlugLocal(slug);
     app ??= await ngmyFetchPublishedAppBySlug(slug);
     if (!context.mounted || app == null) return;
-    NgmyNavigator.push(
-      context,
-      NgmyAppRuntimeScreen(project: app, apiKey: apiKey, email: email),
-      routeName: 'NgmyAppRuntimeScreen',
-    );
+    await ngmyOpenPublishedAppStandalone(app);
   });
 }
 
@@ -55,12 +52,15 @@ Future<void> _ngmyShowAppPublicUrlDialog(BuildContext context, NgmyAppProject pr
   await showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Your unique NGMY link'),
+      title: const Text('Your app is live'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Share this link for "${project.name}" — it opens on ngmy.org:', style: TextStyle(color: Colors.grey.shade700)),
+          Text(
+            '"${project.name}" is hosted on ngmy.org as its own app. Share this link — it opens outside NGMY, no login required:',
+            style: TextStyle(color: Colors.grey.shade700),
+          ),
           const SizedBox(height: 12),
           SelectableText(url, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF2563EB), fontSize: 13)),
           const SizedBox(height: 10),
@@ -79,7 +79,13 @@ Future<void> _ngmyShowAppPublicUrlDialog(BuildContext context, NgmyAppProject pr
           },
           child: const Text('Copy link'),
         ),
-        FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            unawaited(ngmyOpenPublishedAppStandalone(refreshed));
+          },
+          child: const Text('Open live app'),
+        ),
       ],
     ),
   );
@@ -321,6 +327,24 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
     }
   }
 
+  Future<void> _openPublishedOrPreview(NgmyAppProject project) async {
+    if (ngmyProjectHasStandaloneLink(project)) {
+      final ok = await ngmyOpenPublishedAppStandalone(project);
+      if (!mounted) return;
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open live app link. Copy the ngmy.org link and try in a browser.')),
+        );
+      }
+      return;
+    }
+    NgmyNavigator.push(
+      context,
+      NgmyAppRuntimeScreen(project: project, apiKey: _apiKey, email: _email),
+      routeName: 'NgmyAppRuntimeScreen',
+    );
+  }
+
   void _copyUrl(NgmyAppProject project) {
     final url = ngmyResolvedPublicUrl(project);
     if (url.isEmpty) return;
@@ -465,6 +489,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
         NgmyAppRuntimeScreen(project: p, apiKey: _apiKey, email: _email),
         routeName: 'NgmyAppRuntimeScreen',
       ),
+      onOpenPublishedApp: (p) => ngmyOpenPublishedAppStandalone(p),
       onPublish: (p) => _submitOrPublish(p),
       onIntegrations: () => unawaited(_openIntegrationsFromDashboard()),
       onOpenScreenEditor: (p, i) => unawaited(_openScreenFromDashboard(p, i)),
@@ -580,8 +605,13 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
                 if (v == 'ai') await _openAiCopilot(project: p);
                 if (v == 'cloud') await _saveToCloud(p);
                 if (v == 'preview') {
-                  NgmyNavigator.push(context, NgmyAppRuntimeScreen(project: p, apiKey: _apiKey, email: _email), routeName: 'NgmyAppRuntimeScreen');
+                  if (ngmyProjectHasStandaloneLink(p)) {
+                    unawaited(_openPublishedOrPreview(p));
+                  } else {
+                    NgmyNavigator.push(context, NgmyAppRuntimeScreen(project: p, apiKey: _apiKey, email: _email), routeName: 'NgmyAppRuntimeScreen');
+                  }
                 }
+                if (v == 'open') unawaited(ngmyOpenPublishedAppStandalone(p));
                 if (v == 'copy' && ngmyResolvedPublicUrl(p).isNotEmpty) _copyUrl(p);
                 if (v == 'export') await _exportApp(p);
                 if (v == 'publish') await _submitOrPublish(p);
@@ -601,7 +631,8 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
                         : 'Save to cloud (${_cloudSavedProjectIds.length}/${NgmyAppStudioPayments.maxCloudApps})',
                   ),
                 ),
-                const PopupMenuItem(value: 'preview', child: Text('Preview')),
+                const PopupMenuItem(value: 'preview', child: Text('Preview in builder')),
+                if (ngmyResolvedPublicUrl(p).isNotEmpty) const PopupMenuItem(value: 'open', child: Text('Open live app')),
                 if (ngmyResolvedPublicUrl(p).isNotEmpty) const PopupMenuItem(value: 'copy', child: Text('Copy ngmy.org link')),
                 const PopupMenuItem(value: 'export', child: Text('Download backup (.ngmy.json)')),
                 PopupMenuItem(value: 'publish', child: Text(_isAdmin ? 'Publish now' : 'Submit for review')),
@@ -844,7 +875,7 @@ class _NgmyAppBuilderScreenState extends State<NgmyAppBuilderScreen> {
               icon: const Icon(Icons.link_rounded),
               onPressed: ngmyResolvedPublicUrl(p).isEmpty ? null : () => _copyUrl(p),
             ),
-            onTap: () => NgmyNavigator.push(context, NgmyAppRuntimeScreen(project: p, apiKey: _apiKey, email: _email), routeName: 'NgmyAppRuntimeScreen'),
+            onTap: () => _openPublishedOrPreview(p),
           ),
         );
       },

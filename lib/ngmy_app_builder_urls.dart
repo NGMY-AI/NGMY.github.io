@@ -1,5 +1,27 @@
+import 'ngmy_app_builder_open_stub.dart' if (dart.library.html) 'ngmy_app_builder_open_web.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
+
+/// True when this project has a public ngmy.org link and should open outside NGMY.
+bool ngmyProjectHasStandaloneLink(NgmyAppProject project) {
+  if (project.slug.trim().isEmpty) return false;
+  if (project.status == NgmyAppBuilderStatus.published) return true;
+  return ngmyResolvedPublicUrl(project).isNotEmpty;
+}
+
+/// Opens the published app at its own hosted URL (ngmy.org/app/{slug}) — not inside NGMY.
+Future<bool> ngmyOpenPublishedAppStandalone(
+  NgmyAppProject project, {
+  bool newTab = false,
+}) async {
+  final slug = project.slug.trim().toLowerCase();
+  if (slug.isEmpty) return false;
+  final url = ngmyResolvedPublicUrl(project).isNotEmpty
+      ? ngmyResolvedPublicUrl(project)
+      : ngmyAppPublicUrlForSlug(slug);
+  if (url.isEmpty) return false;
+  return ngmyLaunchPublishedAppUrl(url, newTab: newTab);
+}
 
 /// Production domain for App Studio public links (custom domain).
 const String kNgmyAppStudioCanonicalBaseUrl = 'https://ngmy.org/';
