@@ -46,6 +46,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
   late final TextEditingController _deliveryC;
   late final TextEditingController _mileageC;
   late final TextEditingController _jobDescC;
+  late final TextEditingController _serviceAddressC;
+  late final TextEditingController _fixtureTypeC;
+  late final TextEditingController _problemDetailsC;
+  late final TextEditingController _preferredScheduleC;
+  late final TextEditingController _urgencyC;
   late final AnimationController _pulse;
   String _reference = '';
   bool _cashAppOpened = false;
@@ -69,6 +74,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     _deliveryC = TextEditingController();
     _mileageC = TextEditingController();
     _jobDescC = TextEditingController();
+    _serviceAddressC = TextEditingController();
+    _fixtureTypeC = TextEditingController();
+    _problemDetailsC = TextEditingController();
+    _preferredScheduleC = TextEditingController();
+    _urgencyC = TextEditingController();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
   }
 
@@ -89,6 +99,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     _deliveryC.dispose();
     _mileageC.dispose();
     _jobDescC.dispose();
+    _serviceAddressC.dispose();
+    _fixtureTypeC.dispose();
+    _problemDetailsC.dispose();
+    _preferredScheduleC.dispose();
+    _urgencyC.dispose();
     _pulse.dispose();
     super.dispose();
   }
@@ -112,6 +127,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
       _deliveryC.clear();
       _mileageC.clear();
       _jobDescC.clear();
+      _serviceAddressC.clear();
+      _fixtureTypeC.clear();
+      _problemDetailsC.clear();
+      _preferredScheduleC.clear();
+      _urgencyC.clear();
       _cashAppOpened = false;
       _reference = 'HC-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}-${1000 + DateTime.now().millisecond % 9000}';
     });
@@ -122,6 +142,10 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
   bool get _isGeneralHelp => _selected != null && ngmyHelpCenterIsGeneralHelp(_selected!);
 
   bool get _isMovingDelivery => _selected != null && ngmyHelpCenterIsMovingDelivery(_selected!);
+
+  bool get _isHouseFixture => _selected != null && ngmyHelpCenterIsHouseFixture(_selected!);
+
+  void _touchForm() => setState(() {});
 
   void _resetCashApp() => setState(() => _cashAppOpened = false);
 
@@ -143,6 +167,12 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
       return _pickupC.text.trim().isNotEmpty &&
           _deliveryC.text.trim().isNotEmpty &&
           (double.tryParse(_mileageC.text.trim()) ?? 0) > 0;
+    }
+    if (_isHouseFixture) {
+      return _serviceAddressC.text.trim().isNotEmpty &&
+          _fixtureTypeC.text.trim().isNotEmpty &&
+          _jobDescC.text.trim().length >= 8 &&
+          _problemDetailsC.text.trim().isNotEmpty;
     }
     return true;
   }
@@ -167,6 +197,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
       deliveryAddress: _deliveryC.text,
       mileage: _mileageC.text,
       jobDescription: _jobDescC.text,
+      serviceAddress: _serviceAddressC.text,
+      fixtureType: _fixtureTypeC.text,
+      problemDetails: _problemDetailsC.text,
+      preferredSchedule: _preferredScheduleC.text,
+      urgency: _urgencyC.text,
       notes: _notesC.text,
       qty: _qtyC.text,
       price: _priceC.text,
@@ -174,11 +209,10 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     );
   }
 
+  /// Send Money: WhatsApp unlocks only after Pay on Cash App. Other services: unlock when form is complete.
   bool get _canContactWhatsApp {
     if (!_canContact) return false;
-    if (_isSendMoney && _cfg.cashAppEnabled && _cfg.resolvedCashAppUrl().isNotEmpty && !_cashAppOpened) {
-      return false;
-    }
+    if (_isSendMoney && !_cashAppOpened) return false;
     return true;
   }
 
@@ -211,13 +245,15 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
         _snack('Add a topic and describe what you need help with.');
       } else if (_isMovingDelivery) {
         _snack('Enter pickup address, delivery address, and mileage.');
+      } else if (_isHouseFixture) {
+        _snack('Enter service address, fixture type, job description, and problem details.');
       } else {
         _snack('Complete your request first.');
       }
       return;
     }
-    if (_isSendMoney && _cfg.cashAppEnabled && _cfg.resolvedCashAppUrl().isNotEmpty && !_cashAppOpened) {
-      _snack('Pay on Cash App first, then send your WhatsApp request.');
+    if (_isSendMoney && !_cashAppOpened) {
+      _snack('Tap Pay on Cash App first — then Send on WhatsApp will turn on.');
       return;
     }
     final url = _cfg.resolvedWhatsAppUrl(prefilledText: _message);
@@ -239,6 +275,8 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
         _snack('Add a topic and describe what you need help with.');
       } else if (_isMovingDelivery) {
         _snack('Enter pickup address, delivery address, and mileage.');
+      } else if (_isHouseFixture) {
+        _snack('Enter service address, fixture type, job description, and problem details.');
       } else {
         _snack('Complete your request first.');
       }
@@ -289,7 +327,18 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
                             if (services.isEmpty)
                               _emptyServices(isDark)
                             else
-                              ...services.map((s) => Padding(padding: const EdgeInsets.only(bottom: 10), child: _serviceCard(s, isDark))),
+                              GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 10,
+                                  crossAxisSpacing: 10,
+                                  childAspectRatio: 0.92,
+                                ),
+                                itemCount: services.length,
+                                itemBuilder: (_, i) => _serviceGridTile(services[i], isDark),
+                              ),
                             if (_selected != null) ...[
                               const SizedBox(height: 8),
                               _summaryCard(isDark),
@@ -445,15 +494,16 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     );
   }
 
-  Widget _serviceCard(NgmyHelpCenterService s, bool isDark) {
+  Widget _serviceGridTile(NgmyHelpCenterService s, bool isDark) {
     final selected = _selected?.id == s.id;
+    final isMoney = ngmyHelpCenterIsSendMoney(s);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _selectService(s),
         borderRadius: BorderRadius.circular(18),
         child: Ink(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             gradient: selected
@@ -463,49 +513,45 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
             border: Border.all(color: selected ? _accent.withOpacity(0.65) : (isDark ? Colors.white12 : Colors.black12), width: selected ? 1.6 : 1),
             boxShadow: selected ? [BoxShadow(color: _accent.withOpacity(0.18), blurRadius: 14)] : null,
           ),
-          child: Row(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(colors: [s.id.hashCode.isEven ? _accent2 : _accent, s.id.hashCode.isEven ? _accent : _accent2]),
+                  gradient: LinearGradient(
+                    colors: isMoney
+                        ? [const Color(0xFF059669), const Color(0xFF10B981)]
+                        : [s.id.hashCode.isEven ? _accent2 : _accent, s.id.hashCode.isEven ? _accent : _accent2],
+                  ),
                 ),
-                child: Icon(ngmyHelpCenterIconData(s.icon), color: Colors.white, size: 24),
+                child: Icon(ngmyHelpCenterServiceIcon(s), color: Colors.white, size: 24),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(s.name, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-                    if (s.description.isNotEmpty)
-                      Text(s.description, style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54)),
-                    if (double.tryParse(s.defaultPrice) != null && (double.tryParse(s.defaultPrice) ?? 0) > 0 && !ngmyHelpCenterIsMovingDelivery(s))
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          ngmyHelpCenterIsSendMoney(s)
-                              ? '\$2 fee under \$30 · 5% at \$30+'
-                              : ngmyHelpCenterIsGeneralHelp(s)
-                                  ? 'Tell us anything you need'
-                                  : 'From \$${double.tryParse(s.defaultPrice)!.toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _accent),
-                        ),
-                      ),
-                    if (ngmyHelpCenterIsMovingDelivery(s))
-                      const Padding(
-                        padding: EdgeInsets.only(top: 4),
-                        child: Text(
-                          '\$2.50/mi over 10 mi · under 10 mi on WhatsApp',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _accent),
-                        ),
-                      ),
-                  ],
+              const SizedBox(height: 8),
+              Text(
+                s.name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, height: 1.15, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+              ),
+              if (s.description.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  s.description,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 9, height: 1.2, color: isDark ? Colors.white60 : Colors.black54),
                 ),
-              ),
-              Icon(selected ? Icons.check_circle_rounded : Icons.chevron_right_rounded, color: selected ? _accent : (isDark ? Colors.white38 : Colors.black26)),
+              ],
+              if (selected)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Icon(Icons.check_circle_rounded, size: 16, color: _accent),
+                ),
             ],
           ),
         ),
@@ -590,38 +636,56 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : const Color(0xFF475569)),
             ),
             const SizedBox(height: 10),
-            _textField('What do you need help with? *', _helpTopicC, isDark, textCapitalization: TextCapitalization.sentences),
+            _textField('What do you need help with? *', _helpTopicC, isDark, onChanged: (_) => _touchForm(), textCapitalization: TextCapitalization.sentences),
             const SizedBox(height: 10),
-            _textField('Describe your request *', _helpDetailsC, isDark, maxLines: 4, hint: 'Explain the problem, what you tried, and what outcome you want…'),
+            _textField('Describe your request *', _helpDetailsC, isDark, maxLines: 4, onChanged: (_) => _touchForm(), hint: 'Explain the problem, what you tried, and what outcome you want…'),
             const SizedBox(height: 10),
-            _textField('Your location (optional)', _helpLocationC, isDark, textCapitalization: TextCapitalization.words),
+            _textField('Your location (optional)', _helpLocationC, isDark, onChanged: (_) => _touchForm(), textCapitalization: TextCapitalization.words),
             const SizedBox(height: 10),
-            _textField('Best time to contact you (optional)', _preferredContactC, isDark, hint: 'e.g. Weekdays after 5pm'),
+            _textField('Best time to contact you (optional)', _preferredContactC, isDark, onChanged: (_) => _touchForm(), hint: 'e.g. Weekdays after 5pm'),
           ] else if (_isMovingDelivery) ...[
             const SizedBox(height: 10),
-            _textField('Pickup address *', _pickupC, isDark, maxLines: 2, hint: 'Where items are coming from'),
+            _textField('Pickup address *', _pickupC, isDark, maxLines: 2, onChanged: (_) => _touchForm(), hint: 'Where items are coming from'),
             const SizedBox(height: 10),
-            _textField('Delivery address *', _deliveryC, isDark, maxLines: 2, hint: 'Where items are going'),
+            _textField('Delivery address *', _deliveryC, isDark, maxLines: 2, onChanged: (_) => _touchForm(), hint: 'Where items are going'),
             const SizedBox(height: 10),
-            _field('Estimated mileage (miles) *', _mileageC, isDark, onChanged: (_) => setState(() {})),
+            _field('Estimated mileage (miles) *', _mileageC, isDark, onChanged: (_) => _touchForm()),
             const SizedBox(height: 10),
             _deliveryFeeBox(isDark),
+          ] else if (_isHouseFixture) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Tell us about the repair — the more detail, the faster we can help.',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+            ),
+            const SizedBox(height: 10),
+            _textField('Service address *', _serviceAddressC, isDark, maxLines: 2, onChanged: (_) => _touchForm(), hint: 'Where the work needs to be done'),
+            const SizedBox(height: 10),
+            _textField('Fixture / area *', _fixtureTypeC, isDark, onChanged: (_) => _touchForm(), hint: 'e.g. Kitchen faucet, bathroom tile, outlet'),
+            const SizedBox(height: 10),
+            _textField('Job description *', _jobDescC, isDark, maxLines: 3, onChanged: (_) => _touchForm(), hint: 'What work do you need done?'),
+            const SizedBox(height: 10),
+            _textField('Problem details *', _problemDetailsC, isDark, maxLines: 3, onChanged: (_) => _touchForm(), hint: 'What is broken, leaking, or not working?'),
+            const SizedBox(height: 10),
+            _textField('Urgency (optional)', _urgencyC, isDark, onChanged: (_) => _touchForm(), hint: 'e.g. Emergency, this week, flexible'),
+            const SizedBox(height: 10),
+            _textField('Preferred date / time (optional)', _preferredScheduleC, isDark, onChanged: (_) => _touchForm(), hint: 'When works best for you?'),
           ] else ...[
             const SizedBox(height: 10),
-            _textField('Job description', _jobDescC, isDark, maxLines: 3, hint: 'What needs to be done?'),
+            _textField('Job description', _jobDescC, isDark, maxLines: 3, onChanged: (_) => _touchForm(), hint: 'What needs to be done?'),
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: _field('Qty', _qtyC, isDark, onChanged: (_) => setState(() {}))),
+                Expanded(child: _field('Qty', _qtyC, isDark, onChanged: (_) => _touchForm())),
                 const SizedBox(width: 10),
-                Expanded(child: _field('Est. rate (\$)', _priceC, isDark, onChanged: (_) => setState(() {}))),
+                Expanded(child: _field('Est. rate (\$)', _priceC, isDark, onChanged: (_) => _touchForm())),
               ],
             ),
           ],
           const SizedBox(height: 10),
           TextField(
             controller: _notesC,
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) => _touchForm(),
             maxLines: 2,
             decoration: InputDecoration(
               labelText: 'Notes (optional)',
@@ -646,8 +710,12 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
           const SizedBox(height: 8),
           Text(
             _isSendMoney
-                ? 'Step 1: Pay on Cash App · Step 2: Send on WhatsApp or call.'
-                : 'Nothing is sent from the app — tap WhatsApp or Call to reach us with this message.',
+                ? (_cashAppOpened
+                    ? 'Cash App opened — tap Send on WhatsApp to finish.'
+                    : 'Step 1: Pay on Cash App · Step 2: Send on WhatsApp turns on after payment.')
+                : _canContactWhatsApp
+                    ? 'All set — tap Send on WhatsApp or Call.'
+                    : 'Fill in every required field (*) to turn on Send on WhatsApp.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 9, color: isDark ? Colors.white38 : Colors.black45, height: 1.3),
           ),
@@ -713,7 +781,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
   }) {
     return TextField(
       controller: c,
-      onChanged: onChanged ?? (_) => setState(() {}),
+      onChanged: onChanged ?? (_) => _touchForm(),
       keyboardType: keyboard,
       textCapitalization: textCapitalization,
       maxLines: maxLines,
@@ -786,18 +854,30 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
           ),
           if (_cfg.whatsappEnabled) const SizedBox(height: 10),
         ],
-        if (_cfg.whatsappEnabled)
+        if (_cfg.whatsappEnabled) ...[
           FilledButton.icon(
             onPressed: _canContactWhatsApp ? _openWhatsApp : null,
-            icon: const Icon(Icons.chat_rounded),
+            icon: Icon(_canContactWhatsApp ? Icons.chat_rounded : Icons.lock_outline_rounded),
             label: Text(_cfg.whatsappButtonLabel, style: const TextStyle(fontWeight: FontWeight.w900)),
             style: FilledButton.styleFrom(
-              backgroundColor: _waGreen,
+              backgroundColor: _canContactWhatsApp ? _waGreen : _waGreen.withValues(alpha: 0.35),
+              disabledBackgroundColor: _waGreen.withValues(alpha: 0.28),
               foregroundColor: Colors.white,
+              disabledForegroundColor: Colors.white.withValues(alpha: 0.85),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
+          if (_isSendMoney && _canContact && !_cashAppOpened)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Send on WhatsApp unlocks after you tap Pay on Cash App.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.amber.shade200 : const Color(0xFFB45309)),
+              ),
+            ),
+        ],
         if (_cfg.whatsappEnabled && _cfg.callEnabled) const SizedBox(height: 10),
         if (_cfg.callEnabled)
           OutlinedButton.icon(
