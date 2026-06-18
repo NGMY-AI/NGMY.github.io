@@ -15,6 +15,63 @@ type Provider = "gemini" | "openai" | "anthropic" | "openaiCompatible";
 
 type GeminiImagePart = { mimeType?: string; data?: string };
 
+async function geminiVirtualOutfit(
+  apiKey: string,
+  prompt: string,
+  personImage: GeminiImagePart,
+  outfitImage: GeminiImagePart,
+): Promise<string> {
+  const models = [
+    "gemini-2.5-flash-image",
+    "gemini-2.5-flash-image-preview",
+    "gemini-2.0-flash-preview-image-generation",
+  ];
+  const parts: unknown[] = [];
+  for (const img of [personImage, outfitImage]) {
+    const data = String(img?.data ?? "").trim();
+    if (!data) continue;
+    parts.push({
+      inline_data: {
+        mime_type: String(img?.mimeType ?? "image/jpeg").trim() || "image/jpeg",
+        data,
+      },
+    });
+  }
+  parts.push({ text: prompt });
+
+  let lastErr = "Gemini image generation failed";
+  for (const model of models) {
+    const url =
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          responseModalities: ["TEXT", "IMAGE"],
+        },
+      }),
+    });
+    if (!res.ok) {
+      lastErr = await res.text();
+      continue;
+    }
+    const data = await res.json();
+    const candidates = data?.candidates;
+    if (!Array.isArray(candidates) || candidates.length === 0) continue;
+    const respParts = candidates[0]?.content?.parts;
+    if (!Array.isArray(respParts)) continue;
+    for (const part of respParts) {
+      const inline = part?.inlineData ?? part?.inline_data;
+      const b64 = inline?.data;
+      if (b64 && String(b64).trim()) return String(b64).trim();
+    }
+    lastErr = "No image in Gemini response";
+  }
+  throw new Error(lastErr);
+}
+
 async function geminiChat(
   apiKey: string,
   prompt: string,
@@ -180,6 +237,33 @@ serve(async (req) => {
       }
       const audioBase64 = await elevenLabsTts(apiKey, text, voiceId, modelId);
       return new Response(JSON.stringify({ audioBase64 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "geminiVirtualOutfit") {
+      const prompt = String(body?.prompt ?? "").trim();
+      const images: GeminiImagePart[] = Array.isArray(body?.images)
+        ? body.images
+        : [];
+      if (!apiKey || images.length < 2) {
+        return new Response(
+          JSON.stringify({
+            error: "apiKey, prompt, and two images (person + outfit) are required",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const imageBase64 = await geminiVirtualOutfit(
+        apiKey,
+        prompt,
+        images[0],
+        images[1],
+      );
+      return new Response(JSON.stringify({ imageBase64 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

@@ -360,7 +360,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           ngmyHelpCenterIsSendMoney(s)
-                              ? '15% service fee applies'
+                              ? '\$2 fee under \$30 · 5% at \$30+'
                               : 'From \$${double.tryParse(s.defaultPrice)!.toStringAsFixed(2)}',
                           style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _accent),
                         ),
@@ -380,8 +380,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     final s = _selected!;
     final isMoney = ngmyHelpCenterIsSendMoney(s);
     final amount = double.tryParse(_priceC.text.trim()) ?? 0;
-    final fee = amount * kNgmyHelpCenterMoneyTransferFeeRate;
+    final fee = ngmyHelpCenterMoneyTransferFee(amount);
     final recipientGets = amount - fee;
+    final feeLabel = amount < kNgmyHelpCenterMoneyTransferMinAmount
+        ? 'Fee (\$2 flat)'
+        : 'Fee (5%)';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -434,10 +437,15 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('15% NGMY service fee', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: isDark ? Colors.amber : const Color(0xFFB45309))),
+                  Text(
+                    amount < kNgmyHelpCenterMoneyTransferMinAmount
+                        ? 'NGMY service fee — \$2 flat (under \$30)'
+                        : 'NGMY service fee — 5%',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: isDark ? Colors.amber : const Color(0xFFB45309)),
+                  ),
                   const SizedBox(height: 6),
                   _summaryLine('Transfer', '\$${amount.toStringAsFixed(2)}', isDark),
-                  _summaryLine('Fee (15%)', '\$${fee.toStringAsFixed(2)}', isDark),
+                  _summaryLine(feeLabel, '\$${fee.toStringAsFixed(2)}', isDark),
                   _summaryLine('Recipient gets', '\$${recipientGets.toStringAsFixed(2)}', isDark),
                 ],
               ),

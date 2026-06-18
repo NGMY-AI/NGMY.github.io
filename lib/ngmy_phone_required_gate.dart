@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Money transfer service id in Help Center — 15% service fee applies.
-const String kNgmyHelpCenterSendMoneyId = 'send_money';
-
-/// NGMY fee on send-money transfers (15%).
-const double kNgmyHelpCenterMoneyTransferFeeRate = 0.15;
-
 bool ngmyUserPhoneOnFile(String phone) {
   final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
   return digits.length >= 10;

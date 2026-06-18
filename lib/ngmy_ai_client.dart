@@ -801,3 +801,248 @@ Future<({Uint8List? bytes, String? error})> ngmyAiGenerateImage(
   if (fallback.bytes != null) return fallback;
   return (bytes: null, error: primary.error ?? fallback.error ?? 'Could not generate image.');
 }
+
+const _kNgmyOutfitTryOnPrompt = '''
+You are a world-class fashion photo editor performing virtual try-on.
+
+IMAGE 1 (first): A photo of a real person. Preserve their face, skin tone, body proportions, pose, hair, hands, and background.
+IMAGE 2 (second): A reference photo of clothing or an outfit they should wear.
+
+Create ONE photorealistic result: the same person from IMAGE 1 naturally wearing the outfit from IMAGE 2.
+- Match fabric, color, pattern, cut, and style of the outfit precisely.
+- Fit clothes realistically with natural folds, seams, shadows, and lighting that match the original photo.
+- Do NOT overlay a flat cutout — the result must look like a real photograph.
+- Keep the person's identity unchanged. Do not alter face features or ethnicity.
+- Output only the final edited photograph.
+''';
+
+Uint8List? _extractGeminiImageFromResponse(Map<String, dynamic> data) {
+  final candidates = data['candidates'];
+  if (candidates is! List || candidates.isEmpty) return null;
+  final parts = candidates[0]['content']?['parts'];
+  if (parts is! List) return null;
+  for (final part in parts) {
+    if (part is! Map) continue;
+    final inline = part['inlineData'] ?? part['inline_data'];
+    if (inline is Map) {
+      final b64 = inline['data']?.toString();
+      if (b64 != null && b64.trim().isNotEmpty) {
+        try {
+          return base64Decode(b64.trim());
+        } catch (_) {}
+      }
+    }
+  }
+  return null;
+}
+
+Future<({Uint8List? bytes, String? error})> _callGeminiOutfitDirect({
+  required String apiKey,
+  required Uint8List personBytes,
+  required String personMime,
+  required Uint8List outfitBytes,
+  required String outfitMime,
+  String prompt = _kNgmyOutfitTryOnPrompt,
+}) async {
+  const models = [
+    'gemini-2.5-flash-image',
+    'gemini-2.5-flash-image-preview',
+    'gemini-2.0-flash-preview-image-generation',
+  ];
+  final parts = <Map<String, dynamic>>[
+    {
+      'inline_data': {
+        'mime_type': personMime.trim().isEmpty ? 'image/jpeg' : personMime,
+        'data': base64Encode(personBytes),
+      },
+    },
+    {
+      'inline_data': {
+        'mime_type': outfitMime.trim().isEmpty ? 'image/jpeg' : outfitMime,
+        'data': base64Encode(outfitBytes),
+      },
+    },
+    {'text': prompt},
+  ];
+
+  Object? lastError;
+  String? lastBody;
+  for (final model in models) {
+    try {
+      final url = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${Uri.encodeQueryComponent(apiKey)}',
+      );
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'contents': [
+                {'parts': parts},
+              ],
+              'generationConfig': {
+                'responseModalities': ['TEXT', 'IMAGE'],
+              },
+            }),
+          )
+          .timeout(const Duration(seconds: 180));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final bytes = _extractGeminiImageFromResponse(data);
+        if (bytes != null && bytes.length > 2048) {
+          return (bytes: bytes, error: null);
+        }
+        lastError = 'No image in AI response';
+      } else {
+        lastBody = response.body;
+        lastError = 'HTTP ${response.statusCode}';
+      }
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  return (bytes: null, error: _extractApiErrorMessage(lastError, body: lastBody));
+}
+
+Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({
+  required String apiKey,
+  required Uint8List personBytes,
+  required String personMime,
+  required Uint8List outfitBytes,
+  required String outfitMime,
+  String prompt = _kNgmyOutfitTryOnPrompt,
+}) async {
+  try {
+    final client = Supabase.instance.client;
+    final body = <String, dynamic>{
+      'action': 'geminiVirtualOutfit',
+      'apiKey': apiKey.trim(),
+      'prompt': prompt,
+      'images': [
+        {'mimeType': personMime, 'data': base64Encode(personBytes)},
+        {'mimeType': outfitMime, 'data': base64Encode(outfitBytes)},
+      ],
+    };
+
+    try {
+      final res = await client.functions.invoke('ngmy-ai-chat', body: body);
+      if (res.status == 200) {
+        final data = res.data;
+        if (data is Map) {
+          final b64 = data['imageBase64']?.toString();
+          if (b64 != null && b64.trim().isNotEmpty) {
+            return (bytes: base64Decode(b64.trim()), error: null);
+          }
+          final err = data['error']?.toString();
+          if (err != null && err.isNotEmpty) return (bytes: null, error: err);
+        }
+      } else if (res.status == 404) {
+        return (
+          bytes: null,
+          error: 'AI proxy not deployed. Deploy ngmy-ai-chat in Supabase, then try again.',
+        );
+      } else {
+        return (bytes: null, error: 'AI proxy HTTP ${res.status}');
+      }
+    } catch (e) {
+      debugPrint('[outfit-ai] functions.invoke: $e');
+    }
+
+    final restUrl = client.rest.url;
+    final base = restUrl.contains('/rest/v1')
+        ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
+        : restUrl;
+    final url = '$base/functions/v1/ngmy-ai-chat';
+    final session = client.auth.currentSession;
+    final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
+    final token = session?.accessToken ?? anonKey;
+    final response = await http
+        .post(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+            if (anonKey.isNotEmpty) 'apikey': anonKey,
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 180));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final b64 = data['imageBase64']?.toString();
+      if (b64 != null && b64.trim().isNotEmpty) {
+        return (bytes: base64Decode(b64.trim()), error: null);
+      }
+      final err = data['error']?.toString();
+      if (err != null && err.isNotEmpty) return (bytes: null, error: err);
+    }
+    if (response.statusCode == 404) {
+      return (
+        bytes: null,
+        error: 'AI proxy not deployed. Deploy ngmy-ai-chat in Supabase Dashboard.',
+      );
+    }
+    return (bytes: null, error: _extractApiErrorMessage('HTTP ${response.statusCode}', body: response.body));
+  } catch (e) {
+    return (bytes: null, error: _extractApiErrorMessage(e));
+  }
+}
+
+/// Virtual outfit try-on — person photo + outfit reference → photorealistic dressed image.
+Future<({Uint8List? bytes, String? error})> ngmyAiVirtualOutfitTryOn({
+  required String apiKey,
+  required Uint8List personBytes,
+  required Uint8List outfitBytes,
+  String personMime = 'image/jpeg',
+  String outfitMime = 'image/jpeg',
+}) async {
+  final creds = ngmyParseAiCredentials(apiKey);
+  if (creds.apiKey.isEmpty) {
+    return (bytes: null, error: 'No AI API key configured. Admin → Management Menus → NGMY AI.');
+  }
+  if (creds.provider != NgmyAiProviderKind.gemini) {
+    return (
+      bytes: null,
+      error: 'AI Outfit Studio needs a Google Gemini API key (AIza… or gemini: prefix).',
+    );
+  }
+  if (personBytes.length < 1024) return (bytes: null, error: 'Person photo is too small or missing.');
+  if (outfitBytes.length < 512) return (bytes: null, error: 'Outfit photo is too small or missing.');
+
+  Future<({Uint8List? bytes, String? error})> runDirect() => _callGeminiOutfitDirect(
+        apiKey: creds.apiKey,
+        personBytes: personBytes,
+        personMime: personMime,
+        outfitBytes: outfitBytes,
+        outfitMime: outfitMime,
+      );
+
+  if (kIsWeb) {
+    final proxied = await _callGeminiOutfitViaProxy(
+      apiKey: creds.apiKey,
+      personBytes: personBytes,
+      personMime: personMime,
+      outfitBytes: outfitBytes,
+      outfitMime: outfitMime,
+    );
+    if (proxied.bytes != null) return proxied;
+    final direct = await runDirect();
+    if (direct.bytes != null) return direct;
+    return (
+      bytes: null,
+      error: proxied.error ?? direct.error ?? 'Outfit AI failed on web. Deploy the ngmy-ai-chat proxy.',
+    );
+  }
+
+  final direct = await runDirect();
+  if (direct.bytes != null) return direct;
+  final proxied = await _callGeminiOutfitViaProxy(
+    apiKey: creds.apiKey,
+    personBytes: personBytes,
+    personMime: personMime,
+    outfitBytes: outfitBytes,
+    outfitMime: outfitMime,
+  );
+  if (proxied.bytes != null) return proxied;
+  return (bytes: null, error: direct.error ?? proxied.error ?? 'Could not generate outfit image.');
+}

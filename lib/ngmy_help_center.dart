@@ -2,11 +2,30 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// Money transfer service id in Help Center — 15% service fee applies.
+/// Money transfer service id in Help Center.
 const String kNgmyHelpCenterSendMoneyId = 'send_money';
 
-/// NGMY fee on send-money transfers (15%).
-const double kNgmyHelpCenterMoneyTransferFeeRate = 0.15;
+/// NGMY fee on send-money transfers (5% when amount is \$30 or more).
+const double kNgmyHelpCenterMoneyTransferFeeRate = 0.05;
+
+/// Transfers under this amount use a flat fee instead of the percentage.
+const double kNgmyHelpCenterMoneyTransferMinAmount = 30.0;
+
+/// Flat fee for transfers under \$30.
+const double kNgmyHelpCenterMoneyTransferFlatFee = 2.0;
+
+double ngmyHelpCenterMoneyTransferFee(double amount) {
+  if (amount <= 0) return 0;
+  if (amount < kNgmyHelpCenterMoneyTransferMinAmount) return kNgmyHelpCenterMoneyTransferFlatFee;
+  return amount * kNgmyHelpCenterMoneyTransferFeeRate;
+}
+
+String ngmyHelpCenterMoneyTransferFeeDescription(double amount) {
+  if (amount < kNgmyHelpCenterMoneyTransferMinAmount) {
+    return 'NGMY service fee (\$2 flat under \$30)';
+  }
+  return 'NGMY service fee (5%)';
+}
 
 bool ngmyHelpCenterIsSendMoney(NgmyHelpCenterService service) =>
     service.id == kNgmyHelpCenterSendMoneyId ||
@@ -127,7 +146,7 @@ class NgmyHelpCenterConfig {
         NgmyHelpCenterService(
           id: 'send_money',
           name: 'Send Money',
-          description: 'Money transfer — 15% NGMY service fee applies',
+          description: 'Money transfer — 5% fee (\$2 flat under \$30)',
           icon: 'send_rounded',
           defaultPrice: '100',
           defaultQty: '1',
@@ -198,12 +217,12 @@ class NgmyHelpCenterConfig {
 
     if (isMoney) {
       final amount = double.tryParse((price ?? service.defaultPrice).trim()) ?? 0;
-      final fee = amount * kNgmyHelpCenterMoneyTransferFeeRate;
+      final fee = ngmyHelpCenterMoneyTransferFee(amount);
       final recipientGets = amount - fee;
       if (receiverName.trim().isNotEmpty) buf.writeln('Receiver name: *${receiverName.trim()}*');
       buf
         ..writeln('Transfer amount: \$${amount.toStringAsFixed(2)}')
-        ..writeln('NGMY service fee (15%): \$${fee.toStringAsFixed(2)}')
+        ..writeln('${ngmyHelpCenterMoneyTransferFeeDescription(amount)}: \$${fee.toStringAsFixed(2)}')
         ..writeln('Recipient receives: \$${recipientGets.toStringAsFixed(2)}');
     } else {
       final q = qty ?? service.defaultQty;
@@ -221,7 +240,7 @@ class NgmyHelpCenterConfig {
     if (notes.trim().isNotEmpty) buf.writeln('Notes: ${notes.trim()}');
     buf.writeln();
     buf.writeln(isMoney
-        ? 'Please process this money transfer request. I understand the 15% NGMY service fee applies.'
+        ? 'Please process this money transfer request. I understand the NGMY service fee applies (\$2 under \$30, otherwise 5%).'
         : 'Please contact me about this service. Thank you!');
     return buf.toString().trim();
   }

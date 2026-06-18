@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_doc_share_gate_ui.dart';
+import 'ngmy_outfit_studio.dart';
 import 'ngmy_video_studio.dart';
+import 'ngmy_ai_client.dart';
 
 const Color kNgmyStudioHubAccent = Color(0xFF7C3AED);
 const Color kNgmyStudioHubAccent2 = Color(0xFF00B25A);
@@ -69,6 +71,18 @@ class NgmyCreatorHubTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tools = <_CreatorTool>[
+      _CreatorTool(
+        icon: Icons.style_rounded,
+        colors: const [Color(0xFFDB2777), Color(0xFF9333EA)],
+        title: 'AI Outfit',
+        subtitle: 'Virtual dress try-on',
+        onTap: () {
+          showNgmyOutfitStudio(
+            context: context,
+            resolveApiKey: () => ngmyResolveGeminiApiKey(config: config),
+          );
+        },
+      ),
       _CreatorTool(
         icon: Icons.movie_creation_rounded,
         colors: const [Color(0xFF6D28D9), Color(0xFF9333EA)],
