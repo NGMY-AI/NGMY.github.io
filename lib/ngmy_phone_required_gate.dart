@@ -99,7 +99,13 @@ class _NgmyPhoneRequiredGateState extends State<NgmyPhoneRequiredGate> {
                         border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.45)),
                         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 24)],
                       ),
-                      child: Column(
+                      child: DefaultTextStyle(
+                        style: TextStyle(
+                          decoration: TextDecoration.none,
+                          decorationColor: Colors.transparent,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -108,28 +114,69 @@ class _NgmyPhoneRequiredGateState extends State<NgmyPhoneRequiredGate> {
                           Text(
                             'Phone number required',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              decoration: TextDecoration.none,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Every NGMY account must have a phone number on file before using the app. Your email is already registered — add your phone to continue.',
+                            'Every NGMY account must have a phone number on file before using the app. Your email is already registered. Add your phone to continue.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 13, height: 1.4, color: isDark ? Colors.white70 : Colors.black54),
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.4,
+                              color: isDark ? Colors.white70 : Colors.black54,
+                              decoration: TextDecoration.none,
+                            ),
                           ),
                           if (widget.email.trim().isNotEmpty) ...[
                             const SizedBox(height: 12),
-                            Text('Email: ${widget.email}', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black45)),
+                            Text(
+                              'Email: ${widget.email}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? Colors.white54 : Colors.black45,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
                           ],
                           const SizedBox(height: 18),
                           TextField(
                             controller: _phoneC,
                             keyboardType: TextInputType.phone,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            spellCheckConfiguration: const SpellCheckConfiguration.disabled(),
+                            style: TextStyle(
+                              decoration: TextDecoration.none,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
                             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d+\-\(\)\s]'))],
                             decoration: InputDecoration(
                               labelText: 'Your phone number',
                               prefixIcon: const Icon(Icons.phone_rounded),
                               filled: true,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(color: Color(0xFF7C3AED), width: 1.6),
+                              ),
+                              labelStyle: TextStyle(
+                                decoration: TextDecoration.none,
+                                color: isDark ? Colors.white60 : Colors.black54,
+                              ),
+                              floatingLabelStyle: TextStyle(
+                                decoration: TextDecoration.none,
+                                color: isDark ? Colors.white70 : Colors.black87,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -141,9 +188,10 @@ class _NgmyPhoneRequiredGateState extends State<NgmyPhoneRequiredGate> {
                             ),
                             child: _saving
                                 ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Text('Save & continue', style: TextStyle(fontWeight: FontWeight.w900)),
+                                : const Text('Save & continue', style: TextStyle(fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                           ),
                         ],
+                      ),
                       ),
                     ),
                   ),
