@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'ngmy_doc_share_ui.dart';
+import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_video_studio.dart';
 
 const Color kNgmyStudioHubAccent = Color(0xFF7C3AED);
@@ -47,10 +47,24 @@ class NgmyStudioHubNavIcon extends StatelessWidget {
 
 /// Main tab content — 2-column grid of creator tools (Video Studio, Doc Share, …).
 class NgmyCreatorHubTab extends StatelessWidget {
-  const NgmyCreatorHubTab({super.key, required this.userEmail, required this.bottomScrollPadding});
+  const NgmyCreatorHubTab({
+    super.key,
+    required this.userEmail,
+    required this.bottomScrollPadding,
+    this.user,
+    this.config,
+    this.onCharge,
+    this.onDataChanged,
+    this.onPersistConfig,
+  });
 
   final String userEmail;
   final double bottomScrollPadding;
+  final dynamic user;
+  final dynamic config;
+  final Future<bool> Function(double amount, String description)? onCharge;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
 
   @override
   Widget build(BuildContext context) {
@@ -69,10 +83,13 @@ class NgmyCreatorHubTab extends StatelessWidget {
         subtitle: 'Upload & share any file',
         onTap: () {
           if (userEmail.trim().isEmpty) return;
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => NgmyDocSharePage(email: userEmail.trim()),
-            ),
+          openNgmyDocShare(
+            context: context,
+            user: user ?? _HubGuestUser(userEmail),
+            config: config,
+            onCharge: onCharge ?? (_, __) async => false,
+            onDataChanged: onDataChanged ?? () {},
+            onPersistConfig: onPersistConfig ?? () async => false,
           );
         },
       ),
@@ -233,4 +250,10 @@ class _CreatorToolCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HubGuestUser {
+  const _HubGuestUser(this.email);
+  final String email;
+  bool get isAdmin => false;
 }

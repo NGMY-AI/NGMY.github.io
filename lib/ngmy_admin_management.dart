@@ -25,6 +25,8 @@ const String _kNgmyTranslatePaymentSettingsKey = 'translate_message_payment_sett
 const String _kNgmyTranslatePaymentPrefsKey = 'ngmy_translate_message_payment_settings_v1';
 const String _kNgmyDocumentScanPaymentSettingsKey = 'document_scan_payment_settings';
 const String _kNgmyDocumentScanPaymentPrefsKey = 'ngmy_document_scan_payment_settings_v1';
+const String _kNgmyDocSharePaymentSettingsKey = 'doc_share_payment_settings';
+const String _kNgmyDocSharePaymentPrefsKey = 'ngmy_doc_share_payment_settings_v1';
 const String _kNgmyCivicSelfEnrollmentSettingsKey = 'civic_self_enrollment_settings';
 const String _kNgmyCivicSelfEnrollmentPrefsKey = 'ngmy_civic_self_enrollment_settings_v1';
 const String _kNgmyHelperAiSettingsKey = 'ngmy_helper_ai_settings';
@@ -1095,6 +1097,72 @@ Future<bool> ngmyPersistDocumentScanPaymentSettings(AppConfig config) async {
   return cloudOk;
 }
 
+Map<String, dynamic> _docSharePaymentPayload(AppConfig config) => {
+      'docShareIndividualFreeLimit': config.docShareIndividualFreeLimit,
+      'docShareIndividualUnlockFee': config.docShareIndividualUnlockFee,
+      'docShareSchoolLicenseFee': config.docShareSchoolLicenseFee,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+void _applyDocSharePaymentPayload(AppConfig config, Map<String, dynamic> payload, {bool fromRemote = false}) {
+  if (fromRemote && ngmyShouldDeferRemoteConfigOverwrite()) return;
+  final limit = payload['docShareIndividualFreeLimit'];
+  if (limit is num && limit >= 0) config.docShareIndividualFreeLimit = limit.toInt();
+  final indFee = payload['docShareIndividualUnlockFee'];
+  if (indFee is num && indFee >= 0) config.docShareIndividualUnlockFee = indFee.toDouble();
+  final schoolFee = payload['docShareSchoolLicenseFee'];
+  if (schoolFee is num && schoolFee >= 0) config.docShareSchoolLicenseFee = schoolFee.toDouble();
+}
+
+Future<void> _persistDocSharePaymentSettingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyDocSharePaymentPrefsKey, jsonEncode(_docSharePaymentPayload(config)));
+  } catch (e) {
+    debugPrint('[admin doc share payments] local backup: $e');
+  }
+}
+
+Future<void> ngmyHydrateDocSharePaymentsFromAllBackups(AppConfig config) async {
+  Map<String, dynamic>? localPayload;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyDocSharePaymentPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        localPayload = Map<String, dynamic>.from(decoded);
+        _applyDocSharePaymentPayload(config, localPayload!, fromRemote: false);
+      }
+    }
+  } catch (e) {
+    debugPrint('[admin doc share payments] local hydrate: $e');
+  }
+  if (await ngmyCanReachCloud()) {
+    final row = await _fetchNgmySettingSafe(_kNgmyDocSharePaymentSettingsKey);
+    if (row != null && row.isNotEmpty && _shouldApplyRemoteNgmySettingsPayload(localPayload, row)) {
+      _applyDocSharePaymentPayload(config, row, fromRemote: true);
+      await _persistDocSharePaymentSettingsLocal(config);
+    }
+  }
+}
+
+Future<bool> ngmyPersistDocSharePaymentSettings(AppConfig config) async {
+  ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  await _persistDocSharePaymentSettingsLocal(config);
+
+  var cloudOk = false;
+  if (await ngmyCanReachCloud()) {
+    final payload = _docSharePaymentPayload(config);
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyDocSharePaymentSettingsKey, payload);
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+  }
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  return cloudOk;
+}
+
 Map<String, dynamic> _helperAiSettingsPayload(AppConfig config) => {
       'ngmyHelperDailyMessageLimit': config.ngmyHelperDailyMessageLimit,
       'maxMediaPostsPerWeek': config.maxMediaPostsPerWeek,
@@ -1444,6 +1512,8 @@ Future<void> ngmyAdminRefreshManagementConfig(AppConfig config) async {
   await ngmyHydrateWalletPaymentsFromAllBackups(config);
   await ngmyHydrateRepairEstimatePaymentsFromAllBackups(config);
   await ngmyHydrateTranslatePaymentsFromAllBackups(config);
+  await ngmyHydrateDocumentScanPaymentsFromAllBackups(config);
+  await ngmyHydrateDocSharePaymentsFromAllBackups(config);
   await NgmyAppStudioAccess.hydrate(config);
   final snapshot = AppConfig.fromJson(config.toJson());
 

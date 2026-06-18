@@ -82,10 +82,11 @@ class NgmyDocShareVideoCloud {
     await _saveRelays(relays);
   }
 
-  /// Starts cloud upload in background; QR can be shown immediately.
+  /// Starts cloud upload; when [awaitUpload] is true, QR is returned only after upload completes.
   static Future<NgmyDocShareVideoCloudQr?> beginShare({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
+    bool awaitUpload = false,
   }) async {
     if (items.isEmpty || !await ngmyCanReachCloud()) return null;
     final videos = items.where((e) => e.isVideo).toList();
@@ -113,7 +114,11 @@ class NgmyDocShareVideoCloud {
     };
     await _saveRelays(relays);
 
-    unawaited(_uploadAll(ownerEmail: ownerEmail, token: token, items: videos, fileRows: fileRows));
+    if (awaitUpload) {
+      await _uploadAll(ownerEmail: ownerEmail, token: token, items: videos, fileRows: fileRows);
+    } else {
+      unawaited(_uploadAll(ownerEmail: ownerEmail, token: token, items: videos, fileRows: fileRows));
+    }
 
     return (
       qrPayload: '$kNgmyDocShareQrPrefixVideoCloud|$token',
@@ -196,10 +201,10 @@ class NgmyDocShareVideoCloud {
     if (id.isEmpty || !id.startsWith(kNgmyDocShareVideoCloudTokenPrefix)) return null;
     if (!await ngmyCanReachCloud()) return null;
 
-    // Wait for sender upload (keep both screens open).
-    for (var attempt = 0; attempt < 900; attempt++) {
+    // Wait for sender upload (poll quickly once sender used awaitUpload).
+    for (var attempt = 0; attempt < 7200; attempt++) {
       if (await isReady(id)) break;
-      await Future<void>.delayed(const Duration(seconds: 2));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
     }
     if (!await isReady(id)) return null;
 

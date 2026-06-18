@@ -88,6 +88,7 @@ import 'ngmy_store_listing_extras.dart';
 import 'ngmy_store_payment_notification.dart';
 import 'ngmy_document_scanner.dart';
 import 'ngmy_document_scan_payments.dart';
+import 'ngmy_doc_share_payments.dart';
 import 'ngmy_oauth.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
@@ -1214,6 +1215,11 @@ class AppConfig {
   int documentScanFreeLimit;
   double documentScanUnlockFee;
   Map<String, String> documentScanAccessUntilByEmail;
+  int docShareIndividualFreeLimit;
+  double docShareIndividualUnlockFee;
+  double docShareSchoolLicenseFee;
+  Map<String, String> docShareAccessUntilByEmail;
+  Map<String, String> docShareSchoolLicenseUntilByEmail;
   List<Map<String, dynamic>> communicateProfiles;
   /// Per US state: president / group names admin teaches Mshauri advisors.
   Map<String, Map<String, dynamic>> mshauriSettingsByState;
@@ -1317,6 +1323,11 @@ class AppConfig {
     this.documentScanFreeLimit = NgmyDocumentScanPayments.defaultFreeScanLimit,
     this.documentScanUnlockFee = NgmyDocumentScanPayments.defaultUnlockFee,
     Map<String, String>? documentScanAccessUntilByEmail,
+    this.docShareIndividualFreeLimit = NgmyDocSharePayments.defaultIndividualFreeLimit,
+    this.docShareIndividualUnlockFee = NgmyDocSharePayments.defaultIndividualUnlockFee,
+    this.docShareSchoolLicenseFee = NgmyDocSharePayments.defaultSchoolLicenseFee,
+    Map<String, String>? docShareAccessUntilByEmail,
+    Map<String, String>? docShareSchoolLicenseUntilByEmail,
     List<Map<String, dynamic>>? communicateProfiles,
     Map<String, Map<String, dynamic>>? mshauriSettingsByState,
     Map<String, String>? familyTreePhotoAccessUntilByEmail,
@@ -1347,6 +1358,8 @@ class AppConfig {
         translateWeekPassByEmail = translateWeekPassByEmail ?? const {},
         communicateAccessUntilByEmail = communicateAccessUntilByEmail ?? const {},
         documentScanAccessUntilByEmail = documentScanAccessUntilByEmail ?? const {},
+        docShareAccessUntilByEmail = docShareAccessUntilByEmail ?? const {},
+        docShareSchoolLicenseUntilByEmail = docShareSchoolLicenseUntilByEmail ?? const {},
         invoicePremiumAccessUntilByEmail = invoicePremiumAccessUntilByEmail ?? const {},
         invoiceLuxuryAccessUntilByEmail = invoiceLuxuryAccessUntilByEmail ?? const {},
         invoicePremiumLifetimeEmails = invoicePremiumLifetimeEmails ?? const [],
@@ -1449,6 +1462,11 @@ class AppConfig {
     'documentScanFreeLimit': documentScanFreeLimit,
     'documentScanUnlockFee': documentScanUnlockFee,
     'documentScanAccessUntilByEmail': documentScanAccessUntilByEmail,
+    'docShareIndividualFreeLimit': docShareIndividualFreeLimit,
+    'docShareIndividualUnlockFee': docShareIndividualUnlockFee,
+    'docShareSchoolLicenseFee': docShareSchoolLicenseFee,
+    'docShareAccessUntilByEmail': docShareAccessUntilByEmail,
+    'docShareSchoolLicenseUntilByEmail': docShareSchoolLicenseUntilByEmail,
     'communicateProfiles': communicateProfiles,
     'mshauriSettingsByState': mshauriSettingsByState,
     'invoicePremiumOneTimeFee': invoicePremiumOneTimeFee,
@@ -1575,6 +1593,11 @@ class AppConfig {
     documentScanFreeLimit: (json['documentScanFreeLimit'] as num?)?.toInt() ?? NgmyDocumentScanPayments.defaultFreeScanLimit,
     documentScanUnlockFee: (json['documentScanUnlockFee'] as num?)?.toDouble() ?? NgmyDocumentScanPayments.defaultUnlockFee,
     documentScanAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['documentScanAccessUntilByEmail']),
+    docShareIndividualFreeLimit: (json['docShareIndividualFreeLimit'] as num?)?.toInt() ?? NgmyDocSharePayments.defaultIndividualFreeLimit,
+    docShareIndividualUnlockFee: (json['docShareIndividualUnlockFee'] as num?)?.toDouble() ?? NgmyDocSharePayments.defaultIndividualUnlockFee,
+    docShareSchoolLicenseFee: (json['docShareSchoolLicenseFee'] as num?)?.toDouble() ?? NgmyDocSharePayments.defaultSchoolLicenseFee,
+    docShareAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['docShareAccessUntilByEmail']),
+    docShareSchoolLicenseUntilByEmail: _familyTreePhotoAccessFromJson(json['docShareSchoolLicenseUntilByEmail']),
     communicateProfiles: List<Map<String, dynamic>>.from(
       (json['communicateProfiles'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
     ),
@@ -2472,6 +2495,9 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
   next.communicatePassYearlyEnabled = keep.communicatePassYearlyEnabled;
   next.documentScanFreeLimit = keep.documentScanFreeLimit;
   next.documentScanUnlockFee = keep.documentScanUnlockFee;
+  next.docShareIndividualFreeLimit = keep.docShareIndividualFreeLimit;
+  next.docShareIndividualUnlockFee = keep.docShareIndividualUnlockFee;
+  next.docShareSchoolLicenseFee = keep.docShareSchoolLicenseFee;
   if (record.containsKey('communicateAccessUntilByEmail') && record['communicateAccessUntilByEmail'] is Map) {
     next.communicateAccessUntilByEmail = {
       ..._familyTreePhotoAccessFromJson(record['communicateAccessUntilByEmail']),
@@ -2487,6 +2513,22 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     };
   } else if (keep.documentScanAccessUntilByEmail.isNotEmpty) {
     next.documentScanAccessUntilByEmail = Map<String, String>.from(keep.documentScanAccessUntilByEmail);
+  }
+  if (record.containsKey('docShareAccessUntilByEmail') && record['docShareAccessUntilByEmail'] is Map) {
+    next.docShareAccessUntilByEmail = {
+      ..._familyTreePhotoAccessFromJson(record['docShareAccessUntilByEmail']),
+      ...keep.docShareAccessUntilByEmail,
+    };
+  } else if (keep.docShareAccessUntilByEmail.isNotEmpty) {
+    next.docShareAccessUntilByEmail = Map<String, String>.from(keep.docShareAccessUntilByEmail);
+  }
+  if (record.containsKey('docShareSchoolLicenseUntilByEmail') && record['docShareSchoolLicenseUntilByEmail'] is Map) {
+    next.docShareSchoolLicenseUntilByEmail = {
+      ..._familyTreePhotoAccessFromJson(record['docShareSchoolLicenseUntilByEmail']),
+      ...keep.docShareSchoolLicenseUntilByEmail,
+    };
+  } else if (keep.docShareSchoolLicenseUntilByEmail.isNotEmpty) {
+    next.docShareSchoolLicenseUntilByEmail = Map<String, String>.from(keep.docShareSchoolLicenseUntilByEmail);
   }
   if (record.containsKey('communicateProfiles') && record['communicateProfiles'] is List) {
     final remote = List<Map<String, dynamic>>.from(
@@ -7020,6 +7062,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
     await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
+    await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
     await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
     await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
@@ -8325,6 +8368,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await ngmyHydrateCivicHelpModeFromAllBackups(next);
         await ngmyHydrateCommunicatePaymentsFromAllBackups(next);
         await ngmyHydrateDocumentScanPaymentsFromAllBackups(next);
+        await ngmyHydrateDocSharePaymentsFromAllBackups(next);
         if (_appConfigSig(_config) == _appConfigSig(next)) return;
         setState(() {
           _config = next;
@@ -10373,6 +10417,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
     await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
+    await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
     await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
     await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
@@ -10633,6 +10678,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
     await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
+    await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
     await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
     await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
@@ -13628,6 +13674,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
       5: () => NgmyCreatorHubTab(
         userEmail: widget.user.email,
         bottomScrollPadding: _ngmyBottomNavScrollPadding(context),
+        user: widget.user,
+        config: widget.config,
+        onCharge: (amount, description) async => ngmyChargeUserWallet(
+          user: widget.user,
+          allUsers: widget.allUsers,
+          amount: amount,
+          description: description,
+          onAddTransaction: widget.onAddTransaction,
+        ),
+        onDataChanged: widget.onDataChanged,
+        onPersistConfig: () => widget.onPersistManagementConfig?.call() ?? ngmyAdminPersistManagementConfig(widget.config),
       ),
       6: () => ProfileScreen(
         user: widget.user,
@@ -19078,6 +19135,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _showPaymentsAdmin(bool isDark) async {
     await ngmyHydrateCommunicatePaymentsFromAllBackups(widget.config);
     await ngmyHydrateDocumentScanPaymentsFromAllBackups(widget.config);
+    await ngmyHydrateDocSharePaymentsFromAllBackups(widget.config);
     if (!mounted) return;
     final createC = TextEditingController(text: widget.config.familyTreeCreateFee.toStringAsFixed(2));
     final photoC = TextEditingController(text: widget.config.familyTreePhotoMonthlyFee.toStringAsFixed(2));
@@ -19103,6 +19161,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final commYearlyFeeC = TextEditingController(text: widget.config.communicatePassYearlyFee.toStringAsFixed(2));
     final docScanLimitC = TextEditingController(text: '${widget.config.documentScanFreeLimit}');
     final docScanFeeC = TextEditingController(text: widget.config.documentScanUnlockFee.toStringAsFixed(2));
+    final docShareIndLimitC = TextEditingController(text: '${widget.config.docShareIndividualFreeLimit}');
+    final docShareIndFeeC = TextEditingController(text: widget.config.docShareIndividualUnlockFee.toStringAsFixed(2));
+    final docShareSchoolFeeC = TextEditingController(text: widget.config.docShareSchoolLicenseFee.toStringAsFixed(2));
     var commTwoWeekOn = widget.config.communicatePassTwoWeekEnabled;
     var commMonthlyOn = widget.config.communicatePassMonthlyEnabled;
     var commYearlyOn = widget.config.communicatePassYearlyEnabled;
@@ -19114,6 +19175,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     var translateExpanded = false;
     var communicatePayExpanded = false;
     var documentScanExpanded = false;
+    var docShareExpanded = false;
 
     Widget categoryShell({
       required String title,
@@ -19741,6 +19803,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             repairEstimateExpanded = false;
                             translateExpanded = false;
                             communicatePayExpanded = false;
+                            docShareExpanded = false;
                           }
                         }),
                         children: [
@@ -19787,6 +19850,81 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ),
                         ],
                       ),
+                      categoryShell(
+                        title: 'Doc Share',
+                        subtitle: 'Individual free uploads/shares, school license, wallet unlock',
+                        icon: Icons.qr_code_2_rounded,
+                        accent: const Color(0xFF0D9488),
+                        expanded: docShareExpanded,
+                        onToggle: () => setST(() {
+                          docShareExpanded = !docShareExpanded;
+                          if (docShareExpanded) {
+                            familyExpanded = false;
+                            invoicesExpanded = false;
+                            musicExpanded = false;
+                            appStudioExpanded = false;
+                            repairEstimateExpanded = false;
+                            translateExpanded = false;
+                            communicatePayExpanded = false;
+                            documentScanExpanded = false;
+                          }
+                        }),
+                        children: [
+                          TextField(
+                            controller: docShareIndLimitC,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Individual free uploads/shares',
+                              prefixIcon: Icon(Icons.person_outline_rounded),
+                              helperText: 'Default 10 — set 0 for unlimited free.',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: docShareIndFeeC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Individual unlock fee after free limit (\$)',
+                              prefixIcon: Icon(Icons.lock_open_rounded),
+                              helperText: 'Unlimited Doc Share for 30 days. Set 0 for free.',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: docShareSchoolFeeC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'School license fee (\$/year)',
+                              prefixIcon: Icon(Icons.school_rounded),
+                              helperText: 'Head of school pays once to create student login. Set 0 for free.',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: () async {
+                              final limit = int.tryParse(docShareIndLimitC.text.trim());
+                              final indFee = double.tryParse(docShareIndFeeC.text.trim());
+                              final schoolFee = double.tryParse(docShareSchoolFeeC.text.trim());
+                              if (limit == null || limit < 0 || indFee == null || indFee < 0 || schoolFee == null || schoolFee < 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid Doc Share limits and fees.')));
+                                return;
+                              }
+                              setST(() {
+                                widget.config.docShareIndividualFreeLimit = limit;
+                                widget.config.docShareIndividualUnlockFee = indFee;
+                                widget.config.docShareSchoolLicenseFee = schoolFee;
+                              });
+                              widget.onDataChanged();
+                              final ok = await ngmyPersistDocSharePaymentSettings(widget.config);
+                              if (!context.mounted) return;
+                              setState(() {});
+                              ngmyAdminShowCloudSaveSnackBar(context, cloudOk: ok, success: 'Doc Share payment settings saved.');
+                            },
+                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0D9488), minimumSize: const Size(double.infinity, 44)),
+                            child: const Text('Save Doc Share', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -19809,6 +19947,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       commYearlyFeeC.dispose();
       docScanLimitC.dispose();
       docScanFeeC.dispose();
+      docShareIndLimitC.dispose();
+      docShareIndFeeC.dispose();
+      docShareSchoolFeeC.dispose();
     });
   }
 

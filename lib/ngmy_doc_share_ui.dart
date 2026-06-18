@@ -13,6 +13,7 @@ import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platfor
 import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
 import 'ngmy_doc_share_folder.dart';
 import 'ngmy_doc_share_models.dart';
+import 'ngmy_doc_share_payments.dart';
 import 'ngmy_doc_share_playback.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_sync.dart';
@@ -33,9 +34,26 @@ import 'ngmy_studio_slot_video_io.dart' if (dart.library.html) 'ngmy_studio_slot
 }
 
 class NgmyDocSharePage extends StatefulWidget {
-  const NgmyDocSharePage({super.key, required this.email});
+  const NgmyDocSharePage({
+    super.key,
+    required this.email,
+    this.user,
+    this.config,
+    this.isAdmin = false,
+    this.schoolMode = false,
+    this.onCharge,
+    this.onDataChanged,
+    this.onPersistConfig,
+  });
 
   final String email;
+  final dynamic user;
+  final dynamic config;
+  final bool isAdmin;
+  final bool schoolMode;
+  final Future<bool> Function(double amount, String description)? onCharge;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
 
   @override
   State<NgmyDocSharePage> createState() => _NgmyDocSharePageState();
@@ -83,8 +101,30 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     }
   }
 
+  Future<bool> _ensureCanCreate() async {
+    if (widget.isAdmin || widget.config == null) return true;
+    if (widget.schoolMode) return true;
+    final ok = await NgmyDocSharePayments.ensureIndividualAccess(
+      context: context,
+      user: widget.user ?? _GuestUser(widget.email),
+      config: widget.config!,
+      onCharge: widget.onCharge ?? (_, __) async => false,
+      onDataChanged: widget.onDataChanged ?? () {},
+      onPersistConfig: widget.onPersistConfig ?? () async => false,
+    );
+    return ok;
+  }
+
+  Future<void> _recordCreationIfNeeded({int count = 1}) async {
+    if (widget.isAdmin || widget.schoolMode) return;
+    for (var i = 0; i < count; i++) {
+      await NgmyDocSharePayments.recordCreation(widget.email);
+    }
+  }
+
   Future<void> _uploadFiles() async {
     await _withWork(() async {
+      if (!await _ensureCanCreate()) return;
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: true,
         withData: kIsWeb,
@@ -102,6 +142,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         }
       }
       await _refresh();
+      if (added > 0) await _recordCreationIfNeeded(count: added);
       if (added == 0) {
         _toast(skipped > 0 ? 'Could not read selected file(s). Try again.' : 'No files selected.');
       } else if (skipped > 0) {
@@ -115,6 +156,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   Future<void> _uploadFolder() async {
     if (kIsWeb) {
       await _withWork(() async {
+        if (!await _ensureCanCreate()) return;
         final picked = await pickWebFolderFiles();
         if (picked.isEmpty) {
           _toast('No folder selected.');
@@ -122,15 +164,18 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         }
         final count = await NgmyDocShareStore.addWebFolderFiles(email: widget.email, files: picked);
         await _refresh();
+        if (count > 0) await _recordCreationIfNeeded(count: count);
         _toast(count == 0 ? 'No files found in that folder.' : 'Added $count file(s) from folder.');
       }, label: 'Reading folder…');
       return;
     }
     await _withWork(() async {
+      if (!await _ensureCanCreate()) return;
       final path = await FilePicker.platform.getDirectoryPath();
       if (path == null || path.isEmpty) return;
       final count = await NgmyDocShareStore.addFromDirectory(email: widget.email, dirPath: path);
       await _refresh();
+      if (count > 0) await _recordCreationIfNeeded(count: count);
       _toast(count == 0 ? 'No files found in that folder.' : 'Added $count file(s) from folder.');
     }, label: 'Reading folder…');
   }
@@ -280,12 +325,14 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       return;
     }
     await _withWork(() async {
+      if (!await _ensureCanCreate()) return;
       final created = await NgmyDocShareSync.createQrForItems(ownerEmail: widget.email, items: batch);
       if (!mounted) return;
       if (created == null) {
         _toast('Could not create share QR. Check your connection and try again.');
         return;
       }
+      await _recordCreationIfNeeded();
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           fullscreenDialog: true,
@@ -1525,4 +1572,10 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
       ),
     );
   }
+}
+
+class _GuestUser {
+  const _GuestUser(this.email);
+  final String email;
+  bool get isAdmin => false;
 }

@@ -126,7 +126,11 @@ class NgmyDocShareSync {
       }
     }
 
-    final cloud = await NgmyDocShareVideoCloud.beginShare(ownerEmail: ownerEmail, items: items);
+    final cloud = await NgmyDocShareVideoCloud.beginShare(
+      ownerEmail: ownerEmail,
+      items: items,
+      awaitUpload: kIsWeb,
+    );
     if (cloud != null) {
       return (
         qrPayload: cloud.qrPayload,
