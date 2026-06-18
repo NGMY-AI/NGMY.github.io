@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -217,6 +218,42 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       await _refresh();
       _toast('Imported ${imported.length} file(s).');
     }, label: 'Importing…');
+  }
+
+  Future<void> _viewItem(NgmyDocShareItem item) async {
+    if (item.isVideo) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => _DocShareVideoPage(email: widget.email, item: item),
+        ),
+      );
+      return;
+    }
+    if (item.isImage) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => _DocShareImagePage(email: widget.email, item: item),
+        ),
+      );
+      return;
+    }
+    if (_isAudio(item)) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => _DocShareAudioPage(email: widget.email, item: item),
+        ),
+      );
+      return;
+    }
+    _toast('Preview not available for this file type. Try Download / save.');
+  }
+
+  bool _isAudio(NgmyDocShareItem item) {
+    if (item.mime.startsWith('audio/')) return true;
+    final dot = item.name.lastIndexOf('.');
+    if (dot < 0 || dot >= item.name.length - 1) return false;
+    const exts = ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'opus', 'wma', 'weba'];
+    return exts.contains(item.name.substring(dot + 1).toLowerCase());
   }
 
   Future<void> _openItem(NgmyDocShareItem item) async {
@@ -524,14 +561,14 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                               PopupMenuButton<String>(
                                 icon: Icon(Icons.more_vert_rounded, color: c.muted),
                                 onSelected: (v) {
+                                  if (v == 'view') unawaited(_viewItem(item));
                                   if (v == 'qr') unawaited(_showQrForOne(item));
                                   if (v == 'save') unawaited(_saveItem(item));
                                   if (v == 'delete') unawaited(_deleteItem(item));
-                                  if (v == 'play' && item.isVideo) unawaited(_openItem(item));
                                 },
                                 itemBuilder: (_) => [
+                                  const PopupMenuItem(value: 'view', child: Text('View')),
                                   const PopupMenuItem(value: 'qr', child: Text('Share via QR')),
-                                  if (item.isVideo) const PopupMenuItem(value: 'play', child: Text('Play video')),
                                   const PopupMenuItem(value: 'save', child: Text('Download / save')),
                                   const PopupMenuItem(value: 'delete', child: Text('Delete')),
                                 ],
@@ -545,6 +582,223 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DocShareImagePage extends StatefulWidget {
+  const _DocShareImagePage({required this.email, required this.item});
+
+  final String email;
+  final NgmyDocShareItem item;
+
+  @override
+  State<_DocShareImagePage> createState() => _DocShareImagePageState();
+}
+
+class _DocShareImagePageState extends State<_DocShareImagePage> {
+  Uint8List? _bytes;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    try {
+      final bytes = await NgmyDocShareStore.readBytes(widget.email, widget.item);
+      if (!mounted) return;
+      if (bytes == null || bytes.isEmpty) {
+        setState(() {
+          _loading = false;
+          _error = 'Could not load image.';
+        });
+        return;
+      }
+      setState(() {
+        _bytes = bytes;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load image: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _docShareColors(context);
+    return Scaffold(
+      backgroundColor: c.bg,
+      appBar: AppBar(
+        backgroundColor: c.bg,
+        foregroundColor: c.fg,
+        elevation: 0,
+        title: Text(widget.item.name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: c.fg)),
+      ),
+      body: Center(
+        child: _loading
+            ? const CircularProgressIndicator(color: kNgmyStudioHubAccent)
+            : _error != null
+                ? Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: c.muted)),
+                  )
+                : _bytes != null
+                    ? InteractiveViewer(
+                        minScale: 0.5,
+                        maxScale: 4,
+                        child: Image.memory(_bytes!, fit: BoxFit.contain),
+                      )
+                    : const SizedBox.shrink(),
+      ),
+    );
+  }
+}
+
+class _DocShareAudioPage extends StatefulWidget {
+  const _DocShareAudioPage({required this.email, required this.item});
+
+  final String email;
+  final NgmyDocShareItem item;
+
+  @override
+  State<_DocShareAudioPage> createState() => _DocShareAudioPageState();
+}
+
+class _DocShareAudioPageState extends State<_DocShareAudioPage> {
+  final _player = AudioPlayer();
+  bool _loading = true;
+  bool _playing = false;
+  String? _error;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _player.onPlayerStateChanged.listen((state) {
+      if (!mounted) return;
+      setState(() => _playing = state == PlayerState.playing);
+    });
+    _player.onDurationChanged.listen((d) {
+      if (!mounted) return;
+      setState(() => _duration = d);
+    });
+    _player.onPositionChanged.listen((p) {
+      if (!mounted) return;
+      setState(() => _position = p);
+    });
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    try {
+      final bytes = await NgmyDocShareStore.readBytes(widget.email, widget.item);
+      if (!mounted) return;
+      if (bytes == null || bytes.isEmpty) {
+        setState(() {
+          _loading = false;
+          _error = 'Could not load audio.';
+        });
+        return;
+      }
+      await _player.play(BytesSource(bytes, mimeType: widget.item.mime));
+      if (!mounted) return;
+      setState(() => _loading = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not play audio: $e';
+      });
+    }
+  }
+
+  Future<void> _togglePlay() async {
+    if (_playing) {
+      await _player.pause();
+    } else {
+      await _player.resume();
+    }
+  }
+
+  String _fmt(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  void dispose() {
+    unawaited(_player.dispose());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _docShareColors(context);
+    final maxMs = _duration.inMilliseconds > 0 ? _duration.inMilliseconds : 1;
+    return Scaffold(
+      backgroundColor: c.bg,
+      appBar: AppBar(
+        backgroundColor: c.bg,
+        foregroundColor: c.fg,
+        elevation: 0,
+        title: Text(widget.item.name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: c.fg)),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: _loading
+              ? const CircularProgressIndicator(color: kNgmyStudioHubAccent)
+              : _error != null
+                  ? Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: c.muted))
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 88,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [kNgmyStudioHubAccent, kNgmyStudioHubAccent2],
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: const Icon(Icons.audiotrack_rounded, color: Colors.white, size: 44),
+                        ),
+                        const SizedBox(height: 28),
+                        Slider(
+                          value: _position.inMilliseconds.clamp(0, maxMs).toDouble(),
+                          max: maxMs.toDouble(),
+                          activeColor: kNgmyStudioHubAccent,
+                          onChanged: (v) => _player.seek(Duration(milliseconds: v.round())),
+                        ),
+                        Text(
+                          '${_fmt(_position)} / ${_fmt(_duration)}',
+                          style: TextStyle(color: c.muted, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton.icon(
+                          onPressed: _togglePlay,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: kNgmyStudioHubAccent,
+                            minimumSize: const Size(160, 48),
+                          ),
+                          icon: Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                          label: Text(_playing ? 'Pause' : 'Play'),
+                        ),
+                      ],
+                    ),
+        ),
       ),
     );
   }
