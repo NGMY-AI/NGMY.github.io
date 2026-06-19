@@ -86,13 +86,40 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
       }
     }
     if (src.startsWith('http') || src.startsWith('blob:')) return NetworkImage(src);
-    if (src.startsWith('supabase://')) return null;
     return null;
+  }
+
+  static String _signaturePreview(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return 'Signature';
+    if (parts.length == 1) return parts.first.toLowerCase();
+    return '${parts.first[0]}${parts.last.toLowerCase()}';
+  }
+
+  static Widget _circlePhoto(ImageProvider? photo, double size, {double opacity = 1, double iconSize = 28}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFFE5E7EB),
+        border: Border.all(color: const Color(0xFF374151), width: 1.4),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 4, offset: const Offset(0, 2))],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: photo != null
+          ? Opacity(
+              opacity: opacity,
+              child: Image(image: photo, fit: BoxFit.cover, width: size, height: size),
+            )
+          : Icon(Icons.person_rounded, size: iconSize, color: Colors.white),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final w = 340.0 * scale;
+    const baseW = 360.0;
+    final w = baseW * scale;
     final h = w / 1.586;
     final state = (record['state'] ?? '').toString();
     final stateUpper = state.trim().isEmpty ? 'STATE' : state.trim().toUpperCase();
@@ -111,42 +138,110 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
     final exp = _formatExpDate(record);
     final photo = photoImage ?? _photoProvider(photoPath ?? (record['idPhotoPath'] ?? '').toString());
     final isGeorgia = state.trim().toLowerCase() == 'georgia';
+    final photoSize = 78.0 * scale;
+    final ghostSize = 46.0 * scale;
 
-    return Container(
+    return SizedBox(
       width: w,
       height: h,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10 * scale),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.22), blurRadius: 12 * scale, offset: Offset(0, 4 * scale)),
-        ],
-      ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(10 * scale),
+        borderRadius: BorderRadius.circular(12 * scale),
         child: Stack(
           fit: StackFit.expand,
           children: [
             CustomPaint(painter: _IdCardBackgroundPainter(isGeorgia: isGeorgia)),
             Padding(
-              padding: EdgeInsets.fromLTRB(8 * scale, 6 * scale, 8 * scale, 6 * scale),
+              padding: EdgeInsets.fromLTRB(10 * scale, 8 * scale, 10 * scale, 7 * scale),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _headerRow(stateUpper, docTitle, badge, code, scale),
-                  SizedBox(height: 4 * scale),
+                  SizedBox(height: 6 * scale),
                   Expanded(
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _photoColumn(photo, name, scale),
+                        SizedBox(
+                          width: 88 * scale,
+                          child: Column(
+                            children: [
+                              _circlePhoto(photo, photoSize, iconSize: 34 * scale),
+                              SizedBox(height: 5 * scale),
+                              Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.only(bottom: 2 * scale),
+                                decoration: const BoxDecoration(
+                                  border: Border(bottom: BorderSide(color: Color(0xFF111827), width: 1)),
+                                ),
+                                child: Text(
+                                  _signaturePreview(name),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 9 * scale,
+                                    fontStyle: FontStyle.italic,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF111827),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: 8 * scale),
+                        Expanded(
+                          child: _dataColumn(registryId, dob, name, address, city, code, room, iss, exp, scale),
+                        ),
                         SizedBox(width: 6 * scale),
-                        Expanded(child: _dataColumn(registryId, dob, name, address, city, code, room, iss, exp, scale)),
-                        SizedBox(width: 4 * scale),
-                        _rightColumn(photo, dob, isGeorgia, code, scale),
+                        SizedBox(
+                          width: 82 * scale,
+                          child: Stack(
+                            children: [
+                              Align(
+                                alignment: Alignment.topRight,
+                                child: isGeorgia
+                                    ? CustomPaint(size: Size(68 * scale, 68 * scale), painter: _PeachPainter())
+                                    : Container(
+                                        width: 62 * scale,
+                                        height: 62 * scale,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          gradient: RadialGradient(
+                                            colors: [
+                                              const Color(0xFF93C5FD).withOpacity(0.55),
+                                              const Color(0xFF1E40AF).withOpacity(0.12),
+                                            ],
+                                          ),
+                                          border: Border.all(color: const Color(0xFF1E3A8A), width: 1.4),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          code,
+                                          style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.w900, color: const Color(0xFF1E3A8A)),
+                                        ),
+                                      ),
+                              ),
+                              Align(
+                                alignment: Alignment.bottomRight,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _circlePhoto(photo, ghostSize, opacity: 0.62, iconSize: 22 * scale),
+                                    SizedBox(height: 2 * scale),
+                                    Text(
+                                      dob.isEmpty ? '--/--/----' : dob,
+                                      style: TextStyle(fontSize: 7 * scale, fontWeight: FontWeight.w900, color: const Color(0xFF111827)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  SizedBox(height: 2 * scale),
+                  SizedBox(height: 4 * scale),
                   _footerRow(registryId, phone, scale),
                 ],
               ),
@@ -171,11 +266,11 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 15 * scale,
+                  fontSize: 19 * scale,
                   fontWeight: FontWeight.w900,
                   color: const Color(0xFF1E3A8A),
                   height: 1,
-                  letterSpacing: 0.5,
+                  letterSpacing: 0.4,
                 ),
               ),
               Text(
@@ -183,7 +278,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 6.5 * scale,
+                  fontSize: 8.5 * scale,
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFFB91C1C),
                   height: 1.1,
@@ -200,76 +295,32 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 8 * scale, fontWeight: FontWeight.w900, color: Colors.black87),
+              style: TextStyle(fontSize: 10.5 * scale, fontWeight: FontWeight.w900, color: const Color(0xFF111827)),
             ),
           ),
         ),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(badge, style: TextStyle(fontSize: 10 * scale, fontWeight: FontWeight.w900)),
-            SizedBox(width: 3 * scale),
+            Text(badge, style: TextStyle(fontSize: 12 * scale, fontWeight: FontWeight.w900)),
+            SizedBox(width: 4 * scale),
             Container(
-              width: 14 * scale,
-              height: 14 * scale,
+              width: 16 * scale,
+              height: 16 * scale,
               decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-              child: Icon(Icons.star_rounded, size: 9 * scale, color: const Color(0xFFFBBF24)),
+              child: Icon(Icons.star_rounded, size: 10 * scale, color: const Color(0xFFFBBF24)),
             ),
-            SizedBox(width: 3 * scale),
+            SizedBox(width: 4 * scale),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('USA', style: TextStyle(fontSize: 4.5 * scale, fontWeight: FontWeight.w800, color: const Color(0xFFB91C1C))),
-                Text(code, style: TextStyle(fontSize: 5 * scale, fontWeight: FontWeight.w900)),
+                Text('USA', style: TextStyle(fontSize: 5.5 * scale, fontWeight: FontWeight.w800, color: const Color(0xFFB91C1C))),
+                Text(code, style: TextStyle(fontSize: 6.5 * scale, fontWeight: FontWeight.w900)),
               ],
             ),
           ],
         ),
       ],
-    );
-  }
-
-  static String _signaturePreview(String name) {
-    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return 'Signature';
-    if (parts.length == 1) return parts.first.toLowerCase();
-    return '${parts.first[0]}${parts.last.toLowerCase()}';
-  }
-
-  Widget _photoColumn(ImageProvider? photo, String name, double scale) {
-    return SizedBox(
-      width: 72 * scale,
-      child: Column(
-        children: [
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: const Color(0xFFD1D5DB),
-                border: Border.all(color: Colors.black54, width: 0.8),
-              ),
-              child: photo != null
-                  ? Image(image: photo, fit: BoxFit.cover, color: Colors.black.withOpacity(0.05), colorBlendMode: BlendMode.darken)
-                  : Icon(Icons.person, size: 36 * scale, color: Colors.white70),
-            ),
-          ),
-          SizedBox(height: 2 * scale),
-          Container(
-            width: double.infinity,
-            height: 12 * scale,
-            alignment: Alignment.centerLeft,
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: Colors.black87, width: 0.8)),
-            ),
-            child: Text(
-              _signaturePreview(name),
-              maxLines: 1,
-              overflow: TextOverflow.clip,
-              style: TextStyle(fontSize: 7 * scale, fontStyle: FontStyle.italic, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -287,15 +338,22 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
   ) {
     Widget field(String label, String value, {bool bold = false}) {
       return Padding(
-        padding: EdgeInsets.only(bottom: 1.5 * scale),
+        padding: EdgeInsets.only(bottom: 2.5 * scale),
         child: RichText(
-          maxLines: 2,
+          maxLines: 3,
           overflow: TextOverflow.ellipsis,
           text: TextSpan(
-            style: TextStyle(fontSize: 5.2 * scale, color: Colors.black87, height: 1.15),
+            style: TextStyle(fontSize: 7.5 * scale, color: const Color(0xFF111827), height: 1.2),
             children: [
-              TextSpan(text: '$label ', style: const TextStyle(fontWeight: FontWeight.w600)),
-              TextSpan(text: value, style: TextStyle(fontWeight: bold ? FontWeight.w900 : FontWeight.w800, fontSize: (bold ? 6.2 : 5.2) * scale)),
+              if (label.isNotEmpty)
+                TextSpan(text: '$label ', style: const TextStyle(fontWeight: FontWeight.w600)),
+              TextSpan(
+                text: value,
+                style: TextStyle(
+                  fontWeight: bold ? FontWeight.w900 : FontWeight.w800,
+                  fontSize: (bold ? 9.5 : 7.5) * scale,
+                ),
+              ),
             ],
           ),
         ),
@@ -345,66 +403,6 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
     );
   }
 
-  Widget _rightColumn(ImageProvider? photo, String dob, bool isGeorgia, String code, double scale) {
-    return SizedBox(
-      width: 78 * scale,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            top: 0,
-            right: 0,
-            child: isGeorgia
-                ? CustomPaint(size: Size(62 * scale, 62 * scale), painter: _PeachPainter())
-                : Container(
-                    width: 56 * scale,
-                    height: 56 * scale,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(colors: [const Color(0xFF93C5FD).withOpacity(0.5), const Color(0xFF1E40AF).withOpacity(0.15)]),
-                      border: Border.all(color: const Color(0xFF1E3A8A), width: 1.2),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(code, style: TextStyle(fontSize: 16 * scale, fontWeight: FontWeight.w900, color: const Color(0xFF1E3A8A))),
-                  ),
-          ),
-          Positioned(
-            bottom: 2 * scale,
-            right: 2 * scale,
-            child: Column(
-              children: [
-                Container(
-                  width: 34 * scale,
-                  height: 42 * scale,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD1D5DB),
-                    border: Border.all(color: Colors.black45),
-                  ),
-                  child: photo != null
-                      ? Opacity(
-                          opacity: 0.55,
-                          child: Image(image: photo, fit: BoxFit.cover),
-                        )
-                      : null,
-                ),
-                Container(
-                  width: 34 * scale,
-                  color: Colors.white70,
-                  padding: EdgeInsets.symmetric(vertical: 1 * scale),
-                  child: Text(
-                    dob.isEmpty ? '--/--/----' : dob,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 4.5 * scale, fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _footerRow(String registryId, String phone, double scale) {
     return Row(
       children: [
@@ -413,15 +411,15 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
             '5 DD ${registryId.padRight(20, '0')}${phone.replaceAll(RegExp(r'\D'), '').padRight(8, '0')}'.substring(0, 28.clamp(0, 40)),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 4.5 * scale, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+            style: TextStyle(fontSize: 6.5 * scale, fontWeight: FontWeight.w600, letterSpacing: 0.3),
           ),
         ),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.favorite, size: 7 * scale, color: Colors.black87),
-            SizedBox(width: 2 * scale),
-            Text('CIVIC REGISTRY', style: TextStyle(fontSize: 4.5 * scale, fontWeight: FontWeight.w800)),
+            Icon(Icons.favorite, size: 8 * scale, color: const Color(0xFF111827)),
+            SizedBox(width: 3 * scale),
+            Text('CIVIC REGISTRY', style: TextStyle(fontSize: 6.5 * scale, fontWeight: FontWeight.w800)),
           ],
         ),
       ],
@@ -448,9 +446,9 @@ class _IdCardBackgroundPainter extends CustomPainter {
     canvas.drawRect(rect, bg);
 
     final line = Paint()
-      ..color = Colors.black.withOpacity(0.04)
-      ..strokeWidth = 0.6;
-    for (var i = -size.height; i < size.width + size.height; i += 8) {
+      ..color = Colors.black.withOpacity(0.035)
+      ..strokeWidth = 0.7;
+    for (var i = -size.height; i < size.width + size.height; i += 7) {
       canvas.drawLine(Offset(i.toDouble(), 0), Offset(i + size.height, size.height), line);
     }
   }
@@ -479,6 +477,25 @@ class _PeachPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+Widget _floatingIconButton({
+  required IconData icon,
+  required VoidCallback onPressed,
+  String? tooltip,
+}) {
+  return Material(
+    color: Colors.white.withOpacity(0.92),
+    elevation: 3,
+    shadowColor: Colors.black26,
+    shape: const CircleBorder(),
+    child: IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon, color: const Color(0xFF111827)),
+      visualDensity: VisualDensity.compact,
+    ),
+  );
+}
+
 Future<void> showNgmyCivicRegistryIdCardDialog(
   BuildContext context, {
   required Map<String, dynamic> record,
@@ -486,52 +503,69 @@ Future<void> showNgmyCivicRegistryIdCardDialog(
   ImageProvider? photoImage,
   VoidCallback? onChangePhoto,
 }) {
-  return showDialog<void>(
+  return showGeneralDialog<void>(
     context: context,
-    builder: (ctx) {
-      final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    barrierDismissible: true,
+    barrierLabel: 'Close ID',
+    barrierColor: Colors.black.withOpacity(0.35),
+    pageBuilder: (ctx, _, __) {
       final resolvedPhoto = photoPath ?? (record['idPhotoPath'] ?? '').toString();
-      return Dialog(
-        insetPadding: const EdgeInsets.all(16),
-        backgroundColor: isDark ? const Color(0xFF111827) : const Color(0xFFF3F4F6),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
+      final screenW = MediaQuery.sizeOf(ctx).width;
+      final cardScale = ((screenW - 28) / 360).clamp(0.82, 1.08);
+      return SafeArea(
+        child: Stack(
+          children: [
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 56),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    NgmyCivicRegistryIdCard(
+                      record: record,
+                      photoPath: resolvedPhoto.isEmpty ? null : resolvedPhoto,
+                      photoImage: photoImage,
+                      scale: cardScale,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Official Civic Registry ID',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.92),
+                        shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Expanded(
-                    child: Text('Registry ID / Passport', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                  ),
                   if (onChangePhoto != null)
-                    IconButton(
+                    _floatingIconButton(
+                      icon: Icons.photo_camera_outlined,
                       tooltip: 'Change photo',
                       onPressed: () {
                         Navigator.pop(ctx);
                         onChangePhoto();
                       },
-                      icon: const Icon(Icons.photo_camera_outlined),
                     ),
-                  IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
+                  if (onChangePhoto != null) const SizedBox(width: 8),
+                  _floatingIconButton(
+                    icon: Icons.close,
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-              FittedBox(
-                child: NgmyCivicRegistryIdCard(
-                  record: record,
-                  photoPath: resolvedPhoto.isEmpty ? null : resolvedPhoto,
-                  photoImage: photoImage,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Official Civic Registry identity card',
-                style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     },

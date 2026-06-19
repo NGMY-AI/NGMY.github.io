@@ -116,6 +116,7 @@ import 'ngmy_civic_self_enrollment.dart';
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_registry_id_card.dart';
 import 'ngmy_civic_id_photo.dart';
+import 'ngmy_civic_member_report.dart';
 import 'ngmy_civic_enroll_link.dart';
 import 'ngmy_referral_link.dart';
 import 'ngmy_referral.dart';
@@ -29688,40 +29689,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       }
     }
     final text = report.toString();
-    final escaped = text
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('\n', '<br>');
-    final html = '''
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>Civic Registry Report</title>
-    <style>
-      body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.5; }
-      h2 { margin-bottom: 14px; }
-      .card { border: 1px solid #d1d5db; border-radius: 8px; padding: 14px; }
-    </style>
-  </head>
-  <body>
-    <h2>FULL MEMBER INFORMATION</h2>
-    <div class="card">$escaped</div>
-    <script>window.onload = function(){ window.print(); };</script>
-  </body>
-</html>
-''';
-    final dataUri = Uri.parse('data:text/html;charset=utf-8,${Uri.encodeComponent(html)}');
-    launchUrl(dataUri, mode: LaunchMode.platformDefault).then((ok) async {
-      if (!ok) {
-        await Clipboard.setData(ClipboardData(text: text));
-      }
-    }).catchError((_) async {
-      await Clipboard.setData(ClipboardData(text: text));
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Print report opened. If blocked, report copied to clipboard.')),
+    showNgmyCivicMemberReportSheet(
+      context,
+      memberName: u.fullName ?? u.username,
+      plainText: text,
     );
   }
 
@@ -30427,77 +30398,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
   }
 
-  Widget _civicPassportBanner(bool isDark) {
-    final record = _civicPassportForCurrentUser();
-    if (record == null) return const SizedBox.shrink();
-    final name = (record['fullName'] ?? widget.user.fullName ?? widget.user.username).toString();
-    final registryId = (record['registryId'] ?? '').toString().trim();
-    final state = (record['state'] ?? widget.user.state).toString();
-    final idType = (record['idType'] ?? 'Registry ID').toString();
-    if (registryId.isEmpty) return const SizedBox.shrink();
-
-    return GestureDetector(
-      onTap: _showMyCivicIdCard,
-      child: Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F766E), Color(0xFF059669)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: const Color(0xFF059669).withOpacity(0.25), blurRadius: 14, offset: const Offset(0, 6))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(14)),
-                child: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 28),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Your Registry Passport', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                    Text('Tap to view your ID card · $idType', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                  ],
-                ),
-              ),
-              const Icon(Icons.badge_outlined, color: Colors.white70),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Center(
-            child: FittedBox(
-              child: NgmyCivicRegistryIdCard(
-                record: record,
-                photoPath: ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.user.profilePicturePath),
-                photoImage: ngmyCachedProfileImage(ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.user.profilePicturePath)),
-                scale: 0.72,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Center(
-            child: Text(
-              '$name · $registryId · $state',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
-            ),
-          ),
-        ],
-      ),
-    ),
-    );
-  }
-
   Widget _passportAdminPanel(UserData member, bool isDark) {
     final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, member.email);
     if (raw == null) return const SizedBox.shrink();
@@ -30682,9 +30582,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            _civicPassportBanner(isDark),
-            if (_civicPassportForCurrentUser() != null) const SizedBox(height: 20),
 
             if (_canCurrentUserSeeHelpMode()) ...[
               Container(
