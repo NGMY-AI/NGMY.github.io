@@ -641,15 +641,13 @@ double ngmyPendingWithdrawalTotal(String email, List<AppTransaction> transaction
 /// Authoritative balance from the transaction ledger (approved credits/debits + pending withdrawal holds).
 double ngmyResolveAccountBalance(String email, double storedBalance, List<AppTransaction> transactions) {
   final key = ngmyNormalizeEmail(email);
+  if (key.isEmpty) return 0.0;
   final ledger = ngmyBalanceFromApprovedTransactions(email, transactions);
-  if (key.isEmpty) return storedBalance.clamp(0.0, double.infinity);
   final txnCount = transactions.where((t) => ngmyNormalizeEmail(t.userEmail) == key).length;
-  if (txnCount == 0) return storedBalance.clamp(0.0, double.infinity);
-  // Truncated local cache — cloud stored balance may include older txns not in memory.
-  if (txnCount >= kNgmyUserTxnFetchMax && storedBalance > ledger + 0.01) {
+  if (txnCount == 0) {
     return storedBalance.clamp(0.0, double.infinity);
   }
-  // Ledger is authoritative whenever we have the user's transactions (bets, payouts, deposits, etc.).
+  // Ledger is the only source of truth whenever we have transaction rows for this user.
   return ledger;
 }
 
@@ -757,27 +755,24 @@ void ngmyReleasePendingWithdrawalHold(UserData user, AppTransaction t, Set<Strin
   user.accountBalance += t.amount;
 }
 
-/// After admin approves/rejects a wallet txn, sync user balance from ledger + any prior balance.
+/// After admin approves/rejects a wallet txn, sync user balance strictly from the ledger.
 void ngmySyncUserBalanceAfterWalletDecision(
   UserData user,
   List<AppTransaction> transactions, {
   AppTransaction? justDecided,
   TransactionStatus? previousStatus,
 }) {
-  if (justDecided != null && previousStatus == TransactionStatus.pending) {
-    if (justDecided.status == TransactionStatus.approved) {
-      _ngmyApplyApprovedTransitionToBalance(
-        user,
-        justDecided,
-        previousStatus: previousStatus,
-      );
-    }
-  }
   user.accountBalance = ngmyResolveAccountBalance(
     user.email,
     user.accountBalance,
     transactions,
   );
+  if (justDecided != null &&
+      previousStatus == TransactionStatus.pending &&
+      justDecided.status == TransactionStatus.approved &&
+      ngmyTransactionCountsAsIncome(justDecided)) {
+    ngmyPlayIncomeSoundForTransaction(justDecided, force: true);
+  }
 }
 
 bool ngmyTransactionCountsAsIncome(AppTransaction t) {
@@ -942,8 +937,20 @@ bool ngmyIsClockInHistoryTransaction(AppTransaction t) {
   return (t.sourceDetails ?? '').toLowerCase().contains('clock-in');
 }
 
-bool ngmyIsWalletHistoryTransaction(AppTransaction t) =>
-    ngmyIsWalletDepositOrWithdraw(t) || ngmyIsClockInHistoryTransaction(t);
+bool ngmyIsWalletHistoryTransaction(AppTransaction t) {
+  if (_ngmyIsClockInSessionStartTransaction(t)) return false;
+  if (t.type == TransactionType.contribution) return false;
+  if (t.status == TransactionStatus.rejected) return false;
+  if (t.status == TransactionStatus.pending) {
+    return t.type == TransactionType.deposit || t.type == TransactionType.withdrawal;
+  }
+  return t.type == TransactionType.deposit ||
+      t.type == TransactionType.withdrawal ||
+      t.type == TransactionType.adminAdd ||
+      t.type == TransactionType.adminRemove ||
+      t.type == TransactionType.reimbursement ||
+      t.type == TransactionType.claim;
+}
 
 List<AppTransaction> ngmyUserWalletHistoryTransactions(
   List<AppTransaction> all,
@@ -10552,12 +10559,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             unawaited(_pushUserToCloudFast(_allUsers[userIdx]));
           }
         } else if (becameApproved && ngmyTransactionCountsAsIncome(tx)) {
-          if (userIdx >= 0) {
-            ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], tx);
-            if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
-              _currentUser = _allUsers[userIdx];
-            }
-          }
           ngmyDeliverTransactionAlerts(tx);
         }
         if (userIdx >= 0 &&
@@ -10666,13 +10667,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _reconcileAllUserBalances() {
-    final admin = _ngmySessionIsAdmin(_currentUser);
     for (final u in _allUsers) {
-      if (admin) {
-        u.accountBalance = ngmyAdminDisplayBalance(u, _allTransactions);
-      } else {
-        ngmyReconcileUserAccountBalance(u, _allTransactions);
-      }
+      ngmyReconcileUserAccountBalance(u, _allTransactions);
     }
     if (_currentUser != null) {
       final key = _currentUser!.email.toLowerCase().trim();
@@ -11314,6 +11310,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
     if (toPurge.isEmpty) return;
 
+    final affectedEmails = <String>{};
+    for (final t in _allTransactions) {
+      if (toPurge.contains(t.id)) {
+        final e = ngmyNormalizeEmail(t.userEmail);
+        if (e.isNotEmpty) affectedEmails.add(e);
+      }
+    }
+
     if (mounted) {
       setState(() {
         _allTransactions.removeWhere((t) => toPurge.contains(t.id));
@@ -11330,6 +11334,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (online) {
       await _safeDeleteTransactionsByIds(toPurge.toList());
       await NgmyWalletDecisionLedger.removeFromCloud(toPurge);
+    }
+    for (final email in affectedEmails) {
+      final idx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == email);
+      if (idx >= 0) unawaited(_pushUserToCloudFast(_allUsers[idx], includeFreeTrial: true));
     }
     _reconcileAllUserBalances();
     NgmyAdminLiveRefresh.notify();
@@ -21904,7 +21912,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
 // --- STANDARD SCREENS ---
 
-enum _WalletHistoryFilter { all, deposit, withdrawal, clockIn }
+enum _WalletHistoryFilter { all, deposit, withdrawal, clockIn, games }
 
 Future<void> ngmyPersistWalletHandlesLocal(UserData user) async {
   final key = user.email.toLowerCase().trim();
@@ -22196,6 +22204,11 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
             return t.type == TransactionType.withdrawal;
           case _WalletHistoryFilter.clockIn:
             return ngmyIsClockInHistoryTransaction(t);
+          case _WalletHistoryFilter.games:
+            return ngmyIsGameLedgerTransaction(t) ||
+                (t.type == TransactionType.reimbursement &&
+                    !ngmyIsClockInHistoryTransaction(t) &&
+                    !_ngmyIsClockInSessionStartTransaction(t));
           case _WalletHistoryFilter.all:
             return true;
         }
@@ -22230,6 +22243,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
                     _historyFilterMenuItem(_WalletHistoryFilter.deposit, 'Deposits only'),
                     _historyFilterMenuItem(_WalletHistoryFilter.withdrawal, 'Withdrawals only'),
                     _historyFilterMenuItem(_WalletHistoryFilter.clockIn, 'Clock-in only'),
+                    _historyFilterMenuItem(_WalletHistoryFilter.games, 'Games & earnings'),
                   ],
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -22257,9 +22271,17 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
                   _WalletHistoryFilter.deposit => 'Showing deposits',
                   _WalletHistoryFilter.withdrawal => 'Showing withdrawals',
                   _WalletHistoryFilter.clockIn => 'Showing clock-in earnings',
+                  _WalletHistoryFilter.games => 'Showing games & other earnings',
                   _WalletHistoryFilter.all => '',
                 },
                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white54 : Colors.black45),
+              ),
+            ],
+            if (_historyFilter == _WalletHistoryFilter.all) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Every balance change is listed here — deposits, games, clock-in, store, and more.',
+                style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.black45),
               ),
             ],
             const SizedBox(height: 15),
@@ -22272,6 +22294,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
                           _WalletHistoryFilter.deposit => 'deposits',
                           _WalletHistoryFilter.withdrawal => 'withdrawals',
                           _WalletHistoryFilter.clockIn => 'clock-in transactions',
+                          _WalletHistoryFilter.games => 'game or earnings transactions',
                           _WalletHistoryFilter.all => 'transactions',
                         }}',
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
@@ -22634,12 +22657,8 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
     return _isIncomingTransaction(t) ? t.amount : -t.amount;
   }
 
-  /// History balance column — only approved deposits/withdrawals change balance.
-  double _walletHistoryBalanceDelta(AppTransaction t) {
-    if (!ngmyIsWalletDepositOrWithdraw(t)) return _transactionSignedDelta(t);
-    if (t.status != TransactionStatus.approved) return 0;
-    return _transactionSignedDelta(t);
-  }
+  /// History balance column — matches full ledger effect per row.
+  double _walletHistoryBalanceDelta(AppTransaction t) => ngmyTransactionLedgerEffect(t);
 
   bool _walletHistoryShowsStatus(AppTransaction t) =>
       t.type == TransactionType.deposit || t.type == TransactionType.withdrawal;
@@ -22667,17 +22686,25 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
         return 'Admin Credit';
       case TransactionType.adminRemove:
         if (raw.contains('investment')) return 'Invested';
+        if (raw.contains('game bet')) return 'Game Bet';
+        if (raw.contains('ngmy store purchase')) return 'Store Purchase';
+        if (raw.contains('video unlock')) return 'Video Unlock';
         if (raw.contains('ticket')) return 'Ticket Purchase';
         return 'Purchase';
       case TransactionType.reimbursement:
         if (raw.contains('points converted')) return 'Points Conversion';
         if (raw.contains('clock-in session started')) return 'Clock In Started';
         if (raw.contains('clock-in')) return 'Clock In';
-        if (raw.contains('game payout')) return 'Game Reward';
+        if (raw.contains('game partial')) return 'Game Win (Partial)';
+        if (raw.contains('game payout')) return 'Game Win';
+        if (raw.contains('multiplayer payout')) return 'Game Win (Multiplayer)';
+        if (raw.contains('dice')) return 'Dice Win';
+        if (raw.contains('video unlock sale')) return 'Video Sale';
         if (raw.contains('ticket sale')) return 'Ticket Sale';
         if (raw.contains('creator')) return 'Creator Sale';
         if (raw.contains('rhyme')) return 'Rhyme Payment';
         if (raw.contains('savings')) return 'Savings Withdrawal';
+        if (raw.contains('ngmy store')) return 'Store Credit';
         return 'Earnings';
       case TransactionType.contribution:
         return 'Contribution';
@@ -33454,8 +33481,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         final seller = widget.allUsers[sellerIdx];
         final buyer = widget.allUsers[buyerIdx];
         final refund = math.min(total, seller.accountBalance);
-        seller.accountBalance -= refund;
-        buyer.accountBalance += refund;
         final ts = DateTime.now().microsecondsSinceEpoch.toString();
         widget.onAddTransaction(AppTransaction(
           id: 'store_refund_buy_$ts',
@@ -37789,10 +37814,6 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     });
 
     setState(() {
-      if (selectedPay == 'ngmy') {
-        widget.user.accountBalance -= total;
-        widget.allUsers[sellerIdx].accountBalance += total;
-      }
       final newRemaining = remaining - quantity;
       _listings[idx]['unitsRemaining'] = newRemaining;
       _listings[idx]['updatedAt'] = now;
@@ -38920,6 +38941,7 @@ class VideoPostWidget extends StatefulWidget {
   final Future<bool> Function(MediaPost post)? onPayoutWatchReward;
   final Future<bool> Function(MediaPost post)? onSyncPost;
   final Future<void> Function(MediaPost post)? onMissingStorage;
+  final void Function(AppTransaction)? onAddTransaction;
   const VideoPostWidget({
     super.key,
     required this.post,
@@ -38931,6 +38953,7 @@ class VideoPostWidget extends StatefulWidget {
     this.onPayoutWatchReward,
     this.onSyncPost,
     this.onMissingStorage,
+    this.onAddTransaction,
   });
 
   @override
@@ -39145,12 +39168,35 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
     final ownerIdx = widget.allUsers.indexWhere(
       (u) => u.email.toLowerCase().trim() == widget.post.userEmail.toLowerCase().trim(),
     );
+    final ts = DateTime.now().microsecondsSinceEpoch.toString();
+    final ownerEmail = widget.post.userEmail.toLowerCase().trim();
+    widget.onAddTransaction?.call(
+      AppTransaction(
+        id: 'video_unlock_buy_$ts',
+        userEmail: widget.currentUser.email,
+        amount: price,
+        type: TransactionType.adminRemove,
+        method: PaymentMethod.system,
+        sourceDetails: 'Video unlock: ${widget.post.caption.isNotEmpty ? widget.post.caption : widget.post.id}',
+        status: TransactionStatus.approved,
+        timestamp: DateTime.now(),
+      ),
+    );
+    if (ownerIdx >= 0 && ownerEmail != widget.currentUser.email.toLowerCase().trim()) {
+      widget.onAddTransaction?.call(
+        AppTransaction(
+          id: 'video_unlock_sale_$ts',
+          userEmail: widget.allUsers[ownerIdx].email,
+          amount: price,
+          type: TransactionType.reimbursement,
+          method: PaymentMethod.system,
+          sourceDetails: 'Video unlock sale: ${widget.post.caption.isNotEmpty ? widget.post.caption : widget.post.id}',
+          status: TransactionStatus.approved,
+          timestamp: DateTime.now(),
+        ),
+      );
+    }
     setState(() {
-      widget.allUsers[idx].accountBalance -= price;
-      widget.currentUser.accountBalance -= price;
-      if (ownerIdx >= 0 && ownerIdx != idx) {
-        widget.allUsers[ownerIdx].accountBalance += price;
-      }
       _unlockedFullVideo = true;
       _previewEnded = false;
     });
