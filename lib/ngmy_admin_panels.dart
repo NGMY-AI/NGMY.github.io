@@ -117,6 +117,33 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
     }
   }
 
+  void _openDepositScreenshot(String? path) {
+    if (path == null || path.trim().isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Deposit payment proof', style: TextStyle(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.65,
+                  maxWidth: MediaQuery.of(ctx).size.width * 0.9,
+                ),
+                child: NgmyPaymentProofImage(path: path),
+              ),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _savePayments() async {
     if (_savingPayments) return;
     setState(() => _savingPayments = true);
@@ -344,6 +371,56 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
                   const SizedBox(height: 8),
                   Text('Code: ${t.verificationCode}', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.purpleAccent : Colors.purple)),
                 ],
+                Builder(builder: (context) {
+                  final proof = (t.screenshotPath ?? '').trim();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 10),
+                      Text(
+                        proof.isNotEmpty ? 'Payment screenshot' : 'Payment screenshot missing',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                          color: proof.isNotEmpty
+                              ? (isDark ? Colors.greenAccent : const Color(0xFF15803D))
+                              : Colors.redAccent,
+                        ),
+                      ),
+                      if (proof.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: () => _openDepositScreenshot(proof),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            width: double.infinity,
+                            constraints: const BoxConstraints(maxHeight: 220),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFE5E7EB)),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(11),
+                              child: NgmyPaymentProofImage(path: proof),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tap screenshot to enlarge',
+                          style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black45),
+                        ),
+                      ] else if (pending && !isInvestment)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'No proof attached — ask the user to resubmit with a payment screenshot.',
+                            style: TextStyle(fontSize: 10, color: Colors.orange.shade800),
+                          ),
+                        ),
+                    ],
+                  );
+                }),
                 const SizedBox(height: 10),
                 if (showActions && pending)
                   Row(

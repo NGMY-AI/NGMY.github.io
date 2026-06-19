@@ -557,6 +557,22 @@ String formatCurrency(double amount) {
 
 String ngmyNormalizeEmail(String email) => email.toLowerCase().trim();
 
+/// Strip leading `$` so the field can use a visual prefix without fighting the controller.
+String ngmyCashAppTagInputText(String raw) {
+  var t = raw.trim();
+  while (t.startsWith('\$')) {
+    t = t.substring(1).trim();
+  }
+  return t;
+}
+
+/// Ensure one leading `$` when saving or submitting a Cash App tag.
+String ngmyNormalizeCashAppTagForSubmit(String raw) {
+  final bare = ngmyCashAppTagInputText(raw);
+  if (bare.isEmpty) return '';
+  return '\$$bare';
+}
+
 /// Emails that signed up or signed in on the login page (users table / session).
 final Set<String> ngmyAppLoginUserEmails = <String>{};
 
@@ -21755,14 +21771,16 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
 
   void _applySavedWithdrawHandle() {
     final saved = _savedHandleForMethod;
-    if (saved.isNotEmpty) _handle.text = saved;
+    if (saved.isNotEmpty) {
+      _handle.text = _method == PaymentMethod.cashApp ? ngmyCashAppTagInputText(saved) : saved;
+    }
   }
 
   void _saveWithdrawHandle(String handle) {
     final trimmed = handle.trim();
     if (trimmed.isEmpty) return;
     if (_method == PaymentMethod.cashApp) {
-      widget.user.savedCashAppTag = trimmed;
+      widget.user.savedCashAppTag = ngmyNormalizeCashAppTagForSubmit(trimmed);
     } else {
       widget.user.savedBitcoinAddress = trimmed;
     }
@@ -21827,7 +21845,15 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
       );
       return;
     }
-    if (_method == PaymentMethod.cashApp && !handle.startsWith('\$')) handle = '\$$handle';
+    if (_method == PaymentMethod.cashApp) {
+      handle = ngmyNormalizeCashAppTagForSubmit(handle);
+      if (handle.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter your Cash App tag.')),
+        );
+        return;
+      }
+    }
 
     _saveWithdrawHandle(handle);
 
@@ -22235,15 +22261,11 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
               decoration: _iosInputDecoration(
                 fill: inputBg,
                 borderColor: inputBorder,
-                hint: _method == PaymentMethod.cashApp ? '\$YourCashTag' : 'bc1...',
+                hint: _method == PaymentMethod.cashApp ? 'YourCashTag' : 'bc1...',
+              ).copyWith(
+                prefixText: _method == PaymentMethod.cashApp ? '\$ ' : null,
               ),
-              onChanged: (v) {
-                if (_method == PaymentMethod.cashApp && v.isNotEmpty && !v.startsWith('\$')) {
-                  _handle.text = '\$$v';
-                  _handle.selection = TextSelection.fromPosition(TextPosition(offset: _handle.text.length));
-                }
-                _scheduleWithdrawHandleSave();
-              },
+              onChanged: (_) => _scheduleWithdrawHandleSave(),
             ),
             if (_savedHandleForMethod.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -22549,11 +22571,55 @@ class _SubmitPaymentPageState extends State<SubmitPaymentPage> {
         const SizedBox(height: 25),
         _instCard(),
         const SizedBox(height: 25),
-        TextField(controller: _tag, decoration: InputDecoration(labelText: _method == PaymentMethod.cashApp ? 'Your Cash App Tag' : 'Your BTC Wallet', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide(color: Colors.grey.withOpacity(0.1))), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: const BorderSide(color: Colors.green, width: 2)), hintText: _method == PaymentMethod.cashApp ? 'Starts with \$' : ''), onChanged: (v) { if (_method == PaymentMethod.cashApp && !v.startsWith('\$')) _tag.text = '\$$v'; }),
+        TextField(
+          controller: _tag,
+          decoration: InputDecoration(
+            labelText: _method == PaymentMethod.cashApp ? 'Your Cash App Tag' : 'Your BTC Wallet',
+            prefixText: _method == PaymentMethod.cashApp ? '\$ ' : null,
+            filled: true,
+            fillColor: Theme.of(context).cardColor,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide(color: Colors.grey.withOpacity(0.1))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: const BorderSide(color: Colors.green, width: 2)),
+            hintText: _method == PaymentMethod.cashApp ? 'YourCashTag' : '',
+          ),
+        ),
         const SizedBox(height: 25),
         _codeBox(),
         const SizedBox(height: 25),
-        GestureDetector(onTap: _pickScreenshot, child: Container(width: double.infinity, padding: const EdgeInsets.all(30), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), border: Border.all(color: Colors.blue.withOpacity(0.3), style: BorderStyle.solid), borderRadius: BorderRadius.circular(30)), child: Column(children: [const Icon(Icons.cloud_upload_outlined, color: Colors.blue, size: 40), const SizedBox(height: 12), Text(_screenshotRef == null ? 'Click to upload payment screenshot' : 'Screenshot Attached!', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue)), const Text('PNG, JPG (Required)', style: TextStyle(fontSize: 10, color: Colors.grey))]))),
+        GestureDetector(
+          onTap: _pickScreenshot,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.05),
+              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.cloud_upload_outlined, color: Colors.blue, size: 40),
+                const SizedBox(height: 12),
+                Text(
+                  _screenshotRef == null ? 'Click to upload payment screenshot' : 'Screenshot Attached!',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue),
+                ),
+                const Text('PNG, JPG (Required)', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                if (_screenshotRef != null) ...[
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 160),
+                      child: NgmyPaymentProofImage(path: _screenshotRef),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
         const SizedBox(height: 20),
         Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(25), border: Border.all(color: Colors.amber.withOpacity(0.2))), child: Text(widget.successHint, style: const TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
         const SizedBox(height: 35),
@@ -22565,7 +22631,11 @@ class _SubmitPaymentPageState extends State<SubmitPaymentPage> {
                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please upload screenshot and enter your handle')));
                return;
             }
-            String t = _tag.text; if (_method == PaymentMethod.cashApp && !t.startsWith('\$')) t = '\$$t';
+            String t = _method == PaymentMethod.cashApp ? ngmyNormalizeCashAppTagForSubmit(_tag.text) : _tag.text.trim();
+            if (t.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please upload screenshot and enter your handle')));
+              return;
+            }
             final sourceDetails = _isInvestmentRequest
                 ? buildInvestmentRequestDetails(
                     plan: widget.investmentPlanName ?? '',
