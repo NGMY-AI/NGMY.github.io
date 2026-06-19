@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -9060,11 +9060,45 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _reloadMediaFromSupabase() async {
-    _allMedia = const [];
+    await _hydrateMediaTombstonesFromCloud(_tombstonedMediaIds);
+    final remote = await _fetchMediaPostsFromSupabase();
+    if (remote == null || !mounted) return;
+    await _resyncLocalMediaMissingFromCloud(remote);
+    final refreshed = await _fetchMediaPostsFromSupabase();
+    final mergedRemote = refreshed ?? remote;
+    final next = _mergeMediaWithRemote(_allMedia, mergedRemote, tombstones: _tombstonedMediaIds);
+    if (!mounted) return;
+    setState(() => _allMedia = next);
+    await _persistAllMediaLocally();
+    await _pruneStaleMediaAgainstCloud();
+    await _purgeGhostAndBrokenMedia(verifyUrls: true);
   }
 
   Future<void> _pruneStaleMediaAgainstCloud() async {
-    return;
+    if (_adminMediaProtectUntil != null && DateTime.now().isBefore(_adminMediaProtectUntil!)) {
+      return;
+    }
+    await _hydrateMediaTombstonesFromCloud(_tombstonedMediaIds);
+    final remote = await _fetchMediaPostsFromSupabase();
+    if (remote == null || !mounted) return;
+    final remoteIds = remote.map((m) => m.id).where((id) => id.isNotEmpty).toSet();
+    final removeIds = <String>{};
+    for (final m in _allMedia) {
+      if (m.id.isEmpty) continue;
+      if (_tombstonedMediaIds.contains(m.id)) {
+        removeIds.add(m.id);
+        continue;
+      }
+      if (_mediaUrlIsCloudSynced(m.videoUrl) && !remoteIds.contains(m.id)) {
+        removeIds.add(m.id);
+      }
+    }
+    if (removeIds.isEmpty) return;
+    await _persistDeletedMediaIdsBatchAuthoritative(removeIds, _tombstonedMediaIds);
+    _allMedia.removeWhere((m) => removeIds.contains(m.id) || m.id.isEmpty);
+    if (!mounted) return;
+    setState(() {});
+    await _persistAllMediaLocally();
   }
 
   bool _mediaListsSameIds(List<MediaPost> a, List<MediaPost> b) {
@@ -14087,9 +14121,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
         user: widget.user,
         allUsers: widget.allUsers,
         allTransactions: sorted,
+        allMedia: widget.allMedia,
         onAddTransaction: widget.onAddTransaction,
+        onPostMedia: widget.onPostMedia,
         onDataChanged: widget.onDataChanged,
         config: widget.config,
+        onRefreshMediaFromCloud: widget.onRefreshMediaFromCloud,
+        onDeleteMedia: widget.onDeleteMedia,
+        onPruneMedia: widget.onPruneMedia,
+        onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
+        onSyncMediaPost: widget.onSyncAdminMediaPost,
+        onSyncUserMedia: widget.onSyncAdminUserMedia,
       ),
       4: () => MediaHubScreen(
         user: widget.user,
@@ -19285,12 +19327,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _adminInvest(isDark),
       _adminLegal(isDark),
       _adminWallet(isDark),
+      _adminMedia(isDark),
       _adminStore(isDark),
       NgmyAdminDomainCalendarPanel(isDark: isDark),
     ];
     return NgmyTabBackScope(
       activeTab: _idx,
-      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 6)),
+      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 7)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
       appBar: AppBar(
@@ -19336,8 +19379,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
               frameBorder,
               badgeCount: _adminWalletPendingCount(),
             ),
-            _navItem(5, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
-            _navItem(6, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
+            _navItem(5, Icons.perm_media_outlined, 'Media', isDark, frameBg, frameBorder),
+            _navItem(6, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
+            _navItem(7, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
           ],
         ),
       ),
@@ -19452,7 +19496,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "STORE", "CALENDAR"][_idx];
+  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "MEDIA", "STORE", "CALENDAR"][_idx];
 
   Widget _adminRetiredPanel({
     required bool isDark,
@@ -21367,6 +21411,113 @@ class _AdminDashboardState extends State<AdminDashboard> {
           );
         }, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white), child: const Text('SAVE ALL SETTINGS'))
       ]),
+    );
+  }
+
+  Widget _adminMedia(bool isDark) {
+    final limitC = TextEditingController(text: widget.config.maxMediaPostsPerWeek.toString());
+    final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
+    final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Media Hub Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isDark ? Colors.white : Colors.black)),
+          const SizedBox(height: 8),
+          Text(
+            'Job Marketplace media feed — admin posts only. Sync uses polling (no realtime) to save Supabase quota.',
+            style: TextStyle(fontSize: 12, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(color: panelBg, borderRadius: BorderRadius.circular(20), border: Border.all(color: frameBorder)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Admin upload limit', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 8),
+                Text(
+                  'Maximum media posts the admin account can publish every 7 days.',
+                  style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: limitC,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                  decoration: _adminInputDecoration(label: 'Max posts per week', isDark: isDark),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () async {
+                    final val = int.tryParse(limitC.text.trim()) ?? 3;
+                    setState(() {
+                      widget.config.maxMediaPostsPerWeek = val;
+                    });
+                    final ok = await ngmyAdminPersistManagementConfig(widget.config);
+                    widget.onDataChanged();
+                    if (!context.mounted) return;
+                    ngmyAdminShowCloudSaveSnackBar(
+                      context,
+                      cloudOk: ok,
+                      success: 'Media limit saved.',
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
+                    backgroundColor: const Color(0xFF7C3AED),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('SAVE MEDIA SETTINGS'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
+          NgmyMediaAdminPanel(
+            allMedia: widget.allMedia,
+            allUsers: widget.allUsers,
+            adminUser: widget.user,
+            onDataChanged: widget.onDataChanged,
+            persistPost: (p) async {
+              final post = p is MediaPost ? p : MediaPost.fromJson(Map<String, dynamic>.from((p as dynamic).toJson()));
+              if (widget.onSyncAdminMediaPost != null) {
+                return widget.onSyncAdminMediaPost!(post);
+              }
+              return _upsertMediaSocialFields(post);
+            },
+            persistUser: (u) async {
+              if (u is! UserData) return false;
+              if (widget.onSyncAdminUserMedia != null) {
+                return widget.onSyncAdminUserMedia!(u);
+              }
+              return _pushUserMediaProfileFast(u);
+            },
+            onEnqueueDelivery: widget.onEnqueueMediaDelivery,
+            isPostExpired: (m) => DateTime.now().difference(m.timestamp).inDays >= 7,
+            isDark: isDark,
+            virtualProfilesRaw: (widget.config as dynamic).mediaVirtualProfiles,
+            onVirtualProfilesChanged: (list) {
+              setState(() => (widget.config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(list));
+              widget.onDataChanged();
+            },
+            resolveMediaUrl: _resolveSupabaseStorageUrlResilient,
+            onDeleteMedia: widget.onDeleteMedia == null
+                ? null
+                : (p) async {
+                    final post = p is MediaPost ? p : MediaPost.fromJson(Map<String, dynamic>.from((p as dynamic).toJson()));
+                    await widget.onDeleteMedia!(post);
+                  },
+            uploadMediaRef: _adminUploadVirtualProfilePic,
+            onRefreshMedia: widget.onRefreshAdminMedia,
+            onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
+          ),
+        ],
+      ),
     );
   }
 
@@ -26113,17 +26264,33 @@ class NgmyHubScreen extends StatefulWidget {
   final UserData user;
   final List<UserData> allUsers;
   final List<AppTransaction> allTransactions;
+  final List<MediaPost> allMedia;
   final Function(AppTransaction) onAddTransaction;
+  final Function(MediaPost) onPostMedia;
   final VoidCallback onDataChanged;
   final AppConfig config;
+  final Future<void> Function()? onRefreshMediaFromCloud;
+  final Future<void> Function(MediaPost)? onDeleteMedia;
+  final Future<void> Function(MediaPost)? onPruneMedia;
+  final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
+  final Future<bool> Function(MediaPost post)? onSyncMediaPost;
+  final Future<bool> Function(UserData user)? onSyncUserMedia;
   const NgmyHubScreen({
     super.key,
     required this.user,
     required this.allUsers,
     required this.allTransactions,
+    required this.allMedia,
     required this.onAddTransaction,
+    required this.onPostMedia,
     required this.onDataChanged,
     required this.config,
+    this.onRefreshMediaFromCloud,
+    this.onDeleteMedia,
+    this.onPruneMedia,
+    this.onPurgeBrokenMedia,
+    this.onSyncMediaPost,
+    this.onSyncUserMedia,
   });
 
   @override
@@ -26365,7 +26532,21 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       routeName: 'NgmyStoreScreen',
                     ),
                   ),
-                  _hubBox('Job Marketplace', Icons.business_center_outlined, jobColors, () => NgmyNavigator.push(context, JobMarketplaceScreen(user: widget.user, allUsers: widget.allUsers, config: widget.config, onDataChanged: widget.onDataChanged), routeName: 'JobMarketplaceScreen')),
+                  _hubBox('Job Marketplace', Icons.business_center_outlined, jobColors, () => NgmyNavigator.push(context, JobMarketplaceScreen(
+                    user: widget.user,
+                    allUsers: widget.allUsers,
+                    allMedia: widget.allMedia,
+                    config: widget.config,
+                    onDataChanged: widget.onDataChanged,
+                    onAddTransaction: widget.onAddTransaction,
+                    onPost: widget.onPostMedia,
+                    onRefreshFromCloud: widget.onRefreshMediaFromCloud,
+                    onDeleteMedia: widget.onDeleteMedia,
+                    onPruneMedia: widget.onPruneMedia,
+                    onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
+                    onSyncMediaPost: widget.onSyncMediaPost,
+                    onSyncUserMedia: widget.onSyncUserMedia,
+                  ), routeName: 'JobMarketplaceScreen')),
                   _hubBox(
                     'Help Center',
                     Icons.support_agent_rounded,
@@ -38770,35 +38951,1278 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 }
 
+class NgmyJobMarketplaceMediaScreen extends StatefulWidget {
+  final UserData user;
+  final List<UserData> allUsers;
+  final List<MediaPost> allMedia;
+  final AppConfig config;
+  final Function(MediaPost) onPost;
+  final VoidCallback onDataChanged;
+  final Function(AppTransaction) onAddTransaction;
+  final Future<void> Function()? onRefreshFromCloud;
+  final Future<void> Function(MediaPost)? onDeleteMedia;
+  final Future<void> Function(MediaPost)? onPruneMedia;
+  final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
+  final Future<bool> Function(MediaPost post)? onSyncMediaPost;
+  final Future<bool> Function(UserData user)? onSyncUserMedia;
+  final bool showBackButton;
+
+  const NgmyJobMarketplaceMediaScreen({
+    super.key,
+    required this.user,
+    required this.allUsers,
+    required this.allMedia,
+    required this.config,
+    required this.onPost,
+    required this.onDataChanged,
+    required this.onAddTransaction,
+    this.onRefreshFromCloud,
+    this.onDeleteMedia,
+    this.onPruneMedia,
+    this.onPurgeBrokenMedia,
+    this.onSyncMediaPost,
+    this.onSyncUserMedia,
+    this.showBackButton = false,
+  });
+
+  @override
+  State<NgmyJobMarketplaceMediaScreen> createState() => _NgmyJobMarketplaceMediaScreenState();
+}
+
+class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaScreen> {
+  final _captionController = TextEditingController();
+  final _mediaSearchCtrl = TextEditingController();
+  final _mediaSearchFocus = FocusNode();
+  bool _isPosting = false;
+  bool _mediaSearchOpen = false;
+  OverlayEntry? _noticeEntry;
+  Timer? _mediaSyncTimer;
+  String _lastFeedSig = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _mediaSearchCtrl.addListener(_onMediaSearchChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await widget.onPurgeBrokenMedia?.call();
+      await _cleanupExpiredPosts();
+      await _silentRefreshFeed();
+    });
+    _mediaSyncTimer = Timer.periodic(const Duration(minutes: 2), (_) => _silentRefreshFeed());
+  }
+
+  String _feedSignature() {
+    final buf = StringBuffer();
+    for (final m in widget.allMedia.where((m) => !_isExpired(m))) {
+      buf
+        ..write(m.id)
+        ..write(':')
+        ..write(_mediaCommentCount(m.comments))
+        ..write(':')
+        ..write(m.likedBy.length)
+        ..write('|');
+    }
+    return buf.toString();
+  }
+
+  Future<void> _silentRefreshFeed() async {
+    if (!mounted || _isPosting) return;
+    if (!await ngmyCanReachCloud()) return;
+    await widget.onRefreshFromCloud?.call();
+    if (!mounted || _isPosting) return;
+    final sig = _feedSignature();
+    if (sig == _lastFeedSig) return;
+    _lastFeedSig = sig;
+    setState(() {});
+  }
+
+  Future<void> _removeBrokenPost(MediaPost post) async {
+    if (widget.onDeleteMedia != null) {
+      await widget.onDeleteMedia!(post);
+    } else {
+      await widget.onPruneMedia?.call(post);
+    }
+    widget.onDataChanged();
+    if (mounted) setState(() {});
+  }
+
+  bool _isExpired(MediaPost post) {
+    return DateTime.now().difference(post.timestamp).inDays >= 7;
+  }
+
+  ({String bucket, String path})? _parseSupabaseRef(String mediaUrl) {
+    if (!mediaUrl.startsWith('supabase://')) return null;
+    final withoutScheme = mediaUrl.replaceFirst('supabase://', '');
+    final slashIdx = withoutScheme.indexOf('/');
+    if (slashIdx <= 0 || slashIdx >= withoutScheme.length - 1) return null;
+    return (bucket: withoutScheme.substring(0, slashIdx), path: withoutScheme.substring(slashIdx + 1));
+  }
+
+  Future<void> _deletePostFromStorage(MediaPost post) async {
+    final ref = _parseSupabaseRef(post.videoUrl);
+    if (ref == null) return;
+    try {
+      await Supabase.instance.client.storage.from(ref.bucket).remove([ref.path]);
+    } catch (e) {
+      debugPrint('Storage remove warning: $e');
+    }
+  }
+
+  Future<void> _deletePostSilently(MediaPost post) async {
+    if (widget.onDeleteMedia != null) {
+      await widget.onDeleteMedia!(post);
+      return;
+    }
+    await _deleteMediaRowFromSupabase(post.id);
+    await _deletePostFromStorage(post);
+    widget.allMedia.removeWhere((m) => m.id == post.id);
+  }
+
+  Future<void> _deletePost(MediaPost post, {bool triggerSave = true}) async {
+    final owner = post.userEmail.toLowerCase().trim() == widget.user.email.toLowerCase().trim();
+    if (!owner && !widget.user.isAdmin) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You can only delete your own posts.')),
+        );
+      }
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete post?'),
+        content: const Text('This removes the photo or video for everyone. This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    if (widget.onDeleteMedia != null) {
+      await widget.onDeleteMedia!(post);
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post deleted for everyone.')),
+        );
+      }
+      widget.onDataChanged();
+      return;
+    }
+    await _deleteMediaRowFromSupabase(post.id);
+    await _deletePostFromStorage(post);
+    if (mounted) {
+      setState(() => widget.allMedia.removeWhere((m) => m.id == post.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post deleted for everyone.')),
+      );
+    } else {
+      widget.allMedia.removeWhere((m) => m.id == post.id);
+    }
+    if (triggerSave) widget.onDataChanged();
+  }
+
+  Future<void> _cleanupExpiredPosts() async {
+    final expired = widget.allMedia.where(_isExpired).toList();
+    if (expired.isEmpty) return;
+    for (final post in expired) {
+      await _deletePostSilently(post);
+    }
+    if (mounted) setState(() {});
+    widget.onDataChanged();
+  }
+
+  int _weeklyPostsForCurrentUser() {
+    final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+    return widget.allMedia.where((m) {
+      final sameUser = m.userEmail.toLowerCase().trim() == widget.user.email.toLowerCase().trim();
+      return sameUser && m.timestamp.isAfter(weekAgo);
+    }).length;
+  }
+
+  void _showGlassNotice(String title, String body, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isError ? const Color(0xFFEF4444) : const Color(0xFF7C3AED),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: Row(
+            children: [
+              Icon(isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text(body, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<String> _resolveTaggedEmails(String raw) {
+    final out = <String>[];
+    for (final part in raw.split(RegExp(r'[,\s]+'))) {
+      final token = part.trim().replaceAll('@', '');
+      if (token.isEmpty) continue;
+      for (final u in widget.allUsers) {
+        if (u.username.toLowerCase() == token.toLowerCase() || u.email.toLowerCase() == token.toLowerCase()) {
+          out.add(u.email);
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
+  Future<bool> _payoutWatchReward(MediaPost post) async {
+    final mon = post.monetization;
+    if (!mon.hasWatchReward || mon.hasClaimed(widget.user.email)) return false;
+    final creatorEmail = post.userEmail.toLowerCase().trim();
+    final viewerEmail = widget.user.email.toLowerCase().trim();
+    if (creatorEmail == viewerEmail) return false;
+
+    final creatorIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == creatorEmail);
+    final viewerIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == viewerEmail);
+    if (creatorIdx < 0 || viewerIdx < 0) return false;
+    if (widget.allUsers[creatorIdx].accountBalance + 0.001 < mon.watchReward) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Creator does not have enough balance for this reward right now.')),
+        );
+      }
+      return false;
+    }
+
+    ngmyPlayIncomeSoundForAmount(
+      beneficiaryEmail: viewerEmail,
+      amount: mon.watchReward,
+    );
+    if (!post.rewardedViewers.contains(viewerEmail)) {
+      post.rewardedViewers.add(viewerEmail);
+    }
+
+    final ts = DateTime.now().microsecondsSinceEpoch.toString();
+    widget.onAddTransaction(AppTransaction(
+      id: 'media_reward_$ts',
+      userEmail: viewerEmail,
+      amount: mon.watchReward,
+      type: TransactionType.adminAdd,
+      method: PaymentMethod.system,
+      status: TransactionStatus.approved,
+      timestamp: DateTime.now(),
+      sourceDetails: 'Media watch reward: ${post.caption.isNotEmpty ? post.caption : post.id}',
+    ));
+    widget.onAddTransaction(AppTransaction(
+      id: 'media_reward_pay_$ts',
+      userEmail: creatorEmail,
+      amount: mon.watchReward,
+      type: TransactionType.adminRemove,
+      method: PaymentMethod.system,
+      status: TransactionStatus.approved,
+      timestamp: DateTime.now(),
+      sourceDetails: 'Paid watch reward on media post',
+    ));
+
+    await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+    widget.onDataChanged();
+    await NgmyMediaRewardTracker.clearSession(post.id, viewerEmail);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You earned \$${formatCurrency(mon.watchReward)} for watching!')),
+      );
+    }
+    return true;
+  }
+
+  Future<void> _pickAndPost({required bool isVideo, String tagRaw = '', NgmyMediaMonetization monetization = const NgmyMediaMonetization()}) async {
+    if (_isPosting) return;
+    if (!widget.user.isAdmin) {
+      if (mounted) {
+        _showGlassNotice('Admin only', 'Only the admin can post in Job Marketplace media.', isError: true);
+      }
+      return;
+    }
+    final limit = widget.config.maxMediaPostsPerWeek;
+    if (limit > 0 && _weeklyPostsForCurrentUser() >= limit) {
+      if (mounted) {
+        _showGlassNotice('Limit Reached', 'You can only upload $limit posts every 7 days.', isError: true);
+      }
+      return;
+    }
+
+    final picker = ImagePicker();
+    XFile? media;
+    try {
+      await Future<void>.delayed(Duration.zero);
+      media = isVideo
+          ? await picker.pickVideo(source: ImageSource.gallery)
+          : await picker.pickImage(
+              source: ImageSource.gallery,
+              imageQuality: 85,
+            );
+    } catch (e) {
+      debugPrint('[media] picker error: $e');
+      if (mounted) {
+        _showGlassNotice('Picker failed', 'Could not open your gallery. Try again.', isError: true);
+      }
+      return;
+    }
+    if (media == null || !mounted) return;
+
+    setState(() => _isPosting = true);
+    try {
+      final fallbackExt = isVideo ? 'mp4' : 'jpg';
+      var ext = fallbackExt;
+      if (media.mimeType != null && media.mimeType!.contains('/')) {
+        final mimeExt = media.mimeType!.split('/').last.toLowerCase();
+        if (mimeExt.isNotEmpty && mimeExt.length <= 5) ext = mimeExt == 'jpeg' ? 'jpg' : mimeExt;
+      } else if (media.path.contains('.')) {
+        ext = media.path.split('.').last.toLowerCase();
+      }
+
+      final maxBytes = isVideo
+          ? (kIsWeb ? 120 * 1024 * 1024 : 280 * 1024 * 1024)
+          : (kIsWeb ? 12 * 1024 * 1024 : 16 * 1024 * 1024);
+
+      Uint8List bytes;
+      try {
+        bytes = await _readMediaPickerBytes(media);
+      } catch (e) {
+        debugPrint('[media] read bytes error: $e');
+        if (mounted) {
+          _showGlassNotice('File read failed', 'Could not read that file. Try a smaller photo or video.', isError: true);
+        }
+        return;
+      }
+
+      if (bytes.length > maxBytes) {
+        if (mounted) {
+          _showGlassNotice(
+            'File too large',
+            isVideo
+                ? (kIsWeb ? 'Video must be under 120 MB on web (about 5+ min).' : 'Video must be under 280 MB.')
+                : (kIsWeb ? 'Photo must be under 12 MB on web.' : 'Photo must be under 16 MB.'),
+            isError: true,
+          );
+        }
+        return;
+      }
+
+      double? aspectRatio;
+      if (!isVideo) {
+        aspectRatio = await _aspectRatioFromImageBytes(bytes);
+      }
+
+      final fileName = '${DateTime.now().microsecondsSinceEpoch}_${widget.user.email.hashCode.abs()}.$ext';
+      final storagePath = 'uploads/$fileName';
+      final contentType = isVideo ? _mimeForVideoExt(ext) : _mimeForImageExt(ext);
+
+      final upload = await _uploadNgmyMediaBytes(
+        bytes: bytes,
+        storagePath: storagePath,
+        contentType: contentType,
+      );
+
+      if (upload.ref == null) {
+        if (mounted) {
+          _showGlassNotice('Upload failed', upload.error ?? 'Could not upload to cloud.', isError: true);
+        }
+        return;
+      }
+
+      if (monetization.hasWatchReward && widget.user.accountBalance < monetization.watchReward) {
+        if (mounted) {
+          _showGlassNotice(
+            'Insufficient balance',
+            'You need at least \$${formatCurrency(monetization.watchReward)} in your account to offer this reward per viewer.',
+            isError: true,
+          );
+        }
+        return;
+      }
+
+      final post = MediaPost(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userEmail: widget.user.email,
+        username: _mediaAuthorName(widget.user),
+        videoUrl: upload.ref!,
+        contentType: isVideo ? 'video' : 'image',
+        caption: _captionController.text.trim(),
+        timestamp: DateTime.now(),
+        mediaAspectRatio: aspectRatio,
+        taggedUsers: _resolveTaggedEmails(tagRaw),
+      );
+      post.applyMonetization(monetization);
+
+      var saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+      if (!saved) {
+        await Future.delayed(const Duration(seconds: 2));
+        saved = await _upsertMediaRowSafe(Map<String, dynamic>.from(post.toJson()));
+      }
+      if (!saved && mounted) {
+        _showGlassNotice(
+          'Sync warning',
+          'Uploaded to storage but database sync failed. Run supabase/media_tables.sql if this keeps happening.',
+          isError: true,
+        );
+      }
+
+      widget.onPost(post);
+      _captionController.clear();
+      _lastFeedSig = _feedSignature();
+
+      if (mounted) {
+        _showGlassNotice('Post live!', '${isVideo ? 'Video' : 'Photo'} shared successfully.');
+        setState(() {});
+      }
+      widget.onDataChanged();
+    } catch (e, st) {
+      debugPrint('Media post error: $e\n$st');
+      if (mounted) {
+        _showGlassNotice('Post failed', 'Something went wrong. Try a smaller file or check your internet.', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _isPosting = false);
+    }
+  }
+
+  Future<void> _beginPostFlow({required bool isVideo, String tagRaw = '', NgmyMediaMonetization monetization = const NgmyMediaMonetization()}) async {
+    if (_isPosting) return;
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
+    await _pickAndPost(isVideo: isVideo, tagRaw: tagRaw, monetization: monetization);
+  }
+
+  NgmyMediaMonetization _monetizationFromDialog({
+    required String link,
+    required String previewSec,
+    required String continuePrice,
+    required String watchReward,
+    required String watchSec,
+    required bool enableLink,
+    required bool enablePreview,
+    required bool enablePayContinue,
+    required bool enableWatchEarn,
+  }) {
+    return NgmyMediaMonetization(
+      externalLink: enableLink ? link.trim() : '',
+      previewSeconds: enablePreview ? (int.tryParse(previewSec.trim()) ?? 0) : 0,
+      continuePrice: enablePayContinue ? (double.tryParse(continuePrice.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0) : 0,
+      watchReward: enableWatchEarn ? (double.tryParse(watchReward.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0) : 0,
+      watchRequiredSeconds: enableWatchEarn ? (int.tryParse(watchSec.trim()) ?? 0) : 0,
+    );
+  }
+
+  void _showPostDialog() {
+    if (_isPosting) return;
+    if (!widget.user.isAdmin) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Only the admin can post in Job Marketplace media.')),
+        );
+      }
+      return;
+    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final captionCtrl = TextEditingController(text: _captionController.text);
+    final tagCtrl = TextEditingController();
+    final linkCtrl = TextEditingController();
+    final previewSecCtrl = TextEditingController(text: '20');
+    final continuePriceCtrl = TextEditingController();
+    final watchRewardCtrl = TextEditingController(text: '1');
+    final watchSecCtrl = TextEditingController(text: '60');
+    var enableLink = false;
+    var enablePreview = false;
+    var enablePayContinue = false;
+    var enableWatchEarn = false;
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDlg) => Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 36),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 420),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF121726) : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 28, offset: const Offset(0, 12)),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7C3AED).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.add_photo_alternate_rounded, color: Color(0xFF8B5CF6), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'New Post',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(dialogCtx),
+                        icon: Icon(Icons.close_rounded, color: isDark ? Colors.white70 : Colors.black54),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: captionCtrl,
+                    maxLines: 3,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                    decoration: InputDecoration(
+                      hintText: 'Add a caption (optional)',
+                      filled: true,
+                      fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: tagCtrl,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                    decoration: InputDecoration(
+                      hintText: 'Tag users (@username, comma separated)',
+                      filled: true,
+                      fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text('Link & monetization (optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: isDark ? Colors.white70 : Colors.black54)),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Attach link', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    subtitle: const Text('Photo tap or video continue opens this URL', style: TextStyle(fontSize: 11)),
+                    value: enableLink,
+                    activeColor: const Color(0xFF8B5CF6),
+                    onChanged: (v) => setDlg(() => enableLink = v),
+                  ),
+                  if (enableLink)
+                    TextField(
+                      controller: linkCtrl,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        hintText: 'https://youtube.com/... or any link',
+                        filled: true,
+                        fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Video preview limit (seconds)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    value: enablePreview,
+                    activeColor: const Color(0xFF8B5CF6),
+                    onChanged: (v) => setDlg(() => enablePreview = v),
+                  ),
+                  if (enablePreview)
+                    TextField(
+                      controller: previewSecCtrl,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        hintText: 'Free watch seconds (e.g. 20)',
+                        filled: true,
+                        fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Pay to continue watching', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    value: enablePayContinue,
+                    activeColor: const Color(0xFF8B5CF6),
+                    onChanged: (v) => setDlg(() => enablePayContinue = v),
+                  ),
+                  if (enablePayContinue)
+                    TextField(
+                      controller: continuePriceCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        hintText: 'NGMY balance price to unlock full video',
+                        filled: true,
+                        fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Pay viewers to watch link', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    subtitle: const Text('Deducted from your balance per viewer', style: TextStyle(fontSize: 11)),
+                    value: enableWatchEarn,
+                    activeColor: const Color(0xFF8B5CF6),
+                    onChanged: (v) => setDlg(() => enableWatchEarn = v),
+                  ),
+                  if (enableWatchEarn) ...[
+                    TextField(
+                      controller: watchRewardCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        hintText: 'Reward per viewer (\$)',
+                        filled: true,
+                        fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: watchSecCtrl,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        hintText: 'Seconds they must stay on link',
+                        filled: true,
+                        fillColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  Text(
+                    'Choose media type',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white60 : Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Material(
+                          color: isDark ? const Color(0xFF1C2236) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: _isPosting
+                                ? null
+                                : () {
+                                    _captionController.text = captionCtrl.text.trim();
+                                    final tags = tagCtrl.text.trim();
+                                    final mon = _monetizationFromDialog(
+                                      link: linkCtrl.text,
+                                      previewSec: previewSecCtrl.text,
+                                      continuePrice: continuePriceCtrl.text,
+                                      watchReward: watchRewardCtrl.text,
+                                      watchSec: watchSecCtrl.text,
+                                      enableLink: enableLink,
+                                      enablePreview: enablePreview,
+                                      enablePayContinue: enablePayContinue,
+                                      enableWatchEarn: enableWatchEarn,
+                                    );
+                                    Navigator.pop(dialogCtx);
+                                    unawaited(_beginPostFlow(isVideo: false, tagRaw: tags, monetization: mon));
+                                  },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.35)),
+                              ),
+                              child: const Column(
+                                children: [
+                                  Icon(Icons.photo_library_rounded, color: Color(0xFF8B5CF6), size: 30),
+                                  SizedBox(height: 8),
+                                  Text('Photo', style: TextStyle(fontWeight: FontWeight.w800)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Material(
+                          color: const Color(0xFF7C3AED),
+                          borderRadius: BorderRadius.circular(16),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: _isPosting
+                                ? null
+                                : () {
+                                    _captionController.text = captionCtrl.text.trim();
+                                    final tags = tagCtrl.text.trim();
+                                    final mon = _monetizationFromDialog(
+                                      link: linkCtrl.text,
+                                      previewSec: previewSecCtrl.text,
+                                      continuePrice: continuePriceCtrl.text,
+                                      watchReward: watchRewardCtrl.text,
+                                      watchSec: watchSecCtrl.text,
+                                      enableLink: enableLink,
+                                      enablePreview: enablePreview,
+                                      enablePayContinue: enablePayContinue,
+                                      enableWatchEarn: enableWatchEarn,
+                                    );
+                                    Navigator.pop(dialogCtx);
+                                    unawaited(_beginPostFlow(isVideo: true, tagRaw: tags, monetization: mon));
+                                  },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              child: const Column(
+                                children: [
+                                  Icon(Icons.videocam_rounded, color: Colors.white, size: 30),
+                                  SizedBox(height: 8),
+                                  Text('Video', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        );
+      },
+    ).whenComplete(() {
+      captionCtrl.dispose();
+      tagCtrl.dispose();
+      linkCtrl.dispose();
+      previewSecCtrl.dispose();
+      continuePriceCtrl.dispose();
+      watchRewardCtrl.dispose();
+      watchSecCtrl.dispose();
+    });
+  }
+
+  void _onMediaSearchChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _openInlineMediaSearch() {
+    setState(() => _mediaSearchOpen = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _mediaSearchFocus.requestFocus();
+    });
+  }
+
+  void _closeInlineMediaSearch() {
+    _mediaSearchFocus.unfocus();
+    _mediaSearchCtrl.clear();
+    setState(() => _mediaSearchOpen = false);
+  }
+
+  Widget _mediaHubHeaderIcon({
+    required bool isDark,
+    required IconData icon,
+    required VoidCallback onTap,
+    Color? backgroundColor,
+    Color? iconColor,
+  }) {
+    return Material(
+      color: backgroundColor ?? (isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB)),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, color: iconColor ?? (isDark ? Colors.white : Colors.black87), size: 20),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInlineMediaSearchResults(bool isDark) {
+    final q = _mediaSearchCtrl.text.trim();
+    if (q.isEmpty) {
+      return Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF111731).withOpacity(0.96) : Colors.white.withOpacity(0.98),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(isDark ? 0.1 : 0.85)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.14), blurRadius: 18, offset: const Offset(0, 8))],
+          ),
+          child: Text(
+            'Search users by name or posts by #hashtag',
+            style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    final results = ngmyMediaSearchMatches(
+      query: q,
+      allUsers: widget.allUsers,
+      allMedia: widget.allMedia,
+      isPostExpired: (m) => _isExpired(m as MediaPost),
+    );
+    final matchedUsers = results.users;
+    final matchedPosts = results.posts;
+    final sub = isDark ? Colors.white38 : Colors.black45;
+    final titleColor = isDark ? Colors.white : Colors.black87;
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.42),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF111731).withOpacity(0.98) : Colors.white.withOpacity(0.98),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(isDark ? 0.1 : 0.85)),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.14), blurRadius: 18, offset: const Offset(0, 8))],
+        ),
+        child: matchedUsers.isEmpty && matchedPosts.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(child: Text('No results for "$q"', style: TextStyle(color: sub, fontWeight: FontWeight.w600))),
+              )
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                shrinkWrap: true,
+                children: [
+                  if (matchedUsers.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+                      child: Text('People', style: TextStyle(color: titleColor, fontWeight: FontWeight.w800, fontSize: 13)),
+                    ),
+                    ...matchedUsers.map((u) {
+                      final avatar = ngmyAdminUserAvatar(u);
+                      return ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                        leading: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB),
+                          backgroundImage: avatar,
+                          child: avatar == null ? Icon(Icons.person, size: 18, color: sub) : null,
+                        ),
+                        title: Text((u.username ?? 'User').toString(), style: TextStyle(color: titleColor, fontWeight: FontWeight.w700, fontSize: 14)),
+                        subtitle: Text((u.email ?? '').toString(), style: TextStyle(color: sub, fontSize: 11)),
+                        onTap: () {
+                          _closeInlineMediaSearch();
+                          _openMediaProfile(u.email.toString());
+                        },
+                      );
+                    }),
+                    if (matchedPosts.isNotEmpty) const SizedBox(height: 6),
+                  ],
+                  if (matchedPosts.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+                      child: Text('Posts', style: TextStyle(color: titleColor, fontWeight: FontWeight.w800, fontSize: 13)),
+                    ),
+                    ...matchedPosts.map((m) {
+                      final caption = (m.caption ?? '').toString();
+                      return ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                        leading: const Icon(Icons.tag_rounded, color: Color(0xFF7C3AED), size: 22),
+                        title: Text(
+                          caption.isEmpty ? 'Media post' : caption,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: titleColor, fontSize: 13),
+                        ),
+                        subtitle: Text('@${(m.username ?? '').toString()}', style: TextStyle(color: sub, fontSize: 11)),
+                        onTap: () {
+                          _closeInlineMediaSearch();
+                          _openMediaProfile(m.userEmail.toString());
+                        },
+                      );
+                    }),
+                  ],
+                ],
+              ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _mediaSyncTimer?.cancel();
+    _noticeEntry?.remove();
+    _mediaSearchCtrl.removeListener(_onMediaSearchChanged);
+    _mediaSearchCtrl.dispose();
+    _mediaSearchFocus.dispose();
+    _captionController.dispose();
+    super.dispose();
+  }
+
+  Future<String> _uploadProfileMediaRef(String ref) async {
+    final src = ref.trim();
+    if (src.isEmpty || src.startsWith('supabase://') || src.startsWith('http')) return src;
+    try {
+      late Uint8List bytes;
+      if (src.startsWith('data:')) {
+        bytes = base64Decode(src.split(',').last);
+      } else if (!kIsWeb) {
+        bytes = await File(src).readAsBytes();
+      } else {
+        return src;
+      }
+      final path = 'profiles/${DateTime.now().microsecondsSinceEpoch}_${widget.user.email.hashCode}.jpg';
+      final upload = await _uploadNgmyMediaBytes(bytes: bytes, storagePath: path, contentType: 'image/jpeg');
+      return upload.ref ?? src;
+    } catch (_) {
+      return src;
+    }
+  }
+
+  void _openMediaProfile(String email) {
+    final target = NgmyMediaProfile.userByEmail(widget.allUsers, email) ??
+        UserData(email: email, username: email.split('@').first);
+    NgmyMediaProfile.normalizeUserMediaFields(target);
+    NgmyMediaProfile.normalizeUserMediaFields(widget.user);
+    if (NgmyMediaProfile.pruneExpiredStories(target)) widget.onDataChanged();
+    NgmyNavigator.push(
+      context,
+      NgmyMediaProfileScreen(
+        targetUser: target,
+        currentUser: widget.user,
+        allUsers: widget.allUsers,
+        allMedia: widget.allMedia,
+        avatarForUser: (u) => ngmyAdminUserAvatar(u),
+        resolveMediaUrl: _resolveSupabaseStorageUrlResilient,
+        persistPost: (p) async {
+          final post = p is MediaPost ? p : MediaPost.fromJson(Map<String, dynamic>.from((p as dynamic).toJson()));
+          if (widget.onSyncMediaPost != null) {
+            return widget.onSyncMediaPost!(post);
+          }
+          return _upsertMediaSocialFields(post);
+        },
+        onDataChanged: widget.onDataChanged,
+        isPostExpired: (m) => _isExpired(m as MediaPost),
+        uploadMediaRef: _uploadProfileMediaRef,
+        persistUser: widget.onSyncUserMedia == null ? null : (u) => widget.onSyncUserMedia!(u is UserData ? u : UserData.fromJson(Map<String, dynamic>.from((u as dynamic).toJson()))),
+        onCreatePost: widget.user.isAdmin ? _showPostDialog : null,
+        isPosting: _isPosting,
+      ),
+      routeName: 'MediaProfile',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final topInset = MediaQuery.paddingOf(context).top + 68;
+    final searchPanelTop = MediaQuery.paddingOf(context).top + 8 + 64 + 6;
+    final mediaFeed = _visibleMediaPosts(
+      widget.allMedia,
+      extraFilter: (m) => !_isExpired(m),
+    )..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF080B16) : const Color(0xFFF3F7FF),
+      body: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: mediaFeed.isEmpty
+                ? Center(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF111731) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(isDark ? 0.1 : 0.8)),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.perm_media_rounded, size: 58, color: Colors.grey.withOpacity(0.55)),
+                          const SizedBox(height: 12),
+                          const Text('No media posted yet', style: TextStyle(fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.user.isAdmin
+                                ? 'Tap your profile, then Post, to upload a photo or video.'
+                                : 'Admin posts will appear here. Check back soon.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.fromLTRB(12, topInset, 12, 120),
+                    cacheExtent: 400,
+                    addAutomaticKeepAlives: false,
+                    itemCount: mediaFeed.length,
+                    itemBuilder: (context, index) => VideoPostWidget(
+                      key: ValueKey(mediaFeed[index].id),
+                      post: mediaFeed[index],
+                      currentUser: widget.user,
+                      allUsers: widget.allUsers,
+                      onChanged: widget.onDataChanged,
+                      onSyncPost: widget.onSyncMediaPost,
+                      onDelete: () => _deletePost(mediaFeed[index]),
+                      onMissingStorage: _removeBrokenPost,
+                      onOpenProfile: _openMediaProfile,
+                      onPayoutWatchReward: _payoutWatchReward,
+                    ),
+                  ),
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(15, 8, 15, 0),
+                child: ngmyClipBackdrop(
+                  borderRadius: BorderRadius.circular(35),
+                  child: Container(
+                    height: 64,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(35),
+                      border: Border.all(color: Colors.white.withOpacity(0.12)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.12),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (widget.showBackButton)
+                                  _mediaHubHeaderIcon(
+                                    isDark: isDark,
+                                    icon: Icons.arrow_back_ios_new_rounded,
+                                    onTap: () => NgmyNavigator.pop(context),
+                                  ),
+                                if (!widget.showBackButton && widget.user.isAdmin)
+                                  _mediaHubHeaderIcon(
+                                    isDark: isDark,
+                                    icon: Icons.add_circle_outline_rounded,
+                                    onTap: _showPostDialog,
+                                  ),
+                                if (widget.showBackButton && widget.user.isAdmin) ...[
+                                  const SizedBox(width: 6),
+                                  _mediaHubHeaderIcon(
+                                    isDark: isDark,
+                                    icon: Icons.add_circle_outline_rounded,
+                                    onTap: _showPostDialog,
+                                  ),
+                                ],
+                                if (!widget.showBackButton && !widget.user.isAdmin)
+                                  const SizedBox(width: 40),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 260),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, animation) => FadeTransition(
+                                opacity: animation,
+                                child: SizeTransition(sizeFactor: animation, axisAlignment: -1, child: child),
+                              ),
+                              child: _mediaSearchOpen
+                                  ? Padding(
+                                      key: const ValueKey('media_search_field'),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      child: TextField(
+                                        controller: _mediaSearchCtrl,
+                                        focusNode: _mediaSearchFocus,
+                                        style: TextStyle(
+                                          color: isDark ? Colors.white : Colors.black87,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        decoration: InputDecoration(
+                                          isDense: true,
+                                          hintText: 'Search users or #tags',
+                                          hintStyle: TextStyle(
+                                            color: isDark ? Colors.white38 : Colors.black38,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          prefixIcon: Icon(Icons.search_rounded, size: 20, color: isDark ? Colors.white54 : Colors.black45),
+                                          filled: true,
+                                          fillColor: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+                                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                                        ),
+                                        textInputAction: TextInputAction.search,
+                                        onSubmitted: (_) => setState(() {}),
+                                      ),
+                                    )
+                                  : Center(
+                                      key: const ValueKey('media_hub_title'),
+                                      child: Text(
+                                        'MEDIA',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 22,
+                                          letterSpacing: 1.4,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          if (_mediaSearchOpen)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: _mediaHubHeaderIcon(
+                                isDark: isDark,
+                                icon: Icons.close_rounded,
+                                onTap: _closeInlineMediaSearch,
+                              ),
+                            )
+                          else
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: _mediaHubHeaderIcon(
+                                isDark: isDark,
+                                icon: Icons.search_rounded,
+                                onTap: _openInlineMediaSearch,
+                              ),
+                            ),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: _mediaHubHeaderIcon(
+                              isDark: isDark,
+                              icon: Icons.person_rounded,
+                              onTap: () => _openMediaProfile(widget.user.email),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (_mediaSearchOpen)
+            Positioned(
+              top: searchPanelTop,
+              left: 15,
+              right: 15,
+              child: _buildInlineMediaSearchResults(isDark),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+
+
 class JobMarketplaceScreen extends StatelessWidget {
   final UserData user;
   final List<UserData> allUsers;
+  final List<MediaPost> allMedia;
   final AppConfig config;
   final VoidCallback onDataChanged;
+  final Function(AppTransaction) onAddTransaction;
+  final Function(MediaPost) onPost;
+  final Future<void> Function()? onRefreshFromCloud;
+  final Future<void> Function(MediaPost)? onDeleteMedia;
+  final Future<void> Function(MediaPost)? onPruneMedia;
+  final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
+  final Future<bool> Function(MediaPost post)? onSyncMediaPost;
+  final Future<bool> Function(UserData user)? onSyncUserMedia;
 
   const JobMarketplaceScreen({
     super.key,
     required this.user,
     required this.allUsers,
+    required this.allMedia,
     required this.config,
     required this.onDataChanged,
+    required this.onAddTransaction,
+    required this.onPost,
+    this.onRefreshFromCloud,
+    this.onDeleteMedia,
+    this.onPruneMedia,
+    this.onPurgeBrokenMedia,
+    this.onSyncMediaPost,
+    this.onSyncUserMedia,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return NgmyComingSoonScreen(
-      title: 'Job Marketplace',
-      icon: Icons.business_center_rounded,
-      message: 'Job Marketplace is being rebuilt. Hiring and job tools will return soon.',
-      appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded), onPressed: () => NgmyNavigator.pop(context)),
-        title: const Text('Job Marketplace', style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: isDark ? Colors.white : Colors.black87,
-      ),
+    return NgmyJobMarketplaceMediaScreen(
+      user: user,
+      allUsers: allUsers,
+      allMedia: allMedia,
+      config: config,
+      onPost: onPost,
+      onDataChanged: onDataChanged,
+      onAddTransaction: onAddTransaction,
+      onRefreshFromCloud: onRefreshFromCloud,
+      onDeleteMedia: onDeleteMedia,
+      onPruneMedia: onPruneMedia,
+      onPurgeBrokenMedia: onPurgeBrokenMedia,
+      onSyncMediaPost: onSyncMediaPost,
+      onSyncUserMedia: onSyncUserMedia,
+      showBackButton: true,
     );
   }
 }
