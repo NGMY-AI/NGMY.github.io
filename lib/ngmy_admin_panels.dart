@@ -337,50 +337,67 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (isInvestment)
-                  Text('Investment: ${meta['plan'] ?? ''} · \$${meta['amount'] ?? ''}', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.orangeAccent : Colors.orange.shade800))
-                else
-                  Text('Method: ${t.method.name.toUpperCase()} · ${t.sourceDetails ?? 'N/A'}', style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black87)),
-                if (t.verificationCode != null && t.verificationCode!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text('Code: ${t.verificationCode}', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.purpleAccent : Colors.purple)),
-                ],
                 Builder(builder: (context) {
                   final proof = (t.screenshotPath ?? '').trim();
-                  return Column(
+                  return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (isInvestment)
+                              Text(
+                                'Investment: ${meta['plan'] ?? ''} · \$${meta['amount'] ?? ''}',
+                                style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.orangeAccent : Colors.orange.shade800, fontSize: 12),
+                              )
+                            else
+                              Text(
+                                'Method: ${t.method.name.toUpperCase()} · ${t.sourceDetails ?? 'N/A'}',
+                                style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black87),
+                              ),
+                            if (t.verificationCode != null && t.verificationCode!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Code: ${t.verificationCode}',
+                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: isDark ? Colors.purpleAccent : Colors.purple),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                       if (proof.isNotEmpty)
-                        OutlinedButton.icon(
-                          onPressed: () => _openDepositScreenshot(proof),
-                          icon: const Icon(Icons.receipt_long_rounded, size: 18),
-                          label: const Text('View proof', style: TextStyle(fontWeight: FontWeight.w800)),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: isDark ? Colors.greenAccent : const Color(0xFF15803D),
-                            side: BorderSide(color: isDark ? Colors.greenAccent : const Color(0xFF16A34A)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: TextButton(
+                            onPressed: () => _openDepositScreenshot(proof),
+                            style: TextButton.styleFrom(
+                              foregroundColor: isDark ? Colors.greenAccent : const Color(0xFF15803D),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            child: const Text('View proof', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
                           ),
                         )
                       else if (pending && !isInvestment)
-                        Text(
-                          'No proof attached — ask the user to resubmit with a payment screenshot.',
-                          style: TextStyle(fontSize: 10, color: Colors.orange.shade800),
-                        )
-                      else if (proof.isEmpty)
-                        Text(
-                          'Payment screenshot missing',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.redAccent.shade200),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8, top: 2),
+                          child: Text(
+                            'No proof',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.orange.shade800),
+                          ),
                         ),
                     ],
                   );
                 }),
-                const SizedBox(height: 10),
-                if (showActions && pending)
+                if (showActions && pending) ...[
+                  const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
@@ -392,8 +409,9 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
                         child: Text(_processingTxnId == t.id ? 'SAVING…' : 'APPROVE'),
                       ),
                     ],
-                  )
-                else if (showActions && !pending && !archived)
+                  ),
+                ] else if (showActions && !pending && !archived) ...[
+                  const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
@@ -402,6 +420,7 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
                       label: const Text('Archive & remove'),
                     ),
                   ),
+                ],
               ],
             ),
           ),
