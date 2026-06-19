@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
+import 'ngmy_civic_id_scanner.dart';
 
 /// Georgia-style horizontal ID / passport card for Civic Registry members.
 class NgmyCivicRegistryIdCard extends StatelessWidget {
@@ -153,9 +157,16 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
           clipBehavior: Clip.hardEdge,
           children: [
             CustomPaint(painter: _IdCardBackgroundPainter(isGeorgia: isGeorgia)),
-            Center(child: _NgmySilverWatermark(fontSize: 42 * scale, opacity: 0.14, rotate: -0.28)),
+            CustomPaint(painter: _NgmyCenterWatermarkPainter(scale: scale)),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 16 * scale,
+              child: CustomPaint(painter: _NgmyHologramStripPainter(scale: scale)),
+            ),
             Padding(
-              padding: EdgeInsets.fromLTRB(10 * scale, 8 * scale, 10 * scale, 7 * scale),
+              padding: EdgeInsets.fromLTRB(10 * scale, 8 * scale, 10 * scale, 9 * scale),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -243,8 +254,11 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                                               style: TextStyle(fontSize: 16 * scale, fontWeight: FontWeight.w900, color: const Color(0xFF1E3A8A)),
                                             ),
                                             Positioned(
-                                              bottom: 6 * scale,
-                                              child: _NgmySilverWatermark(fontSize: 8 * scale, opacity: 0.95, glow: true),
+                                              bottom: 4 * scale,
+                                              child: CustomPaint(
+                                                size: Size(34 * scale, 10 * scale),
+                                                painter: _MiniNgmySealPainter(scale: scale),
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -275,11 +289,6 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                 ],
               ),
             ),
-            Positioned(
-              left: 96 * scale,
-              bottom: 18 * scale,
-              child: _NgmySilverWatermark(fontSize: 11 * scale, opacity: 0.72, glow: true),
-            ),
           ],
         ),
       ),
@@ -287,7 +296,12 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
   }
 
   Widget _headerRow(String stateUpper, String docTitle, String badge, String code, double scale) {
-    return Row(
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: SizedBox(
+        width: 340 * scale,
+        child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
@@ -355,6 +369,8 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
           ],
         ),
       ],
+        ),
+      ),
     );
   }
 
@@ -439,16 +455,37 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
   }
 
   Widget _footerRow(String registryId, String phone, double scale) {
+    final ddRaw = '5 DD ${registryId.padRight(20, '0')}${phone.replaceAll(RegExp(r'\D'), '').padRight(8, '0')}';
+    final dd = ddRaw.length > 28 ? ddRaw.substring(0, 28) : ddRaw;
+    final qrData = registryId.isNotEmpty ? ngmyCivicIdQrPayload(registryId) : 'NGMY-CIVIC';
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Text(
-            '5 DD ${registryId.padRight(20, '0')}${phone.replaceAll(RegExp(r'\D'), '').padRight(8, '0')}'.substring(0, 28.clamp(0, 40)),
+            dd,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 6.5 * scale, fontWeight: FontWeight.w600, letterSpacing: 0.3),
           ),
         ),
+        Container(
+          padding: EdgeInsets.all(1.5 * scale),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFF374151), width: 0.8),
+            borderRadius: BorderRadius.circular(3 * scale),
+          ),
+          child: QrImageView(
+            data: qrData,
+            size: 24 * scale,
+            padding: EdgeInsets.zero,
+            backgroundColor: Colors.white,
+            eyeStyle: const QrEyeStyle(color: Color(0xFF111827)),
+            dataModuleStyle: const QrDataModuleStyle(color: Color(0xFF111827)),
+          ),
+        ),
+        SizedBox(width: 4 * scale),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -462,56 +499,60 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
   }
 }
 
-class _NgmySilverWatermark extends StatelessWidget {
-  const _NgmySilverWatermark({
-    required this.fontSize,
-    this.opacity = 1,
-    this.glow = false,
-    this.rotate = 0,
-  });
+class _NgmyCenterWatermarkPainter extends CustomPainter {
+  _NgmyCenterWatermarkPainter({required this.scale});
 
-  final double fontSize;
-  final double opacity;
-  final bool glow;
-  final double rotate;
+  final double scale;
 
   @override
-  Widget build(BuildContext context) {
-    const text = 'NGMY';
-    final style = TextStyle(
-      fontSize: fontSize,
-      fontWeight: FontWeight.w900,
-      letterSpacing: fontSize * 0.08,
-      height: 1,
-      foreground: Paint()
-        ..shader = ui.Gradient.linear(
-          const Offset(0, 0),
-          Offset(fontSize * 1.6, fontSize * 1.2),
-          [
-            Color.lerp(const Color(0xFFF8FAFC), Colors.white, 0.9)!,
-            const Color(0xFFCBD5E1),
-            const Color(0xFF94A3B8),
-            const Color(0xFFE2E8F0),
-          ],
-          [0.0, 0.35, 0.7, 1.0],
-        ),
-      shadows: glow
-          ? [
-              Shadow(color: Colors.white.withOpacity(0.95), blurRadius: fontSize * 0.18),
-              Shadow(color: const Color(0xFF94A3B8).withOpacity(0.85), blurRadius: fontSize * 0.35),
-              Shadow(color: Colors.black.withOpacity(0.25), blurRadius: fontSize * 0.12, offset: Offset(0, fontSize * 0.06)),
-            ]
-          : null,
-    );
-
-    return Opacity(
-      opacity: opacity,
-      child: Transform.rotate(
-        angle: rotate,
-        child: Text(text, style: style),
-      ),
+  void paint(Canvas canvas, Size size) {
+    _PeachPainter._paintEmbossedNgmy(
+      canvas,
+      Offset(size.width * 0.52, size.height * 0.52),
+      34 * scale,
+      opacity: 0.11,
+      rotate: -0.32,
     );
   }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _NgmyHologramStripPainter extends CustomPainter {
+  _NgmyHologramStripPainter({required this.scale});
+
+  final double scale;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final band = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          const Color(0xFFCBD5E1).withOpacity(0.08),
+          const Color(0xFFE2E8F0).withOpacity(0.28),
+          const Color(0xFF94A3B8).withOpacity(0.22),
+          const Color(0xFFE2E8F0).withOpacity(0.28),
+          const Color(0xFFCBD5E1).withOpacity(0.08),
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, band);
+
+    final step = 34.0 * scale;
+    for (var x = -step; x < size.width + step; x += step) {
+      _PeachPainter._paintEmbossedNgmy(
+        canvas,
+        Offset(x + step * 0.5, size.height * 0.52),
+        7.5 * scale,
+        opacity: 0.42,
+        rotate: -0.08,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _IdCardBackgroundPainter extends CustomPainter {
@@ -565,35 +606,77 @@ class _PeachPainter extends CustomPainter {
     canvas.drawLine(Offset(cx, cy - size.height * 0.34), Offset(cx + size.width * 0.04, cy - size.height * 0.42), stem);
 
     if (showNgmy) {
-      _paintSilverNgmy(canvas, Offset(cx, cy + size.height * 0.02), 11 * ngmyScale);
+      _paintCurvedNgmyOnPeach(canvas, Offset(cx, cy), size.width * 0.34, ngmyScale);
     }
   }
 
-  static void _paintSilverNgmy(Canvas canvas, Offset center, double fontSize) {
+  static void _paintCurvedNgmyOnPeach(Canvas canvas, Offset center, double radius, double scale) {
     const text = 'NGMY';
+    final fontSize = 8.8 * scale;
+    final startAngle = -1.05;
+    final sweep = 2.1 / math.max(text.length - 1, 1);
+    for (var i = 0; i < text.length; i++) {
+      final angle = startAngle + sweep * i;
+      final px = center.dx + math.cos(angle) * radius;
+      final py = center.dy + math.sin(angle) * radius * 0.55;
+      canvas.save();
+      canvas.translate(px, py);
+      canvas.rotate(angle + math.pi / 2);
+      _paintEmbossedNgmy(canvas, Offset.zero, fontSize, opacity: 0.95, rotate: 0, singleLetter: text[i]);
+      canvas.restore();
+    }
+  }
+
+  static void _paintEmbossedNgmy(
+    Canvas canvas,
+    Offset center,
+    double fontSize, {
+    required double opacity,
+    double rotate = 0,
+    String? singleLetter,
+  }) {
+    final text = singleLetter ?? 'NGMY';
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(rotate);
     final builder = ui.ParagraphBuilder(
       ui.ParagraphStyle(textAlign: TextAlign.center, fontWeight: FontWeight.w900),
     )
       ..pushStyle(
         ui.TextStyle(
-          color: const Color(0xFFF1F5F9),
+          color: Color.fromRGBO(241, 245, 249, opacity),
           fontSize: fontSize,
           fontWeight: FontWeight.w900,
-          letterSpacing: 1.2,
-          shadows: const [
-            ui.Shadow(color: Color(0xE6FFFFFF), blurRadius: 4),
-            ui.Shadow(color: Color(0xCC94A3B8), blurRadius: 8),
-            ui.Shadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
+          letterSpacing: singleLetter == null ? 1.4 : 0,
+          shadows: [
+            ui.Shadow(color: Color.fromRGBO(255, 255, 255, opacity * 0.95), blurRadius: fontSize * 0.22),
+            ui.Shadow(color: Color.fromRGBO(148, 163, 184, opacity * 0.85), blurRadius: fontSize * 0.38),
+            ui.Shadow(color: Color.fromRGBO(0, 0, 0, opacity * 0.35), blurRadius: fontSize * 0.08, offset: Offset(0, fontSize * 0.08)),
           ],
         ),
       )
       ..addText(text);
-    final paragraph = builder.build()..layout(ui.ParagraphConstraints(width: fontSize * 5));
-    canvas.drawParagraph(paragraph, Offset(center.dx - paragraph.maxIntrinsicWidth / 2, center.dy - fontSize / 2));
+    final paragraph = builder.build()..layout(ui.ParagraphConstraints(width: fontSize * (singleLetter == null ? 5.5 : 1.4)));
+    canvas.drawParagraph(paragraph, Offset(-paragraph.maxIntrinsicWidth / 2, -fontSize / 2));
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant _PeachPainter oldDelegate) => false;
+}
+
+class _MiniNgmySealPainter extends CustomPainter {
+  _MiniNgmySealPainter({required this.scale});
+
+  final double scale;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _PeachPainter._paintEmbossedNgmy(canvas, Offset(size.width / 2, size.height / 2), 7 * scale, opacity: 0.92, rotate: -0.12);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 Widget _floatingIconButton({
@@ -629,35 +712,41 @@ Future<void> showNgmyCivicRegistryIdCardDialog(
     barrierColor: Colors.black.withOpacity(0.35),
     pageBuilder: (ctx, _, __) {
       final resolvedPhoto = photoPath ?? (record['idPhotoPath'] ?? '').toString();
-      final screenW = MediaQuery.sizeOf(ctx).width;
-      final cardScale = ((screenW - 28) / 360).clamp(0.82, 1.08);
+      final maxH = MediaQuery.sizeOf(ctx).height * 0.82;
       return SafeArea(
         child: Stack(
           clipBehavior: Clip.none,
           children: [
             Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 56),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    NgmyCivicRegistryIdCard(
-                      record: record,
-                      photoPath: resolvedPhoto.isEmpty ? null : resolvedPhoto,
-                      photoImage: photoImage,
-                      scale: cardScale,
+              child: SizedBox(
+                height: maxH,
+                width: MediaQuery.sizeOf(ctx).width,
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: SizedBox(
+                    width: 360,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        NgmyCivicRegistryIdCard(
+                          record: record,
+                          photoPath: resolvedPhoto.isEmpty ? null : resolvedPhoto,
+                          photoImage: photoImage,
+                          scale: 1,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Official Civic Registry ID',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withOpacity(0.92),
+                            shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Official Civic Registry ID',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withOpacity(0.92),
-                        shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

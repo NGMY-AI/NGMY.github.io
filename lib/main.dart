@@ -117,6 +117,7 @@ import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_registry_id_card.dart';
 import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_member_report.dart';
+import 'ngmy_civic_id_scanner.dart';
 import 'ngmy_civic_enroll_link.dart';
 import 'ngmy_referral_link.dart';
 import 'ngmy_referral.dart';
@@ -24109,6 +24110,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String get _accountId => 'NGMY/USR/${widget.user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
   String get _referralCode => ngmyReferralCodeForEmail(widget.user.email);
 
+  bool _canScanCivicRegistryIds() =>
+      widget.user.isAdmin ||
+      widget.user.isAuthorizedRegistrar ||
+      widget.user.isCivicRegistryAdmin ||
+      widget.user.isCivicRegistryKing;
+
+  void _openCivicIdScanner() {
+    showNgmyCivicIdScannerSheet(
+      context,
+      config: widget.config,
+      walletDepositEnabled: widget.user.isAdmin,
+      onDeposit: ({
+        required String memberEmail,
+        required String registryId,
+        required String memberName,
+        required double amount,
+        required bool walletDeposit,
+      }) {
+        final now = DateTime.now();
+        if (walletDeposit) {
+          widget.onAddTransaction(
+            AppTransaction(
+              id: 'civic_scan_${registryId}_${now.millisecondsSinceEpoch}',
+              userEmail: memberEmail,
+              amount: amount,
+              type: TransactionType.adminAdd,
+              method: PaymentMethod.system,
+              sourceDetails: 'Admin deposit via Registry ID scan ($registryId)',
+              status: TransactionStatus.approved,
+              timestamp: now,
+            ),
+          );
+        } else {
+          widget.onAddTransaction(
+            AppTransaction(
+              id: 'civic_scan_${registryId}_${now.millisecondsSinceEpoch}',
+              userEmail: memberEmail,
+              amount: amount,
+              type: TransactionType.contribution,
+              method: PaymentMethod.system,
+              sourceDetails: '{"kind":"contribution","note":"Registrar deposit via ID scan","registryId":"$registryId"}',
+              status: TransactionStatus.approved,
+              timestamp: now,
+            ),
+          );
+        }
+        widget.onDataChanged();
+      },
+    );
+  }
+
   void _syncProfileAvatarCache() {
     final path = (widget.user.profilePicturePath ?? '').trim();
     if (path == _profileAvatarPath) return;
@@ -24605,45 +24657,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
       const SizedBox(height: 20),
-      _box(context, 'Contact', [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: panelBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: panelBorder, width: 1.25),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.22 : 0.08), blurRadius: 12, offset: const Offset(0, 5))],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Personal Info', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryText)),
-              IconButton(icon: Icon(Icons.edit, size: 16, color: neutralActionText), onPressed: () => _editMe(context)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: panelBorder, width: 1.15),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.18 : 0.07), blurRadius: 10, offset: const Offset(0, 4))],
-          ),
-          child: Column(
-            children: [
-              _row(Icons.person_outline, 'Username', widget.user.username, copyText: widget.user.username),
-              const SizedBox(height: 10),
-              _row(Icons.email_outlined, 'Email', widget.user.email, copyText: widget.user.email),
-              const SizedBox(height: 10),
-              _row(Icons.phone_android_outlined, 'Phone', widget.user.phone.isEmpty ? 'Not set' : widget.user.phone, copyText: widget.user.phone.isEmpty ? null : widget.user.phone),
-            ],
-          ),
-        ),
-      ]), const SizedBox(height: 15),
+      _profileContactSection(
+        context,
+        panelBg: panelBg,
+        panelBorder: panelBorder,
+        cardBg: cardBg,
+        primaryText: primaryText,
+        neutralActionText: neutralActionText,
+      ),
+      const SizedBox(height: 15),
       _box(context, 'Account Information', [
         _pair('Account ID', _accountId),
         const Divider(),
@@ -25103,6 +25125,90 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     ),
   );
+
+  Widget _profileContactSection(
+    BuildContext context, {
+    required Color panelBg,
+    required Color panelBorder,
+    required Color cardBg,
+    required Color primaryText,
+    required Color neutralActionText,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final frameBg = isDark ? const Color(0xFF0C1320) : const Color(0xFFFFFFFF);
+    final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: frameBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: frameBorder, width: 1.25),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.24 : 0.10), blurRadius: 14, offset: const Offset(0, 6)),
+          BoxShadow(color: (isDark ? Colors.white : Colors.black).withOpacity(0.04), blurRadius: 1, offset: const Offset(0, -1)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Contact', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const Spacer(),
+              if (_canScanCivicRegistryIds())
+                IconButton(
+                  tooltip: 'Scan Registry ID to deposit',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                  onPressed: _openCivicIdScanner,
+                  icon: Icon(Icons.qr_code_scanner_rounded, size: 20, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF6200EE)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: panelBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: panelBorder, width: 1.25),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.22 : 0.08), blurRadius: 12, offset: const Offset(0, 5))],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Personal Info', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryText)),
+                IconButton(icon: Icon(Icons.edit, size: 16, color: neutralActionText), onPressed: () => _editMe(context)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: panelBorder, width: 1.15),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.18 : 0.07), blurRadius: 10, offset: const Offset(0, 4))],
+            ),
+            child: Column(
+              children: [
+                _row(Icons.person_outline, 'Username', widget.user.username, copyText: widget.user.username),
+                const SizedBox(height: 10),
+                _row(Icons.email_outlined, 'Email', widget.user.email, copyText: widget.user.email),
+                const SizedBox(height: 10),
+                _row(Icons.phone_android_outlined, 'Phone', widget.user.phone.isEmpty ? 'Not set' : widget.user.phone, copyText: widget.user.phone.isEmpty ? null : widget.user.phone),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _box(BuildContext ctx, String t, List<Widget> c) {
     final isDark = Theme.of(ctx).brightness == Brightness.dark;
     final frameBg = isDark ? const Color(0xFF0C1320) : const Color(0xFFFFFFFF);

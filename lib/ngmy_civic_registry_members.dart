@@ -163,6 +163,15 @@ class NgmyCivicRegistryMembers {
     return null;
   }
 
+  static Map<String, dynamic>? findByRegistryId(dynamic config, String registryId) {
+    final key = registryId.trim().toUpperCase();
+    if (key.isEmpty) return null;
+    for (final m in listFrom(config)) {
+      if ((m['registryId'] ?? '').toString().trim().toUpperCase() == key) return m;
+    }
+    return null;
+  }
+
   static Map<String, dynamic>? findDuplicateRecord({
     required dynamic config,
     required String fullName,
