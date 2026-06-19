@@ -650,15 +650,10 @@ bool ngmyIsGameSpendTransaction(AppTransaction t) {
 
 enum NgmyPushSoundKind { incomeCash, spendDefault }
 
-void ngmyDeliverTransactionAlerts(AppTransaction t, {bool forceIncomeSound = false}) {
+void ngmyDeliverTransactionAlerts(AppTransaction t, {bool forceIncomeSound = true}) {
   if (t.status != TransactionStatus.approved) return;
   if (ngmyTransactionCountsAsIncome(t)) {
-    ngmyPlayIncomeSoundForTransaction(
-      t,
-      force: forceIncomeSound ||
-          ngmyIsGameLedgerTransaction(t) ||
-          ngmyIsStoreLedgerTransaction(t),
-    );
+    ngmyPlayIncomeSoundForTransaction(t, force: forceIncomeSound);
   }
 }
 
@@ -708,7 +703,7 @@ bool ngmyTransactionCountsAsIncome(AppTransaction t) {
   return t.amount >= 0.01;
 }
 
-void ngmyPlayIncomeSoundForTransaction(AppTransaction t, {bool force = false}) {
+void ngmyPlayIncomeSoundForTransaction(AppTransaction t, {bool force = true}) {
   if (!ngmyTransactionCountsAsIncome(t)) return;
   unawaited(NgmyIncomeSound.playForUser(
     beneficiaryEmail: t.userEmail,
@@ -722,7 +717,7 @@ void ngmyPlayIncomeSoundForAmount({
   required String beneficiaryEmail,
   required double amount,
   String? dedupeKey,
-  bool force = false,
+  bool force = true,
 }) {
   unawaited(NgmyIncomeSound.playForUser(
     beneficiaryEmail: beneficiaryEmail,
@@ -803,7 +798,7 @@ void _ngmyApplyApprovedTransitionToBalance(
   }
   ngmyApplyApprovedTransactionToBalance(user, tx);
   if (previousStatus == TransactionStatus.pending && ngmyTransactionCountsAsIncome(tx)) {
-    ngmyPlayIncomeSoundForTransaction(tx);
+    ngmyPlayIncomeSoundForTransaction(tx, force: true);
   }
 }
 
@@ -4626,6 +4621,42 @@ bool ngmyEmailIsAdmin(String email) => kNgmyAdminEmails.contains(email.toLowerCa
 
 /// Every NGMY app account with an email. Civic-only registry entries are not in [allUsers].
 bool ngmyIsAppSignupUser(UserData u, [AppConfig? config]) => u.email.trim().isNotEmpty;
+
+/// True when this row looks like someone who signed up or signed in on the login page.
+bool ngmyLooksLikeAppLoginUser(UserData u) {
+  if (u.email.trim().isEmpty) return false;
+  if (u.passwordHash.trim().isNotEmpty) return true;
+  if ((u.profilePicturePath ?? '').trim().isNotEmpty) return true;
+  if (u.phone.trim().isNotEmpty) return true;
+  if (u.activeInvestment != null) return true;
+  if (u.freeTrialActive) return true;
+  if (u.referredByCode.trim().isNotEmpty || u.referralCount > 0) return true;
+  if (u.canSellOnStore || u.isApprovedWorker || u.isApprovedHelper) return true;
+  if (u.lastClockInDate != null || u.lastClockInEarningsDate != null || u.isClockedIn) return true;
+  if (u.savedCashAppTag.trim().isNotEmpty ||
+      u.savedZelleInfo.trim().isNotEmpty ||
+      u.savedBitcoinAddress.trim().isNotEmpty) {
+    return true;
+  }
+  if (u.mediaFollowers.isNotEmpty || u.mediaFollowing.isNotEmpty || u.mediaBio.trim().isNotEmpty) {
+    return true;
+  }
+  if (u.points > 0 || u.totalProfit > 0) return true;
+  final defaultName = u.email.split('@').first.toLowerCase();
+  if (u.username.trim().isNotEmpty &&
+      u.username.toLowerCase() != defaultName &&
+      u.username.contains(' ')) {
+    return true;
+  }
+  return false;
+}
+
+/// Civic Registry manual enroll with no login-page account signals.
+bool ngmyIsCivicRegistryOnlyAccount(UserData u, AppConfig config) {
+  if (u.email.trim().isEmpty) return false;
+  if (!NgmyCivicRegistryMembers.isEnrolled(config, u.email)) return false;
+  return !ngmyLooksLikeAppLoginUser(u);
+}
 
 List<String> ngmyGamePaywallMissedDays(UserData user) {
   NgmyClockInMissPolicy.rolloverMonthIfNeeded(user);
@@ -9232,12 +9263,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
     if (useCashSound) {
       if (incomeTransaction != null) {
-        ngmyPlayIncomeSoundForTransaction(incomeTransaction);
+        ngmyPlayIncomeSoundForTransaction(incomeTransaction, force: true);
       } else if (incomeAmount != null && incomeAmount >= 0.01) {
         ngmyPlayIncomeSoundForAmount(
           beneficiaryEmail: _currentUser!.email,
           amount: incomeAmount,
           dedupeKey: tag ?? dedupeKey,
+          force: true,
         );
       }
     }
@@ -10384,12 +10416,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               _currentUser = _allUsers[userIdx];
             }
           }
-          final isFreshApproval = previous != null && previous!.status != TransactionStatus.approved;
-          final isLiveInsert = previous == null &&
-              DateTime.now().difference(tx.timestamp) <= const Duration(minutes: 3);
-          if (isFreshApproval || isLiveInsert) {
-            ngmyDeliverTransactionAlerts(tx);
-          }
+          ngmyDeliverTransactionAlerts(tx);
         }
         if (userIdx >= 0 &&
             (_ngmyIsClockInSessionStartTransaction(tx) ||
@@ -18783,6 +18810,7 @@ class NgmyAdminWalletApprovedArchive {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   int _idx = 0; final _search = TextEditingController(); bool _isSearching = false; String _query = '';
+  String _adminUserListMode = 'login';
   String? _selectedUserEmail;
   String? _processingTxnId;
   Timer? _adminRefreshTimer;
@@ -21447,18 +21475,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ));
   }
 
-  List<UserData> _adminAppSignupUsers() =>
-      widget.allUsers.where(ngmyIsAppSignupUser).toList();
+  List<UserData> _adminUsersForCurrentMode() {
+    if (_adminUserListMode == 'civic') {
+      return _civicRegistryMembersForDisplay(widget.config, widget.allUsers);
+    }
+    return widget.allUsers.where(ngmyLooksLikeAppLoginUser).toList();
+  }
 
   Widget _adminUsers(bool isDark) {
     final q = _query.trim().toLowerCase();
-    final filtered = _adminAppSignupUsers()
+    final modeUsers = _adminUsersForCurrentMode();
+    final filtered = modeUsers
         .where((u) => _userMatchesQuery(u, q))
         .toList()
       ..sort((a, b) => a.username.toLowerCase().compareTo(b.username.toLowerCase()));
     if (_selectedUserEmail != null) {
       UserData? selected;
-      for (final x in _adminAppSignupUsers()) {
+      for (final x in modeUsers) {
         if (x.email.toLowerCase() == _selectedUserEmail!.toLowerCase()) {
           selected = x;
           break;
@@ -21468,12 +21501,45 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _selectedUserEmail = null;
     }
     final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
+    final subtitle = _adminUserListMode == 'civic'
+        ? 'Civic Registry (${filtered.length}) — balances from wallet ledger + cloud sync.'
+        : 'Login accounts (${filtered.length}) — balances from wallet ledger + cloud sync.';
     return Column(children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
-        child: Text(
-          'All NGMY accounts (${filtered.length} users) — balances from wallet ledger + cloud sync.',
-          style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text(
+                subtitle,
+                style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+              ),
+            ),
+            SizedBox(
+              height: 28,
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _adminUserListMode,
+                  isDense: true,
+                  iconSize: 16,
+                  style: TextStyle(fontSize: 10, color: isDark ? Colors.white70 : Colors.black87),
+                  dropdownColor: panelBg,
+                  items: const [
+                    DropdownMenuItem(value: 'login', child: Text('Login')),
+                    DropdownMenuItem(value: 'civic', child: Text('Civic Registry')),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() {
+                      _adminUserListMode = v;
+                      _selectedUserEmail = null;
+                    });
+                  },
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       Padding(
@@ -31002,7 +31068,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _enrollSection(bool isDark) {
     final availableAppUsers = widget.allUsers.where((u) =>
-      ngmyIsAppSignupUser(u) &&
+      ngmyLooksLikeAppLoginUser(u) &&
       !NgmyCivicRegistryMembers.isEnrolled(widget.config, u.email) &&
       (u.username.toLowerCase().contains(_enrollSearchC.text.toLowerCase()) ||
        u.email.toLowerCase().contains(_enrollSearchC.text.toLowerCase()))

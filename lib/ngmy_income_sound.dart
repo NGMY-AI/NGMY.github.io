@@ -37,10 +37,6 @@ class NgmyIncomeSound {
 
   static bool _webAudioUnlocked = false;
 
-  static DateTime? _lastPlayedAt;
-
-  static const _debounce = Duration(milliseconds: 900);
-
   static const _prefPlayedKeys = 'ngmy_income_sound_played_keys';
 
   static final Set<String> _playedDedupeKeys = {};
@@ -269,14 +265,6 @@ class NgmyIncomeSound {
       unawaited(_persistPlayedKeys());
 
     }
-
-
-
-    final now = DateTime.now();
-
-    if (!force && _lastPlayedAt != null && now.difference(_lastPlayedAt!) < _debounce) return;
-
-    _lastPlayedAt = now;
 
 
 
