@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_doc_share_gate_ui.dart';
+import 'ngmy_mechanic_studio.dart';
 import 'ngmy_outfit_studio.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_ai_client.dart';
@@ -89,6 +90,13 @@ class NgmyCreatorHubTab extends StatelessWidget {
         title: 'Video Studio',
         subtitle: 'Templates, clips & export',
         onTap: () => showNgmyVideoStudio(context),
+      ),
+      _CreatorTool(
+        icon: Icons.precision_manufacturing_rounded,
+        colors: const [Color(0xFFF97316), Color(0xFF0EA5E9)],
+        title: '3D Mechanic Lab',
+        subtitle: 'Disassemble cars & learn parts',
+        onTap: () => showNgmyMechanicStudio(context: context),
       ),
       _CreatorTool(
         icon: Icons.folder_shared_rounded,
