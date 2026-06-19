@@ -603,11 +603,11 @@ double ngmyResolveAccountBalance(String email, double storedBalance, List<AppTra
   if (key.isEmpty) return storedBalance.clamp(0.0, double.infinity);
   final txnCount = transactions.where((t) => ngmyNormalizeEmail(t.userEmail) == key).length;
   if (txnCount == 0) return storedBalance.clamp(0.0, double.infinity);
-  // Local txn cache may be truncated — keep cloud-stored balance when ledger would under-report.
-  if (storedBalance > ledger + 0.01) return storedBalance.clamp(0.0, double.infinity);
-  if (txnCount >= kNgmyUserTxnFetchMax && (storedBalance - ledger).abs() > 0.01) {
+  // Truncated local cache — cloud stored balance may include older txns not in memory.
+  if (txnCount >= kNgmyUserTxnFetchMax && storedBalance > ledger + 0.01) {
     return storedBalance.clamp(0.0, double.infinity);
   }
+  // Ledger is authoritative whenever we have the user's transactions (bets, payouts, deposits, etc.).
   return ledger;
 }
 
@@ -7433,6 +7433,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         _reconcileAllUserBalances();
       });
+      if (_currentUser != null) {
+        ngmySyncLiveBalanceFor(_currentUser!.email, _currentUser!.accountBalance);
+      }
       unawaited(_persistLocalOnly());
     } catch (e) {
       debugPrint('[user] transactions refresh: $e');
@@ -10352,6 +10355,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _reconcileAllUserBalances();
         if (_currentUser != null) {
           ngmySyncLiveBalanceFor(_currentUser!.email, _currentUser!.accountBalance);
+          final userIdx = _allUsers.indexWhere(
+            (u) => ngmyNormalizeEmail(u.email) == ngmyNormalizeEmail(_currentUser!.email),
+          );
+          if (userIdx >= 0 && (becameApproved || previous == null) && ngmyIsGameLedgerTransaction(tx)) {
+            unawaited(_pushUserToCloudFast(_allUsers[userIdx], includeFreeTrial: true));
+          }
         }
         if (tx.status == TransactionStatus.pending &&
             (tx.type == TransactionType.deposit || tx.type == TransactionType.withdrawal) &&
@@ -11412,9 +11421,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   });
                   unawaited(_pushTransactionToCloudReliable(t));
                   unawaited(_pushTransactionToCloudFast(t));
-                  if (syncedUser != null && !ngmyIsGameLedgerTransaction(t)) {
-                    unawaited(_pushUserToCloudFast(syncedUser!));
+                  if (syncedUser != null) {
                     _markUserDirty(syncedUser!.email);
+                    unawaited(_pushUserToCloudFast(syncedUser!, includeFreeTrial: true).then((ok) {
+                      if (ok) _dirtyUserEmails.remove(ngmyNormalizeEmail(syncedUser!.email));
+                    }));
                   }
                   _markTransactionDirty(t.id);
                   if (syncedUser != null) {
@@ -16329,7 +16340,8 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
           }
           unawaited(NgmyGameAccess.markFreePlayUsed(widget.user.email));
         }
-        if (widget.user.accountBalance < bet) return false;
+        final balance = ngmyLiveBalanceFor(widget.user.email, fallback: () => widget.user.accountBalance);
+        if (balance < bet) return false;
         widget.user.points += 20;
         widget.onGameStarted();
         widget.onAddTransaction(
@@ -16440,7 +16452,8 @@ class _GameBetScreenState extends State<GameBetScreen> with NgmyBalanceListener 
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Minimum bet is \$2.00')));
       return;
     }
-    if (widget.user.accountBalance < wager) {
+    final balance = ngmyLiveBalanceFor(widget.user.email, fallback: () => widget.user.accountBalance);
+    if (balance < wager) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Insufficient balance for this bet.')));
       return;
     }
