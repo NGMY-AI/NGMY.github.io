@@ -2321,7 +2321,7 @@ void _preserveRegistryEnrollmentFromLocal(UserData local, UserData remote) {
   if ((local.city ?? '').trim().isNotEmpty) remote.city = local.city;
   if ((local.room ?? '').trim().isNotEmpty) remote.room = local.room;
   if (local.state.trim().isNotEmpty) remote.state = local.state;
-  if (local.phone.trim().isNotEmpty) remote.phone = local.phone;
+  remote.phone = ngmyMergeAccountPhone(local: local.phone, remote: remote.phone);
   remote.helps = local.helps;
   remote.missed = local.missed;
 }
@@ -3177,6 +3177,23 @@ Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
         .timeout(kNgmyCloudWriteTimeout);
   } catch (e) {
     debugPrint('[txn] fast upsert: $e');
+  }
+}
+
+Future<bool> _pushUserPhoneToCloud(UserData u) async {
+  if (!await ngmyCanReachCloud()) return false;
+  final email = u.email.trim();
+  final phone = u.phone.trim();
+  if (email.isEmpty || !ngmyUserPhoneOnFile(phone)) return false;
+  try {
+    await Supabase.instance.client.from('users').upsert({
+      'email': email,
+      'phone': phone,
+    }).timeout(kNgmyCloudWriteTimeout);
+    return true;
+  } catch (e) {
+    debugPrint('[user] phone upsert: $e');
+    return false;
   }
 }
 
@@ -7412,9 +7429,27 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
     var index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
     if (index >= 0) {
-      _allUsers[index].passwordHash = passwordHash;
-      if (ngmyEmailIsAdmin(key)) _allUsers[index].isAdmin = true;
-      _currentUser = _allUsers[index];
+      final local = _allUsers[index];
+      local.passwordHash = passwordHash;
+      if (ngmyEmailIsAdmin(key)) local.isAdmin = true;
+      try {
+        final row = await ngmyFetchUserLoginRow(Supabase.instance.client, email);
+        if (row != null) {
+          final remote = UserData.fromJson(row);
+          remote.passwordHash = passwordHash;
+          if (ngmyEmailIsAdmin(key)) remote.isAdmin = true;
+          _preserveLocalSessionState(local, remote);
+          _mergeUserMediaProfileFields(local, remote);
+          ngmyReconcileUserAccountBalance(remote, _allTransactions);
+          _allUsers[index] = remote;
+          _currentUser = remote;
+        } else {
+          _currentUser = local;
+        }
+      } catch (e) {
+        debugPrint('[login] merge local user with cloud: $e');
+        _currentUser = local;
+      }
     } else {
       UserData user;
       try {
@@ -10649,6 +10684,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (local.savedBitcoinAddress.trim().isNotEmpty && remote.savedBitcoinAddress.trim().isEmpty) {
       remote.savedBitcoinAddress = local.savedBitcoinAddress;
     }
+    remote.phone = ngmyMergeAccountPhone(local: local.phone, remote: remote.phone);
     if (local.isApprovedWorker && !remote.isApprovedWorker) remote.isApprovedWorker = true;
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
     if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) {
@@ -14102,6 +14138,33 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
   }
 
+  Future<String?> _resolveUserPhoneFromCloud() async {
+    if (!await ngmyCanReachCloud()) return null;
+    final email = widget.user.email.trim();
+    if (email.isEmpty) return null;
+    try {
+      final row = await Supabase.instance.client
+          .from('users')
+          .select('phone')
+          .eq('email', email)
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      if (row == null) return null;
+      final phone = (row['phone'] ?? '').toString().trim();
+      if (!ngmyUserPhoneOnFile(phone)) return null;
+      final key = email.toLowerCase().trim();
+      widget.user.phone = phone;
+      final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+      if (idx >= 0) widget.allUsers[idx].phone = phone;
+      widget.onDataChanged();
+      if (mounted) setState(() {});
+      return phone;
+    } catch (e) {
+      debugPrint('[phone] resolve from cloud: $e');
+      return null;
+    }
+  }
+
   Future<bool> _saveUserPhone(String phone) async {
     final trimmed = phone.trim();
     if (!ngmyUserPhoneOnFile(trimmed)) return false;
@@ -14111,7 +14174,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     );
     if (taken) return false;
     widget.user.phone = trimmed;
+    final idx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == myEmail);
+    if (idx >= 0) widget.allUsers[idx].phone = trimmed;
+    _syncCivicMemberRecordFromUser(widget.config, widget.user);
     widget.onDataChanged();
+    await _pushUserPhoneToCloud(widget.user);
     await widget.onPushUserToCloud?.call(widget.user);
     if (mounted) setState(() {});
     return true;
@@ -14143,6 +14210,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
           phone: widget.user.phone,
           email: widget.user.email,
           onSavePhone: _saveUserPhone,
+          onResolvePhoneFromCloud: _resolveUserPhoneFromCloud,
           child: Scaffold(
         extendBody: true,
         backgroundColor: shellBg,
@@ -25487,8 +25555,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _editMe(BuildContext ctx) {
-    final e = TextEditingController(text: widget.user.email); final p = TextEditingController(text: widget.user.phone); final n = TextEditingController(text: widget.user.username);
-    showDialog(context: ctx, builder: (c) => AlertDialog(title: const Text('Edit Profile'), content: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: n, decoration: const InputDecoration(labelText: 'Username')), TextField(controller: e, decoration: const InputDecoration(labelText: 'Email')), TextField(controller: p, decoration: const InputDecoration(labelText: 'Phone'))]), actions: [TextButton(onPressed:()=>Navigator.pop(c), child:const Text('CANCEL')), ElevatedButton(onPressed: (){ widget.user.username = n.text; widget.user.email = e.text; widget.user.phone = p.text; widget.onDataChanged(); Navigator.pop(c); setState((){}); }, child: const Text('SAVE'))]));
+    final e = TextEditingController(text: widget.user.email);
+    final p = TextEditingController(text: widget.user.phone);
+    final n = TextEditingController(text: widget.user.username);
+    showDialog(
+      context: ctx,
+      builder: (c) => AlertDialog(
+        title: const Text('Edit Profile'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: n, decoration: const InputDecoration(labelText: 'Username')),
+            TextField(controller: e, decoration: const InputDecoration(labelText: 'Email')),
+            TextField(
+              controller: p,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Phone',
+                helperText: 'Required — synced across your devices',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () async {
+              final phone = p.text.trim();
+              if (!ngmyUserPhoneOnFile(phone)) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Phone number is required (at least 10 digits).')),
+                );
+                return;
+              }
+              final myEmail = widget.user.email.toLowerCase().trim();
+              final taken = widget.allUsers.any(
+                (u) => u.email.toLowerCase().trim() != myEmail && u.phone.trim() == phone,
+              );
+              if (taken) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('That phone number is already registered to another account.')),
+                );
+                return;
+              }
+              widget.user.username = n.text.trim();
+              widget.user.email = e.text.trim();
+              widget.user.phone = phone;
+              widget.onDataChanged();
+              Navigator.pop(c);
+              setState(() {});
+              await _pushUserPhoneToCloud(widget.user);
+              await widget.onPersistUserToCloud?.call(widget.user);
+            },
+            child: const Text('SAVE'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showLegal(BuildContext ctx, String title, String content) {
