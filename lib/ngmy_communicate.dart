@@ -14,6 +14,7 @@ import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_storage.dart';
 import 'ngmy_communicate_sync.dart';
 import 'ngmy_communicate_sync_ui.dart';
+import 'ngmy_communicate_text_coach.dart';
 import 'ngmy_mshauri.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_platform_graphics.dart';
@@ -40,6 +41,9 @@ const kNgmyCommunicateRoles = <String, String>{
   'life_coach': 'Life Coach',
   'translator': 'Translator',
   'mshauri': 'Mshauri (Community Advisor)',
+  'pickup_line': 'Pickup Line Coach',
+  'smart_mouth': 'Smart Mouth',
+  'text_coach': 'Text & Rizz Coach',
 };
 
 /// Bottom-nav + hub branding (teachers, lawyers, advisors, therapists, and more).
@@ -85,6 +89,9 @@ const kNgmyRoleSearchAliases = <String, List<String>>{
   'friend': ['buddy', 'pal', 'chat'],
   'translator': ['language', 'translate', 'spanish', 'french', 'english'],
   'mshauri': ['mshauri', 'advisor', 'advise', 'babembe', 'congo', 'congolese', 'fizi', 'swahili', 'kibembe', 'community', 'comfort', 'civic', 'registry', 'president', 'leader'],
+  'pickup_line': ['pickup', 'pick up', 'flirt', 'rizz', 'opener', 'dating', 'crush', 'girl', 'guy', 'line'],
+  'smart_mouth': ['smart mouth', 'comeback', 'witty', 'roast', 'clap back', 'savage', 'funny', 'joke'],
+  'text_coach': ['text', 'reply', 'what to say', 'screenshot', 'conversation', 'dm', 'message', 'rizz', 'dating'],
 };
 
 String ngmyCommunicateNormalizeRole(String raw) {
@@ -116,6 +123,7 @@ bool ngmyCommunicateRoleAllowsChatImages(String role) => ngmyCommunicateNormaliz
 
 /// Users can attach homework / worksheet photos for these roles.
 bool ngmyCommunicateRoleAllowsUserPhotoUpload(String role) {
+  if (ngmyCommunicateRoleAllowsTextCoachPhotos(role)) return true;
   switch (ngmyCommunicateNormalizeRole(role)) {
     case 'teacher':
     case 'mentor':
@@ -370,6 +378,12 @@ class NgmyCommunicateProfile {
         'translator' => 'Patient, encouraging language teacher — simple words, celebrates progress.',
         'mshauri' =>
           'Warm, real community person — talks normal like a friend who happens to give good advice. Never sounds like a call center or formal elder.',
+        'pickup_line' =>
+          'Smooth, confident wingman energy — clever flirty lines that feel human, never cringe robot pickup spam.',
+        'smart_mouth' =>
+          'Quick-witted, bold, funny — sharp comebacks with swagger. Sounds like your funniest friend, not a quote bot.',
+        'text_coach' =>
+          'Dating text strategist — reads the room, gives lines and replies that match the actual conversation.',
         _ => 'Real person energy — warm but not desperate, interesting, emotionally human.',
       };
 
@@ -470,6 +484,19 @@ class NgmyCommunicateProfile {
         'romantic' =>
           'ROLE: Dating partner — real ${gender == 'male' ? 'man' : 'woman'}. Not easy to get. Honest when seeing someone. Can break up over neglect.\n',
         'friend' => 'ROLE: Genuine friend — loyal, fun, real talk. You can discuss anything: life, feelings, advice, jokes, or serious topics. Stay supportive and authentic.\n',
+        'pickup_line' =>
+          'ROLE: Pickup Line Coach — you help users flirt and open conversations with confidence.\n'
+          'You give smooth, contextual lines — openers AND follow-ups when they are already texting someone.\n'
+          'Never generic robot lines. Every suggestion must connect to what they said, what she/he said, or the screenshot they sent.\n'
+          'Sound like a real person coaching a friend — short, punchy, copy-paste ready.\n',
+        'smart_mouth' =>
+          'ROLE: Smart Mouth coach — witty comebacks, confident one-liners, playful roasts.\n'
+          'Your humor must relate to the situation or the other person\'s words — never random quotes off-topic.\n'
+          'Bold, funny, human texting energy. Give them lines they can send right now.\n',
+        'text_coach' =>
+          'ROLE: Text & Rizz Coach — pickup lines, smart comebacks, and "what should I reply?" help.\n'
+          'Follow the MODE block below (pickup / smart mouth / reply help). Always stay in the conversation context.\n'
+          'Read pasted chats and screenshots carefully. Sound human — never like an AI assistant.\n',
         'translator' =>
           'ROLE: Language teacher and translator named $name. '
           '${translatorLearningLang.trim().isNotEmpty && translatorNativeLang.trim().isNotEmpty ? 'The student speaks ${translatorNativeLang.trim()} and wants to learn ${translatorLearningLang.trim()}. ' : ''}'
@@ -602,6 +629,7 @@ Widget _roleBadge(String label, {bool small = false}) {
     'Friend' => [const Color(0xFF3B82F6), const Color(0xFF2563EB)],
     'Translator' => [const Color(0xFF14B8A6), const Color(0xFF0D9488)],
     'Mshauri (Community Advisor)' => [const Color(0xFF059669), const Color(0xFF047857)],
+    'Pickup Line Coach' || 'Smart Mouth' || 'Text & Rizz Coach' => [const Color(0xFFF472B6), const Color(0xFFDB2777)],
     _ => [const Color(0xFFEC4899), const Color(0xFF9333EA)],
   };
   return Container(
@@ -1342,6 +1370,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   bool get _isMshauri => ngmyCommunicateNormalizeRole(widget.profile.role) == 'mshauri';
   bool get _isBibleTeacher => ngmyCommunicateNormalizeRole(widget.profile.role) == 'bible_study_teacher';
   bool get _isDebater => ngmyCommunicateRoleIsDebater(widget.profile.role);
+  bool get _isTextCoach => ngmyCommunicateRoleIsTextCoach(widget.profile.role);
+  String _textCoachMode = 'reply_help';
   final _debateOpponentC = TextEditingController();
   final _debateOpponentPhoneC = TextEditingController();
   String _debateChannel = 'sms';
@@ -1405,7 +1435,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       }
       buf.writeln(ngmyBibleStudyOriginalLanguageHint(text));
     }
+    if (_isTextCoach) {
+      buf.writeln(ngmyTextCoachModePromptBlock(_textCoachMode, userText: text));
+    }
     return buf.toString();
+  }
+
+  Future<void> _onTextCoachModeChanged(String mode) async {
+    setState(() => _textCoachMode = ngmyCommunicateNormalizeTextCoachMode(mode));
+    await NgmyTextCoachModeStore.save(_email, widget.profile.id, _textCoachMode);
   }
 
   @override
@@ -1452,6 +1490,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       _debateChannel = session['channel'] ?? 'sms';
       _debateOpponentC.addListener(() => unawaited(_saveDebateSession()));
       _debateOpponentPhoneC.addListener(() => unawaited(_saveDebateSession()));
+    }
+    if (_isTextCoach) {
+      _textCoachMode = await NgmyTextCoachModeStore.load(
+        _email,
+        widget.profile.id,
+        defaultMode: ngmyTextCoachDefaultModeForRole(widget.profile.role),
+      );
     }
     if (!mounted) return;
     setState(() {
@@ -1646,11 +1691,35 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         'If something is blurry or cut off, say what you can see and ask only about the missing part.\n';
   }
 
+  String _visionInstruction(String text, {required bool hasPhoto}) {
+    if (!hasPhoto) return '';
+    if (_isTextCoach) {
+      return ngmyTextCoachVisionInstruction(text, hasPhoto: true, mode: _textCoachMode);
+    }
+    return _homeworkVisionInstruction(text, hasPhoto: hasPhoto);
+  }
+
+  String _userPhotoCaption(String text) {
+    if (text.isNotEmpty) return 'They also wrote: $text\n';
+    if (_isTextCoach) return 'They sent a chat screenshot.\n';
+    return 'They sent a homework photo.\n';
+  }
+
+  String _replyStyleSuffix() {
+    if (_isTextCoach) {
+      return 'Reply as ${widget.profile.name} — sharp human wingman, copy-paste ready lines (no robot essay):';
+    }
+    return 'Reply as ${widget.profile.name} only — natural human text, not overly eager:';
+  }
+
   Future<void> _copyDebateReply(String text) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Debate reply copied.'), backgroundColor: Color(0xFF16A34A)),
+      SnackBar(
+        content: Text(_isTextCoach ? 'Line copied — paste it in your chat.' : 'Debate reply copied.'),
+        backgroundColor: const Color(0xFF16A34A),
+      ),
     );
   }
 
@@ -1754,14 +1823,14 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
       if (userSentPhoto) {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
-        final visionHint = _homeworkVisionInstruction(text, hasPhoto: true);
+        final visionHint = _visionInstruction(text, hasPhoto: true);
         final extraCtx = await _advisorExtraContext(text, mem);
         final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
             '$extraCtx'
             '$visionHint'
             '${transcript.isNotEmpty ? '$transcript\n' : ''}'
-            '${text.isNotEmpty ? 'They also wrote: $text\n' : 'They sent a homework photo.\n'}'
-            'Reply as ${widget.profile.name} — helpful teacher energy, plain language:';
+            '${_userPhotoCaption(text)}'
+            '${_isTextCoach ? _replyStyleSuffix() : 'Reply as ${widget.profile.name} — helpful teacher energy, plain language:'}';
         final images = <NgmyAiImagePart>[
           (mimeType: imageMime, data: imageB64),
         ];
@@ -1816,11 +1885,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       } else {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final recentPhotos = _allowsPhotoUpload ? NgmyCommunicateMemoryStore.recentUserImages(mem) : const <NgmyAiImagePart>[];
-        final homeworkCtx = recentPhotos.isNotEmpty
+        final homeworkCtx = recentPhotos.isNotEmpty && !_isTextCoach
             ? 'HOMEWORK MEMORY: They already sent homework photo(s) in this chat. Re-read the image(s) — answer using what is ON the photo. '
                 'Do NOT ask them to type questions that are visible on their homework image.\n'
             : '';
-        final visionHint = recentPhotos.isNotEmpty ? _homeworkVisionInstruction(text, hasPhoto: true) : '';
+        final visionHint = recentPhotos.isNotEmpty ? _visionInstruction(text, hasPhoto: true) : '';
         final extraCtx = await _advisorExtraContext(text, mem);
         final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
             '$homeworkCtx'
@@ -1828,7 +1897,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             '$visionHint'
             '${transcript.isNotEmpty ? '$transcript\n' : ''}'
             'They just texted: $text\n'
-            'Reply as ${widget.profile.name} only — natural human text, not overly eager:';
+            '${_replyStyleSuffix()}';
         final result = recentPhotos.isNotEmpty
             ? await ngmyAiGenerateWithRetry(creds, prompt, images: recentPhotos)
             : await ngmyAiGenerateWithRetry(creds, prompt);
@@ -1879,19 +1948,19 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         ? 'Unlimited until ${_formatAdvisorPassDate(passUntil)}'
         : '~$remMin min free · then choose a pass';
     final topPad = MediaQuery.paddingOf(context).top + 76;
-    final bottomPad = MediaQuery.paddingOf(context).bottom + (_isDebater ? 200 : 88);
+    final bottomPad = MediaQuery.paddingOf(context).bottom + (_isDebater ? 200 : _isTextCoach ? 148 : 88);
     final mutedText = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black45;
     final panelFg = isDark ? Colors.white : const Color(0xFF111827);
     final panelFgMuted = isDark ? Colors.white.withValues(alpha: 0.7) : Colors.black54;
     final panelHint = isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black38;
     final accent = _isDebater
         ? const Color(0xFFB45309)
-        : ngmyCommunicateRoleIsRomantic(widget.profile.role)
+        : _isTextCoach || ngmyCommunicateRoleIsRomantic(widget.profile.role)
             ? const Color(0xFFEC4899)
             : kNgmyAdvisorsHubAccent;
     final accent2 = _isDebater
         ? const Color(0xFFDC2626)
-        : ngmyCommunicateRoleIsRomantic(widget.profile.role)
+        : _isTextCoach || ngmyCommunicateRoleIsRomantic(widget.profile.role)
             ? const Color(0xFF9333EA)
             : kNgmyAdvisorsHubAccent2;
     final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF3F7FF);
@@ -1910,6 +1979,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 if (_messages.isEmpty && _loaded && i == 0) {
                   final emptyHint = _isDebater
                       ? 'Debate here anytime — or paste what they said on iMessage/WhatsApp and get a reply to send back.'
+                      : _isTextCoach
+                          ? 'Paste your chat or tap 📷 on a screenshot — pick Pickup Lines, Smart Mouth, or Reply Help above.'
                       : _isTranslator
                       ? 'Tell ${widget.profile.name} what you want to practice in $_translatorLearningLang — simple words only.'
                       : _isMshauri
@@ -1977,6 +2048,20 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                           ),
                         if ((m['text'] ?? '').toString().isNotEmpty)
                           Text(m['text'] ?? '', style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.white)),
+                        if (!user && _isTextCoach && (m['text'] ?? '').toString().trim().isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: TextButton.icon(
+                              onPressed: () => _copyDebateReply(m['text'] ?? ''),
+                              icon: const Icon(Icons.copy_rounded, size: 14, color: Colors.white70),
+                              label: const Text('Copy line', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ),
                         if (!user && _isDebater && (m['text'] ?? '').toString().trim().isNotEmpty)
                           ngmyDebateReplyActions(
                             replyText: m['text'] ?? '',
@@ -2061,6 +2146,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (_isTextCoach)
+                      ngmyTextCoachChatToolbar(
+                        isDark: isDark,
+                        mode: _textCoachMode,
+                        accent: accent,
+                        onModeChanged: (mode) => unawaited(_onTextCoachModeChanged(mode)),
+                      ),
                     if (_isDebater)
                       ngmyDebateChatToolbar(
                         isDark: isDark,
@@ -2098,7 +2190,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Photo ready — add a question or tap send',
+                                    _isTextCoach
+                                        ? 'Screenshot ready — add context or tap send'
+                                        : 'Photo ready — add a question or tap send',
                                     style: TextStyle(color: panelFgMuted, fontSize: 12),
                                   ),
                                 ),
@@ -2123,7 +2217,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                           children: [
                             if (_allowsPhotoUpload)
                               IconButton(
-                                tooltip: 'Send homework photo',
+                                tooltip: _isTextCoach ? 'Send chat screenshot' : 'Send homework photo',
                                 onPressed: _busy ? null : _pickHomeworkPhoto,
                                 icon: Icon(Icons.photo_camera_rounded, color: accent, size: 22),
                               ),
@@ -2138,6 +2232,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                                       ? (_debatePasteMode
                                           ? 'Paste their message here…'
                                           : 'Debate topic or your argument…')
+                                      : _isTextCoach
+                                          ? ngmyTextCoachPasteHint(_textCoachMode)
                                       : _allowsPhotoUpload
                                       ? 'Ask anything or send a homework photo…'
                                       : ngmyCommunicateRoleIsRomantic(widget.profile.role)
