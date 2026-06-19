@@ -37,7 +37,7 @@ class NgmySupabaseColumns {
 
   /// Media feed read — matches live Supabase (extras in `data` jsonb).
   static const mediaFeedCore =
-      'id,userEmail,videoUrl,url,contentType,type,description,created_at,likedBy,savedBy,data';
+      'id,userEmail,videoUrl,url,contentType,type,description,created_at,likes,likedBy,savedBy,comments,data';
 
   /// Full media row when all optional columns exist (see media_optional_columns.sql).
   static const mediaFeed =

@@ -3797,58 +3797,7 @@ Future<void> _pushUserFreeTrialToCloud(UserData u) async {
 Future<bool> _upsertMediaSocialFields(MediaPost post) async {
   if (!await ngmyCanReachCloud()) return false;
   if (post.id.isEmpty) return false;
-  final comments = post.comments.map((e) => Map<String, dynamic>.from(e)).toList();
-  final likedBy = List<String>.from(post.likedBy);
-  final savedBy = List<String>.from(post.savedBy);
-  final patch = <String, dynamic>{
-    'comments': comments,
-    'likedBy': likedBy,
-    'savedBy': savedBy,
-    'likes': likedBy.length,
-  };
-  final client = Supabase.instance.client;
-  try {
-    final updated = await client
-        .from('media')
-        .update(patch)
-        .eq('id', post.id)
-        .select('id, comments, likedBy, likes')
-        .maybeSingle()
-        .timeout(kNgmyCloudWriteTimeout);
-    if (updated != null) return true;
-  } catch (e) {
-    debugPrint('[media] patch update: $e');
-  }
-  try {
-    await client.from('media').upsert({
-      'id': post.id,
-      ...patch,
-    }).timeout(kNgmyCloudWriteTimeout);
-    final verify = await client.from('media').select('comments').eq('id', post.id).maybeSingle().timeout(kNgmyCloudWriteTimeout);
-    if (verify != null) {
-      final remoteCount = _jsonMapList(verify['comments']).length;
-      if (remoteCount >= comments.length) return true;
-      debugPrint('[media] social verify: expected ${comments.length} comments, cloud has $remoteCount');
-    }
-    return true;
-  } catch (e) {
-    debugPrint('[media] social upsert: $e');
-  }
-  final row = <String, dynamic>{
-    'id': post.id,
-    'userEmail': post.userEmail,
-    'username': post.username,
-    'videoUrl': post.videoUrl,
-    'url': post.videoUrl,
-    'contentType': post.contentType,
-    'type': post.contentType,
-    'caption': post.caption,
-    'timestamp': post.timestamp.toUtc().toIso8601String(),
-    'comments': comments,
-    'likedBy': likedBy,
-    'savedBy': savedBy,
-    'likes': likedBy.length,
-  };
+  final row = ngmyMediaRowForCloud(Map<String, dynamic>.from(post.toJson()));
   return _upsertMediaRowSafe(row);
 }
 
@@ -21427,7 +21376,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Text('Media Hub Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isDark ? Colors.white : Colors.black)),
           const SizedBox(height: 8),
           Text(
-            'Job Marketplace media feed — admin posts only. Sync uses polling (no realtime) to save Supabase quota.',
+            'NGMY Media feed — admin posts only. Sync uses polling (no realtime) to save Supabase quota.',
             style: TextStyle(fontSize: 12, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
           ),
           const SizedBox(height: 20),
@@ -26609,10 +26558,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       ? [const Color(0xFFC2185B), const Color(0xFF7B1FA2)]
       : [const Color(0xFFF06292), const Color(0xFFBA68C8)];
 
-    final mediaColors = isDark
-      ? [const Color(0xFF5B21B6), const Color(0xFF7C3AED)]
-      : [const Color(0xFF8B5CF6), const Color(0xFF6366F1)];
-
     final helpColors = isDark
       ? [const Color(0xFF880E4F), const Color(0xFF4A148C)]
       : [const Color(0xFFF06292), const Color(0xFF9C27B0)];
@@ -26672,21 +26617,28 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       routeName: 'NgmyStoreScreen',
                     ),
                   ),
-                  _hubBox('Media', Icons.perm_media_rounded, mediaColors, () => NgmyNavigator.push(context, JobMarketplaceScreen(
-                    user: widget.user,
-                    allUsers: widget.allUsers,
-                    allMedia: widget.allMedia,
-                    config: widget.config,
-                    onDataChanged: widget.onDataChanged,
-                    onAddTransaction: widget.onAddTransaction,
-                    onPost: widget.onPostMedia,
-                    onRefreshFromCloud: widget.onRefreshMediaFromCloud,
-                    onDeleteMedia: widget.onDeleteMedia,
-                    onPruneMedia: widget.onPruneMedia,
-                    onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
-                    onSyncMediaPost: widget.onSyncMediaPost,
-                    onSyncUserMedia: widget.onSyncUserMedia,
-                  ), routeName: 'MediaScreen')),
+                  _ngmyMediaHubBox(
+                    isDark: isDark,
+                    onTap: () => NgmyNavigator.push(
+                      context,
+                      JobMarketplaceScreen(
+                        user: widget.user,
+                        allUsers: widget.allUsers,
+                        allMedia: widget.allMedia,
+                        config: widget.config,
+                        onDataChanged: widget.onDataChanged,
+                        onAddTransaction: widget.onAddTransaction,
+                        onPost: widget.onPostMedia,
+                        onRefreshFromCloud: widget.onRefreshMediaFromCloud,
+                        onDeleteMedia: widget.onDeleteMedia,
+                        onPruneMedia: widget.onPruneMedia,
+                        onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
+                        onSyncMediaPost: widget.onSyncMediaPost,
+                        onSyncUserMedia: widget.onSyncUserMedia,
+                      ),
+                      routeName: 'MediaScreen',
+                    ),
+                  ),
                   _hubBox(
                     'Help Center',
                     Icons.support_agent_rounded,
@@ -27984,6 +27936,166 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
           curve: Curves.easeOutCubic,
           scale: scale,
           child: starCore,
+        ),
+      ),
+    );
+  }
+
+  Widget _ngmyMediaHubBox({required bool isDark, required VoidCallback onTap}) {
+    const ngmyGreen = Color(0xFF34D399);
+    const ngmyGreenDeep = Color(0xFF059669);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? [const Color(0xFF0F172A), const Color(0xFF312E81), const Color(0xFF0E7490)]
+                  : [const Color(0xFF4338CA), const Color(0xFF6366F1), const Color(0xFF0891B2)],
+              stops: const [0, 0.52, 1],
+            ),
+            border: Border.all(color: Colors.white.withOpacity(isDark ? 0.14 : 0.26), width: 1.1),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF6366F1).withOpacity(isDark ? 0.32 : 0.38),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: ngmyGreen.withOpacity(0.12),
+                blurRadius: 20,
+                spreadRadius: -4,
+              ),
+            ],
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                top: 7,
+                left: 10,
+                right: 10,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: List.generate(
+                    7,
+                    (i) => Container(
+                      width: 3.5,
+                      height: 3.5,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.22),
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: -6,
+                bottom: -6,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [ngmyGreen.withOpacity(0.28), ngmyGreen.withOpacity(0)],
+                    ),
+                  ),
+                ),
+              ),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          Colors.white.withOpacity(isDark ? 0.22 : 0.32),
+                          Colors.white.withOpacity(0.06),
+                        ],
+                      ),
+                      border: Border.all(color: Colors.white.withOpacity(0.38), width: 1.4),
+                      boxShadow: [
+                        BoxShadow(color: ngmyGreen.withOpacity(0.35), blurRadius: 10, spreadRadius: -2),
+                      ],
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(Icons.movie_creation_rounded, size: 17, color: Colors.white.withOpacity(0.92)),
+                        Positioned(
+                          right: 11,
+                          bottom: 11,
+                          child: Container(
+                            width: 18,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [ngmyGreen, ngmyGreenDeep],
+                              ),
+                              border: Border.all(color: Colors.white.withOpacity(0.85), width: 1.2),
+                              boxShadow: [
+                                BoxShadow(color: ngmyGreen.withOpacity(0.45), blurRadius: 6),
+                              ],
+                            ),
+                            child: const Icon(Icons.play_arrow_rounded, size: 12, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: ngmyGreen.withOpacity(0.22),
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(color: ngmyGreen.withOpacity(0.55)),
+                        ),
+                        child: const Text(
+                          'NGMY',
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.9,
+                            color: ngmyGreen,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Media',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          letterSpacing: 0.3,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -39148,7 +39260,7 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
       await _cleanupExpiredPosts();
       await _silentRefreshFeed();
     });
-    _mediaSyncTimer = Timer.periodic(const Duration(minutes: 2), (_) => _silentRefreshFeed());
+    _mediaSyncTimer = Timer.periodic(const Duration(seconds: 30), (_) => _silentRefreshFeed());
   }
 
   String _feedSignature() {
@@ -39159,7 +39271,9 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
         ..write(':')
         ..write(_mediaCommentCount(m.comments))
         ..write(':')
-        ..write(m.likedBy.length)
+        ..write(m.likedBy.join(','))
+        ..write(':')
+        ..write(m.savedBy.contains(widget.user.email) ? '1' : '0')
         ..write('|');
     }
     return buf.toString();
@@ -39171,9 +39285,37 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
     await widget.onRefreshFromCloud?.call();
     if (!mounted || _isPosting) return;
     final sig = _feedSignature();
-    if (sig == _lastFeedSig) return;
+    final changed = sig != _lastFeedSig;
     _lastFeedSig = sig;
-    setState(() {});
+    if (changed && mounted) setState(() {});
+  }
+
+  List<MediaPost> _savedPostsForUser() {
+    final email = widget.user.email.toLowerCase().trim();
+    return widget.allMedia
+        .where((m) => !_isExpired(m) && m.savedBy.any((e) => e.toLowerCase().trim() == email))
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  }
+
+  void _openSavedMedia() {
+    final saved = _savedPostsForUser();
+    NgmyNavigator.push(
+      context,
+      _NgmySavedMediaScreen(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        savedPosts: saved,
+        onDataChanged: widget.onDataChanged,
+        onSyncMediaPost: widget.onSyncMediaPost,
+        onDeleteMedia: widget.onDeleteMedia,
+        onPruneMedia: widget.onPruneMedia,
+        onOpenProfile: _openMediaProfile,
+        onPayoutWatchReward: _payoutWatchReward,
+        onRemoveBrokenPost: _removeBrokenPost,
+      ),
+      routeName: 'SavedMedia',
+    );
   }
 
   Future<void> _removeBrokenPost(MediaPost post) async {
@@ -39889,6 +40031,7 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
   }
 
   void _openInlineMediaSearch() {
+    if (!widget.user.isAdmin) return;
     setState(() => _mediaSearchOpen = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _mediaSearchFocus.requestFocus();
@@ -40095,6 +40238,7 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
   }
 
   Widget _buildMediaEmptyState(bool isDark) {
+    const ngmyGreen = Color(0xFF34D399);
     final muted = isDark ? Colors.white54 : const Color(0xFF64748B);
     final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
     return Center(
@@ -40104,33 +40248,64 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 88,
-              height: 88,
+              width: 92,
+              height: 92,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: isDark
-                      ? [const Color(0xFF5B21B6).withOpacity(0.35), const Color(0xFF7C3AED).withOpacity(0.2)]
-                      : [const Color(0xFFEDE9FE), const Color(0xFFDDD6FE)],
+                      ? [const Color(0xFF312E81).withOpacity(0.55), const Color(0xFF0E7490).withOpacity(0.35)]
+                      : [const Color(0xFF6366F1), const Color(0xFF0891B2)],
                 ),
+                border: Border.all(color: Colors.white.withOpacity(isDark ? 0.16 : 0.35)),
+                boxShadow: [
+                  BoxShadow(color: ngmyGreen.withOpacity(0.2), blurRadius: 16, spreadRadius: -2),
+                ],
               ),
-              child: Icon(
-                Icons.play_circle_outline_rounded,
-                size: 42,
-                color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(Icons.movie_creation_rounded, size: 30, color: Colors.white.withOpacity(0.9)),
+                  Positioned(
+                    right: 18,
+                    bottom: 18,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [ngmyGreen, Color(0xFF059669)],
+                        ),
+                        border: Border.all(color: Colors.white.withOpacity(0.85)),
+                      ),
+                      child: const Icon(Icons.play_arrow_rounded, size: 15, color: Colors.white),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 22),
+            RichText(
+              text: TextSpan(
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.2,
+                  color: titleColor,
+                ),
+                children: const [
+                  TextSpan(text: 'NGMY ', style: TextStyle(color: ngmyGreen)),
+                  TextSpan(text: 'Media'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
             Text(
               'Nothing here yet',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
-                color: titleColor,
-              ),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: muted),
             ),
             const SizedBox(height: 8),
             Text(
@@ -40155,6 +40330,8 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
       widget.allMedia,
       extraFilter: (m) => !_isExpired(m),
     )..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final savedPosts = _savedPostsForUser();
+    final hasSavedPosts = savedPosts.isNotEmpty;
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF080B16) : const Color(0xFFF3F7FF),
       body: Stack(
@@ -40248,7 +40425,7 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
                                 opacity: animation,
                                 child: SizeTransition(sizeFactor: animation, axisAlignment: -1, child: child),
                               ),
-                              child: _mediaSearchOpen
+                              child: _mediaSearchOpen && widget.user.isAdmin
                                   ? Padding(
                                       key: const ValueKey('media_search_field'),
                                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -40280,19 +40457,31 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
                                     )
                                   : Center(
                                       key: const ValueKey('media_hub_title'),
-                                      child: Text(
-                                        'MEDIA',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 22,
-                                          letterSpacing: 1.4,
-                                          color: isDark ? Colors.white : Colors.black87,
+                                      child: RichText(
+                                        text: TextSpan(
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 22,
+                                            letterSpacing: 1.2,
+                                            color: isDark ? Colors.white : Colors.black87,
+                                          ),
+                                          children: const [
+                                            TextSpan(
+                                              text: 'NGMY ',
+                                              style: TextStyle(
+                                                fontSize: 18,
+                                                letterSpacing: 1.0,
+                                                color: Color(0xFF34D399),
+                                              ),
+                                            ),
+                                            TextSpan(text: 'MEDIA'),
+                                          ],
                                         ),
                                       ),
                                     ),
                             ),
                           ),
-                          if (_mediaSearchOpen)
+                          if (widget.user.isAdmin && _mediaSearchOpen)
                             Padding(
                               padding: const EdgeInsets.only(right: 4),
                               child: _mediaHubHeaderIcon(
@@ -40301,7 +40490,7 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
                                 onTap: _closeInlineMediaSearch,
                               ),
                             )
-                          else
+                          else if (widget.user.isAdmin)
                             Padding(
                               padding: const EdgeInsets.only(right: 4),
                               child: _mediaHubHeaderIcon(
@@ -40314,8 +40503,9 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
                             padding: const EdgeInsets.only(right: 6),
                             child: _mediaHubHeaderIcon(
                               isDark: isDark,
-                              icon: Icons.person_rounded,
-                              onTap: () => _openMediaProfile(widget.user.email),
+                              icon: hasSavedPosts ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
+                              iconColor: hasSavedPosts ? const Color(0xFF34D399) : null,
+                              onTap: _openSavedMedia,
                             ),
                           ),
                         ],
@@ -40325,7 +40515,7 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
                 ),
               ),
             ),
-          if (_mediaSearchOpen)
+          if (widget.user.isAdmin && _mediaSearchOpen)
             Positioned(
               top: searchPanelTop,
               left: 15,
@@ -40339,6 +40529,97 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
 }
 
 
+
+class _NgmySavedMediaScreen extends StatelessWidget {
+  const _NgmySavedMediaScreen({
+    required this.user,
+    required this.allUsers,
+    required this.savedPosts,
+    required this.onDataChanged,
+    this.onSyncMediaPost,
+    this.onDeleteMedia,
+    this.onPruneMedia,
+    this.onOpenProfile,
+    this.onPayoutWatchReward,
+    this.onRemoveBrokenPost,
+  });
+
+  final UserData user;
+  final List<UserData> allUsers;
+  final List<MediaPost> savedPosts;
+  final VoidCallback onDataChanged;
+  final Future<bool> Function(MediaPost post)? onSyncMediaPost;
+  final Future<void> Function(MediaPost)? onDeleteMedia;
+  final Future<void> Function(MediaPost)? onPruneMedia;
+  final void Function(String userEmail)? onOpenProfile;
+  final Future<bool> Function(MediaPost post)? onPayoutWatchReward;
+  final Future<void> Function(MediaPost post)? onRemoveBrokenPost;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF080B16) : const Color(0xFFF3F7FF),
+      appBar: AppBar(
+        backgroundColor: isDark ? const Color(0xFF111731) : Colors.white,
+        foregroundColor: isDark ? Colors.white : Colors.black87,
+        elevation: 0,
+        title: const Text('Saved', style: TextStyle(fontWeight: FontWeight.w800)),
+      ),
+      body: savedPosts.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.bookmark_outline_rounded, size: 56, color: isDark ? Colors.white38 : Colors.black26),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No saved posts yet',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tap the bookmark on any post to save it here.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, height: 1.45, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 120),
+              itemCount: savedPosts.length,
+              itemBuilder: (context, index) => VideoPostWidget(
+                key: ValueKey('saved_${savedPosts[index].id}'),
+                post: savedPosts[index],
+                currentUser: user,
+                allUsers: allUsers,
+                onChanged: onDataChanged,
+                onSyncPost: onSyncMediaPost,
+                onDelete: () async {
+                  final post = savedPosts[index];
+                  if (onDeleteMedia != null) {
+                    await onDeleteMedia!(post);
+                  } else {
+                    await onPruneMedia?.call(post);
+                  }
+                  onDataChanged();
+                },
+                onMissingStorage: onRemoveBrokenPost,
+                onOpenProfile: onOpenProfile,
+                onPayoutWatchReward: onPayoutWatchReward,
+              ),
+            ),
+    );
+  }
+}
 
 class JobMarketplaceScreen extends StatelessWidget {
   final UserData user;
