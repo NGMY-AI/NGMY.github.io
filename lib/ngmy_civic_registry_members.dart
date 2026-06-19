@@ -66,6 +66,7 @@ class NgmyCivicRegistryMembers {
       next['passportGranted'] = next['passportGranted'] ?? keep['passportGranted'] ?? false;
       next['linkedAppEmail'] = (next['linkedAppEmail'] ?? keep['linkedAppEmail'] ?? '').toString();
       next['passportGrantedAt'] = keep['passportGrantedAt'] ?? next['passportGrantedAt'];
+      next['idPhotoPath'] = (next['idPhotoPath'] ?? keep['idPhotoPath'] ?? '').toString();
       members[idx] = next;
     } else {
       members.add(next);

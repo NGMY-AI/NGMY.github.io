@@ -114,6 +114,8 @@ import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_civic_self_enrollment.dart';
 import 'ngmy_civic_registry_members.dart';
+import 'ngmy_civic_registry_id_card.dart';
+import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_enroll_link.dart';
 import 'ngmy_referral_link.dart';
 import 'ngmy_referral.dart';
@@ -27202,6 +27204,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       if (widget.openSelfEnrollmentOnStart && _selfEnrollmentEnabled) {
         _showSelfEnrollmentSheet();
       }
+      unawaited(_maybePromptCivicIdPhoto());
     });
     unawaited(_refreshCivicHelpModeAndContributions());
     _helpModePoll = Timer.periodic(const Duration(seconds: 75), (_) {
@@ -28145,6 +28148,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         backgroundColor: saved ? Colors.green : Colors.orange,
       ),
     );
+    if (targetUser != null) {
+      unawaited(showNgmyCivicIdPhotoSheet(
+        context,
+        config: widget.config,
+        email: email,
+        onSaved: _persistCivicIdPhotoChange,
+      ));
+    }
   }
 
   Future<bool> _persistRegistryMember(UserData member) async {
@@ -29302,10 +29313,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('Full Member Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-                      ElevatedButton.icon(
-                        onPressed: () => _copyMemberReport(u),
-                        icon: const Icon(Icons.print_outlined, size: 16),
-                        label: const Text('Print Full Report'),
+                      IconButton(
+                        tooltip: 'Print full report',
+                        onPressed: () => _copyMemberReport(u, contributions: contributions, claims: claims, contributionTotal: contributionTotal, openClaims: openClaims.length),
+                        icon: const Icon(Icons.print_outlined),
+                        style: IconButton.styleFrom(
+                          backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                          foregroundColor: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                        ),
                       ),
                     ],
                   ),
@@ -29460,6 +29475,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ),
                     ),
                   const SizedBox(height: 20),
+                  if ((u.registryId ?? '').trim().isNotEmpty) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+                          if (raw != null) {
+                            _showCivicIdCardForRecord(raw);
+                          }
+                        },
+                        icon: const Icon(Icons.badge_outlined),
+                        label: const Text('View Registry ID / Passport'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   if (_canManageCivicRegistry()) _passportAdminPanel(u, isDark),
                   Row(
                     children: [
@@ -29590,20 +29621,72 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  void _copyMemberReport(UserData u) {
+  void _copyMemberReport(
+    UserData u, {
+    List<AppTransaction>? contributions,
+    List<AppTransaction>? claims,
+    double? contributionTotal,
+    int? openClaims,
+  }) {
+    final contrib = contributions ??
+        widget.allTransactions
+            .where((t) => t.userEmail == u.email && t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
+            .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final claimList = claims ??
+        widget.allTransactions.where((t) => t.userEmail == u.email && t.type == TransactionType.claim).toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final total = contributionTotal ?? contrib.fold<double>(0.0, (sum, t) => sum + t.amount);
+    final open = openClaims ?? claimList.where((c) => c.status == TransactionStatus.pending).length;
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+    final passportGranted = raw != null && NgmyCivicRegistryMembers.passportGranted(raw);
+
     final report = StringBuffer()
       ..writeln('FULL MEMBER INFORMATION')
+      ..writeln('Generated: ${DateTime.now().toLocal()}')
+      ..writeln('')
+      ..writeln('--- OFFICIAL RECORD ---')
       ..writeln('Name: ${u.fullName ?? u.username}')
       ..writeln('Registry ID: ${u.registryId ?? 'N/A'}')
-      ..writeln('DOB: ${u.dob ?? 'N/A'}')
+      ..writeln('Date of Birth: ${u.dob ?? 'N/A'}')
       ..writeln('ID Type: ${u.idType ?? 'N/A'}')
       ..writeln('State: ${u.state}')
       ..writeln('City: ${u.city ?? 'N/A'}')
       ..writeln('Room: ${u.room ?? 'N/A'}')
-      ..writeln('Address: ${u.homeAddress ?? 'N/A'}')
-      ..writeln('Phone: ${u.phone}')
+      ..writeln('Status: ${_statusLabelForMissed(u.missed)}')
+      ..writeln('Registry Passport: ${passportGranted ? 'Granted' : 'Not granted'}')
+      ..writeln('')
+      ..writeln('--- CONTACT ---')
+      ..writeln('Home Address: ${u.homeAddress ?? 'N/A'}')
+      ..writeln('Phone: ${u.phone.isEmpty ? 'N/A' : u.phone}')
       ..writeln('Email: ${u.email}')
-      ..writeln('Status: ${_statusLabelForMissed(u.missed)}');
+      ..writeln('')
+      ..writeln('--- ACTIVITY ---')
+      ..writeln('Contributions (helps): ${u.helps}')
+      ..writeln('Missed: ${u.missed}')
+      ..writeln('Open Claims: $open')
+      ..writeln('Total Money Given: \$${formatCurrency(total)}')
+      ..writeln('')
+      ..writeln('--- CONTRIBUTION RECORDS (${contrib.length}) ---');
+    if (contrib.isEmpty) {
+      report.writeln('No contribution records.');
+    } else {
+      for (final t in contrib) {
+        report.writeln('- \$${formatCurrency(t.amount)} · ${_txReadableDetails(t)} · ${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}');
+      }
+    }
+    report
+      ..writeln('')
+      ..writeln('--- CLAIM RECORDS (${claimList.length}) ---');
+    if (claimList.isEmpty) {
+      report.writeln('No claim records.');
+    } else {
+      for (final t in claimList) {
+        final label = t.sourceDetails?.trim().isNotEmpty == true ? t.sourceDetails!.trim() : 'Claim';
+        final status = t.status == TransactionStatus.pending ? 'Open' : 'Resolved';
+        report.writeln('- $label · $status · ${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}');
+      }
+    }
     final text = report.toString();
     final escaped = text
         .replaceAll('&', '&amp;')
@@ -30209,6 +30292,87 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         phone: widget.user.phone,
       );
 
+  Map<String, dynamic>? _civicMemberRecordForCurrentUser() {
+    final byEmail = NgmyCivicRegistryMembers.findByEmail(widget.config, widget.user.email);
+    if (byEmail != null) return byEmail;
+    final passport = _civicPassportForCurrentUser();
+    return passport;
+  }
+
+  bool _canViewCivicIdForCurrentUser() {
+    final record = _civicMemberRecordForCurrentUser();
+    if (record == null) return false;
+    final id = (record['registryId'] ?? '').toString().trim();
+    if (id.isEmpty) return false;
+    if (NgmyCivicRegistryMembers.passportGranted(record)) return true;
+    return _userIsCivicRegistryEnrolled(widget.config, widget.user);
+  }
+
+  Future<void> _persistCivicIdPhotoChange() async {
+    final ok = await ngmyPersistCivicRegistryMembers(widget.config);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+    } catch (_) {}
+    widget.onDataChanged();
+    if (!mounted) return;
+    setState(() {});
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ID photo saved on this device — will sync when online.'), backgroundColor: Colors.orange),
+      );
+    }
+  }
+
+  Future<void> _maybePromptCivicIdPhoto() async {
+    if (!_registryUnlocked && !_canBypassCivicGate()) return;
+    if (!_canViewCivicIdForCurrentUser()) return;
+    final record = _civicMemberRecordForCurrentUser();
+    if (record == null) return;
+    final existing = (record['idPhotoPath'] ?? '').toString().trim();
+    if (existing.isNotEmpty) return;
+    if (await ngmyCivicIdPhotoPromptWasShown(widget.user.email)) return;
+    if (!mounted) return;
+    await showNgmyCivicIdPhotoSheet(
+      context,
+      config: widget.config,
+      email: widget.user.email,
+      onSaved: _persistCivicIdPhotoChange,
+    );
+  }
+
+  void _showCivicIdCardForRecord(Map<String, dynamic> record, {bool allowPhotoChange = false}) {
+    final email = NgmyCivicRegistryMembers.emailKey((record['email'] ?? widget.user.email).toString());
+    final photoPath = ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.user.profilePicturePath);
+    final photoImage = ngmyCachedProfileImage(photoPath);
+    showNgmyCivicRegistryIdCardDialog(
+      context,
+      record: record,
+      photoPath: photoPath,
+      photoImage: photoImage,
+      onChangePhoto: allowPhotoChange
+          ? () {
+              showNgmyCivicIdPhotoSheet(
+                context,
+                config: widget.config,
+                email: email,
+                skippable: true,
+                onSaved: _persistCivicIdPhotoChange,
+              );
+            }
+          : null,
+    );
+  }
+
+  void _showMyCivicIdCard() {
+    final record = _civicMemberRecordForCurrentUser();
+    if (record == null || (record['registryId'] ?? '').toString().trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No registry ID found yet.')));
+      return;
+    }
+    _showCivicIdCardForRecord(record, allowPhotoChange: true);
+  }
+
   Future<void> _grantRegistryPassport(UserData member) async {
     final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, member.email);
     if (raw == null) return;
@@ -30257,6 +30421,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         backgroundColor: ok ? Colors.green : Colors.orange,
       ),
     );
+    final updated = NgmyCivicRegistryMembers.findByEmail(widget.config, member.email);
+    if (updated != null && mounted) {
+      _showCivicIdCardForRecord(updated);
+    }
   }
 
   Widget _civicPassportBanner(bool isDark) {
@@ -30268,7 +30436,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final idType = (record['idType'] ?? 'Registry ID').toString();
     if (registryId.isEmpty) return const SizedBox.shrink();
 
-    return Container(
+    return GestureDetector(
+      onTap: _showMyCivicIdCard,
+      child: Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -30291,39 +30461,40 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 child: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 28),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Your Registry Passport', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                    Text('Official Civic Registry identity', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    const Text('Your Registry Passport', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                    Text('Tap to view your ID card · $idType', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                   ],
                 ),
               ),
+              const Icon(Icons.badge_outlined, color: Colors.white70),
             ],
           ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.14),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white24),
+          const SizedBox(height: 14),
+          Center(
+            child: FittedBox(
+              child: NgmyCivicRegistryIdCard(
+                record: record,
+                photoPath: ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.user.profilePicturePath),
+                photoImage: ngmyCachedProfileImage(ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.user.profilePicturePath)),
+                scale: 0.72,
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20)),
-                const SizedBox(height: 6),
-                Text(registryId, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26, letterSpacing: 1.2)),
-                const SizedBox(height: 8),
-                Text('$idType · $state', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              ],
+          ),
+          const SizedBox(height: 10),
+          Center(
+            child: Text(
+              '$name · $registryId · $state',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
             ),
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -30439,6 +30610,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          if (_canViewCivicIdForCurrentUser())
+            IconButton(
+              tooltip: 'View Registry ID / Passport',
+              onPressed: _showMyCivicIdCard,
+              icon: const Icon(Icons.badge_outlined),
+            ),
+        ],
       ),
       body: SelectionContainer.disabled(
         child: SingleChildScrollView(
