@@ -48,7 +48,7 @@ class NgmyStudioHubNavIcon extends StatelessWidget {
   }
 }
 
-/// Main tab content — 2-column grid of creator tools (Video Studio, Doc Share, …).
+/// Main tab content — 2-column grid of creator tools (Doc Share, AI Outfit, Video Studio, …).
 class NgmyCreatorHubTab extends StatelessWidget {
   const NgmyCreatorHubTab({
     super.key,
@@ -71,7 +71,25 @@ class NgmyCreatorHubTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Pinned top order: Doc Share → AI Outfit → Video Studio. Add new tools at the bottom only.
     final tools = <_CreatorTool>[
+      _CreatorTool(
+        icon: Icons.folder_shared_rounded,
+        colors: const [Color(0xFF0D9488), Color(0xFF059669)],
+        title: 'Doc Share',
+        subtitle: 'Upload & share any file',
+        onTap: () {
+          if (userEmail.trim().isEmpty) return;
+          openNgmyDocShare(
+            context: context,
+            user: user ?? _HubGuestUser(userEmail),
+            config: config,
+            onCharge: onCharge ?? (_, __) async => false,
+            onDataChanged: onDataChanged ?? () {},
+            onPersistConfig: onPersistConfig ?? () async => false,
+          );
+        },
+      ),
       _CreatorTool(
         icon: Icons.style_rounded,
         colors: const [Color(0xFFDB2777), Color(0xFF9333EA)],
@@ -97,23 +115,6 @@ class NgmyCreatorHubTab extends StatelessWidget {
         title: '3D Mechanic Lab',
         subtitle: 'Disassemble cars & learn parts',
         onTap: () => showNgmyMechanicStudio(context: context),
-      ),
-      _CreatorTool(
-        icon: Icons.folder_shared_rounded,
-        colors: const [Color(0xFF0D9488), Color(0xFF059669)],
-        title: 'Doc Share',
-        subtitle: 'Upload & share any file',
-        onTap: () {
-          if (userEmail.trim().isEmpty) return;
-          openNgmyDocShare(
-            context: context,
-            user: user ?? _HubGuestUser(userEmail),
-            config: config,
-            onCharge: onCharge ?? (_, __) async => false,
-            onDataChanged: onDataChanged ?? () {},
-            onPersistConfig: onPersistConfig ?? () async => false,
-          );
-        },
       ),
     ];
 

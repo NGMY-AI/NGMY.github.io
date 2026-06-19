@@ -746,3 +746,87 @@ class _Err extends StatelessWidget {
     return const Center(child: Text('Unable to load screenshot', style: TextStyle(color: Colors.grey, fontSize: 10)));
   }
 }
+
+/// Full-screen payment proof with pinch / scroll zoom (admin deposit review).
+void showNgmyPaymentProofFullscreen(BuildContext context, String path) {
+  final p = path.trim();
+  if (p.isEmpty) return;
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (ctx) => _NgmyFullscreenPaymentProofPage(path: p),
+    ),
+  );
+}
+
+class _NgmyFullscreenPaymentProofPage extends StatefulWidget {
+  const _NgmyFullscreenPaymentProofPage({required this.path});
+
+  final String path;
+
+  @override
+  State<_NgmyFullscreenPaymentProofPage> createState() => _NgmyFullscreenPaymentProofPageState();
+}
+
+class _NgmyFullscreenPaymentProofPageState extends State<_NgmyFullscreenPaymentProofPage> {
+  final TransformationController _transform = TransformationController();
+
+  void _zoomBy(double factor) {
+    final m = Matrix4.copy(_transform.value);
+    m.scale(factor);
+    _transform.value = m;
+  }
+
+  void _resetZoom() {
+    _transform.value = Matrix4.identity();
+  }
+
+  @override
+  void dispose() {
+    _transform.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: const Text('Payment proof', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Zoom out',
+            icon: const Icon(Icons.zoom_out_rounded),
+            onPressed: () => _zoomBy(0.85),
+          ),
+          IconButton(
+            tooltip: 'Reset zoom',
+            icon: const Icon(Icons.fit_screen_rounded),
+            onPressed: _resetZoom,
+          ),
+          IconButton(
+            tooltip: 'Zoom in',
+            icon: const Icon(Icons.zoom_in_rounded),
+            onPressed: () => _zoomBy(1.18),
+          ),
+        ],
+      ),
+      body: InteractiveViewer(
+        transformationController: _transform,
+        minScale: 0.4,
+        maxScale: 8.0,
+        panEnabled: true,
+        scaleEnabled: true,
+        child: Center(
+          child: NgmyPaymentProofImage(path: widget.path),
+        ),
+      ),
+    );
+  }
+}
