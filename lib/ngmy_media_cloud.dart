@@ -80,6 +80,8 @@ Map<String, dynamic> ngmyMediaRowMinimalForCloud(Map<String, dynamic> raw) {
       'username': (raw['username'] ?? 'User').toString(),
       'comments': raw['comments'] is List ? raw['comments'] : const [],
       'likes': likedBy is List ? likedBy.length : (raw['likes'] as num?)?.toInt() ?? 0,
+      'likedBy': likedBy is List ? likedBy : const [],
+      'savedBy': savedBy is List ? savedBy : const [],
     },
   };
 }

@@ -17,6 +17,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 
 import 'ngmy_coming_soon.dart';
@@ -4099,6 +4100,29 @@ int _mediaCommentCount(List<Map<String, dynamic>> comments) {
   }
   return n;
 }
+
+String _ngmyMediaActorKey(String raw) => raw.toLowerCase().trim();
+
+bool _ngmyMediaLikedByContains(List<String> likedBy, String email) {
+  final key = _ngmyMediaActorKey(email);
+  if (key.isEmpty) return false;
+  return likedBy.any((e) => _ngmyMediaActorKey(e) == key);
+}
+
+void _ngmyMediaAddLike(List<String> likedBy, String email) {
+  final key = _ngmyMediaActorKey(email);
+  if (key.isEmpty) return;
+  likedBy.removeWhere((e) => _ngmyMediaActorKey(e) == key);
+  likedBy.add(key);
+}
+
+void _ngmyMediaRemoveLike(List<String> likedBy, String email) {
+  final key = _ngmyMediaActorKey(email);
+  if (key.isEmpty) return;
+  likedBy.removeWhere((e) => _ngmyMediaActorKey(e) == key);
+}
+
+int _ngmyMediaLikeCount(MediaPost post) => math.max(post.likedBy.length, post.likes);
 
 Uint8List _readMediaFileBytesSync(String path) => File(path).readAsBytesSync();
 
@@ -8817,15 +8841,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<bool> _syncAdminMediaPost(MediaPost post) async {
+    post.likes = post.likedBy.length;
     final idx = _allMedia.indexWhere((m) => m.id == post.id);
     if (idx >= 0) {
       _allMedia[idx] = post;
     }
     await _persistAllMediaLocally();
-    final ok = await _upsertMediaSocialFields(post);
+    var ok = await _upsertMediaSocialFields(post);
+    if (!ok) {
+      ok = await _upsertMediaRowSafe(ngmyMediaRowForCloud(Map<String, dynamic>.from(post.toJson())));
+    }
     if (ok) {
       _markAdminMediaProtectWindow();
       if (mounted) setState(() {});
+    } else {
+      debugPrint('[media] social sync failed for post ${post.id} (likes=${post.likedBy.length}, comments=${post.comments.length})');
     }
     return ok;
   }
@@ -27943,7 +27973,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
   Widget _ngmyMediaHubBox({required bool isDark, required VoidCallback onTap}) {
     const ngmyGreen = Color(0xFF34D399);
-    const ngmyGreenDeep = Color(0xFF059669);
 
     return Material(
       color: Colors.transparent,
@@ -27968,133 +27997,56 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                 blurRadius: 14,
                 offset: const Offset(0, 6),
               ),
-              BoxShadow(
-                color: ngmyGreen.withOpacity(0.12),
-                blurRadius: 20,
-                spreadRadius: -4,
-              ),
             ],
           ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                top: 7,
-                left: 10,
-                right: 10,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: List.generate(
-                    7,
-                    (i) => Container(
-                      width: 3.5,
-                      height: 3.5,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.22),
-                        borderRadius: BorderRadius.circular(1),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: -6,
-                bottom: -6,
-                child: Container(
-                  width: 46,
-                  height: 46,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 52,
+                  height: 36,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [ngmyGreen.withOpacity(0.28), ngmyGreen.withOpacity(0)],
-                    ),
-                  ),
-                ),
-              ),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          Colors.white.withOpacity(isDark ? 0.22 : 0.32),
-                          Colors.white.withOpacity(0.06),
-                        ],
-                      ),
-                      border: Border.all(color: Colors.white.withOpacity(0.38), width: 1.4),
-                      boxShadow: [
-                        BoxShadow(color: ngmyGreen.withOpacity(0.35), blurRadius: 10, spreadRadius: -2),
+                    borderRadius: BorderRadius.circular(10),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withOpacity(isDark ? 0.28 : 0.38),
+                        Colors.white.withOpacity(0.08),
                       ],
                     ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Icon(Icons.movie_creation_rounded, size: 17, color: Colors.white.withOpacity(0.92)),
-                        Positioned(
-                          right: 11,
-                          bottom: 11,
-                          child: Container(
-                            width: 18,
-                            height: 18,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [ngmyGreen, ngmyGreenDeep],
-                              ),
-                              border: Border.all(color: Colors.white.withOpacity(0.85), width: 1.2),
-                              boxShadow: [
-                                BoxShadow(color: ngmyGreen.withOpacity(0.45), blurRadius: 6),
-                              ],
-                            ),
-                            child: const Icon(Icons.play_arrow_rounded, size: 12, color: Colors.white),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 9),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: ngmyGreen.withOpacity(0.22),
-                          borderRadius: BorderRadius.circular(5),
-                          border: Border.all(color: ngmyGreen.withOpacity(0.55)),
-                        ),
-                        child: const Text(
-                          'NGMY',
-                          style: TextStyle(
-                            fontSize: 8,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.9,
-                            color: ngmyGreen,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Text(
-                        'Media',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                          letterSpacing: 0.3,
-                          color: Colors.white,
-                        ),
-                      ),
+                    border: Border.all(color: Colors.white.withOpacity(0.45), width: 1.2),
+                    boxShadow: [
+                      BoxShadow(color: ngmyGreen.withOpacity(0.28), blurRadius: 10, spreadRadius: -2),
                     ],
                   ),
-                ],
-              ),
-            ],
+                  child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 26),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'NGMY',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.1,
+                    color: ngmyGreen.withOpacity(0.95),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Media',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    letterSpacing: 0.35,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -39284,10 +39236,8 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
     if (!await ngmyCanReachCloud()) return;
     await widget.onRefreshFromCloud?.call();
     if (!mounted || _isPosting) return;
-    final sig = _feedSignature();
-    final changed = sig != _lastFeedSig;
-    _lastFeedSig = sig;
-    if (changed && mounted) setState(() {});
+    _lastFeedSig = _feedSignature();
+    setState(() {});
   }
 
   List<MediaPost> _savedPostsForUser() {
@@ -41463,27 +41413,34 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
     return null;
   }
 
-  bool get _liked => widget.post.likedBy.contains(widget.currentUser.email);
-  bool get _saved => widget.post.savedBy.contains(widget.currentUser.email);
+  bool get _liked => _ngmyMediaLikedByContains(widget.post.likedBy, widget.currentUser.email);
+  bool get _saved => widget.post.savedBy.any(
+        (e) => _ngmyMediaActorKey(e) == _ngmyMediaActorKey(widget.currentUser.email),
+      );
   bool get _isOwner => widget.currentUser.email.toLowerCase().trim() == widget.post.userEmail.toLowerCase().trim();
 
   String get _displayUsername => _mediaPostDisplayName(widget.post, widget.allUsers);
 
   Future<void> _persistPostChange() async {
-    if (widget.onSyncPost != null) {
-      await widget.onSyncPost!(widget.post);
-    } else {
-      await _upsertMediaSocialFields(widget.post);
-    }
+    widget.post.likes = widget.post.likedBy.length;
+    final ok = widget.onSyncPost != null
+        ? await widget.onSyncPost!(widget.post)
+        : await _upsertMediaSocialFields(widget.post);
     widget.onChanged();
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not sync like or comment. Check your connection and try again.')),
+      );
+    }
   }
 
   Future<void> _toggleLike() async {
     setState(() {
       if (_liked) {
-        widget.post.likedBy.remove(widget.currentUser.email);
+        _ngmyMediaRemoveLike(widget.post.likedBy, widget.currentUser.email);
       } else {
-        widget.post.likedBy.add(widget.currentUser.email);
+        _ngmyMediaAddLike(widget.post.likedBy, widget.currentUser.email);
       }
       widget.post.likes = widget.post.likedBy.length;
     });
@@ -41491,23 +41448,111 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
   }
 
   Future<void> _toggleSave() async {
+    final key = _ngmyMediaActorKey(widget.currentUser.email);
     setState(() {
       if (_saved) {
-        widget.post.savedBy.remove(widget.currentUser.email);
+        widget.post.savedBy.removeWhere((e) => _ngmyMediaActorKey(e) == key);
       } else {
-        widget.post.savedBy.add(widget.currentUser.email);
+        widget.post.savedBy.removeWhere((e) => _ngmyMediaActorKey(e) == key);
+        widget.post.savedBy.add(key);
       }
     });
     await _persistPostChange();
   }
 
+  Future<void> _launchMediaShareUrl(Uri uri) async {
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   Future<void> _sharePost() async {
     final resolved = await _resolveSupabaseStorageUrl(widget.post.videoUrl);
     if (!mounted) return;
-    await Clipboard.setData(ClipboardData(text: '${widget.post.caption}\n$resolved'));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Post link copied to clipboard.')),
+    final caption = widget.post.caption.trim();
+    final link = resolved.startsWith('http') ? resolved : 'https://ngmy.org/';
+    final shareText = caption.isEmpty ? 'Check out this post on NGMY Media' : caption;
+    final fullText = '$shareText\n$link';
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        Future<void> closeThen(Future<void> Function() action) async {
+          Navigator.pop(ctx);
+          await action();
+        }
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.35),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const Text('Share post', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.ios_share_rounded),
+                  title: const Text('Share…'),
+                  subtitle: const Text('Messages, email, or other apps'),
+                  onTap: () => closeThen(() => Share.share(fullText, subject: 'NGMY Media')),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.facebook_rounded, color: Color(0xFF1877F2)),
+                  title: const Text('Facebook'),
+                  onTap: () => closeThen(
+                    () => _launchMediaShareUrl(
+                      Uri.parse('https://www.facebook.com/sharer/sharer.php?u=${Uri.encodeComponent(link)}'),
+                    ),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.chat_rounded, color: Color(0xFF25D366)),
+                  title: const Text('WhatsApp'),
+                  onTap: () => closeThen(
+                    () => _launchMediaShareUrl(
+                      Uri.parse('https://wa.me/?text=${Uri.encodeComponent(fullText)}'),
+                    ),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.alternate_email_rounded),
+                  title: const Text('X (Twitter)'),
+                  onTap: () => closeThen(
+                    () => _launchMediaShareUrl(
+                      Uri.parse(
+                        'https://twitter.com/intent/tweet?text=${Uri.encodeComponent(shareText)}&url=${Uri.encodeComponent(link)}',
+                      ),
+                    ),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.content_copy_rounded),
+                  title: const Text('Copy link'),
+                  onTap: () => closeThen(() async {
+                    await Clipboard.setData(ClipboardData(text: fullText));
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Post link copied.')),
+                      );
+                    }
+                  }),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -41525,7 +41570,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
   Future<void> _quickLike() async {
     if (!_liked) {
       setState(() {
-        widget.post.likedBy.add(widget.currentUser.email);
+        _ngmyMediaAddLike(widget.post.likedBy, widget.currentUser.email);
         widget.post.likes = widget.post.likedBy.length;
       });
       await _persistPostChange();
@@ -41706,7 +41751,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
               if (text.isEmpty) return;
               final node = {
                 'id': DateTime.now().microsecondsSinceEpoch.toString(),
-                'userEmail': widget.currentUser.email,
+                'userEmail': _ngmyMediaActorKey(widget.currentUser.email),
                 'username': _mediaAuthorName(widget.currentUser),
                 'text': text,
                 'timestamp': DateTime.now().toUtc().toIso8601String(),
@@ -41982,7 +42027,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
                   ],
                 ),
                 const SizedBox(height: 10),
-                Text('${widget.post.likedBy.length} likes  •  ${_mediaCommentCount(widget.post.comments)} comments', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Text('${_ngmyMediaLikeCount(widget.post)} likes  •  ${_mediaCommentCount(widget.post.comments)} comments', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 const SizedBox(height: 5),
                 RichText(
                   text: TextSpan(

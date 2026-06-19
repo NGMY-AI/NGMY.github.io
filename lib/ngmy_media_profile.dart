@@ -1719,28 +1719,52 @@ class _AdminPostCardState extends State<_AdminPostCard> {
   String get _postId => (widget.post as dynamic).id.toString();
 
   List<String> _buildLikeIds(int count) {
-    final liked = NgmyMediaProfile.asStringList((widget.post as dynamic).likedBy);
+    if (count <= 0) return [];
+    final liked = NgmyMediaProfile.asStringList((widget.post as dynamic).likedBy).toSet();
     final out = <String>[];
-    for (var i = 0; i < count; i++) {
-      final profile = widget.virtualProfiles.isNotEmpty ? widget.virtualProfiles[i % widget.virtualProfiles.length] : widget.pickVirtualProfile();
+    final base = DateTime.now().microsecondsSinceEpoch;
+
+    // Use virtual demo profiles first when available.
+    for (var i = 0; i < widget.virtualProfiles.length && out.length < count; i++) {
+      final profile = widget.virtualProfiles[i];
       final id = (profile['id'] ?? 'vp_$i').toString();
-      if (!liked.contains(id) && !out.contains(id)) out.add(id);
+      if (liked.add(id)) out.add(id);
+    }
+
+    // Generate unique synthetic likers for any remaining count (e.g. +1000 instant).
+    var n = 0;
+    while (out.length < count) {
+      final id = 'vlike_${base}_$n';
+      n++;
+      if (liked.add(id)) out.add(id);
     }
     return out;
   }
 
   List<Map<String, dynamic>> _buildCommentBatch(int count) {
-    if (count <= 0 || widget.virtualProfiles.isEmpty || _selectedProfileIdx == null) return [];
+    if (count <= 0) return [];
     final fallback = _commentTextCtrl.text.trim();
-    final start = _selectedProfileIdx!.clamp(0, widget.virtualProfiles.length - 1);
     final out = <Map<String, dynamic>>[];
-    for (var i = 0; i < count; i++) {
-      final profile = widget.virtualProfiles[(start + i) % widget.virtualProfiles.length];
-      final text = (profile['defaultComment'] ?? '').toString().trim().isNotEmpty
-          ? (profile['defaultComment'] ?? '').toString().trim()
-          : fallback;
-      if (text.isEmpty) continue;
-      out.add(_commentFromProfile(profile, text, suffix: '_$i'));
+    final base = DateTime.now().microsecondsSinceEpoch;
+
+    if (widget.virtualProfiles.isNotEmpty && _selectedProfileIdx != null) {
+      final start = _selectedProfileIdx!.clamp(0, widget.virtualProfiles.length - 1);
+      for (var i = 0; i < count; i++) {
+        final profile = widget.virtualProfiles[(start + i) % widget.virtualProfiles.length];
+        final text = (profile['defaultComment'] ?? '').toString().trim().isNotEmpty
+            ? (profile['defaultComment'] ?? '').toString().trim()
+            : fallback;
+        if (text.isEmpty) continue;
+        out.add(_commentFromProfile(profile, text, suffix: '_$i'));
+      }
+    }
+
+    while (out.length < count) {
+      final text = fallback.isNotEmpty ? fallback : 'Great post!';
+      final profile = widget.virtualProfiles.isNotEmpty
+          ? widget.virtualProfiles[out.length % widget.virtualProfiles.length]
+          : widget.pickVirtualProfile();
+      out.add(_commentFromProfile(profile, text, suffix: '_syn_${base}_${out.length}'));
     }
     return out;
   }
