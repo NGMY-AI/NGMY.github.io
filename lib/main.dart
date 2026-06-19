@@ -42,6 +42,7 @@ import 'ngmy_repair_estimate_payments.dart';
 import 'ngmy_translate_payments.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_session.dart';
+import 'ngmy_game_notifications.dart';
 import 'ngmy_games.dart';
 import 'ngmy_game_admin_sheet.dart';
 import 'ngmy_game_center_persist.dart';
@@ -677,6 +678,50 @@ bool ngmyIsGameLedgerTransaction(AppTransaction t) {
   return false;
 }
 
+Future<void> ngmyBackfillGameWinNotificationsFromLedger(
+  String email,
+  List<AppTransaction> transactions,
+) async {
+  final key = ngmyNormalizeEmail(email);
+  if (key.isEmpty) return;
+  final cutoff = DateTime.now().subtract(kNgmyGameNotificationRetention);
+  for (final t in transactions) {
+    if (ngmyNormalizeEmail(t.userEmail) != key) continue;
+    if (t.timestamp.isBefore(cutoff)) continue;
+    if (t.status != TransactionStatus.approved) continue;
+    if (t.type != TransactionType.reimbursement) continue;
+    final d = t.sourceDetails ?? '';
+    final lower = d.toLowerCase();
+    final isGameWin = lower.contains('game payout:') ||
+        lower.contains('game partial:') ||
+        lower.contains('multiplayer payout:') ||
+        (lower.contains('dice') && t.method == PaymentMethod.system);
+    if (!isGameWin) continue;
+    String title = 'Game';
+    if (lower.contains('game payout:')) {
+      title = d.substring(lower.indexOf('game payout:') + 'game payout:'.length).trim();
+    } else if (lower.contains('game partial:')) {
+      title = d.substring(lower.indexOf('game partial:') + 'game partial:'.length).trim();
+      final paren = title.indexOf('(');
+      if (paren > 0) title = title.substring(0, paren).trim();
+    } else if (lower.contains('multiplayer payout:')) {
+      title = d.substring(lower.indexOf('multiplayer payout:') + 'multiplayer payout:'.length).trim();
+      final paren = title.indexOf('(');
+      if (paren > 0) title = title.substring(0, paren).trim();
+    } else if (lower.contains('dice')) {
+      title = 'Dice Roll';
+    }
+    await NgmyGameNotifications.record(
+      email: email,
+      gameTitle: title.isEmpty ? 'Game' : title,
+      won: true,
+      amount: t.amount,
+      detail: d,
+      txnId: t.id,
+    );
+  }
+}
+
 bool ngmyIsStoreLedgerTransaction(AppTransaction t) {
   final d = (t.sourceDetails ?? '').toLowerCase();
   return d.contains('ngmy store sale') || d.contains('ngmy store purchase');
@@ -792,13 +837,32 @@ int _ngmyTransactionStatusRank(TransactionStatus status) {
 AppTransaction _pickPreferredTransaction(AppTransaction local, AppTransaction remote) {
   final localRank = _ngmyTransactionStatusRank(local.status);
   final remoteRank = _ngmyTransactionStatusRank(remote.status);
+  late AppTransaction pick;
   if (localRank != remoteRank) {
-    return localRank > remoteRank ? local : remote;
+    pick = localRank > remoteRank ? local : remote;
+  } else if (ngmyIsWalletDepositOrWithdraw(local) || ngmyIsWalletDepositOrWithdraw(remote)) {
+    pick = local.timestamp.isAfter(remote.timestamp) ? local : remote;
+  } else {
+    pick = local.timestamp.isAfter(remote.timestamp) ? local : remote;
   }
-  if (ngmyIsWalletDepositOrWithdraw(local) || ngmyIsWalletDepositOrWithdraw(remote)) {
-    return local.timestamp.isAfter(remote.timestamp) ? local : remote;
-  }
-  return local.timestamp.isAfter(remote.timestamp) ? local : remote;
+  final localProof = (local.screenshotPath ?? '').trim();
+  final remoteProof = (remote.screenshotPath ?? '').trim();
+  final pickProof = (pick.screenshotPath ?? '').trim();
+  if (pickProof.isNotEmpty) return pick;
+  final bestProof = localProof.isNotEmpty ? localProof : remoteProof;
+  if (bestProof.isEmpty) return pick;
+  return AppTransaction(
+    id: pick.id,
+    userEmail: pick.userEmail,
+    amount: pick.amount,
+    type: pick.type,
+    method: pick.method,
+    sourceDetails: pick.sourceDetails ?? local.sourceDetails ?? remote.sourceDetails,
+    screenshotPath: bestProof,
+    verificationCode: pick.verificationCode ?? local.verificationCode ?? remote.verificationCode,
+    status: pick.status,
+    timestamp: pick.timestamp,
+  );
 }
 
 List<AppTransaction> _mergeTransactionsWithRemote(
@@ -847,8 +911,22 @@ enum TransactionType { deposit, withdrawal, adminAdd, adminRemove, reimbursement
 enum TransactionStatus { pending, approved, rejected }
 enum PaymentMethod { cashApp, bitcoin, system }
 
-/// Wallet deposit/withdraw history — never auto-delete from Supabase.
+/// Wallet deposit/withdraw receipts (with screenshots) auto-delete after 5 days.
+const int kNgmyWalletReceiptRetentionDays = 5;
 const int kNgmyWalletHistoryDisplayMax = 500;
+
+bool ngmyIsWalletReceiptTransaction(AppTransaction t) {
+  if (t.status == TransactionStatus.pending) return false;
+  return t.type == TransactionType.deposit ||
+      t.type == TransactionType.withdrawal ||
+      t.type == TransactionType.adminAdd;
+}
+
+bool ngmyWalletReceiptExpired(AppTransaction t, DateTime cutoff, Map<String, DateTime> decisionTimes) {
+  if (!ngmyIsWalletReceiptTransaction(t)) return false;
+  final decidedAt = decisionTimes[t.id] ?? t.timestamp;
+  return decidedAt.isBefore(cutoff);
+}
 
 bool ngmyIsWalletDepositOrWithdraw(AppTransaction t) =>
     t.type == TransactionType.deposit || t.type == TransactionType.withdrawal;
@@ -7164,6 +7242,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<bool> _syncWalletApprovalInBackground(AppTransaction t, UserData? user) async {
     if (t.status == TransactionStatus.pending) return false;
+    await _pushTransactionToCloudFast(t);
     var synced = await _pushTransactionDecisionToCloud(t, attempts: 3);
     if (!synced && _ngmySessionIsAdmin(_currentUser)) {
       synced = await _pushTransactionDecisionToCloud(t, attempts: 2);
@@ -7290,6 +7369,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateCivicHelpModeFromAllBackups(_config);
     await ngmyApplyStoreSellAccessFromSettings(_config);
     _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
+    await _archiveAndPurgeOldApprovedWalletRequests(online: await ngmyCanReachCloud());
     await _persistLocalOnly();
     if (mounted) {
       setState(() {});
@@ -7821,6 +7901,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       });
       if (_ngmySessionIsAdmin(_currentUser)) {
         unawaited(_refreshPendingTransactionsFromCloud());
+        unawaited(_archiveAndPurgeOldApprovedWalletRequests(online: true));
       }
       if (_allowConfigDiffNotifications) {
         unawaited(_notifyStoreMarketDayListings());
@@ -7836,6 +7917,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     setState(() {
       _reconcileAllUserBalances();
     });
+    unawaited(_archiveAndPurgeOldApprovedWalletRequests(online: await ngmyCanReachCloud()));
     unawaited(_persistLocalOnly());
   }
 
@@ -11214,9 +11296,43 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
   }
 
-  /// Wallet history stays in the app and Supabase (users need pending/approved/rejected).
+  /// Purge wallet deposit/withdraw receipts older than 5 days (app + Supabase + screenshots).
   Future<void> _archiveAndPurgeOldApprovedWalletRequests({required bool online}) async {
-    return;
+    final cutoff = DateTime.now().subtract(const Duration(days: kNgmyWalletReceiptRetentionDays));
+    final decisionTimes = await NgmyWalletDecisionLedger.loadDecisionTimesMerged();
+    final toPurge = <String>{};
+    for (final t in _allTransactions) {
+      if (!ngmyWalletReceiptExpired(t, cutoff, decisionTimes)) continue;
+      if (t.id.trim().isNotEmpty) toPurge.add(t.id);
+    }
+
+    final archive = await NgmyAdminWalletApprovedArchive.load();
+    for (final t in archive) {
+      if (!ngmyWalletReceiptExpired(t, cutoff, decisionTimes)) continue;
+      if (t.id.trim().isNotEmpty) toPurge.add(t.id);
+    }
+
+    if (toPurge.isEmpty) return;
+
+    if (mounted) {
+      setState(() {
+        _allTransactions.removeWhere((t) => toPurge.contains(t.id));
+      });
+    } else {
+      _allTransactions.removeWhere((t) => toPurge.contains(t.id));
+    }
+
+    await NgmyAdminWalletApprovedArchive.removeByIds(toPurge);
+    for (final id in toPurge) {
+      await NgmyWalletDecisionLedger.clear(id);
+    }
+    await NgmyWalletDecisionLedger.clearDecisionTimes(toPurge);
+    if (online) {
+      await _safeDeleteTransactionsByIds(toPurge.toList());
+      await NgmyWalletDecisionLedger.removeFromCloud(toPurge);
+    }
+    _reconcileAllUserBalances();
+    NgmyAdminLiveRefresh.notify();
   }
 
   Future<void> _saveData({bool heavy = true, bool fullCloud = true}) async {
@@ -14682,6 +14798,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       GameCenterScreen(
         user: widget.user,
         config: widget.config,
+        allTransactions: widget.allTransactions,
         onAddTransaction: widget.onAddTransaction,
         onDataChanged: widget.onDataChanged,
         onGoToInvest: widget.onOpenInvest,
@@ -15924,6 +16041,7 @@ class _GameRewardPopupState extends State<_GameRewardPopup> with SingleTickerPro
 class GameCenterScreen extends StatefulWidget {
   final UserData user;
   final AppConfig config;
+  final List<AppTransaction> allTransactions;
   final Function(AppTransaction) onAddTransaction;
   final VoidCallback onDataChanged;
   final VoidCallback? onGoToInvest;
@@ -15931,6 +16049,7 @@ class GameCenterScreen extends StatefulWidget {
     super.key,
     required this.user,
     required this.config,
+    this.allTransactions = const [],
     required this.onAddTransaction,
     required this.onDataChanged,
     this.onGoToInvest,
@@ -16314,9 +16433,57 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
                 children: [
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
                     decoration: BoxDecoration(color: const Color(0xFF5C3B8A), borderRadius: BorderRadius.circular(12)),
-                    child: const Text('🎮  All Games\nWin real money playing skill games!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            '🎮  All Games\nWin real money playing skill games!',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        ListenableBuilder(
+                          listenable: ngmyGameNotificationsTick,
+                          builder: (context, _) {
+                            return FutureBuilder<int>(
+                              future: NgmyGameNotifications.countFor(widget.user.email),
+                              builder: (context, snap) {
+                                final count = snap.data ?? 0;
+                                return Material(
+                                  color: const Color(0xFF4A2F75),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: () async {
+                                      await ngmyBackfillGameWinNotificationsFromLedger(
+                                        widget.user.email,
+                                        widget.allTransactions,
+                                      );
+                                      if (!context.mounted) return;
+                                      await showNgmyGameReceiptSheet(
+                                        context,
+                                        email: widget.user.email,
+                                      );
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      child: Badge(
+                                        isLabelVisible: count > 0,
+                                        label: Text(count > kNgmyGameNotificationMax ? '$kNgmyGameNotificationMax' : '$count'),
+                                        backgroundColor: Colors.orange,
+                                        child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 26),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 10),
                   _inviteBanner(),
@@ -16495,9 +16662,10 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
         return true;
       },
       onPayout: (payout, note, {double bonus = 0}) {
+        final txnId = DateTime.now().microsecondsSinceEpoch.toString();
         widget.onAddTransaction(
           AppTransaction(
-            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            id: txnId,
             userEmail: widget.user.email,
             amount: payout,
             type: TransactionType.reimbursement,
@@ -16508,6 +16676,17 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
           ),
         );
         widget.onDataChanged();
+        final detail = bonus > 0
+            ? '+\$${payout.toStringAsFixed(2)} total (includes \$3 bonus for +3!)'
+            : '+\$${payout.toStringAsFixed(2)} added to your balance';
+        unawaited(NgmyGameNotifications.record(
+          email: widget.user.email,
+          gameTitle: 'Dice Roll',
+          won: true,
+          amount: payout,
+          detail: detail,
+          txnId: txnId,
+        ));
       },
     );
   }
@@ -18004,8 +18183,16 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     ngmyPlayIncomeSoundForTransaction(payoutTxn, force: true);
     widget.onAddTransaction(payoutTxn);
     widget.onDataChanged();
-    if (!mounted) return;
     final winSubtitle = subtitle ?? '+\$${payout.toStringAsFixed(2)} added to your balance!';
+    unawaited(NgmyGameNotifications.record(
+      email: widget.user.email,
+      gameTitle: widget.gameTitle,
+      won: true,
+      amount: payout,
+      detail: winSubtitle,
+      txnId: txnId,
+    ));
+    if (!mounted) return;
     await _showEndPopup(win: true, title: 'YOU WIN!', subtitle: winSubtitle, outcomeLabel: outcomeLabel);
     await ngmyNotifyGameWin(widget.gameTitle, winSubtitle);
   }
@@ -18167,6 +18354,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     final subtitle = winnerEmail == key
         ? '+\$${totalPayout.toStringAsFixed(2)} (includes opponent bonus \$${bonus.toStringAsFixed(2)})'
         : '+\$${soloPayout.toStringAsFixed(2)} (your progress payout)';
+    unawaited(NgmyGameNotifications.record(
+      email: widget.user.email,
+      gameTitle: widget.gameTitle,
+      won: true,
+      amount: totalPayout,
+      detail: subtitle,
+    ));
     await _showEndPopup(
       win: true,
       title: 'MATCH OVER',
@@ -18206,6 +18400,14 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     final partialSubtitle = wrong != null && wrong > 0
         ? '+\$${payout.toStringAsFixed(2)} ($pct% — $wrong mistakes/missed)'
         : '+\$${payout.toStringAsFixed(2)} ($pct% of full prize)';
+    unawaited(NgmyGameNotifications.record(
+      email: widget.user.email,
+      gameTitle: widget.gameTitle,
+      won: true,
+      amount: payout,
+      detail: partialSubtitle,
+      txnId: partialTxn.id,
+    ));
     await _showEndPopup(
       win: true,
       title: 'PARTIAL WIN',
@@ -18221,6 +18423,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     _simonPlayGen++;
     _roundTimer?.cancel();
     _miniTicker?.cancel();
+    unawaited(NgmyGameNotifications.record(
+      email: widget.user.email,
+      gameTitle: widget.gameTitle,
+      won: false,
+      amount: widget.wager,
+      detail: reason,
+    ));
     if (!mounted) return;
     await _showEndPopup(win: false, title: 'YOU LOSE', subtitle: reason, outcomeLabel: outcomeLabel);
   }
@@ -18871,10 +19080,24 @@ class NgmyAdminWalletApprovedArchive {
         if (t.id.trim().isEmpty) continue;
         byId[t.id] = t;
       }
-      final merged = byId.values.toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_kKey, jsonEncode(merged.map((e) => e.toJson()).toList()));
+      await _saveMerged(byId.values.toList());
     } catch (_) {}
+  }
+
+  static Future<void> removeByIds(Set<String> ids) async {
+    if (ids.isEmpty) return;
+    try {
+      final existing = await load();
+      final filtered = existing.where((t) => !ids.contains(t.id)).toList();
+      if (filtered.length == existing.length) return;
+      await _saveMerged(filtered);
+    } catch (_) {}
+  }
+
+  static Future<void> _saveMerged(List<AppTransaction> merged) async {
+    merged.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kKey, jsonEncode(merged.map((e) => e.toJson()).toList()));
   }
 }
 

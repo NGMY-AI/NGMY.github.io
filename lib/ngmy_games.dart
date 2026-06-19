@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
@@ -6,6 +7,7 @@ import 'ngmy_dice_cube.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_result_popup.dart';
 import 'ngmy_game_session.dart';
+import 'ngmy_game_notifications.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_multiplayer.dart';
 
@@ -447,6 +449,13 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
           _rollPreview = null;
         }),
       );
+      unawaited(NgmyGameNotifications.record(
+        email: widget.userEmail,
+        gameTitle: 'Dice Roll',
+        won: false,
+        amount: wager,
+        detail: 'Better luck on the next roll! ($label)',
+      ));
     }
   }
 

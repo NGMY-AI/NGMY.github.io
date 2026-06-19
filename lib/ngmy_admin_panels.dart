@@ -222,6 +222,13 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
               2 => _resolvedWallet.isEmpty && _archive.isEmpty
                   ? [_empty('No completed wallet transactions yet.', isDark)]
                   : [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Text(
+                          'Approved deposits keep View proof for $kNgmyWalletReceiptRetentionDays days, then receipts auto-delete from the app and database.',
+                          style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.black54),
+                        ),
+                      ),
                       ..._resolvedWallet.take(40).map((t) => t.type == TransactionType.withdrawal
                           ? _withdrawalCard(t, isDark, showActions: false)
                           : _depositCard(t, isDark, showActions: false)),
@@ -383,6 +390,14 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
                               visualDensity: VisualDensity.compact,
                             ),
                             child: const Text('View proof', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                          ),
+                        )
+                      else if (!pending && t.status == TransactionStatus.approved && !isInvestment)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8, top: 2),
+                          child: Text(
+                            'Proof expired',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white38 : Colors.black38),
                           ),
                         )
                       else if (pending && !isInvestment)
