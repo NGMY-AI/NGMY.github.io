@@ -6,6 +6,7 @@ Future<bool> ngmyAddNativeCalendarEvent({
   required DateTime end,
   String? notes,
   String? location,
+  int reminderMinutesBefore = 15,
 }) async {
   final event = Event(
     title: title,
@@ -13,7 +14,7 @@ Future<bool> ngmyAddNativeCalendarEvent({
     location: location,
     startDate: start,
     endDate: end,
-    iosParams: const IOSParams(reminder: Duration(minutes: 15)),
+    iosParams: IOSParams(reminder: Duration(minutes: reminderMinutesBefore)),
     androidParams: const AndroidParams(emailInvites: []),
   );
   return Add2Calendar.addEvent2Cal(event);

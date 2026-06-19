@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'ngmy_helper_alarm_calendar.dart';
 import 'ngmy_helper_alarm_memory.dart';
 
 final FlutterLocalNotificationsPlugin _ngmyAlarmNotifications = FlutterLocalNotificationsPlugin();
@@ -35,29 +36,12 @@ Future<void> _ensureAlarmNotificationsReady() async {
   _ngmyAlarmNotificationsReady = true;
 }
 
-Future<String> ngmyScheduleHelperWakeAlarm({
-  required String userEmail,
+Future<void> _scheduleBackupNotification({
   required String title,
   required DateTime when,
   String? notes,
 }) async {
-  final localWhen = when.toLocal();
-  if (localWhen.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
-    return 'That time already passed — pick a future time for your wake alarm.';
-  }
-
-  final entry = NgmyHelperAlarmEntry(
-    id: 'alarm_${DateTime.now().microsecondsSinceEpoch}',
-    title: title.trim().isEmpty ? 'Wake up' : title.trim(),
-    when: localWhen,
-    notes: notes,
-  );
-  await NgmyHelperAlarmMemoryStore.add(userEmail, entry);
-
-  if (kIsWeb) {
-    return 'Saved wake alarm for ${_formatWhen(localWhen)}. On iPhone, also add it to Calendar so your phone can ring even if the browser is closed.';
-  }
-
+  if (kIsWeb) return;
   try {
     await _ensureAlarmNotificationsReady();
     final id = _ngmyAlarmIdSeq++;
@@ -77,25 +61,53 @@ Future<String> ngmyScheduleHelperWakeAlarm({
       interruptionLevel: InterruptionLevel.timeSensitive,
     );
     final details = NotificationDetails(android: android, iOS: darwin, macOS: darwin);
-    final scheduled = tz.TZDateTime.from(localWhen, tz.local);
+    final scheduled = tz.TZDateTime.from(when.toLocal(), tz.local);
     await _ngmyAlarmNotifications.zonedSchedule(
       id: id,
-      title: entry.title,
+      title: title,
       body: notes?.trim().isNotEmpty == true ? notes!.trim() : 'Time to wake up — NGMY Helper',
       scheduledDate: scheduled,
       notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
-    return 'Wake alarm set for ${_formatWhen(localWhen)}. Keep notifications on for NGMY.';
   } catch (e) {
-    debugPrint('[helper-alarm] schedule failed: $e');
-    return 'Saved alarm for ${_formatWhen(localWhen)}, but could not schedule the phone notification. Allow notifications for NGMY in Settings.';
+    debugPrint('[helper-alarm] backup notification failed: $e');
   }
 }
 
-String _formatWhen(DateTime dt) {
-  final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-  final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-  final min = dt.minute.toString().padLeft(2, '0');
-  return '${dt.month}/${dt.day} at $h:$min $ampm';
+Future<String> ngmyScheduleHelperWakeAlarm({
+  required String userEmail,
+  required String title,
+  required DateTime when,
+  String? notes,
+}) async {
+  final localWhen = when.toLocal();
+  if (localWhen.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
+    return 'That time already passed — pick a future time for your wake alarm.';
+  }
+
+  final entry = NgmyHelperAlarmEntry(
+    id: 'alarm_${DateTime.now().microsecondsSinceEpoch}',
+    title: title.trim().isEmpty ? 'Wake up' : title.trim(),
+    when: localWhen,
+    notes: notes,
+  );
+  await NgmyHelperAlarmMemoryStore.add(userEmail, entry);
+
+  final calendarMsg = await ngmyInstallWakeAlarmOnDevice(
+    title: entry.title,
+    when: localWhen,
+    notes: notes,
+  );
+
+  await _scheduleBackupNotification(title: entry.title, when: localWhen, notes: notes);
+
+  if (kIsWeb) {
+    return calendarMsg;
+  }
+
+  return '$calendarMsg A backup NGMY notification is also scheduled.';
 }
+
+String ngmyWakeAlarmIosClockNote() =>
+    'On iPhone, Apple does not let any app add alarms inside the Clock app. NGMY adds a Calendar alert that rings at the set time — tap Allow when prompted.';

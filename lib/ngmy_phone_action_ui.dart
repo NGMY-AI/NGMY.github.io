@@ -40,7 +40,7 @@ String _subtitleFor(NgmyPhoneAction action) => switch (action.type) {
       'calendar' =>
         'Tap continue — iPhone will ask if ngmy.org may show a calendar invite. Tap Allow, then Add.',
       'alarm' =>
-        'NGMY will notify you at the wake time. Allow notifications when asked. On web, also add to Calendar for a reliable ring.',
+        'NGMY opens your Calendar with a ringing alert at the wake time. On iPhone tap Allow / Add on the calendar prompt (Apple does not allow apps to write inside the Clock app). On Android, Clock may open too.',
       'call' => 'Opens your Phone app to call this contact.',
       'sms' => 'Opens Messages / iMessage with this person.',
       'whatsapp' => 'Opens WhatsApp with this person and your message.',

@@ -5,6 +5,7 @@ Future<bool> ngmyAddNativeCalendarEvent({
   required DateTime end,
   String? notes,
   String? location,
+  int reminderMinutesBefore = 15,
 }) async {
   return false;
 }

@@ -72,6 +72,7 @@ import 'ngmy_phone_contact_resolve.dart';
 import 'ngmy_phone_contact_intent.dart';
 import 'ngmy_helper_call_memory.dart';
 import 'ngmy_helper_calendar_memory.dart';
+import 'ngmy_helper_alarm.dart';
 import 'ngmy_helper_permissions.dart';
 import 'ngmy_helper_superpowers.dart';
 import 'ngmy_voice_input.dart';
@@ -40075,8 +40076,26 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           userEmail: widget.user.email,
           onDone: (result) async {
             if (!mounted || result == null) return;
+            final start = DateTime.tryParse(action.fields['start'] ?? '');
+            if (start != null) {
+              await NgmyHelperCalendarMemoryStore.add(
+                widget.user.email,
+                NgmyCalendarMemoryEntry(
+                  id: 'alarm_cal_${DateTime.now().microsecondsSinceEpoch}',
+                  title: (action.fields['title'] ?? 'Wake up').trim(),
+                  start: start.toLocal(),
+                  end: start.toLocal().add(const Duration(minutes: 15)),
+                  notes: action.fields['notes'] ?? 'Wake alarm from NGMY Helper',
+                ),
+              );
+              unawaited(_bootstrapHelperConnections());
+            }
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(result), backgroundColor: const Color(0xFFF97316)),
+              SnackBar(
+                content: Text('$result\n${ngmyWakeAlarmIosClockNote()}'),
+                backgroundColor: const Color(0xFFF97316),
+                duration: const Duration(seconds: 8),
+              ),
             );
           },
         );

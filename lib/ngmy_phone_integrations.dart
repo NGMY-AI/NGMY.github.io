@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_calendar_ics.dart';
 import 'ngmy_helper_alarm.dart';
 import 'ngmy_calendar_download_stub.dart' if (dart.library.html) 'ngmy_calendar_download_web.dart';
 import 'ngmy_calendar_native_stub.dart' if (dart.library.io) 'ngmy_calendar_native_io.dart';
@@ -46,7 +47,7 @@ When the user asks to call, text, WhatsApp, iMessage, calendar, maps, email, or 
 
 Action types (JSON array):
 - calendar — title, start (ISO local), end (optional), notes, location
-- alarm — title, start (ISO local wake time), notes (optional) — schedules a wake-up notification
+- alarm — title, start (ISO local wake time), notes (optional) — opens Calendar + Clock with alert at that time (iPhone uses Calendar alert; Apple blocks writing to Clock app)
 - call — name (preferred) OR phone
 - sms — name OR phone, body (optional) — opens iMessage/Messages on iPhone
 - whatsapp — name OR phone, body (optional)
@@ -228,31 +229,18 @@ Uint8List _buildIcs({
   required DateTime end,
   String? notes,
   String? location,
-}) {
-  final uid = 'ngmy-${DateTime.now().microsecondsSinceEpoch}@ngmy.org';
-  final body = StringBuffer()
-    ..writeln('BEGIN:VCALENDAR')
-    ..writeln('VERSION:2.0')
-    ..writeln('PRODID:-//NGMY//Helper AI//EN')
-    ..writeln('CALSCALE:GREGORIAN')
-    ..writeln('METHOD:PUBLISH')
-    ..writeln('BEGIN:VEVENT')
-    ..writeln('UID:$uid')
-    ..writeln('DTSTAMP:${_icsDate(DateTime.now().toUtc())}Z')
-    ..writeln('DTSTART:${_icsDate(start)}')
-    ..writeln('DTEND:${_icsDate(end)}')
-    ..writeln('SUMMARY:${_escapeIcs(title)}');
-  if (notes != null && notes.trim().isNotEmpty) {
-    body.writeln('DESCRIPTION:${_escapeIcs(notes.trim())}');
-  }
-  if (location != null && location.trim().isNotEmpty) {
-    body.writeln('LOCATION:${_escapeIcs(location.trim())}');
-  }
-  body
-    ..writeln('END:VEVENT')
-    ..writeln('END:VCALENDAR');
-  return Uint8List.fromList(utf8.encode(body.toString()));
-}
+  bool alarmAtStart = false,
+  int alarmMinutesBefore = 15,
+}) =>
+    ngmyBuildIcsBytes(
+      title: title,
+      start: start,
+      end: end,
+      notes: notes,
+      location: location,
+      alarmAtStart: alarmAtStart,
+      alarmMinutesBefore: alarmMinutesBefore,
+    );
 
 String _googleCalendarUrl({
   required String title,
@@ -345,6 +333,7 @@ Future<String?> _runCalendar(NgmyPhoneAction action) async {
         end: end,
         notes: notes,
         location: location,
+        reminderMinutesBefore: 15,
       );
       if (added) return 'Added "$title" to your phone Calendar app.';
     } catch (e) {
@@ -354,7 +343,14 @@ Future<String?> _runCalendar(NgmyPhoneAction action) async {
 
   if (kIsWeb) {
     try {
-      final bytes = _buildIcs(title: title, start: start, end: end, notes: notes, location: location);
+      final bytes = _buildIcs(
+        title: title,
+        start: start,
+        end: end,
+        notes: notes,
+        location: location,
+        alarmMinutesBefore: 15,
+      );
       final msg = await ngmyDownloadIcsFile(
         bytes,
         '${title.replaceAll(RegExp(r'[^\w]+'), '_')}.ics',
