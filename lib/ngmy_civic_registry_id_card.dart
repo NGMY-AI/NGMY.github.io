@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -157,14 +156,6 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
           clipBehavior: Clip.hardEdge,
           children: [
             CustomPaint(painter: _IdCardBackgroundPainter(isGeorgia: isGeorgia)),
-            CustomPaint(painter: _NgmyCenterWatermarkPainter(scale: scale)),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 16 * scale,
-              child: CustomPaint(painter: _NgmyHologramStripPainter(scale: scale)),
-            ),
             Padding(
               padding: EdgeInsets.fromLTRB(10 * scale, 8 * scale, 10 * scale, 9 * scale),
               child: Column(
@@ -491,68 +482,12 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
           children: [
             Icon(Icons.favorite, size: 8 * scale, color: const Color(0xFF111827)),
             SizedBox(width: 3 * scale),
-            Text('CIVIC REGISTRY', style: TextStyle(fontSize: 6.5 * scale, fontWeight: FontWeight.w800)),
+            Text('CIVIC REGISTRY', style: TextStyle(fontSize: 6.5 * scale, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
           ],
         ),
       ],
     );
   }
-}
-
-class _NgmyCenterWatermarkPainter extends CustomPainter {
-  _NgmyCenterWatermarkPainter({required this.scale});
-
-  final double scale;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    _PeachPainter._paintEmbossedNgmy(
-      canvas,
-      Offset(size.width * 0.52, size.height * 0.52),
-      34 * scale,
-      opacity: 0.11,
-      rotate: -0.32,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _NgmyHologramStripPainter extends CustomPainter {
-  _NgmyHologramStripPainter({required this.scale});
-
-  final double scale;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final band = Paint()
-      ..shader = LinearGradient(
-        colors: [
-          const Color(0xFFCBD5E1).withOpacity(0.08),
-          const Color(0xFFE2E8F0).withOpacity(0.28),
-          const Color(0xFF94A3B8).withOpacity(0.22),
-          const Color(0xFFE2E8F0).withOpacity(0.28),
-          const Color(0xFFCBD5E1).withOpacity(0.08),
-        ],
-      ).createShader(rect);
-    canvas.drawRect(rect, band);
-
-    final step = 34.0 * scale;
-    for (var x = -step; x < size.width + step; x += step) {
-      _PeachPainter._paintEmbossedNgmy(
-        canvas,
-        Offset(x + step * 0.5, size.height * 0.52),
-        7.5 * scale,
-        opacity: 0.42,
-        rotate: -0.08,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _IdCardBackgroundPainter extends CustomPainter {
@@ -568,15 +503,15 @@ class _IdCardBackgroundPainter extends CustomPainter {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: isGeorgia
-            ? [const Color(0xFFE8F5E0), const Color(0xFFF5E6C8), const Color(0xFFDCEFCF)]
-            : [const Color(0xFFE8F0FA), const Color(0xFFF5F0E6), const Color(0xFFE2EEF8)],
+            ? [const Color(0xFFE8F5E0), const Color(0xFFEDF4E8), const Color(0xFFDCEFCF)]
+            : [const Color(0xFFE8F0FA), const Color(0xFFF0F4F8), const Color(0xFFE2EEF8)],
       ).createShader(rect);
     canvas.drawRect(rect, bg);
 
     final line = Paint()
-      ..color = Colors.black.withOpacity(0.03)
-      ..strokeWidth = 0.6;
-    for (var i = -size.height; i < size.width + size.height; i += 9) {
+      ..color = Colors.black.withOpacity(0.025)
+      ..strokeWidth = 0.5;
+    for (var i = -size.height; i < size.width + size.height; i += 11) {
       canvas.drawLine(Offset(i.toDouble(), 0), Offset(i + size.height, size.height), line);
     }
   }
@@ -593,72 +528,116 @@ class _PeachPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final cx = size.width * 0.55;
+    final cx = size.width * 0.52;
     final cy = size.height * 0.5;
-    final peach = Paint()..color = const Color(0xFFF97316).withOpacity(0.72);
-    final leaf = Paint()..color = const Color(0xFF16A34A).withOpacity(0.8);
-    canvas.drawOval(Rect.fromCenter(center: Offset(cx, cy), width: size.width * 0.72, height: size.height * 0.78), peach);
-    canvas.drawOval(Rect.fromCenter(center: Offset(cx - size.width * 0.08, cy - size.height * 0.28), width: size.width * 0.22, height: size.height * 0.18), leaf);
+    final peachRect = Rect.fromCenter(
+      center: Offset(cx, cy),
+      width: size.width * 0.72,
+      height: size.height * 0.78,
+    );
+
+    final peachPaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.25, -0.35),
+        radius: 0.95,
+        colors: [
+          const Color(0xFFFFB86A),
+          const Color(0xFFF97316),
+          const Color(0xFFEA580C),
+        ],
+      ).createShader(peachRect);
+    canvas.drawOval(peachRect, peachPaint);
+
+    final highlight = Paint()..color = Colors.white.withOpacity(0.28);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(cx - size.width * 0.12, cy - size.height * 0.12),
+        width: size.width * 0.22,
+        height: size.height * 0.16,
+      ),
+      highlight,
+    );
+
+    final leafRect = Rect.fromCenter(
+      center: Offset(cx - size.width * 0.08, cy - size.height * 0.3),
+      width: size.width * 0.24,
+      height: size.height * 0.16,
+    );
+    final leafPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF4ADE80), Color(0xFF15803D)],
+      ).createShader(leafRect);
+    canvas.drawOval(leafRect, leafPaint);
+
     final stem = Paint()
       ..color = const Color(0xFF854D0E)
-      ..strokeWidth = 1.2
+      ..strokeWidth = 1.4
       ..style = PaintingStyle.stroke;
-    canvas.drawLine(Offset(cx, cy - size.height * 0.34), Offset(cx + size.width * 0.04, cy - size.height * 0.42), stem);
+    canvas.drawLine(
+      Offset(cx, cy - size.height * 0.34),
+      Offset(cx + size.width * 0.05, cy - size.height * 0.44),
+      stem,
+    );
 
     if (showNgmy) {
-      _paintCurvedNgmyOnPeach(canvas, Offset(cx, cy), size.width * 0.34, ngmyScale);
+      _paintNgmyOfficialSeal(canvas, Offset(cx, cy + size.height * 0.02), size.width * 0.42, ngmyScale);
     }
   }
 
-  static void _paintCurvedNgmyOnPeach(Canvas canvas, Offset center, double radius, double scale) {
-    const text = 'NGMY';
-    final fontSize = 8.8 * scale;
-    final startAngle = -1.05;
-    final sweep = 2.1 / math.max(text.length - 1, 1);
-    for (var i = 0; i < text.length; i++) {
-      final angle = startAngle + sweep * i;
-      final px = center.dx + math.cos(angle) * radius;
-      final py = center.dy + math.sin(angle) * radius * 0.55;
-      canvas.save();
-      canvas.translate(px, py);
-      canvas.rotate(angle + math.pi / 2);
-      _paintEmbossedNgmy(canvas, Offset.zero, fontSize, opacity: 0.95, rotate: 0, singleLetter: text[i]);
-      canvas.restore();
-    }
-  }
+  /// Clean circular NGMY seal — no curved letters or yellow shadow lines.
+  static void _paintNgmyOfficialSeal(Canvas canvas, Offset center, double diameter, double scale) {
+    final radius = diameter / 2;
+    final opacity = 1.0;
 
-  static void _paintEmbossedNgmy(
-    Canvas canvas,
-    Offset center,
-    double fontSize, {
-    required double opacity,
-    double rotate = 0,
-    String? singleLetter,
-  }) {
-    final text = singleLetter ?? 'NGMY';
-    canvas.save();
-    canvas.translate(center.dx, center.dy);
-    canvas.rotate(rotate);
+    canvas.drawCircle(
+      center,
+      radius + 1.2 * scale,
+      Paint()..color = Colors.black.withOpacity(0.12),
+    );
+
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()..color = const Color(0xFF1E3A8A).withOpacity(opacity),
+    );
+
+    canvas.drawCircle(
+      center,
+      radius - 1.1 * scale,
+      Paint()
+        ..color = const Color(0xFFD4AF37)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2 * scale,
+    );
+
+    canvas.drawCircle(
+      center,
+      radius * 0.78,
+      Paint()
+        ..color = Colors.white.withOpacity(0.12)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8 * scale,
+    );
+
     final builder = ui.ParagraphBuilder(
       ui.ParagraphStyle(textAlign: TextAlign.center, fontWeight: FontWeight.w900),
     )
       ..pushStyle(
         ui.TextStyle(
-          color: Color.fromRGBO(241, 245, 249, opacity),
-          fontSize: fontSize,
+          color: const Color(0xFFFFFFFF),
+          fontSize: diameter * 0.26,
           fontWeight: FontWeight.w900,
-          letterSpacing: singleLetter == null ? 1.4 : 0,
-          shadows: [
-            ui.Shadow(color: Color.fromRGBO(255, 255, 255, opacity * 0.95), blurRadius: fontSize * 0.22),
-            ui.Shadow(color: Color.fromRGBO(148, 163, 184, opacity * 0.85), blurRadius: fontSize * 0.38),
-            ui.Shadow(color: Color.fromRGBO(0, 0, 0, opacity * 0.35), blurRadius: fontSize * 0.08, offset: Offset(0, fontSize * 0.08)),
-          ],
+          letterSpacing: 1.1,
         ),
       )
-      ..addText(text);
-    final paragraph = builder.build()..layout(ui.ParagraphConstraints(width: fontSize * (singleLetter == null ? 5.5 : 1.4)));
-    canvas.drawParagraph(paragraph, Offset(-paragraph.maxIntrinsicWidth / 2, -fontSize / 2));
-    canvas.restore();
+      ..addText('NGMY');
+    final paragraph = builder.build()..layout(ui.ParagraphConstraints(width: diameter));
+    canvas.drawParagraph(
+      paragraph,
+      Offset(center.dx - paragraph.maxIntrinsicWidth / 2, center.dy - diameter * 0.13),
+    );
   }
 
   @override
@@ -672,7 +651,12 @@ class _MiniNgmySealPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    _PeachPainter._paintEmbossedNgmy(canvas, Offset(size.width / 2, size.height / 2), 7 * scale, opacity: 0.92, rotate: -0.12);
+    _PeachPainter._paintNgmyOfficialSeal(
+      canvas,
+      Offset(size.width / 2, size.height / 2),
+      size.width * 0.92,
+      scale,
+    );
   }
 
   @override
@@ -741,6 +725,7 @@ Future<void> showNgmyCivicRegistryIdCardDialog(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: Colors.white.withOpacity(0.92),
+                            decoration: TextDecoration.none,
                             shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
                           ),
                         ),
