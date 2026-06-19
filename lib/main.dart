@@ -611,6 +611,19 @@ double ngmyResolveAccountBalance(String email, double storedBalance, List<AppTra
   return ledger;
 }
 
+/// Admin dashboard balance — cloud [accountBalance] is synced after every wallet change; the admin
+/// txn cache is only a recent global slice so ledger alone is often incomplete.
+double ngmyAdminDisplayBalance(UserData u, List<AppTransaction> transactions) {
+  final key = ngmyNormalizeEmail(u.email);
+  if (key.isEmpty) return 0;
+  final stored = u.accountBalance;
+  final userTxns = transactions.where((t) => ngmyNormalizeEmail(t.userEmail) == key).toList();
+  if (userTxns.isEmpty) return stored.clamp(0.0, double.infinity);
+  final ledger = ngmyBalanceFromApprovedTransactions(u.email, userTxns);
+  if (stored > ledger + 0.01) return stored.clamp(0.0, double.infinity);
+  return ledger;
+}
+
 void ngmyReconcileUserAccountBalance(UserData user, List<AppTransaction> transactions) {
   user.accountBalance = ngmyResolveAccountBalance(user.email, user.accountBalance, transactions);
 }
@@ -6870,6 +6883,47 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return merged.values.toList();
   }
 
+  Future<List<UserData>> _fetchAllUsersFromCloud() async {
+    final all = <UserData>[];
+    var from = 0;
+    const pageSize = 1000;
+    while (from < 50000) {
+      final to = from + pageSize - 1;
+      final chunk = await supabase
+          .from('users')
+          .select()
+          .order('email')
+          .range(from, to)
+          .timeout(kNgmyCloudLoadTimeout);
+      if (chunk == null || (chunk as List).isEmpty) break;
+      all.addAll(chunk.map((e) => UserData.fromJson(Map<String, dynamic>.from(e as Map))));
+      if (chunk.length < pageSize) break;
+      from += pageSize;
+    }
+    return all;
+  }
+
+  void _mergeUsersDiscoveredFromTransactions(List<UserData> users, List<AppTransaction> txns) {
+    final keys = <String>{for (final u in users) ngmyNormalizeEmail(u.email)};
+    for (final t in txns) {
+      final key = ngmyNormalizeEmail(t.userEmail);
+      if (key.isEmpty || keys.contains(key)) continue;
+      users.add(UserData(email: key, username: key.split('@').first));
+      keys.add(key);
+    }
+  }
+
+  Future<List<AppTransaction>> _fetchAdminTransactionsFromCloud({int limit = 10000}) async {
+    final transData = await supabase
+        .from('transactions')
+        .select()
+        .order('timestamp', ascending: false)
+        .limit(limit)
+        .timeout(kNgmyCloudLoadTimeout);
+    if (transData == null) return const [];
+    return (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
+  }
+
   /// Flush debounced saves immediately — call on pause/close and after login.
   Future<void> _persistSessionImmediately() async {
     _saveDebounceTimer?.cancel();
@@ -6981,36 +7035,28 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _applyWalletDecisionLedgerToTransactions();
 
       if (!lightweight) {
-        final usersData = await supabase.from('users').select().limit(2500);
-        if (usersData != null) {
-          final remote = (usersData as List).map((e) => UserData.fromJson(e)).toList();
-          if (remote.isNotEmpty) {
-            _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
-            _reconcileAllUserBalances();
-            unawaited(ngmyRegisterReferralCodesForUsers(remote));
-          } else {
-            debugPrint('[admin] cloud users empty — keeping ${_allUsers.length} local users');
-          }
+        final remote = await _fetchAllUsersFromCloud();
+        if (remote.isNotEmpty) {
+          _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
+          _reconcileAllUserBalances();
+          unawaited(ngmyRegisterReferralCodesForUsers(remote));
+        } else {
+          debugPrint('[admin] cloud users empty — keeping ${_allUsers.length} local users');
         }
       }
 
-      final transData = await supabase
-          .from('transactions')
-          .select()
-          .order('timestamp', ascending: false)
-          .limit(lightweight ? 400 : 5000);
-      if (transData != null) {
-        final remoteTransactions =
-            (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
-        if (remoteTransactions.isNotEmpty || !lightweight) {
-          _allTransactions = _mergeTransactionsWithRemote(
-            _allTransactions,
-            remoteTransactions,
-            walletDecisionLedger: _walletDecisionLedger,
-          );
-          _applyWalletDecisionLedgerToTransactions();
-        }
+      final remoteTransactions = await _fetchAdminTransactionsFromCloud(
+        limit: lightweight ? 800 : 10000,
+      );
+      if (remoteTransactions.isNotEmpty || !lightweight) {
+        _allTransactions = _mergeTransactionsWithRemote(
+          _allTransactions,
+          remoteTransactions,
+          walletDecisionLedger: _walletDecisionLedger,
+        );
+        _applyWalletDecisionLedgerToTransactions();
       }
+      _mergeUsersDiscoveredFromTransactions(_allUsers, _allTransactions);
       _reconcileAllUserBalances();
       _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
       for (final email in kNgmyAdminEmails) {
@@ -9514,6 +9560,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _persistSessionImmediately();
     if (_currentUser != null) {
       await _applyPendingReferralLink(_currentUser!);
+      unawaited(_pushUserToCloudFast(_currentUser!, includeFreeTrial: true));
     }
     _restartSyncLoopsForCurrentUser();
     unawaited(_refreshCurrentUserFromCloud());
@@ -10450,8 +10497,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _reconcileAllUserBalances() {
+    final admin = _ngmySessionIsAdmin(_currentUser);
     for (final u in _allUsers) {
-      ngmyReconcileUserAccountBalance(u, _allTransactions);
+      if (admin) {
+        u.accountBalance = ngmyAdminDisplayBalance(u, _allTransactions);
+      } else {
+        ngmyReconcileUserAccountBalance(u, _allTransactions);
+      }
     }
     if (_currentUser != null) {
       final key = _currentUser!.email.toLowerCase().trim();
@@ -10679,17 +10731,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
         if (bootstrapAdmin) {
           try {
-            final usersData = await supabase.from('users').select().limit(2500);
-            if (usersData != null) {
-              final remote = (usersData as List).map((e) => UserData.fromJson(e)).toList();
-              if (remote.isNotEmpty) {
-                _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
-                _reconcileAllUserBalances();
-                unawaited(ngmyRegisterReferralCodesForUsers(remote));
-              } else {
-                debugPrint('[admin] bootstrap users empty — keeping local cache');
-                _allUsers = localUsersBeforeFetch.values.toList();
-              }
+            final remote = await _fetchAllUsersFromCloud();
+            if (remote.isNotEmpty) {
+              _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
+              _reconcileAllUserBalances();
+              unawaited(ngmyRegisterReferralCodesForUsers(remote));
+            } else {
+              debugPrint('[admin] bootstrap users empty — keeping local cache');
+              _allUsers = localUsersBeforeFetch.values.toList();
             }
           } catch (e) {
             debugPrint('[admin] bootstrap users fetch: $e');
@@ -10732,14 +10781,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
         final List<AppTransaction> remoteTransactions;
         if (bootstrapAdmin || sessionEmail.isEmpty) {
-          final transData = await supabase
-              .from('transactions')
-              .select()
-              .order('timestamp', ascending: false)
-              .limit(500);
-          remoteTransactions = transData == null
-              ? <AppTransaction>[]
-              : (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
+          remoteTransactions = await _fetchAdminTransactionsFromCloud(limit: 10000);
         } else {
           remoteTransactions = await _fetchCloudTransactionsForEmail(sessionEmail);
         }
@@ -10752,13 +10794,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           );
           if (bootstrapAdmin) {
             await _flushLocalWalletDecisionsToCloud();
-            final refreshed = await supabase
-                .from('transactions')
-                .select()
-                .order('timestamp', ascending: false)
-                .limit(500);
-            if (refreshed != null) {
-              final again = (refreshed as List).map((e) => AppTransaction.fromJson(e)).toList();
+            final again = await _fetchAdminTransactionsFromCloud(limit: 10000);
+            if (again.isNotEmpty) {
               _allTransactions = _mergeTransactionsWithRemote(
                 _allTransactions,
                 again,
@@ -10766,6 +10803,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               );
             }
             _applyWalletDecisionLedgerToTransactions();
+            _mergeUsersDiscoveredFromTransactions(_allUsers, _allTransactions);
           } else {
             _applyWalletDecisionLedgerToTransactions();
           }
@@ -21065,7 +21103,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   );
 
   Widget _adminUserDetail(UserData u, bool isDark) {
-    ngmyReconcileUserAccountBalance(u, widget.allTransactions);
+    final displayBalance = ngmyAdminDisplayBalance(u, widget.allTransactions);
     final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
     final border = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
     final statusColor = u.status == 'active'
@@ -21128,7 +21166,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           children: [
                             Text('Balance', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white54 : Colors.black45)),
                             const SizedBox(height: 4),
-                            Text('\$${formatCurrency(u.accountBalance)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF00B25A))),
+                            Text('\$${formatCurrency(displayBalance)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF00B25A))),
                           ],
                         ),
                       ),
@@ -21413,9 +21451,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       widget.allUsers.where(ngmyIsAppSignupUser).toList();
 
   Widget _adminUsers(bool isDark) {
-    for (final u in widget.allUsers) {
-      ngmyReconcileUserAccountBalance(u, widget.allTransactions);
-    }
     final q = _query.trim().toLowerCase();
     final filtered = _adminAppSignupUsers()
         .where((u) => _userMatchesQuery(u, q))
@@ -21463,7 +21498,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           itemCount: filtered.length,
           itemBuilder: (_, i) {
             final u = filtered[i];
-            ngmyReconcileUserAccountBalance(u, widget.allTransactions);
+            final displayBalance = ngmyAdminDisplayBalance(u, widget.allTransactions);
             final statusColor = u.status == 'active' ? Colors.green : u.status == 'suspended' ? Colors.orange : Colors.red;
             return Card(
               elevation: 0,
@@ -21471,10 +21506,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               margin: const EdgeInsets.only(bottom: 10),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               child: ListTile(
-                onTap: () {
-                  ngmyReconcileUserAccountBalance(u, widget.allTransactions);
-                  setState(() => _selectedUserEmail = u.email);
-                },
+                onTap: () => setState(() => _selectedUserEmail = u.email),
                 leading: _adminUserAvatar(u, fallback: statusColor),
                 title: Text(u.username, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white : Colors.black)),
                 subtitle: Column(
@@ -21490,7 +21522,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '\$${formatCurrency(u.accountBalance)}',
+                      '\$${formatCurrency(displayBalance)}',
                       style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF00B25A)),
                     ),
                     Icon(Icons.chevron_right, color: isDark ? Colors.white38 : Colors.black38, size: 18),
