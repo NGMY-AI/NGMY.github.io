@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_helper_alarm.dart';
 import 'ngmy_calendar_download_stub.dart' if (dart.library.html) 'ngmy_calendar_download_web.dart';
 import 'ngmy_calendar_native_stub.dart' if (dart.library.io) 'ngmy_calendar_native_io.dart';
 import 'ngmy_phone_action_ui.dart';
@@ -14,6 +15,7 @@ export 'ngmy_phone_action_ui.dart';
 /// Apps NGMY Helper AI can open on the user's phone right now.
 const List<({String id, String label, String example})> kNgmyPhoneConnectedApps = [
   (id: 'calendar', label: 'Calendar', example: 'Add dentist Friday at 3pm'),
+  (id: 'alarm', label: 'Wake alarm', example: 'Wake me at 7am — work at 10'),
   (id: 'maps', label: 'Maps', example: 'Open directions to 123 Main St'),
   (id: 'call', label: 'Phone', example: 'Call Mom'),
   (id: 'sms', label: 'iMessage / Messages', example: 'Text Sarah I am on my way'),
@@ -44,6 +46,7 @@ When the user asks to call, text, WhatsApp, iMessage, calendar, maps, email, or 
 
 Action types (JSON array):
 - calendar — title, start (ISO local), end (optional), notes, location
+- alarm — title, start (ISO local wake time), notes (optional) — schedules a wake-up notification
 - call — name (preferred) OR phone
 - sms — name OR phone, body (optional) — opens iMessage/Messages on iPhone
 - whatsapp — name OR phone, body (optional)
@@ -55,6 +58,7 @@ Rules:
 - When user says "call Mom" or "text John on WhatsApp", use "name" — NEVER invent phone numbers.
 - If the name is not in PHONE CONTACTS, say you will look them up after they say "allow access" once — do NOT tell them to tap a contacts button.
 - REQUIRED calendar block for any meeting/appointment request.
+- REQUIRED alarm block when user says wake me, set alarm, wake up at, or needs alarm before work/shift/meeting.
 - start/end must be valid ISO datetimes in local timezone.
 ''';
 }
@@ -68,6 +72,7 @@ class NgmyPhoneAction {
 
   String get label => switch (type) {
         'calendar' => 'Add to Calendar',
+        'alarm' => 'Set wake alarm',
         'maps' => 'Open Maps',
         'call' => 'Call',
         'sms' => 'Send Text',
@@ -79,6 +84,7 @@ class NgmyPhoneAction {
 
   IconData get icon => switch (type) {
         'calendar' => Icons.calendar_month_rounded,
+        'alarm' => Icons.alarm_rounded,
         'maps' => Icons.map_rounded,
         'call' => Icons.phone_rounded,
         'sms' => Icons.sms_rounded,
@@ -92,6 +98,13 @@ class NgmyPhoneAction {
     switch (type) {
       case 'calendar':
         final title = fields['title'] ?? 'Event';
+        final start = _parseDateTime(fields['start']);
+        if (start != null) {
+          return '$title · ${_formatShort(start)}';
+        }
+        return title;
+      case 'alarm':
+        final title = fields['title'] ?? 'Wake up';
         final start = _parseDateTime(fields['start']);
         if (start != null) {
           return '$title · ${_formatShort(start)}';
@@ -287,6 +300,7 @@ Future<String?> ngmyRunPhoneAction(
   NgmyPhoneAction action, {
   BuildContext? context,
   bool skipConfirmation = false,
+  String userEmail = '',
 }) async {
   if (_needsConfirmation(action) && context != null && context.mounted && !skipConfirmation) {
     final ok = await ngmyShowPhoneActionSheet(context: context, action: action);
@@ -296,6 +310,8 @@ Future<String?> ngmyRunPhoneAction(
   switch (action.type) {
     case 'calendar':
       return _runCalendar(action);
+    case 'alarm':
+      return _runAlarm(action, userEmail: userEmail);
     case 'maps':
       return _runMaps(action);
     case 'call':
@@ -355,6 +371,21 @@ Future<String?> _runCalendar(NgmyPhoneAction action) async {
   final url = _googleCalendarUrl(title: title, start: start, end: end, notes: notes, location: location);
   final ok = await _launchExternal(Uri.parse(url));
   return ok ? 'Opened Calendar to add "$title".' : 'Could not open Calendar. Tap Add to Calendar below.';
+}
+
+Future<String?> _runAlarm(NgmyPhoneAction action, {required String userEmail}) async {
+  final title = (action.fields['title'] ?? 'Wake up').trim();
+  final start = _parseDateTime(action.fields['start']);
+  if (start == null) return 'Could not read the alarm time.';
+  if (userEmail.trim().isEmpty) {
+    return 'Sign in to save wake alarms to your NGMY account on this device.';
+  }
+  return ngmyScheduleHelperWakeAlarm(
+    userEmail: userEmail,
+    title: title,
+    when: start,
+    notes: action.fields['notes'],
+  );
 }
 
 Future<String?> _runMaps(NgmyPhoneAction action) async {

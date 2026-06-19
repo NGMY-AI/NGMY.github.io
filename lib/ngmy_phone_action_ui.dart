@@ -15,6 +15,7 @@ String ngmyFormatPhoneDisplay(String phone) {
 
 Color _accentForType(String type) => switch (type) {
       'calendar' => const Color(0xFF00B25A),
+      'alarm' => const Color(0xFFF97316),
       'call' => const Color(0xFF2563EB),
       'sms' => const Color(0xFF7C3AED),
       'whatsapp' => const Color(0xFF25D366),
@@ -25,6 +26,7 @@ Color _accentForType(String type) => switch (type) {
 
 String _headlineFor(NgmyPhoneAction action) => switch (action.type) {
       'calendar' => 'Add to iPhone Calendar',
+      'alarm' => 'Set wake-up alarm',
       'call' => 'Place a phone call',
       'sms' => 'Send iMessage / text',
       'whatsapp' => 'Send WhatsApp message',
@@ -37,6 +39,8 @@ String _headlineFor(NgmyPhoneAction action) => switch (action.type) {
 String _subtitleFor(NgmyPhoneAction action) => switch (action.type) {
       'calendar' =>
         'Tap continue — iPhone will ask if ngmy.org may show a calendar invite. Tap Allow, then Add.',
+      'alarm' =>
+        'NGMY will notify you at the wake time. Allow notifications when asked. On web, also add to Calendar for a reliable ring.',
       'call' => 'Opens your Phone app to call this contact.',
       'sms' => 'Opens Messages / iMessage with this person.',
       'whatsapp' => 'Opens WhatsApp with this person and your message.',
@@ -48,6 +52,7 @@ String _subtitleFor(NgmyPhoneAction action) => switch (action.type) {
 
 String _primaryLabelFor(NgmyPhoneAction action) => switch (action.type) {
       'calendar' => 'Show calendar invite',
+      'alarm' => 'Set wake alarm',
       'call' => 'Call now',
       'sms' => 'Open Messages',
       'whatsapp' => 'Open WhatsApp',
@@ -261,5 +266,19 @@ Future<void> ngmyPresentPhoneCalendarSheet({
   final ok = await ngmyShowPhoneActionSheet(context: context, action: action);
   if (!ok || !context.mounted) return;
   final result = await ngmyRunPhoneAction(action, skipConfirmation: true);
+  await onDone(result);
+}
+
+/// Wake alarm entry — confirm sheet, then schedule notification.
+Future<void> ngmyPresentPhoneAlarmSheet({
+  required BuildContext context,
+  required NgmyPhoneAction action,
+  required String userEmail,
+  required Future<void> Function(String? result) onDone,
+}) async {
+  if (!context.mounted) return;
+  final ok = await ngmyShowPhoneActionSheet(context: context, action: action);
+  if (!ok || !context.mounted) return;
+  final result = await ngmyRunPhoneAction(action, skipConfirmation: true, userEmail: userEmail);
   await onDone(result);
 }

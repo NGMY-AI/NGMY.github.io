@@ -66,6 +66,7 @@ import 'ngmy_helper_kb_ui.dart';
 import 'ngmy_helper_kb_admin.dart';
 import 'ngmy_phone_integrations.dart';
 import 'ngmy_phone_calendar_intent.dart';
+import 'ngmy_phone_alarm_intent.dart';
 import 'ngmy_phone_contacts.dart';
 import 'ngmy_phone_contact_resolve.dart';
 import 'ngmy_phone_contact_intent.dart';
@@ -39971,6 +39972,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       var phoneActions = parsed.actions;
       if (phoneActions.isEmpty) {
         phoneActions = [
+          ...ngmyInferAlarmActionsFromUserMessage(text),
           ...ngmyInferCalendarActionsFromUserMessage(text),
           ...ngmyInferContactActionsFromUserMessage(text),
         ];
@@ -40066,9 +40068,24 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         );
         continue;
       }
+      if (action.type == 'alarm') {
+        await ngmyPresentPhoneAlarmSheet(
+          context: context,
+          action: action,
+          userEmail: widget.user.email,
+          onDone: (result) async {
+            if (!mounted || result == null) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(result), backgroundColor: const Color(0xFFF97316)),
+            );
+          },
+        );
+        continue;
+      }
       final result = await ngmyRunPhoneAction(
         action,
         context: context,
+        userEmail: widget.user.email,
         skipConfirmation: action.type == 'call' || action.type == 'sms' || action.type == 'whatsapp',
       );
       if (!mounted || result == null) continue;
@@ -40107,9 +40124,24 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       );
       return;
     }
+    if (action.type == 'alarm') {
+      await ngmyPresentPhoneAlarmSheet(
+        context: context,
+        action: action,
+        userEmail: widget.user.email,
+        onDone: (result) async {
+          if (!mounted || result == null) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result), backgroundColor: const Color(0xFFF97316)),
+          );
+        },
+      );
+      return;
+    }
     final result = await ngmyRunPhoneAction(
       action,
       context: context,
+      userEmail: widget.user.email,
       skipConfirmation: action.type == 'call' || action.type == 'sms' || action.type == 'whatsapp',
     );
     if (!mounted || result == null) return;
