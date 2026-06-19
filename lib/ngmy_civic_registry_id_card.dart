@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -146,10 +147,13 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
       height: h,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12 * scale),
+        clipBehavior: Clip.hardEdge,
         child: Stack(
           fit: StackFit.expand,
+          clipBehavior: Clip.hardEdge,
           children: [
             CustomPaint(painter: _IdCardBackgroundPainter(isGeorgia: isGeorgia)),
+            Center(child: _NgmySilverWatermark(fontSize: 42 * scale, opacity: 0.14, rotate: -0.28)),
             Padding(
               padding: EdgeInsets.fromLTRB(10 * scale, 8 * scale, 10 * scale, 7 * scale),
               child: Column(
@@ -164,6 +168,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                         SizedBox(
                           width: 88 * scale,
                           child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               _circlePhoto(photo, photoSize, iconSize: 34 * scale),
                               SizedBox(height: 5 * scale),
@@ -190,17 +195,33 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                         ),
                         SizedBox(width: 8 * scale),
                         Expanded(
-                          child: _dataColumn(registryId, dob, name, address, city, code, room, iss, exp, scale),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              return FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.topLeft,
+                                child: SizedBox(
+                                  width: constraints.maxWidth,
+                                  child: _dataColumn(registryId, dob, name, address, city, code, room, iss, exp, scale),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                         SizedBox(width: 6 * scale),
                         SizedBox(
                           width: 82 * scale,
                           child: Stack(
+                            clipBehavior: Clip.hardEdge,
                             children: [
                               Align(
                                 alignment: Alignment.topRight,
                                 child: isGeorgia
-                                    ? CustomPaint(size: Size(68 * scale, 68 * scale), painter: _PeachPainter())
+                                    ? SizedBox(
+                                        width: 68 * scale,
+                                        height: 68 * scale,
+                                        child: CustomPaint(painter: _PeachPainter(showNgmy: true, ngmyScale: scale)),
+                                      )
                                     : Container(
                                         width: 62 * scale,
                                         height: 62 * scale,
@@ -214,10 +235,18 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                                           ),
                                           border: Border.all(color: const Color(0xFF1E3A8A), width: 1.4),
                                         ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          code,
-                                          style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.w900, color: const Color(0xFF1E3A8A)),
+                                        child: Stack(
+                                          alignment: Alignment.center,
+                                          children: [
+                                            Text(
+                                              code,
+                                              style: TextStyle(fontSize: 16 * scale, fontWeight: FontWeight.w900, color: const Color(0xFF1E3A8A)),
+                                            ),
+                                            Positioned(
+                                              bottom: 6 * scale,
+                                              child: _NgmySilverWatermark(fontSize: 8 * scale, opacity: 0.95, glow: true),
+                                            ),
+                                          ],
                                         ),
                                       ),
                               ),
@@ -245,6 +274,11 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                   _footerRow(registryId, phone, scale),
                 ],
               ),
+            ),
+            Positioned(
+              left: 96 * scale,
+              bottom: 18 * scale,
+              child: _NgmySilverWatermark(fontSize: 11 * scale, opacity: 0.72, glow: true),
             ),
           ],
         ),
@@ -308,7 +342,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
               width: 16 * scale,
               height: 16 * scale,
               decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-              child: Icon(Icons.star_rounded, size: 10 * scale, color: const Color(0xFFFBBF24)),
+              child: Icon(Icons.star_rounded, size: 10 * scale, color: const Color(0xFFE2E8F0)),
             ),
             SizedBox(width: 4 * scale),
             Column(
@@ -338,12 +372,12 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
   ) {
     Widget field(String label, String value, {bool bold = false}) {
       return Padding(
-        padding: EdgeInsets.only(bottom: 2.5 * scale),
+        padding: EdgeInsets.only(bottom: 2 * scale),
         child: RichText(
-          maxLines: 3,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
           text: TextSpan(
-            style: TextStyle(fontSize: 7.5 * scale, color: const Color(0xFF111827), height: 1.2),
+            style: TextStyle(fontSize: 7.5 * scale, color: const Color(0xFF111827), height: 1.15),
             children: [
               if (label.isNotEmpty)
                 TextSpan(text: '$label ', style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -364,6 +398,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           children: [
@@ -379,7 +414,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
         ),
         field('', name, bold: true),
         if (addrLine.isNotEmpty) field('8', addrLine),
-        const Spacer(),
+        SizedBox(height: 4 * scale),
         Row(
           children: [
             Expanded(child: field('REST', 'NONE')),
@@ -427,6 +462,58 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
   }
 }
 
+class _NgmySilverWatermark extends StatelessWidget {
+  const _NgmySilverWatermark({
+    required this.fontSize,
+    this.opacity = 1,
+    this.glow = false,
+    this.rotate = 0,
+  });
+
+  final double fontSize;
+  final double opacity;
+  final bool glow;
+  final double rotate;
+
+  @override
+  Widget build(BuildContext context) {
+    const text = 'NGMY';
+    final style = TextStyle(
+      fontSize: fontSize,
+      fontWeight: FontWeight.w900,
+      letterSpacing: fontSize * 0.08,
+      height: 1,
+      foreground: Paint()
+        ..shader = ui.Gradient.linear(
+          const Offset(0, 0),
+          Offset(fontSize * 1.6, fontSize * 1.2),
+          [
+            Color.lerp(const Color(0xFFF8FAFC), Colors.white, 0.9)!,
+            const Color(0xFFCBD5E1),
+            const Color(0xFF94A3B8),
+            const Color(0xFFE2E8F0),
+          ],
+          [0.0, 0.35, 0.7, 1.0],
+        ),
+      shadows: glow
+          ? [
+              Shadow(color: Colors.white.withOpacity(0.95), blurRadius: fontSize * 0.18),
+              Shadow(color: const Color(0xFF94A3B8).withOpacity(0.85), blurRadius: fontSize * 0.35),
+              Shadow(color: Colors.black.withOpacity(0.25), blurRadius: fontSize * 0.12, offset: Offset(0, fontSize * 0.06)),
+            ]
+          : null,
+    );
+
+    return Opacity(
+      opacity: opacity,
+      child: Transform.rotate(
+        angle: rotate,
+        child: Text(text, style: style),
+      ),
+    );
+  }
+}
+
 class _IdCardBackgroundPainter extends CustomPainter {
   _IdCardBackgroundPainter({required this.isGeorgia});
 
@@ -446,9 +533,9 @@ class _IdCardBackgroundPainter extends CustomPainter {
     canvas.drawRect(rect, bg);
 
     final line = Paint()
-      ..color = Colors.black.withOpacity(0.035)
-      ..strokeWidth = 0.7;
-    for (var i = -size.height; i < size.width + size.height; i += 7) {
+      ..color = Colors.black.withOpacity(0.03)
+      ..strokeWidth = 0.6;
+    for (var i = -size.height; i < size.width + size.height; i += 9) {
       canvas.drawLine(Offset(i.toDouble(), 0), Offset(i + size.height, size.height), line);
     }
   }
@@ -458,6 +545,11 @@ class _IdCardBackgroundPainter extends CustomPainter {
 }
 
 class _PeachPainter extends CustomPainter {
+  _PeachPainter({this.showNgmy = false, this.ngmyScale = 1});
+
+  final bool showNgmy;
+  final double ngmyScale;
+
   @override
   void paint(Canvas canvas, Size size) {
     final cx = size.width * 0.55;
@@ -471,10 +563,37 @@ class _PeachPainter extends CustomPainter {
       ..strokeWidth = 1.2
       ..style = PaintingStyle.stroke;
     canvas.drawLine(Offset(cx, cy - size.height * 0.34), Offset(cx + size.width * 0.04, cy - size.height * 0.42), stem);
+
+    if (showNgmy) {
+      _paintSilverNgmy(canvas, Offset(cx, cy + size.height * 0.02), 11 * ngmyScale);
+    }
+  }
+
+  static void _paintSilverNgmy(Canvas canvas, Offset center, double fontSize) {
+    const text = 'NGMY';
+    final builder = ui.ParagraphBuilder(
+      ui.ParagraphStyle(textAlign: TextAlign.center, fontWeight: FontWeight.w900),
+    )
+      ..pushStyle(
+        ui.TextStyle(
+          color: const Color(0xFFF1F5F9),
+          fontSize: fontSize,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.2,
+          shadows: const [
+            ui.Shadow(color: Color(0xE6FFFFFF), blurRadius: 4),
+            ui.Shadow(color: Color(0xCC94A3B8), blurRadius: 8),
+            ui.Shadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
+          ],
+        ),
+      )
+      ..addText(text);
+    final paragraph = builder.build()..layout(ui.ParagraphConstraints(width: fontSize * 5));
+    canvas.drawParagraph(paragraph, Offset(center.dx - paragraph.maxIntrinsicWidth / 2, center.dy - fontSize / 2));
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _PeachPainter oldDelegate) => false;
 }
 
 Widget _floatingIconButton({
@@ -514,9 +633,10 @@ Future<void> showNgmyCivicRegistryIdCardDialog(
       final cardScale = ((screenW - 28) / 360).clamp(0.82, 1.08);
       return SafeArea(
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
             Center(
-              child: SingleChildScrollView(
+              child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 56),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -527,7 +647,7 @@ Future<void> showNgmyCivicRegistryIdCardDialog(
                       photoImage: photoImage,
                       scale: cardScale,
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Text(
                       'Official Civic Registry ID',
                       style: TextStyle(
