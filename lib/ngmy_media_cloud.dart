@@ -127,6 +127,7 @@ Map<String, dynamic> ngmyMediaRowForCloud(Map<String, dynamic> raw) {
   take('watch_required_seconds');
   take('rewardedViewers');
   take('rewarded_viewers');
+  take('shareCount');
   if (raw['monetization'] is Map) {
     data['monetization'] = raw['monetization'];
   }
@@ -149,6 +150,7 @@ Map<String, dynamic> ngmyMediaRowForCloud(Map<String, dynamic> raw) {
   row['timestamp'] = ts;
   row['comments'] = comments is List ? comments : const [];
   row['likes'] = likedBy is List ? likedBy.length : (raw['likes'] as num?)?.toInt() ?? 0;
+  row['shareCount'] = (raw['shareCount'] as num?)?.toInt() ?? 0;
 
   return row;
 }
@@ -175,6 +177,9 @@ Map<String, dynamic> ngmyMediaJsonWithData(Map<String, dynamic> json) {
   out['savedBy'] = ngmyMergeStringLists(topSavedBy, dataSavedBy);
   out['comments'] = ngmyMergeCommentLists(topComments, dataComments);
   out['likes'] = out['likedBy'] is List ? (out['likedBy'] as List).length : (out['likes'] as num?)?.toInt() ?? 0;
+  final topShare = (out['shareCount'] as num?)?.toInt() ?? 0;
+  final dataShare = nestedMap != null ? (nestedMap['shareCount'] as num?)?.toInt() ?? 0 : 0;
+  out['shareCount'] = topShare > dataShare ? topShare : dataShare;
 
   if ((out['caption'] ?? '').toString().isEmpty && (out['description'] ?? '').toString().isNotEmpty) {
     out['caption'] = out['description'];

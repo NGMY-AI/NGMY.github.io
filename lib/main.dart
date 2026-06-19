@@ -120,6 +120,7 @@ import 'ngmy_civic_registry_id_card.dart';
 import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_member_report.dart';
 import 'ngmy_civic_id_scanner.dart';
+import 'ngmy_media_deep_link.dart';
 import 'ngmy_civic_enroll_link.dart';
 import 'ngmy_referral_link.dart';
 import 'ngmy_referral.dart';
@@ -442,6 +443,7 @@ void main() async {
   }
 
   ngmyCaptureCivicEnrollLaunchIntent();
+  ngmyCaptureMediaPostLaunchIntent();
   ngmyCaptureReferralLaunchIntent();
   _ngmyInitialThemeMode = launchBootstrap.themeMode;
   _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
@@ -3557,6 +3559,7 @@ class MediaPost {
   final String caption;
   final DateTime timestamp;
   int likes;
+  int shareCount;
   List<String> likedBy;
   List<String> savedBy;
   List<Map<String, dynamic>> comments;
@@ -3578,6 +3581,7 @@ class MediaPost {
     required this.timestamp,
     this.contentType = 'video',
     this.likes = 0,
+    this.shareCount = 0,
     this.likedBy = const <String>[],
     this.savedBy = const <String>[],
     this.comments = const <Map<String, dynamic>>[],
@@ -3621,6 +3625,7 @@ class MediaPost {
       'caption': caption,
       'timestamp': timestamp.toUtc().toIso8601String(),
       'likes': likedBy.length,
+      'shareCount': shareCount,
       'likedBy': likedBy,
       'savedBy': savedBy,
       'comments': comments,
@@ -3651,6 +3656,7 @@ class MediaPost {
       comments: comments,
       taggedUsers: taggedUsers,
       likes: likedBy.isNotEmpty ? likedBy.length : (json['likes'] ?? 0),
+      shareCount: (json['shareCount'] as num?)?.toInt() ?? 0,
       mediaAspectRatio: (json['mediaAspectRatio'] as num?)?.toDouble(),
       externalLink: mon.externalLink,
       previewSeconds: mon.previewSeconds,
@@ -4077,6 +4083,7 @@ MediaPost _combineMediaPosts(MediaPost remote, MediaPost local) {
     caption: remote.caption.isNotEmpty ? remote.caption : local.caption,
     timestamp: remote.timestamp.isAfter(local.timestamp) ? remote.timestamp : local.timestamp,
     likes: likedBy.length,
+    shareCount: remote.shareCount > local.shareCount ? remote.shareCount : local.shareCount,
     likedBy: likedBy,
     savedBy: savedBy,
     comments: comments,
@@ -13665,6 +13672,39 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     }
   }
 
+  Future<void> _maybeOpenMediaPostDeepLink() async {
+    final postId = ngmyTakePendingMediaPostId();
+    if (postId == null || postId.isEmpty || !mounted) return;
+    await widget.onRefreshMediaFromCloud?.call();
+    if (!mounted) return;
+    if (!widget.allMedia.any((m) => m.id == postId)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This NGMY Media post is no longer available.')),
+      );
+      return;
+    }
+    await NgmyNavigator.push(
+      context,
+      JobMarketplaceScreen(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        allMedia: widget.allMedia,
+        config: widget.config,
+        onDataChanged: widget.onDataChanged,
+        onAddTransaction: widget.onAddTransaction,
+        onPost: widget.onPostMedia,
+        onRefreshFromCloud: widget.onRefreshMediaFromCloud,
+        onDeleteMedia: widget.onDeleteMedia,
+        onPruneMedia: widget.onPruneMedia,
+        onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
+        onSyncMediaPost: widget.onSyncAdminMediaPost,
+        onSyncUserMedia: widget.onSyncAdminUserMedia,
+        highlightPostId: postId,
+      ),
+      routeName: 'MediaScreen',
+    );
+  }
+
   Future<void> _maybeOpenCivicEnrollDeepLink() async {
     if (!ngmyTakePendingCivicSelfEnrollmentOpen()) return;
     if (!mounted) return;
@@ -13740,6 +13780,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     _runScheduledPopups();
     WidgetsBinding.instance.addPostFrameCallback((_) => _promptPushNotificationsIfNeeded());
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenCivicEnrollDeepLink());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenMediaPostDeepLink());
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
@@ -39170,6 +39211,7 @@ class NgmyJobMarketplaceMediaScreen extends StatefulWidget {
   final Future<bool> Function(MediaPost post)? onSyncMediaPost;
   final Future<bool> Function(UserData user)? onSyncUserMedia;
   final bool showBackButton;
+  final String? highlightPostId;
 
   const NgmyJobMarketplaceMediaScreen({
     super.key,
@@ -39187,6 +39229,7 @@ class NgmyJobMarketplaceMediaScreen extends StatefulWidget {
     this.onSyncMediaPost,
     this.onSyncUserMedia,
     this.showBackButton = false,
+    this.highlightPostId,
   });
 
   @override
@@ -39202,6 +39245,24 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
   OverlayEntry? _noticeEntry;
   Timer? _mediaSyncTimer;
   String _lastFeedSig = '';
+  final Map<String, GlobalKey> _postKeys = {};
+  bool _highlightScrolled = false;
+
+  GlobalKey _postKey(String id) => _postKeys.putIfAbsent(id, GlobalKey.new);
+
+  void _scrollToHighlightedPost() {
+    final id = widget.highlightPostId?.trim();
+    if (id == null || id.isEmpty || _highlightScrolled) return;
+    final ctx = _postKeys[id]?.currentContext;
+    if (ctx == null) return;
+    _highlightScrolled = true;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      alignment: 0.06,
+    );
+  }
 
   @override
   void initState() {
@@ -39211,6 +39272,9 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
       await widget.onPurgeBrokenMedia?.call();
       await _cleanupExpiredPosts();
       await _silentRefreshFeed();
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToHighlightedPost());
+      }
     });
     _mediaSyncTimer = Timer.periodic(const Duration(seconds: 30), (_) => _silentRefreshFeed());
   }
@@ -40295,9 +40359,12 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
                     cacheExtent: 400,
                     addAutomaticKeepAlives: false,
                     itemCount: mediaFeed.length,
-                    itemBuilder: (context, index) => VideoPostWidget(
-                      key: ValueKey(mediaFeed[index].id),
-                      post: mediaFeed[index],
+                    itemBuilder: (context, index) {
+                      final post = mediaFeed[index];
+                      final highlight = widget.highlightPostId == post.id;
+                      return VideoPostWidget(
+                        key: highlight ? _postKey(post.id) : ValueKey(post.id),
+                        post: post,
                       currentUser: widget.user,
                       allUsers: widget.allUsers,
                       onChanged: widget.onDataChanged,
@@ -40306,7 +40373,8 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
                       onMissingStorage: _removeBrokenPost,
                       onOpenProfile: _openMediaProfile,
                       onPayoutWatchReward: _payoutWatchReward,
-                    ),
+                    );
+                    },
                   ),
           ),
           Positioned(
@@ -40585,6 +40653,7 @@ class JobMarketplaceScreen extends StatelessWidget {
   final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
   final Future<bool> Function(MediaPost post)? onSyncMediaPost;
   final Future<bool> Function(UserData user)? onSyncUserMedia;
+  final String? highlightPostId;
 
   const JobMarketplaceScreen({
     super.key,
@@ -40601,6 +40670,7 @@ class JobMarketplaceScreen extends StatelessWidget {
     this.onPurgeBrokenMedia,
     this.onSyncMediaPost,
     this.onSyncUserMedia,
+    this.highlightPostId,
   });
 
   @override
@@ -40620,6 +40690,7 @@ class JobMarketplaceScreen extends StatelessWidget {
       onSyncMediaPost: onSyncMediaPost,
       onSyncUserMedia: onSyncUserMedia,
       showBackButton: true,
+      highlightPostId: highlightPostId,
     );
   }
 }
@@ -40871,6 +40942,53 @@ class _NgmyFullscreenImagePage extends StatelessWidget {
       ),
     );
   }
+}
+
+class _NgmyInstagramCommentBubbleIcon extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const _NgmyInstagramCommentBubbleIcon({this.size = 24, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(size, size),
+      painter: _NgmyInstagramCommentBubblePainter(color: color),
+    );
+  }
+}
+
+class _NgmyInstagramCommentBubblePainter extends CustomPainter {
+  final Color color;
+
+  _NgmyInstagramCommentBubblePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.075
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final body = RRect.fromRectAndRadius(
+      Rect.fromLTWH(size.width * 0.05, size.height * 0.06, size.width * 0.9, size.height * 0.68),
+      Radius.circular(size.width * 0.38),
+    );
+    canvas.drawRRect(body, paint);
+
+    final tail = Path()
+      ..moveTo(size.width * 0.17, size.height * 0.72)
+      ..lineTo(size.width * 0.06, size.height * 0.96)
+      ..lineTo(size.width * 0.31, size.height * 0.72);
+    canvas.drawPath(tail, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _NgmyInstagramCommentBubblePainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 class VideoPostWidget extends StatefulWidget {
@@ -41466,11 +41584,15 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
     }
   }
 
+  Future<void> _recordShare() async {
+    setState(() => widget.post.shareCount += 1);
+    await _persistPostChange();
+  }
+
   Future<void> _sharePost() async {
-    final resolved = await _resolveSupabaseStorageUrl(widget.post.videoUrl);
     if (!mounted) return;
+    final link = ngmyMediaPostShareUrl(widget.post.id);
     final caption = widget.post.caption.trim();
-    final link = resolved.startsWith('http') ? resolved : 'https://ngmy.org/';
     final shareText = caption.isEmpty ? 'Check out this post on NGMY Media' : caption;
     final fullText = '$shareText\n$link';
 
@@ -41482,6 +41604,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
         Future<void> closeThen(Future<void> Function() action) async {
           Navigator.pop(ctx);
           await action();
+          await _recordShare();
         }
 
         return SafeArea(
@@ -41500,6 +41623,12 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
                   ),
                 ),
                 const Text('Share post', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                const SizedBox(height: 4),
+                Text(
+                  'Friends can open this link in NGMY to like and comment.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.35),
+                ),
                 const SizedBox(height: 8),
                 ListTile(
                   leading: const Icon(Icons.ios_share_rounded),
@@ -41538,12 +41667,12 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
                 ),
                 ListTile(
                   leading: const Icon(Icons.content_copy_rounded),
-                  title: const Text('Copy link'),
+                  title: const Text('Copy NGMY link'),
                   onTap: () => closeThen(() async {
-                    await Clipboard.setData(ClipboardData(text: fullText));
+                    await Clipboard.setData(ClipboardData(text: link));
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Post link copied.')),
+                        const SnackBar(content: Text('NGMY Media link copied.')),
                       );
                     }
                   }),
@@ -41553,6 +41682,37 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
           ),
         );
       },
+    );
+  }
+
+  Widget _instagramMetric({
+    required Widget icon,
+    required int count,
+    required VoidCallback onTap,
+  }) {
+    final metricColor = Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            icon,
+            const SizedBox(width: 6),
+            Text(
+              NgmyMediaProfile.formatInstagramCount(count),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.1,
+                color: metricColor,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -41995,40 +42155,54 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
               ),
             ),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    IconButton(
-                      onPressed: _toggleLike,
+                    _instagramMetric(
+                      count: _ngmyMediaLikeCount(widget.post),
+                      onTap: _toggleLike,
                       icon: Icon(
-                        _liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                        size: 25,
+                        _liked ? Icons.favorite : Icons.favorite_border,
+                        size: 26,
                         color: _liked ? const Color(0xFFFF3B8A) : Theme.of(context).iconTheme.color,
                       ),
                     ),
-                    const SizedBox(width: 15),
-                    IconButton(
-                      onPressed: _openComments,
-                      icon: const Icon(Icons.forum_outlined, size: 23),
+                    const SizedBox(width: 10),
+                    _instagramMetric(
+                      count: _mediaCommentCount(widget.post.comments),
+                      onTap: _openComments,
+                      icon: _NgmyInstagramCommentBubbleIcon(
+                        size: 24,
+                        color: Theme.of(context).iconTheme.color ?? Colors.black87,
+                      ),
                     ),
-                    const SizedBox(width: 15),
-                    IconButton(
-                      onPressed: _sharePost,
-                      icon: const Icon(Icons.near_me_rounded, size: 23),
+                    const SizedBox(width: 10),
+                    _instagramMetric(
+                      count: widget.post.shareCount,
+                      onTap: _sharePost,
+                      icon: Icon(
+                        Icons.send_rounded,
+                        size: 24,
+                        color: Theme.of(context).iconTheme.color,
+                      ),
                     ),
                     const Spacer(),
                     IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                       onPressed: _toggleSave,
-                      icon: Icon(_saved ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded, size: 25),
+                      icon: Icon(
+                        _saved ? Icons.bookmark : Icons.bookmark_border,
+                        size: 26,
+                        color: Theme.of(context).iconTheme.color,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Text('${_ngmyMediaLikeCount(widget.post)} likes  •  ${_mediaCommentCount(widget.post.comments)} comments', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 5),
+                const SizedBox(height: 8),
                 RichText(
                   text: TextSpan(
                     style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87, fontSize: 13),
