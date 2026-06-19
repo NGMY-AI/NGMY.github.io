@@ -557,6 +557,31 @@ String formatCurrency(double amount) {
 
 String ngmyNormalizeEmail(String email) => email.toLowerCase().trim();
 
+/// Emails that signed up or signed in on the login page (users table / session).
+final Set<String> ngmyAppLoginUserEmails = <String>{};
+
+void ngmyRegisterAppLoginUser(String email) {
+  final key = ngmyNormalizeEmail(email);
+  if (key.isNotEmpty) ngmyAppLoginUserEmails.add(key);
+}
+
+void ngmyRegisterAppLoginUsers(Iterable<UserData> users) {
+  for (final u in users) {
+    ngmyRegisterAppLoginUser(u.email);
+  }
+}
+
+void ngmyHydrateAppLoginUserRegistry(Iterable<UserData> users) {
+  for (final u in users) {
+    if (ngmyLooksLikeAppLoginUser(u)) ngmyRegisterAppLoginUser(u.email);
+  }
+}
+
+bool ngmyIsRegisteredAppLoginUser(UserData u) {
+  if (u.email.trim().isEmpty) return false;
+  return ngmyAppLoginUserEmails.contains(ngmyNormalizeEmail(u.email));
+}
+
 const int kNgmyUserTxnFetchMax = 5000;
 
 bool _ngmyTxnIncreasesBalance(AppTransaction t) {
@@ -4654,8 +4679,15 @@ bool ngmyLooksLikeAppLoginUser(UserData u) {
 /// Civic Registry manual enroll with no login-page account signals.
 bool ngmyIsCivicRegistryOnlyAccount(UserData u, AppConfig config) {
   if (u.email.trim().isEmpty) return false;
+  if (ngmyIsRegisteredAppLoginUser(u) || ngmyLooksLikeAppLoginUser(u)) return false;
   if (!NgmyCivicRegistryMembers.isEnrolled(config, u.email)) return false;
-  return !ngmyLooksLikeAppLoginUser(u);
+  return true;
+}
+
+bool ngmyShowInAdminLoginUsersList(UserData u, AppConfig config) {
+  if (u.email.trim().isEmpty) return false;
+  if (ngmyIsCivicRegistryOnlyAccount(u, config)) return false;
+  return ngmyIsRegisteredAppLoginUser(u) || ngmyLooksLikeAppLoginUser(u);
 }
 
 List<String> ngmyGamePaywallMissedDays(UserData user) {
@@ -6914,6 +6946,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return merged.values.toList();
   }
 
+  void _registerCloudUsersAsAppLogins(Iterable<UserData> users) {
+    ngmyRegisterAppLoginUsers(users);
+  }
+
   Future<List<UserData>> _fetchAllUsersFromCloud() async {
     final all = <UserData>[];
     var from = 0;
@@ -6931,6 +6967,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (chunk.length < pageSize) break;
       from += pageSize;
     }
+    _registerCloudUsersAsAppLogins(all);
     return all;
   }
 
@@ -7302,6 +7339,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _currentUser = user;
     }
 
+    ngmyRegisterAppLoginUser(key);
+    NgmyIncomeSound.bindSession(key);
+    unawaited(NgmyIncomeSound.unlockForWebUserGesture());
     if (!mounted) return;
     setState(() {});
     try {
@@ -9588,6 +9628,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _currentUser = _allUsers[idx];
       }
     });
+    ngmyRegisterAppLoginUser(emailNorm);
+    NgmyIncomeSound.bindSession(emailNorm);
+    unawaited(NgmyIncomeSound.unlockForWebUserGesture());
     await _saveData();
     await _persistSessionImmediately();
     if (_currentUser != null) {
@@ -10271,6 +10314,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final updatedUser = UserData.fromJson(newRow);
         final email = updatedUser.email.toLowerCase().trim();
         if (email.isEmpty) return;
+        ngmyRegisterAppLoginUser(email);
         final grant = _canSellOnStoreForEmail(_config, email);
         updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
         setState(() {
@@ -10409,7 +10453,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (becameApproved && previous?.status == TransactionStatus.pending) {
             unawaited(_pushUserToCloudFast(_allUsers[userIdx]));
           }
-        } else if (becameApproved && ngmyTransactionCountsAsIncome(tx) && !ownDirtyTxn) {
+        } else if (becameApproved && ngmyTransactionCountsAsIncome(tx)) {
           if (userIdx >= 0) {
             ngmyApplyApprovedTransactionToBalance(_allUsers[userIdx], tx);
             if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
@@ -10775,6 +10819,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final row = await supabase.from('users').select().eq('email', sessionEmail).maybeSingle();
           if (row != null) {
             final remote = UserData.fromJson(Map<String, dynamic>.from(row));
+            ngmyRegisterAppLoginUser(sessionEmail);
             final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sessionEmail);
             if (idx >= 0) {
               _preserveLocalSessionState(_allUsers[idx], remote);
@@ -11188,6 +11233,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
       }
       _allUsers = mergedByEmail.values.toList();
+      ngmyHydrateAppLoginUserRegistry(_allUsers);
+      if (_currentUser != null) ngmyRegisterAppLoginUser(_currentUser!.email);
 
       for (final u in _allUsers) {
         NgmyMediaProfile.normalizeUserMediaFields(u);
@@ -11445,6 +11492,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     _currentUser = user;
                     _allUsers.add(user);
                   });
+                  ngmyRegisterAppLoginUser(email);
+                  NgmyIncomeSound.bindSession(email);
+                  unawaited(NgmyIncomeSound.unlockForWebUserGesture());
                   await _applyPendingReferralLink(user);
                   await _persistLocalOnly();
                   for (var i = 0; i < 4; i++) {
@@ -11466,8 +11516,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onDataChanged: _onDataChanged,
                 onReferralLinked: _onReferralLinked,
                 onAddTransaction: (t) {
-                  if (_allTransactions.any((x) => x.id == t.id)) return;
+                  final exists = _allTransactions.any((x) => x.id == t.id);
                   UserData? syncedUser;
+                  if (!exists) {
                   setState(() {
                     _allTransactions.add(t);
                     final userKey = ngmyNormalizeEmail(t.userEmail);
@@ -11502,7 +11553,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     ngmyNotifyBalanceChanged();
                   }
                   unawaited(_persistLocalOnly());
-                  ngmyDeliverTransactionAlerts(t);
+                  }
+                  if (t.status == TransactionStatus.approved && ngmyTransactionCountsAsIncome(t)) {
+                    ngmyDeliverTransactionAlerts(t);
+                  }
                   if (t.status == TransactionStatus.pending &&
                       (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal)) {
                     unawaited(_notifyAdminAboutPendingTransaction(t));
@@ -17921,18 +17975,18 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
       widget.user.totalProfit += (payout - widget.wager);
     });
     final txnId = DateTime.now().microsecondsSinceEpoch.toString();
-    widget.onAddTransaction(
-      AppTransaction(
-        id: txnId,
-        userEmail: widget.user.email,
-        amount: payout,
-        type: TransactionType.reimbursement,
-        method: PaymentMethod.system,
-        sourceDetails: 'Game payout: ${widget.gameTitle}',
-        status: TransactionStatus.approved,
-        timestamp: DateTime.now(),
-      ),
+    final payoutTxn = AppTransaction(
+      id: txnId,
+      userEmail: widget.user.email,
+      amount: payout,
+      type: TransactionType.reimbursement,
+      method: PaymentMethod.system,
+      sourceDetails: 'Game payout: ${widget.gameTitle}',
+      status: TransactionStatus.approved,
+      timestamp: DateTime.now(),
     );
+    ngmyPlayIncomeSoundForTransaction(payoutTxn, force: true);
+    widget.onAddTransaction(payoutTxn);
     widget.onDataChanged();
     if (!mounted) return;
     final winSubtitle = subtitle ?? '+\$${payout.toStringAsFixed(2)} added to your balance!';
@@ -18115,18 +18169,18 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     setState(() {
       widget.user.totalProfit += (payout - widget.wager * ratio);
     });
-    widget.onAddTransaction(
-      AppTransaction(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        userEmail: widget.user.email,
-        amount: payout,
-        type: TransactionType.reimbursement,
-        method: PaymentMethod.system,
-        sourceDetails: 'Game partial: ${widget.gameTitle} ($done/$total)',
-        status: TransactionStatus.approved,
-        timestamp: DateTime.now(),
-      ),
+    final partialTxn = AppTransaction(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      userEmail: widget.user.email,
+      amount: payout,
+      type: TransactionType.reimbursement,
+      method: PaymentMethod.system,
+      sourceDetails: 'Game partial: ${widget.gameTitle} ($done/$total)',
+      status: TransactionStatus.approved,
+      timestamp: DateTime.now(),
     );
+    ngmyPlayIncomeSoundForTransaction(partialTxn, force: true);
+    widget.onAddTransaction(partialTxn);
     widget.onDataChanged();
     if (!mounted) return;
     final pct = (ratio * 100).round();
@@ -21479,7 +21533,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (_adminUserListMode == 'civic') {
       return _civicRegistryMembersForDisplay(widget.config, widget.allUsers);
     }
-    return widget.allUsers.where(ngmyLooksLikeAppLoginUser).toList();
+    return widget.allUsers.where((u) => ngmyShowInAdminLoginUsersList(u, widget.config)).toList();
   }
 
   Widget _adminUsers(bool isDark) {
@@ -21502,8 +21556,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
     final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
     final subtitle = _adminUserListMode == 'civic'
-        ? 'Civic Registry (${filtered.length}) — balances from wallet ledger + cloud sync.'
-        : 'Login accounts (${filtered.length}) — balances from wallet ledger + cloud sync.';
+        ? 'Civic Registry (${filtered.length})'
+        : 'Login (${filtered.length})';
     return Column(children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
