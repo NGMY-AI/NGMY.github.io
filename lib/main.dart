@@ -716,6 +716,7 @@ Future<void> ngmyBackfillGameWinNotificationsFromLedger(
       amount: t.amount,
       detail: d,
       txnId: t.id,
+      at: t.timestamp,
     );
   }
 }
@@ -938,6 +939,7 @@ bool ngmyIsClockInHistoryTransaction(AppTransaction t) {
 }
 
 bool ngmyIsWalletHistoryTransaction(AppTransaction t) {
+  if (ngmyIsGameLedgerTransaction(t)) return false;
   if (_ngmyIsClockInSessionStartTransaction(t)) return false;
   if (t.type == TransactionType.contribution) return false;
   if (t.status == TransactionStatus.rejected) return false;
@@ -7924,6 +7926,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     setState(() {
       _reconcileAllUserBalances();
     });
+    if (_currentUser != null) {
+      unawaited(NgmyGameNotifications.syncFromCloud(_currentUser!.email));
+    }
     unawaited(_archiveAndPurgeOldApprovedWalletRequests(online: await ngmyCanReachCloud()));
     unawaited(_persistLocalOnly());
   }
@@ -16465,6 +16470,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(12),
                                     onTap: () async {
+                                      await NgmyGameNotifications.syncFromCloud(widget.user.email);
                                       await ngmyBackfillGameWinNotificationsFromLedger(
                                         widget.user.email,
                                         widget.allTransactions,
@@ -21912,7 +21918,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
 // --- STANDARD SCREENS ---
 
-enum _WalletHistoryFilter { all, deposit, withdrawal, clockIn, games }
+enum _WalletHistoryFilter { all, deposit, withdrawal, clockIn }
 
 Future<void> ngmyPersistWalletHandlesLocal(UserData user) async {
   final key = user.email.toLowerCase().trim();
@@ -22204,11 +22210,6 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
             return t.type == TransactionType.withdrawal;
           case _WalletHistoryFilter.clockIn:
             return ngmyIsClockInHistoryTransaction(t);
-          case _WalletHistoryFilter.games:
-            return ngmyIsGameLedgerTransaction(t) ||
-                (t.type == TransactionType.reimbursement &&
-                    !ngmyIsClockInHistoryTransaction(t) &&
-                    !_ngmyIsClockInSessionStartTransaction(t));
           case _WalletHistoryFilter.all:
             return true;
         }
@@ -22243,7 +22244,6 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
                     _historyFilterMenuItem(_WalletHistoryFilter.deposit, 'Deposits only'),
                     _historyFilterMenuItem(_WalletHistoryFilter.withdrawal, 'Withdrawals only'),
                     _historyFilterMenuItem(_WalletHistoryFilter.clockIn, 'Clock-in only'),
-                    _historyFilterMenuItem(_WalletHistoryFilter.games, 'Games & earnings'),
                   ],
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -22271,7 +22271,6 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
                   _WalletHistoryFilter.deposit => 'Showing deposits',
                   _WalletHistoryFilter.withdrawal => 'Showing withdrawals',
                   _WalletHistoryFilter.clockIn => 'Showing clock-in earnings',
-                  _WalletHistoryFilter.games => 'Showing games & other earnings',
                   _WalletHistoryFilter.all => '',
                 },
                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white54 : Colors.black45),
@@ -22280,7 +22279,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
             if (_historyFilter == _WalletHistoryFilter.all) ...[
               const SizedBox(height: 6),
               Text(
-                'Every balance change is listed here — deposits, games, clock-in, store, and more.',
+                'Deposits, withdrawals, clock-in, store, and more. Game wins/losses are in Game Center receipts only.',
                 style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.black45),
               ),
             ],
@@ -22294,7 +22293,6 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
                           _WalletHistoryFilter.deposit => 'deposits',
                           _WalletHistoryFilter.withdrawal => 'withdrawals',
                           _WalletHistoryFilter.clockIn => 'clock-in transactions',
-                          _WalletHistoryFilter.games => 'game or earnings transactions',
                           _WalletHistoryFilter.all => 'transactions',
                         }}',
                   style: const TextStyle(color: Colors.grey, fontSize: 12),

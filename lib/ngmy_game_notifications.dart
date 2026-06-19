@@ -1,10 +1,16 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'ngmy_network_resilience.dart';
 
 const int kNgmyGameNotificationMax = 99;
 const Duration kNgmyGameNotificationRetention = Duration(days: 5);
+const Duration _kGameReceiptCloudTimeout = Duration(seconds: 12);
 
 /// Bumped when game win/lose receipts change (Game Center badge).
 final ValueNotifier<int> ngmyGameNotificationsTick = ValueNotifier<int>(0);
@@ -12,6 +18,8 @@ final ValueNotifier<int> ngmyGameNotificationsTick = ValueNotifier<int>(0);
 String _emailKey(String email) => email.toLowerCase().trim();
 
 String _prefsKey(String email) => 'ngmy_game_notifications_${_emailKey(email)}';
+
+String _cloudSettingsKey(String email) => 'ngmy_game_receipts_${_emailKey(email)}';
 
 class NgmyGameNotification {
   final String id;
@@ -31,6 +39,9 @@ class NgmyGameNotification {
     required this.timestamp,
     this.txnId,
   });
+
+  String get _mergeKey =>
+      (txnId != null && txnId!.trim().isNotEmpty) ? 'txn:${txnId!.trim()}' : 'id:${id.trim()}';
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -74,6 +85,33 @@ class NgmyGameNotifications {
     return fresh;
   }
 
+  static List<NgmyGameNotification> _mergeReceiptLists(
+    Iterable<NgmyGameNotification> a,
+    Iterable<NgmyGameNotification> b,
+  ) {
+    final byKey = <String, NgmyGameNotification>{};
+    void consider(NgmyGameNotification n) {
+      final key = n._mergeKey;
+      final existing = byKey[key];
+      if (existing == null) {
+        byKey[key] = n;
+        return;
+      }
+      // Keep the original receipt time (earliest timestamp wins).
+      if (n.timestamp.isBefore(existing.timestamp)) {
+        byKey[key] = n;
+      }
+    }
+
+    for (final n in a) {
+      consider(n);
+    }
+    for (final n in b) {
+      consider(n);
+    }
+    return byKey.values.toList();
+  }
+
   static Future<List<NgmyGameNotification>> _loadRaw(String email) async {
     final key = _emailKey(email);
     if (key.isEmpty) return [];
@@ -92,13 +130,77 @@ class NgmyGameNotifications {
     }
   }
 
-  static Future<void> _save(String email, List<NgmyGameNotification> items) async {
+  static Future<List<NgmyGameNotification>> _loadFromCloud(String email) async {
+    final key = _emailKey(email);
+    if (key.isEmpty) return [];
+    if (!await ngmyCanReachCloud()) return [];
+    try {
+      final row = await Supabase.instance.client
+          .from('ngmy_settings')
+          .select()
+          .eq('key', _cloudSettingsKey(key))
+          .maybeSingle()
+          .timeout(_kGameReceiptCloudTimeout);
+      if (row == null) return [];
+      final value = row['value'];
+      if (value is! List) return [];
+      return value
+          .whereType<Map>()
+          .map((e) => NgmyGameNotification.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      debugPrint('[game-receipts] cloud load: $e');
+      return [];
+    }
+  }
+
+  static Future<void> _pushToCloud(String email, List<NgmyGameNotification> items) async {
+    final key = _emailKey(email);
+    if (key.isEmpty) return;
+    if (!await ngmyCanReachCloud()) return;
+    try {
+      await Supabase.instance.client.from('ngmy_settings').upsert([
+        {
+          'key': _cloudSettingsKey(key),
+          'value': items.map((e) => e.toJson()).toList(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        },
+      ]).timeout(_kGameReceiptCloudTimeout);
+    } catch (e) {
+      debugPrint('[game-receipts] cloud push: $e');
+    }
+  }
+
+  static Future<void> _saveLocal(String email, List<NgmyGameNotification> items) async {
     final key = _emailKey(email);
     if (key.isEmpty) return;
     final pruned = _prune(items);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefsKey(key), jsonEncode(pruned.map((e) => e.toJson()).toList()));
     ngmyGameNotificationsTick.value++;
+  }
+
+  static Future<void> _saveMerged(String email, List<NgmyGameNotification> items) async {
+    final pruned = _prune(items);
+    await _saveLocal(email, pruned);
+    unawaited(_pushToCloud(email, pruned));
+  }
+
+  /// Merge local + cloud receipts (preserves original timestamps across devices).
+  static Future<void> syncFromCloud(String email) async {
+    final key = _emailKey(email);
+    if (key.isEmpty) return;
+    final local = await _loadRaw(key);
+    final cloud = await _loadFromCloud(key);
+    if (cloud.isEmpty && local.isEmpty) return;
+    final merged = _prune(_mergeReceiptLists(local, cloud));
+    final localPruned = _prune(local);
+    final localJson = jsonEncode(localPruned.map((e) => e.toJson()).toList());
+    final mergedJson = jsonEncode(merged.map((e) => e.toJson()).toList());
+    if (localJson != mergedJson) {
+      await _saveLocal(key, merged);
+    }
+    await _pushToCloud(key, merged);
   }
 
   static Future<void> record({
@@ -108,35 +210,39 @@ class NgmyGameNotifications {
     required double amount,
     required String detail,
     String? txnId,
+    DateTime? at,
   }) async {
     final key = _emailKey(email);
     if (key.isEmpty) return;
     final items = await _loadRaw(key);
     if (txnId != null && txnId.isNotEmpty && items.any((e) => e.txnId == txnId)) return;
+    final when = at ?? DateTime.now();
     final entry = NgmyGameNotification(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       gameTitle: gameTitle,
       won: won,
       amount: amount,
       detail: detail,
-      timestamp: DateTime.now(),
+      timestamp: when,
       txnId: txnId,
     );
     items.insert(0, entry);
-    await _save(key, items);
+    await _saveMerged(key, items);
   }
 
   static Future<int> countFor(String email) async {
-    final list = await listFor(email);
+    await syncFromCloud(email);
+    final list = await listFor(email, syncCloud: false);
     return list.length;
   }
 
-  static Future<List<NgmyGameNotification>> listFor(String email) async {
+  static Future<List<NgmyGameNotification>> listFor(String email, {bool syncCloud = true}) async {
     final key = _emailKey(email);
     if (key.isEmpty) return [];
+    if (syncCloud) await syncFromCloud(email);
     final raw = await _loadRaw(key);
     final items = _prune(List<NgmyGameNotification>.from(raw));
-    if (items.length != raw.length) await _save(key, items);
+    if (items.length != raw.length) await _saveMerged(key, items);
     return items;
   }
 }
@@ -159,7 +265,8 @@ Future<void> showNgmyGameReceiptSheet(
   BuildContext context, {
   required String email,
 }) async {
-  final items = await NgmyGameNotifications.listFor(email);
+  await NgmyGameNotifications.syncFromCloud(email);
+  final items = await NgmyGameNotifications.listFor(email, syncCloud: false);
   if (!context.mounted) return;
 
   await showModalBottomSheet<void>(
@@ -205,7 +312,7 @@ Future<void> showNgmyGameReceiptSheet(
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
                         ),
                         Text(
-                          'Wins & losses · last 5 days · max 99',
+                          'Wins & losses · last 5 days · max 99 · syncs across devices',
                           style: TextStyle(color: Colors.white60, fontSize: 11),
                         ),
                       ],
